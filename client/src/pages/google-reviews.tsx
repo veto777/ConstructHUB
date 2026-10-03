@@ -2,7 +2,7 @@ import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-wor
 import { GoogleReport } from "@/components/profile-guard";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GbpConnection } from "@/components/gbp-connection";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -10,22 +10,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  AppPage, AppTabsList, EmptyState, Notice, PageHeader, Section, Stat, StatGrid, StatusPill, Toolbar,
+} from "@/components/app-ui";
 import {
   Star, Send, Plus, Trash2, RefreshCw, Loader2, ExternalLink,
   Camera, Mail, User, Building2, Link, FileText, CheckCircle2,
-  XCircle, Clock, MessageSquare, Eye, ShieldCheck, TrendingUp,
-  ThumbsUp, ThumbsDown, DollarSign, Sparkles, Filter, Heart, Target,
-  ArrowRight, Megaphone, BadgeCheck, AlertTriangle, ChevronDown, ChevronUp,
-  Settings, Edit, Copy, X, Info, Bell, Timer, Upload, ImagePlus,
+  Clock, MessageSquare, Eye, ShieldCheck, TrendingUp,
+  ThumbsUp, ThumbsDown, Sparkles, Filter, Heart, Target,
+  Megaphone, BadgeCheck, AlertTriangle, ChevronDown, ChevronUp,
+  Edit, Copy, X, Info, Bell, Timer, ImagePlus,
   Phone, MapPin, Search, Download, Bot, PenLine, MousePointerClick,
-  CalendarDays, StickyNote, BarChart3, FolderOpen
+  CalendarDays, StickyNote, FolderOpen,
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
 
@@ -81,63 +83,14 @@ function looksLikeGoogleReviewLink(input: string): boolean {
 
 const stepLabels: Record<string, string> = {
   rating: "Rating",
-  improvement: "Improvement Feedback",
-  referral: "Referral Info",
-  referral_feedback: "Referral Feedback",
-  describe: "Describe Project",
-  review: "Review Step",
-  bonus_reviews: "Bonus Reviews",
+  improvement: "Improvement feedback",
+  referral: "Referral info",
+  referral_feedback: "Referral feedback",
+  describe: "Describe project",
+  review: "Review step",
+  bonus_reviews: "Bonus reviews",
   done: "Completed",
 };
-
-function FloatingParticles({ color = "#f59e0b" }: { color?: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    let animId: number;
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    resize();
-    window.addEventListener("resize", resize);
-    const particles: { x: number; y: number; size: number; speedX: number; speedY: number; opacity: number; rotation: number; rotSpeed: number }[] = [];
-    for (let i = 0; i < 40; i++) {
-      particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 6 + 2,
-        speedX: (Math.random() - 0.5) * 0.4,
-        speedY: Math.random() * 0.3 + 0.1,
-        opacity: Math.random() * 0.15 + 0.04,
-        rotation: Math.random() * 360,
-        rotSpeed: (Math.random() - 0.5) * 1.5,
-      });
-    }
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const p of particles) {
-        p.x += p.speedX;
-        p.y += p.speedY;
-        p.rotation += p.rotSpeed;
-        if (p.y > canvas.height + 10) { p.y = -10; p.x = Math.random() * canvas.width; }
-        if (p.x < -10) p.x = canvas.width + 10;
-        if (p.x > canvas.width + 10) p.x = -10;
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate((p.rotation * Math.PI) / 180);
-        ctx.globalAlpha = p.opacity;
-        ctx.fillStyle = color;
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-        ctx.restore();
-      }
-      animId = requestAnimationFrame(draw);
-    };
-    draw();
-    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
-  }, [color]);
-  return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />;
-}
 
 export default function GoogleReviewsPage() {
   const { toast } = useToast();
@@ -147,7 +100,7 @@ export default function GoogleReviewsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
-  const [showHowItWorks, setShowHowItWorks] = useState(true);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
@@ -173,18 +126,6 @@ export default function GoogleReviewsPage() {
   const [emailTheme, setEmailTheme] = useState("navy-orange");
   const [bccEmail, setBccEmail] = useState("");
   const [bccInfoOpen, setBccInfoOpen] = useState(false);
-  const bccInfoToggle = useRef<HTMLButtonElement>(null);
-  // Escape closes the BCC explainer (and returns focus to its toggle), like any popover.
-  useEffect(() => {
-    if (!bccInfoOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setBccInfoOpen(false);
-      bccInfoToggle.current?.focus();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [bccInfoOpen]);
   const [savedBccEmails, setSavedBccEmails] = useState<string[]>(() => {
     try { return JSON.parse(localStorage.getItem("savedBccEmails") || "[]").slice(0, 3); } catch { return []; }
   });
@@ -437,7 +378,7 @@ export default function GoogleReviewsPage() {
       return res.json();
     },
     onSuccess: (template: any) => {
-      toast({ title: "Template saved" });
+      toast({ title: "Profile saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
       // Added from inside the send dialog: pick the new profile for this request.
       if (createOpen && template?.id) setSelectedTemplateId(String(template.id));
@@ -445,7 +386,7 @@ export default function GoogleReviewsPage() {
       resetTemplateForm();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to save template", description: apiErrorMessage(err), variant: "destructive" });
+      toast({ title: "Failed to save profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -460,14 +401,14 @@ export default function GoogleReviewsPage() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Template updated" });
+      toast({ title: "Profile updated" });
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
       setTemplateDialogOpen(false);
       setEditingTemplate(null);
       resetTemplateForm();
     },
     onError: (err: any) => {
-      toast({ title: "Failed to update template", description: apiErrorMessage(err), variant: "destructive" });
+      toast({ title: "Failed to update profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -476,11 +417,11 @@ export default function GoogleReviewsPage() {
       await apiRequest("DELETE", `/api/review-templates/${id}`);
     },
     onSuccess: () => {
-      toast({ title: "Template deleted" });
+      toast({ title: "Profile deleted" });
       queryClient.invalidateQueries({ queryKey: ["/api/review-templates"] });
     },
     onError: (err: any) => {
-      toast({ title: "Could not delete template", description: apiErrorMessage(err), variant: "destructive" });
+      toast({ title: "Could not delete profile", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -523,1429 +464,1271 @@ export default function GoogleReviewsPage() {
   };
 
   const getStatusBadge = (review: any) => {
-    if (review.googleLinkOpened) return <Badge className="bg-green-600 text-white" data-testid={`badge-status-${review.id}`}><CheckCircle2 className="w-3 h-3 mr-1" />Google link opened</Badge>;
-    if (review.status === "positive_feedback") return <Badge className="bg-blue-600 text-white" data-testid={`badge-status-${review.id}`}><Star className="w-3 h-3 mr-1" />Positive</Badge>;
-    if (review.status === "negative_feedback") return <Badge variant="secondary" data-testid={`badge-status-${review.id}`}><MessageSquare className="w-3 h-3 mr-1" />Feedback</Badge>;
+    if (review.googleLinkOpened) return <StatusPill tone="success" data-testid={`badge-status-${review.id}`}>Google link opened</StatusPill>;
+    if (review.status === "positive_feedback") return <StatusPill tone="success" data-testid={`badge-status-${review.id}`}>Positive</StatusPill>;
+    if (review.status === "negative_feedback") return <StatusPill tone="info" data-testid={`badge-status-${review.id}`}>Feedback</StatusPill>;
     // No response and unsubscribed: the card's own "Unsubscribed" badge says it all — never "Pending".
     if (review.unsubscribed) return null;
-    if (review.status === "scheduled") return <Badge className="bg-amber-500/80 text-white" data-testid={`badge-status-${review.id}`}><CalendarDays className="w-3 h-3 mr-1" />Scheduled{review.scheduledFor ? ` · ${new Date(review.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</Badge>;
-    return <Badge variant="outline" data-testid={`badge-status-${review.id}`}><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+    if (review.status === "scheduled") return <StatusPill tone="warning" data-testid={`badge-status-${review.id}`}>Scheduled{review.scheduledFor ? ` · ${new Date(review.scheduledFor).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}</StatusPill>;
+    return <StatusPill tone="neutral" data-testid={`badge-status-${review.id}`}>Pending</StatusPill>;
   };
 
-  const hasProfileSetup = user?.companyName && user?.googleProfileUrl;
-  const selectedTemplate = templates.find((t: any) => String(t.id) === selectedTemplateId);
-  const hasGoogleUrl = !!(user?.googleProfileUrl || selectedTemplate?.googleProfileUrl);
+  const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
   const canSend = !!(clientName && clientEmail && hasGoogleUrl);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6 relative">
-      <FloatingParticles color="#f59e0b" />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
-            <Star className="w-5 h-5 text-amber-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-reviews-title">Google Reviews</h1>
-            <p className="text-sm text-muted-foreground">
-              {pageTab === "requests" ? "Ask every client for a Google review with a simple, professional feedback flow" : "Monitor and manage your Google Business Profile reviews"}
-            </p>
-          </div>
-        </div>
-        {pageTab === "requests" && (
-          <Button className="bg-amber-500 hover:bg-amber-600 text-white w-full sm:w-auto shrink-0" onClick={openSendDialog} data-testid="button-new-review-request">
-            <Plus className="w-4 h-4 mr-2" />
-            New Review Request
+    <AppPage>
+      <PageHeader
+        title={<span data-testid="text-reviews-title">Google Reviews</span>}
+        description={pageTab === "requests"
+          ? "Ask every client for a Google review with one professional feedback flow."
+          : "Read and reply to the reviews on your Google Business Profiles."}
+        actions={pageTab === "requests" ? (
+          <Button onClick={openSendDialog} data-testid="button-new-review-request">
+            <Plus className="mr-2 h-4 w-4" aria-hidden="true" />New review request
           </Button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
-      <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as any)} className="relative z-10">
-        <TabsList className="w-full max-w-md">
-          <TabsTrigger value="requests" className="flex-1 gap-1.5" data-testid="tab-review-requests">
-            <Send className="w-3.5 h-3.5" />
-            Review Requests
-          </TabsTrigger>
-          <TabsTrigger value="profile-reviews" className="flex-1 gap-1.5" data-testid="tab-profile-reviews">
-            <Star className="w-3.5 h-3.5" />
-            Google Profile Reviews
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as any)}>
+        <AppTabsList>
+          <TabsTrigger value="requests" data-testid="tab-review-requests">Review requests</TabsTrigger>
+          <TabsTrigger value="profile-reviews" data-testid="tab-profile-reviews">Google profile reviews</TabsTrigger>
+        </AppTabsList>
 
-      {pageTab === "requests" && (<div className="space-y-6">
+        <TabsContent value="requests" className="mt-5 sm:mt-6">
+          <div className="space-y-5 sm:space-y-6">
+            <StatGrid cols={4}>
+              <Stat label="Total sent" testId="stat-total-sent" value={reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length} />
+              <Stat label="Google links opened" testId="stat-google-links-opened" tone="good" value={reviews.filter((r: any) => r.googleLinkOpened).length} />
+              <Stat label="Positive feedback" testId="stat-positive" tone="good" value={reviews.filter((r: any) => r.feedbackRating >= 9).length} />
+              <Stat label="Awaiting response" testId="stat-pending" value={reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length} />
+            </StatGrid>
 
-      {createOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" data-testid="modal-send-review">
-          <div className="fixed inset-0 bg-black/80" onClick={() => setCreateOpen(false)} />
-          <div className="relative z-[101] bg-background border rounded-lg shadow-lg w-[95vw] sm:max-w-xl max-h-[85vh] overflow-y-auto p-6">
-            <button
-              onClick={() => setCreateOpen(false)}
-              className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-              data-testid="button-close-send-dialog"
-            >
-              <X className="h-4 w-4" />
-            </button>
-            <div className="flex flex-col space-y-1.5 mb-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Send className="w-5 h-5 text-amber-500" />
-                Send Review Request
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Send a feedback request to your client. They'll rate their experience and every client is invited to leave a Google review.
-              </p>
-            </div>
-            <div className="space-y-5">
-              <div className="space-y-2">
-                <Label><Building2 className="w-3.5 h-3.5 inline mr-1" />Google Business Profile *</Label>
-                {templates.length > 0 ? (
-                  <>
-                    <Select value={selectedTemplateId} onValueChange={(val) => {
-                      if (val === "__create__") {
-                        // Opens on top of this dialog, so the request typed so far is kept.
-                        openNewTemplate();
-                      } else {
-                        setSelectedTemplateId(val);
-                      }
-                    }}>
-                      <SelectTrigger data-testid="select-gmb-profile">
-                        <SelectValue placeholder="Select a Google Business Profile..." />
-                      </SelectTrigger>
-                      <SelectContent className="z-[200]">
-                        {templates.map((t: any) => (
-                          <SelectItem key={t.id} value={String(t.id)}>
-                            {t.name} {t.isDefault ? "(Default)" : ""}
-                          </SelectItem>
-                        ))}
-                        {!atTemplateLimit && (
-                          <SelectItem value="__create__">
-                            <span className="flex items-center gap-1 text-primary">
-                              <Plus className="w-3.5 h-3.5" /> Add another profile...
-                            </span>
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Reviews will be directed to this profile's Google review link</p>
-                  </>
-                ) : (
-                  <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300/50 dark:border-amber-700/50 rounded-lg p-3">
-                    <p className="text-sm text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      No Google Business Profiles set up yet.
-                    </p>
-                    <button type="button" onClick={openNewTemplate} className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-primary hover:underline" data-testid="link-create-profile">
-                      <Plus className="w-3.5 h-3.5" /> Add a Google Business Profile
+            <Section title="Review requests">
+              {!isLoading && reviews.length > 0 && (
+                <div className="relative mb-4">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name, email, phone or address…"
+                    className="pl-9"
+                    data-testid="input-search-reviews"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      data-testid="button-clear-search"
+                    >
+                      <X className="w-4 h-4" />
                     </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="clientName"><User className="w-3.5 h-3.5 inline mr-1" />Client Name *</Label>
-                  <Input
-                    id="clientName"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="John Smith"
-                    data-testid="input-client-name"
-                  />
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientEmail"><Mail className="w-3.5 h-3.5 inline mr-1" />Client Email *</Label>
-                  <Input
-                    id="clientEmail"
-                    type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    placeholder="john@example.com"
-                    data-testid="input-client-email"
-                  />
+              )}
+              {isLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" aria-hidden="true" />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="clientPhone"><Phone className="w-3.5 h-3.5 inline mr-1" />Phone Number</Label>
-                  <Input
-                    id="clientPhone"
-                    type="tel"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="(555) 123-4567"
-                    data-testid="input-client-phone"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientAddress"><MapPin className="w-3.5 h-3.5 inline mr-1" />Address</Label>
-                  <Input
-                    id="clientAddress"
-                    value={clientAddress}
-                    onChange={(e) => setClientAddress(e.target.value)}
-                    placeholder="123 Main St, City, ST 12345"
-                    data-testid="input-client-address"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {/* On phones the tooltip hangs off the whole label row (full dialog width); from sm up, beside the icon. */}
-                <div className="relative flex items-center gap-1.5">
-                  <Label htmlFor="bccEmail"><Mail className="w-3.5 h-3.5 inline mr-1" />BCC Email</Label>
-                  <div className="sm:relative">
-                    {/* Above the click-away overlay while open, so clicking it again closes the explainer. */}
-                    <button type="button" ref={bccInfoToggle} onClick={() => setBccInfoOpen(!bccInfoOpen)} aria-label="Why add a BCC email?" aria-expanded={bccInfoOpen} aria-controls="bcc-info-tooltip" className={`text-amber-500 hover:text-amber-600 transition-colors ${bccInfoOpen ? "relative z-[301]" : ""}`} data-testid="icon-bcc-info">
-                      <Info className="w-3.5 h-3.5" />
-                    </button>
-                    {bccInfoOpen && (
-                      <>
-                        <div className="fixed inset-0 z-[299]" onClick={() => setBccInfoOpen(false)} />
-                        <div id="bcc-info-tooltip" className="absolute top-full left-0 right-0 mt-2 sm:right-auto sm:top-0 sm:left-full sm:mt-0 sm:ml-2 sm:w-72 p-3 rounded-lg bg-popover border border-border shadow-lg text-xs text-popover-foreground z-[300]" data-testid="tooltip-bcc-info">
-                          <button type="button" onClick={() => setBccInfoOpen(false)} aria-label="Close" className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
-                          <p className="font-semibold text-amber-500 mb-1.5">Why this is critical for deliverability</p>
-                          <p className="mb-1.5">Adding a BCC of your existing business email helps the review request avoid spam folders. Email providers like Gmail track sender-recipient relationships — if this client has already received emails from you, that trust carries over.</p>
-                          <p className="mb-1.5"><strong>Use the same email you've been communicating with this client through.</strong> If you used a CRM, use a well-established, trusted email address instead.</p>
-                          <p className="text-muted-foreground">The client will never see this address — it's completely hidden. It simply helps email providers recognize this as a legitimate, expected message.</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <Input
-                  id="bccEmail"
-                  type="email"
-                  value={bccEmail}
-                  onChange={(e) => setBccEmail(e.target.value)}
-                  placeholder="you@yourcompany.com"
-                  data-testid="input-bcc-email"
+              ) : reviews.length === 0 ? (
+                <EmptyState
+                  icon={Star}
+                  title="No review requests yet"
+                  description="Send your first review request to start collecting Google reviews from your clients."
+                  action={<Button onClick={openSendDialog} data-testid="button-first-review-request">New review request</Button>}
                 />
-                {savedBccEmails.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5">
-                    {savedBccEmails.map((email) => (
+              ) : filteredReviews.length === 0 ? (
+                <div className="py-8 text-center">
+                  <p className="text-sm text-muted-foreground">No results for &ldquo;{searchQuery}&rdquo;</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredReviews.map((review: any) => {
+                    const isExpanded = expandedReviewId === review.id;
+                    const hasPhotos = Array.isArray(review.photos) && review.photos.length > 0;
+                    return (
                       <div
-                        key={email}
-                        className={`flex items-center gap-1 text-[11px] rounded-full border px-2.5 py-1 transition-colors cursor-pointer ${bccEmail === email ? "bg-primary/10 border-primary/30 text-primary" : "bg-muted/50 border-border hover:bg-muted text-muted-foreground hover:text-foreground"}`}
-                        data-testid={`chip-bcc-${email}`}
+                        key={review.id}
+                        className="overflow-hidden rounded-xl border"
+                        data-testid={`card-review-request-${review.id}`}
                       >
-                        <button
-                          type="button"
-                          onClick={() => setBccEmail(bccEmail === email ? "" : email)}
-                          className="truncate max-w-[160px]"
-                          data-testid={`button-select-bcc-${email}`}
+                        <div
+                          className="flex cursor-pointer items-center gap-3 p-4 transition-colors hover:bg-muted/40"
+                          onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
+                          data-testid={`button-expand-${review.id}`}
                         >
-                          {email}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const updated = savedBccEmails.filter(e => e !== email);
-                            setSavedBccEmails(updated);
-                            localStorage.setItem("savedBccEmails", JSON.stringify(updated));
-                            if (bccEmail === email) setBccEmail("");
-                          }}
-                          className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-                          data-testid={`button-remove-bcc-${email}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {bccEmail.trim() && !savedBccEmails.includes(bccEmail.trim().toLowerCase()) && savedBccEmails.length < 3 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const email = bccEmail.trim().toLowerCase();
-                      const updated = [email, ...savedBccEmails].slice(0, 3);
-                      setSavedBccEmails(updated);
-                      localStorage.setItem("savedBccEmails", JSON.stringify(updated));
-                    }}
-                    className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 transition-colors mt-1"
-                    data-testid="button-save-bcc"
-                  >
-                    <Plus className="w-3 h-3" />
-                    Save this email for quick access
-                  </button>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 mb-1">
-                  <button
-                    type="button"
-                    onClick={() => setMessageMode("description")}
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${messageMode === "description" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                    data-testid="button-mode-description"
-                  >
-                    <FileText className="w-3 h-3 inline mr-1" />Project Description
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMessageMode("personal")}
-                    className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${messageMode === "personal" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                    data-testid="button-mode-personal"
-                  >
-                    <MessageSquare className="w-3 h-3 inline mr-1" />Personal Message
-                  </button>
-                </div>
-                {messageMode === "description" ? (
-                  <>
-                    <Textarea
-                      id="projectDesc"
-                      value={projectDescription}
-                      onChange={(e) => setProjectDescription(e.target.value)}
-                      placeholder="Brief description of the work done (e.g., Kitchen remodel, bathroom renovation, roof replacement...)"
-                      rows={3}
-                      data-testid="input-project-description"
-                    />
-                    <p className="text-xs text-muted-foreground">Used by AI to generate the review. Overrides the template description if provided.</p>
-                  </>
-                ) : (
-                  <>
-                    <Textarea
-                      id="personalMsg"
-                      value={personalMessage}
-                      onChange={(e) => setPersonalMessage(e.target.value)}
-                      placeholder="Write a personal note to your client (e.g., Hey Jennifer, it was great working on your kitchen! We'd love to hear how everything turned out...)"
-                      rows={3}
-                      data-testid="input-personal-message"
-                    />
-                    <p className="text-xs text-muted-foreground">Replaces the default email body with your own message. The feedback link is still included automatically.</p>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label><Camera className="w-3.5 h-3.5 inline mr-1" />Project Photos (optional)</Label>
-                <p className="text-xs text-muted-foreground">Attach up to 30 project photos. Clients can download these to include with their Google review. All photo metadata is preserved.</p>
-                <div className="flex flex-wrap gap-2">
-                  {attachedPhotos.map((photo, i) => (
-                    <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-border">
-                      <img src={photo.url} alt={photo.originalName} className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setAttachedPhotos(prev => prev.filter((_, j) => j !== i))}
-                        className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        data-testid={`button-remove-photo-${i}`}
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                      <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] px-1 truncate">{photo.originalName}</p>
-                    </div>
-                  ))}
-                  {attachedPhotos.length < 30 && (
-                    <label
-                      className={`w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-amber-400 dark:hover:border-amber-500 transition-colors flex flex-col items-center justify-center cursor-pointer ${uploadingPhotos ? "pointer-events-none opacity-50" : ""}`}
-                      data-testid="button-add-photos"
-                    >
-                      {uploadingPhotos ? (
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                      ) : (
-                        <>
-                          <ImagePlus className="w-5 h-5 text-muted-foreground" />
-                          <span className="text-[10px] text-muted-foreground mt-0.5">Add</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        multiple
-                        onChange={handlePhotoUpload}
-                        className="hidden"
-                        data-testid="input-photo-upload"
-                      />
-                    </label>
-                  )}
-                  {attachedPhotos.length < 30 && (
-                    <button
-                      type="button"
-                      onClick={openMediaPicker}
-                      className="w-20 h-20 rounded-lg border-2 border-dashed border-amber-300 dark:border-amber-600 hover:border-amber-400 dark:hover:border-amber-500 transition-colors flex flex-col items-center justify-center"
-                      data-testid="button-media-library-picker"
-                    >
-                      <FolderOpen className="w-4 h-4 text-amber-500" />
-                      <span className="text-[9px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight text-center">Media<br/>Library</span>
-                    </button>
-                  )}
-                </div>
-                {attachedPhotos.length > 0 && (
-                  <p className="text-xs text-muted-foreground">{attachedPhotos.length}/30 photos attached</p>
-                )}
-              </div>
-
-              {showMediaPicker && (
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setShowMediaPicker(false)}>
-                  <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 p-5 space-y-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="modal-media-picker">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <FolderOpen className="h-4 w-4 text-amber-500" />
-                        Media Library
-                      </h3>
-                      <button onClick={() => setShowMediaPicker(false)} className="text-muted-foreground hover:text-foreground">
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    {mediaPickerLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : !mediaPickerFolderId ? (
-                      <div className="space-y-2">
-                        <p className="text-xs text-muted-foreground">Select a folder to browse photos.</p>
-                        {mediaPickerFolders.length === 0 ? (
-                          <div className="text-center py-6 text-muted-foreground">
-                            <FolderOpen className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                            <p className="text-sm">No folders yet</p>
-                            <p className="text-xs mt-1">Process photos in the Photo Optimizer and save them to create folders.</p>
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <User className="h-5 w-5" aria-hidden="true" />
                           </div>
-                        ) : (
-                          <div className="space-y-1">
-                            {mediaPickerFolders.map(f => (
-                              <button
-                                key={f.id}
-                                onClick={() => loadFolderPhotos(f.id)}
-                                className="w-full text-left text-sm px-3 py-2 rounded-lg hover:bg-muted flex items-center gap-2 transition-colors"
-                                data-testid={`media-folder-${f.id}`}
-                              >
-                                <FolderOpen className="h-4 w-4 text-amber-500 shrink-0" />
-                                {f.name}
-                                <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground -rotate-90" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <button onClick={() => setMediaPickerFolderId(null)} className="text-xs text-primary hover:underline flex items-center gap-1" data-testid="button-back-to-folders">
-                          <ChevronDown className="h-3 w-3 rotate-90" /> Back to folders
-                        </button>
-                        {mediaPickerPhotos.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-6">This folder is empty.</p>
-                        ) : (
-                          <>
-                            <div className="grid grid-cols-4 gap-2">
-                              {mediaPickerPhotos.map(p => (
-                                <button
-                                  key={p.id}
-                                  onClick={() => setMediaPickerSelected(prev => {
-                                    const next = new Set(prev);
-                                    next.has(p.id) ? next.delete(p.id) : next.add(p.id);
-                                    return next;
-                                  })}
-                                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-colors ${mediaPickerSelected.has(p.id) ? "border-amber-500 ring-2 ring-amber-500/30" : "border-border hover:border-amber-300"}`}
-                                  data-testid={`media-photo-${p.id}`}
-                                >
-                                  <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
-                                  {mediaPickerSelected.has(p.id) && (
-                                    <div className="absolute inset-0 bg-amber-500/20 flex items-center justify-center">
-                                      <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
-                                      </div>
-                                    </div>
-                                  )}
-                                  <p className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] px-1 truncate">{p.name}</p>
-                                </button>
-                              ))}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium" data-testid={`text-client-name-${review.id}`}>{review.clientName}</p>
+                              {getStatusBadge(review)}
+                              {review.feedbackRating && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Star className="mr-0.5 h-3 w-3 text-amber-500" aria-hidden="true" />
+                                  {review.feedbackRating}/10
+                                </Badge>
+                              )}
+                              {review.status === "sent" && review.remindersSent > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Bell className="mr-0.5 h-3 w-3" aria-hidden="true" />
+                                  {review.remindersSent} reminder{review.remindersSent > 1 ? "s" : ""}
+                                </Badge>
+                              )}
+                              {review.unsubscribed && (
+                                <Badge variant="outline" className="text-xs border-red-200 text-red-600 dark:border-red-800 dark:text-red-400">
+                                  Unsubscribed
+                                </Badge>
+                              )}
+                              {review.referralFeedback === "up" && (
+                                <Badge variant="outline" className="text-xs">
+                                  <ThumbsUp className="mr-0.5 h-3 w-3" aria-hidden="true" />Referral
+                                </Badge>
+                              )}
+                              {review.referralFeedback === "down" && (
+                                <Badge variant="outline" className="text-xs">
+                                  <ThumbsDown className="mr-0.5 h-3 w-3" aria-hidden="true" />Referral
+                                </Badge>
+                              )}
                             </div>
-                            <div className="flex items-center justify-between pt-1">
-                              <p className="text-xs text-muted-foreground">{mediaPickerSelected.size} selected</p>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              <span className="truncate">{review.clientEmail}</span>
+                              {review.clientPhone && (
+                                <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" aria-hidden="true" />{review.clientPhone}</span>
+                              )}
+                            </div>
+                            {review.clientAddress && (
+                              <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />{review.clientAddress}</p>
+                            )}
+                            {review.projectDescription && (
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">{review.projectDescription}</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => { e.stopPropagation(); window.open(`/review/${review.token}`, "_blank"); }}
+                              title="Preview review page"
+                              data-testid={`button-preview-${review.id}`}
+                            >
+                              <Eye className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                            {!review.unsubscribed && (
                               <Button
-                                size="sm"
-                                className="bg-amber-500 hover:bg-amber-600 text-white"
-                                onClick={attachFromMediaLibrary}
-                                disabled={mediaPickerSelected.size === 0}
-                                data-testid="button-attach-from-library"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => { e.stopPropagation(); resendMutation.mutate(review.id); }}
+                                disabled={resendMutation.isPending}
+                                title={review.feedbackRating != null ? "Resend email (this customer already responded)" : "Resend email"}
+                                data-testid={`button-resend-${review.id}`}
                               >
-                                Attach {mediaPickerSelected.size > 0 ? `${mediaPickerSelected.size} Photo${mediaPickerSelected.size !== 1 ? "s" : ""}` : "Selected"}
+                                <RefreshCw className="h-4 w-4" aria-hidden="true" />
                               </Button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label><Mail className="w-3.5 h-3.5 inline mr-1" />Email Theme</Label>
-                <p className="text-xs text-muted-foreground">Choose a color scheme for the review request email your client receives.</p>
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-                  {([
-                    { id: "navy-orange", label: "Navy & Orange", header: "#1a1a2e", accent: "#F97316" },
-                    { id: "green-black", label: "Green & Black", header: "#0a0a0a", accent: "#22c55e" },
-                    { id: "blue-white", label: "Blue & White", header: "#2563eb", accent: "#3b82f6" },
-                    { id: "black-gold", label: "Black & Gold", header: "#0a0a0a", accent: "#eab308" },
-                    { id: "red-white", label: "Red & White", header: "#dc2626", accent: "#ef4444" },
-                    { id: "purple-white", label: "Purple & White", header: "#7c3aed", accent: "#8b5cf6" },
-                    { id: "teal-white", label: "Teal & White", header: "#0d9488", accent: "#14b8a6" },
-                    { id: "white-gray", label: "White & Gray", header: "#dee2e6", accent: "#374151" },
-                    { id: "black-white", label: "Black & White", header: "#000000", accent: "#ffffff" },
-                  ] as const).map(theme => (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      onClick={() => setEmailTheme(theme.id)}
-                      className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all ${
-                        emailTheme === theme.id
-                          ? "border-foreground ring-1 ring-foreground/20 scale-105"
-                          : "border-border hover:border-foreground/30"
-                      }`}
-                      data-testid={`button-theme-${theme.id}`}
-                    >
-                      <div className="w-full h-7 rounded-md overflow-hidden flex flex-col border border-gray-200 dark:border-gray-700">
-                        <div className="flex-1" style={{ background: theme.header }} />
-                        <div className="h-1.5" style={{ background: theme.accent }} />
-                      </div>
-                      <span className="text-[9px] text-muted-foreground leading-tight text-center">{theme.label}</span>
-                      {emailTheme === theme.id && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-foreground text-background flex items-center justify-center">
-                          <CheckCircle2 className="w-3 h-3" />
+                            )}
+                            {confirmDeleteId === review.id ? (
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white"
+                                  onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteId(null); }}
+                                  data-testid={`button-confirm-delete-${review.id}`}
+                                >
+                                  Delete
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  data-testid={`button-cancel-delete-${review.id}`}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(review.id); }}
+                                title="Delete"
+                                data-testid={`button-delete-${review.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            )}
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                          </div>
                         </div>
-                      )}
-                    </button>
-                  ))}
+
+                        {isExpanded && (
+                          <div className="border-t px-4 pb-4 pt-0" data-testid={`panel-tracking-${review.id}`}>
+                            {(() => {
+                              const reviewUrl = `${window.location.origin}/review/${review.token}`;
+                              const emailBody = `Hi ${review.clientName?.split(" ")[0] || "there"},\n\nThanks again for choosing us! We'd really appreciate it if you could take a moment to share your experience using the link below:\n\n${reviewUrl}\n\nIt only takes a minute and means a lot to our small business.\n\nThank you!`;
+                              const mailto = `mailto:${encodeURIComponent(review.clientEmail || "")}?subject=${encodeURIComponent("Quick favor — share your experience")}&body=${encodeURIComponent(emailBody)}`;
+                              return (
+                                <div className="mt-3 space-y-2 rounded-xl border bg-muted/30 p-3" data-testid={`panel-share-link-${review.id}`}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Personal review link</p>
+                                    <span className="text-[10px] text-muted-foreground">Send manually if needed</span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Input
+                                      value={reviewUrl}
+                                      readOnly
+                                      onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).select(); }}
+                                      className="h-8 w-full min-w-0 bg-background text-xs font-mono sm:w-auto sm:flex-1"
+                                      data-testid={`input-review-link-${review.id}`}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(reviewUrl).then(
+                                          () => toast({ title: "Link copied", description: "Personal review link is on your clipboard." }),
+                                          () => toast({ title: "Copy failed", description: "Select the text manually and copy.", variant: "destructive" }),
+                                        );
+                                      }}
+                                      data-testid={`button-copy-link-${review.id}`}
+                                    >
+                                      <Copy className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Copy link
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigator.clipboard.writeText(emailBody).then(
+                                          () => toast({ title: "Email body copied", description: "Paste it into your email client." }),
+                                          () => toast({ title: "Copy failed", variant: "destructive" }),
+                                        );
+                                      }}
+                                      data-testid={`button-copy-email-body-${review.id}`}
+                                    >
+                                      <FileText className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Copy email
+                                    </Button>
+                                    {review.clientEmail && (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-8 shrink-0"
+                                        onClick={(e) => { e.stopPropagation(); window.location.href = mailto; }}
+                                        title={`Open mail app addressed to ${review.clientEmail}`}
+                                        data-testid={`button-open-mailto-${review.id}`}
+                                      >
+                                        <Mail className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Email
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                              {(() => {
+                                const emailWasOpened = review.emailOpened || review.linkClicked;
+                                const emailOpenTime = review.emailOpenedAt || (review.linkClicked ? review.linkClickedAt : null);
+                                return (
+                                  <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                                    <span className={`h-2 w-2 shrink-0 rounded-full ${emailWasOpened ? "bg-emerald-500" : "bg-muted-foreground/30"}`} aria-hidden="true" />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium">{emailWasOpened ? "Email opened" : "Not opened"}</p>
+                                      {emailOpenTime && (
+                                        <p className="truncate text-[10px] text-muted-foreground">{formatPST(emailOpenTime)}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+
+                              <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${review.linkClicked ? "bg-emerald-500" : "bg-muted-foreground/30"}`} aria-hidden="true" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium">{review.linkClicked ? "Link clicked" : "Not clicked"}</p>
+                                  {review.linkClickedAt && (
+                                    <p className="truncate text-[10px] text-muted-foreground">{formatPST(review.linkClickedAt)}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                                <span className={`h-2 w-2 shrink-0 rounded-full ${review.photosDownloaded ? "bg-emerald-500" : "bg-muted-foreground/30"}`} aria-hidden="true" />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium">{!hasPhotos ? "No photos" : review.photosDownloaded ? "Photos downloaded" : "Not downloaded"}</p>
+                                  {review.photosDownloadedAt && (
+                                    <p className="truncate text-[10px] text-muted-foreground">{formatPST(review.photosDownloadedAt)}</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 rounded-lg border p-2.5">
+                                {review.reviewMethod === "ai" ? (
+                                  <Bot className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                ) : review.reviewMethod === "own" ? (
+                                  <PenLine className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                ) : (
+                                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium">{review.reviewMethod === "ai" ? "AI generated" : review.reviewMethod === "own" ? "Wrote their own" : "No review yet"}</p>
+                                </div>
+                              </div>
+
+                              {review.lastStep === "done" || review.lastStep === "bonus_reviews" ? (
+                                // ConstructHUB can't see whether a review was actually posted on Google — only that the flow was finished.
+                                <div className="flex items-center gap-2 rounded-lg border p-2.5" data-testid={`tile-flow-completed-${review.id}`}>
+                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium">Completed flow</p>
+                                  </div>
+                                </div>
+                              ) : review.lastStep && !review.reviewSubmitted ? (
+                                <div className="flex items-center gap-2 rounded-lg border p-2.5" data-testid={`tile-flow-bounced-${review.id}`}>
+                                  <Target className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium">Bounced: {stepLabels[review.lastStep] || review.lastStep}</p>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {(review.feedbackComments || review.feedbackCategories || (review.feedbackRating && review.feedbackRating < 9)) && (
+                              <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+                                <p className="mb-1 text-xs font-medium">Private feedback</p>
+                                {review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0 && (
+                                  <div className="mb-1.5 flex flex-wrap gap-1">
+                                    {review.feedbackCategories.map((cat: string) => (
+                                      <Badge key={cat} variant="outline" className="text-[10px]">{cat}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                                {review.feedbackComments && (
+                                  <p className="text-xs text-muted-foreground">{review.feedbackComments}</p>
+                                )}
+                                {review.feedbackRating && review.feedbackRating < 9 && !review.feedbackComments && !(review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0) && (
+                                  <p className="text-xs italic text-muted-foreground">No written feedback provided</p>
+                                )}
+                              </div>
+                            )}
+                            {review.referralFeedback && (
+                              <div className="mt-2 rounded-lg border bg-muted/30 p-3">
+                                <p className="mb-1 text-xs font-medium">Referral response</p>
+                                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  {review.referralFeedback === "up" && <><ThumbsUp className="h-3 w-3" aria-hidden="true" />Would refer others</>}
+                                  {review.referralFeedback === "down" && <><ThumbsDown className="h-3 w-3" aria-hidden="true" />Would not refer</>}
+                                  {review.referralFeedback !== "up" && review.referralFeedback !== "down" && review.referralFeedback}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap items-center gap-4 text-[10px] text-muted-foreground">
+                              <span>Sent: {formatPST(review.createdAt)}</span>
+                              {review.remindersSent > 0 && review.lastReminderAt && (
+                                <span>Last reminder: {formatPST(review.lastReminderAt)}</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg">
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  <strong>How it works:</strong> The client will receive an email from <strong>your company</strong> asking them to rate their experience (1-10). Every client, whatever their rating, is invited to leave a Google review — Google's policy prohibits only asking happy customers. They can also send you private improvement notes.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer" data-testid="checkbox-schedule-toggle">
-                  <input
-                    type="checkbox"
-                    checked={scheduleEnabled}
-                    onChange={e => setScheduleEnabled(e.target.checked)}
-                    className="accent-amber-500"
-                  />
-                  <CalendarDays className="w-4 h-4 text-amber-500" />
-                  <span className="text-sm font-medium">Schedule for later</span>
-                </label>
-
-                {scheduleEnabled && (
-                  <div className="pl-6 space-y-3 border-l-2 border-amber-500/30">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Date</Label>
-                        <Input
-                          type="date"
-                          value={scheduleDate}
-                          onChange={e => setScheduleDate(e.target.value)}
-                          min={localYmd(new Date())}
-                          className="text-sm"
-                          data-testid="input-schedule-date"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Time</Label>
-                        <Input
-                          type="time"
-                          value={scheduleTime}
-                          onChange={e => setScheduleTime(e.target.value)}
-                          className="text-sm"
-                          data-testid="input-schedule-time"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { label: "Tomorrow 9am", getDate: tomorrowYmd, time: "09:00" },
-                        { label: "Tomorrow 3pm", getDate: tomorrowYmd, time: "15:00" },
-                        { label: "Tomorrow 6pm", getDate: tomorrowYmd, time: "18:00" },
-                      ].map(preset => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                            scheduleDate === preset.getDate() && scheduleTime === preset.time
-                              ? "bg-amber-500 text-white border-amber-500"
-                              : "border-border hover:border-amber-500/50 text-muted-foreground hover:text-foreground"
-                          }`}
-                          onClick={() => { setScheduleDate(preset.getDate()); setScheduleTime(preset.time); }}
-                          data-testid={`button-preset-${preset.label.toLowerCase().replace(/\s+/g, "-")}`}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-                    {scheduleDate && scheduleTime && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Will be sent on {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {!hasGoogleUrl && !selectedTemplateId && clientName && clientEmail && (
-                <p className="text-xs text-red-500 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Select a Google Business Profile above to send requests.
-                </p>
               )}
+            </Section>
 
-              <Button
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={() => createMutation.mutate()}
-                disabled={!canSend || createMutation.isPending || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
-                data-testid="button-send-review-request"
-              >
-                {createMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />{scheduleEnabled ? "Scheduling..." : "Sending..."}</>
-                ) : scheduleEnabled ? (
-                  <><CalendarDays className="w-4 h-4 mr-2" />Schedule Feedback Request</>
-                ) : (
-                  <><Send className="w-4 h-4 mr-2" />Send Feedback Request</>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {templateDialogOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center" data-testid="modal-template">
-          <div className="fixed inset-0 bg-black/80" onClick={() => { setTemplateDialogOpen(false); setEditingTemplate(null); resetTemplateForm(); }} />
-          <div className="relative z-[101] bg-background border rounded-lg shadow-lg w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto p-6">
-            <button
-              onClick={() => { setTemplateDialogOpen(false); setEditingTemplate(null); resetTemplateForm(); }}
-              className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
-              data-testid="button-close-template-dialog"
+            <Section
+              title={<span className="flex items-center gap-2">Google Business Profiles<Badge variant="outline" className="text-xs" data-testid="badge-template-count">{templateCount}</Badge></span>}
+              description="One profile per Google Business listing — each gets its own review link."
+              actions={<Button variant="outline" size="sm" onClick={openNewTemplate} disabled={atTemplateLimit} data-testid="button-new-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add profile</Button>}
             >
-              <X className="h-4 w-4" />
-            </button>
-            <div className="flex flex-col space-y-1.5 mb-4">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-amber-500" />
-                {editingTemplate ? "Edit GMB Profile" : "Add GMB Profile"}
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Each profile links to a different Google Business listing. When you send a review request, just pick which profile it's for.
-              </p>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tplName">Profile / Location Name *</Label>
-                <Input
-                  id="tplName"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="e.g., ABC Roofing - Dallas, Main Street Office"
-                  data-testid="input-template-name"
+              {templates.length === 0 ? (
+                <EmptyState
+                  icon={Building2}
+                  title="No profiles yet"
+                  description="Add a profile for each Google Business listing you manage, so review requests go to the right page."
+                  action={<Button variant="outline" size="sm" onClick={openNewTemplate} data-testid="button-create-first-template"><Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add your first profile</Button>}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tplUrl"><Link className="w-3.5 h-3.5 inline mr-1" />Google Review Link *</Label>
-                <Input
-                  id="tplUrl"
-                  type="url"
-                  inputMode="url"
-                  value={templateGoogleUrl}
-                  onChange={(e) => setTemplateGoogleUrl(e.target.value)}
-                  placeholder="https://g.page/r/..."
-                  aria-invalid={templateUrlInvalid}
-                  aria-describedby={templateUrlInvalid ? "tplUrl-error" : undefined}
-                  data-testid="input-template-google-url"
-                />
-                {templateUrlInvalid && (
-                  <p id="tplUrl-error" className="text-xs text-destructive" data-testid="text-template-url-error">
-                    Paste your Google review link (https://g.page/r/... or a Google Maps link).
-                  </p>
-                )}
-                <div className="flex items-start gap-2 p-2.5 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50">
-                  <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                  <p className="text-xs text-blue-700 dark:text-blue-300">
-                    Find this in your Google Business Profile: go to your profile, click <strong>"Ask for reviews"</strong> (or "Get more reviews"), and copy the <strong>Review link</strong> that looks like <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/50 px-1 rounded">https://g.page/r/xxxx/review</span>
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tplDesc">Default Project Description</Label>
-                <Textarea
-                  id="tplDesc"
-                  value={templateDescription}
-                  onChange={(e) => setTemplateDescription(e.target.value)}
-                  placeholder="e.g., Full kitchen renovation including cabinets, countertops, backsplash, and flooring..."
-                  rows={3}
-                  data-testid="input-template-description"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="tplDefault"
-                  checked={templateIsDefault}
-                  onChange={(e) => setTemplateIsDefault(e.target.checked)}
-                  className="rounded border-gray-300"
-                  data-testid="checkbox-template-default"
-                />
-                <Label htmlFor="tplDefault" className="text-sm cursor-pointer">Set as default template</Label>
-              </div>
-              <Button
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={() => editingTemplate ? updateTemplateMutation.mutate() : createTemplateMutation.mutate()}
-                disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || createTemplateMutation.isPending || updateTemplateMutation.isPending}
-                data-testid="button-save-template"
-              >
-                {(createTemplateMutation.isPending || updateTemplateMutation.isPending) ? (
-                  <><Loader2 className="w-4 h-4 animate-spin mr-2" />Saving...</>
-                ) : (
-                  <>{editingTemplate ? "Update Template" : "Save Template"}</>
-                )}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold" data-testid="stat-total-sent">{reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length}</p>
-            <p className="text-xs text-muted-foreground">Total Sent</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600" data-testid="stat-google-links-opened">{reviews.filter((r: any) => r.googleLinkOpened).length}</p>
-            <p className="text-xs text-muted-foreground">Google Links Opened</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600" data-testid="stat-positive">{reviews.filter((r: any) => r.feedbackRating >= 9).length}</p>
-            <p className="text-xs text-muted-foreground">Positive Feedback</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-amber-600" data-testid="stat-pending">{reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length}</p>
-            <p className="text-xs text-muted-foreground">Awaiting Response</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-base">
-              <Building2 className="w-4 h-4" />
-              GMB Profiles & Templates
-              <Badge variant="outline" className="text-xs" data-testid="badge-template-count">{templateCount}</Badge>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openNewTemplate}
-              disabled={atTemplateLimit}
-              data-testid="button-new-template"
-            >
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              Add Profile
-            </Button>
-          </CardTitle>
-          <p className="text-sm text-muted-foreground -mt-1">Each template links to a different Google Business Profile — perfect if you manage multiple locations or GMB pages</p>
-        </CardHeader>
-        <CardContent>
-          {templates.length === 0 ? (
-            <div className="text-center py-8 space-y-3">
-              <Building2 className="w-8 h-8 text-muted-foreground mx-auto" />
-              <p className="font-medium text-sm">No GMB profiles added</p>
-              <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                Add a profile for each Google Business listing you manage. Each one gets its own Google review link, so review requests go to the right page. Got 5 locations? Add 5 profiles.
-              </p>
-              <Button variant="outline" size="sm" onClick={openNewTemplate} data-testid="button-create-first-template">
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Add Your First GMB Profile
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {templates.map((template: any) => (
-                <div
-                  key={template.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors"
-                  data-testid={`card-template-${template.id}`}
-                >
-                  <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                    <Building2 className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm" data-testid={`text-template-name-${template.id}`}>{template.name}</p>
-                      {template.isDefault && <Badge className="bg-amber-500 text-white text-[10px]">Default</Badge>}
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                      <Link className="w-3 h-3 shrink-0" />{template.googleProfileUrl}
-                    </p>
-                    {template.projectDescription && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{template.projectDescription}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => openEditTemplate(template)}
-                      title="Edit template"
-                      data-testid={`button-edit-template-${template.id}`}
+              ) : (
+                <div className="space-y-2">
+                  {templates.map((template: any) => (
+                    <div
+                      key={template.id}
+                      className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:bg-muted/40"
+                      data-testid={`card-template-${template.id}`}
                     >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    {confirmDeleteTemplateId === template.id ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
-                          onClick={() => { deleteTemplateMutation.mutate(template.id); setConfirmDeleteTemplateId(null); }}
-                          data-testid={`button-confirm-delete-template-${template.id}`}
-                        >
-                          Delete
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs text-muted-foreground"
-                          onClick={() => setConfirmDeleteTemplateId(null)}
-                          data-testid={`button-cancel-delete-template-${template.id}`}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setConfirmDeleteTemplateId(template.id)}
-                        title="Delete template"
-                        data-testid={`button-delete-template-${template.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {atTemplateLimit && (
-                <p className="text-xs text-muted-foreground text-center pt-2" data-testid="text-template-limit">
-                  {templateLimit === 0
-                    ? <>Saving templates is included with every plan. <a href="/pricing" className="underline text-amber-600">See plans</a>.</>
-                    : <>Template limit reached ({templateLimit}). <a href="/pricing" className="underline text-amber-600">See plans</a> for more templates.</>}
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Mail className="w-4 h-4" />
-            Review Requests
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!isLoading && reviews.length > 0 && (
-            <div className="relative mb-4">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by name, email, phone, or address..."
-                className="pl-9"
-                data-testid="input-search-reviews"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  data-testid="button-clear-search"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          )}
-          {isLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : reviews.length === 0 ? (
-            <div className="text-center py-12 space-y-3">
-              <Star className="w-10 h-10 text-muted-foreground mx-auto" />
-              <p className="font-medium">No review requests yet</p>
-              <p className="text-sm text-muted-foreground">Send your first review request to start collecting Google reviews from your clients.</p>
-            </div>
-          ) : filteredReviews.length === 0 ? (
-            <div className="text-center py-8 space-y-2">
-              <Search className="w-8 h-8 text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">No results for "{searchQuery}"</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredReviews.map((review: any) => {
-                const isExpanded = expandedReviewId === review.id;
-                const hasPhotos = Array.isArray(review.photos) && review.photos.length > 0;
-                return (
-                <div
-                  key={review.id}
-                  className="rounded-lg border border-border/50 bg-muted/20 overflow-hidden"
-                  data-testid={`card-review-request-${review.id}`}
-                >
-                  <div
-                    className="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors cursor-pointer"
-                    onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
-                    data-testid={`button-expand-${review.id}`}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                      <User className="w-5 h-5 text-amber-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-sm" data-testid={`text-client-name-${review.id}`}>{review.clientName}</p>
-                        {getStatusBadge(review)}
-                        {review.feedbackRating && (
-                          <Badge variant="outline" className="text-xs">
-                            <Star className="w-3 h-3 mr-0.5 text-amber-500" />
-                            {review.feedbackRating}/10
-                          </Badge>
-                        )}
-                        {review.status === "sent" && review.remindersSent > 0 && (
-                          <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 dark:border-blue-800 dark:text-blue-400">
-                            <Bell className="w-3 h-3 mr-0.5" />
-                            {review.remindersSent} reminder{review.remindersSent > 1 ? "s" : ""}
-                          </Badge>
-                        )}
-                        {review.unsubscribed && (
-                          <Badge variant="outline" className="text-xs border-red-200 text-red-600 dark:border-red-800 dark:text-red-400">
-                            Unsubscribed
-                          </Badge>
-                        )}
-                        {review.referralFeedback === "up" && (
-                          <Badge variant="outline" className="text-xs border-green-200 text-green-600">
-                            <ThumbsUp className="w-3 h-3 mr-0.5" />
-                            Referral
-                          </Badge>
-                        )}
-                        {review.referralFeedback === "down" && (
-                          <Badge variant="outline" className="text-xs border-red-200 text-red-600">
-                            <ThumbsDown className="w-3 h-3 mr-0.5" />
-                            Referral
-                          </Badge>
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <Building2 className="h-4 w-4" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium" data-testid={`text-template-name-${template.id}`}>{template.name}</p>
+                          {template.isDefault && <Badge className="text-[10px]" data-testid={`badge-template-default-${template.id}`}>Default</Badge>}
+                        </div>
+                        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                          <Link className="h-3 w-3 shrink-0" aria-hidden="true" />{template.googleProfileUrl}
+                        </p>
+                        {template.projectDescription && (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{template.projectDescription}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
-                        <span className="truncate">{review.clientEmail}</span>
-                        {review.clientPhone && (
-                          <span className="flex items-center gap-0.5"><Phone className="w-3 h-3" />{review.clientPhone}</span>
-                        )}
-                      </div>
-                      {review.clientAddress && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate flex items-center gap-1"><MapPin className="w-3 h-3 shrink-0" />{review.clientAddress}</p>
-                      )}
-                      {review.projectDescription && (
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{review.projectDescription}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => { e.stopPropagation(); window.open(`/review/${review.token}`, "_blank"); }}
-                        title="Preview review page"
-                        data-testid={`button-preview-${review.id}`}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      {!review.unsubscribed && (
+                      <div className="flex shrink-0 items-center gap-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
-                          onClick={(e) => { e.stopPropagation(); resendMutation.mutate(review.id); }}
-                          disabled={resendMutation.isPending}
-                          title={review.feedbackRating != null ? "Resend email (this customer already responded)" : "Resend email"}
-                          data-testid={`button-resend-${review.id}`}
+                          onClick={() => openEditTemplate(template)}
+                          title="Edit profile"
+                          data-testid={`button-edit-template-${template.id}`}
                         >
-                          <RefreshCw className="w-4 h-4" />
+                          <Edit className="h-4 w-4" aria-hidden="true" />
                         </Button>
-                      )}
-                      {confirmDeleteId === review.id ? (
-                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {confirmDeleteTemplateId === template.id ? (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white"
+                              onClick={() => { deleteTemplateMutation.mutate(template.id); setConfirmDeleteTemplateId(null); }}
+                              data-testid={`button-confirm-delete-template-${template.id}`}
+                            >
+                              Delete
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-muted-foreground"
+                              onClick={() => setConfirmDeleteTemplateId(null)}
+                              data-testid={`button-cancel-delete-template-${template.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </>
+                        ) : (
                           <Button
                             variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
-                            onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteId(null); }}
-                            data-testid={`button-confirm-delete-${review.id}`}
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setConfirmDeleteTemplateId(template.id)}
+                            title="Delete profile"
+                            data-testid={`button-delete-template-${template.id}`}
                           >
-                            Delete
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-muted-foreground"
-                            onClick={() => setConfirmDeleteId(null)}
-                            data-testid={`button-cancel-delete-${review.id}`}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(review.id); }}
-                          title="Delete"
-                          data-testid={`button-delete-${review.id}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="px-4 pb-4 pt-0 border-t border-border/30" data-testid={`panel-tracking-${review.id}`}>
-                      {(() => {
-                        const reviewUrl = `${window.location.origin}/review/${review.token}`;
-                        const emailBody = `Hi ${review.clientName?.split(" ")[0] || "there"},\n\nThanks again for choosing us! We'd really appreciate it if you could take a moment to share your experience using the link below:\n\n${reviewUrl}\n\nIt only takes a minute and means a lot to our small business.\n\nThank you!`;
-                        const mailto = `mailto:${encodeURIComponent(review.clientEmail || "")}?subject=${encodeURIComponent("Quick favor — share your experience")}&body=${encodeURIComponent(emailBody)}`;
-                        return (
-                          <div className="mt-3 p-3 rounded-lg border border-border/50 bg-muted/30 space-y-2" data-testid={`panel-share-link-${review.id}`}>
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Personal Review Link</p>
-                              <span className="text-[10px] text-muted-foreground">Send manually if needed</span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Input
-                                value={reviewUrl}
-                                readOnly
-                                onClick={(e) => { e.stopPropagation(); (e.currentTarget as HTMLInputElement).select(); }}
-                                className="h-8 text-xs font-mono bg-background w-full sm:w-auto sm:flex-1 min-w-0"
-                                data-testid={`input-review-link-${review.id}`}
-                              />
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(reviewUrl).then(
-                                    () => toast({ title: "Link copied", description: "Personal review link is on your clipboard." }),
-                                    () => toast({ title: "Copy failed", description: "Select the text manually and copy.", variant: "destructive" }),
-                                  );
-                                }}
-                                data-testid={`button-copy-link-${review.id}`}
-                              >
-                                <Copy className="w-3.5 h-3.5 mr-1.5" /> Copy Link
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigator.clipboard.writeText(emailBody).then(
-                                    () => toast({ title: "Email body copied", description: "Paste it into your email client." }),
-                                    () => toast({ title: "Copy failed", variant: "destructive" }),
-                                  );
-                                }}
-                                data-testid={`button-copy-email-body-${review.id}`}
-                              >
-                                <FileText className="w-3.5 h-3.5 mr-1.5" /> Copy Email
-                              </Button>
-                              {review.clientEmail && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 shrink-0"
-                                  onClick={(e) => { e.stopPropagation(); window.location.href = mailto; }}
-                                  title={`Open mail app addressed to ${review.clientEmail}`}
-                                  data-testid={`button-open-mailto-${review.id}`}
-                                >
-                                  <Mail className="w-3.5 h-3.5 mr-1.5" /> Email
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                        {(() => {
-                          const emailWasOpened = review.emailOpened || review.linkClicked;
-                          const emailOpenTime = review.emailOpenedAt || (review.linkClicked ? review.linkClickedAt : null);
-                          return (
-                            <div className={`flex items-center gap-2 p-2.5 rounded-lg border ${emailWasOpened ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-muted/30 border-border/50"}`}>
-                              <Mail className={`w-4 h-4 shrink-0 ${emailWasOpened ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`} />
-                              <div className="min-w-0">
-                                <p className={`text-xs font-medium ${emailWasOpened ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
-                                  {emailWasOpened ? "Email Opened" : "Not Opened"}
-                                </p>
-                                {emailOpenTime && (
-                                  <p className="text-[10px] text-muted-foreground truncate">{formatPST(emailOpenTime)}</p>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        <div className={`flex items-center gap-2 p-2.5 rounded-lg border ${review.linkClicked ? "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800" : "bg-muted/30 border-border/50"}`}>
-                          <MousePointerClick className={`w-4 h-4 shrink-0 ${review.linkClicked ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"}`} />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-medium ${review.linkClicked ? "text-blue-700 dark:text-blue-300" : "text-muted-foreground"}`}>
-                              {review.linkClicked ? "Link Clicked" : "Not Clicked"}
-                            </p>
-                            {review.linkClickedAt && (
-                              <p className="text-[10px] text-muted-foreground truncate">{formatPST(review.linkClickedAt)}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className={`flex items-center gap-2 p-2.5 rounded-lg border ${review.photosDownloaded ? "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800" : hasPhotos ? "bg-muted/30 border-border/50" : "bg-muted/10 border-border/30"}`}>
-                          <Download className={`w-4 h-4 shrink-0 ${review.photosDownloaded ? "text-purple-600 dark:text-purple-400" : "text-muted-foreground"}`} />
-                          <div className="min-w-0">
-                            <p className={`text-xs font-medium ${review.photosDownloaded ? "text-purple-700 dark:text-purple-300" : "text-muted-foreground"}`}>
-                              {!hasPhotos ? "No Photos" : review.photosDownloaded ? "Photos Downloaded" : "Not Downloaded"}
-                            </p>
-                            {review.photosDownloadedAt && (
-                              <p className="text-[10px] text-muted-foreground truncate">{formatPST(review.photosDownloadedAt)}</p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className={`flex items-center gap-2 p-2.5 rounded-lg border ${review.reviewMethod === "ai" ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800" : review.reviewMethod === "own" ? "bg-sky-50 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800" : "bg-muted/30 border-border/50"}`}>
-                          {review.reviewMethod === "ai" ? (
-                            <Bot className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                          ) : review.reviewMethod === "own" ? (
-                            <PenLine className="w-4 h-4 shrink-0 text-sky-600 dark:text-sky-400" />
-                          ) : (
-                            <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
-                          )}
-                          <div className="min-w-0">
-                            <p className={`text-xs font-medium ${review.reviewMethod === "ai" ? "text-amber-700 dark:text-amber-300" : review.reviewMethod === "own" ? "text-sky-700 dark:text-sky-300" : "text-muted-foreground"}`}>
-                              {review.reviewMethod === "ai" ? "AI Generated" : review.reviewMethod === "own" ? "Wrote Their Own" : "No Review Yet"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {review.lastStep === "done" || review.lastStep === "bonus_reviews" ? (
-                          // ConstructHUB can't see whether a review was actually posted on Google — only that the flow was finished.
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-muted/30 border-border/50" data-testid={`tile-flow-completed-${review.id}`}>
-                            <CheckCircle2 className="w-4 h-4 shrink-0 text-muted-foreground" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-muted-foreground">Completed flow</p>
-                            </div>
-                          </div>
-                        ) : review.lastStep && !review.reviewSubmitted ? (
-                          <div className="flex items-center gap-2 p-2.5 rounded-lg border bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800" data-testid={`tile-flow-bounced-${review.id}`}>
-                            <Target className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                                Bounced: {stepLabels[review.lastStep] || review.lastStep}
-                              </p>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {(review.feedbackComments || review.feedbackCategories || (review.feedbackRating && review.feedbackRating < 9)) && (
-                        <div className="mt-3 p-3 bg-muted/30 rounded-lg border border-border/30">
-                          <p className="text-xs font-medium mb-1">Private Feedback</p>
-                          {review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mb-1.5">
-                              {review.feedbackCategories.map((cat: string) => (
-                                <Badge key={cat} variant="outline" className="text-[10px]">{cat}</Badge>
-                              ))}
-                            </div>
-                          )}
-                          {review.feedbackComments && (
-                            <p className="text-xs text-muted-foreground">{review.feedbackComments}</p>
-                          )}
-                          {review.feedbackRating && review.feedbackRating < 9 && !review.feedbackComments && !(review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0) && (
-                            <p className="text-xs text-muted-foreground italic">No written feedback provided</p>
-                          )}
-                        </div>
-                      )}
-                      {review.referralFeedback && (
-                        <div className="mt-2 p-3 bg-muted/30 rounded-lg border border-border/30">
-                          <p className="text-xs font-medium mb-1">Referral Response</p>
-                          <p className="text-xs text-muted-foreground">{review.referralFeedback === "up" ? "👍 Would refer others" : review.referralFeedback === "down" ? "👎 Would not refer" : review.referralFeedback}</p>
-                        </div>
-                      )}
-
-                      <div className="mt-3 flex items-center gap-4 text-[10px] text-muted-foreground">
-                        <span>Sent: {formatPST(review.createdAt)}</span>
-                        {review.remindersSent > 0 && review.lastReminderAt && (
-                          <span>Last reminder: {formatPST(review.lastReminderAt)}</span>
                         )}
                       </div>
                     </div>
+                  ))}
+                  {atTemplateLimit && (
+                    <p className="pt-2 text-center text-xs text-muted-foreground" data-testid="text-template-limit">
+                      {templateLimit === 0
+                        ? <>Saving profiles is included with every plan. <a href="/pricing" className="underline">See plans</a>.</>
+                        : <>Profile limit reached ({templateLimit}). <a href="/pricing" className="underline">See plans</a> for more.</>}
+                    </p>
                   )}
                 </div>
-              );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </Section>
 
-      <Card data-testid="card-other-platforms">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <ExternalLink className="w-5 h-5 text-amber-500" />
-            Other Review Platforms
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">Quick links to manage your reviews across all major platforms</p>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {[
-              { name: "Yelp", url: "https://biz.yelp.com", color: "bg-red-500", letter: "Y" },
-              { name: "BBB", url: "https://www.bbb.org/near-me", color: "bg-blue-600", letter: "B" },
-              { name: "Angi", url: "https://www.angi.com/pro/login", color: "bg-green-600", letter: "A" },
-              { name: "GuildQuality", url: "https://www.guildquality.com/login", color: "bg-indigo-600", letter: "G" },
-              { name: "HomeAdvisor", url: "https://pro.homeadvisor.com", color: "bg-orange-500", letter: "H" },
-              { name: "Houzz", url: "https://www.houzz.com/pro/login", color: "bg-emerald-600", letter: "H" },
-              { name: "Thumbtack", url: "https://pro.thumbtack.com", color: "bg-sky-500", letter: "T" },
-              { name: "Facebook", url: "https://business.facebook.com", color: "bg-blue-500", letter: "F" },
-            ].map((platform) => (
-              <a
-                key={platform.name}
-                href={platform.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-amber-500/40 hover:bg-amber-50/30 dark:hover:bg-amber-950/10 transition-all group"
-                data-testid={`link-platform-${platform.name.toLowerCase()}`}
-              >
-                <div className={`w-8 h-8 rounded-lg ${platform.color} flex items-center justify-center shrink-0`}>
-                  <span className="text-white font-bold text-sm">{platform.letter}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{platform.name}</p>
-                  <p className="text-[10px] text-muted-foreground">Manage reviews</p>
-                </div>
-                <ExternalLink className="w-3 h-3 text-muted-foreground ml-auto shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </a>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+            <ReminderSettingsCard />
 
-      <Card className="bg-white dark:bg-card border-border/50">
-        <CardContent className="p-0">
-          <button
-            onClick={() => setShowHowItWorks(!showHowItWorks)}
-            className="w-full flex items-center justify-between p-6 pb-4 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors rounded-t-xl"
-            data-testid="button-toggle-how-it-works"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-left">
-                <h3 className="font-bold text-lg">How Review Requests Work</h3>
-                <p className="text-sm text-muted-foreground">Ask every client the same way, learn from every rating, and stay inside Google's review policy</p>
-              </div>
-            </div>
-            {showHowItWorks ? <ChevronUp className="w-5 h-5 text-muted-foreground" /> : <ChevronDown className="w-5 h-5 text-muted-foreground" />}
-          </button>
+            <Section
+              title={<button className="flex w-full items-center justify-between gap-2 text-left" onClick={() => setShowHowItWorks(!showHowItWorks)} data-testid="button-toggle-how-it-works">
+                <span>How review requests work</span>
+                {showHowItWorks ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+              </button>}
+            >
+              {showHowItWorks && (
+                <div className="space-y-5">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Happy clients forget to leave reviews; this makes it easy for every client to do it while the job is fresh. It asks everyone the same way — Google prohibits &ldquo;review gating&rdquo; (only sending happy customers to Google) and incentivized reviews, and profiles caught doing either can have reviews removed or be suspended.
+                  </p>
 
-          {showHowItWorks && (
-            <div className="px-6 pb-6 space-y-6">
-              <Separator />
-
-              <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-                <p className="text-sm font-medium leading-relaxed">
-                  Happy clients forget to leave reviews; this system makes it easy for every client to do it while the job is fresh. It asks everyone the same way — Google prohibits "review gating" (only sending happy customers to Google) and incentivized reviews, and profiles caught doing either can have reviews removed or be suspended.
-                </p>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-base mb-4 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-gray-500" />
-                  The Flow
-                </h4>
-                <div className="space-y-4">
-                  {[
-                    { n: "1", Icon: Filter, title: "A quick private rating (1-10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs. It never decides whether they are allowed to review you." },
-                    { n: "2", Icon: ExternalLink, title: "Every client is invited to Google", body: "Whatever the score, the client gets the same button to open your Google Business Profile and leave a review. Low scores are a signal to reach out and make it right, not a reason to hide the link." },
-                    { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. It's in addition to a public review, never instead of the option." },
-                    { n: "4", Icon: DollarSign, title: "Your referral program, kept separate", body: "Clients can opt in to your referral program. Referral rewards are paid for referred customers only — never for leaving a review or for its star rating." },
-                    { n: "5", Icon: Sparkles, title: "Optional writing help", body: "If a client wants help getting started, AI can draft a starting point from the highlights they type. They edit it into their own words and choose their own star rating — the review must reflect their real experience." },
-                  ].map(({ n, Icon, title, body }) => (
-                    <div key={n} className="flex gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-bold text-sm shrink-0">{n}</div>
-                      <div className="pb-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Icon className="w-4 h-4 text-gray-500" />
-                          <p className="font-bold text-sm">{title}</p>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h4 className="font-bold text-base mb-4 flex items-center gap-2">
-                  <BadgeCheck className="w-4 h-4 text-gray-500" />
-                  Why It Works
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {[
-                    { Icon: TrendingUp, title: "More reviews, steadily", body: "Automatic requests and reminders mean more of your satisfied clients actually follow through — review volume and recency both help your profile." },
-                    { Icon: Heart, title: "Catch problems early", body: "A low private score alerts you to call the client while there's still time to fix the issue." },
-                    { Icon: Megaphone, title: "Clients become promoters", body: "The opt-in referral program rewards clients who send you new customers." },
-                    { Icon: ThumbsUp, title: "Reviews you can trust", body: "Reviews earned by asking everyone hold up to Google's filters and to homeowners reading them." },
-                  ].map(({ Icon, title, body }) => (
-                    <div key={title} className="flex items-start gap-3 p-3 rounded-lg bg-background border border-border/50">
-                      <Icon className="w-5 h-5 text-gray-400 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm">{title}</p>
-                        <p className="text-xs text-muted-foreground">{body}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-bold text-sm mb-1">Rules that protect your profile</p>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Ask every client, not just happy ones. Never offer discounts, gifts, drawings, or referral bonuses in exchange for a review. Never write a review for a client or tell them what rating to give. Breaking these can get reviews removed or your Business Profile suspended, and paying for positive reviews violates the FTC's consumer-review rule.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {trashQuery.data && trashQuery.data.length > 0 && (
-        <Card className="border shadow-sm">
-          <CardHeader className="pb-3 cursor-pointer" onClick={() => setShowTrash(!showTrash)}>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-muted-foreground" />
-                Trash
-                <Badge variant="secondary" className="text-xs">{trashQuery.data.length}</Badge>
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Auto-deletes after 14 days</span>
-                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${showTrash ? "rotate-180" : ""}`} />
-              </div>
-            </div>
-          </CardHeader>
-          {showTrash && (
-            <CardContent className="pt-0 space-y-2">
-              {trashQuery.data.map((item: any) => {
-                const daysLeft = Math.max(0, Math.ceil(14 - (Date.now() - new Date(item.deletedAt).getTime()) / (1000 * 60 * 60 * 24)));
-                return (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-muted/20" data-testid={`trash-item-${item.id}`}>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{item.clientName}</p>
-                        <p className="text-xs text-muted-foreground truncate">{item.clientEmail}</p>
-                      </div>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {item.feedbackRating ? `${item.feedbackRating}/10` : item.status}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground shrink-0">{daysLeft}d left</span>
+                    <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                      <Target className="h-4 w-4 text-muted-foreground" aria-hidden="true" />The flow
+                    </h4>
+                    <div className="space-y-4">
+                      {[
+                        { n: "1", Icon: Filter, title: "A quick private rating (1–10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs. It never decides whether they are allowed to review you." },
+                        { n: "2", Icon: ExternalLink, title: "Every client is invited to Google", body: "Whatever the score, the client gets the same button to open your Google Business Profile and leave a review. Low scores are a signal to reach out and make it right, not a reason to hide the link." },
+                        { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. It's in addition to a public review, never instead of the option." },
+                        { n: "4", Icon: Megaphone, title: "Your referral program, kept separate", body: "Clients can opt in to your referral program. Referral rewards are paid for referred customers only — never for leaving a review or for its star rating." },
+                        { n: "5", Icon: Sparkles, title: "Optional writing help", body: "If a client wants help getting started, AI can draft a starting point from the highlights they type. They edit it into their own words and choose their own star rating — the review must reflect their real experience." },
+                      ].map(({ n, Icon, title, body }) => (
+                        <div key={n} className="flex gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold text-muted-foreground">{n}</div>
+                          <div className="pb-1">
+                            <div className="mb-0.5 flex items-center gap-2">
+                              <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                              <p className="text-sm font-medium">{title}</p>
+                            </div>
+                            <p className="text-sm text-muted-foreground">{body}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-                        onClick={() => restoreMutation.mutate(item.id)}
-                        disabled={restoreMutation.isPending}
-                        data-testid={`button-restore-${item.id}`}
-                      >
-                        <RefreshCw className="w-3 h-3 mr-1" />
-                        Restore
-                      </Button>
-                      {confirmPermanentDeleteId === item.id ? (
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
-                            onClick={() => { permanentDeleteMutation.mutate(item.id); setConfirmPermanentDeleteId(null); }}
-                            data-testid={`button-confirm-perm-delete-${item.id}`}
-                          >
-                            Delete Forever
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-muted-foreground"
-                            onClick={() => setConfirmPermanentDeleteId(null)}
-                          >
-                            Cancel
-                          </Button>
+                  </div>
+
+                  <div>
+                    <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                      <BadgeCheck className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Why it works
+                    </h4>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {[
+                        { Icon: TrendingUp, title: "More reviews, steadily", body: "Automatic requests and reminders mean more of your satisfied clients actually follow through — review volume and recency both help your profile." },
+                        { Icon: Heart, title: "Catch problems early", body: "A low private score alerts you to call the client while there's still time to fix the issue." },
+                        { Icon: Megaphone, title: "Clients become promoters", body: "The opt-in referral program rewards clients who send you new customers." },
+                        { Icon: ThumbsUp, title: "Reviews you can trust", body: "Reviews earned by asking everyone hold up to Google's filters and to homeowners reading them." },
+                      ].map(({ Icon, title, body }) => (
+                        <div key={title} className="flex items-start gap-3 rounded-xl border p-3">
+                          <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                          <div>
+                            <p className="text-sm font-medium">{title}</p>
+                            <p className="text-xs text-muted-foreground">{body}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Notice tone="warning" title="Rules that protect your profile">
+                    Ask every client, not just happy ones. Never offer discounts, gifts, drawings, or referral bonuses in exchange for a review. Never write a review for a client or tell them what rating to give. Breaking these can get reviews removed or your Business Profile suspended, and paying for positive reviews violates the FTC's consumer-review rule.
+                  </Notice>
+                </div>
+              )}
+            </Section>
+
+            <Section title="Other review platforms" description="Quick links to manage your reviews elsewhere.">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { name: "Yelp", url: "https://biz.yelp.com" },
+                  { name: "BBB", url: "https://www.bbb.org/near-me" },
+                  { name: "Angi", url: "https://www.angi.com/pro/login" },
+                  { name: "GuildQuality", url: "https://www.guildquality.com/login" },
+                  { name: "HomeAdvisor", url: "https://pro.homeadvisor.com" },
+                  { name: "Houzz", url: "https://www.houzz.com/pro/login" },
+                  { name: "Thumbtack", url: "https://pro.thumbtack.com" },
+                  { name: "Facebook", url: "https://business.facebook.com" },
+                ].map((platform) => (
+                  <a
+                    key={platform.name}
+                    href={platform.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-xl border p-3 text-sm font-medium transition-colors hover:bg-muted/40"
+                    data-testid={`link-platform-${platform.name.toLowerCase()}`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{platform.name}</span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </a>
+                ))}
+              </div>
+            </Section>
+
+            {trashQuery.data && trashQuery.data.length > 0 && (
+              <Section
+                title={<span className="flex items-center gap-2">Trash<Badge variant="secondary" className="text-xs">{trashQuery.data.length}</Badge></span>}
+                description="Auto-deletes after 14 days."
+              >
+                <button
+                  className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowTrash(!showTrash)}
+                  data-testid="button-toggle-trash"
+                >
+                  {showTrash ? "Hide" : "Show"} trashed requests
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showTrash ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
+                {showTrash && (
+                  <div className="space-y-2">
+                    {trashQuery.data.map((item: any) => {
+                      const daysLeft = Math.max(0, Math.ceil(14 - (Date.now() - new Date(item.deletedAt).getTime()) / (1000 * 60 * 60 * 24)));
+                      return (
+                        <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border bg-muted/20 p-3" data-testid={`trash-item-${item.id}`}>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                              <User className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{item.clientName}</p>
+                              <p className="truncate text-xs text-muted-foreground">{item.clientEmail}</p>
+                            </div>
+                            <Badge variant="outline" className="shrink-0 text-[10px]">
+                              {item.feedbackRating ? `${item.feedbackRating}/10` : item.status}
+                            </Badge>
+                            <span className="shrink-0 text-[10px] text-muted-foreground">{daysLeft}d left</span>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                              onClick={() => restoreMutation.mutate(item.id)}
+                              disabled={restoreMutation.isPending}
+                              data-testid={`button-restore-${item.id}`}
+                            >
+                              <RefreshCw className="mr-1 h-3 w-3" aria-hidden="true" />Restore
+                            </Button>
+                            {confirmPermanentDeleteId === item.id ? (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white"
+                                  onClick={() => { permanentDeleteMutation.mutate(item.id); setConfirmPermanentDeleteId(null); }}
+                                  data-testid={`button-confirm-perm-delete-${item.id}`}
+                                >
+                                  Delete forever
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-muted-foreground"
+                                  onClick={() => setConfirmPermanentDeleteId(null)}
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => setConfirmPermanentDeleteId(item.id)}
+                                title="Permanently delete"
+                                data-testid={`button-perm-delete-${item.id}`}
+                              >
+                                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Section>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="profile-reviews" className="mt-5 sm:mt-6">
+          <GoogleProfileReviewsTab />
+        </TabsContent>
+      </Tabs>
+
+      {/* ── Send review request ─────────────────────────────────────────── */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl" data-testid="modal-send-review">
+          <DialogHeader>
+            <DialogTitle>Send review request</DialogTitle>
+            <DialogDescription>
+              Your client rates the experience and every client is invited to leave a Google review.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label>Google Business Profile *</Label>
+              {templates.length > 0 ? (
+                <>
+                  <Select value={selectedTemplateId} onValueChange={(val) => {
+                    if (val === "__create__") {
+                      // Opens on top of this dialog, so the request typed so far is kept.
+                      openNewTemplate();
+                    } else {
+                      setSelectedTemplateId(val);
+                    }
+                  }}>
+                    <SelectTrigger data-testid="select-gmb-profile">
+                      <SelectValue placeholder="Select a Google Business Profile…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name} {t.isDefault ? "(Default)" : ""}
+                        </SelectItem>
+                      ))}
+                      {!atTemplateLimit && (
+                        <SelectItem value="__create__">
+                          <span className="flex items-center gap-1 text-primary">
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />Add another profile…
+                          </span>
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Reviews will be directed to this profile&rsquo;s Google review link.</p>
+                </>
+              ) : (
+                <Notice tone="warning">
+                  No Google Business Profiles set up yet.{" "}
+                  <button type="button" onClick={openNewTemplate} className="font-medium text-primary hover:underline" data-testid="link-create-profile">
+                    Add a Google Business Profile
+                  </button>
+                </Notice>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="clientName">Client name *</Label>
+                <Input
+                  id="clientName"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  placeholder="John Smith"
+                  data-testid="input-client-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientEmail">Client email *</Label>
+                <Input
+                  id="clientEmail"
+                  type="email"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="john@example.com"
+                  data-testid="input-client-email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientPhone">Phone</Label>
+                <Input
+                  id="clientPhone"
+                  type="tel"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  data-testid="input-client-phone"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clientAddress">Address</Label>
+                <Input
+                  id="clientAddress"
+                  value={clientAddress}
+                  onChange={(e) => setClientAddress(e.target.value)}
+                  placeholder="123 Main St, City, ST 12345"
+                  data-testid="input-client-address"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="mb-1 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMessageMode("description")}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${messageMode === "description" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  data-testid="button-mode-description"
+                >
+                  <FileText className="mr-1 inline h-3 w-3" aria-hidden="true" />Project description
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMessageMode("personal")}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${messageMode === "personal" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  data-testid="button-mode-personal"
+                >
+                  <MessageSquare className="mr-1 inline h-3 w-3" aria-hidden="true" />Personal message
+                </button>
+              </div>
+              {messageMode === "description" ? (
+                <>
+                  <Textarea
+                    id="projectDesc"
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                    placeholder="Brief description of the work done (e.g., Kitchen remodel, bathroom renovation, roof replacement...)"
+                    rows={3}
+                    data-testid="input-project-description"
+                  />
+                  <p className="text-xs text-muted-foreground">Used by AI to generate the review. Overrides the template description if provided.</p>
+                </>
+              ) : (
+                <>
+                  <Textarea
+                    id="personalMsg"
+                    value={personalMessage}
+                    onChange={(e) => setPersonalMessage(e.target.value)}
+                    placeholder="Write a personal note to your client (e.g., Hey Jennifer, it was great working on your kitchen! We'd love to hear how everything turned out...)"
+                    rows={3}
+                    data-testid="input-personal-message"
+                  />
+                  <p className="text-xs text-muted-foreground">Replaces the default email body with your own message. The feedback link is still included automatically.</p>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Project photos (optional)</Label>
+              <p className="text-xs text-muted-foreground">Attach up to 30 photos — clients can download them to include with their Google review.</p>
+              <div className="flex flex-wrap gap-2">
+                {attachedPhotos.map((photo, i) => (
+                  <div key={i} className="group relative h-20 w-20 overflow-hidden rounded-lg border">
+                    <img src={photo.url} alt={photo.originalName} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setAttachedPhotos(prev => prev.filter((_, j) => j !== i))}
+                      className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                      data-testid={`button-remove-photo-${i}`}
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                    <p className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 text-[9px] text-white">{photo.originalName}</p>
+                  </div>
+                ))}
+                {attachedPhotos.length < 30 && (
+                  <label
+                    className={`flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-primary ${uploadingPhotos ? "pointer-events-none opacity-50" : ""}`}
+                    data-testid="button-add-photos"
+                  >
+                    {uploadingPhotos ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                    ) : (
+                      <>
+                        <ImagePlus className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                        <span className="mt-0.5 text-[10px] text-muted-foreground">Add</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                      data-testid="input-photo-upload"
+                    />
+                  </label>
+                )}
+                {attachedPhotos.length < 30 && (
+                  <button
+                    type="button"
+                    onClick={openMediaPicker}
+                    className="flex h-20 w-20 flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors hover:border-primary"
+                    data-testid="button-media-library-picker"
+                  >
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="mt-0.5 text-center text-[9px] leading-tight text-muted-foreground">Media<br />Library</span>
+                  </button>
+                )}
+              </div>
+              {attachedPhotos.length > 0 && (
+                <p className="text-xs text-muted-foreground">{attachedPhotos.length}/30 photos attached</p>
+              )}
+            </div>
+
+            {showMediaPicker && (
+              <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setShowMediaPicker(false)}>
+                <div className="mx-4 max-h-[80vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-xl border bg-background p-5 shadow-2xl" onClick={e => e.stopPropagation()} data-testid="modal-media-picker">
+                  <div className="flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold">
+                      <FolderOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />Media Library
+                    </h3>
+                    <button onClick={() => setShowMediaPicker(false)} className="text-muted-foreground hover:text-foreground">
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                  {mediaPickerLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-hidden="true" />
+                    </div>
+                  ) : !mediaPickerFolderId ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Select a folder to browse photos.</p>
+                      {mediaPickerFolders.length === 0 ? (
+                        <div className="py-6 text-center text-muted-foreground">
+                          <FolderOpen className="mx-auto mb-2 h-8 w-8 opacity-30" aria-hidden="true" />
+                          <p className="text-sm">No folders yet</p>
+                          <p className="mt-1 text-xs">Process photos in the Photo Optimizer and save them to create folders.</p>
                         </div>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => setConfirmPermanentDeleteId(item.id)}
-                          title="Permanently delete"
-                          data-testid={`button-perm-delete-${item.id}`}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </Button>
+                        <div className="space-y-1">
+                          {mediaPickerFolders.map(f => (
+                            <button
+                              key={f.id}
+                              onClick={() => loadFolderPhotos(f.id)}
+                              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted"
+                              data-testid={`media-folder-${f.id}`}
+                            >
+                              <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                              {f.name}
+                              <ChevronDown className="ml-auto h-3 w-3 -rotate-90 text-muted-foreground" aria-hidden="true" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <button onClick={() => setMediaPickerFolderId(null)} className="flex items-center gap-1 text-xs text-primary hover:underline" data-testid="button-back-to-folders">
+                        <ChevronDown className="h-3 w-3 rotate-90" aria-hidden="true" />Back to folders
+                      </button>
+                      {mediaPickerPhotos.length === 0 ? (
+                        <p className="py-6 text-center text-sm text-muted-foreground">This folder is empty.</p>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-4 gap-2">
+                            {mediaPickerPhotos.map(p => (
+                              <button
+                                key={p.id}
+                                onClick={() => setMediaPickerSelected(prev => {
+                                  const next = new Set(prev);
+                                  next.has(p.id) ? next.delete(p.id) : next.add(p.id);
+                                  return next;
+                                })}
+                                className={`relative aspect-square overflow-hidden rounded-lg border-2 transition-colors ${mediaPickerSelected.has(p.id) ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50"}`}
+                                data-testid={`media-photo-${p.id}`}
+                              >
+                                <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
+                                {mediaPickerSelected.has(p.id) && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-primary/20">
+                                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
+                                      <CheckCircle2 className="h-3.5 w-3.5 text-white" aria-hidden="true" />
+                                    </div>
+                                  </div>
+                                )}
+                                <p className="absolute bottom-0 left-0 right-0 truncate bg-black/60 px-1 text-[8px] text-white">{p.name}</p>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex items-center justify-between pt-1">
+                            <p className="text-xs text-muted-foreground">{mediaPickerSelected.size} selected</p>
+                            <Button
+                              size="sm"
+                              onClick={attachFromMediaLibrary}
+                              disabled={mediaPickerSelected.size === 0}
+                              data-testid="button-attach-from-library"
+                            >
+                              Attach {mediaPickerSelected.size > 0 ? `${mediaPickerSelected.size} photo${mediaPickerSelected.size !== 1 ? "s" : ""}` : "selected"}
+                            </Button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <Collapsible>
+              <CollapsibleTrigger className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />Email appearance and deliverability
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-3 space-y-5">
+                <div className="space-y-2">
+                  <Label>Email theme</Label>
+                  <p className="text-xs text-muted-foreground">Choose a color scheme for the review request email your client receives.</p>
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                    {([
+                      { id: "navy-orange", label: "Navy & Orange", header: "#1a1a2e", accent: "#F97316" },
+                      { id: "green-black", label: "Green & Black", header: "#0a0a0a", accent: "#22c55e" },
+                      { id: "blue-white", label: "Blue & White", header: "#2563eb", accent: "#3b82f6" },
+                      { id: "black-gold", label: "Black & Gold", header: "#0a0a0a", accent: "#eab308" },
+                      { id: "red-white", label: "Red & White", header: "#dc2626", accent: "#ef4444" },
+                      { id: "purple-white", label: "Purple & White", header: "#7c3aed", accent: "#8b5cf6" },
+                      { id: "teal-white", label: "Teal & White", header: "#0d9488", accent: "#14b8a6" },
+                      { id: "white-gray", label: "White & Gray", header: "#dee2e6", accent: "#374151" },
+                      { id: "black-white", label: "Black & White", header: "#000000", accent: "#ffffff" },
+                    ] as const).map(theme => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => setEmailTheme(theme.id)}
+                        className={`relative flex flex-col items-center gap-1 rounded-lg border-2 p-2 transition-all ${
+                          emailTheme === theme.id
+                            ? "border-foreground ring-1 ring-foreground/20"
+                            : "border-border hover:border-foreground/30"
+                        }`}
+                        data-testid={`button-theme-${theme.id}`}
+                      >
+                        <div className="flex h-7 w-full flex-col overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
+                          <div className="flex-1" style={{ background: theme.header }} />
+                          <div className="h-1.5" style={{ background: theme.accent }} />
+                        </div>
+                        <span className="text-center text-[9px] leading-tight text-muted-foreground">{theme.label}</span>
+                        {emailTheme === theme.id && (
+                          <div className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-foreground text-background">
+                            <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="relative flex items-center gap-1.5">
+                    <Label htmlFor="bccEmail">BCC email</Label>
+                    <div className="sm:relative">
+                      {/* Above the click-away overlay while open, so clicking it again closes the explainer. */}
+                      <button type="button" onClick={() => setBccInfoOpen(!bccInfoOpen)} aria-label="Why add a BCC email?" aria-expanded={bccInfoOpen} aria-controls="bcc-info-tooltip" className={`text-muted-foreground hover:text-foreground transition-colors ${bccInfoOpen ? "relative z-[301]" : ""}`} data-testid="icon-bcc-info">
+                        <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      {bccInfoOpen && (
+                        <>
+                          <div className="fixed inset-0 z-[299]" onClick={() => setBccInfoOpen(false)} />
+                          <div id="bcc-info-tooltip" className="absolute left-0 right-0 top-full mt-2 rounded-lg border bg-popover p-3 text-xs text-popover-foreground shadow-lg z-[300] sm:left-full sm:right-auto sm:top-0 sm:ml-2 sm:mt-0 sm:w-72" data-testid="tooltip-bcc-info">
+                            <button type="button" onClick={() => setBccInfoOpen(false)} aria-label="Close" className="absolute right-1.5 top-1.5 text-muted-foreground hover:text-foreground"><X className="h-3 w-3" aria-hidden="true" /></button>
+                            <p className="mb-1.5 font-semibold">Why this matters for deliverability</p>
+                            <p className="mb-1.5">Adding a BCC of your existing business email helps the review request avoid spam folders. Email providers like Gmail track sender-recipient relationships — if this client has already received emails from you, that trust carries over.</p>
+                            <p className="mb-1.5"><strong>Use the same email you&rsquo;ve been communicating with this client through.</strong> If you used a CRM, use a well-established, trusted email address instead.</p>
+                            <p className="text-muted-foreground">The client will never see this address — it simply helps email providers recognize this as a legitimate, expected message.</p>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </CardContent>
-          )}
-        </Card>
-      )}
+                  <Input
+                    id="bccEmail"
+                    type="email"
+                    value={bccEmail}
+                    onChange={(e) => setBccEmail(e.target.value)}
+                    placeholder="you@yourcompany.com"
+                    data-testid="input-bcc-email"
+                  />
+                  {savedBccEmails.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {savedBccEmails.map((email) => (
+                        <div
+                          key={email}
+                          className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors ${bccEmail === email ? "border-primary/30 bg-primary/10 text-primary" : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                          data-testid={`chip-bcc-${email}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setBccEmail(bccEmail === email ? "" : email)}
+                            className="max-w-[160px] truncate"
+                            data-testid={`button-select-bcc-${email}`}
+                          >
+                            {email}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updated = savedBccEmails.filter(x => x !== email);
+                              setSavedBccEmails(updated);
+                              localStorage.setItem("savedBccEmails", JSON.stringify(updated));
+                              if (bccEmail === email) setBccEmail("");
+                            }}
+                            className="ml-0.5 text-muted-foreground transition-colors hover:text-destructive"
+                            data-testid={`button-remove-bcc-${email}`}
+                          >
+                            <X className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {bccEmail.trim() && !savedBccEmails.includes(bccEmail.trim().toLowerCase()) && savedBccEmails.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const email = bccEmail.trim().toLowerCase();
+                        const updated = [email, ...savedBccEmails].slice(0, 3);
+                        setSavedBccEmails(updated);
+                        localStorage.setItem("savedBccEmails", JSON.stringify(updated));
+                      }}
+                      className="mt-1 flex items-center gap-1 text-[11px] text-primary transition-colors hover:text-primary/80"
+                      data-testid="button-save-bcc"
+                    >
+                      <Plus className="h-3 w-3" aria-hidden="true" />Save this email for quick access
+                    </button>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-      <ReminderSettingsCard />
-      </div>)}
+            <Notice tone="info">
+              Every client — whatever their rating — is invited to leave a Google review; Google&rsquo;s policy prohibits asking only happy customers. They can also send you private improvement notes.
+            </Notice>
 
-      {pageTab === "profile-reviews" && (
-        <GoogleProfileReviewsTab />
-      )}
-    </div>
+            <div className="space-y-3">
+              <label className="flex cursor-pointer items-center gap-2" data-testid="checkbox-schedule-toggle">
+                <input
+                  type="checkbox"
+                  checked={scheduleEnabled}
+                  onChange={e => setScheduleEnabled(e.target.checked)}
+                />
+                <CalendarDays className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-sm font-medium">Schedule for later</span>
+              </label>
+
+              {scheduleEnabled && (
+                <div className="space-y-3 border-l-2 pl-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Date</Label>
+                      <Input
+                        type="date"
+                        value={scheduleDate}
+                        onChange={e => setScheduleDate(e.target.value)}
+                        min={localYmd(new Date())}
+                        className="text-sm"
+                        data-testid="input-schedule-date"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Time</Label>
+                      <Input
+                        type="time"
+                        value={scheduleTime}
+                        onChange={e => setScheduleTime(e.target.value)}
+                        className="text-sm"
+                        data-testid="input-schedule-time"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "Tomorrow 9am", getDate: tomorrowYmd, time: "09:00" },
+                      { label: "Tomorrow 3pm", getDate: tomorrowYmd, time: "15:00" },
+                      { label: "Tomorrow 6pm", getDate: tomorrowYmd, time: "18:00" },
+                    ].map(preset => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                          scheduleDate === preset.getDate() && scheduleTime === preset.time
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        }`}
+                        onClick={() => { setScheduleDate(preset.getDate()); setScheduleTime(preset.time); }}
+                        data-testid={`button-preset-${preset.label.toLowerCase().replace(/\s+/g, "-")}`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                  {scheduleDate && scheduleTime && (
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" aria-hidden="true" />
+                      Will be sent on {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at {new Date(`${scheduleDate}T${scheduleTime}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {!hasGoogleUrl && !selectedTemplateId && clientName && clientEmail && (
+              <p className="flex items-center gap-1 text-xs text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                Select a Google Business Profile above to send requests.
+              </p>
+            )}
+
+            <Button
+              className="w-full"
+              onClick={() => createMutation.mutate()}
+              disabled={!canSend || createMutation.isPending || (scheduleEnabled && (!scheduleDate || !scheduleTime))}
+              data-testid="button-send-review-request"
+            >
+              {createMutation.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />{scheduleEnabled ? "Scheduling…" : "Sending…"}</>
+              ) : scheduleEnabled ? (
+                <><CalendarDays className="mr-2 h-4 w-4" aria-hidden="true" />Schedule feedback request</>
+              ) : (
+                <><Send className="mr-2 h-4 w-4" aria-hidden="true" />Send feedback request</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add / edit Google Business Profile ──────────────────────────── */}
+      <Dialog open={templateDialogOpen} onOpenChange={(open) => { setTemplateDialogOpen(open); if (!open) { setEditingTemplate(null); resetTemplateForm(); } }}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" data-testid="modal-template">
+          <DialogHeader>
+            <DialogTitle>{editingTemplate ? "Edit Google Business Profile" : "Add Google Business Profile"}</DialogTitle>
+            <DialogDescription>
+              Each profile links to a different Google Business listing. When you send a review request, just pick which profile it&rsquo;s for.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tplName">Profile or location name *</Label>
+              <Input
+                id="tplName"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="e.g., ABC Roofing - Dallas, Main Street Office"
+                data-testid="input-template-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tplUrl">Google review link *</Label>
+              <Input
+                id="tplUrl"
+                type="url"
+                inputMode="url"
+                value={templateGoogleUrl}
+                onChange={(e) => setTemplateGoogleUrl(e.target.value)}
+                placeholder="https://g.page/r/..."
+                aria-invalid={templateUrlInvalid}
+                aria-describedby={templateUrlInvalid ? "tplUrl-error" : undefined}
+                data-testid="input-template-google-url"
+              />
+              {templateUrlInvalid && (
+                <p id="tplUrl-error" className="text-xs text-destructive" data-testid="text-template-url-error">
+                  Paste your Google review link (https://g.page/r/... or a Google Maps link).
+                </p>
+              )}
+              <Notice tone="info">
+                In your Google Business Profile, click <strong>&ldquo;Ask for reviews&rdquo;</strong> and copy the review link that looks like <span className="font-mono text-[10px]">https://g.page/r/xxxx/review</span>.
+              </Notice>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tplDesc">Default project description</Label>
+              <Textarea
+                id="tplDesc"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="e.g., Full kitchen renovation including cabinets, countertops, backsplash, and flooring..."
+                rows={3}
+                data-testid="input-template-description"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="tplDefault"
+                checked={templateIsDefault}
+                onChange={(e) => setTemplateIsDefault(e.target.checked)}
+                data-testid="checkbox-template-default"
+              />
+              <Label htmlFor="tplDefault" className="cursor-pointer text-sm">Set as default profile</Label>
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => editingTemplate ? updateTemplateMutation.mutate() : createTemplateMutation.mutate()}
+              disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || createTemplateMutation.isPending || updateTemplateMutation.isPending}
+              data-testid="button-save-template"
+            >
+              {(createTemplateMutation.isPending || updateTemplateMutation.isPending) ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />Saving…</>
+              ) : (
+                <>{editingTemplate ? "Save changes" : "Save profile"}</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </AppPage>
   );
 }
 
 function GoogleProfileReviewsTab() {
-  const f=useAgencyFilter();
-  const [reviewOffset,setReviewOffset]=useState(0);
+  const f = useAgencyFilter();
+  const [reviewOffset, setReviewOffset] = useState(0);
   const { data: gbp } = useQuery<any>({ queryKey: ["/api/gbp/status"] });
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -2051,7 +1834,8 @@ function GoogleProfileReviewsTab() {
     setResponseFilter("all");
   };
 
-  const hasFilters = searchQuery || locationFilter !== "all" || ratingFilter !== "all" || responseFilter !== "all";
+  const activeFilters = (locationFilter !== "all" ? 1 : 0) + (ratingFilter !== "all" ? 1 : 0) + (responseFilter !== "all" ? 1 : 0);
+  const hasFilters = searchQuery || activeFilters > 0;
 
   const allLocations = locations.map((l: any) => ({
     id: `loc-${l.id}`,
@@ -2068,216 +1852,178 @@ function GoogleProfileReviewsTab() {
     : allLocations;
 
   const selectedLocationName = locationFilter === "all"
-    ? "All Locations"
+    ? "All locations"
     : allLocations.find(l => l.id === locationFilter)?.name || "Unknown";
 
   const renderStars = (rating: number) => (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map(s => (
-        <Star key={s} className={`w-3.5 h-3.5 ${s <= rating ? "fill-amber-400 text-amber-400" : "text-gray-300 dark:text-gray-600"}`} />
+        <Star key={s} className={`h-3.5 w-3.5 ${s <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} aria-hidden="true" />
       ))}
     </div>
   );
 
   return (
-    <div className="space-y-6 relative z-10">
-      <AgencyWorkspace compact/>
-      <Pager offset={reviewOffset} total={totalReviews} onChange={setReviewOffset}/>
+    <div className="space-y-5 sm:space-y-6">
       <GbpConnection />
       <AiReplySettings locations={locations} />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-medium">Search</Label>
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by review or comment"
-              className="pl-9"
-              data-testid="input-search-profile-reviews"
-            />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-medium">Location</Label>
-          <div className="relative">
-            <button
-              onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-input bg-background text-sm hover:bg-accent/50 transition-colors"
-              data-testid="dropdown-location-filter"
-            >
-              <span className="truncate">{selectedLocationName}</span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
-            </button>
-            {locationDropdownOpen && (
-              <>
-                <div className="fixed inset-0 z-[49]" onClick={() => setLocationDropdownOpen(false)} />
-                <div className="absolute top-full left-0 right-0 mt-1 z-[50] bg-popover border border-border rounded-lg shadow-lg max-h-72 overflow-hidden">
-                  <div className="p-2 border-b border-border">
-                    <Input
-                      value={locationSearch}
-                      onChange={(e) => setLocationSearch(e.target.value)}
-                      placeholder="Search by name, address, place id or store code"
-                      className="text-xs h-8"
-                      autoFocus
-                      data-testid="input-location-search"
-                    />
-                  </div>
-                  <div className="overflow-y-auto max-h-56">
-                    <button
-                      onClick={() => { setLocationFilter("all"); setLocationDropdownOpen(false); setLocationSearch(""); }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${locationFilter === "all" ? "bg-accent" : ""}`}
-                      data-testid="option-location-all"
-                    >
-                      All Locations
-                    </button>
-                    {filteredLocations.map((loc) => (
-                      <button
-                        key={loc.id}
-                        onClick={() => { setLocationFilter(loc.id); setLocationDropdownOpen(false); setLocationSearch(""); }}
-                        className={`w-full text-left px-3 py-2.5 hover:bg-accent transition-colors border-t border-border/30 ${locationFilter === loc.id ? "bg-accent" : ""}`}
-                        data-testid={`option-location-${loc.id}`}
-                      >
-                        <p className="text-sm font-medium truncate">{loc.name}</p>
-                        <p className="text-xs text-muted-foreground">{loc.type}</p>
-                        <p className="text-xs text-muted-foreground/60 truncate">{loc.detail}</p>
-                      </button>
-                    ))}
-                    {filteredLocations.length === 0 && (
-                      <p className="text-center text-xs text-muted-foreground py-4">No locations found</p>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-medium">Rating</Label>
-          <Select value={ratingFilter} onValueChange={setRatingFilter}>
-            <SelectTrigger className="w-[120px]" data-testid="select-rating-filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="5">5 Stars</SelectItem>
-              <SelectItem value="4">4 Stars</SelectItem>
-              <SelectItem value="3">3 Stars</SelectItem>
-              <SelectItem value="2">2 Stars</SelectItem>
-              <SelectItem value="1">1 Star</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground font-medium">Response</Label>
-          <Select value={responseFilter} onValueChange={setResponseFilter}>
-            <SelectTrigger className="w-[140px]" data-testid="select-response-filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="answered">Answered</SelectItem>
-              <SelectItem value="unanswered">Unanswered</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-amber-600 hover:text-amber-700 gap-1" data-testid="button-clear-filters">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Clear filters
-          </Button>
-        )}
-      </div>
+      <StatGrid cols={3}>
+        <Stat label="Reviews" value={totalReviews} testId="stat-total-profile-reviews" hint="matching the filters below" />
+        <Stat label="Unanswered" value={unanswered} testId="stat-unanswered" tone={unanswered > 0 ? "warn" : "default"} hint={unanswered > 0 ? "need a reply" : "all replied"} />
+        <Stat label="Average rating" value={avgRating ? avgRating.toFixed(2) : "—"} testId="stat-avg-rating" hint="across matching reviews" />
+      </StatGrid>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground font-medium">Reviews</p>
-          <p className="text-3xl font-bold" data-testid="stat-total-profile-reviews">{totalReviews}</p>
-          <p className="text-xs text-muted-foreground">Statistics for all matching reviews</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground font-medium">Unanswered</p>
-          <p className="text-3xl font-bold text-amber-600" data-testid="stat-unanswered">{unanswered}</p>
-        </div>
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground font-medium">Average rating</p>
-          <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-            <span className="text-3xl font-bold" data-testid="stat-avg-rating">{avgRating.toFixed(2)}</span>
-          </div>
-          <div className="space-y-1 mt-2">
-            {ratingDistribution.map(({ star, count, pct }) => (
-              <div key={star} className="flex items-center gap-2 text-xs">
-                <span className="text-amber-500 font-medium flex items-center gap-0.5">
-                  <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                  {star}
-                </span>
-                <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-amber-400 rounded-full transition-all"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="text-muted-foreground min-w-[80px] text-right">
-                  {pct}% ({count})
-                </span>
+      <Section title="Rating breakdown">
+        <div className="space-y-1.5">
+          {ratingDistribution.map(({ star, count, pct }) => (
+            <div key={star} className="flex items-center gap-2 text-xs">
+              <span className="flex w-6 items-center gap-0.5 font-medium text-muted-foreground">
+                <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" aria-hidden="true" />{star}
+              </span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
               </div>
-            ))}
-          </div>
+              <span className="min-w-[70px] text-right text-muted-foreground">{pct}% ({count})</span>
+            </div>
+          ))}
         </div>
-      </div>
+      </Section>
 
-      <Separator />
-
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <Section
+        title="Reviews"
+        flush
+        actions={<Pager offset={reviewOffset} total={totalReviews} onChange={setReviewOffset} />}
+      >
+        <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+          <Toolbar
+            search={{ value: searchQuery, onChange: setSearchQuery, placeholder: "Search reviews", testId: "input-search-profile-reviews" }}
+            filters={<>
+              <div className="relative sm:w-56">
+                <button
+                  onClick={() => setLocationDropdownOpen(!locationDropdownOpen)}
+                  className="flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm hover:bg-accent/50"
+                  data-testid="dropdown-location-filter"
+                >
+                  <span className="truncate">{selectedLocationName}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </button>
+                {locationDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[49]" onClick={() => setLocationDropdownOpen(false)} />
+                    <div className="absolute left-0 right-0 top-full z-[50] mt-1 max-h-72 overflow-hidden rounded-lg border bg-popover shadow-lg">
+                      <div className="border-b p-2">
+                        <Input
+                          value={locationSearch}
+                          onChange={(e) => setLocationSearch(e.target.value)}
+                          placeholder="Search by name, address, place id or store code"
+                          className="h-8 text-xs"
+                          autoFocus
+                          data-testid="input-location-search"
+                        />
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        <button
+                          onClick={() => { setLocationFilter("all"); setLocationDropdownOpen(false); setLocationSearch(""); }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent ${locationFilter === "all" ? "bg-accent" : ""}`}
+                          data-testid="option-location-all"
+                        >
+                          All locations
+                        </button>
+                        {filteredLocations.map((loc) => (
+                          <button
+                            key={loc.id}
+                            onClick={() => { setLocationFilter(loc.id); setLocationDropdownOpen(false); setLocationSearch(""); }}
+                            className={`w-full border-t border-border/30 px-3 py-2.5 text-left transition-colors hover:bg-accent ${locationFilter === loc.id ? "bg-accent" : ""}`}
+                            data-testid={`option-location-${loc.id}`}
+                          >
+                            <p className="truncate text-sm font-medium">{loc.name}</p>
+                            <p className="text-xs text-muted-foreground">{loc.type}</p>
+                            <p className="truncate text-xs text-muted-foreground/60">{loc.detail}</p>
+                          </button>
+                        ))}
+                        {filteredLocations.length === 0 && (
+                          <p className="py-4 text-center text-xs text-muted-foreground">No locations found</p>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              <Select value={ratingFilter} onValueChange={setRatingFilter}>
+                <SelectTrigger className="h-10 w-full sm:w-[130px]" data-testid="select-rating-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All ratings</SelectItem>
+                  <SelectItem value="5">5 stars</SelectItem>
+                  <SelectItem value="4">4 stars</SelectItem>
+                  <SelectItem value="3">3 stars</SelectItem>
+                  <SelectItem value="2">2 stars</SelectItem>
+                  <SelectItem value="1">1 star</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={responseFilter} onValueChange={setResponseFilter}>
+                <SelectTrigger className="h-10 w-full sm:w-[140px]" data-testid="select-response-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="answered">Answered</SelectItem>
+                  <SelectItem value="unanswered">Unanswered</SelectItem>
+                </SelectContent>
+              </Select>
+            </>}
+            activeFilters={activeFilters}
+            actions={hasFilters ? (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1" data-testid="button-clear-filters">
+                <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />Clear filters
+              </Button>
+            ) : undefined}
+          />
         </div>
-      ) : reviews.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center space-y-3">
-            <Star className="w-10 h-10 text-muted-foreground mx-auto" />
-            <p className="font-medium">No Google profile reviews yet</p>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Reviews from your Google Business Profiles will appear here once synced. Connect your Google account, import a location, then choose Sync now.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {reviews.map((review: any) => {
-            const isExpanded = expandedReviewId === review.id;
-            const locationName = (() => {
-              if (review.locationId) {
-                const loc = locations.find((l: any) => l.id === review.locationId);
-                if (loc) return loc.businessName;
-              }
-              if (review.templateId) {
-                const tpl = templates.find((t: any) => t.id === review.templateId);
-                if (tpl) return tpl.name;
-              }
-              return null;
-            })();
-            const locationCategories = (() => {
-              if (review.locationId) {
-                const loc = locations.find((l: any) => l.id === review.locationId);
-                return loc?.categories?.join(", ") || "";
-              }
-              return "";
-            })();
 
-            return (
-              <Card key={review.id} data-testid={`card-profile-review-${review.id}`}>
-                <CardContent className="p-0">
-                  <div className={`px-4 pt-3 pb-2 border-b border-border/30 flex items-center gap-2 ${locationName ? "justify-between" : "justify-end"}`}>
+        <div className="p-4 pt-3 sm:p-5 sm:pt-3">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+            </div>
+          ) : reviews.length === 0 ? (
+            <EmptyState
+              icon={Star}
+              title="No Google profile reviews yet"
+              description="Reviews from your Google Business Profiles appear here once synced. Connect your Google account, import a location, then choose Sync now."
+            />
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((review: any) => {
+                const isExpanded = expandedReviewId === review.id;
+                const locationName = (() => {
+                  if (review.locationId) {
+                    const loc = locations.find((l: any) => l.id === review.locationId);
+                    if (loc) return loc.businessName;
+                  }
+                  if (review.templateId) {
+                    const tpl = templates.find((t: any) => t.id === review.templateId);
+                    if (tpl) return tpl.name;
+                  }
+                  return null;
+                })();
+                const locationCategories = (() => {
+                  if (review.locationId) {
+                    const loc = locations.find((l: any) => l.id === review.locationId);
+                    return loc?.categories?.join(", ") || "";
+                  }
+                  return "";
+                })();
+
+                return (
+                  <article key={review.id} className="overflow-hidden rounded-xl border" data-testid={`card-profile-review-${review.id}`}>
+                    <div className={`flex items-center gap-2 border-b px-4 py-2 ${locationName ? "justify-between" : "justify-end"}`}>
                       {locationName && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
-                          <Building2 className="w-3.5 h-3.5 shrink-0" />
-                          <span className="font-medium text-foreground truncate">{locationName}</span>
+                        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                          <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate font-medium text-foreground">{locationName}</span>
                           {locationCategories && (
                             <>
                               <span className="text-border">|</span>
@@ -2289,213 +2035,215 @@ function GoogleProfileReviewsTab() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs h-7 gap-1"
+                        className="h-7 gap-1 text-xs"
                         onClick={() => {
                           setNoteEditId(review.id);
                           setNoteText(review.internalNote || "");
                         }}
                         data-testid={`button-add-note-${review.id}`}
                       >
-                        <StickyNote className="w-3 h-3" />
-                        {review.internalNote ? "Edit Note" : "Add Internal Note"}
+                        <StickyNote className="h-3 w-3" aria-hidden="true" />
+                        {review.internalNote ? "Edit note" : "Add internal note"}
                       </Button>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center shrink-0">
-                        {review.reviewerPhotoUrl ? (
-                          <img src={review.reviewerPhotoUrl} alt="" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          <span className="text-white font-bold text-sm">{review.reviewerName?.charAt(0)?.toUpperCase() || "?"}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <p className="font-semibold text-sm" data-testid={`text-reviewer-name-${review.id}`}>{review.reviewerName}</p>
-                          {renderStars(review.rating)}
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(review.reviewDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {" "}
-                            {new Date(review.reviewDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                          </span>
-                        </div>
-                        {review.comment && (
-                          <p className="text-sm mt-2 leading-relaxed" data-testid={`text-review-comment-${review.id}`}>
-                            {isExpanded ? review.comment : review.comment.length > 200 ? review.comment.slice(0, 200) + "..." : review.comment}
-                          </p>
-                        )}
-                        {review.comment?.length > 200 && (
-                          <button
-                            onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
-                            className="text-xs text-amber-600 hover:text-amber-700 mt-1"
-                            data-testid={`button-expand-review-${review.id}`}
-                          >
-                            {isExpanded ? "Show less" : "Read more"}
-                          </button>
-                        )}
-
-                        {review.internalNote && noteEditId !== review.id && (
-                          <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800/40 rounded text-xs">
-                            <span className="font-medium text-yellow-700 dark:text-yellow-400 flex items-center gap-1 mb-0.5">
-                              <StickyNote className="w-3 h-3" /> Internal Note:
-                            </span>
-                            <span className="text-yellow-800 dark:text-yellow-300">{review.internalNote}</span>
-                          </div>
-                        )}
-
-                        {noteEditId === review.id && (
-                          <div className="mt-3 space-y-2">
-                            <Textarea
-                              value={noteText}
-                              onChange={(e) => setNoteText(e.target.value)}
-                              placeholder="Add an internal note (only visible to you)..."
-                              className="text-sm min-h-[60px]"
-                              data-testid={`input-note-${review.id}`}
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => noteMutation.mutate({ id: review.id, internalNote: noteText })}
-                                disabled={noteMutation.isPending}
-                                data-testid={`button-save-note-${review.id}`}
-                              >
-                                {noteMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                                Save Note
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => setNoteEditId(null)}>Cancel</Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {!review.replyComment && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
-                            title="Reply"
-                            data-testid={`button-reply-${review.id}`}
-                          >
-                            <MessageSquare className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {confirmDeleteReviewId === review.id ? (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-destructive hover:bg-destructive hover:text-white font-semibold"
-                              onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteReviewId(null); }}
-                              data-testid={`button-confirm-delete-review-${review.id}`}
-                            >
-                              Delete
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-xs text-muted-foreground"
-                              onClick={() => setConfirmDeleteReviewId(null)}
-                              data-testid={`button-cancel-delete-review-${review.id}`}
-                            >
-                              Cancel
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => setConfirmDeleteReviewId(review.id)}
-                            title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
-                            data-testid={`button-delete-review-${review.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
                     </div>
 
-                    {replyingToId === review.id && !review.replyComment && (
-                      <div className="mt-4 ml-13 pl-4 border-l-2 border-amber-300 space-y-2">
-                        <Label className="text-xs font-medium">Reply to this review:</Label>
-                        <Textarea
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Write your reply..."
-                          className="text-sm min-h-[80px]"
-                          data-testid={`input-reply-${review.id}`}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-amber-500 hover:bg-amber-600 text-white"
-                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: gbp?.connected && review.googleReviewId ? "publish" : "draft" })}
-                            disabled={!replyText.trim() || replyMutation.isPending}
-                            data-testid={`button-submit-reply-${review.id}`}
-                          >
-                            {replyMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Send className="w-3 h-3 mr-1" />}
-                            {gbp?.connected && review.googleReviewId ? "Publish reply to Google" : "Save draft in ConstructHUB"}
-                          </Button>
-                          {gbp?.connected && review.googleReviewId && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
-                          <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
+                    <div className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
+                          {review.reviewerPhotoUrl ? (
+                            <img src={review.reviewerPhotoUrl} alt="" className="h-full w-full rounded-full object-cover" />
+                          ) : (
+                            <span className="text-sm font-semibold text-muted-foreground">{review.reviewerName?.charAt(0)?.toUpperCase() || "?"}</span>
+                          )}
                         </div>
-                      </div>
-                    )}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <p className="text-sm font-semibold" data-testid={`text-reviewer-name-${review.id}`}>{review.reviewerName}</p>
+                            {renderStars(review.rating)}
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(review.reviewDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              {" "}
+                              {new Date(review.reviewDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          {review.comment && (
+                            <p className="mt-2 text-sm leading-relaxed" data-testid={`text-review-comment-${review.id}`}>
+                              {isExpanded ? review.comment : review.comment.length > 200 ? review.comment.slice(0, 200) + "..." : review.comment}
+                            </p>
+                          )}
+                          {review.comment?.length > 200 && (
+                            <button
+                              onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
+                              className="mt-1 text-xs text-primary hover:underline"
+                              data-testid={`button-expand-review-${review.id}`}
+                            >
+                              {isExpanded ? "Show less" : "Read more"}
+                            </button>
+                          )}
 
-                    <GoogleReport type="reviews" id={review.id} />
-                    {!review.googleReviewId && <p className="text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
-                    {review.replyDraft && (
-                      <div className="p-3 flex items-start gap-2" data-testid={`reply-draft-${review.id}`}>
-                        <p className="text-sm flex-1 min-w-0 break-words">Draft saved in ConstructHUB: {review.replyDraft}</p>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive shrink-0"
-                          disabled={replyMutation.isPending}
-                          onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "draft" })}
-                          data-testid={`button-discard-draft-${review.id}`}
-                        >
-                          Discard draft
-                        </Button>
-                      </div>
-                    )}
-                    {review.replyError && <p role="alert" className="text-destructive">{review.replyError}</p>}
-                    {review.replyComment && (
-                      <div className="mt-4 ml-4 sm:ml-13 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/40 rounded-lg">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">{review.replyStatus === "posted" ? "Posted on Google:" : "Local draft (not posted):"}</span>
-                          <div className="flex items-center gap-2">
-                            {review.replyDate && (
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(review.replyDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                {" "}
-                                {new Date(review.replyDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          {review.internalNote && noteEditId !== review.id && (
+                            <div className="mt-2 rounded-lg border-l-2 border-amber-400 bg-muted/40 p-2 text-xs">
+                              <span className="mb-0.5 flex items-center gap-1 font-medium text-muted-foreground">
+                                <StickyNote className="h-3 w-3" aria-hidden="true" />Internal note
                               </span>
-                            )}
+                              <span className="text-muted-foreground">{review.internalNote}</span>
+                            </div>
+                          )}
+
+                          {noteEditId === review.id && (
+                            <div className="mt-3 space-y-2">
+                              <Textarea
+                                value={noteText}
+                                onChange={(e) => setNoteText(e.target.value)}
+                                placeholder="Add an internal note (only visible to you)..."
+                                className="min-h-[60px] text-sm"
+                                data-testid={`input-note-${review.id}`}
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => noteMutation.mutate({ id: review.id, internalNote: noteText })}
+                                  disabled={noteMutation.isPending}
+                                  data-testid={`button-save-note-${review.id}`}
+                                >
+                                  {noteMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+                                  Save note
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setNoteEditId(null)}>Cancel</Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          {!review.replyComment && (
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
-                              title="Delete reply"
-                              data-testid={`button-delete-reply-${review.id}`}
+                              className="h-8 w-8"
+                              onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
+                              title="Reply"
+                              data-testid={`button-reply-${review.id}`}
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <MessageSquare className="h-4 w-4" aria-hidden="true" />
                             </Button>
+                          )}
+                          {confirmDeleteReviewId === review.id ? (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white"
+                                onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteReviewId(null); }}
+                                data-testid={`button-confirm-delete-review-${review.id}`}
+                              >
+                                Delete
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs text-muted-foreground"
+                                onClick={() => setConfirmDeleteReviewId(null)}
+                                data-testid={`button-cancel-delete-review-${review.id}`}
+                              >
+                                Cancel
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => setConfirmDeleteReviewId(review.id)}
+                              title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
+                              data-testid={`button-delete-review-${review.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {replyingToId === review.id && !review.replyComment && (
+                        <div className="ml-4 space-y-2 border-l-2 pl-4 sm:ml-12">
+                          <Label className="text-xs font-medium">Reply to this review:</Label>
+                          <Textarea
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="Write your reply..."
+                            className="min-h-[80px] text-sm"
+                            data-testid={`input-reply-${review.id}`}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: gbp?.connected && review.googleReviewId ? "publish" : "draft" })}
+                              disabled={!replyText.trim() || replyMutation.isPending}
+                              data-testid={`button-submit-reply-${review.id}`}
+                            >
+                              {replyMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : <Send className="mr-1 h-3 w-3" aria-hidden="true" />}
+                              {gbp?.connected && review.googleReviewId ? "Publish reply to Google" : "Save draft in ConstructHUB"}
+                            </Button>
+                            {gbp?.connected && review.googleReviewId && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
+                            <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
                           </div>
                         </div>
-                        <p className="text-sm leading-relaxed">{review.replyComment}</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                      )}
+
+                      <GoogleReport type="reviews" id={review.id} />
+                      {!review.googleReviewId && <p className="mt-2 text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
+                      {review.replyDraft && (
+                        <div className="mt-3 flex items-start gap-2 rounded-lg border bg-muted/30 p-3" data-testid={`reply-draft-${review.id}`}>
+                          <p className="min-w-0 flex-1 break-words text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
+                            disabled={replyMutation.isPending}
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "draft" })}
+                            data-testid={`button-discard-draft-${review.id}`}
+                          >
+                            Discard draft
+                          </Button>
+                        </div>
+                      )}
+                      {review.replyError && <p role="alert" className="mt-2 text-sm text-destructive">{review.replyError}</p>}
+                      {review.replyComment && (
+                        <div className="mt-3 rounded-lg border bg-muted/30 p-3 sm:ml-12">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground">{review.replyStatus === "posted" ? "Posted on Google:" : "Local draft (not posted):"}</span>
+                            <div className="flex items-center gap-2">
+                              {review.replyDate && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(review.replyDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {" "}
+                                  {new Date(review.replyDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                                </span>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
+                                title="Delete reply"
+                                data-testid={`button-delete-reply-${review.id}`}
+                              >
+                                <Trash2 className="h-3 w-3" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </div>
+                          <p className="text-sm leading-relaxed">{review.replyComment}</p>
+                        </div>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </Section>
+
+      <AgencyWorkspace compact />
     </div>
   );
 }
@@ -2557,40 +2305,29 @@ function ReminderSettingsCard() {
     return `${hr}:00 ${ampm}`;
   };
 
-  const reminderLabels = ["1st Reminder", "2nd Reminder", "3rd Reminder"];
+  const reminderLabels = ["1st reminder", "2nd reminder", "3rd reminder"];
 
   return (
-    <Card data-testid="card-reminder-settings">
-      <CardHeader className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-              <Bell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Follow-Up Reminders</CardTitle>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Automatically remind clients who haven't responded
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={currentSettings.enabled ? "default" : "secondary"} className={currentSettings.enabled ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""} data-testid="badge-reminder-status">
-              {currentSettings.enabled ? "Active" : "Disabled"}
-            </Badge>
-            {expanded ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
-          </div>
-        </div>
-      </CardHeader>
-
+    <Section
+      testId="card-reminder-settings"
+      title="Follow-up reminders"
+      description={expanded ? undefined : "Automatically remind clients who haven&rsquo;t responded."}
+      actions={<>
+        <StatusPill tone={currentSettings.enabled ? "success" : "neutral"} data-testid="badge-reminder-status">
+          {currentSettings.enabled ? "Active" : "Disabled"}
+        </StatusPill>
+        <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+          {expanded ? "Close" : "Manage"}
+          {expanded ? <ChevronUp className="ml-1 h-4 w-4" aria-hidden="true" /> : <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" />}
+        </Button>
+      </>}
+    >
       {expanded && (
-        <CardContent className="space-y-6 pt-0">
-          <Separator />
-
-          <div className="flex items-center justify-between">
+        <div className="space-y-5 border-t pt-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <Label className="text-base font-medium">Enable Automatic Reminders</Label>
-              <p className="text-sm text-muted-foreground mt-1">Send follow-up emails to clients who haven't responded</p>
+              <Label className="text-sm font-medium">Automatic reminders</Label>
+              <p className="text-sm text-muted-foreground">Send follow-up emails to clients who haven&rsquo;t responded.</p>
             </div>
             <Switch
               checked={currentSettings.enabled}
@@ -2601,13 +2338,11 @@ function ReminderSettingsCard() {
 
           {currentSettings.enabled && (
             <>
-              <Separator />
-
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <Timer className="h-4 w-4" />
-                    Interval Between Reminders
+                    <Timer className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    Interval between reminders
                   </Label>
                   <Select
                     value={String(currentSettings.intervalHours)}
@@ -2628,8 +2363,8 @@ function ReminderSettingsCard() {
 
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <RefreshCw className="h-4 w-4" />
-                    Max Reminders Per Client
+                    <RefreshCw className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    Max reminders per client
                   </Label>
                   <Select
                     value={String(currentSettings.maxReminders)}
@@ -2649,18 +2384,18 @@ function ReminderSettingsCard() {
               </div>
 
               <div className="space-y-3">
-                <Label className="flex items-center gap-2 text-base font-medium">
-                  <Clock className="h-4 w-4" />
-                  Delivery Time Windows ({timeZoneLabel(currentSettings.timezone || "America/New_York")})
+                <Label className="flex items-center gap-2 text-sm font-medium">
+                  <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  Delivery windows ({timeZoneLabel(currentSettings.timezone || "America/New_York")})
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Each reminder is sent during a different time window for better open rates. Times rotate through the windows below.
+                  Each reminder is sent during a different window; times rotate through the windows below.
                 </p>
 
                 <div className="grid gap-3">
                   {(currentSettings.timeWindows || []).slice(0, currentSettings.maxReminders).map((window: any, i: number) => (
-                    <div key={i} className="flex flex-wrap items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
-                      <Badge variant="outline" className="shrink-0 text-xs min-w-[100px] justify-center">
+                    <div key={i} className="flex flex-wrap items-center gap-3 rounded-xl border bg-muted/30 p-3">
+                      <Badge variant="outline" className="min-w-[100px] shrink-0 justify-center text-xs">
                         {reminderLabels[i] || `Reminder ${i + 1}`}
                       </Badge>
                       <Select
@@ -2676,7 +2411,7 @@ function ReminderSettingsCard() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <span className="text-muted-foreground text-sm">to</span>
+                      <span className="text-sm text-muted-foreground">to</span>
                       <Select
                         value={String(window.end)}
                         onValueChange={v => updateTimeWindow(i, "end", parseInt(v))}
@@ -2695,27 +2430,24 @@ function ReminderSettingsCard() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200/50 dark:border-amber-800/50">
-                <Info className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                <div className="text-xs text-amber-700 dark:text-amber-300 space-y-1">
-                  <p><strong>How it works:</strong> When you send a review request, the system automatically schedules follow-up reminders at the intervals and times configured above.</p>
-                  <p>Reminders automatically stop when the client submits feedback, unsubscribes, or the max reminder count is reached. Every reminder includes a visible unsubscribe link.</p>
-                </div>
-              </div>
+              <Notice tone="info" title="How it works">
+                Reminders are scheduled automatically when you send a request, and stop when the client responds, unsubscribes, or the max count is reached. Every reminder includes an unsubscribe link.
+              </Notice>
             </>
           )}
 
           <div className="flex justify-end">
             <Button
+              variant="outline"
               onClick={() => saveMutation.mutate(currentSettings)}
               disabled={saveMutation.isPending}
               data-testid="button-save-reminder-settings"
             >
-              {saveMutation.isPending ? "Saving..." : "Save Reminder Settings"}
+              {saveMutation.isPending ? "Saving…" : "Save reminder settings"}
             </Button>
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </Section>
   );
 }
