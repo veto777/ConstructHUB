@@ -226,7 +226,10 @@
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
-.app-theme body { letter-spacing: 0; word-spacing: 0.03em; font-feature-settings: "cv11", "ss01"; }
+/* Plus Jakarta Sans has a narrow space (≈0.2em): open it a little, and on form controls too — buttons, inputs and
+   selects don't inherit word-spacing by default, which made "Add location" read as "Addlocation". */
+.app-theme body { letter-spacing: 0; word-spacing: 0.06em; }
+.app-theme button, .app-theme input, .app-theme select, .app-theme textarea { word-spacing: inherit; }
 
 .dark.app-theme {
   --background: 222 28% 11%;
