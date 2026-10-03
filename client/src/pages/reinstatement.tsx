@@ -1,5 +1,6 @@
+import { AppPage, PageHeader, Section, StatGrid, Stat } from "@/components/app-ui";
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ReinstatementPage() {
   const { toast } = useToast();
+  const { data: user } = useQuery<any>({queryKey:["/api/auth/me"]});
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -100,6 +102,100 @@ export default function ReinstatementPage() {
 
   const canSubmit = [formData.name, formData.email, formData.businessName, formData.businessAddress, formData.businessType, formData.problemDescription]
     .every((v) => v.trim() !== "");
+
+  const requestForm = (                <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Your name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-name" />
+                    </div>
+                    <div>
+                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Your email <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-email" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Business name <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-business" />
+                    </div>
+                    <div>
+                      <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Website URL</Label>
+                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-website" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Business address <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <p className="text-xs text-muted-foreground">Please include this, even if the address is hidden.</p>
+                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="input-reinstate-address" />
+                  </div>
+                  <div>
+                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Which best describes your business? <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <Select value={formData.businessType} onValueChange={v => updateField("businessType", v)}>
+                      <SelectTrigger className={user ? "mt-1.5 min-h-10" : FIELD} data-testid="select-business-type">
+                        <SelectValue placeholder="Please choose one" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="storefront">Storefront / Physical location</SelectItem>
+                        <SelectItem value="service-area">Service area business (no storefront)</SelectItem>
+                        <SelectItem value="hybrid">Hybrid (storefront + service area)</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Does this business have multiple locations? <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <RadioGroup value={formData.multipleLocations} onValueChange={v => updateField("multipleLocations", v)} className="flex gap-4 mt-2">
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="no" id="multi-no" data-testid="radio-multi-no" />
+                        <Label htmlFor="multi-no" className="text-sm">No</Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <RadioGroupItem value="yes" id="multi-yes" data-testid="radio-multi-yes" />
+                        <Label htmlFor="multi-yes" className="text-sm">Yes</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div>
+                    <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Describe the problem you're having <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
+                    <Textarea
+                      value={formData.problemDescription}
+                      onChange={e => updateField("problemDescription", e.target.value)}
+                      placeholder="Tell us about the suspension — when it happened, any details from Google, anything you've already tried, and anything else we should know."
+                      rows={4}
+                      className={user ? "mt-1.5" : "mt-1.5 rounded-lg bg-mkt-paper text-[15px] md:text-[15px]"}
+                      data-testid="textarea-problem-description"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant={user ? "outline" : "default"}
+                    className="w-full h-12 rounded-lg text-base font-semibold"
+                    disabled={!canSubmit || submitMutation.isPending}
+                    data-testid="button-submit-reinstatement"
+                  >
+                    {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Submit
+                  </Button>
+                </form>);
+  if (user) return <AppPage width="narrow" testId="page-reinstatement">
+    <PageHeader title={<span data-testid="text-reinstatement-title">Profile reinstatement</span>} description="Request help with a suspended Google Business Profile." actions={<Button asChild><a href="#request" data-testid="button-get-reinstated">Review request form</a></Button>}/>
+    <div data-testid="reinstatement-facts"><StatGrid cols={2}><Stat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><Stat label="Initial review" value="1–2 days" hint="Business days"/></StatGrid></div>
+    <Section id="request" title={<span data-testid="text-form-title">Tell us about your suspension</span>} testId="card-reinstatement-form" description="We’ll review your case before taking it on.">
+      {requestForm}
+    </Section>
+    <details className="rounded-xl border bg-card p-4 space-y-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">How reinstatement works</summary>
+      <p className="text-sm text-muted-foreground" data-testid="badge-service-label">Google Business Profile reinstatement service</p>
+      <h2 className="font-semibold" data-testid="text-process-title">How we get you back on the map</h2>
+      <ol className="space-y-4">{PROCESS_STEPS.map(step=><li key={step.num} data-testid={`process-step-${step.num}`}><h3 className="text-sm font-medium">{step.num}. {step.title}</h3><p className="text-sm text-muted-foreground">{step.desc}</p></li>)}</ol>
+      <h2 className="font-semibold" data-testid="text-suspension-reasons-title">Common suspension reasons</h2>
+      {SUSPENSION_REASONS.map((reason,i)=><p className="text-sm" key={i} data-testid={`suspension-reason-${i}`}><strong>{reason.title}.</strong> {reason.desc}</p>)}
+      <h2 className="font-semibold" data-testid="text-consequences-title">What a suspension affects</h2>
+      {CONSEQUENCES.map((item,i)=><p className="text-sm" key={i} data-testid={`card-consequence-${i}`}>{item.title}: {item.desc}</p>)}
+      <h2 className="font-semibold" data-testid="text-trust-title">What to expect</h2>
+      {TRUST_POINTS.map((item,i)=><p className="text-sm" key={i} data-testid={`card-trust-${i}`}><strong>{item.title}.</strong> {item.desc}</p>)}
+    </details>
+  </AppPage>;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -310,80 +406,7 @@ export default function ReinstatementPage() {
             <div className="rounded-2xl border border-mkt-rule bg-mkt-card" data-testid="card-reinstatement-form">
               <div className="p-6 sm:p-7">
                 <h3 className="font-display font-semibold text-[1.35rem] mb-5">Tell us about your suspension</h3>
-                <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label className={FIELD_LABEL}>Your name <span className={REQUIRED}>(required)</span></Label>
-                      <Input value={formData.name} onChange={e => updateField("name", e.target.value)} className={FIELD} data-testid="input-reinstate-name" />
-                    </div>
-                    <div>
-                      <Label className={FIELD_LABEL}>Your email <span className={REQUIRED}>(required)</span></Label>
-                      <Input type="email" required value={formData.email} onChange={e => updateField("email", e.target.value)} className={FIELD} data-testid="input-reinstate-email" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label className={FIELD_LABEL}>Business name <span className={REQUIRED}>(required)</span></Label>
-                      <Input value={formData.businessName} onChange={e => updateField("businessName", e.target.value)} className={FIELD} data-testid="input-reinstate-business" />
-                    </div>
-                    <div>
-                      <Label className={FIELD_LABEL}>Website URL</Label>
-                      <Input value={formData.websiteUrl} onChange={e => updateField("websiteUrl", e.target.value)} className={FIELD} data-testid="input-reinstate-website" />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className={FIELD_LABEL}>Business address <span className={REQUIRED}>(required)</span></Label>
-                    <p className="text-[12px] text-mkt-muted">Please include this, even if the address is hidden.</p>
-                    <Input value={formData.businessAddress} onChange={e => updateField("businessAddress", e.target.value)} className={FIELD} data-testid="input-reinstate-address" />
-                  </div>
-                  <div>
-                    <Label className={FIELD_LABEL}>Which best describes your business? <span className={REQUIRED}>(required)</span></Label>
-                    <Select value={formData.businessType} onValueChange={v => updateField("businessType", v)}>
-                      <SelectTrigger className={FIELD} data-testid="select-business-type">
-                        <SelectValue placeholder="Please choose one" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="storefront">Storefront / Physical location</SelectItem>
-                        <SelectItem value="service-area">Service area business (no storefront)</SelectItem>
-                        <SelectItem value="hybrid">Hybrid (storefront + service area)</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className={FIELD_LABEL}>Does this business have multiple locations? <span className={REQUIRED}>(required)</span></Label>
-                    <RadioGroup value={formData.multipleLocations} onValueChange={v => updateField("multipleLocations", v)} className="flex gap-4 mt-2">
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="no" id="multi-no" data-testid="radio-multi-no" />
-                        <Label htmlFor="multi-no" className="text-sm">No</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <RadioGroupItem value="yes" id="multi-yes" data-testid="radio-multi-yes" />
-                        <Label htmlFor="multi-yes" className="text-sm">Yes</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                  <div>
-                    <Label className={FIELD_LABEL}>Describe the problem you're having <span className={REQUIRED}>(required)</span></Label>
-                    <Textarea
-                      value={formData.problemDescription}
-                      onChange={e => updateField("problemDescription", e.target.value)}
-                      placeholder="Tell us about the suspension — when it happened, any details from Google, anything you've already tried, and anything else we should know."
-                      rows={4}
-                      className="mt-1.5 rounded-lg bg-mkt-paper text-[15px] md:text-[15px]"
-                      data-testid="textarea-problem-description"
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full h-12 rounded-lg text-base font-semibold"
-                    disabled={!canSubmit || submitMutation.isPending}
-                    data-testid="button-submit-reinstatement"
-                  >
-                    {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                    Submit
-                  </Button>
-                </form>
+{requestForm}
               </div>
             </div>
           </div>

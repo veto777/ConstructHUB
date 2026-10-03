@@ -1,3 +1,4 @@
+import { Section } from '@/components/app-ui';
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
@@ -45,7 +46,7 @@ function GuardUnlinked({locationId}:{locationId:number}) {
   const {data}=useGbpLinkage();
   const ready=data?.locations.find(l=>l.id===locationId)?.state==='available';
   return <Card data-testid="card-guard-unlinked"><CardHeader className="pb-3"><CardTitle className="text-base">Profile Guard</CardTitle>
-    <CardDescription>Profile Guard checks this location's Google Business Profile every 15 minutes — name, phone, website, address, categories, hours and more — and alerts you when something changes. In Lockdown it puts your approved values back after a change is detected.</CardDescription></CardHeader>
+    <CardDescription>Link this profile to check for changes every 15 minutes.</CardDescription></CardHeader>
     <CardContent className="space-y-3 text-sm">{ready
       ?<><p>This listing is on a Google account you've connected. Link it to turn on Profile Guard.</p><GbpLinkCell locationId={locationId}/></>
       :<><p>It works once this location is linked to its Google Business Profile listing. Connect the Google account that manages the listing; if the listing is found there, you can link it here.</p>
@@ -62,13 +63,13 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
   if(!data)return <p>Loading Profile Guard…</p>;
   const selected:string[]=watched??(data.snapshot?data.watched:Object.keys(fieldLabels));
   const act=(method:string,path:string,body?:any)=>mutation.mutateAsync({method,path,body});
-  return <section className="space-y-4" aria-label="Profile Guard"><h2 className="text-lg font-semibold">Profile Guard</h2>
-    <p className="text-sm">Checks every 15 minutes. Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p>
+  return <div role="region" aria-label="Profile Guard"><Section title="Profile Guard" contentClassName="space-y-4 text-sm">
+    <details><summary className="cursor-pointer py-2">How checks work</summary><p className="text-sm">Checks every 15 minutes. Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p></details>
     <p>Current mode: {data.mode}. {data.checkedAt?`Last checked ${new Date(data.checkedAt).toLocaleString()}`:'Not checked yet'}</p>
     {data.lastError&&<p role="alert">{data.lastError}</p>}
     <label className="block">Mode <select aria-label="Guard mode" className="border rounded p-2 bg-background" value={mode??data.mode} onChange={e=>setMode(e.target.value)}><option value="off">Off</option><option value="notify">Notify</option><option value="lockdown">Lockdown (auto-reject)</option></select></label>
-    <fieldset className="grid grid-cols-2 gap-2"><legend>Watched fields</legend>{Object.entries(fieldLabels).map(([f,label])=><label key={f} className="text-sm flex gap-2"><input type="checkbox" checked={selected.includes(f)} onChange={e=>setWatched(e.target.checked?[...selected,f]:selected.filter(x=>x!==f))}/>{label}</label>)}</fieldset>
-    {!data.snapshot&&<Button disabled={mutation.isPending} onClick={()=>act('POST',url+'/preview').then(setPreview).catch(()=>{})}>Preview current Google values</Button>}
+    <details><summary className="cursor-pointer py-2">Watched fields</summary><fieldset className="grid grid-cols-2 gap-2"><legend>Watched fields</legend>{Object.entries(fieldLabels).map(([f,label])=><label key={f} className="text-sm flex gap-2"><input type="checkbox" checked={selected.includes(f)} onChange={e=>setWatched(e.target.checked?[...selected,f]:selected.filter(x=>x!==f))}/>{label}</label>)}</fieldset></details>
+    {!data.snapshot&&<Button variant="outline" disabled={mutation.isPending} onClick={()=>act('POST',url+'/preview').then(setPreview).catch(()=>{})}>Preview current Google values</Button>}
     {(data.snapshot||preview)&&<details open={!data.snapshot}><summary>{data.snapshot?'Owner-approved snapshot':'Review these values before approving your snapshot'}</summary><dl>{Object.entries(data.snapshot??preview.snapshot).map(([f,v])=><div key={f} className="border-b py-2"><dt className="font-medium">{fieldLabels[f]}</dt><dd className="whitespace-pre-wrap break-all text-sm">{pretty(v)}</dd></div>)}</dl></details>}
     <p className="text-xs text-muted-foreground">Saving Guard settings asks you to confirm it’s you (password, authenticator or an emailed code): once, then not again for 12 hours. This stops anyone using a signed-in session from quietly turning Guard off.</p>
     <Button disabled={mutation.isPending} onClick={()=>act('PUT',url,{mode:mode??data.mode,watched:selected,...(!data.snapshot&&preview?{token:preview.token}:{})}).then(()=>{setPreview(null);toast({title:'Profile Guard settings saved'});}).catch(()=>{})}>{!data.snapshot&&preview?'Approve snapshot and save settings':'Save guard settings'}</Button>
@@ -78,7 +79,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
     {data.changes.map((c:any)=><article className="border rounded p-3 space-y-2" key={c.id}>
       <p className="font-medium">{fieldLabels[c.field]??c.field} — {c.status}</p><p className="text-xs">{new Date(c.detected_at).toLocaleString()} · {c.source}</p>
       <div className="grid grid-cols-2 gap-3 text-sm"><div>Approved<pre className="whitespace-pre-wrap break-all">{pretty(c.old_value)}</pre></div><div>Detected<pre className="whitespace-pre-wrap break-all">{pretty(c.new_value)}</pre></div></div>
-      {c.error&&<p role="alert">{c.error}</p>}<div className="flex flex-wrap gap-2">{c.status==='pending'&&<><Button disabled={mutation.isPending} onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'approve'}).catch(()=>{})}>Approve</Button><Button disabled={mutation.isPending} variant="outline" onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'reject'}).catch(()=>{})}>Reject</Button></>}<GoogleReport type="changes" id={c.id}/>{c.reported_at&&<span>Reported locally</span>}</div>
+      {c.error&&<p role="alert">{c.error}</p>}<div className="flex flex-wrap gap-2">{c.status==='pending'&&<><Button variant="outline" disabled={mutation.isPending} onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'approve'}).catch(()=>{})}>Approve</Button><Button disabled={mutation.isPending} variant="outline" onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'reject'}).catch(()=>{})}>Reject</Button></>}<GoogleReport type="changes" id={c.id}/>{c.reported_at&&<span>Reported locally</span>}</div>
     </article>)}
-  </section>;
+  </Section></div>;
 }

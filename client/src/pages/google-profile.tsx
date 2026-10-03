@@ -1,3 +1,4 @@
+import { AppPage, PageHeader } from "@/components/app-ui";
 /**
  * /google-profile — the sidebar's "Google Profile" button (owner, 2026-10-02: "just add button that says
  * Google Profile and it takes you to that page"). One location → its profile page; several → the list to
@@ -23,8 +24,8 @@ export default function GoogleProfilePage() {
     else setLocation("/locations", { replace: true });
   }, [data, error, setLocation]);
   return (
-    <main className="flex items-center justify-center gap-2 p-10 text-sm text-muted-foreground" data-testid="page-google-profile">
+    <AppPage testId="page-google-profile"><PageHeader title="Google Profile" description="Opening your business profile."/><div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 className="h-4 w-4 animate-spin" /> Opening your Google Business Profile…
-    </main>
+    </div></AppPage>
   );
 }
