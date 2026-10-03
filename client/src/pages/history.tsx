@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AppPage, PageHeader, EmptyState } from "@/components/app-ui";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileText,
@@ -76,117 +75,93 @@ export default function HistoryPage() {
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-          <div className="space-y-3">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-64" />
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-14 rounded-md" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const count = queries?.length ?? 0;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-        <div className="flex items-start justify-between gap-4 animate-in">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
-              Search History
-            </h1>
-            <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
-            <p className="text-sm text-muted-foreground max-w-lg">
-              Your recent permit searches. Select one to open it on the Search page and run it again.
-            </p>
-          </div>
-          {count > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setConfirmClearAll(true)}
-              disabled={deleteAllMutation.isPending}
-              data-testid="button-clear-all-history"
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Clear all
-            </Button>
-          )}
-        </div>
+    <AppPage width="narrow" testId="page-history">
+      <PageHeader
+        title={<span data-testid="text-page-title">Search history</span>}
+        description="Rerun a recent permit search with one tap."
+        actions={count > 0 ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmClearAll(true)}
+            disabled={deleteAllMutation.isPending}
+            data-testid="button-clear-all-history"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Clear all
+          </Button>
+        ) : undefined}
+      />
 
-        {queries && queries.length > 0 ? (
-          <div className="space-y-1.5">
-            {queries.map((query, index) => {
-              const Icon = typeIcons[query.searchType] ?? Search;
-              return (
-                <Card
-                  key={query.id}
-                  className="p-3.5 flex items-center gap-3 hover-elevate transition-all duration-200 group"
-                  style={{
-                    boxShadow: 'var(--shadow-2xs)',
-                    animation: `fadeSlideIn 0.3s ease-out ${index * 0.03}s both`,
-                  }}
-                  data-testid={`card-query-${query.id}`}
+      {isLoading ? (
+        <div className="space-y-2" data-testid="history-loading">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-14 animate-pulse rounded-xl border bg-card" />
+          ))}
+        </div>
+      ) : count > 0 ? (
+        <div className="rounded-xl border bg-card divide-y" data-testid="list-history">
+          {queries!.map((query) => {
+            const Icon = typeIcons[query.searchType] ?? Search;
+            return (
+              <div
+                key={query.id}
+                className="flex items-center gap-3 px-4 py-3 group"
+                data-testid={`card-query-${query.id}`}
+              >
+                <Link
+                  href={searchAgainHref(query)}
+                  className="flex flex-1 min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  title="Open this search on the Search page"
+                  data-testid={`link-search-again-${query.id}`}
                 >
-                  <Link
-                    href={searchAgainHref(query)}
-                    className="flex flex-1 min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    title="Open this search on the Search page"
-                    data-testid={`link-search-again-${query.id}`}
-                  >
-                    <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{query.searchValue}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                        <span className="capitalize">{query.searchType.replace(/_/g, " ")}</span>
-                        <span className="text-border">·</span>
-                        {new Date(query.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground flex-shrink-0">
-                      <RotateCcw className="h-3 w-3" />
-                      Search again
-                    </span>
-                  </Link>
-                  {/* Always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
-                  <button
-                    type="button"
-                    onClick={() => deleteOneMutation.mutate(query.id)}
-                    disabled={deleteOneMutation.isPending}
-                    aria-label={`Delete search "${query.searchValue}"`}
-                    title="Delete search"
-                    className="opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"
-                    data-testid={`button-delete-query-${query.id}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 animate-in-delay-1">
-            <FileText className="h-8 w-8 text-muted-foreground/20" />
-            <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">No search history</p>
-              <p className="text-xs text-muted-foreground/70 max-w-sm">
-                Your searches will appear here after you run a search.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+                  <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{query.searchValue}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                      <span className="capitalize">{query.searchType.replace(/_/g, " ")}</span>
+                      <span className="text-border">·</span>
+                      {new Date(query.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground flex-shrink-0">
+                    <RotateCcw className="h-3 w-3" />
+                    Search again
+                  </span>
+                </Link>
+                {/* Always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
+                <button
+                  type="button"
+                  onClick={() => deleteOneMutation.mutate(query.id)}
+                  disabled={deleteOneMutation.isPending}
+                  aria-label={`Delete search "${query.searchValue}"`}
+                  title="Delete search"
+                  className="opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"
+                  data-testid={`button-delete-query-${query.id}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          icon={FileText}
+          title="No searches yet"
+          description="Run a permit search and it shows up here, ready to rerun."
+          action={
+            <Button asChild>
+              <Link href="/search" data-testid="link-history-search">Search permits</Link>
+            </Button>
+          }
+        />
+      )}
 
       <AlertDialog open={confirmClearAll} onOpenChange={setConfirmClearAll}>
         <AlertDialogContent>
@@ -211,6 +186,6 @@ export default function HistoryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPage>
   );
 }
