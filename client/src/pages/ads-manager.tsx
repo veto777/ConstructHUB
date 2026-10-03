@@ -54,8 +54,8 @@ export default function AdsManagerPage() {
   };
   const enabled=status.data?.connected&&status.data?.grant?.verified;
   const rows:any[]=data.data?.items||[];
-  const header=<PageHeader title="Agency Ads & LSA manager" description="Manage client access and review ad protections before applying them." actions={status.data?.connected ? <Button disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})}>Discover clients</Button> : <Button disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})}>Connect MCC with Google</Button>} />;
   const planGate=[status.error,data.error].find(e=>planRequiredFrom(e));
+  const header=<PageHeader title="Agency Ads & LSA manager" description="Manage client access and review ad protections before applying them." actions={planGate ? null : status.data?.connected ? <Button disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})}>Discover clients</Button> : <Button disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})}>Connect MCC with Google</Button>} />;
   if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
   return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">
     {header}
