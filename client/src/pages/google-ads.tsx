@@ -537,40 +537,18 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
         </Section>
       ) : (
         <>
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Section flush className="    border-border" testId="card-blocked-count">
-              <CardContent className="p-5">
-                <Ban className="h-6 w-6 text-muted-foreground mb-2" />
-                <div className="text-2xl font-bold text-foreground">{activeBlockedCount}</div>
-                <div className="text-xs text-muted-foreground">Blocked IPs Ready to Sync</div>
-              </CardContent>
-            </Section>
-            <Section flush className="    border-border" testId="card-api-status">
-              <CardContent className="p-5">
-                <Activity className="h-6 w-6 text-muted-foreground mb-2" />
-                <div className="text-2xl font-bold text-foreground" data-testid="text-api-status">
-                  {scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {exclusionCheck ? `Exclusion list URL · serving ${exclusionCheck.count} IP${exclusionCheck.count === 1 ? "" : "s"}` : "Exclusion list URL"}
-                </div>
-              </CardContent>
-            </Section>
-            <Section flush className="    border-emerald-500/20" testId="card-google-limit">
-              <CardContent className="p-5">
-                <ShieldCheck className="h-6 w-6 text-emerald-400 mb-2" />
-                <div className="text-2xl font-bold text-foreground">{Math.min(activeBlockedCount, 500)}/500</div>
-                <div className="text-xs text-muted-foreground">Your list vs. Google's 500-IP campaign limit</div>
-              </CardContent>
-            </Section>
-          </div>
+          <StatGrid cols={3} className="max-w-4xl mx-auto">
+            <Stat label="IPs ready to sync" value={activeBlockedCount} testId="card-blocked-count" />
+            <Stat label="Exclusion list" testId="card-api-status" value={<span data-testid="text-api-status">{scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}</span>} hint={exclusionCheck ? `Serving ${exclusionCheck.count} IPs` : "Exclusion list URL"} />
+            <Stat label="Campaign IP limit" value={`${Math.min(activeBlockedCount, 500)}/500`} testId="card-google-limit" />
+          </StatGrid>
 
           <Section flush className="max-w-4xl mx-auto border-border" testId="card-step1-tracking">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">1</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Install Tracking Code on Your Website</CardTitle>
+                  <CardTitle className="text-foreground text-base">Install tracking code on your website</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">Add this snippet to the header or footer of every page your Google Ads point to</p>
                 </div>
               </div>
@@ -621,7 +599,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">2</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Click Guard Flags Unusual Traffic Automatically</CardTitle>
+                  <CardTitle className="text-foreground text-base">Click Guard flags unusual traffic automatically</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5">No action needed — this happens on ConstructHUB's servers</p>
                 </div>
               </div>
@@ -651,7 +629,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg    flex items-center justify-center text-white font-bold text-sm">3</div>
                 <div>
-                  <CardTitle className="text-foreground text-base">Paste the Script into Google Ads</CardTitle>
+                  <CardTitle className="text-foreground text-base">Paste the script into Google Ads</CardTitle>
                   <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-step3-subtitle">Paste this script into Google Ads &rarr; Tools &rarr; Bulk actions &rarr; Scripts and schedule it. No Google sign-in is needed here; the script runs inside your own Google Ads account.</p>
                 </div>
               </div>
@@ -707,7 +685,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                   <div className="bg-muted border border-border rounded-lg p-4">
                     <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
                       <BookOpen className="h-4 w-4" />
-                      Install in Google Ads (3 Steps)
+                      Install in Google Ads (3 steps)
                     </h4>
                     <div className="space-y-3">
                       {[
@@ -733,7 +711,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="border-t border-border pt-4">
                 <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Code2 className="h-4 w-4 text-muted-foreground" />
-                  IP Exclusion List URL
+                  IP exclusion list URL
                 </h4>
                 <div className="flex items-center gap-2">
                   <div className="flex-1 bg-muted rounded-lg border border-border px-4 py-2.5">
@@ -771,7 +749,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
                     <FileText className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div className="text-left">
-                    <CardTitle className="text-foreground text-base">Manual Fallback — Copy & Paste IPs</CardTitle>
+                    <CardTitle className="text-foreground text-base">Manual fallback — copy & paste IPs</CardTitle>
                     <p className="text-xs text-muted-foreground mt-0.5">If you prefer to manually add IPs to Google Ads</p>
                   </div>
                 </div>
@@ -819,25 +797,26 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
             )}
           </Section>
 
+          <details className="max-w-4xl mx-auto space-y-4"><summary className="cursor-pointer py-3 text-sm font-medium">More about exclusions and limits</summary>
           <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4">
             <Section flush className="    border-emerald-500/20" testId="card-tip-budget">
               <CardContent className="p-5">
                 <DollarSign className="h-8 w-8 text-emerald-400 mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Review IP Exclusions</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Review IP exclusions</h4>
                 <p className="text-xs text-muted-foreground">IP exclusions can reduce repeated traffic from specified addresses on supported campaigns, but do not identify a person or guarantee savings.</p>
               </CardContent>
             </Section>
             <Section flush className="    border-border" testId="card-tip-auto">
               <CardContent className="p-5">
                 <RefreshCw className="h-8 w-8 text-muted-foreground mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Runs When You Schedule It</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Runs when you schedule it</h4>
                 <p className="text-xs text-muted-foreground">Once you schedule the pasted script to run hourly in Google Ads, each run adds newly listed IPs to your enabled campaigns. Check its Logs tab to confirm it ran.</p>
               </CardContent>
             </Section>
             <Section flush className="    border-border" testId="card-tip-fingerprint">
               <CardContent className="p-5">
                 <Fingerprint className="h-8 w-8 text-muted-foreground mb-3" />
-                <h4 className="text-sm font-semibold text-foreground mb-1">Smarter Than IP Alone</h4>
+                <h4 className="text-sm font-semibold text-foreground mb-1">Smarter than IP alone</h4>
                 <p className="text-xs text-muted-foreground">Click Guard compares reported fingerprints and visit patterns. These signals can flag legitimate visitors and do not establish identity or fraud.</p>
               </CardContent>
             </Section>
@@ -848,7 +827,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-muted-foreground mb-1">Pro Tip: Google Ads Has a 500 IP Limit</h4>
+                  <h4 className="text-sm font-semibold text-muted-foreground mb-1">Pro tip: Google Ads has a 500 IP limit</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Google Ads allows 500 IP exclusions per campaign. The script stops adding IPs once a campaign reaches that limit, so review and remove old exclusions in Google Ads when the list fills up.
                   </p>
@@ -856,6 +835,7 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
               </div>
             </CardContent>
           </Section>
+          </details>
         </>
       )}
     </div>
@@ -954,7 +934,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
         <Section flush className="bg-card border-border" testId="card-chart">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-muted-foreground" /> Visit Trend
+              <BarChart3 className="h-5 w-5 text-muted-foreground" /> Visit trend
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-2">
@@ -982,7 +962,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
           <Section flush className="bg-card border-border" testId="card-device-breakdown">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Monitor className="h-4 w-4 text-muted-foreground" /> Visits by Device
+                <Monitor className="h-4 w-4 text-muted-foreground" /> Visits by device
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -1012,7 +992,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
           <Section flush className="bg-card border-border" testId="card-browser-breakdown">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Globe className="h-4 w-4 text-muted-foreground" /> Browser Breakdown
+                <Globe className="h-4 w-4 text-muted-foreground" /> Browser breakdown
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -1055,7 +1035,7 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-base font-semibold text-foreground flex items-center gap-2" data-testid="text-traffic-title">
-          <Globe className="h-5 w-5 text-muted-foreground" /> Traffic sources by Domain / Vendor
+          <Globe className="h-5 w-5 text-muted-foreground" /> Traffic sources by domain / vendor
         </h3>
         <Toolbar filters={<>
           {["1d", "7d", "30d"].map(r => (
@@ -1086,9 +1066,9 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
               <thead className={appTableCards.thead}>
                 <tr className={appTableCards.tr + " border-b border-border bg-muted/50"}>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Percentage</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Page Loads</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Page loads</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Visitors</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Traffic sources by Domain / Vendor</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground ">Traffic sources by domain / vendor</th>
                 </tr>
               </thead>
               <tbody>
@@ -1139,7 +1119,7 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
           <div className="flex items-start gap-3">
             <Activity className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div>
-              <h4 className="text-sm font-semibold text-muted-foreground mb-1">Understanding Traffic sources</h4>
+              <h4 className="text-sm font-semibold text-muted-foreground mb-1">Understanding traffic sources</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Traffic sources show where your website visitors are coming from. "NO REFERRER DATA" means the visitor typed your URL directly or the referrer was stripped. Look for entries like "google.com =&gt; (Campaign: Google AdWords)" to see your paid ad traffic vs organic search traffic.
               </p>
@@ -1212,10 +1192,10 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     <table className={appTable.table} data-testid="table-blocked-ips">
                       <thead className={appTableCards.thead}>
                         <tr className={appTableCards.tr + " border-b border-border"}>
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">IP Address</th>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">IP address</th>
                           <th className="text-left text-muted-foreground font-medium py-2 px-3">Reason</th>
                           <th className="text-left text-muted-foreground font-medium py-2 px-3">Source</th>
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Blocked At</th>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Blocked at</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Action</th>
                         </tr>
                       </thead>
@@ -1285,7 +1265,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     <table className={appTable.table}>
                       <thead className={appTableCards.thead}>
                         <tr className={appTableCards.tr + " border-b border-border"}>
-                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Number of Clicks</th>
+                          <th className="text-left text-muted-foreground font-medium py-2 px-3">Number of clicks</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Users</th>
                           <th className="text-right text-muted-foreground font-medium py-2 px-3">Percentage</th>
                         </tr>
@@ -1393,7 +1373,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
       <Section flush className="bg-card border-border" testId="card-clicks-report">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-            Clicks Report
+            Clicks report
             <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] ml-1">LIVE</Badge>
           </CardTitle>
         </CardHeader>
@@ -1435,7 +1415,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
               <table className={appTable.table} data-testid="table-clicks-report">
                 <thead className={appTableCards.thead}>
                   <tr className={appTableCards.tr + " border-b border-border"}>
-                    <th className="text-left text-muted-foreground font-medium py-2 px-3">IP Address</th>
+                    <th className="text-left text-muted-foreground font-medium py-2 px-3">IP address</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">Device</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">Browser</th>
                     <th className="text-left text-muted-foreground font-medium py-2 px-3">OS</th>
@@ -1508,7 +1488,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
       <Section flush className="bg-card border-border" testId="card-tracking-script">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-muted-foreground" /> Tracking Script
+            <ShieldCheck className="h-5 w-5 text-muted-foreground" /> Tracking script
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 pt-0">
@@ -1542,7 +1522,7 @@ function ToolsView({ domain, scriptSnippet, copyScript }: {
       <Section flush className="bg-card border-border" testId="card-conversion-tracking">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-            <Target className="h-5 w-5 text-muted-foreground" /> Conversion Tracking
+            <Target className="h-5 w-5 text-muted-foreground" /> Conversion tracking
             <Badge className="bg-card text-muted-foreground border-border text-[10px] ml-1">Not available yet</Badge>
           </CardTitle>
         </CardHeader>
@@ -1625,7 +1605,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
       <p className="rounded-md border p-4 text-sm text-muted-foreground" data-testid="text-settings-note">Detection preferences below are saved but do not yet change automatic detection. The exclusion list your Google Ads script downloads is built from Manually Exclude IPs and the Blocked IPs tab (Traffic signals), minus Whitelist IPs, up to the Exclusion List Refresh Rate length. The script only adds exclusions in Google Ads; it never removes them. VPN Shield has separate browser controls.</p>
       <div className="flex items-center justify-between">
         <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Globe className="h-5 w-5 text-muted-foreground" /> Your Domains
+          <Globe className="h-5 w-5 text-muted-foreground" /> Your domains
         </h2>
         <Button
           size="sm"
@@ -1774,7 +1754,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
       <div className="border-t border-border pt-6 mt-8" />
 
       <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-        <Settings2 className="h-5 w-5 text-muted-foreground" /> Detection Rules
+        <Settings2 className="h-5 w-5 text-muted-foreground" /> Detection rules
         <span className="text-xs font-normal text-muted-foreground ml-2">for {domain.domain}</span>
       </h2>
 
@@ -1783,7 +1763,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Crosshair className="h-4 w-4 text-muted-foreground" /> Click Fraud Threshold
+                <Crosshair className="h-4 w-4 text-muted-foreground" /> Click fraud threshold
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; automatic flagging currently uses fixed rules: bot-like user agents, more than 5 visits from one IP in an hour or more than 15 in a day, and one device fingerprint seen from different IPs.
@@ -1812,7 +1792,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                   disabled={!!thresholdError || updateSetting.isPending}
                   data-testid="button-update-threshold"
                 >
-                  Update Threshold Rules
+                  Update threshold rules
                 </Button>
               </div>
             </div>
@@ -1826,7 +1806,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Fingerprint className="h-4 w-4 text-muted-foreground" /> Detect IPs Based on Device IDs
+                <Fingerprint className="h-4 w-4 text-muted-foreground" /> Detect IPs based on device IDs
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; Click Guard already flags a device fingerprint seen from different IPs, and this toggle does not turn that off. Requires the tracking code to be installed.
@@ -1846,7 +1826,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" /> Block IPs By Country
+                <MapPin className="h-4 w-4 text-muted-foreground" /> Block IPs by country
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: country-based enforcement is not implemented in this tracker.
@@ -1883,7 +1863,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Bot className="h-4 w-4 text-muted-foreground" /> Block JavaScript Disabled Browsers
+                <Bot className="h-4 w-4 text-muted-foreground" /> Block JavaScript disabled browsers
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Not enforced: the tracking script cannot observe browsers that do not execute JavaScript.
@@ -1903,7 +1883,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <ShieldBan className="h-4 w-4 text-muted-foreground" /> VPN Blocking
+                <ShieldBan className="h-4 w-4 text-muted-foreground" /> VPN blocking
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: this toggle does not enforce VPN blocking. VPN Shield offers separate, heuristic browser controls.
@@ -1924,7 +1904,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                <Activity className="h-4 w-4 text-muted-foreground" /> Behavior Analysis
+                <Activity className="h-4 w-4 text-muted-foreground" /> Behavior analysis
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
                 The installed tracking script records page visits and device signals. These cannot reliably distinguish a person from a bot; this saved preference does not change collection.
@@ -1941,14 +1921,14 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
       </Section>
 
       <h2 className="text-base font-semibold text-foreground flex items-center gap-2 pt-4">
-        <ShieldBan className="h-5 w-5 text-muted-foreground" /> Manage Auto IP Blocking
+        <ShieldBan className="h-5 w-5 text-muted-foreground" /> Manage auto IP blocking
       </h2>
 
       <Section flush className="bg-card border-border" testId="card-block-period">
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Block IPs for a Certain Period</h3>
+              <h3 className="text-base font-semibold text-foreground">Block IPs for a certain period</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; not applied yet. Blocked IPs stay on the list until you remove them.
               </p>
@@ -1984,7 +1964,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Exclusion List Refresh Rate</h3>
+              <h3 className="text-base font-semibold text-foreground">Exclusion list refresh rate</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 The exclusion list URL serves at most this many IPs (50&ndash;500). Manually excluded IPs come first, then the newest blocked IPs.
               </p>
@@ -2020,7 +2000,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">IP Range Exclusion</h3>
+              <h3 className="text-base font-semibold text-foreground">IP range exclusion</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only &mdash; this switch does not change the exclusion list. Automatic blocking lists single IPs; to exclude a range, add it under Manually Exclude IPs.
               </p>
@@ -2036,7 +2016,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
 
       <Section flush className="bg-card border-border" testId="card-manual-exclude">
         <CardContent className="p-5">
-          <h3 className="text-base font-semibold text-foreground">Manually Exclude IPs</h3>
+          <h3 className="text-base font-semibold text-foreground">Manually exclude IPs</h3>
           <p className="text-sm text-muted-foreground mt-1">
             Added first to the exclusion list your Google Ads script downloads. One IP, CIDR range or 1.2.3.* per line. Every line must be valid: if one isn&rsquo;t, nothing is saved and that line is named here.
           </p>
@@ -2100,7 +2080,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex-1">
-              <h3 className="text-base font-semibold text-foreground">Aggressive Blocking</h3>
+              <h3 className="text-base font-semibold text-foreground">Aggressive blocking</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Saved preference only: this mode does not change the current automatic traffic rules.
               </p>
