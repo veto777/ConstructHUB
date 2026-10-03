@@ -163,7 +163,7 @@ export default function LsaAccountManagerPage() {
   }
 
   if (selectedAccountId) {
-    return <AppPage><PageHeader title="LSA account details" description="Review campaigns, budgets and leads for this account." /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
+    return <AppPage><PageHeader title="LSA account details" description="Review campaigns, budgets and leads for this account." actions={<Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})}>Refresh account</Button>} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
   }
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -175,7 +175,7 @@ export default function LsaAccountManagerPage() {
 
   return (
     <AppPage className="[&_button]:min-h-10">
-      <PageHeader title={<span data-testid="text-page-title">LSA account manager</span>} description="Manage client accounts through your Google Ads manager connection." meta={<Badge variant="outline" data-testid="badge-admin-only">Admin only</Badge>} />
+      <PageHeader title={<span data-testid="text-page-title">LSA account manager</span>} description="Manage client accounts through your Google Ads manager connection." meta={<Badge variant="outline" data-testid="badge-admin-only">Admin only</Badge>} actions={activeTab === "audit" ? <Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})}>Refresh audit</Button> : undefined} />
         <Tabs value={activeTab}><AppTabsList>
           {tabs.map(tab => (
             <Button
@@ -748,7 +748,7 @@ function InvitationsTab() {
           {invitations.map(inv => (
             <Section flush key={inv.id} testId={`card-invitation-${inv.id}`}>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="font-medium" data-testid={`text-inv-name-${inv.id}`}>{inv.accountName || "Unnamed Account"}</span>
@@ -763,7 +763,7 @@ function InvitationsTab() {
                     <p className="text-xs text-muted-foreground mt-1">Invited {new Date(inv.invitedAt).toLocaleDateString()}</p>
                   </div>
                   {inv.status === "pending" && (
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-wrap gap-2 sm:shrink-0">
                       <Button
                         size="sm"
                         className="bg-emerald-600 text-white text-xs"
@@ -952,7 +952,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
               {campaigns.map(campaign => (
                 <Section flush key={campaign.id} testId={`card-campaign-${campaign.id}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-medium truncate" data-testid={`text-campaign-name-${campaign.id}`}>{campaign.name}</span>
@@ -966,7 +966,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
                           <span className="text-xs">{campaign.channelType}</span>
                         </div>
                       </div>
-                      <div className="flex gap-2 shrink-0">
+                      <div className="flex flex-wrap gap-2 sm:shrink-0">
                         <Button
                           size="sm"
                           variant="outline"
