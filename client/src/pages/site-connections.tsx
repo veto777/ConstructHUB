@@ -53,8 +53,8 @@ function TabStrip({ tabs, active, onChange }: {
         {tabs.map((t) => (
           <Button
             key={t}
-            variant={t === active ? "default" : "ghost"}
-            className="shrink-0 rounded-lg px-3.5"
+            variant="ghost"
+            className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${t === active ? "bg-background text-foreground shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
             onClick={() => onChange(t)}
             aria-selected={active === t}
             data-testid={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}

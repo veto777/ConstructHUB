@@ -1030,8 +1030,8 @@ export default function IpTrackerPage() {
               aria-selected={activeTab === tab.id}
               className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium transition-colors ${
                 activeTab === tab.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-background text-foreground shadow-sm hover:bg-background"
+                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
               }`}
               data-testid={`tab-${tab.id}`}
             >

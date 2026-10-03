@@ -638,8 +638,8 @@ export default function VpnShieldPage() {
           {tabs.map(tab => (
             <Button
               key={tab.id}
-              variant={activeTab === tab.id ? "default" : "ghost"}
-              className="shrink-0 rounded-lg px-3.5"
+              variant="ghost"
+              className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${activeTab === tab.id ? "bg-background text-foreground shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
               onClick={() => setActiveTab(tab.id)}
               role="tab"
               aria-selected={activeTab === tab.id}

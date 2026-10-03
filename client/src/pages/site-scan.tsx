@@ -524,11 +524,11 @@ export default function SiteScanPage() {
     });
   return (
     <AppPage testId="page-site-scan">
-      <AgencyWorkspace compact />
       <PageHeader
         title="Site Scan"
         description="Find website issues, compare your Google Business Profile, and draft your next fixes."
       />
+      <AgencyWorkspace compact />
       <Section
         title="Start a scan"
         description="Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes."

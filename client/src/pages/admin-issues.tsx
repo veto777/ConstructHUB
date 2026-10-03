@@ -218,7 +218,7 @@ export default function AdminIssuesPage() {
           {chips.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={status === c.key} onClick={() => setStatusFilter(c.key)}
               className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                status === c.key ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-muted")}
+                status === c.key ? "border-border bg-background text-foreground shadow-sm" : "border-transparent bg-muted/70 text-muted-foreground hover:text-foreground")}
               data-testid={`filter-status-${c.key}`}>
               {c.label}
               <span className={cn("tabular-nums text-xs", status === c.key ? "opacity-80" : "text-muted-foreground")}>{c.n}</span>
