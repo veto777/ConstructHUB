@@ -309,7 +309,7 @@ function ManagerConnectionTab() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Wifi className="h-4 w-4 text-muted-foreground" />
-            Central MCC Manager connection
+            Manager connection
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -326,7 +326,7 @@ function ManagerConnectionTab() {
                   <p className="text-sm text-muted-foreground">Manager ID: <span className="font-mono" data-testid="text-manager-id">{status.managerId}</span></p>
                 </div>
                 <Badge className={status.hasDeveloperToken ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
-                  {status.hasDeveloperToken ? "Dev Token ✓" : "No Dev Token"}
+                  {status.hasDeveloperToken ? "API access" : "API access needed"}
                 </Badge>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -354,15 +354,9 @@ function ManagerConnectionTab() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-                <div>
-                  <p className="font-medium text-amber-600 dark:text-amber-400" data-testid="text-manager-not-connected">Not connected</p>
-                  <p className="text-sm text-muted-foreground">No central Google Ads Manager (MCC) account is connected.</p>
-                </div>
-              </div>
-              <Button onClick={() => setShowConnect(true)} className="bg-primary text-white" data-testid="button-connect-manager">
-                <Link2 className="h-4 w-4 mr-2" /> Connect Manager Account
+              <Notice tone="warning"><span data-testid="text-manager-not-connected">Not connected</span> · Connect a Google Ads manager account.</Notice>
+              <Button onClick={() => setShowConnect(true)} className="w-full sm:w-auto" data-testid="button-connect-manager">
+                <Link2 className="h-4 w-4 mr-2" /> Connect manager
               </Button>
             </div>
           )}
@@ -441,7 +435,7 @@ function ManagerConnectionTab() {
             <Button
               onClick={() => connectMutation.mutate()}
               disabled={!managerId || !refreshToken || connectMutation.isPending}
-              className="bg-primary text-white"
+              className="w-full sm:w-auto"
               data-testid="button-save-connect"
             >
               {connectMutation.isPending ? "Connecting..." : "Connect"}
@@ -496,8 +490,8 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="relative w-full flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search by customer ID or name..."
@@ -507,7 +501,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
             data-testid="input-search-accounts"
           />
         </div>
-        <Button variant={showAdd ? "outline" : "default"} size="sm" onClick={() => setShowAdd(true)} className="bg-primary text-white" data-testid="button-add-account">
+        <Button variant={showAdd ? "outline" : "default"} size="sm" onClick={() => setShowAdd(true)} className="w-full sm:w-auto" data-testid="button-add-account">
           <Plus className="h-3.5 w-3.5 mr-1.5" /> Add account
         </Button>
       </div>
@@ -526,7 +520,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="bg-primary text-white" data-testid="button-save-account">
+              <Button size="sm" onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="w-full sm:w-auto" data-testid="button-save-account">
                 {addAccountMutation.isPending ? "Adding..." : "Add account"}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
@@ -568,14 +562,14 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
             <tbody>
               {filtered.map(account => (
                 <tr key={account.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-account-${account.id}`}>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>{account.accountName || "—"}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-customer-id-${account.id}`}>{account.customerId}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-owner-${account.id}`}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{account.accountName || "—"}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-customer-id-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer ID: </span>{account.customerId}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-owner-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Owner: </span>
                     {account.ownerEmail ? (
                       <span className="truncate max-w-[140px] block" title={account.ownerEmail}>{account.ownerEmail}</span>
                     ) : <span className="text-muted-foreground/50">—</span>}
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Link Type: </span>
                     <Badge className={
                       account.linkType === "central" ? "bg-primary/10 text-muted-foreground border-[#4285F4]/20" :
                       account.linkType === "both" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
@@ -584,26 +578,26 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
                       {account.linkType}
                     </Badge>
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span>
                     <Badge className={account.linkStatus === "active" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"}>
                       {account.linkStatus}
                     </Badge>
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-lead-count-${account.id}`}>{account.leadCount}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-lead-count-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Leads: </span>{account.leadCount}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Charged: </span>
                     {(account.chargedLeads ?? 0) > 0 ? (
                       <Badge className="bg-red-500/10 text-red-500 border-red-500/20 text-xs" data-testid={`text-charged-leads-${account.id}`}>{account.chargedLeads}</Badge>
                     ) : <span className="text-muted-foreground text-xs">0</span>}
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Disputed: </span>
                     {(account.disputedLeads ?? 0) > 0 ? (
                       <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-xs" data-testid={`text-disputed-leads-${account.id}`}>{account.disputedLeads}</Badge>
                     ) : <span className="text-muted-foreground text-xs">0</span>}
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-total-spend-${account.id}`}>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-total-spend-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Spend: </span>
                     {account.totalSpend ? account.totalSpend : <span className="opacity-40">—</span>}
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">LSA: </span>
                     {account.isLsaEnrolled ? (
                       <Badge className="bg-[#34A853]/10 text-[#34A853] border-[#34A853]/20 text-xs">LSA ✓</Badge>
                     ) : (
@@ -728,7 +722,7 @@ function InvitationsTab() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => createMutation.mutate()} disabled={!targetCustomerId || createMutation.isPending} className="bg-primary text-white" data-testid="button-send-invitation">
+              <Button size="sm" onClick={() => createMutation.mutate()} disabled={!targetCustomerId || createMutation.isPending} className="w-full sm:w-auto" data-testid="button-send-invitation">
                 <Send className="h-3.5 w-3.5 mr-1.5" />
                 {createMutation.isPending ? "Sending..." : "Send invitation"}
               </Button>
@@ -908,7 +902,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back">
           <ChevronRight className="h-4 w-4 rotate-180 mr-1" /> Back
         </Button>
@@ -923,7 +917,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
         )}
       </div>
 
-      <div className="flex gap-1 bg-card border border-border rounded-lg p-1 w-fit">
+      <div className="flex gap-1 overflow-x-auto bg-muted rounded-xl p-1 w-full sm:w-fit">
         <Button size="sm" variant={activeTab === "campaigns" ? "secondary" : "ghost"} className={activeTab === "campaigns" ? "bg-muted text-foreground" : "text-muted-foreground"} onClick={() => setActiveTab("campaigns")} data-testid="tab-campaigns">
           <BarChart3 className="h-3.5 w-3.5 mr-1.5" /> Campaigns
         </Button>
@@ -1067,11 +1061,11 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
                 <tbody>
                   {leads.map(lead => (
                     <tr key={lead.id} className={appTableCards.tr + " border-b border-border last:border-0"} data-testid={`row-lead-${lead.id}`}>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>{lead.customerName || "—"}</td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>{lead.serviceRequested || "—"}</td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}><Badge>{lead.status}</Badge></td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>{lead.charged ? <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Charged {lead.chargeAmount || ""}</Badge> : <span className="text-muted-foreground">No</span>}</td>
-                      <td className={appTableCards.td + " min-w-0 break-words"}>{lead.disputed ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Disputed</Badge> : <span className="text-muted-foreground">No</span>}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer: </span>{lead.customerName || "—"}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Service: </span>{lead.serviceRequested || "—"}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span><Badge>{lead.status}</Badge></td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Charged: </span>{lead.charged ? <Badge className="bg-red-500/10 text-red-500 border-red-500/20">Charged {lead.chargeAmount || ""}</Badge> : <span className="text-muted-foreground">No</span>}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Disputed: </span>{lead.disputed ? <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/20">Disputed</Badge> : <span className="text-muted-foreground">No</span>}</td>
                       <td className={appTableCards.td + " min-w-0 break-words"}>
                         {lead.charged && !lead.disputed && (
                           <Button size="sm" variant="outline" className="text-xs" onClick={() => { setDisputeDialog({ lead }); setDisputeReason(""); }} data-testid={`button-dispute-lead-${lead.id}`}>
@@ -1099,7 +1093,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => { confirmDialog?.onConfirm(); }}
               disabled={statusMutation.isPending}
-              className="bg-primary text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-action"
             >
               {statusMutation.isPending ? "Updating..." : "Confirm"}
@@ -1125,7 +1119,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => budgetDialog && budgetMutation.mutate({ campaign: budgetDialog.campaign, budget: Number(newBudget) })}
               disabled={!newBudget || Number(newBudget) <= 0 || budgetMutation.isPending}
-              className="bg-primary text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-budget"
             >
               {budgetMutation.isPending ? "Updating..." : "Update Budget"}
@@ -1150,7 +1144,7 @@ function AccountDetailView({ accountId, onBack }: { accountId: number; onBack: (
             <Button
               onClick={() => renameDialog && renameMutation.mutate({ campaign: renameDialog.campaign, name: newName })}
               disabled={!newName.trim() || newName === renameDialog?.campaign.name || renameMutation.isPending}
-              className="bg-primary text-white"
+              className="w-full sm:w-auto"
               data-testid="button-confirm-rename"
             >
               {renameMutation.isPending ? "Renaming..." : "Save Name"}
@@ -1263,20 +1257,20 @@ function AuditLogTab() {
             <tbody>
               {logs.map(log => (
                 <tr key={log.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/20"} data-testid={`row-audit-${log.id}`}>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>{new Date(log.createdAt).toLocaleString()}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-audit-actor-${log.id}`}>{log.actorEmail}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">When: </span>{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-audit-actor-${log.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Admin: </span>{log.actorEmail}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Action: </span>
                     <Badge className={`text-xs ${actionColor(log.action)}`} data-testid={`badge-audit-action-${log.id}`}>
                       {actionLabel(log.action)}
                     </Badge>
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>{log.targetAccountName || log.targetCustomerId || "—"}</td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{log.targetAccountName || log.targetCustomerId || "—"}</td>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Result: </span>
                     <Badge className={log.result === "success" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-xs" : "bg-red-500/10 text-red-500 border-red-500/20 text-xs"} data-testid={`badge-audit-result-${log.id}`}>
                       {log.result}
                     </Badge>
                   </td>
-                  <td className={appTableCards.td + " min-w-0 break-words"}>
+                  <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Details: </span>
                     {log.errorMessage || (log.parameters ? JSON.stringify(log.parameters) : "—")}
                   </td>
                 </tr>
