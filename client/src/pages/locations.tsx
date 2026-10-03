@@ -509,13 +509,13 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
             </tr></thead>
             <tbody>
               <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`} data-testid="row-performance-total">
-                <td className={appTableCards.td}>Total</td>
-                {data.metrics.map((m) => <td className={appTableCards.td} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{total(m).toLocaleString()}</td>)}
+                <td className={`${appTableCards.td} !text-foreground`}>Total</td>
+                {data.metrics.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{total(m).toLocaleString()}</td>)}
               </tr>
               {periods.map((p) => (
                 <tr key={p} className={`${appTableCards.tr} border-b ${pending(p) ? "text-muted-foreground" : ""}`}>
-                  <td className={appTableCards.td}>{label(p)}{pending(p) && <span className="ml-2 text-[10px] rounded bg-muted px-1.5 py-0.5" title="Google reports with a delay of a few days">not final yet</span>}</td>
-                  {data.metrics.map((m) => <td className={appTableCards.td} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{cell(p, m) ? Number(cell(p, m)!.value).toLocaleString() : "—"}</td>)}
+                  <td className={`${appTableCards.td} !text-foreground`}>{label(p)}{pending(p) && <span className="ml-2 text-[10px] rounded bg-muted px-1.5 py-0.5" title="Google reports with a delay of a few days">not final yet</span>}</td>
+                  {data.metrics.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{cell(p, m) ? Number(cell(p, m)!.value).toLocaleString() : "—"}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -1300,16 +1300,16 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
             <TableBody>
               {rows.map((c) => (
                 <TableRow className={appTableCards.tr} key={c.id} data-testid={`row-citation-${c.id}`}>
-                  <TableCell className={appTableCards.td}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     <p className="text-sm font-medium">{c.siteName}</p>
                     <p className="text-[10px] text-muted-foreground">{c.category}</p>
                   </TableCell>
-                  <TableCell className={appTableCards.td}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     <a href={searchUrl(c)} target="_blank" rel="noopener noreferrer" className="text-foreground text-xs inline-flex items-center gap-1" data-testid={`link-search-${c.id}`}>
                       Search <ExternalLink className="w-3 h-3" />
                     </a>
                   </TableCell>
-                  <TableCell className={appTableCards.td}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     <select
                       className="border rounded px-2 py-1 text-xs bg-background"
                       value={statusOf(c)}
@@ -1324,7 +1324,7 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
                       <option value="missing">Not listed</option>
                     </select>
                   </TableCell>
-                  <TableCell className={appTableCards.td}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     {hasListing(statusOf(c)) ? (
                       <div className="flex items-center gap-1.5 min-w-[12rem]">
                         <Input

@@ -63,7 +63,7 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
   if(!data)return <p>Loading Profile Guard…</p>;
   const selected:string[]=watched??(data.snapshot?data.watched:Object.keys(fieldLabels));
   const act=(method:string,path:string,body?:any)=>mutation.mutateAsync({method,path,body});
-  return <Section title="Profile Guard" contentClassName="space-y-4 text-sm">
+  return <div role="region" aria-label="Profile Guard"><Section title="Profile Guard" contentClassName="space-y-4 text-sm">
     <details><summary className="cursor-pointer py-2">How checks work</summary><p className="text-sm">Checks every 15 minutes. Lockdown reasserts approved values after detection; it cannot block Google edits. Google may delay publication. Public suggestions cannot be distinguished reliably from other Google updates.</p></details>
     <p>Current mode: {data.mode}. {data.checkedAt?`Last checked ${new Date(data.checkedAt).toLocaleString()}`:'Not checked yet'}</p>
     {data.lastError&&<p role="alert">{data.lastError}</p>}
@@ -81,5 +81,5 @@ export function ProfileGuard({locationId,linked}:{locationId:number;linked:boole
       <div className="grid grid-cols-2 gap-3 text-sm"><div>Approved<pre className="whitespace-pre-wrap break-all">{pretty(c.old_value)}</pre></div><div>Detected<pre className="whitespace-pre-wrap break-all">{pretty(c.new_value)}</pre></div></div>
       {c.error&&<p role="alert">{c.error}</p>}<div className="flex flex-wrap gap-2">{c.status==='pending'&&<><Button variant="outline" disabled={mutation.isPending} onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'approve'}).catch(()=>{})}>Approve</Button><Button disabled={mutation.isPending} variant="outline" onClick={()=>act('POST',url+`/changes/${c.id}`,{action:'reject'}).catch(()=>{})}>Reject</Button></>}<GoogleReport type="changes" id={c.id}/>{c.reported_at&&<span>Reported locally</span>}</div>
     </article>)}
-  </Section>;
+  </Section></div>;
 }

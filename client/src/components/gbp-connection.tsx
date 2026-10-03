@@ -142,7 +142,7 @@ export function GbpConnection({locationId,context='reviews'}:{locationId?:number
       <Button asChild variant="outline"><a href="/api/gbp/connect">{accounts.length ? 'Connect another Google account' : 'Connect Google Business Profile'}</a></Button>
       {!locationId && available.length > 0 && <Button variant="outline" disabled={link.isPending} onClick={()=>link.mutate(available)} data-testid="button-link-all-gbp">Link &amp; sync {available.length} ready location{available.length === 1 ? '' : 's'}</Button>}
     </div>
-    {unique.length>0&&<details><summary className="cursor-pointer min-h-10 py-2">Sync details</summary><div className="space-y-3">{unique.map(l=><div key={l.id} className="border-t pt-2 space-y-1">
+    {unique.length>0&&<details open={context==='reviews'}><summary className="cursor-pointer min-h-10 py-2">Sync details</summary><div className="space-y-3">{unique.map(l=><div key={l.id} className="border-t pt-2 space-y-1">
       <div className="flex flex-wrap gap-3 items-center"><strong>{l.name}</strong>{l.account_email && <span className="text-xs text-muted-foreground">via {l.account_email}</span>}<Button size="sm" variant="outline" disabled={!data?.connected||mutation.isPending} onClick={()=>mutation.mutate({path:`/api/gbp/locations/${l.id}/sync`})}>Sync now</Button></div>
       {locations.filter((s:any)=>s.id===l.id).map((s:any,i:number)=><p key={i} className="text-sm">{s.kind||'Reviews and performance'}: {s.last_success?`Last success ${new Date(s.last_success).toLocaleString()}`:'Never synced'}{s.last_error && <span role="alert" className="text-destructive"> — {s.last_error}</span>}</p>)}
     </div>)}</div></details>}
