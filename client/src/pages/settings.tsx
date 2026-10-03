@@ -63,7 +63,7 @@ export default function SettingsPage() {
   return (
     <div ref={root} className="min-w-0">
       <AppPage>
-        <PageHeader title={<span data-testid="text-settings-title">Account settings</span>} description="Manage your account and workspace." actions={
+        <PageHeader title={<span data-testid="text-settings-title">Account settings</span>} description="Manage your account and workspace." meta={
           <button
             type="button"
             onClick={() => {

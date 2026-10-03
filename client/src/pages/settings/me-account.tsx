@@ -156,7 +156,17 @@ function ProfileSection({ user }: { user: SettingsUser }) {
     <div className="space-y-6">
       <Card data-testid="card-profile">
         <CardHeader>
-          <CardTitle className="text-base">Profile Information</CardTitle>
+          <CardTitle className="text-base">Profile information</CardTitle>
+          <div className="flex justify-end [&>button]:w-full sm:[&>button]:w-auto">
+            <Button
+              onClick={() => updateProfileMutation.mutate()}
+              disabled={updateProfileMutation.isPending || nameMissing}
+              data-testid="button-save-profile"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {updateProfileMutation.isPending ? "Saving..." : "Save changes"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
@@ -165,20 +175,20 @@ function ProfileSection({ user }: { user: SettingsUser }) {
                 <img
                   src={user.avatarUrl}
                   alt=""
-                  className="h-20 w-20 rounded-full object-cover border-2 border-border"
+                  className="h-12 w-12 rounded-full object-cover border-2 border-border"
                   referrerPolicy="no-referrer"
                   data-testid="img-avatar"
                 />
               ) : (
-                <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-border" data-testid="img-avatar-placeholder">
-                  <span className="text-2xl font-bold text-primary">
+                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center border-2 border-border" data-testid="img-avatar-placeholder">
+                  <span className="text-base font-semibold text-foreground">
                     {(user.displayName || user.email)?.[0]?.toUpperCase() || "?"}
                   </span>
                 </div>
               )}
               <label htmlFor="avatarUpload" className="cursor-pointer">
                 <div
-                  className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
+                  className="absolute -bottom-1 -right-1 h-10 w-10 rounded-full border bg-background text-foreground flex items-center justify-center hover:bg-muted transition-colors"
                   data-testid="button-change-avatar"
                 >
                   {avatarUploading ? (
@@ -210,7 +220,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
+              <Label htmlFor="displayName">Display name</Label>
               <Input
                 id="displayName"
                 value={displayName}
@@ -238,7 +248,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="companyName"><Building2 className="h-3.5 w-3.5 inline mr-1" />Company Name</Label>
+              <Label htmlFor="companyName"><Building2 className="h-3.5 w-3.5 inline mr-1" />Company name</Label>
               <Input
                 id="companyName"
                 value={companyName}
@@ -249,7 +259,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
               <p className="text-xs text-muted-foreground">Used in review request emails sent to your clients</p>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label><Camera className="h-3.5 w-3.5 inline mr-1" />Company Logo</Label>
+              <Label><Camera className="h-3.5 w-3.5 inline mr-1" />Company logo</Label>
               <div className="flex items-center gap-4">
                 {companyLogoUrl ? (
                   <div className="relative">
@@ -295,20 +305,11 @@ function ProfileSection({ user }: { user: SettingsUser }) {
             </div>
           </div>
 
-          <div className="flex justify-end [&>button]:w-full sm:[&>button]:w-auto">
-            <Button
-              onClick={() => updateProfileMutation.mutate()}
-              disabled={updateProfileMutation.isPending || nameMissing}
-              data-testid="button-save-profile"
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {updateProfileMutation.isPending ? "Saving..." : "Save changes"}
-            </Button>
-          </div>
+
         </CardContent>
       </Card>
 
-      <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Review referral settings</summary><div className="mt-4"><ReviewReferralSettings /></div></details>
+      <details className="border-t pt-4"><summary className="cursor-pointer text-sm font-medium">Review referral settings</summary><div className="mt-4"><ReviewReferralSettings /></div></details>
       <GmbProfilesSection />
     </div>
   );
@@ -420,7 +421,7 @@ function GmbProfilesSection() {
           <p className="text-sm text-muted-foreground mt-1">Manage your GMB locations for review requests</p>
         </div>
         <Button size="sm" variant="outline" className="shrink-0" onClick={() => setShowDialog(true)} data-testid="button-add-gmb-profile">
-          <Plus className="h-4 w-4 mr-1" /> Add Profile
+          <Plus className="h-4 w-4 mr-1" /> Add profile
         </Button>
       </CardHeader>
       <CardContent>
@@ -441,7 +442,7 @@ function GmbProfilesSection() {
                 data-testid={`gmb-profile-${t.id}`}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
                     <Building2 className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
@@ -579,7 +580,7 @@ function GmbProfilesSection() {
               disabled={!name.trim() || !googleProfileUrl.trim() || urlInvalid || createMutation.isPending || updateMutation.isPending}
               data-testid="button-save-gmb"
             >
-              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save changes" : "Add Profile"}
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save changes" : "Add profile"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -642,7 +643,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
         </CardContent>
       </Card>
 
-      <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>
+      <details className="border-t pt-4"><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>
 
       <Card className="border-destructive/20" data-testid="card-danger-zone">
         <CardHeader>
