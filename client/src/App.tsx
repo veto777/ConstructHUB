@@ -679,24 +679,24 @@ function AppContent() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-1 px-4 h-12 border-b border-border/40 bg-background sticky top-0 z-50">
+          <header className="flex items-center justify-between gap-2 px-4 h-14 shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <RecentAuthModal /><NotificationBell />
               <Link href="/settings" data-testid="link-header-settings" aria-label="Settings"
-                className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <Settings className="h-4 w-4" />
               </Link>
               <CartSheet />
               <ThemeToggle />
             </div>
           </header>
-          <main className="flex-1 overflow-auto flex flex-col">
+          <main className="flex-1 min-h-0 overflow-auto flex flex-col">
             <div className="flex-1">
               <DashboardRouter />
             </div>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
-            <footer className="border-t border-border/30 pt-3 pb-20 sm:pb-3 px-4 text-center text-xs text-muted-foreground" data-testid="footer-dashboard">
+            <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 sm:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
               <a href="mailto:support@constructhub.us" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-email">support@constructhub.us</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>

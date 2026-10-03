@@ -36,7 +36,7 @@ export function PaymentMethodsPanel({ onManage }: PaymentMethodsPanelProps = {})
     <Card data-testid="card-payment-methods">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle className="text-lg">Payment methods</CardTitle>
+          <CardTitle className="text-base">Payment methods</CardTitle>
           <CardDescription>Cards on file with Stripe. Card numbers never touch ConstructHUB.</CardDescription>
         </div>
         {methods.length > 0 && (

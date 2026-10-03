@@ -161,7 +161,10 @@ test.describe("platform admin (signed in)", () => {
 
   test("the dashboard header links the index; a feature page opens the tool inside the app frame", async ({ page }) => {
     await open(page, `${SIGNED_IN}/`);
-    await expect(page.getByTestId("link-dashboard-feature-pages")).toHaveAttribute("href", "/admin/feature-pages", { timeout: 30_000 });
+    // Since the 2026-10-03 redesign the admin's "Feature pages" link sits in the dashboard's More menu.
+    await page.getByRole("button", { name: "More", exact: true }).click({ timeout: 30_000 });
+    await expect(page.getByTestId("link-dashboard-feature-pages")).toHaveAttribute("href", "/admin/feature-pages");
+    await page.keyboard.press("Escape");
     await open(page, `${SIGNED_IN}/features/site-scan`);
     await expect(page.getByTestId("header-public-page")).toHaveCount(0);
     await expect(page.getByTestId("link-nav-admin-feature-pages")).toBeVisible();

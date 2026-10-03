@@ -106,7 +106,7 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
     <Card data-testid="card-subscription">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle className="text-lg">Subscription</CardTitle>
+          <CardTitle className="text-base">Subscription</CardTitle>
           <CardDescription>What you're on, when it renews and what it costs.</CardDescription>
         </div>
         {showActions && (

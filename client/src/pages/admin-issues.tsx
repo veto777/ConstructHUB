@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section, Toolbar } from "@/components/app-ui";
 /**
  * /admin/issues — the issue desk (docs/ops/ISSUE-DESK.md): every failure the
  * app captured (server 5xx, background jobs, browser errors, the Call
@@ -209,40 +210,31 @@ export default function AdminIssuesPage() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6" data-testid="page-admin-issues">
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Issues</h1>
-          <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">ADMIN</span>
-        </div>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Failures the app caught — server errors, background jobs, browser errors, the Call Assistant and health checks — and what Claude found
-          when it inspected them. Nothing here deploys or pushes: a fix waits on its branch for review.
-        </p>
-      </div>
+    <AppPage testId="page-admin-issues">
+      <PageHeader title="Issues" description="Review failures, inspect reports, and track fixes." />
 
-      <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0 space-y-3">
         <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Filter by status">
           {chips.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={status === c.key} onClick={() => setStatusFilter(c.key)}
-              className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                status === c.key ? "border-foreground bg-foreground text-background" : "bg-background hover:bg-muted")}
+              className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                status === c.key ? "border-border bg-background text-foreground shadow-sm" : "border-transparent bg-muted/70 text-muted-foreground hover:text-foreground")}
               data-testid={`filter-status-${c.key}`}>
               {c.label}
               <span className={cn("tabular-nums text-xs", status === c.key ? "opacity-80" : "text-muted-foreground")}>{c.n}</span>
             </button>
           ))}
         </div>
-        <Select value={source} onValueChange={setSource}>
+        <Toolbar filters={<Select value={source} onValueChange={setSource}>
           <SelectTrigger className="w-full md:w-48" aria-label="Filter by source" data-testid="select-issue-source"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All sources</SelectItem>
             {ISSUE_SOURCES.map((s) => <SelectItem key={s} value={s}>{ISSUE_SOURCE_LABELS[s]}</SelectItem>)}
           </SelectContent>
-        </Select>
+        </Select>} activeFilters={source === "all" ? 0 : 1} />
       </div>
 
-      <Card className="mt-4 overflow-hidden">
+      <Section flush className="overflow-hidden">
         <div className="hidden grid-cols-12 gap-3 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground md:grid">
           <span className="col-span-5">Issue</span>
           <span className="col-span-2">Source</span>
@@ -284,12 +276,12 @@ export default function AdminIssuesPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </Section>
       {data.total > data.issues.length && (
         <p className="mt-2 text-xs text-muted-foreground">Showing the {data.issues.length} most recent of {data.total.toLocaleString()}.</p>
       )}
 
       <IssueDrawer id={openId} onClose={() => setOpenId(null)} />
-    </div>
+    </AppPage>
   );
 }

@@ -1,10 +1,11 @@
+import { Section } from "@/components/app-ui";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Hash, Loader2, Pencil, Plus, AlertTriangle } from "lucide-react";
 import { EmptyState } from "@/components/crm-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -83,28 +84,28 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
         </div>
       </div>
 
-      <Card data-testid="card-voice-numbers-rules">
+      <Section flush testId="card-voice-numbers-rules">
         <CardContent className="p-4 text-sm space-y-1.5">
-          <p className="font-medium">How numbers work</p>
+          <details><summary className="cursor-pointer py-2 font-medium">How numbers work</summary>
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
             <li data-testid="text-voice-numbers-rule-own">{CALL_ASSISTANT_NUMBER_RULES.ownNumbers}</li>
             <li data-testid="text-voice-numbers-rule-cancel">{CALL_ASSISTANT_NUMBER_RULES.cancel}</li>
             <li data-testid="text-voice-numbers-rule-payment">{CALL_ASSISTANT_NUMBER_RULES.payment}</li>
-          </ul>
+          </ul></details>
         </CardContent>
-      </Card>
+      </Section>
 
       {!d.configured && (
-        <Card className="border-amber-500/40" data-testid="card-voice-numbers-unconfigured">
+        <Section flush className="border-amber-500/40" testId="card-voice-numbers-unconfigured">
           <CardContent className="flex items-start gap-3 p-4 text-sm">
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
             <span>Numbers can't be bought on this server yet: the phone carrier isn't connected. Nothing will be charged.</span>
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       {manage && full && d.configured && (
-        <Card data-testid="card-voice-numbers-full">
+        <Section flush testId="card-voice-numbers-full">
           <CardContent className="p-4 text-sm space-y-2">
             <p>Every number your tier includes is in use.</p>
             <p className="text-muted-foreground">
@@ -112,10 +113,10 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
               {ADDONS.call_number.preview ? " (It isn't on sale yet.)" : ""}
             </p>
             {!ADDONS.call_number.preview && (
-              <Button asChild size="sm" variant="outline"><a href="/settings?tab=billing" data-testid="link-voice-numbers-billing">Open Billing</a></Button>
+              <Button asChild size="sm" variant="outline"><a href="/settings?tab=billing" data-testid="link-voice-numbers-billing">Open billing</a></Button>
             )}
           </CardContent>
-        </Card>
+        </Section>
       )}
 
       {!manage && shown.length === 0 && (
@@ -134,7 +135,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
       {shown.length > 0 && (
         <div className="grid gap-3" data-testid="list-voice-numbers">
           {shown.map((n) => (
-            <Card key={n.id} data-testid={`card-voice-number-${n.id}`}>
+            <Section flush key={n.id} testId={`card-voice-number-${n.id}`}>
               <CardContent className="flex flex-wrap items-start justify-between gap-3 p-4">
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -179,7 +180,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
                   </div>
                 )}
               </CardContent>
-            </Card>
+            </Section>
           ))}
         </div>
       )}

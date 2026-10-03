@@ -23,7 +23,7 @@ export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; o
       <nav aria-label="Settings sections" className="hidden lg:block w-56 shrink-0" data-testid="nav-settings">
         {groups.map((g) => (
           <div key={g.id} className="mb-5" data-testid={`nav-settings-group-${g.id}`}>
-            <h3 className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</h3>
+            <h3 className="px-3 mb-1.5 text-[11px] font-semibold  text-muted-foreground">{g.label}</h3>
             <ul className="space-y-0.5">
               {g.sections.map((s) => (
                 <li key={s.id}>
@@ -67,7 +67,7 @@ export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; o
             <nav aria-label="Settings sections" className="mt-4">
               {groups.map((g) => (
                 <div key={g.id} className="mb-5">
-                  <h3 className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.label}</h3>
+                  <h3 className="px-3 mb-1.5 text-[11px] font-semibold  text-muted-foreground">{g.label}</h3>
                   <ul className="space-y-0.5">
                     {g.sections.map((s) => (
                       <li key={s.id}>

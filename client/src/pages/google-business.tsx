@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section } from "@/components/app-ui";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { PublicPageHeader } from "@/components/public-page-chrome";
@@ -101,6 +102,23 @@ export default function GoogleBusinessPage() {
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
+
+  if (user) return <AppPage>
+    <PageHeader title={<span data-testid="text-hero-title">Google Business</span>} description="Manage your profile, check changes and improve your local presence." actions={<Button asChild><Link href="/gmb-monitor" data-testid="link-hero-start">Start monitoring</Link></Button>}/>
+    <Section id="tools" title="Your Google tools" actions={<a href="#tools" className="text-sm underline" data-testid="link-hero-explore">Explore all tools</a>}>
+      <div className="divide-y">{tools.map((tool,i)=><Link key={tool.link} href={tool.link} data-testid={`card-tool-${i}`} className="flex items-start gap-3 py-4 first:pt-0 last:pb-0 group"><tool.icon className="mt-1 h-5 w-5 shrink-0 text-muted-foreground"/><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold group-hover:underline">{['Profile monitor','Ranking grid','Photo optimizer','Locations','Reinstatement'][i]}</h2><p className="mt-1 text-sm text-muted-foreground">{['Check listing changes and draft review replies.','See where you rank across your service area.','Prepare job photos for your business profiles.','Manage profiles, connections and performance.','Get help with a suspended profile.'][i]}</p></div><ArrowRight className="h-4 w-4 shrink-0 mt-1"/></Link>)}</div>
+    </Section>
+    <details className="rounded-xl border bg-card p-4 space-y-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">About Google Business Profile</summary>
+      <p className="text-sm text-muted-foreground" data-testid="badge-hero">Google Business Profile Suite for Contractors</p>
+      <div className="grid gap-4 sm:grid-cols-2">{opportunity.map((point,i)=><div key={point.label} data-testid={`card-stat-${i}`}><h3 className="text-sm font-medium">{point.label}</h3><p className="text-sm text-muted-foreground">{point.sub}</p></div>)}</div>
+      <div className="divide-y">{pipeline.map(item=><div key={item.step} className="py-3" data-testid={`card-pipeline-${item.step}`}><h3 className="text-sm font-medium">{item.title}</h3><p className="text-sm text-muted-foreground">{item.desc}</p></div>)}</div>
+      <Button asChild variant="outline"><Link href="/gmb-monitor" data-testid="link-pipeline-cta">Open monitor</Link></Button>
+      <div className="grid gap-4 sm:grid-cols-2">{keyPoints.map((point,i)=><div key={point.title} data-testid={`card-insight-${i}`}><h3 className="text-sm font-medium">{point.title}</h3><p className="text-sm text-muted-foreground">{point.desc}</p></div>)}</div>
+      <div data-testid="card-comparison" className="text-sm text-muted-foreground">Keep your details current, check for changes and show customers your recent work.</div>
+      <p className="font-medium" data-testid="text-final-cta">Keep your profile up to date</p>
+      <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/gmb-monitor" data-testid="link-final-start">Open monitor</Link></Button><Button asChild variant="outline"><Link href="/pricing" data-testid="link-final-pricing">View plans</Link></Button></div>
+    </details>
+  </AppPage>;
 
   return (
     <>

@@ -122,7 +122,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     return (
       <Card data-testid="card-limits-no-plan">
         <CardHeader>
-          <CardTitle className="text-lg">No active plan</CardTitle>
+          <CardTitle className="text-base">No active plan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
@@ -130,7 +130,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           </p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => navigate("/pricing")} data-testid="button-limits-choose-plan">Compare plans</Button>
-            <Button size="sm" variant="outline" onClick={() => go("billing")} data-testid="button-limits-open-billing">Open Billing</Button>
+            <Button size="sm" variant="outline" onClick={() => go("billing")} data-testid="button-limits-open-billing">Open billing</Button>
           </div>
         </CardContent>
       </Card>
@@ -357,10 +357,10 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
       {groups.map((group) => (
         <Card key={group.title} data-testid={`card-limits-${group.title.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">{group.title}</CardTitle>
+            <CardTitle className="text-base">{group.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_8rem_8rem] gap-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="hidden sm:grid grid-cols-[minmax(0,1fr)_8rem_8rem] gap-3 pb-2 text-[11px] font-semibold  text-muted-foreground">
               <span>Limit</span>
               <span className="text-right">Included</span>
               <span className="text-right">Used</span>
@@ -419,7 +419,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className="h-10 w-10"
                               aria-label={`Remove one ${addon.name}`}
                               disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
                               onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
@@ -433,7 +433,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className="h-10 w-10"
                               aria-label={`Add one ${addon.name}`}
                               disabled={!editable || addonMutation.isPending || addon.preview === true}
                               onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty + 1 })}

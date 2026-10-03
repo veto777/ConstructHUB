@@ -1,9 +1,10 @@
+import { Section } from "@/components/app-ui";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CircleAlert, Eye, History, Loader2, Pause, Play, Rocket, Save, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,10 +73,10 @@ export function StudioEditor({ data, canManage, onRunWizard }: { data: VoiceProf
         const bad = s.id !== "preview" && s.id !== "versions" && issuesFor(issues, [s.id as StudioSectionId]).length > 0;
         return (
           <button key={s.id} type="button" onClick={() => setView(s.id as View)} aria-current={view === s.id ? "page" : undefined} data-testid={`studio-nav-${s.id}`}
-            className={cn("w-full rounded-md px-3 py-2 text-left text-sm flex items-center justify-between gap-2", view === s.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted")}>
+            className={cn("w-full rounded-md px-3 py-2 text-left text-sm flex items-center justify-between gap-2", view === s.id ? "bg-muted text-foreground font-medium" : "hover:bg-muted")}>
             <span>
               <span className="block">{s.label}</span>
-              <span className="block text-[11px] text-muted-foreground font-normal">{s.blurb}</span>
+              <span className="sr-only">{s.blurb}</span>
             </span>
             {bad && <CircleAlert className="h-4 w-4 text-destructive shrink-0" aria-label="Needs attention" />}
             {s.id === "preview" && <Eye className="h-4 w-4 text-muted-foreground shrink-0" />}
@@ -90,7 +91,7 @@ export function StudioEditor({ data, canManage, onRunWizard }: { data: VoiceProf
     <div className="pt-4 space-y-4" data-testid="studio-editor">
       <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b sm:static sm:mx-0 sm:px-0 sm:border-0 sm:bg-transparent">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={data.status === "live" ? "default" : "secondary"} data-testid="badge-studio-status">{data.status}</Badge>
+          <Badge variant="secondary" data-testid="badge-studio-status">{data.status}</Badge>
           {data.publishedVersion != null && <Badge variant="outline" data-testid="badge-studio-version">v{data.publishedVersion}</Badge>}
           <span className="text-xs text-muted-foreground" data-testid="text-studio-dirty">{dirty ? "Unsaved changes" : "All changes saved"}</span>
           {issues.length > 0 && <span className="text-xs text-destructive flex items-center gap-1" data-testid="text-studio-issues"><CircleAlert className="h-3 w-3" /> {issues.length} to fix before publishing</span>}
@@ -124,9 +125,9 @@ export function StudioEditor({ data, canManage, onRunWizard }: { data: VoiceProf
         </Select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-[14rem_1fr]">
-        <aside className="hidden sm:block"><Card><CardContent className="p-2">{nav}</CardContent></Card></aside>
-        <Card>
+      <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+        <aside className="hidden sm:block"><Section flush><CardContent className="p-2">{nav}</CardContent></Section></aside>
+        <Section flush>
           <CardContent className="p-4 sm:p-6">
             {view === "preview" ? (
               <PromptPreview dirty={dirty} />
@@ -137,7 +138,7 @@ export function StudioEditor({ data, canManage, onRunWizard }: { data: VoiceProf
               <StudioSection id={view} draft={draft} onChange={setDraft} disabled={disabled} />
             )}
           </CardContent>
-        </Card>
+        </Section>
       </div>
 
       <PublishDialog open={publishOpen} onOpenChange={setPublishOpen} draft={draft} data={data} dirty={dirty}
@@ -155,7 +156,7 @@ function PromptPreview({ dirty }: { dirty: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-base font-semibold">Prompt preview</h3>
-          <p className="text-sm text-muted-foreground">The compiled instructions the engine runs for the current draft, section by section. Deterministic: the same draft always compiles the same.</p>
+          <p className="text-sm text-muted-foreground">Review the instructions your saved draft gives the assistant.</p>
         </div>
         <Button variant="outline" size="sm" onClick={() => preview.refetch()} disabled={preview.isFetching} data-testid="button-preview-refresh">
           {preview.isFetching ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Refresh
@@ -199,7 +200,7 @@ function PromptPreview({ dirty }: { dirty: boolean }) {
 function Stat({ label, value, testid }: { label: string; value: string; testid: string }) {
   return (
     <div className="rounded-md border px-3 py-2" data-testid={testid}>
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-[11px]  text-muted-foreground">{label}</div>
       <div className="font-medium truncate" title={value}>{value}</div>
     </div>
   );

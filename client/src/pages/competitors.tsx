@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { useState } from "react";
 import { SHOW_AD_ACTIVITY } from "@/lib/features";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -73,18 +74,18 @@ const INDUSTRIES = [
 
 function getBsColor(score: number) {
   if (score >= 60) return "text-red-500";
-  if (score >= 30) return "text-yellow-500";
+  if (score >= 30) return "text-muted-foreground";
   return "text-green-500";
 }
 
 function getBsBadge(score: number) {
   if (score >= 60) return { label: "More signals", variant: "destructive" as const, color: "bg-red-500/10 text-red-500 border-red-500/20" };
-  if (score >= 30) return { label: "Some signals", variant: "outline" as const, color: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" };
+  if (score >= 30) return { label: "Some signals", variant: "outline" as const, color: "bg-muted text-muted-foreground border-border" };
   return { label: "Few signals", variant: "outline" as const, color: "bg-green-500/10 text-green-500 border-green-500/20" };
 }
 
 function BsMeter({ score }: { score: number }) {
-  const color = score >= 60 ? "bg-red-500" : score >= 30 ? "bg-yellow-500" : "bg-green-500";
+  const color = score >= 60 ? "bg-red-500" : score >= 30 ? "bg-muted" : "bg-green-500";
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
@@ -160,72 +161,47 @@ export default function CompetitorsPage() {
   if (planRequired) {
     const requiredName = planRequired.requiredPlan ? PLANS[planRequired.requiredPlan].name : null;
     return (
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-16 text-center space-y-6">
-          <div className="w-20 h-20 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto">
-            <Lock className="w-10 h-10 text-yellow-500" />
-          </div>
-          <h1 className="text-3xl font-extrabold" data-testid="text-locked-title">Competitor Intelligence</h1>
-          <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Index every competitor in your market, track their rankings, and use our heuristic BS Meter to find signals worth a closer look.
-          </p>
+      <AppPage width="narrow">
+        <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
+        <Section>
           <p className="text-muted-foreground" data-testid="text-plan-required">
             {planRequired.message || "Your plan does not include Competitor Intel."}
           </p>
           <p className="text-sm text-muted-foreground">
-            Competitor Intel is included with the <span className="text-yellow-500 font-bold">{COMPETITOR_INTEL_PLANS}</span> plans.
+            Competitor Intel is included with the <span className="text-muted-foreground font-bold">{COMPETITOR_INTEL_PLANS}</span> plans.
           </p>
           <Button
-            className="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-8"
+            className="font-bold px-8"
             onClick={() => window.location.href = "/pricing"}
             data-testid="button-upgrade-plan"
           >
             <Shield className="w-4 h-4 mr-2" />
             {requiredName ? `See the ${requiredName} plan` : "See plans"}
           </Button>
-        </div>
-      </div>
+        </Section>
+      </AppPage>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-competitors-title">
-            <Eye className="w-6 h-6 text-yellow-500" />
-            Competitor Intelligence
-          </h1>
-          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
-          <p className="text-muted-foreground text-sm max-w-lg">
-            Know exactly who you're competing against. Index every competitor in your market, and track their rankings and reviews.
-          </p>
-        </div>
-
+    <AppPage>
+      <PageHeader title={<span data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
         <Tabs defaultValue="market-scan" className="space-y-6">
-          <TabsList className="bg-muted/50">
+          <AppTabsList className="bg-muted/50">
             <TabsTrigger value="market-scan" className="flex items-center gap-1.5" data-testid="tab-market-scan">
               <Search className="w-4 h-4" />
-              Market Scan
+              Market scan
             </TabsTrigger>
             {SHOW_AD_ACTIVITY && (
               <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
                 <Megaphone className="w-4 h-4" />
-                Ad Activity
+                Ad activity
               </TabsTrigger>
             )}
-          </TabsList>
+          </AppTabsList>
 
           <TabsContent value="market-scan" className="space-y-6">
-            <Card data-testid="card-new-scan">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Search className="w-5 h-5" />
-                  New Market Scan
-                </CardTitle>
-                <CardDescription>Find and analyze all competitors in a specific industry and location.</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Section title="New market scan" testId="card-new-scan">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="industry">Industry</Label>
@@ -250,6 +226,7 @@ export default function CompetitorsPage() {
                       data-testid="input-location"
                     />
                   </div>
+                  <details className="space-y-2"><summary className="cursor-pointer py-2 text-sm font-medium">Advanced · Search radius</summary>
                   <div className="space-y-1.5">
                     <Label htmlFor="radius">Radius (miles)</Label>
                     <Select value={radius} onValueChange={setRadius}>
@@ -264,20 +241,20 @@ export default function CompetitorsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  </details>
                   <div className="flex items-end">
                     <Button
-                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+                      className="w-full"
                       onClick={handleScan}
                       disabled={scanMutation.isPending}
                       data-testid="button-start-scan"
                     >
                       {scanMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
-                      Scan Market
+                      Scan market
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </Section>
 
             {scansLoading && (
               <div className="flex justify-center py-12">
@@ -312,8 +289,7 @@ export default function CompetitorsPage() {
             </TabsContent>
           )}
         </Tabs>
-      </div>
-    </div>
+    </AppPage>
   );
 }
 
@@ -378,9 +354,9 @@ function AdSpyTab() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+          <h2 className="text-base font-semibold flex items-center gap-2">
             <Megaphone className="w-5 h-5 text-orange-500" />
-            Public Ad Activity
+            Public ad activity
           </h2>
           <p className="text-sm text-muted-foreground">Track who's advertising on Google for your target keywords.</p>
         </div>
@@ -389,7 +365,7 @@ function AdSpyTab() {
         </Badge>
       </div>
 
-      <Card data-testid="card-add-keyword">
+      <Section flush testId="card-add-keyword">
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="md:col-span-2 space-y-1.5">
@@ -428,18 +404,18 @@ function AdSpyTab() {
             </div>
             <div className="flex items-end">
               <Button
-                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold"
+                className="w-full font-semibold"
                 onClick={handleAdd}
                 disabled={addMutation.isPending || keywordCount >= 10}
                 data-testid="button-add-keyword"
               >
                 {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Add Keyword
+                Add keyword
               </Button>
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Section>
 
       {isLoading && (
         <div className="flex justify-center py-12">
@@ -455,12 +431,12 @@ function AdSpyTab() {
       )}
 
       {keywords && keywords.length > 0 && (
-        <Card>
+        <Section flush>
           <CardContent className="pt-6 p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
+              <table className={appTable.table}>
+                <thead className={appTableCards.thead}>
+                  <tr className={appTableCards.tr + " border-b"}>
                     <th className="text-left py-3 px-4 font-semibold text-muted-foreground">KEYWORD</th>
                     <th className="text-left py-3 px-4 font-semibold text-muted-foreground">LOCATION</th>
                     <th className="text-center py-3 px-4 font-semibold text-muted-foreground">DEVICE</th>
@@ -494,7 +470,7 @@ function AdSpyTab() {
               </table>
             </div>
           </CardContent>
-        </Card>
+        </Section>
       )}
     </div>
   );
@@ -516,32 +492,32 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
 
   return (
     <>
-      <tr className="border-b hover:bg-muted/30 transition-colors" data-testid={`row-keyword-${keyword.id}`}>
-        <td className="py-3 px-4 font-medium">{keyword.keyword}</td>
-        <td className="py-3 px-4">
+      <tr className={appTableCards.tr + " border-b hover:bg-muted/30 transition-colors"} data-testid={`row-keyword-${keyword.id}`}>
+        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.keyword}</td>
+        <td className={appTableCards.td + " min-w-0 break-words"}>
           <span className="flex items-center gap-1.5">
             <Flag className="w-3 h-3 text-muted-foreground" />
             {keyword.location}
           </span>
         </td>
-        <td className="py-3 px-4 text-center">
+        <td className={appTableCards.td + " min-w-0 break-words"}>
           <span className="flex items-center justify-center gap-1 text-muted-foreground">
             {keyword.device === "mobile" ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
             {keyword.device === "mobile" ? "Mobile" : "Desktop"}
           </span>
         </td>
-        <td className="py-3 px-4 text-center font-medium">{keyword.advertisers1Day || "—"}</td>
-        <td className="py-3 px-4 text-center font-medium">{keyword.advertisers7Day || "—"}</td>
-        <td className="py-3 px-4 text-center font-medium">{keyword.advertisers30Day || "—"}</td>
-        <td className="py-3 px-4 text-center">
+        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers1Day || "—"}</td>
+        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers7Day || "—"}</td>
+        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers30Day || "—"}</td>
+        <td className={appTableCards.td + " min-w-0 break-words"}>
           <span className="font-bold text-orange-500">{keyword.totalAdvertisers || 0}</span>
         </td>
-        <td className="py-3 px-4">
+        <td className={appTableCards.td + " min-w-0 break-words"}>
           <div className="flex items-center justify-end gap-1">
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs border-orange-500/30 text-orange-500 hover:bg-orange-500/10"
+              className="h-7 text-xs border-orange-500/30 text-orange-500"
               onClick={onToggle}
               data-testid={`button-detailed-view-${keyword.id}`}
             >
@@ -560,7 +536,7 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+              className="h-7 w-7 text-red-500 hover:text-red-600"
               onClick={onDelete}
               disabled={deleting}
               data-testid={`button-delete-keyword-${keyword.id}`}
@@ -572,7 +548,7 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} className="p-0">
+          <td colSpan={8} className={appTableCards.td + " min-w-0 break-words"}>
             <div className="bg-muted/20 border-b p-4 space-y-3">
               {isLoading && (
                 <div className="flex justify-center py-6">
@@ -584,7 +560,7 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
               )}
               {advertisers && advertisers.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  <p className="text-xs font-semibold text-muted-foreground ">
                     {advertisers.length} Advertisers Found
                   </p>
                   <div className="grid gap-2">
@@ -604,7 +580,7 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
                             <div className="space-y-1.5 mt-2">
                               {adv.ads.slice(0, 2).map((ad: any, ai: number) => (
                                 <div key={ai} className="pl-3 border-l-2 border-orange-500/30 text-xs space-y-0.5">
-                                  {ad.headline && <p className="text-blue-500 font-medium">{ad.headline}</p>}
+                                  {ad.headline && <p className="text-muted-foreground font-medium">{ad.headline}</p>}
                                   {ad.displayUrl && (
                                     <p className="text-green-600 dark:text-green-400 text-[11px]">{ad.displayUrl}</p>
                                   )}
@@ -629,7 +605,7 @@ function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, del
                               href={`https://${adv.advertiserDomain}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:underline mt-1"
+                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:underline mt-1"
                             >
                               <ExternalLink className="w-2.5 h-2.5" /> Visit
                             </a>
@@ -670,7 +646,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
   return (
     <div className="mt-3 space-y-3">
       <p className="text-xs font-semibold flex items-center gap-1.5">
-        <Eye className="w-3.5 h-3.5 text-yellow-500" /> Signals worth a closer look ({total} reviews sampled)
+        <Eye className="w-3.5 h-3.5 text-muted-foreground" /> Signals worth a closer look ({total} reviews sampled)
       </p>
 
       <p className="text-xs text-muted-foreground">Heuristic signals from a selected sample are not proof of authorship, purchase, or authenticity. Scores are not probabilities.</p>
@@ -689,10 +665,10 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
           </div>
           <p className="text-[10px] text-muted-foreground">Bad ({badPct}%)</p>
         </div>
-        <div className="p-2 rounded border border-purple-500/20 bg-purple-500/5 text-center">
+        <div className="p-2 rounded border border-border bg-muted text-center">
           <div className="flex items-center justify-center gap-1">
-            <Bot className="w-3 h-3 text-purple-500" />
-            <span className="text-sm font-bold text-purple-500">{analysis.reviewsLookingAi}</span>
+            <Bot className="w-3 h-3 text-muted-foreground" />
+            <span className="text-sm font-bold text-muted-foreground">{analysis.reviewsLookingAi}</span>
           </div>
           <p className="text-[10px] text-muted-foreground">Common phrases ({aiPct}%)</p>
         </div>
@@ -707,7 +683,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
-          <Camera className="w-3 h-3 text-blue-400 shrink-0" />
+          <Camera className="w-3 h-3 text-muted-foreground shrink-0" />
           <span className="text-muted-foreground">Reviewer photos: <strong className="text-foreground">{photoPct}%</strong></span>
         </div>
         <div className="flex items-center gap-1.5 p-1.5 rounded border border-border/30">
@@ -735,16 +711,16 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
 
       {analysis.aiSuspectReviews && analysis.aiSuspectReviews.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-purple-500 uppercase tracking-wide flex items-center gap-1">
+          <p className="text-[10px] font-semibold text-muted-foreground  flex items-center gap-1">
             <Bot className="w-3 h-3" /> Repeated common phrases
           </p>
           {analysis.aiSuspectReviews.map((r: any, i: number) => (
-            <div key={i} className="p-2 rounded border border-purple-500/10 bg-purple-500/5 text-xs">
+            <div key={i} className="p-2 rounded border border-border bg-muted text-xs">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-medium">{r.author}</span>
                 <div className="flex gap-0.5">
                   {Array.from({ length: r.rating }).map((_, j) => (
-                    <Star key={j} className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" />
+                    <Star key={j} className="w-2.5 h-2.5 fill-yellow-400 text-muted-foreground" />
                   ))}
                 </div>
               </div>
@@ -756,7 +732,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
 
       {analysis.genericReviews && analysis.genericReviews.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-amber-500 uppercase tracking-wide flex items-center gap-1">
+          <p className="text-[10px] font-semibold text-amber-500  flex items-center gap-1">
             <Ban className="w-3 h-3" /> Generic Reviews (No Specific Details)
           </p>
           {analysis.genericReviews.map((r: any, i: number) => (
@@ -795,12 +771,12 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
   const organic = listings.filter((l: any) => (l.bsScore || 0) < 30).length;
 
   return (
-    <Card data-testid={`card-scan-${scan.id}`}>
+    <Section flush testId={`card-scan-${scan.id}`}>
       <CardHeader className="pb-2 cursor-pointer" onClick={onToggle}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-lg bg-yellow-500/10 hidden sm:flex items-center justify-center shrink-0">
-              <BarChart3 className="w-5 h-5 text-yellow-500" />
+            <div className="w-10 h-10 rounded-lg bg-muted hidden sm:flex items-center justify-center shrink-0">
+              <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </div>
             <div className="min-w-0">
               <CardTitle className="text-base">{scan.industry} — {scan.location}</CardTitle>
@@ -811,7 +787,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {isRunning && (
-              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
                 Scanning...
               </Badge>
@@ -905,8 +881,8 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                   <p className="text-2xl font-bold text-green-500">{organic}</p>
                   <p className="text-xs text-muted-foreground">Few signals</p>
                 </div>
-                <div className="p-3 rounded-lg border border-yellow-500/20 text-center">
-                  <p className="text-2xl font-bold text-yellow-500">{moderate}</p>
+                <div className="p-3 rounded-lg border border-border text-center">
+                  <p className="text-2xl font-bold text-muted-foreground">{moderate}</p>
                   <p className="text-xs text-muted-foreground">Some signals Risk</p>
                 </div>
                 <div className="p-3 rounded-lg border border-red-500/20 text-center">
@@ -916,7 +892,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">All Competitors</h3>
+                <h3 className="text-sm font-semibold">All competitors</h3>
                 <div className="space-y-2 max-h-[800px] overflow-y-auto pr-1">
                   {listings.map((listing: any, idx: number) => {
                     const bsBadge = getBsBadge(listing.bsScore || 0);
@@ -932,13 +908,13 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-semibold text-sm truncate">{listing.businessName}</p>
                               {listing.isNew && (
-                                <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] px-1.5">NEW</Badge>
+                                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">NEW</Badge>
                               )}
                               <Badge variant="outline" className={`text-[10px] px-1.5 ${bsBadge.color}`}>
                                 {bsBadge.label}
                               </Badge>
                               {listing.reviewAnalysis?.reviewsLookingAi > 0 && (
-                                <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/20 text-[10px] px-1.5">
+                                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">
                                   <Bot className="w-2.5 h-2.5 mr-0.5" />{listing.reviewAnalysis.reviewsLookingAi} AI
                                 </Badge>
                               )}
@@ -951,7 +927,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                               )}
                               {listing.rating && (
                                 <span className="flex items-center gap-1">
-                                  <Star className="w-3 h-3 text-yellow-500" />{listing.rating} ({listing.reviewCount || 0} reviews)
+                                  <Star className="w-3 h-3 text-muted-foreground" />{listing.rating} ({listing.reviewCount || 0} reviews)
                                 </span>
                               )}
                               {listing.phone && (
@@ -960,7 +936,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                                 </span>
                               )}
                               {listing.website && (
-                                <a href={listing.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-500 hover:underline">
+                                <a href={listing.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-muted-foreground hover:underline">
                                   <Globe className="w-3 h-3" />Website
                                 </a>
                               )}
@@ -986,7 +962,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                               data-testid={`button-review-analysis-${listing.id}`}
                             >
                               <Eye className="w-3 h-3 mr-1" />
-                              {isExpanded ? "Hide" : "View"} Review Analysis
+                              {isExpanded ? "Hide" : "View"} Review analysis
                               {isExpanded ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                             </Button>
                             {isExpanded && <ReviewAnalysisPanel analysis={listing.reviewAnalysis} />}
@@ -1008,6 +984,6 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
           )}
         </CardContent>
       )}
-    </Card>
+    </Section>
   );
 }

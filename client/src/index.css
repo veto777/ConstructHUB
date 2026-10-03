@@ -230,6 +230,22 @@
    selects don't inherit word-spacing by default, which made "Add location" read as "Addlocation". */
 .app-theme body { letter-spacing: 0; word-spacing: 0.06em; }
 .app-theme button, .app-theme input, .app-theme select, .app-theme textarea { word-spacing: inherit; }
+/* "Show more" disclosures (<details>) across the platform pages: one quiet style with a turning chevron instead of
+   the browser's ▸. A summary styled on purpose opts out with `list-none`. */
+.app-theme details > summary:not(.list-none) {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: .5rem;
+  padding: .375rem .125rem; border-radius: .375rem;
+  font-size: .875rem; font-weight: 500; color: hsl(var(--muted-foreground));
+}
+.app-theme details > summary:not(.list-none)::-webkit-details-marker { display: none; }
+.app-theme details > summary:not(.list-none)::before {
+  content: ""; flex: none; width: .45rem; height: .45rem; margin: 0 .1rem;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s ease;
+}
+.app-theme details[open] > summary:not(.list-none)::before { transform: rotate(45deg); }
+.app-theme details > summary:not(.list-none):hover { color: hsl(var(--foreground)); }
+.app-theme details > summary:not(.list-none):focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 
 .dark.app-theme {
   --background: 222 28% 11%;

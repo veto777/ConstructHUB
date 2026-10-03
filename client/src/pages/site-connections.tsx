@@ -8,10 +8,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import {
+  AppPage,
+  PageHeader,
+  Section,
+  Toolbar,
+  Notice,
+} from "@/components/app-ui";
+import {
   PlanRequired,
   planRequiredFrom,
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
+const selectClass =
+  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
 const sampledBlocks = (snapshot: any) =>
   Array.isArray(snapshot?.events)
     ? snapshot.events.filter((e: any) => e.action === "block").length
@@ -22,10 +31,39 @@ function Field({
   ...props
 }: React.ComponentProps<typeof Input> & { label: string }) {
   return (
-    <label className="block space-y-1 text-sm">
-      <span>{label}</span>
+    <label className="block min-w-0 space-y-1.5 text-sm">
+      <span className="text-muted-foreground">{label}</span>
       <Input {...props} />
     </label>
+  );
+}
+/**
+ * Tab strip that behaves like the kit's AppTabsList (scrolls sideways on
+ * phones, never wraps) but keeps plain buttons: e2e reaches tabs by role
+ * "button" (e.g. getByRole("button", { name: "Work queue" })).
+ */
+function TabStrip({ tabs, active, onChange }: {
+  tabs: string[];
+  active: string;
+  onChange: (t: string) => void;
+}) {
+  return (
+    <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+      <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0">
+        {tabs.map((t) => (
+          <Button
+            key={t}
+            variant="ghost"
+            className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${t === active ? "bg-background text-foreground shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
+            onClick={() => onChange(t)}
+            aria-selected={active === t}
+            data-testid={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
+          >
+            {t}
+          </Button>
+        ))}
+      </div>
+    </div>
   );
 }
 function DataList({
@@ -50,8 +88,8 @@ function DataList({
   });
   return (
     <section className="space-y-3">
-      <h3 className="font-semibold">{title}</h3>
-      <div className="flex gap-2">
+      <h3 className="text-base font-semibold leading-6">{title}</h3>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Input
           aria-label={`Search ${title}`}
           placeholder={`Search ${title.toLowerCase()}`}
@@ -60,10 +98,12 @@ function DataList({
             Q(e.target.value);
             P(1);
           }}
+          className="h-10 sm:w-72"
         />
         {filters.length > 0 && (
           <select
             aria-label={`Filter ${title}`}
+            className={selectClass}
             value={status}
             onChange={(e) => {
               S(e.target.value);
@@ -78,36 +118,46 @@ function DataList({
         )}
       </div>
       {data.isLoading ? (
-        <p>Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : data.error ? (
-        <p role="alert">{apiErrorMessage(data.error)}</p>
+        <p role="alert" className="text-sm text-destructive">
+          {apiErrorMessage(data.error)}
+        </p>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
             {data.data?.total ?? 0} results
           </p>
-          <div className="divide-y">
+          <div className="divide-y rounded-xl border">
             {data.data?.items?.map((r: any, i: number) => (
               <div
-                className="py-3"
+                className="px-4 py-3"
                 key={r.id ?? r.url ?? r.path ?? `${r.date}:${r.key}:${i}`}
               >
                 {render(r)}
               </div>
             ))}
+            {!data.data?.items?.length && (
+              <p className="px-4 py-6 text-sm text-muted-foreground">
+                No data available yet.
+              </p>
+            )}
           </div>
-          {!data.data?.items?.length && <p>No data available yet.</p>}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
               disabled={page === 1}
               onClick={() => P(page - 1)}
             >
               Previous
             </Button>
-            <span>Page {page}</span>
+            <span className="text-sm tabular-nums text-muted-foreground">
+              Page {page}
+            </span>
             <Button
               variant="outline"
+              size="sm"
               disabled={page * 25 >= (data.data?.total ?? 0)}
               onClick={() => P(page + 1)}
             >
@@ -128,18 +178,28 @@ function MetricRows({ asset }: { asset: any }) {
     [end, E] = useState(new Date().toISOString().slice(0, 10));
   return (
     <div className="space-y-4">
-      <div className="flex gap-3 flex-wrap">
-        <label>
-          Breakdown{" "}
-          <select value={dimension} onChange={(e) => D(e.target.value)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="block space-y-1.5 text-sm">
+          <span className="text-muted-foreground">Breakdown</span>
+          <select
+            aria-label="Breakdown"
+            className={`${selectClass} block`}
+            value={dimension}
+            onChange={(e) => D(e.target.value)}
+          >
             {["date", "query", "page", "device", "country"].map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
         </label>
-        <label>
-          Group{" "}
-          <select value={group} onChange={(e) => G(e.target.value)}>
+        <label className="block space-y-1.5 text-sm">
+          <span className="text-muted-foreground">Group</span>
+          <select
+            aria-label="Group"
+            className={`${selectClass} block`}
+            value={group}
+            onChange={(e) => G(e.target.value)}
+          >
             {["day", "week", "month"].map((d) => (
               <option key={d}>{d}</option>
             ))}
@@ -163,11 +223,11 @@ function MetricRows({ asset }: { asset: any }) {
         title="Search analytics"
         url={`/api/gsc/assets/${asset.id}/analytics?dimension=${dimension}&group=${group}&start=${start}&end=${end}`}
         render={(r) => (
-          <div>
-            <b>
+          <div className="text-sm">
+            <p className="font-medium">
               {r.date} {r.key}
-            </b>
-            <p>
+            </p>
+            <p className="text-muted-foreground">
               Clicks: {r.clicks} · Impressions: {r.impressions} · CTR:{" "}
               {r.ctr === null ? "Unavailable" : `${(r.ctr * 100).toFixed(2)}%`}{" "}
               · Position:{" "}
@@ -188,7 +248,7 @@ function MetricRows({ asset }: { asset: any }) {
         title="Sitemaps"
         url={`/api/gsc/assets/${asset.id}/sitemaps`}
         render={(r) => (
-          <p>
+          <p className="text-sm text-muted-foreground">
             {r.path} · Submitted: {r.lastSubmitted ?? "Unknown"} · Errors:{" "}
             {r.errors ?? "Unknown"}
           </p>
@@ -199,9 +259,9 @@ function MetricRows({ asset }: { asset: any }) {
         url={`/api/gsc/assets/${asset.id}/inspections`}
         filters={["PASS", "FAIL", "NEUTRAL"]}
         render={(r) => (
-          <div>
-            <b>{r.url}</b>
-            <p>
+          <div className="text-sm">
+            <p className="break-all font-medium">{r.url}</p>
+            <p className="text-muted-foreground">
               {r.result?.indexStatusResult?.coverageState ?? "Unavailable"} ·{" "}
               {r.result?.indexStatusResult?.verdict ?? "Unknown"} · Checked{" "}
               {new Date(r.inspected_at).toLocaleString()}
@@ -210,7 +270,7 @@ function MetricRows({ asset }: { asset: any }) {
         )}
       />
       <InspectionCoverage id={asset.id} />
-      <p className="text-sm">
+      <p className="text-sm text-muted-foreground">
         Coverage summarizes inspected URLs only; inspection does not request
         indexing.
       </p>
@@ -230,7 +290,7 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
         <p className="font-medium">
           Google Search Console · property totals · last 30 days
         </p>
-        <p>
+        <p className="text-sm text-muted-foreground">
           {s
             ? `${s.clicks} clicks · ${s.impressions} impressions`
             : "Search Console data unavailable. Connect an account and sync its property."}
@@ -329,325 +389,318 @@ export default function SiteConnections({
     if (d) Z(d);
   }
   const header = (
-    <header>
-      <h1 className="text-2xl font-bold">
-        {cf ? "Cloudflare protection" : "Google Search Console"}
-      </h1>
-      <p className="text-muted-foreground">
-        {cf
+    <PageHeader
+      title={cf ? "Cloudflare protection" : "Google Search Console"}
+      description={
+        cf
           ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
-          : "Manage client properties, search performance, sitemaps, and indexing monitoring."}
-      </p>
-    </header>
+          : "Manage client properties, search performance, sitemaps, and indexing monitoring."
+      }
+    />
   );
+  const TABS = [
+    "Sites",
+    "Connections",
+    "Onboarding",
+    "Work queue",
+    ...(cf ? ["Edge audit"] : []),
+    "Guide",
+  ];
   if (planGate)
     return (
-      <div className="h-full overflow-y-auto">
-        <main className="max-w-6xl mx-auto p-6 space-y-6">
-          {header}
-          <PlanRequired
-            module="cloudflareSearchConsole"
-            error={planGate}
-            className="max-w-3xl"
-          />
-        </main>
-      </div>
+      <AppPage testId={`page-site-connections-${provider}`}>
+        {header}
+        <PlanRequired
+          module="cloudflareSearchConsole"
+          error={planGate}
+          className="max-w-3xl"
+        />
+      </AppPage>
     );
   return (
-    <div className="h-full overflow-y-auto">
-      <main className="max-w-6xl mx-auto p-6 space-y-6">
-        {header}
-        {config.data?.workerEnabled === false && (
-          <p role="status" className="border rounded p-3">
-            Background processing is disabled. Queued work will wait until the
-            owner enables the site integration worker.
-          </p>
-        )}
-        {new URLSearchParams(window.location.search).get("connection") ===
-          "failed" && (
-          <p role="alert">
-            Google consent failed. Reconnect and grant Search Console access.
-          </p>
-        )}
-        <nav className="flex gap-2 flex-wrap">
-          {[
-            "Sites",
-            "Connections",
-            "Onboarding",
-            "Work queue",
-            ...(cf ? ["Edge audit"] : []),
-            "Guide",
-          ].map((t) => (
-            <Button
-              key={t}
-              variant={tab === t ? "default" : "outline"}
-              onClick={() => T(t)}
-            >
-              {t}
-            </Button>
-          ))}
-        </nav>
-        {tab === "Guide" && <SiteConnectionGuide />}
-        {tab === "Connections" && (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Connect {cf ? "Cloudflare" : "Google"}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {cf ? (
-                  <>
-                    <p>
-                      Your Global Key is used once to create a limited
-                      ConstructHUB key and is never saved. You can see and
-                      revoke it in Cloudflare → My Profile → API Tokens.
+    <AppPage testId={`page-site-connections-${provider}`}>
+      {header}
+      {config.data?.workerEnabled === false && (
+        <Notice tone="warning">
+          Background processing is disabled. Queued work will wait until the
+          owner enables the site integration worker.
+        </Notice>
+      )}
+      {new URLSearchParams(window.location.search).get("connection") ===
+        "failed" && (
+        <Notice tone="danger">
+          Google consent failed. Reconnect and grant Search Console access.
+        </Notice>
+      )}
+      <TabStrip tabs={TABS} active={tab} onChange={T} />
+      {tab === "Guide" && <SiteConnectionGuide />}
+      {tab === "Connections" && (
+        <div className="space-y-5 sm:space-y-6">
+          <Section
+            title={`Connect ${cf ? "Cloudflare" : "Google"}`}
+            description={
+              cf
+                ? "Your Global Key is used once to create a limited ConstructHUB key and is never saved."
+                : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
+            }
+          >
+            {cf ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field
+                    label="Cloudflare login email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => Email(e.target.value)}
+                  />
+                  <Field
+                    label="Global API Key"
+                    type="password"
+                    autoComplete="off"
+                    value={key}
+                    onChange={(e) => Key(e.target.value)}
+                  />
+                </div>
+                <Field
+                  label="Find zone by domain"
+                  value={zoneSearch}
+                  onChange={(e) => ZS(e.target.value)}
+                />
+                <Button
+                  disabled={busy || !key || !email}
+                  className="w-full sm:w-auto"
+                  onClick={() => discover(1)}
+                >
+                  Verify and choose zones
+                </Button>
+                {zones && (
+                  <section className="space-y-3 rounded-xl border p-4">
+                    <p className="text-sm text-muted-foreground">
+                      {zones.total} zones · page {zonePage}
                     </p>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <Field
-                        label="Cloudflare login email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => Email(e.target.value)}
-                      />
-                      <Field
-                        label="Global API Key"
-                        type="password"
-                        autoComplete="off"
-                        value={key}
-                        onChange={(e) => Key(e.target.value)}
-                      />
+                    {zones.accounts.map((a: any) => (
+                      <p key={a.id} className="text-sm">
+                        Account: {a.name}
+                      </p>
+                    ))}
+                    {zones.zones.map((z: any) => (
+                      <label className="flex gap-2 text-sm" key={z.id}>
+                        <input
+                          type="checkbox"
+                          checked={zoneIds.includes(z.id)}
+                          onChange={() =>
+                            ZI(
+                              zoneIds.includes(z.id)
+                                ? zoneIds.filter((id) => id !== z.id)
+                                : [...zoneIds, z.id],
+                            )
+                          }
+                        />
+                        {z.name} · {z.status}
+                      </label>
+                    ))}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <Button
+                        variant="outline"
+                        disabled={busy || zonePage === 1}
+                        onClick={() => discover(zonePage - 1)}
+                      >
+                        Previous zones
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={busy || zonePage * 50 >= zones.total}
+                        onClick={() => discover(zonePage + 1)}
+                      >
+                        Next zones
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={busy || !zoneIds.length}
+                        onClick={async () => {
+                          try {
+                            const r = await act(
+                              () =>
+                                post("/exchange", {
+                                  email,
+                                  key,
+                                  zones: zoneIds,
+                                }),
+                              "Limited Cloudflare key created",
+                            );
+                            if (r) {
+                              Z(null);
+                              ZI([]);
+                            }
+                          } finally {
+                            Key("");
+                          }
+                        }}
+                      >
+                        Create limited key
+                      </Button>
                     </div>
+                    <p className="text-sm text-muted-foreground">
+                      Permissions: Zone Read, Analytics Read, Zone WAF Edit.
+                      Limited to selected zones.
+                    </p>
+                  </section>
+                )}
+                <details className="rounded-xl border px-4 py-3">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Fallback: paste a scoped API token
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Cloudflare → My Profile → API Tokens → Create Token →
+                      Custom token. Add the zone permissions listed above,
+                      choose Include → Specific zone for each client site, then
+                      Continue to summary → Create Token.
+                    </p>
                     <Field
-                      label="Find zone by domain"
-                      value={zoneSearch}
-                      onChange={(e) => ZS(e.target.value)}
+                      label="Scoped API token"
+                      type="password"
+                      autoComplete="off"
+                      value={token}
+                      onChange={(e) => Token(e.target.value)}
                     />
                     <Button
-                      disabled={busy || !key || !email}
-                      onClick={() => discover(1)}
-                    >
-                      Verify and choose zones
-                    </Button>
-                    {zones && (
-                      <section className="space-y-3">
-                        <p>
-                          {zones.total} zones · page {zonePage}
-                        </p>
-                        {zones.accounts.map((a: any) => (
-                          <p key={a.id} className="text-sm">
-                            Account: {a.name}
-                          </p>
-                        ))}
-                        {zones.zones.map((z: any) => (
-                          <label className="flex gap-2" key={z.id}>
-                            <input
-                              type="checkbox"
-                              checked={zoneIds.includes(z.id)}
-                              onChange={() =>
-                                ZI(
-                                  zoneIds.includes(z.id)
-                                    ? zoneIds.filter((id) => id !== z.id)
-                                    : [...zoneIds, z.id],
-                                )
-                              }
-                            />
-                            {z.name} · {z.status}
-                          </label>
-                        ))}
-                        <div className="flex gap-2">
-                          <Button
-                            disabled={busy || zonePage === 1}
-                            onClick={() => discover(zonePage - 1)}
-                          >
-                            Previous zones
-                          </Button>
-                          <Button
-                            disabled={busy || zonePage * 50 >= zones.total}
-                            onClick={() => discover(zonePage + 1)}
-                          >
-                            Next zones
-                          </Button>
-                          <Button
-                            disabled={busy || !zoneIds.length}
-                            onClick={async () => {
-                              try {
-                                const r = await act(
-                                  () =>
-                                    post("/exchange", {
-                                      email,
-                                      key,
-                                      zones: zoneIds,
-                                    }),
-                                  "Limited Cloudflare key created",
-                                );
-                                if (r) {
-                                  Z(null);
-                                  ZI([]);
-                                }
-                              } finally {
-                                Key("");
-                              }
-                            }}
-                          >
-                            Create limited key
-                          </Button>
-                        </div>
-                        <p className="text-sm">
-                          Permissions: Zone Read, Analytics Read, Zone WAF Edit.
-                          Limited to selected zones.
-                        </p>
-                      </section>
-                    )}
-                    <details>
-                      <summary>Fallback: paste a scoped API token</summary>
-                      <div className="space-y-3 mt-3">
-                        <p>
-                          Cloudflare → My Profile → API Tokens → Create Token →
-                          Custom token. Add the zone permissions listed above,
-                          choose Include → Specific zone for each client site,
-                          then Continue to summary → Create Token.
-                        </p>
-                        <Field
-                          label="Scoped API token"
-                          type="password"
-                          autoComplete="off"
-                          value={token}
-                          onChange={(e) => Token(e.target.value)}
-                        />
-                        <Button
-                          disabled={busy || !token}
-                          onClick={async () => {
-                            try {
-                              await act(
-                                () => post("/token", { token }),
-                                "Cloudflare connected",
-                              );
-                            } finally {
-                              Token("");
-                            }
-                          }}
-                        >
-                          Connect scoped token
-                        </Button>
-                      </div>
-                    </details>
-                    <p>
-                      Agency member email:{" "}
-                      {config.data?.agencyEmail ?? "Not configured"}
-                    </p>
-                    <Button
-                      disabled={busy}
                       variant="outline"
-                      onClick={() =>
-                        act(
-                          () => post("/agency", {}),
-                          "Agency membership worker connected",
-                        )
-                      }
-                    >
-                      Enable agency membership connection
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      Connect the agency’s Google account. Search Console
-                      permissions are stored separately from GBP and Calendar.
-                    </p>
-                    <Button
-                      disabled={busy}
-                      onClick={() =>
-                        act(async () => {
-                          const d = await read(`${base}/connect`);
-                          window.location.assign(d.url);
-                        })
-                      }
-                    >
-                      Connect Google Search Console
-                    </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-            <DataList
-              title="Connections"
-              url={`${base}/connections`}
-              render={(c) => (
-                <div className="flex justify-between gap-3 flex-wrap">
-                  <div>
-                    <label className="flex gap-2">
-                      <input
-                        type="radio"
-                        name="connection"
-                        checked={connection === c.id}
-                        onChange={() => C(c.id)}
-                      />
-                      <b>{c.email ?? c.subject}</b>
-                    </label>
-                    <p>{c.token_name ?? c.method}</p>
-                    <p className="text-sm">
-                      {c.permissions
-                        ?.map((p: any) =>
-                          typeof p === "string" ? p : (p.name ?? p.id),
-                        )
-                        .join(", ")}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      disabled={busy}
-                      variant="outline"
-                      onClick={() =>
-                        act(() => post("/discover", { connectionIds: [c.id] }))
-                      }
-                    >
-                      Discover sites
-                    </Button>
-                    <Button
-                      disabled={busy}
-                      variant="destructive"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Disconnect and delete cached data? Applied Cloudflare rules remain. Revoke access at the provider if requested.",
-                          )
-                        )
-                          act(() => post("/disconnect", { ids: [c.id] })).then(
-                            (r) => {
-                              if (r)
-                                toast({
-                                  title: "Disconnected",
-                                  description: r.results
-                                    .map((x: any) => x.message)
-                                    .join(" "),
-                                });
-                            },
+                      disabled={busy || !token}
+                      onClick={async () => {
+                        try {
+                          await act(
+                            () => post("/token", { token }),
+                            "Cloudflare connected",
                           );
+                        } finally {
+                          Token("");
+                        }
                       }}
                     >
-                      Disconnect
+                      Connect scoped token
                     </Button>
                   </div>
+                </details>
+                <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+                  <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                    Agency member email:{" "}
+                    {config.data?.agencyEmail ?? "Not configured"}
+                  </p>
+                  <Button
+                    disabled={busy}
+                    variant="outline"
+                    onClick={() =>
+                      act(
+                        () => post("/agency", {}),
+                        "Agency membership worker connected",
+                      )
+                    }
+                  >
+                    Enable agency membership connection
+                  </Button>
                 </div>
-              )}
-            />
-          </div>
-        )}
-        {tab === "Sites" && (
-          <div className="space-y-4">
-            <div className="flex gap-3">
-              <Input
-                aria-label="Search sites"
-                placeholder="Search sites"
-                value={q}
-                onChange={(e) => {
-                  Q(e.target.value);
-                  P(1);
-                  Select([]);
-                }}
-              />
+              </div>
+            ) : (
+              <Button
+                disabled={busy}
+                className="w-full sm:w-auto"
+                onClick={() =>
+                  act(async () => {
+                    const d = await read(`${base}/connect`);
+                    window.location.assign(d.url);
+                  })
+                }
+              >
+                Connect Google Search Console
+              </Button>
+            )}
+          </Section>
+          <DataList
+            title="Connections"
+            url={`${base}/connections`}
+            render={(c) => (
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <label className="flex gap-2 text-sm">
+                    <input
+                      type="radio"
+                      name="connection"
+                      checked={connection === c.id}
+                      onChange={() => C(c.id)}
+                    />
+                    <b>{c.email ?? c.subject}</b>
+                  </label>
+                  <p className="text-sm text-muted-foreground">
+                    {c.token_name ?? c.method}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {c.permissions
+                      ?.map((p: any) =>
+                        typeof p === "string" ? p : (p.name ?? p.id),
+                      )
+                      .join(", ")}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    disabled={busy}
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      act(() => post("/discover", { connectionIds: [c.id] }))
+                    }
+                  >
+                    Discover sites
+                  </Button>
+                  <Button
+                    disabled={busy}
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "Disconnect and delete cached data? Applied Cloudflare rules remain. Revoke access at the provider if requested.",
+                        )
+                      )
+                        act(() => post("/disconnect", { ids: [c.id] })).then(
+                          (r) => {
+                            if (r)
+                              toast({
+                                title: "Disconnected",
+                                description: r.results
+                                  .map((x: any) => x.message)
+                                  .join(" "),
+                              });
+                          },
+                        );
+                    }}
+                  >
+                    Disconnect
+                  </Button>
+                </div>
+              </div>
+            )}
+          />
+        </div>
+      )}
+      {tab === "Sites" && (
+        <div className="space-y-4 sm:space-y-5">
+          <Toolbar
+            search={{
+              value: q,
+              onChange: (v) => {
+                Q(v);
+                P(1);
+                Select([]);
+              },
+              placeholder: "Search sites",
+            }}
+            activeFilters={status ? 1 : 0}
+            filters={
               <select
                 aria-label="Site status"
+                className={selectClass}
                 value={status}
                 onChange={(e) => {
                   Status(e.target.value);
@@ -668,10 +721,29 @@ export default function SiteConnections({
                   <option key={s}>{s}</option>
                 ))}
               </select>
-            </div>
-            <div className="flex gap-3 flex-wrap">
+            }
+          />
+          <div className="flex flex-wrap items-end gap-3">
+            {!cf && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                <Field
+                  label="Sync from (up to 16 months)"
+                  type="date"
+                  value={start}
+                  onChange={(e) => Start(e.target.value)}
+                />
+                <Field
+                  label="Sync through"
+                  type="date"
+                  value={end}
+                  onChange={(e) => End(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
               <Button
                 disabled={busy || !selected.length}
+                className="w-full sm:w-auto"
                 onClick={() =>
                   act(() =>
                     post("/sync", {
@@ -686,6 +758,7 @@ export default function SiteConnections({
               <Button
                 disabled={busy || !assets.data?.total}
                 variant="outline"
+                className="w-full sm:w-auto"
                 onClick={() =>
                   act(() =>
                     post("/sync", {
@@ -699,185 +772,190 @@ export default function SiteConnections({
               >
                 Sync all matching sites
               </Button>
-              {!cf && (
-                <>
-                  <Field
-                    label="Sync from (up to 16 months)"
-                    type="date"
-                    value={start}
-                    onChange={(e) => Start(e.target.value)}
-                  />
-                  <Field
-                    label="Sync through"
-                    type="date"
-                    value={end}
-                    onChange={(e) => End(e.target.value)}
-                  />
-                </>
-              )}
             </div>
-            {assets.error ? (
-              <p role="alert">{apiErrorMessage(assets.error)}</p>
-            ) : assets.isLoading ? (
-              <p>Loading sites…</p>
-            ) : (
-              <>
-                <p>{assets.data?.total ?? 0} sites</p>
-                <div className="border rounded divide-y">
-                  <label className="flex gap-2 p-3">
+          </div>
+          {assets.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {apiErrorMessage(assets.error)}
+            </p>
+          ) : assets.isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading sites…</p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {assets.data?.total ?? 0} sites
+              </p>
+              <div className="rounded-xl border">
+                <label className="flex gap-2 border-b p-3 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    aria-label="Select this page"
+                    checked={
+                      !!assets.data?.items.length &&
+                      assets.data.items.every((a: any) =>
+                        selected.includes(a.id),
+                      )
+                    }
+                    onChange={(e) =>
+                      Select(
+                        e.target.checked
+                          ? assets.data.items.map((a: any) => a.id)
+                          : [],
+                      )
+                    }
+                  />
+                  Select this page
+                </label>
+                {assets.data?.items.map((a: any) => (
+                  <div
+                    className="flex flex-wrap items-center gap-3 border-b p-3 last:border-b-0"
+                    key={a.id}
+                  >
                     <input
                       type="checkbox"
-                      aria-label="Select this page"
-                      checked={
-                        !!assets.data?.items.length &&
-                        assets.data.items.every((a: any) =>
-                          selected.includes(a.id),
-                        )
-                      }
-                      onChange={(e) =>
-                        Select(
-                          e.target.checked
-                            ? assets.data.items.map((a: any) => a.id)
-                            : [],
-                        )
-                      }
+                      aria-label={`Select ${a.name}`}
+                      checked={selected.includes(a.id)}
+                      onChange={() => toggle(a.id)}
                     />
-                    Select this page
-                  </label>
-                  {assets.data?.items.map((a: any) => (
-                    <div className="flex items-center gap-3 p-3" key={a.id}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${a.name}`}
-                        checked={selected.includes(a.id)}
-                        onChange={() => toggle(a.id)}
-                      />
-                      <div className="flex-1">
-                        <button
-                          className="text-primary underline"
-                          onClick={() => A(a)}
-                        >
-                          {a.name}
-                        </button>
-                        <p className="text-sm">
-                          ID {a.id} · {a.status} · {a.locations} linked
-                          locations ·{" "}
-                          {a.synced_at
-                            ? `Synced ${new Date(a.synced_at).toLocaleString()}`
-                            : "Not synced"}
-                        </p>
-                        {a.error && <p role="alert">{a.error}</p>}
-                      </div>
-                      <Button
-                        disabled={busy}
-                        variant="outline"
-                        onClick={() =>
-                          act(() => post("/sync", { ids: [a.id] }))
-                        }
+                    <div className="min-w-0 flex-1">
+                      <button
+                        className="text-sm font-medium text-primary underline"
+                        onClick={() => A(a)}
                       >
-                        Sync
-                      </Button>
+                        {a.name}
+                      </button>
+                      <p className="text-sm text-muted-foreground">
+                        ID {a.id} · {a.status} · {a.locations} linked locations
+                        ·{" "}
+                        {a.synced_at
+                          ? `Synced ${new Date(a.synced_at).toLocaleString()}`
+                          : "Not synced"}
+                      </p>
+                      {a.error && (
+                        <p role="alert" className="text-sm text-destructive">
+                          {a.error}
+                        </p>
+                      )}
                     </div>
-                  ))}
-                  {!assets.data?.items.length && (
-                    <p className="p-6">
-                      No connected sites. Open Connections to get started.
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3 items-center">
-                  <Button disabled={page === 1} onClick={() => P(page - 1)}>
-                    Previous sites
-                  </Button>
-                  <span>Page {page}</span>
-                  <Button
-                    disabled={page * 25 >= (assets.data?.total ?? 0)}
-                    onClick={() => P(page + 1)}
-                  >
-                    Next sites
-                  </Button>
-                </div>
-              </>
-            )}
-            {cf ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>
-                    Preview edge protection for selected zones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <select
-                    aria-label="Rule pack"
-                    value={pack}
-                    onChange={(e) => Pack(e.target.value)}
-                  >
-                    <option value="ads-door">Ads door</option>
-                    <option value="bad-ua">Site-wide bad user agents</option>
-                    <option value="ips">Flagged IPs</option>
-                  </select>
-                  <Field
-                    label="Ads path"
-                    value={path}
-                    onChange={(e) => Path(e.target.value)}
-                  />
-                  <Field
-                    label="Flagged IP addresses (comma separated)"
-                    value={ips}
-                    onChange={(e) => Ips(e.target.value)}
-                  />
-                  <Field
-                    label="Office IP exemptions (comma separated)"
-                    value={officeIps}
-                    onChange={(e) => OfficeIps(e.target.value)}
-                  />
-                  <p className="text-sm">
-                    Review Click Guard / VPN Shield findings before adding IPs.
-                    Rules affect visitors; check office-IP exemptions in
-                    Cloudflare first.
+                    <Button
+                      disabled={busy}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => act(() => post("/sync", { ids: [a.id] }))}
+                    >
+                      Sync
+                    </Button>
+                  </div>
+                ))}
+                {!assets.data?.items.length && (
+                  <p className="p-6 text-sm text-muted-foreground">
+                    No connected sites. Open Connections to get started.
                   </p>
-                  <Button
-                    disabled={busy || !selected.length}
-                    onClick={async () => {
-                      const d = await act(
-                        () =>
-                          post("/preview", {
-                            ids: selected,
-                            kind: pack,
-                            path,
-                            officeIps: officeIps
-                              .split(",")
-                              .map((x) => x.trim())
-                              .filter(Boolean),
-                            ips: ips
-                              .split(",")
-                              .map((x) => x.trim())
-                              .filter(Boolean),
-                          }),
-                        "Preview ready",
-                      );
-                      if (d) Preview(d.items);
-                    }}
-                  >
-                    Preview rules
-                  </Button>
-                  {preview.length > 0 && (
-                    <div className="space-y-3 border rounded p-3">
-                      <h3 className="font-semibold">Review before applying</h3>
-                      {preview.map((p) => (
-                        <div key={p.id}>
-                          <b>{p.zone}</b>
-                          <p>{p.warning}</p>
-                          {p.rules.map((r: any, i: number) => (
-                            <div key={i}>
-                              <p>{r.rule.description}</p>
-                              <code className="break-all text-xs">
-                                {r.rule.expression}
-                              </code>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => P(page - 1)}
+                >
+                  Previous sites
+                </Button>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  Page {page}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * 25 >= (assets.data?.total ?? 0)}
+                  onClick={() => P(page + 1)}
+                >
+                  Next sites
+                </Button>
+              </div>
+            </>
+          )}
+          {cf ? (
+            <Section
+              title="Preview edge protection for selected zones"
+              description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
+            >
+              <div className="space-y-3">
+                <select
+                  aria-label="Rule pack"
+                  className={selectClass}
+                  value={pack}
+                  onChange={(e) => Pack(e.target.value)}
+                >
+                  <option value="ads-door">Ads door</option>
+                  <option value="bad-ua">Site-wide bad user agents</option>
+                  <option value="ips">Flagged IPs</option>
+                </select>
+                <Field
+                  label="Ads path"
+                  value={path}
+                  onChange={(e) => Path(e.target.value)}
+                />
+                <Field
+                  label="Flagged IP addresses (comma separated)"
+                  value={ips}
+                  onChange={(e) => Ips(e.target.value)}
+                />
+                <Field
+                  label="Office IP exemptions (comma separated)"
+                  value={officeIps}
+                  onChange={(e) => OfficeIps(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Check office-IP exemptions in Cloudflare first.
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={busy || !selected.length}
+                  onClick={async () => {
+                    const d = await act(
+                      () =>
+                        post("/preview", {
+                          ids: selected,
+                          kind: pack,
+                          path,
+                          officeIps: officeIps
+                            .split(",")
+                            .map((x) => x.trim())
+                            .filter(Boolean),
+                          ips: ips
+                            .split(",")
+                            .map((x) => x.trim())
+                            .filter(Boolean),
+                        }),
+                      "Preview ready",
+                    );
+                    if (d) Preview(d.items);
+                  }}
+                >
+                  Preview rules
+                </Button>
+                {preview.length > 0 && (
+                  <div className="space-y-3 rounded-xl border p-4">
+                    <h3 className="text-base font-semibold leading-6">
+                      Review before applying
+                    </h3>
+                    {preview.map((p) => (
+                      <div key={p.id} className="text-sm">
+                        <b>{p.zone}</b>
+                        <p className="text-muted-foreground">{p.warning}</p>
+                        {p.rules.map((r: any, i: number) => (
+                          <div key={i}>
+                            <p>{r.rule.description}</p>
+                            <code className="break-all text-xs">
+                              {r.rule.expression}
+                            </code>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                       <Button
                         disabled={busy}
                         variant="destructive"
@@ -898,203 +976,210 @@ export default function SiteConnections({
                         Cancel preview
                       </Button>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Bulk sitemap submission or inspection</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p>
-                    Enter one property ID and URL per line, separated by a
-                    comma. Selected IDs: {selected.join(", ") || "None"}. URLs
-                    must belong to the property.
-                  </p>
-                  <textarea
-                    className="border rounded w-full p-2"
-                    aria-label="Property IDs and URLs"
-                    rows={4}
-                    value={urls}
-                    onChange={(e) => Urls(e.target.value)}
-                    placeholder="123, https://example.com/sitemap.xml"
-                  />
-                  <div className="flex gap-3">
-                    {["inspect", "sitemap"].map((kind) => (
-                      <Button
-                        key={kind}
-                        disabled={busy || !urls.trim()}
-                        onClick={() => {
-                          if (
-                            kind === "sitemap" &&
-                            !window.confirm("Submit these sitemaps to Google?")
-                          )
-                            return;
-                          act(() =>
-                            post("/urls", {
-                              kind,
-                              confirm: kind === "sitemap",
-                              items: urls
-                                .trim()
-                                .split("\n")
-                                .map((line) => {
-                                  const [id, ...rest] = line.split(",");
-                                  return {
-                                    assetId: Number(id),
-                                    url: rest.join(",").trim(),
-                                  };
-                                }),
-                            }),
-                          );
-                        }}
-                      >
-                        {kind === "inspect"
-                          ? "Queue inspections"
-                          : "Review and submit sitemaps"}
-                      </Button>
-                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-            {asset && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{asset.name}</CardTitle>
-                  <Button variant="outline" onClick={() => A(null)}>
-                    Close details
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  {cf ? (
-                    <CloudflareDetails
-                      id={asset.id}
-                      onFlag={(ip) => {
-                        Ips(ips ? `${ips}, ${ip}` : ip);
-                        Pack("ips");
-                        Select([asset.id]);
-                      }}
-                    />
-                  ) : (
-                    <MetricRows key={asset.id} asset={asset} />
-                  )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
-        {tab === "Onboarding" && (
-          <div className="space-y-5">
-            <p>
-              Select a connection under Connections, then enter one client per
-              line: email, location ID{cf ? ", Cloudflare account ID" : ""}.
-              Email goes to the client with steps to grant access. Active
-              connection: {connection ?? "None"}.
-            </p>
-            <DataList
-              title="Locations"
-              url={`${base}/locations`}
-              render={(l) => (
-                <p>
-                  {l.id} · {l.business_name} · {l.website ?? "Website required"}
+                )}
+              </div>
+            </Section>
+          ) : (
+            <Section
+              title="Bulk sitemap submission or inspection"
+              description="One property ID and URL per line, separated by a comma. URLs must belong to the property."
+            >
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Selected IDs: {selected.join(", ") || "None"}.
                 </p>
+                <textarea
+                  className="w-full rounded-md border bg-background p-2 text-sm"
+                  aria-label="Property IDs and URLs"
+                  rows={4}
+                  value={urls}
+                  onChange={(e) => Urls(e.target.value)}
+                  placeholder="123, https://example.com/sitemap.xml"
+                />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {["inspect", "sitemap"].map((kind) => (
+                    <Button
+                      key={kind}
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      disabled={busy || !urls.trim()}
+                      onClick={() => {
+                        if (
+                          kind === "sitemap" &&
+                          !window.confirm(
+                            "Submit these sitemaps to Google?",
+                          )
+                        )
+                          return;
+                        act(() =>
+                          post("/urls", {
+                            kind,
+                            confirm: kind === "sitemap",
+                            items: urls
+                              .trim()
+                              .split("\n")
+                              .map((line) => {
+                                const [id, ...rest] = line.split(",");
+                                return {
+                                  assetId: Number(id),
+                                  url: rest.join(",").trim(),
+                                };
+                              }),
+                          }),
+                        );
+                      }}
+                    >
+                      {kind === "inspect"
+                        ? "Queue inspections"
+                        : "Review and submit sitemaps"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+          )}
+          {asset && (
+            <Section
+              title={asset.name}
+              actions={
+                <Button variant="ghost" size="sm" onClick={() => A(null)}>
+                  Close details
+                </Button>
+              }
+            >
+              {cf ? (
+                <CloudflareDetails
+                  id={asset.id}
+                  onFlag={(ip) => {
+                    Ips(ips ? `${ips}, ${ip}` : ip);
+                    Pack("ips");
+                    Select([asset.id]);
+                  }}
+                />
+              ) : (
+                <MetricRows key={asset.id} asset={asset} />
               )}
-            />
+            </Section>
+          )}
+        </div>
+      )}
+      {tab === "Onboarding" && (
+        <div className="space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Select a connection under Connections, then enter one client per
+            line: email, location ID{cf ? ", Cloudflare account ID" : ""}.
+            Email goes to the client with steps to grant access. Active
+            connection: {connection ?? "None"}.
+          </p>
+          <DataList
+            title="Locations"
+            url={`${base}/locations`}
+            render={(l) => (
+              <p className="text-sm text-muted-foreground">
+                {l.id} · {l.business_name} · {l.website ?? "Website required"}
+              </p>
+            )}
+          />
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-muted-foreground">Client invitations</span>
             <textarea
-              className="w-full border rounded p-2"
+              className="w-full rounded-md border bg-background p-2 text-sm"
               aria-label="Client invitations"
               rows={4}
               value={inviteRows}
               onChange={(e) => Invites(e.target.value)}
             />
-            <Button
-              disabled={busy || !connection || !inviteRows.trim()}
-              onClick={() =>
-                act(
-                  () =>
-                    post("/invites", {
-                      connectionId: connection,
-                      clients: inviteRows
-                        .trim()
-                        .split("\n")
-                        .map((line) => {
-                          const [email, id, account] = line
-                            .split(",")
-                            .map((x) => x.trim());
-                          return {
-                            email,
-                            locationId: Number(id),
-                            accountId: account || undefined,
-                          };
-                        }),
-                    }),
-                  "Invitation emails queued",
-                )
-              }
-            >
-              Send onboarding emails
-            </Button>
-            <DataList
-              title="Invitations"
-              url={`${base}/invites`}
-              filters={["pending", "accepted"]}
-              render={(i) => (
-                <p>
-                  {i.email} · {i.domain} · {i.state}
-                </p>
-              )}
-            />
-          </div>
-        )}
-        {tab === "Work queue" && (
+          </label>
+          <Button
+            disabled={busy || !connection || !inviteRows.trim()}
+            className="w-full sm:w-auto"
+            onClick={() =>
+              act(
+                () =>
+                  post("/invites", {
+                    connectionId: connection,
+                    clients: inviteRows
+                      .trim()
+                      .split("\n")
+                      .map((line) => {
+                        const [email, id, account] = line
+                          .split(",")
+                          .map((x) => x.trim());
+                        return {
+                          email,
+                          locationId: Number(id),
+                          accountId: account || undefined,
+                        };
+                      }),
+                  }),
+                "Invitation emails queued",
+              )
+            }
+          >
+            Send onboarding emails
+          </Button>
           <DataList
-            title="Work queue"
-            url={`${base}/jobs`}
-            filters={["queued", "running", "done", "failed", "uncertain"]}
-            render={(j) => (
-              <p>
-                #{j.id} · {j.kind} · {j.state} {j.error && `— ${j.error}`}
+            title="Invitations"
+            url={`${base}/invites`}
+            filters={["pending", "accepted"]}
+            render={(i) => (
+              <p className="text-sm text-muted-foreground">
+                {i.email} · {i.domain} · {i.state}
               </p>
             )}
           />
-        )}
-        {tab === "Edge audit" && (
-          <DataList
-            title="Edge audit"
-            url={`${base}/actions`}
-            filters={["preview", "queued", "applied", "reverted", "uncertain"]}
-            render={(a) => (
-              <div className="space-y-2">
-                <b>
-                  {a.name} · {a.kind} · {a.state}
-                </b>
-                <p>{new Date(a.created_at).toLocaleString()}</p>
-                <p>
-                  Before snapshot: {a.preview.before?.until ?? "Unavailable"} ·
-                  Latest snapshot: {a.after?.until ?? "Unavailable"}.
-                  Latest-event sample blocks:{" "}
-                  {sampledBlocks(a.preview.before) ?? "Unavailable"} before /{" "}
-                  {sampledBlocks(a.after) ?? "Unavailable"} latest. Sync after
-                  applying; sampled events do not prove causation.
-                </p>
-                {["applied", "uncertain"].includes(a.state) && (
-                  <Button
-                    disabled={busy}
-                    variant="outline"
-                    onClick={() =>
-                      act(() => post("/undo", { ids: [a.id] }), "Undo queued")
-                    }
-                  >
-                    Undo ConstructHUB rules
-                  </Button>
-                )}
-              </div>
-            )}
-          />
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+      {tab === "Work queue" && (
+        <DataList
+          title="Work queue"
+          url={`${base}/jobs`}
+          filters={["queued", "running", "done", "failed", "uncertain"]}
+          render={(j) => (
+            <p className="text-sm text-muted-foreground">
+              #{j.id} · {j.kind} · {j.state} {j.error && `— ${j.error}`}
+            </p>
+          )}
+        />
+      )}
+      {tab === "Edge audit" && (
+        <DataList
+          title="Edge audit"
+          url={`${base}/actions`}
+          filters={["preview", "queued", "applied", "reverted", "uncertain"]}
+          render={(a) => (
+            <div className="space-y-2 text-sm">
+              <b>
+                {a.name} · {a.kind} · {a.state}
+              </b>
+              <p className="text-muted-foreground">
+                {new Date(a.created_at).toLocaleString()}
+              </p>
+              <p className="text-muted-foreground">
+                Before snapshot: {a.preview.before?.until ?? "Unavailable"} ·
+                Latest snapshot: {a.after?.until ?? "Unavailable"}. Latest-event
+                sample blocks: {sampledBlocks(a.preview.before) ?? "Unavailable"}{" "}
+                before / {sampledBlocks(a.after) ?? "Unavailable"} latest. Sync
+                after applying; sampled events do not prove causation.
+              </p>
+              {["applied", "uncertain"].includes(a.state) && (
+                <Button
+                  disabled={busy}
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    act(() => post("/undo", { ids: [a.id] }), "Undo queued")
+                  }
+                >
+                  Undo ConstructHUB rules
+                </Button>
+              )}
+            </div>
+          )}
+        />
+      )}
+    </AppPage>
   );
 }
 function CloudflareDetails({
@@ -1108,18 +1193,24 @@ function CloudflareDetails({
     queryKey: [`/api/cloudflare/assets/${id}`],
   });
   const d = (data as any)?.data;
-  if (error) return <p>{apiErrorMessage(error)}</p>;
+  if (error) return <p className="text-sm text-destructive">{apiErrorMessage(error)}</p>;
   if (!d)
     return (
       <div className="space-y-4">
-        <p>Analytics unavailable. Queue a sync and check Work queue.</p>
+        <p className="text-sm text-muted-foreground">
+          Analytics unavailable. Queue a sync and check Work queue.
+        </p>
         <DataList
           title="Flagged IPs"
           url={`/api/cloudflare/assets/${id}/flagged-ips`}
           render={(r) => (
-            <p>
+            <p className="text-sm text-muted-foreground">
               {r.ip_address} · {r.source} · {r.reason}{" "}
-              <Button onClick={() => onFlag(r.ip_address)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onFlag(r.ip_address)}
+              >
                 Add to preview
               </Button>
             </p>
@@ -1129,34 +1220,34 @@ function CloudflareDetails({
     );
   return (
     <div className="space-y-4">
-      <p>{d.notice}</p>
+      <p className="text-sm">{d.notice}</p>
       <DataList
         title="Flagged IPs"
         url={`/api/cloudflare/assets/${id}/flagged-ips`}
         render={(r) => (
-          <p>
+          <p className="text-sm text-muted-foreground">
             {r.ip_address} · {r.source} · {r.reason}{" "}
-            <Button onClick={() => onFlag(r.ip_address)}>Add to preview</Button>
+            <Button variant="outline" size="sm" onClick={() => onFlag(r.ip_address)}>
+              Add to preview
+            </Button>
           </p>
         )}
       />
-      <p>
+      <p className="text-sm text-muted-foreground">
         Bot traffic share (score 1–29 among scored requests):{" "}
         {d.botShare == null
           ? "Unavailable on this plan or permission set"
           : `${(d.botShare * 100).toFixed(1)}%`}
       </p>
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="divide-y rounded-xl border">
         {d.traffic?.map((day: any) => (
-          <Card key={day.dimensions?.date}>
-            <CardContent className="p-4">
-              <b>{day.dimensions?.date} UTC</b>
-              <p>Requests: {day.sum?.requests ?? "Unavailable"}</p>
-              <p>Unique visitors: {day.uniq?.uniques ?? "Unavailable"}</p>
-              <p>Page views: {day.sum?.pageViews ?? "Unavailable"}</p>
-              <p>Threats: {day.sum?.threats ?? "Unavailable"}</p>
-            </CardContent>
-          </Card>
+          <p key={day.dimensions?.date} className="px-4 py-2.5 text-sm text-muted-foreground">
+            <b className="text-foreground">{day.dimensions?.date} UTC</b> ·
+            Requests: {day.sum?.requests ?? "Unavailable"} · Unique visitors:{" "}
+            {day.uniq?.uniques ?? "Unavailable"} · Page views:{" "}
+            {day.sum?.pageViews ?? "Unavailable"} · Threats:{" "}
+            {day.sum?.threats ?? "Unavailable"}
+          </p>
         ))}
       </div>
       {["traffic", "events", "paths", "bots", "countries"].map((field) => (
@@ -1165,7 +1256,7 @@ function CloudflareDetails({
           title={field}
           url={`/api/cloudflare/assets/${id}/cache?field=${field}`}
           render={(row) => (
-            <pre className="text-xs whitespace-pre-wrap break-all">
+            <pre className="whitespace-pre-wrap break-all text-xs">
               {JSON.stringify(row, null, 2)}
             </pre>
           )}
@@ -1187,15 +1278,15 @@ export function ScanIndexingSummary({ scanId }: { scanId: string }) {
   if (access.isLoading || planRequiredFrom(access.error)) return null;
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Search Console indexing</CardTitle>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Search Console indexing</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <DataList
           title="Scanned URL indexing"
           url={`/api/gsc/scans/${scanId}/indexing`}
           render={(r) => (
-            <p>
+            <p className="text-sm text-muted-foreground">
               {r.url} ·{" "}
               {r.result?.indexStatusResult?.coverageState ?? "Not inspected"}{" "}
               {r.inspected_at &&
@@ -1216,7 +1307,7 @@ function InspectionCoverage({ id }: { id: number }) {
     queryKey: [`/api/gsc/assets/${id}/inspections?limit=1`],
   });
   return (
-    <p>
+    <p className="text-sm text-muted-foreground">
       Inspected URL coverage:{" "}
       {data?.coverage?.length
         ? data.coverage

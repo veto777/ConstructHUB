@@ -1,9 +1,10 @@
+import { Section } from "@/components/app-ui";
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bot, Loader2, MessageSquareText, PhoneOff, RotateCcw, Send, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -89,10 +90,9 @@ export function SimulatorPanel() {
   return (
     <div data-testid="panel-call-assistant-simulator" className="pt-4 space-y-4">
       {!session ? (
-        <Card>
+        <Section flush>
           <CardContent className="p-4 sm:p-6 space-y-4">
-            <EmptyState icon={MessageSquareText} title="Call your assistant by typing" compact
-              description="The same brain a caller gets, with every decision shown. Try the awkward ones: 'are you a bot?', a repair you don't do, an address outside your area, a sales pitch." />
+            <div className="space-y-1"><h2 className="text-base font-semibold">Call your assistant by typing</h2><p className="text-sm text-muted-foreground">Try a conversation before your assistant takes real calls.</p></div>
             {profile.data && isFirstRun(profile.data) && <p className="text-sm text-center text-muted-foreground" data-testid="text-simulator-no-profile">Finish the setup in Agent Studio first — the Simulator runs whatever the draft says.</p>}
             <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] items-end max-w-2xl mx-auto">
               <div className="space-y-1.5">
@@ -116,10 +116,10 @@ export function SimulatorPanel() {
             <p className="text-xs text-center text-muted-foreground">A known caller number lets the assistant greet an existing client by name, as it would on a real call.</p>
             {lastError && <p className="text-sm text-destructive text-center" data-testid="text-simulator-error">{lastError}</p>}
           </CardContent>
-        </Card>
+        </Section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(16rem,0.6fr)]">
-          <Card className="flex flex-col">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.6fr)]">
+          <Section flush className="flex flex-col">
             <CardContent className="p-0 flex flex-col h-[60vh] min-h-[24rem]">
               <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 text-xs text-muted-foreground">
                 <Badge variant="outline" data-testid="badge-simulator-source">{source === "draft" ? "Draft" : `Published v${session.compiledVersion ?? profile.data?.publishedVersion ?? ""}`}</Badge>
@@ -133,8 +133,8 @@ export function SimulatorPanel() {
                 {messages.map((m, i) => (
                   <div key={i} className={cn("flex gap-2", m.role === "caller" ? "justify-end" : "justify-start")} data-testid={`simulator-message-${i}`} data-role={m.role}>
                     {m.role === "assistant" && <Bot className="h-5 w-5 text-primary shrink-0 mt-1" aria-hidden="true" />}
-                    <div className={cn("max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                      m.role === "caller" ? "bg-primary text-primary-foreground" : m.role === "system" ? "bg-muted text-muted-foreground italic" : "bg-muted")}>
+                    <div className={cn("min-w-0 break-words max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                      m.role === "caller" ? "border bg-background" : m.role === "system" ? "bg-muted text-muted-foreground italic" : "bg-muted")}>
                       <p>{m.text}</p>
                       {m.decision && (
                         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -157,17 +157,17 @@ export function SimulatorPanel() {
                 <Button type="submit" disabled={!text.trim() || !!ended || turn.isPending} aria-label="Send" data-testid="button-simulator-send"><Send className="h-4 w-4" /></Button>
               </form>
             </CardContent>
-          </Card>
-          <Card>
+          </Section>
+          <Section flush>
             <CardContent className="p-4 space-y-4 text-sm" data-testid="simulator-decision-panel">
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Last decision</div>
+                <div className="text-[11px]  text-muted-foreground">Last decision</div>
                 <div className="font-medium" data-testid="simulator-last-action">{lastDecision ? DECISION_ACTION_LABELS[lastDecision.action] ?? lastDecision.action : "—"}</div>
                 {lastDecision?.alert && <p className="text-xs text-muted-foreground mt-1">{lastDecision.alert.summary}</p>}
                 {lastDecision?.spam && <p className="text-xs text-muted-foreground mt-1">{lastDecision.spam.reason}</p>}
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Slots collected</div>
+                <div className="text-[11px]  text-muted-foreground">Slots collected</div>
                 {Object.keys(slots).length === 0 ? <p className="text-muted-foreground">Nothing yet.</p> : (
                   <dl className="mt-1 divide-y rounded-md border" data-testid="simulator-slots">
                     {Object.entries(slots).map(([k, v]) => (
@@ -180,7 +180,7 @@ export function SimulatorPanel() {
                 )}
               </div>
               <div>
-                <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Events</div>
+                <div className="text-[11px]  text-muted-foreground">Events</div>
                 {events.length === 0 ? <p className="text-muted-foreground">None.</p> : (
                   <ul className="mt-1 space-y-0.5 text-xs" data-testid="simulator-events">
                     {events.map((e, i) => <li key={i}><Badge variant="outline" className="text-[10px] mr-1">{e.type}</Badge>{typeof e.detail === "string" ? e.detail : e.detail ? JSON.stringify(e.detail) : ""}</li>)}
@@ -189,7 +189,7 @@ export function SimulatorPanel() {
               </div>
               <p className="text-xs text-muted-foreground">Nothing here reaches your CRM or pages anyone — the Simulator is a sandbox.</p>
             </CardContent>
-          </Card>
+          </Section>
         </div>
       )}
     </div>

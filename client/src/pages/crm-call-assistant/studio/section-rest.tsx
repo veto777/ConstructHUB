@@ -264,11 +264,13 @@ export function AdvancedSection({ value, onChange, disabled }: SectionProps<Adva
         <NumberField id="temperature" label="Creativity" value={value.temperature} min={0} max={1} step={0.05} disabled={disabled} testid="input-temperature" onChange={(n) => set("temperature", n)} hint="0 = by the book, 1 = loose. 0.3 is the tested default." />
         <NumberField id="max-turns" label="Max turns per call" value={value.maxTurns} min={4} max={80} disabled={disabled} testid="input-max-turns" onChange={(n) => set("maxTurns", n)} />
         <NumberField id="max-call-seconds" label="Max call length" value={value.maxCallSeconds} min={60} max={3600} step={30} suffix="s" disabled={disabled} testid="input-max-call-seconds" onChange={(n) => set("maxCallSeconds", n)} />
+      </div>
+      <details><summary className="cursor-pointer py-2 text-sm font-medium">Advanced timing</summary><div className="grid gap-4 sm:grid-cols-3">
         <NumberField id="silence-seconds" label="Silence before 'still there?'" value={value.silencePromptSeconds} min={5} max={60} suffix="s" disabled={disabled} testid="input-silence-seconds" onChange={(n) => set("silencePromptSeconds", n)} />
         <NumberField id="silence-prompts" label="Silence prompts before goodbye" value={value.silencePromptsBeforeHangup} min={1} max={5} disabled={disabled} testid="input-silence-prompts" onChange={(n) => set("silencePromptsBeforeHangup", n)} />
         <NumberField id="greeting-delay" label="Greeting delay" value={value.greetingDelaySeconds} min={0} max={10} step={0.5} suffix="s" disabled={disabled} testid="input-greeting-delay" onChange={(n) => set("greetingDelaySeconds", n)}
           hint="Lets a forwarded call bridge (and a CallRail whisper finish) before the assistant speaks." />
-      </div>
+      </div></details>
       <SelectField id="spam-sensitivity" label="Spam sensitivity" value={value.spamSensitivity} onChange={(v) => set("spamSensitivity", v)} disabled={disabled} testid="select-spam-sensitivity"
         options={[{ value: "low", label: "Low — only the obvious pitches" }, { value: "normal", label: "Normal" }, { value: "high", label: "High — flags sooner" }]}
         hint="Two near-certain spam calls from one number block it before the next call is answered." />

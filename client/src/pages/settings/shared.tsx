@@ -25,7 +25,7 @@ export function SettingsSectionHeader({ title, description, infoKey, actions }: 
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 pb-4 border-b border-border/60" data-testid="settings-section-header">
       <div className="min-w-0">
-        <h2 className="text-xl font-semibold tracking-tight flex items-center gap-1" data-testid="text-settings-section-title">
+        <h2 className="text-base font-semibold tracking-tight flex items-center gap-1" data-testid="text-settings-section-title">
           {title}
           {infoKey && <InfoTip k={infoKey} />}
         </h2>

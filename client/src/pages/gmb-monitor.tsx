@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section } from "@/components/app-ui";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -24,7 +25,7 @@ import {
 
 function fieldLabel(field: string): string {
   const labels: Record<string, string> = {
-    businessName: "Business Name",
+    businessName: "Business name",
     address: "Address",
     phone: "Phone Number",
     website: "Website",
@@ -194,18 +195,18 @@ function ListingCard({ listing }: { listing: GmbListing }) {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 text-xs gap-1.5"
+          className="min-h-10 text-xs gap-1.5"
           onClick={() => checkMutation.mutate()}
           disabled={checkMutation.isPending}
           data-testid={`button-check-${listing.id}`}
         >
           {checkMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-          Check Now
+          Check now
         </Button>
         <Button
           size="sm"
           variant="ghost"
-          className="h-7 text-xs gap-1.5"
+          className="min-h-10 text-xs gap-1.5"
           onClick={() => setExpanded(!expanded)}
           data-testid={`button-history-${listing.id}`}
         >
@@ -271,8 +272,8 @@ function ListingCard({ listing }: { listing: GmbListing }) {
               <p className="text-xs text-muted-foreground">No edits detected yet</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 {listing.lastCheckedAt
-                  ? 'Click "Check Now" to compare the listing against Google again'
-                  : 'Click "Check Now" to capture a baseline; later checks compare against it'}
+                  ? 'Click "Check now" to compare the listing against Google again'
+                  : 'Click "Check now" to capture a baseline; later checks compare against it'}
               </p>
             </div>
           )}
@@ -336,40 +337,40 @@ function ReviewResponseTool() {
   };
 
   return (
-    <Card className="p-4 border-[#4A6CF7]/20 bg-[#4A6CF7]/[0.02]" data-testid="card-review-response-tool">
+    <div className="py-4" data-testid="card-review-response-tool">
       <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-[#4A6CF7]" /> AI Review Response Generator
+        <Sparkles className="h-4 w-4 text-muted-foreground" /> Review response draft
       </h3>
       <p className="text-xs text-muted-foreground mb-4">
-        Paste a customer review and we'll generate a professional, SEO-friendly response. Remember: NEVER respond with aggression — even if the customer is wrong, other potential clients are reading.
+        Paste a review, then edit the draft before replying on Google.
       </p>
 
       <div className="space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label className="text-xs mb-1 block">Business Name</Label>
+            <Label className="text-xs mb-1 block">Business name</Label>
             <Input
               placeholder="Your business name"
               value={businessName}
               onChange={e => setBusinessName(e.target.value)}
-              className="h-8 text-sm"
+              className="min-h-10 text-sm"
               data-testid="input-review-business"
             />
           </div>
           <div>
-            <Label className="text-xs mb-1 block">Reviewer Name (optional)</Label>
+            <Label className="text-xs mb-1 block">Reviewer name (optional)</Label>
             <Input
               placeholder="Customer's name"
               value={reviewerName}
               onChange={e => setReviewerName(e.target.value)}
-              className="h-8 text-sm"
+              className="min-h-10 text-sm"
               data-testid="input-reviewer-name"
             />
           </div>
         </div>
 
         <div>
-          <Label className="text-xs mb-1 block">Customer Review</Label>
+          <Label className="text-xs mb-1 block">Customer review</Label>
           <Textarea
             placeholder="Paste the customer review here..."
             value={reviewText}
@@ -380,11 +381,11 @@ function ReviewResponseTool() {
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex-1">
-            <Label className="text-xs mb-1 block">Response Tone</Label>
+            <Label className="text-xs mb-1 block">Response tone</Label>
             <Select value={tone} onValueChange={setTone}>
-              <SelectTrigger className="h-8 text-sm" data-testid="select-tone">
+              <SelectTrigger className="min-h-10 text-sm" data-testid="select-tone">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -396,19 +397,19 @@ function ReviewResponseTool() {
           </div>
           <Button
             size="sm"
-            className="mt-4 gap-1.5 bg-[#4A6CF7] hover:bg-[#3B5CE5]"
+            variant="outline" className="mt-4 gap-1.5"
             onClick={() => generateMutation.mutate()}
             disabled={!reviewText.trim() || generateMutation.isPending}
             data-testid="button-generate-response"
           >
             {generateMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            Generate Response
+            Generate response
           </Button>
         </div>
 
         {generatedResponse && (
           <div className="space-y-2 mt-2 pt-3 border-t border-border/40">
-            <Label className="text-xs mb-1 block">Generated Response (edit if needed)</Label>
+            <Label className="text-xs mb-1 block">Generated response (edit if needed)</Label>
             <Textarea
               value={customEdit}
               onChange={e => handleCustomEditChange(e.target.value)}
@@ -436,12 +437,12 @@ function ReviewResponseTool() {
               onClick={copyToClipboard}
               data-testid="button-copy-response"
             >
-              <Copy className="h-3 w-3" /> Copy to Clipboard
+              <Copy className="h-3 w-3" /> Copy to clipboard
             </Button>
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -466,7 +467,7 @@ export default function GmbMonitorPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/gmb/listings"] });
       setSearchResults([]);
       setSearchQuery("");
-      toast({ title: "Listing added", description: "Click Check Now on the listing to capture a baseline from Google." });
+      toast({ title: "Listing added", description: "Click Check now on the listing to capture a baseline from Google." });
     },
     onError: (err: Error) => {
       toast({ title: "Failed to add", description: apiErrorMessage(err), variant: "destructive" });
@@ -547,49 +548,16 @@ export default function GmbMonitorPage() {
   const monitoredCount = listings?.filter(l => l.isMonitoring).length ?? 0;
 
   return (
-    <div className="h-full overflow-y-auto p-4 sm:p-6">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
-              <Eye className="h-5 w-5 text-primary" />
-              GMB Edit Monitor
-            </h1>
-            <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
-            <p className="text-sm text-muted-foreground mt-1 max-w-lg">
-              Your Google Business listing can be edited by anyone — Google, competitors, or random users. Check your listing against Google's public data whenever you like, and keep a history of every change a check finds. Checks run only when you click Check Now or Check All — there are no automatic checks or alerts.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {monitoredCount > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={() => checkAllMutation.mutate()}
-                disabled={checkAllMutation.isPending}
-                data-testid="button-check-all"
-              >
-                {checkAllMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                Check All ({monitoredCount})
-              </Button>
-            )}
-            <Button
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setShowAddForm(!showAddForm)}
-              data-testid="button-add-listing"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Business
-            </Button>
-          </div>
-        </div>
-
+    <AppPage width="narrow">
+      <PageHeader title={<span data-testid="text-page-title">GMB Edit Monitor</span>} description="Check your Google listings for changes whenever you need." actions={<>
+        <Button onClick={()=>setShowAddForm(!showAddForm)} data-testid="button-add-listing">Add business</Button>
+        {monitoredCount>0&&<Button variant="outline" onClick={()=>checkAllMutation.mutate()} disabled={checkAllMutation.isPending} data-testid="button-check-all">{checkAllMutation.isPending?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:null}Check all ({monitoredCount})</Button>}
+      </>}/>
+      <p className="text-sm text-muted-foreground">Checks run on demand; this tool does not send automatic alerts.</p>
         {showAddForm && (
-          <Card className="p-4 border-primary/20 bg-primary/[0.02]">
+          <Card className="p-4 rounded-xl">
             <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <Search className="h-4 w-4" /> Search Google My Business
+              <Search className="h-4 w-4" /> Find a business on Google
             </h3>
             <div className="flex gap-2">
               <Input
@@ -602,6 +570,7 @@ export default function GmbMonitorPage() {
                 data-testid="input-gmb-search"
               />
               <Button
+                variant="outline" aria-label="Search Google"
                 onClick={handleSearch}
                 disabled={isSearching}
                 data-testid="button-gmb-search"
@@ -632,7 +601,7 @@ export default function GmbMonitorPage() {
                       <p className="text-sm font-medium truncate">{r.companyName || r.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{r.address}</p>
                     </div>
-                    <Button size="sm" variant="ghost" className="shrink-0 h-7 text-xs gap-1">
+                    <Button size="sm" variant="ghost" className="shrink-0 min-h-10 text-xs gap-1">
                       <Plus className="h-3 w-3" /> Add
                     </Button>
                   </div>
@@ -642,7 +611,7 @@ export default function GmbMonitorPage() {
           </Card>
         )}
 
-        <ReviewResponseTool />
+
 
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -659,14 +628,14 @@ export default function GmbMonitorPage() {
             <Eye className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
             <h3 className="text-lg font-semibold mb-1">No listings added yet</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add your Google Business listings, then use Check Now to spot changes like name edits, address updates, photo count changes, and more.
+              Add your Google Business listings, then use Check now to spot changes like name edits, address updates, photo count changes, and more.
             </p>
-            <Button onClick={() => setShowAddForm(true)} data-testid="button-add-first">
-              <Plus className="h-4 w-4 mr-2" /> Add Your First Business
+            <Button variant="outline" onClick={() => setShowAddForm(true)} data-testid="button-add-first">
+              <Plus className="h-4 w-4 mr-2" /> Add your first business
             </Button>
           </Card>
         )}
-      </div>
-    </div>
+      <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">Draft a review response</summary><ReviewResponseTool /></details>
+    </AppPage>
   );
 }

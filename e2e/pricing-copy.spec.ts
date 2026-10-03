@@ -70,7 +70,11 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   const p = callAssistantPricing();
   const short = callAssistantIntroShort();
 
-  await page.goto("/call-assistant");
+  // Signed in, /call-assistant is the dashboard (owner, 2026-10-02: it lives on the platform, not the CRM); the sales
+  // page is what a signed-out visitor gets, so it is read from the signed-out server.
+  const signedOut = process.env.PC_SIGNED_OUT_URL || "http://127.0.0.1:8198";
+  await page.context().addCookies([{ name: "ch_consent", value: "denied", url: signedOut }]);
+  await page.goto(`${signedOut}/call-assistant`);
   // Owner, 2026-10-02: "$99 a month for the first 3 months" … "annually price can be $1999".
   expect(short).toBe(`${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`);
   expect(p.annual).toBe("$1,999");
@@ -175,7 +179,7 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await page.goto("/");
   const entry = page.getByTestId("link-nav-call-assistant");
   await expect(entry).toHaveAttribute("href", "/call-assistant");
-  await expect(page.getByTestId("badge-new-call-assistant")).toHaveText("NEW");
+  await expect(page.getByTestId("badge-new-call-assistant")).toHaveText(/^new$/i);
 });
 
 test("Master Class: modules and bundle at $1,000+ are sold through a sales rep", async ({ page }) => {

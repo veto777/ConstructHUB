@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, AppTabsList, appTableCards } from "@/components/app-ui";
 import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/components/agency-workspace";
 import { STARTING_MONTHLY_CENTS, formatUsd } from "@shared/plan-copy";
 import { LocationSearchSummary } from "./site-connections";
@@ -86,18 +87,18 @@ export default function LocationsPage() {
     void startGbpConnect(message=>toast({title:"Google connection",description:message,variant:"destructive"})).finally(()=>{connectStarted.current=false;});
   },[gbpParam]);
   if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/>;
-  return <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold" data-testid="text-locations-title">Business Profile Locations</h1>
-      <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}><DialogTrigger asChild><Button data-testid="button-add-location">Add Location(s)</Button></DialogTrigger>
-        <DialogContent><DialogHeader><DialogTitle>Add Location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent></Dialog>
-    </div>
+  return <AppPage>
+    <PageHeader title={<span data-testid="text-locations-title">Business Profile Locations</span>} description="Manage your locations and their connection to Google." actions={<Button data-testid="button-add-location" onClick={()=>setAddDialogOpen(true)}>Add location</Button>}/>
+    <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}>
+      <DialogContent><DialogHeader><DialogTitle>Add location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent>
+    </Dialog>
     {notFound&&<div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-destructive/40 p-3 text-sm" data-testid="alert-location-not-found">
       <span>Location #{notFound} was not found, or you don't have access to it.</span>
       <Button size="sm" variant="ghost" onClick={()=>setNotFound(null)}>Dismiss</Button>
     </div>}
     <AgencyWorkspace onOpen={id=>{setNotFound(null);showLocation(String(id));}}/>
     <GbpConnection context="locations"/>
-  </main>;
+  </AppPage>;
 }
 
 function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated: () => void; hasGbpAccess?: boolean; initialTab?: "gbp" }) {
@@ -224,10 +225,10 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
 
   return (
     <Tabs value={tab} onValueChange={v => { setTab(v); if (v === "gbp" && gbpLocations.length === 0 && !gbpLoading) fetchGbpLocations(); }} className="w-full">
-      <TabsList className="w-full">
+      <AppTabsList>
         <TabsTrigger value="search" className="flex-1" data-testid="tab-search-google">Search Google</TabsTrigger>
         <TabsTrigger value="gbp" className="flex-1" data-testid="tab-import-gbp">Import from GBP</TabsTrigger>
-      </TabsList>
+      </AppTabsList>
       <TabsContent value="search" className="space-y-3 mt-4">
         <div className="flex gap-2">
           <Input
@@ -392,33 +393,18 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-4">
-        <AgencyWorkspace compact/>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-to-list">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold" data-testid="text-detail-name">{location.businessName}</h1>
-            {location.address && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {fullAddress(location)}
-              </p>
-            )}
-          </div>
-        </div>
-
+    <AppPage>
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
+        <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'}/>
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:block md:w-48 shrink-0 gap-1 md:space-y-1">
+          <div className="flex overflow-x-auto md:block md:w-48 shrink-0 gap-1 md:space-y-1">
             {tabItems.map(item => {
               const isLocked = item.value === "citations" && !isPremiumPlus;
               return (
                 <Button
                   key={item.value}
                   variant={activeTab === item.value ? "secondary" : "ghost"}
-                  className="w-full justify-start gap-2 text-sm"
+                  className="shrink-0 md:w-full justify-start gap-2 text-sm"
                   onClick={() => !isLocked && setActiveTab(item.value)}
                   disabled={isLocked}
                   data-testid={`tab-${item.value}`}
@@ -442,8 +428,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
             {activeTab === "citations" && <CitationsTab location={location} />}
           </div>
         </div>
-      </div>
-    </div>
+    </AppPage>
   );
 }
 
@@ -518,19 +503,19 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="table-performance">
-            <thead><tr>
+            <thead className={appTableCards.thead}><tr>
               <th className="p-2 text-left">{group === "day" ? "Date" : group === "week" ? "Week" : "Month"}</th>
               {data.metrics.map((m) => <th className="p-2" key={m}>{PERF_LABELS[m] || m}</th>)}
             </tr></thead>
             <tbody>
-              <tr className="border-b font-semibold bg-muted/40" data-testid="row-performance-total">
-                <td className="p-2">Total</td>
-                {data.metrics.map((m) => <td className="p-2 text-center" key={m}>{total(m).toLocaleString()}</td>)}
+              <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`} data-testid="row-performance-total">
+                <td className={`${appTableCards.td} !text-foreground`}>Total</td>
+                {data.metrics.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{total(m).toLocaleString()}</td>)}
               </tr>
               {periods.map((p) => (
-                <tr key={p} className={pending(p) ? "text-muted-foreground" : ""}>
-                  <td className="p-2 whitespace-nowrap">{label(p)}{pending(p) && <span className="ml-2 text-[10px] rounded bg-muted px-1.5 py-0.5" title="Google reports with a delay of a few days">not final yet</span>}</td>
-                  {data.metrics.map((m) => <td className="p-2 text-center" key={m}>{cell(p, m) ? Number(cell(p, m)!.value).toLocaleString() : "—"}</td>)}
+                <tr key={p} className={`${appTableCards.tr} border-b ${pending(p) ? "text-muted-foreground" : ""}`}>
+                  <td className={`${appTableCards.td} !text-foreground`}>{label(p)}{pending(p) && <span className="ml-2 text-[10px] rounded bg-muted px-1.5 py-0.5" title="Google reports with a delay of a few days">not final yet</span>}</td>
+                  {data.metrics.map((m) => <td className={`${appTableCards.td} !text-foreground`} key={m}><span className="sm:hidden text-muted-foreground mr-2">{PERF_LABELS[m] || m}:</span>{cell(p, m) ? Number(cell(p, m)!.value).toLocaleString() : "—"}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -543,7 +528,7 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
 
 function GoogleIcon() {
   return (
-    <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-blue-500/10 text-[9px] font-bold text-blue-500 shrink-0">G</span>
+    <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-muted text-[9px] font-bold text-muted-foreground shrink-0">G</span>
   );
 }
 
@@ -1304,7 +1289,7 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
       ) : (
         <Card className="overflow-x-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className={appTableCards.thead}>
               <TableRow>
                 <TableHead>Site</TableHead>
                 <TableHead>Find it</TableHead>
@@ -1314,17 +1299,17 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
             </TableHeader>
             <TableBody>
               {rows.map((c) => (
-                <TableRow key={c.id} data-testid={`row-citation-${c.id}`}>
-                  <TableCell>
+                <TableRow className={appTableCards.tr} key={c.id} data-testid={`row-citation-${c.id}`}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     <p className="text-sm font-medium">{c.siteName}</p>
                     <p className="text-[10px] text-muted-foreground">{c.category}</p>
                   </TableCell>
-                  <TableCell>
-                    <a href={searchUrl(c)} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1" data-testid={`link-search-${c.id}`}>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
+                    <a href={searchUrl(c)} target="_blank" rel="noopener noreferrer" className="text-foreground text-xs inline-flex items-center gap-1" data-testid={`link-search-${c.id}`}>
                       Search <ExternalLink className="w-3 h-3" />
                     </a>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     <select
                       className="border rounded px-2 py-1 text-xs bg-background"
                       value={statusOf(c)}
@@ -1339,7 +1324,7 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
                       <option value="missing">Not listed</option>
                     </select>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={`${appTableCards.td} !text-foreground`}>
                     {hasListing(statusOf(c)) ? (
                       <div className="flex items-center gap-1.5 min-w-[12rem]">
                         <Input
@@ -1356,7 +1341,7 @@ function CampaignDetail({ campaign, location, onBack }: { campaign: CitationCamp
                         />
                         {c.listingUrl && (
                           <>
-                            <a href={c.listingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-xs inline-flex items-center gap-1 shrink-0" data-testid={`link-listing-${c.id}`}>
+                            <a href={c.listingUrl} target="_blank" rel="noopener noreferrer" className="text-foreground text-xs inline-flex items-center gap-1 shrink-0" data-testid={`link-listing-${c.id}`}>
                               View <ExternalLink className="w-3 h-3" />
                             </a>
                             <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={markMutation.isPending}

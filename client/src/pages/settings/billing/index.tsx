@@ -1,3 +1,4 @@
+import { AppTabsList } from "@/components/app-ui";
 /**
  * Billing panels (Ahrefs-style Billing → Subscriptions / Invoices / Payment
  * methods / Purchases). Each panel is a standalone component that reads its
@@ -47,8 +48,8 @@ export function BillingPanel({ tab, onTabChange, subscriptions, subscriptionsExt
     if (tab === undefined) setParam(next === "subscriptions" ? null : next);
   };
   return (
-    <Tabs value={active} onValueChange={change} className="space-y-4" data-testid="tabs-billing">
-      <TabsList className="h-auto w-full justify-start flex-wrap gap-1 bg-transparent p-0 border-b rounded-none">
+    <Tabs value={active} onValueChange={change} className="space-y-4 min-w-0 [&>div:first-child]:mx-0 [&>div:first-child]:px-0" data-testid="tabs-billing">
+      <AppTabsList>
         {BILLING_TABS.map((t) => (
           <TabsTrigger
             key={t.id}
@@ -59,7 +60,7 @@ export function BillingPanel({ tab, onTabChange, subscriptions, subscriptionsExt
             {t.label}
           </TabsTrigger>
         ))}
-      </TabsList>
+      </AppTabsList>
       <TabsContent value="subscriptions" className="mt-0 space-y-6">
         <SubscriptionsPanel {...subscriptions} />
         {subscriptionsExtra}

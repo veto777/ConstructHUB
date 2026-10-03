@@ -1,7 +1,8 @@
+import { Section } from "@/components/app-ui";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Sparkles } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm-ui";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { planRequiredFrom } from "@/components/plan-required";
@@ -29,19 +30,19 @@ export function StudioPanel({ canManage }: { canManage: boolean }) {
   } else if (profile.isError || !profile.data) {
     const notReady = /^501:/.test(String((profile.error as any)?.message ?? ""));
     body = (
-      <Card><CardContent className="p-0">
+      <Section flush><CardContent className="p-0">
         <EmptyState icon={Sparkles} title={notReady ? "The Studio backend isn't wired up yet" : "Couldn't load the assistant"}
           description={notReady ? "The profile API answers 501 until the studio-backend lane lands. The editor is built and waiting." : apiErrorMessage(profile.error)} />
-      </CardContent></Card>
+      </CardContent></Section>
     );
   } else {
     const showWizard = mode === "wizard" || (mode === "auto" && isFirstRun(profile.data));
     if (showWizard && !canManage) {
       body = (
-        <Card><CardContent className="p-0">
+        <Section flush><CardContent className="p-0">
           <EmptyState icon={Sparkles} title="Your assistant hasn't been set up yet"
             description="Only members who manage settings can run the setup. Ask an owner or admin to finish it in Agent Studio." />
-        </CardContent></Card>
+        </CardContent></Section>
       );
     } else if (showWizard) {
       body = <SetupWizard initial={profile.data.profile} onDone={() => setMode("editor")} onSkip={() => setMode("editor")} />;

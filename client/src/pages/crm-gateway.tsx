@@ -1,3 +1,5 @@
+import { AppPage, PageHeader, Section } from "@/components/app-ui";
+import { Button } from "@/components/ui/button";
 /**
  * CRM gateway — the pathway from the growth platform (constructhub.us) into
  * ConstructHub CRM (portal.constructhub.us). The CRM is included in every
@@ -47,6 +49,28 @@ export default function CrmGatewayPage() {
   const isMember = !signedOut && !!data?.org?.id;
   const orgName = data?.org?.name as string | undefined;
   const openCrm = () => { window.location.href = portalUrl("/crm"); };
+
+  if (user && !signedOut) return (
+    <AppPage testId="page-crm-gateway">
+      <PageHeader title="ConstructHub CRM" description="Clients, jobs and payments — all in one place." actions={isLoading ? undefined : isMember ?
+        <Button onClick={openCrm} data-testid="button-open-crm">Open your CRM <ArrowRight className="ml-2 h-4 w-4" /></Button> :
+        <Button asChild><a href={CRM_ACCESS_MAILTO} data-testid="button-crm-get-access">Request access</a></Button>
+      } />
+      <Section title={isLoading ? "Checking your access…" : isMember ? "Your CRM is active" : "Get your CRM workspace"} testId="card-crm-gateway-action">
+        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : "Workspaces are set up on request. Email us to get started."}</p>
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-included">Your CRM is included with every ConstructHUB plan. {CRM_SEATS_LINE}.</p>
+        {!isLoading && !isMember && <div className="mt-4 flex flex-wrap gap-2">
+          <Button asChild variant="outline"><Link href="/pricing" data-testid="button-crm-plans">See plans</Link></Button>
+          <Button asChild variant="ghost"><a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer" data-testid="button-crm-preview">Visit CRM <ExternalLink className="ml-2 h-4 w-4" /></a></Button>
+        </div>}
+      </Section>
+      <details className="rounded-xl border bg-card p-4 sm:p-5">
+        <summary className="cursor-pointer text-sm font-medium">Explore CRM features</summary>
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-bubble">Clients, jobs and payments — all in one place.</p>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{FEATURES.map(f => <li key={f.label}><h2 className="text-sm font-semibold">{f.label}</h2><p className="mt-1 text-sm text-muted-foreground">{f.desc}</p></li>)}</ul>
+      </details>
+    </AppPage>
+  );
 
   return (
     <div className="flex flex-col min-h-full">

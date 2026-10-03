@@ -1,16 +1,26 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRight } from "lucide-react";
 import { apiRequest, queryClient, apiErrorMessage } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
+import {
+  AppPage,
+  PageHeader,
+  Section,
+  Toolbar,
+  Notice,
+  appTable,
+  appTableCards,
+} from "@/components/app-ui";
 import {
   PlanRequired,
   planRequiredFrom,
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
-const selectClass = "border rounded-md p-2 bg-background";
+const selectClass =
+  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
 // Mirrors the server's domainName check (server/domains/types.ts).
 const domainPattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 export default function DomainsPage() {
@@ -95,63 +105,57 @@ export default function DomainsPage() {
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
     );
   const header = (
-    <header>
-      <h1 className="text-3xl font-bold">Domains</h1>
-      <p className="text-muted-foreground">
-        Manage client DNS and nameservers. Domain registration stays with your
-        registrar.
-      </p>
-      <Link className="underline" href="/mail-alerts">
-        Provider mail alerts →
-      </Link>
-    </header>
+    <PageHeader
+      title="Domains"
+      description="Watch client domains, expiry and DNS — registration stays with your registrar."
+      actions={
+        <Button variant="ghost" asChild>
+          <Link href="/mail-alerts" data-testid="link-domains-mail-alerts">
+            Provider mail alerts <ArrowRight className="ml-1.5 h-4 w-4" />
+          </Link>
+        </Button>
+      }
+    />
   );
   const planGate = [loadError, guidesError].find((e) => planRequiredFrom(e));
   if (planGate)
     return (
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <AppPage width="wide" testId="page-domains">
         {header}
         <PlanRequired
           module="domainsMailAlerts"
           error={planGate}
           className="max-w-3xl"
         />
-      </div>
+      </AppPage>
     );
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <AppPage width="wide" testId="page-domains">
       {header}
-      {error && (
-        <p role="alert" className="text-destructive">
-          {error}
-        </p>
-      )}
-      {notice && <p role="status">{notice}</p>}
+      {error && <Notice tone="danger">{error}</Notice>}
+      {notice && <Notice>{notice}</Notice>}
       {guides && !guides.workerEnabled && (
-        <p className="rounded border p-3">
-          Domain background processing is disabled. Your administrator must
-          enable it before queued previews, changes and monitoring can run.
-        </p>
+        <Notice tone="warning">
+          Domain background processing is off. Your administrator must enable
+          it before queued previews, changes and monitoring can run.
+        </Notice>
       )}
-      <Card>
-        <CardHeader>
-          <CardTitle>Connect registrar</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p>
-            For API automation, use Porkbun or Name.com. Keep existing
-            registrations; moving DNS to Cloudflare only changes nameservers.
-          </p>
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (await act("/connections", { provider, label, key, secret })) {
-                setKey("");
-                setSecret("");
-              }
-            }}
-          >
+      <Section
+        title="Connect registrar"
+        description="Use a Porkbun or Name.com API key to sync and change client DNS."
+      >
+        <form
+          className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (await act("/connections", { provider, label, key, secret })) {
+              setKey("");
+              setSecret("");
+            }
+          }}
+        >
+          <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
+            <span className="text-muted-foreground">Registrar</span>
             <select
               aria-label="Registrar"
               className={selectClass}
@@ -161,14 +165,22 @@ export default function DomainsPage() {
               <option value="porkbun">Porkbun</option>
               <option value="namecom">Name.com CORE</option>
             </select>
+          </label>
+          <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
+            <span className="text-muted-foreground">Connection label</span>
             <Input
               aria-label="Connection label"
               placeholder="Client / account label"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               required
-              className="w-48"
+              className="sm:w-56"
             />
+          </label>
+          <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
+            <span className="text-muted-foreground">
+              {provider === "namecom" ? "Username" : "API key"}
+            </span>
             <Input
               aria-label="API key or username"
               type="password"
@@ -177,8 +189,11 @@ export default function DomainsPage() {
               value={key}
               onChange={(e) => setKey(e.target.value)}
               required
-              className="w-48"
+              className="sm:w-56"
             />
+          </label>
+          <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
+            <span className="text-muted-foreground">Secret / API token</span>
             <Input
               aria-label="API secret or token"
               type="password"
@@ -187,311 +202,365 @@ export default function DomainsPage() {
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               required
-              className="w-48"
+              className="sm:w-56"
             />
-            <Button disabled={busy}>Connect with identity verification</Button>
-          </form>
-          {(connections?.items || []).map((c: any) => (
-            <span key={c.id} className="inline-block border rounded p-2 mr-2">
-              {c.label} · {c.provider}
-            </span>
-          ))}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              disabled={busy || !connections?.items?.length}
-              onClick={() =>
-                act("/sync", {
-                  connectionIds: connections.items.map((c: any) =>
-                    Number(c.id),
-                  ),
-                })
-              }
-            >
-              Sync connections on this page
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={connectionPage === 1}
-              onClick={() => setConnectionPage((p) => p - 1)}
-            >
-              Previous connections
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={connections?.items?.length < 25}
-              onClick={() => setConnectionPage((p) => p + 1)}
-            >
-              Next connections
-            </Button>
+          </label>
+          <Button disabled={busy} className="w-full sm:w-auto">
+            Connect {provider === "namecom" ? "Name.com" : "Porkbun"}
+          </Button>
+        </form>
+        {(connections?.items || []).length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
+            {connections.items.map((c: any) => (
+              <span
+                key={c.id}
+                className="inline-flex items-center rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
+              >
+                {c.label} · {c.provider}
+              </span>
+            ))}
+            <div className="ml-auto flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() =>
+                  act("/sync", {
+                    connectionIds: connections.items.map((c: any) =>
+                      Number(c.id),
+                    ),
+                  })
+                }
+              >
+                Sync connections
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={connectionPage === 1}
+                onClick={() => setConnectionPage((p) => p - 1)}
+              >
+                Previous connections
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={connections?.items?.length < 25}
+                onClick={() => setConnectionPage((p) => p + 1)}
+              >
+                Next connections
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Add domains for manual management and monitoring
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            className="flex gap-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              // Checked here so blank or malformed entries are named without a round trip.
-              const domains = manual.split(/[\s,]+/).filter(Boolean);
-              const invalid = domains.filter(
-                (d) => d.length > 253 || !domainPattern.test(d.toLowerCase()),
+        )}
+      </Section>
+      <Section
+        title="Add domains"
+        description="Track domains your registrar can't reach — comma-separated, up to 100 at a time."
+      >
+        <form
+          className="flex flex-col gap-3 sm:flex-row"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            // Checked here so blank or malformed entries are named without a round trip.
+            const domains = manual.split(/[\s,]+/).filter(Boolean);
+            const invalid = domains.filter(
+              (d) => d.length > 253 || !domainPattern.test(d.toLowerCase()),
+            );
+            if (!domains.length || invalid.length || domains.length > 100) {
+              setManualError(
+                !domains.length
+                  ? "Enter at least one domain, like example.com."
+                  : invalid.length
+                    ? `Not a valid domain name: ${invalid.slice(0, 5).join(", ")}${invalid.length > 5 ? ` and ${invalid.length - 5} more` : ""}. Use the bare domain, like example.com.`
+                    : "Add up to 100 domains at a time.",
               );
-              if (!domains.length || invalid.length || domains.length > 100) {
-                setManualError(
-                  !domains.length
-                    ? "Enter at least one domain, like example.com."
-                    : invalid.length
-                      ? `Not a valid domain name: ${invalid.slice(0, 5).join(", ")}${invalid.length > 5 ? ` and ${invalid.length - 5} more` : ""}. Use the bare domain, like example.com.`
-                      : "Add up to 100 domains at a time.",
-                );
-                return;
-              }
+              return;
+            }
+            setManualError("");
+            if (await act("/manual", { domains })) setManual("");
+          }}
+        >
+          <Input
+            aria-label="Manual domains"
+            placeholder="example.com, client.example"
+            value={manual}
+            onChange={(e) => {
+              setManual(e.target.value);
               setManualError("");
-              if (await act("/manual", { domains })) setManual("");
             }}
-          >
-            <Input
-              aria-label="Manual domains"
-              placeholder="example.com, client.example"
-              value={manual}
-              onChange={(e) => {
-                setManual(e.target.value);
-                setManualError("");
-              }}
-              aria-invalid={!!manualError}
-              aria-describedby={manualError ? "manual-domains-error" : undefined}
-              required
-            />
-            <Button disabled={busy}>Add domains</Button>
-          </form>
-          {manualError && (
-            <p id="manual-domains-error" role="alert" className="mt-2 text-sm text-destructive">
-              {manualError}
-            </p>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Domain inventory</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              aria-label="Search domains"
-              placeholder="Search domains"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
+            aria-invalid={!!manualError}
+            aria-describedby={manualError ? "manual-domains-error" : undefined}
+            required
+            className="w-full sm:max-w-md"
+          />
+          <Button variant="outline" disabled={busy} className="w-full sm:w-auto">
+            Add domains
+          </Button>
+        </form>
+        {manualError && (
+          <p id="manual-domains-error" role="alert" className="mt-2 text-sm text-destructive">
+            {manualError}
+          </p>
+        )}
+      </Section>
+      <Section
+        title="Domain inventory"
+        flush
+        testId="section-domain-inventory"
+      >
+        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+          <Toolbar
+            search={{
+              value: q,
+              onChange: (v) => {
+                setQ(v);
                 setJobSelection([]);
                 setPage(1);
                 setSelected([]);
-              }}
-            />
-            <select
-              className={selectClass}
-              aria-label="Filter registrar"
-              value={registrar}
-              onChange={(e) => {
-                setRegistrar(e.target.value);
-                setPage(1);
-                setSelected([]);
-              }}
-            >
-              <option value="">All registrars</option>
-              {[
-                "porkbun",
-                "namecom",
-                "manual",
-                "squarespace",
-                "wix",
-                "hover",
-              ].map((v) => (
-                <option key={v}>{v}</option>
-              ))}
-            </select>
-          </div>
-          {loadError && <p role="alert">Could not load domains.</p>}
-          {isLoading ? (
-            <p>Loading domains…</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left border-b">
-                    <th>
-                      <input
-                        aria-label="Select page"
-                        type="checkbox"
-                        checked={
-                          !!domains?.items?.length &&
-                          domains.items.every((d: any) =>
-                            selected.includes(Number(d.id)),
-                          )
-                        }
-                        onChange={(e) =>
-                          setSelected(
-                            e.target.checked
-                              ? domains.items.map((d: any) => Number(d.id))
-                              : [],
-                          )
-                        }
-                      />
-                    </th>
-                    <th>Domain</th>
-                    <th>Registrar</th>
-                    <th>Client location</th>
-                    <th>Expiry / auto-renew</th>
-                    <th>Last DNS check</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {domains?.items?.map((d: any) => (
-                    <tr key={d.id} className="border-b">
-                      <td className="p-3">
-                        <input
-                          aria-label={`Select ${d.domain}`}
-                          type="checkbox"
-                          checked={selected.includes(Number(d.id))}
-                          onChange={() => toggle(Number(d.id))}
-                        />
-                      </td>
-                      <td>
-                        {d.domain}
-                        <p className="text-xs text-muted-foreground">
-                          {d.state?.nameservers?.join(", ") ||
-                            "Nameservers not yet checked"}
-                        </p>
-                      </td>
-                      <td>{d.registrar}</td>
-                      <td>{d.location_id || "Unmapped"}</td>
-                      <td>
-                        {d.state?.expires
-                          ? new Date(d.state.expires).toLocaleDateString()
-                          : "Unknown"}{" "}
-                        /{" "}
-                        {d.state?.autoRenew === true
-                          ? "On"
-                          : d.state?.autoRenew === false
-                            ? "Off"
-                            : "Unknown"}
-                      </td>
-                      <td>
-                        {d.checked_at
-                          ? new Date(d.checked_at).toLocaleString()
-                          : "Never"}
-                      </td>
-                    </tr>
+              },
+              placeholder: "Search domains",
+            }}
+            activeFilters={registrar ? 1 : 0}
+            filters={
+              <select
+                className={selectClass}
+                aria-label="Filter registrar"
+                value={registrar}
+                onChange={(e) => {
+                  setRegistrar(e.target.value);
+                  setPage(1);
+                  setSelected([]);
+                }}
+              >
+                <option value="">All registrars</option>
+                {[
+                  "porkbun",
+                  "namecom",
+                  "manual",
+                  "squarespace",
+                  "wix",
+                  "hover",
+                ].map((v) => (
+                  <option key={v}>{v}</option>
+                ))}
+              </select>
+            }
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+              <input
+                aria-label="Select page"
+                type="checkbox"
+                checked={
+                  !!domains?.items?.length &&
+                  domains.items.every((d: any) =>
+                    selected.includes(Number(d.id)),
+                  )
+                }
+                onChange={(e) =>
+                  setSelected(
+                    e.target.checked
+                      ? domains.items.map((d: any) => Number(d.id))
+                      : [],
+                  )
+                }
+              />
+              Select page
+            </label>
+            {selected.length > 0 && (
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {selected.length} selected
+              </span>
+            )}
+            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!selected.length || busy}
+                onClick={() => act("/monitor", { ids: selected })}
+              >
+                Check selected domains
+              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <Input
+                  aria-label="Find client location"
+                  placeholder="Search client name or website"
+                  value={locationQuery}
+                  onChange={(e) => {
+                    setLocationQuery(e.target.value);
+                    setLocationPage(1);
+                  }}
+                  className="h-9 w-full sm:w-56"
+                />
+                <select
+                  aria-label="Client location"
+                  className={`${selectClass} h-9`}
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                >
+                  <option value="">Unmapped</option>
+                  {locations?.items?.map((l: any) => (
+                    <option key={l.id} value={l.id}>
+                      {l.business_name} · {l.website || "No website"}
+                    </option>
                   ))}
-                </tbody>
-              </table>
-              {!domains?.items?.length && (
-                <p className="py-4">
-                  No domains found. Connect a registrar or add domains above.
-                </p>
-              )}
+                </select>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={locationPage === 1}
+                    onClick={() => setLocationPage((p) => p - 1)}
+                  >
+                    Previous clients
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={locations?.items?.length < 25}
+                    onClick={() => setLocationPage((p) => p + 1)}
+                  >
+                    Next clients
+                  </Button>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!selected.length || busy}
+                  onClick={() =>
+                    act("/mapping", {
+                      ids: selected,
+                      locationId: location ? Number(location) : null,
+                    })
+                  }
+                >
+                  Map selected to client
+                </Button>
+              </div>
             </div>
+          </div>
+          {loadError && <Notice tone="danger">Could not load domains.</Notice>}
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Loading domains…</p>
+          ) : (
+            <>
+              <div className={appTable.wrapper}>
+                <table className={appTable.table}>
+                  <thead className={appTable.thead}>
+                    <tr>
+                      <th className={appTable.th} />
+                      <th className={appTable.th}>Domain</th>
+                      <th className={appTable.th}>Registrar</th>
+                      <th className={appTable.th}>Client location</th>
+                      <th className={`${appTable.th} hidden sm:table-cell`}>
+                        Expiry / auto-renew
+                      </th>
+                      <th className={`${appTable.th} hidden sm:table-cell`}>
+                        Last DNS check
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {domains?.items?.map((d: any) => (
+                      <tr
+                        key={d.id}
+                        className={`${appTable.tr} ${appTableCards.tr}`}
+                      >
+                        <td className={`${appTable.td} ${appTableCards.td}`}>
+                          <input
+                            aria-label={`Select ${d.domain}`}
+                            type="checkbox"
+                            checked={selected.includes(Number(d.id))}
+                            onChange={() => toggle(Number(d.id))}
+                          />
+                        </td>
+                        <td className={`${appTable.td} ${appTableCards.td}`}>
+                          <span className="font-medium">{d.domain}</span>
+                          <p className="break-all text-xs text-muted-foreground">
+                            {d.state?.nameservers?.join(", ") ||
+                              "Nameservers not yet checked"}
+                          </p>
+                        </td>
+                        <td className={`${appTable.td} ${appTableCards.td}`}>
+                          <span className="sm:hidden text-muted-foreground">
+                            Registrar:{" "}
+                          </span>
+                          {d.registrar}
+                        </td>
+                        <td className={`${appTable.td} ${appTableCards.td}`}>
+                          <span className="sm:hidden text-muted-foreground">
+                            Client location:{" "}
+                          </span>
+                          {d.location_id || "Unmapped"}
+                        </td>
+                        <td
+                          className={`${appTable.td} ${appTableCards.td} hidden sm:table-cell`}
+                        >
+                          {d.state?.expires
+                            ? new Date(d.state.expires).toLocaleDateString()
+                            : "Unknown"}{" "}
+                          /{" "}
+                          {d.state?.autoRenew === true
+                            ? "On"
+                            : d.state?.autoRenew === false
+                              ? "Off"
+                              : "Unknown"}
+                        </td>
+                        <td
+                          className={`${appTable.td} ${appTableCards.td} hidden sm:table-cell`}
+                        >
+                          {d.checked_at
+                            ? new Date(d.checked_at).toLocaleString()
+                            : "Never"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {!domains?.items?.length && (
+                  <p className="px-4 py-6 text-sm text-muted-foreground">
+                    No domains found. Connect a registrar or add domains above.
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => {
+                    setPage((p) => p - 1);
+                    setSelected([]);
+                  }}
+                >
+                  Previous domains
+                </Button>
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  Page {page} · {domains?.total || 0} domains
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * 25 >= (domains?.total || 0)}
+                  onClick={() => {
+                    setPage((p) => p + 1);
+                    setSelected([]);
+                  }}
+                >
+                  Next domains
+                </Button>
+              </div>
+            </>
           )}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              disabled={page === 1}
-              onClick={() => {
-                setPage((p) => p - 1);
-                setSelected([]);
-              }}
-            >
-              Previous domains
-            </Button>
-            <span>
-              Page {page} · {domains?.total || 0} domains
-            </span>
-            <Button
-              variant="outline"
-              disabled={page * 25 >= (domains?.total || 0)}
-              onClick={() => {
-                setPage((p) => p + 1);
-                setSelected([]);
-              }}
-            >
-              Next domains
-            </Button>
-            <Button
-              disabled={!selected.length || busy}
-              onClick={() => act("/monitor", { ids: selected })}
-            >
-              Check selected domains
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Input
-              aria-label="Find client location"
-              placeholder="Search client name or website"
-              value={locationQuery}
-              onChange={(e) => {
-                setLocationQuery(e.target.value);
-                setLocationPage(1);
-              }}
-              className="w-64"
-            />
-            <select
-              aria-label="Client location"
-              className={selectClass}
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            >
-              <option value="">Unmapped</option>
-              {locations?.items?.map((l: any) => (
-                <option key={l.id} value={l.id}>
-                  {l.business_name} · {l.website || "No website"}
-                </option>
-              ))}
-            </select>
-            <Button
-              variant="ghost"
-              disabled={locationPage === 1}
-              onClick={() => setLocationPage((p) => p - 1)}
-            >
-              Previous clients
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={locations?.items?.length < 25}
-              onClick={() => setLocationPage((p) => p + 1)}
-            >
-              Next clients
-            </Button>
-            <Button
-              disabled={!selected.length || busy}
-              onClick={() =>
-                act("/mapping", {
-                  ids: selected,
-                  locationId: location ? Number(location) : null,
-                })
-              }
-            >
-              Map selected to client
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Nameservers for selected domains</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p>
-              First copy all website and email records to the new DNS provider.
-              Review DNSSEC with your registrar before switching. A nameserver
-              change can interrupt the website and email.
+        </div>
+      </Section>
+      <div className="grid gap-4 md:grid-cols-2 sm:gap-5">
+        <Section title="Nameservers for selected domains">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Copy website and email records first. A nameserver change can
+              interrupt the website and email.
             </p>
             <Input
               aria-label="Nameservers"
@@ -499,41 +568,39 @@ export default function DomainsPage() {
               value={ns}
               onChange={(e) => setNs(e.target.value)}
             />
-            <Button
-              disabled={!selected.length || busy}
-              onClick={() =>
-                act("/preview", {
-                  ids: selected,
-                  change: {
-                    kind: "nameservers",
-                    nameservers: ns.split(/[\s,]+/).filter(Boolean),
-                  },
-                })
-              }
-            >
-              Preview nameservers
-            </Button>
-            <Button
-              variant="outline"
-              className="ml-2"
-              disabled={!selected.length || busy}
-              onClick={() => act("/cloudflare-preview", { ids: selected })}
-            >
-              Preview assigned Cloudflare pair
-            </Button>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>DNS record change</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p>
-              Applies to every selected domain. For update/delete, the worker
-              must find exactly one record with this type and name.
-              Cloudflare-hosted zones are managed in Cloudflare.
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button
+                variant="outline"
+                disabled={!selected.length || busy}
+                onClick={() =>
+                  act("/preview", {
+                    ids: selected,
+                    change: {
+                      kind: "nameservers",
+                      nameservers: ns.split(/[\s,]+/).filter(Boolean),
+                    },
+                  })
+                }
+              >
+                Preview nameservers
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={!selected.length || busy}
+                onClick={() => act("/cloudflare-preview", { ids: selected })}
+              >
+                Preview assigned Cloudflare pair
+              </Button>
+            </div>
+          </div>
+        </Section>
+        <Section title="DNS record change">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Applies to every selected domain. Cloudflare-hosted zones are
+              managed in Cloudflare.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <select
                 className={selectClass}
                 aria-label="DNS operation"
@@ -568,8 +635,8 @@ export default function DomainsPage() {
               onChange={(e) => setContent(e.target.value)}
             />
             <div className="flex gap-2">
-              <label>
-                TTL
+              <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
+                <span className="text-muted-foreground">TTL</span>
                 <Input
                   aria-label="Record TTL"
                   type="number"
@@ -577,8 +644,8 @@ export default function DomainsPage() {
                   onChange={(e) => setTtl(Number(e.target.value))}
                 />
               </label>
-              <label>
-                MX priority
+              <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
+                <span className="text-muted-foreground">MX priority</span>
                 <Input
                   aria-label="MX priority"
                   type="number"
@@ -588,6 +655,7 @@ export default function DomainsPage() {
               </label>
             </div>
             <Button
+              variant="outline"
               disabled={!selected.length || busy}
               onClick={() =>
                 act("/preview", {
@@ -601,21 +669,19 @@ export default function DomainsPage() {
             >
               Preview DNS change
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Previews and change history</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p>
-            Review the diff, select ready previews, confirm, and verify your
-            identity. Applied changes stay pending until public DNS agrees.
-          </p>
+      <Section
+        title="Previews and change history"
+        description="Review the diff, confirm, and verify your identity. Applied changes stay pending until public DNS agrees."
+        flush
+        testId="section-domain-jobs"
+      >
+        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
           {(jobs?.items || []).map((j: any) => (
-            <details key={j.id} className="border rounded p-3">
-              <summary className="cursor-pointer">
+            <details key={j.id} className="rounded-xl border px-4 py-3">
+              <summary className="cursor-pointer text-sm">
                 <input
                   aria-label={`Select job ${j.id}`}
                   type="checkbox"
@@ -633,12 +699,16 @@ export default function DomainsPage() {
                 {j.domain || "Registrar inventory"} · {j.kind} ·{" "}
                 <strong>{j.status}</strong>
               </summary>
-              {j.error && <p role="alert">{j.error}</p>}
+              {j.error && (
+                <p role="alert" className="mt-2 text-sm text-destructive">
+                  {j.error}
+                </p>
+              )}
               {j.before_state && (
-                <div className="grid md:grid-cols-2 gap-3 mt-3">
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div>
-                    <h3 className="font-semibold">Before</h3>
-                    <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                    <h3 className="text-sm font-semibold">Before</h3>
+                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">
                       {JSON.stringify(
                         {
                           nameservers: j.before_state.nameservers,
@@ -650,8 +720,8 @@ export default function DomainsPage() {
                     </pre>
                   </div>
                   <div>
-                    <h3 className="font-semibold">After</h3>
-                    <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-64">
+                    <h3 className="text-sm font-semibold">After</h3>
+                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">
                       {JSON.stringify(
                         {
                           nameservers: j.after_state?.nameservers,
@@ -666,7 +736,12 @@ export default function DomainsPage() {
               )}
             </details>
           ))}
-          <label className="flex gap-2">
+          {!jobs?.items?.length && (
+            <p className="text-sm text-muted-foreground">
+              No previews yet. Select domains above and preview a change.
+            </p>
+          )}
+          <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
               checked={warning}
@@ -675,8 +750,9 @@ export default function DomainsPage() {
             I reviewed the changes and understand that MX, TXT, CNAME or
             nameserver changes can break email and website access.
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
+              variant="outline"
               disabled={!jobSelection.length || busy}
               onClick={async () => {
                 if (
@@ -694,56 +770,57 @@ export default function DomainsPage() {
               Confirm selected previews
             </Button>
             <Button
-              variant="outline"
+              variant="ghost"
               disabled={!jobSelection.length || busy}
               onClick={() => act("/rollback-preview", { jobIds: jobSelection })}
             >
               Preview rollback of selected changes
             </Button>
-            <Button
-              variant="ghost"
-              disabled={jobPage === 1}
-              onClick={() => {
-                setJobSelection([]);
-                setJobPage((p) => p - 1);
-              }}
-            >
-              Previous jobs
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={jobs?.items?.length < 25}
-              onClick={() => {
-                setJobSelection([]);
-                setJobPage((p) => p + 1);
-              }}
-            >
-              Next jobs
-            </Button>
+            <div className="flex items-center gap-1 sm:ml-auto">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={jobPage === 1}
+                onClick={() => {
+                  setJobSelection([]);
+                  setJobPage((p) => p - 1);
+                }}
+              >
+                Previous jobs
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={jobs?.items?.length < 25}
+                onClick={() => {
+                  setJobSelection([]);
+                  setJobPage((p) => p + 1);
+                }}
+              >
+                Next jobs
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Registrar walkthroughs</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p>
+        </div>
+      </Section>
+      <Section title="Registrar walkthroughs">
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
             Server egress IP for allowlists:{" "}
             {guides?.egressIp || "Not configured — ask your administrator"}
           </p>
           {guides?.guides?.map((g: any) => (
-            <details key={g.id} className="border rounded p-3">
-              <summary>
+            <details key={g.id} className="rounded-xl border px-4 py-3">
+              <summary className="cursor-pointer text-sm">
                 {g.name} · {g.mode}
               </summary>
-              <ol className="list-decimal pl-6 py-2">
+              <ol className="list-decimal py-2 pl-6 text-sm">
                 {g.steps.map((s: string, i: number) => (
                   <li key={i}>{s}</li>
                 ))}
               </ol>
               <a
-                className="underline"
+                className="text-sm text-primary underline"
                 href={g.url}
                 target="_blank"
                 rel="noreferrer"
@@ -752,8 +829,8 @@ export default function DomainsPage() {
               </a>
             </details>
           ))}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </Section>
+    </AppPage>
   );
 }

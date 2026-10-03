@@ -1,3 +1,4 @@
+import { Section, StatusPill } from '@/components/app-ui';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -58,7 +59,7 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
   const { data, isLoading } = useGbpLinkage();
   const link = useLinkLocations();
   const unlink = useUnlinkLocation();
-  const unlinkButton = <Button size="sm" variant="outline" className="h-7 text-xs" disabled={unlink.isPending} data-testid={`button-unlink-gbp-${locationId}`}
+  const unlinkButton = <Button size="sm" variant="outline" className="min-h-10 text-xs" disabled={unlink.isPending} data-testid={`button-unlink-gbp-${locationId}`}
     onClick={(e) => { e.stopPropagation(); if (window.confirm('Stop syncing this location from Google? Its synced Google reviews and performance stats will be removed from ConstructHUB. The location itself stays, and you can link it again anytime.')) unlink.mutate(locationId); }}>Unlink</Button>;
   const row = data?.locations.find(l => l.id === locationId);
   if (isLoading) return <span className="text-xs text-muted-foreground">Checking…</span>;
@@ -78,7 +79,7 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
   if (row.state === 'available') return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
     <Badge variant="outline" className="text-[10px] border-amber-500 text-amber-600">{row.unlinkedByUser ? 'Unlinked by you' : 'Ready to link'}</Badge>
     <p className="text-xs text-muted-foreground truncate max-w-[220px]">Managed by {row.accountEmail}</p>
-    <Button size="sm" className="h-7 text-xs" disabled={link.isPending} onClick={(e) => { stop(e); link.mutate([row.listing!]); }} data-testid={`button-link-gbp-${locationId}`}>Link &amp; sync</Button>
+    <Button size="sm" variant="outline" className="min-h-10 text-xs" disabled={link.isPending} onClick={(e) => { stop(e); link.mutate([row.listing!]); }} data-testid={`button-link-gbp-${locationId}`}>Link &amp; sync</Button>
   </div>;
   return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
     <Badge variant="outline" className="text-[10px]">Not linked</Badge>
@@ -111,23 +112,23 @@ export function GbpConnection({locationId,context='reviews'}:{locationId?:number
   const locations=(data?.locations||[]).filter((l:any)=>!locationId||l.id===locationId);
   const unique=[...new Map<number,any>(locations.map((l:any)=>[l.id,l])).values()];
   const failedParam = typeof window!=='undefined' && new URLSearchParams(window.location.search).get('gbp')==='consent-failed';
-  return <section className="rounded-lg border p-4 space-y-3" aria-label="Google Business Profile connection">
+  return <Section title="Google connection" contentClassName="space-y-3 text-sm break-words">
     {error ? <p>Unable to check Google connection</p> : !data ? <p>Checking Google connection…</p> : accounts.length === 0
       ? <p>{NOT_CONNECTED_COPY[context]}</p>
       : <div className="space-y-2">
           <p className="font-medium">Connected Google accounts</p>
           {accounts.map(a => <div key={a.subject || a.email} className="flex flex-wrap items-center gap-2 text-sm" data-testid="gbp-account">
-            <Badge variant={a.connected ? 'default' : 'destructive'} className="text-[10px]">{a.connected ? 'Connected' : 'Reconnect needed'}</Badge>
+            <StatusPill tone={a.connected?'success':'warning'}>{a.connected?'Connected':'Reconnect needed'}</StatusPill>
             <span>{a.email}</span>
             {!a.connected && <a href="/api/gbp/connect" className="text-primary underline">Reconnect</a>}
             {/* Go to the account: its profiles here (to import or open), or its Business Profile on Google. */}
-            {a.connected && <Button asChild size="sm" variant="outline" className="h-7 text-xs" data-testid="button-view-google-profiles">
+            {a.connected && <Button asChild size="sm" variant="outline" className="min-h-10 text-xs" data-testid="button-view-google-profiles">
               <a href="/locations?import=gbp">View profiles</a>
             </Button>}
-            {a.connected && <Button asChild size="sm" variant="outline" className="h-7 text-xs" data-testid="button-open-google-business">
+            {a.connected && <Button asChild size="sm" variant="outline" className="min-h-10 text-xs" data-testid="button-open-google-business">
               <a href={`https://business.google.com/locations?authuser=${encodeURIComponent(a.email)}`} target="_blank" rel="noopener noreferrer">Open in Google ↗</a>
             </Button>}
-            {a.subject && <Button size="sm" variant="outline" className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10" disabled={mutation.isPending} data-testid="button-disconnect-google-account"
+            {a.subject && <Button size="sm" variant="outline" className="min-h-10 text-xs border-destructive/50 text-destructive hover:bg-destructive/10" disabled={mutation.isPending} data-testid="button-disconnect-google-account"
               onClick={()=>{ if (window.confirm(`Disconnect ${a.email}? ConstructHUB's access to this Google account is revoked, its locations stop syncing, and the Google reviews and stats synced through it are removed. Your locations stay.`)) mutation.mutate({path:'/api/gbp/disconnect',body:{subject:a.subject}}); }}>Disconnect</Button>}
           </div>)}
         </div>}
@@ -139,11 +140,11 @@ export function GbpConnection({locationId,context='reviews'}:{locationId?:number
     {(linkage?.errors ?? []).map((e, i) => <p key={i} role="alert" className="text-sm text-destructive">{e.grantEmail ? `${e.grantEmail}: ` : ''}{e.message}</p>)}
     <div className="flex flex-wrap gap-2">
       <Button asChild variant="outline"><a href="/api/gbp/connect">{accounts.length ? 'Connect another Google account' : 'Connect Google Business Profile'}</a></Button>
-      {!locationId && available.length > 0 && <Button disabled={link.isPending} onClick={()=>link.mutate(available)} data-testid="button-link-all-gbp">Link &amp; sync {available.length} ready location{available.length === 1 ? '' : 's'}</Button>}
+      {!locationId && available.length > 0 && <Button variant="outline" disabled={link.isPending} onClick={()=>link.mutate(available)} data-testid="button-link-all-gbp">Link &amp; sync {available.length} ready location{available.length === 1 ? '' : 's'}</Button>}
     </div>
-    {unique.map(l=><div key={l.id} className="border-t pt-2 space-y-1">
-      <div className="flex gap-3 items-center"><strong>{l.name}</strong>{l.account_email && <span className="text-xs text-muted-foreground">via {l.account_email}</span>}<Button size="sm" disabled={!data?.connected||mutation.isPending} onClick={()=>mutation.mutate({path:`/api/gbp/locations/${l.id}/sync`})}>Sync now</Button></div>
+    {unique.length>0&&<details open={context==='reviews'}><summary className="cursor-pointer min-h-10 py-2">Sync details</summary><div className="space-y-3">{unique.map(l=><div key={l.id} className="border-t pt-2 space-y-1">
+      <div className="flex flex-wrap gap-3 items-center"><strong>{l.name}</strong>{l.account_email && <span className="text-xs text-muted-foreground">via {l.account_email}</span>}<Button size="sm" variant="outline" disabled={!data?.connected||mutation.isPending} onClick={()=>mutation.mutate({path:`/api/gbp/locations/${l.id}/sync`})}>Sync now</Button></div>
       {locations.filter((s:any)=>s.id===l.id).map((s:any,i:number)=><p key={i} className="text-sm">{s.kind||'Reviews and performance'}: {s.last_success?`Last success ${new Date(s.last_success).toLocaleString()}`:'Never synced'}{s.last_error && <span role="alert" className="text-destructive"> — {s.last_error}</span>}</p>)}
-    </div>)}
-  </section>;
+    </div>)}</div></details>}
+  </Section>;
 }
