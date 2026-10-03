@@ -14,6 +14,7 @@ import {
   Notice,
   Stat,
   StatGrid,
+  StatusPill,
 } from "@/components/app-ui";
 import {
   AlertTriangle,
@@ -604,8 +605,13 @@ export default function VpnShieldPage() {
   return (
     <AppPage testId="page-vpn-shield">
       <PageHeader
-        title="VPN Shield"
-        description="Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors."
+        title={<span data-testid="text-vpn-page-title">VPN Shield</span>}
+        description={<span data-testid="text-vpn-subtitle">Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors.</span>}
+        meta={selectedDomain ? (
+          <StatusPill tone="neutral" data-testid="badge-vpn-shield">
+            {selectedDomain.name || selectedDomain.domain}
+          </StatusPill>
+        ) : undefined}
         actions={
           domains.length > 0 ? (
             <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-56 sm:flex-none">
