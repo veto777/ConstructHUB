@@ -424,7 +424,7 @@ export function AppSidebar() {
             <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
           </span>
           {/* The mascot stands beside the mark on every ConstructHUB sidebar. */}
-          
+
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -536,7 +536,7 @@ export function AppSidebar() {
                     <Link href="/lsa-account-manager" data-testid="link-nav-lsa-account-manager" className="flex items-center gap-2 w-full">
                       <Users className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-muted-foreground" />
                       <span>Account Manager</span>
-                      
+
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -548,7 +548,7 @@ export function AppSidebar() {
                     <Link href="/admin/feature-pages" data-testid="link-nav-admin-feature-pages" className="flex items-center gap-2 w-full">
                       <LayoutGrid className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Feature pages</span>
-                      
+
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -560,7 +560,7 @@ export function AppSidebar() {
                     <Link href="/admin/access" data-testid="link-nav-admin-access" className="flex items-center gap-2 w-full">
                       <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Access grants</span>
-                      
+
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -579,7 +579,7 @@ export function AppSidebar() {
                             {newIssues > 99 ? "99+" : newIssues}
                           </span>
                         )}
-                        
+
                       </span>
                     </Link>
                   </SidebarMenuButton>
