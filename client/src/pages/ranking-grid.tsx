@@ -341,7 +341,7 @@ function RankDistributionChart({ results }: { results: RankingGridResult[] }) {
     <div className="space-y-3" data-testid="rank-distribution-chart">
       <h3 className="text-sm font-semibold flex items-center gap-2">
         <BarChart3 className="h-4 w-4" />
-        Rank Distribution
+        Rank distribution
       </h3>
       <div className="w-full h-6 rounded-full overflow-hidden flex bg-muted">
         {segments.map((seg) => (
@@ -439,7 +439,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                Rank Summary
+                Rank summary
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 pt-0">
@@ -485,7 +485,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                 <tr className={appTableCards.tr + " border-b bg-muted/50"}>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground w-10">#</th>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground">Name</th>
-                  <th className="text-center py-2.5 px-4 font-medium text-muted-foreground">Found At</th>
+                  <th className="text-center py-2.5 px-4 font-medium text-muted-foreground">Found at</th>
                   <th className="text-center py-2.5 px-4 font-medium text-muted-foreground">AR</th>
                   <th className="text-center py-2.5 px-4 font-medium text-muted-foreground">Best</th>
                 </tr>
