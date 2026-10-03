@@ -1,3 +1,4 @@
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -418,7 +419,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="space-y-6">
-          <Card>
+          <Section flush>
             <CardContent className="p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <Building className="h-5 w-5 text-primary mt-0.5 shrink-0" />
@@ -446,9 +447,9 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card>
+          <Section flush>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Target className="h-4 w-4" />
@@ -467,13 +468,13 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                 <SummaryRow label="Top 3 Count" value={String(dist.rank1to3)} highlight={dist.rank1to3 > 0 ? "green" : undefined} />
               </div>
             </CardContent>
-          </Card>
+          </Section>
 
-          <Card>
+          <Section flush>
             <CardContent className="p-4">
               <RankDistributionChart results={results} />
             </CardContent>
-          </Card>
+          </Section>
         </div>
 
         <div>
@@ -481,7 +482,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
         </div>
       </div>
 
-      <Card>
+      <Section flush>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Trophy className="h-4 w-4" />
@@ -493,9 +494,9 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm" data-testid="table-competitors">
-              <thead>
-                <tr className="border-b bg-muted/50">
+            <table className={appTable.table} data-testid="table-competitors">
+              <thead className={appTableCards.thead}>
+                <tr className={appTableCards.tr + " border-b bg-muted/50"}>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground w-10">#</th>
                   <th className="text-left py-2.5 px-4 font-medium text-muted-foreground">Name</th>
                   <th className="text-center py-2.5 px-4 font-medium text-muted-foreground">Found At</th>
@@ -509,16 +510,16 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                     ? Math.round((comp.foundAt / comp.totalLocations) * 100)
                     : 0;
                   return (
-                    <tr key={idx} className="border-b last:border-0 hover:bg-muted/30 transition-colors" data-testid={`row-competitor-${idx}`}>
-                      <td className="py-2.5 px-4 text-muted-foreground font-medium">{idx + 1}</td>
-                      <td className="py-2.5 px-4">
+                    <tr key={idx} className={appTableCards.tr + " border-b last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-competitor-${idx}`}>
+                      <td className={appTableCards.td + " min-w-0 break-words"}>{idx + 1}</td>
+                      <td className={appTableCards.td + " min-w-0 break-words"}>
                         <p className="font-medium truncate max-w-[300px]">{comp.name}</p>
                         <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[300px]">
                           <MapPin className="h-3 w-3 shrink-0" />
                           {comp.address}
                         </p>
                       </td>
-                      <td className="py-2.5 px-4 text-center">
+                      <td className={appTableCards.td + " min-w-0 break-words"}>
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="font-semibold">{comp.foundAt}</span>
                           <Badge
@@ -529,12 +530,12 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                           </Badge>
                         </div>
                       </td>
-                      <td className="py-2.5 px-4 text-center">
+                      <td className={appTableCards.td + " min-w-0 break-words"}>
                         <Badge variant={getRankBadgeVariant(Math.round(comp.avgRank))} className="text-sm font-bold px-2.5">
                           {comp.avgRank.toFixed(2)}
                         </Badge>
                       </td>
-                      <td className="py-2.5 px-4 text-center">
+                      <td className={appTableCards.td + " min-w-0 break-words"}>
                         <Badge variant={getRankBadgeVariant(comp.bestRank)} className="text-sm font-bold px-2.5">
                           {comp.bestRank}
                         </Badge>
@@ -544,7 +545,7 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
                 })}
                 {competitors.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={5} className={appTableCards.td + " min-w-0 break-words"}>
                       No competitor data available
                     </td>
                   </tr>
@@ -553,14 +554,14 @@ function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results:
             </table>
           </div>
         </CardContent>
-      </Card>
+      </Section>
     </div>
   );
 }
 
 function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: "green" | "yellow" | "red" }) {
   const colorClass = highlight === "green" ? "text-emerald-600 dark:text-emerald-400"
-    : highlight === "yellow" ? "text-yellow-600 dark:text-yellow-400"
+    : highlight === "yellow" ? "text-muted-foreground text-muted-foreground"
     : highlight === "red" ? "text-red-600 dark:text-red-400"
     : "";
 
@@ -702,25 +703,21 @@ export default function RankingGridPage() {
   }
 
   return (
-    <div className="h-full overflow-auto">
-      <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <Grid3X3 className="h-6 w-6 text-primary" />
-            GMB Ranking Grid
-          </h1>
-          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316] mt-1" />
-          <p className="text-muted-foreground text-sm mt-1 max-w-lg">
-            You might rank #1 from your office but #15 from 5 miles away. See exactly where you rank on Google Maps across your entire service area with a visual heatmap grid.
-          </p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">New Scan</CardTitle>
-            <CardDescription>Search for your business, pick a keyword, and see your rankings</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+    <AppPage>
+      <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
+              className="w-full"
+              disabled={!selectedBusiness || !keyword.trim() || startScanMutation.isPending}
+              onClick={() => startScanMutation.mutate()}
+              data-testid="button-start-scan"
+            >
+              {startScanMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Target className="h-4 w-4 mr-2" />
+              )}
+              Start ranking scan
+            </Button>} />
+        <Section title="Scan details" contentClassName="space-y-4">
             <div className="space-y-2">
               <Label>Business</Label>
               <div className="relative">
@@ -801,9 +798,10 @@ export default function RankingGridPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <details><summary className="cursor-pointer py-2 text-sm font-medium">Advanced · Grid size and spacing</summary>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
               <div className="space-y-2">
-                <Label>Grid Size / Locations</Label>
+                <Label>Grid size</Label>
                 <Select value={gridSize} onValueChange={setGridSize}>
                   <SelectTrigger data-testid="select-grid-size">
                     <SelectValue />
@@ -817,7 +815,7 @@ export default function RankingGridPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Distance from Grid Center</Label>
+                <Label>Point spacing</Label>
                 <Select value={gridDistance} onValueChange={setGridDistance}>
                   <SelectTrigger data-testid="select-grid-distance">
                     <SelectValue />
@@ -831,6 +829,7 @@ export default function RankingGridPage() {
               </div>
             </div>
 
+            </details>
             <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
               <p>
                 This scan will check <strong>{parseInt(gridSize) * parseInt(gridSize)} grid points</strong> in a {gridSize}×{gridSize} pattern,
@@ -843,36 +842,23 @@ export default function RankingGridPage() {
               </p>
             </div>
 
-            <Button
-              className="w-full"
-              disabled={!selectedBusiness || !keyword.trim() || startScanMutation.isPending}
-              onClick={() => startScanMutation.mutate()}
-              data-testid="button-start-scan"
-            >
-              {startScanMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Target className="h-4 w-4 mr-2" />
-              )}
-              Start Ranking Scan
-            </Button>
-          </CardContent>
-        </Card>
+
+        </Section>
 
         {scansLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : scans.length === 0 ? (
-          <Card>
+          <Section flush>
             <CardContent className="py-12 text-center">
               <Grid3X3 className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
               <p className="text-muted-foreground">No scans yet. Start your first ranking scan above.</p>
             </CardContent>
-          </Card>
+          </Section>
         ) : (
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold" data-testid="text-scan-history">Scan History</h2>
+            <h2 className="text-base font-semibold" data-testid="text-scan-history">Scan history</h2>
             {scans.map((scan) => (
               <ScanCard
                 key={scan.id}
@@ -885,7 +871,6 @@ export default function RankingGridPage() {
             ))}
           </div>
         )}
-      </div>
 
       <AlertDialog open={!!scanToDelete} onOpenChange={o => { if (!o) setScanToDelete(null); }}>
         <AlertDialogContent data-testid="dialog-delete-scan">
@@ -909,7 +894,7 @@ export default function RankingGridPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPage>
   );
 }
 
@@ -933,7 +918,7 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
   const pctRanked = results.length > 0 ? Math.round((rankedCount / results.length) * 100) : 0;
 
   return (
-    <Card data-testid={`card-scan-${scan.id}`}>
+    <Section flush testId={`card-scan-${scan.id}`}>
       <div
         className="flex items-center justify-between p-4 cursor-pointer hover:bg-accent/50 transition-colors rounded-t-lg"
         onClick={onToggle}
@@ -1066,7 +1051,7 @@ function ScanCard({ scan, isExpanded, onToggle, onDelete, onViewReport }: {
           </div>
         </CardContent>
       )}
-    </Card>
+    </Section>
   );
 }
 
@@ -1103,7 +1088,7 @@ function ReportView({ scanId, onBack }: { scanId: number; onBack: () => void }) 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-muted/50 rounded-lg p-3 text-center">
-      <p className="text-lg font-bold">{value}</p>
+      <p className="text-base font-semibold">{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
