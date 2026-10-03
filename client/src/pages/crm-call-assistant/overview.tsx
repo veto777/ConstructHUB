@@ -1,9 +1,10 @@
+import { Section } from "@/components/app-ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Activity, ArrowRight, Hash, Phone, PhoneCall, ShieldBan, Sparkles, Timer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
@@ -68,6 +69,15 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   return (
     <div data-testid="panel-call-assistant-overview" className="pt-4 space-y-4">
       {paymentPaused && <CallAssistantPausedBanner status={status} />}
+      <Section flush className="border-0 bg-transparent">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-xs  text-muted-foreground">Next step</div>
+            <div className="font-medium" data-testid="text-overview-next-step">{nextStep.text}</div>
+          </div>
+          <Button asChild className="w-full sm:w-auto"><Link href={nextStep.href} data-testid={nextStep.testid}>Continue <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+        </div>
+      </Section>
       <StatGrid cols={4}>
         <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
           value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
@@ -87,11 +97,11 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         else window.location.assign(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`);
       }} />
 
-      <Card data-testid="card-overview-tier">
+      <Section flush testId="card-overview-tier">
         <CardContent className="p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Your tier</div>
+              <div className="text-xs  text-muted-foreground">Your tier</div>
               <div className="font-semibold" data-testid="text-overview-tier">
                 {heldTier ? `${heldTier.name} — ${heldTier.minutes} minutes and ${heldTier.numbersLabel} a month` : "No tier on this account"}
               </div>
@@ -102,6 +112,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               </Button>
             )}
           </div>
+          <details className="text-sm"><summary className="cursor-pointer py-2 font-medium">Compare tiers</summary>
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm" data-testid="list-overview-tiers">
             {tiers.map((t, i) => (
               <li key={t.tier} className={`rounded-md border px-3 py-2 ${t === heldTier ? "border-primary/60 bg-primary/5" : ""}`} data-testid={`row-overview-tier-${t.tier}`}>
@@ -118,17 +129,19 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           <p className="text-xs text-muted-foreground">
             Change tiers any time in Settings → Billing; the difference is prorated. A smaller tier keeps fewer numbers, and you see which ones stop answering before you confirm.
           </p>
+          </details>
         </CardContent>
-      </Card>
+      </Section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
+        <Section flush>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Minutes used</h3>
               <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
             {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
+            <details className="text-sm"><summary className="cursor-pointer py-2">Billing details</summary>
             <p className="text-xs text-muted-foreground">
               {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
               {status.addon.preview ? " Pricing is being finalized." : ""}
@@ -136,6 +149,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             <p className="text-xs" data-testid="text-overview-price">
               <span className="font-medium">{status.addon.name}:</span> Solo {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
             </p>
+            </details>
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">{status.addon.name}</Badge>
               {status.addon.preview && <Badge variant="outline" data-testid="badge-overview-preview">Coming soon</Badge>}
@@ -143,9 +157,9 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <StatusPill tone={engine.tone} data-testid="pill-overview-engine" title={engine.hint}>{engine.text}</StatusPill>
             </div>
           </CardContent>
-        </Card>
+        </Section>
 
-        <Card>
+        <Section flush>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Numbers ringing the assistant</h3>
@@ -154,7 +168,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             {numbers.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">No number yet. Buy a local number in the Numbers tab, then forward your existing line to it.</p>
             ) : (
-              <ul className="divide-y rounded-md border text-sm" data-testid="list-overview-numbers">
+              <ul className="divide-y text-sm" data-testid="list-overview-numbers">
                 {numbers.map((n, i) => (
                   <li key={String(n.id ?? n.phoneNumber ?? i)} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid={`row-overview-number-${i}`}>
                     <span className="font-medium tabular-nums">{n.phoneNumber ? prettyPhone(n.phoneNumber) : "—"}</span>
@@ -167,10 +181,10 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               </ul>
             )}
           </CardContent>
-        </Card>
+        </Section>
       </div>
 
-      <Card>
+      <Section flush>
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Recent calls</h3>
@@ -181,7 +195,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               {calls.isError ? "The call log isn't available yet." : "No calls yet. Once a forwarded line rings the assistant, every call shows here with its outcome and summary."}
             </p>
           ) : (
-            <ul className="divide-y rounded-md border text-sm" data-testid="list-overview-calls">
+            <ul className="divide-y text-sm" data-testid="list-overview-calls">
               {recent.map((c, i) => (
                 <li key={String(c.id)} data-testid={`row-overview-call-${i}`}>
                   <Link href={`/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`} className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-muted/40" data-testid={`link-overview-call-${i}`}>
@@ -196,17 +210,9 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             </ul>
           )}
         </CardContent>
-      </Card>
+      </Section>
 
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Next step</div>
-            <div className="font-medium" data-testid="text-overview-next-step">{nextStep.text}</div>
-          </div>
-          <Button asChild><Link href={nextStep.href} data-testid={nextStep.testid}>Go <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }

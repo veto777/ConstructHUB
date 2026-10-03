@@ -1,10 +1,11 @@
+import { Section } from "@/components/app-ui";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { AppPage, AppTabsList, PageHeader, StatusPill } from "@/components/app-ui";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
@@ -39,7 +40,7 @@ import { CallsPanel } from "./calls";
 export const CALL_ASSISTANT_TABS = ["overview", "numbers", "studio", "simulator", "calls"] as const;
 export type CallAssistantTab = (typeof CALL_ASSISTANT_TABS)[number];
 const TAB_LABELS: Record<CallAssistantTab, string> = {
-  overview: "Overview", numbers: "Numbers", studio: "Agent Studio", simulator: "Simulator", calls: "Calls",
+  overview: "Overview", numbers: "Numbers", studio: "Agent studio", simulator: "Simulator", calls: "Calls",
 };
 
 export type VoiceStatus = {
@@ -84,24 +85,32 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
   const message = body?.message || `${CALL_ASSISTANT_NAME} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`;
   const tiers = callAssistantTiers();
   return (
-    <Card role="region" aria-labelledby="call-assistant-gate" data-testid="plan-required-callAssistant">
+    <Section flush testId="plan-required-callAssistant">
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 id="call-assistant-gate" className="text-xl font-semibold leading-none tracking-tight">{CALL_ASSISTANT_NAME}</h2>
+          <h2 id="call-assistant-gate" className="text-base font-semibold leading-none tracking-tight">{CALL_ASSISTANT_NAME}</h2>
           <Badge variant="secondary">Add-on</Badge>
           {preview && <Badge variant="outline" data-testid="badge-call-assistant-preview">Coming soon</Badge>}
         </div>
         <p className="text-sm" data-testid="text-plan-required-message">{message}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}
+        {preview ? (
+          <Button className="w-full sm:w-auto" disabled data-testid="button-call-assistant-unavailable">Not available yet</Button>
+        ) : (
+          <Button asChild className="w-full sm:w-auto">
+            <a href="/settings?tab=billing" data-testid="link-call-assistant-billing">Add it in Billing</a>
+          </Button>
+        )}
+        <details><summary className="cursor-pointer py-2 text-sm font-medium">What’s included</summary><ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Answers every call, 24/7, in a voice and name you choose, and says it is a virtual assistant when asked.</li>
           <li>Asks what the caller needs, the address, a name, a good email and the best time to call — then files the lead in your CRM.</li>
           <li>Texts or emails the right person for emergencies, existing customers and "I want a person".</li>
           <li>Screens out spam on every call forwarded to it, so you stop answering telemarketers and robocalls; a number caught twice as near-certain spam is blocked before it's answered.</li>
           <li>Every call logged with a summary, transcript and recording.</li>
-        </ul>
+        </ul></details>
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm" data-testid="list-plan-required-tiers">
           {tiers.map((t) => (
             <li key={t.tier} className="rounded-md border p-2.5" data-testid={`text-plan-required-tier-${t.tier}`}>
@@ -114,16 +123,9 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           Solo launch price: <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>. {callAssistantSpamAllowanceLine()}. On the {plans} plans.
           {preview ? " Pricing is being finalized; it cannot be added yet." : ""}
         </p>
-        {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}
-        {preview ? (
-          <Button disabled data-testid="button-call-assistant-unavailable">Not available yet</Button>
-        ) : (
-          <Button asChild>
-            <a href="/settings?tab=billing" data-testid="link-call-assistant-billing">Add it in Billing</a>
-          </Button>
-        )}
+
       </CardContent>
-    </Card>
+    </Section>
   );
 }
 
@@ -152,7 +154,7 @@ export default function CrmCallAssistantPage() {
     <AppPage testId="page-call-assistant">
       <PageHeader
         title={<span data-testid="text-call-assistant-title">Call Assistant</span>}
-        description="Your AI receptionist answers every call, files the lead and alerts the right person."
+        description="Answer calls, capture leads and keep your team informed."
         meta={status.data?.profile?.status ? (
           <StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
             {status.data.profile.status}

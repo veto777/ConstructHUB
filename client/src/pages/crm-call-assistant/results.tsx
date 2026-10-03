@@ -1,3 +1,4 @@
+import { Section } from "@/components/app-ui";
 /**
  * Results — what the assistant did with the calls (owner, 2026-10-02: "this data should be logged in the
  * constructhub page … The clients want to see this data when using this service. This is very helpful to see what
@@ -8,7 +9,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart3, BellRing, ClipboardCheck, Info, Mic, PhoneMissed, ShieldBan, Timer, XCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -30,7 +31,7 @@ const RANGE_LABELS: Record<ResultsRange, string> = { "7d": "Last 7 days", "30d":
 
 /** The tiles, in the order an owner reads them: what made money first, spam last. */
 const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: string }[] = [
-  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "text-emerald-600 dark:text-emerald-400" },
+  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "text-foreground" },
   { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "text-amber-600 dark:text-amber-400" },
   { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "text-sky-600 dark:text-sky-400" },
   { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "text-muted-foreground" },
@@ -52,7 +53,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
   const maxLine = d?.lines.reduce((m, l) => Math.max(m, l.calls), 0) ?? 0;
 
   return (
-    <Card className={className} data-testid="card-call-results">
+    <Section flush className={className} testId="card-call-results">
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -70,7 +71,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
         </div>
 
         {q.isLoading ? (
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{TILES.map((t) => <Skeleton key={t.key} className="h-20" />)}</div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">{TILES.map((t) => <Skeleton key={t.key} className="h-20" />)}</div>
         ) : q.isError || !d ? (
           <p className="text-sm text-muted-foreground" role="alert" data-testid="text-results-error">Couldn't load the results. <button type="button" className="underline" onClick={() => q.refetch()}>Try again</button></p>
         ) : d.total === 0 ? (
@@ -83,11 +84,11 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
               <p><span className="text-2xl font-semibold tabular-nums" data-testid="text-results-total">{d.total.toLocaleString("en-US")}</span> calls answered</p>
               <p><span className="text-2xl font-semibold tabular-nums" data-testid="text-results-real">{real.toLocaleString("en-US")}</span> real callers</p>
               {leadRate !== null && (
-                <p><span className="text-2xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400" data-testid="text-results-lead-rate">{leadRate}%</span> became estimate requests</p>
+                <p><span className="text-2xl font-semibold tabular-nums text-foreground" data-testid="text-results-lead-rate">{leadRate}%</span> became estimate requests</p>
               )}
             </div>
 
-            <ul className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="list-results-outcomes">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="list-results-outcomes">
               {TILES.map((t) => {
                 const n = sum(d.outcomes, t.outcomes);
                 return (
@@ -95,10 +96,10 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                     <button
                       type="button"
                       onClick={() => onPick(t.key)}
-                      className="h-full w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="h-full w-full rounded-lg p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       data-testid={`tile-results-${t.key}`}
                     >
-                      <span className={cn("flex items-center gap-1.5 text-sm font-medium", t.tone)}><t.icon className="h-4 w-4" aria-hidden="true" /> {t.label}</span>
+                      <span className="block text-xs font-medium text-muted-foreground">{t.label}</span>
                       <span className="mt-1 block text-2xl font-semibold tabular-nums" data-testid={`text-results-${t.key}`}>{n.toLocaleString("en-US")}</span>
                       <span className="block text-xs text-muted-foreground">{t.hint}</span>
                     </button>
@@ -114,7 +115,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                   {d.lines.map((l) => (
                     <li key={l.label} className="text-sm" data-testid="row-results-line">
                       <div className="flex justify-between gap-2"><span className="truncate">{l.label}</span><span className="tabular-nums text-muted-foreground">{l.calls} calls · {l.leads} estimate {l.leads === 1 ? "request" : "requests"}</span></div>
-                      <div className="mt-1 h-1.5 rounded bg-muted"><div className="h-1.5 rounded bg-primary" style={{ width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
+                      <div className="mt-1 h-1.5 rounded bg-muted"><div className="h-1.5 rounded bg-foreground/30" style={{ width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
                     </li>
                   ))}
                 </ul>
@@ -127,6 +128,6 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
           </>
         )}
       </CardContent>
-    </Card>
+    </Section>
   );
 }
