@@ -419,7 +419,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className="h-10 w-10"
                               aria-label={`Remove one ${addon.name}`}
                               disabled={!editable || addonMutation.isPending || addonChange.checking || qty === 0 || addon.preview === true}
                               onClick={() => void addonChange.request({ addon: addon.key, quantity: qty - 1 }, qty)}
@@ -433,7 +433,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                             <Button
                               size="icon"
                               variant="outline"
-                              className="h-8 w-8"
+                              className="h-10 w-10"
                               aria-label={`Add one ${addon.name}`}
                               disabled={!editable || addonMutation.isPending || addon.preview === true}
                               onClick={() => addonMutation.mutate({ addon: addon.key, quantity: qty + 1 })}

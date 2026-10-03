@@ -19,8 +19,9 @@ import type { SettingsSectionProps, SettingsUser } from "./types";
 export function PasswordSecuritySection({ user }: SettingsSectionProps) {
   return (
     <div className="space-y-6" data-testid="section-security">
+      <TwoFactorSection user={user} />
       {user?.hasPassword ? (
-        <ChangePasswordCard />
+        <ChangePasswordCard primary={!!user.totpEnabled} />
       ) : user ? (
         <Card data-testid="card-no-password">
           <CardHeader>
@@ -36,13 +37,12 @@ export function PasswordSecuritySection({ user }: SettingsSectionProps) {
           </CardContent>
         </Card>
       ) : null}
-      <TwoFactorSection user={user} />
       <SecurityActivity />
     </div>
   );
 }
 
-function ChangePasswordCard() {
+function ChangePasswordCard({ primary }: { primary: boolean }) {
   const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -71,7 +71,7 @@ function ChangePasswordCard() {
   return (
     <Card data-testid="card-change-password">
       <CardHeader>
-        <CardTitle className="text-base">Change Password</CardTitle>
+        <CardTitle className="text-base">Change password</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -132,6 +132,7 @@ function ChangePasswordCard() {
         </div>
         <div className="flex justify-end">
           <Button
+            variant={primary ? "default" : "outline"}
             onClick={() => changePasswordMutation.mutate()}
             disabled={!currentPassword || !newPassword || !confirmPassword || changePasswordMutation.isPending}
             data-testid="button-change-password"
@@ -204,7 +205,7 @@ function TwoFactorSection({ user }: { user: SettingsUser | undefined }) {
   return (
     <Card data-testid="card-two-factor">
       <CardHeader>
-        <CardTitle className="text-base">Two-Factor Authentication</CardTitle>
+        <CardTitle className="text-base">Two-factor authentication</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {recoveryCodes.length > 0 && (
