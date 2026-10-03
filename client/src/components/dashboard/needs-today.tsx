@@ -234,7 +234,7 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
                       <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="[&_[role=menuitem]]:min-h-10">
                     {!dashboardItemSnoozeOnly(item.key) && <DropdownMenuItem onSelect={() => clear([item], null)} data-testid={`button-needs-done-${item.key}`} aria-label={`Done: ${name}`}>Done</DropdownMenuItem>}
                     <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Snooze “{item.label}”</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={() => clear([item], snoozeUntil("tomorrow"))} data-testid={`menu-needs-snooze-tomorrow-${item.key}`}>

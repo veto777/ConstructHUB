@@ -98,7 +98,7 @@ export function DashboardHeader({
         {onCustomize && <Button variant="outline" onClick={onCustomize} aria-haspopup="dialog" data-testid="button-dashboard-customize">Customize</Button>}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline">More</Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)]">
+          <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)] [&_[role=menuitem]]:min-h-10">
             <div className="px-2 py-2"><PlanChip account={account} /><p className="mt-2 text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</p></div>
             <DropdownMenuItem onSelect={onRefresh} disabled={refreshing} data-testid="button-dashboard-refresh">{refreshing ? "Refreshing…" : "Refresh"}</DropdownMenuItem>
             {account.status !== "none" && <DropdownMenuItem asChild><Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">Manage plan</Link></DropdownMenuItem>}
