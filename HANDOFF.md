@@ -19,6 +19,15 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🎨 2026-10-03 — every signed-in platform page redesigned ("less is more")
+- Owner: "All these pages are so clunky and not user friendly … make them flow and look cleaner simpler and better!
+  Less is more … Better design too." Scope: the ~37 signed-in platform pages. The CRM and marketing pages are separate.
+- Foundation: `.app-theme` (brand orange, Plus Jakarta Sans, warm page, white cards; dark mode too) and the page kit
+  `client/src/components/app-ui.tsx`. The rules are `docs/design/APP-UI.md` — follow them for every new page.
+- Built by seven lanes: Codex lanes 1, 2, 4 and 6, Kimi lanes 3, 5 and 7. Each worked in its own worktree from a
+  brief (session scratchpad `ui/`), then I polished: one tab style, styled disclosures, location cards on phones,
+  and a word-spacing fix for buttons and inputs. Every page has 0 px overflow at 390 px. Testids are kept.
+
 ## 🧰 2026-10-02 evening — what is live now (all deployed to vb11; dump-first each time)
 - **Call Assistant is LAUNCHED (purchasable).** Four tiers in `shared/plans.ts` CALL_ASSISTANT_TIERS: Lite $149
   (1,000 min, 1 number), Solo $249 ($99 × 3 monthly intro; 2,000 min, 1 number), Crew $449 (5,000 min, 5 numbers),
