@@ -5,9 +5,7 @@ import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -33,13 +31,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { AppPage, PageHeader, EmptyState, StatusPill } from "@/components/app-ui";
 import { useToast } from "@/hooks/use-toast";
 import {
   Clock,
   Plus,
   Trash2,
   Loader2,
-  Calendar,
 } from "lucide-react";
 import type { ScrapeSchedule, PermitDatabase } from "@shared/schema";
 
@@ -108,52 +106,35 @@ export default function SchedulesPage() {
     return databaseRows ? `Database #${dbId} (not a live-searchable portal)` : `Database #${dbId}`;
   };
 
-  if (error) return <div className="p-6"><Card className="p-6" role="alert">
-    <h1 className="text-xl font-semibold">System permit-refresh schedules</h1>
-    <p className="mt-2 text-muted-foreground">{String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}</p>
-  </Card></div>;
-
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="h-full overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-          <div className="space-y-3">
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-4 w-72" />
-          </div>
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-20 rounded-md" />
-            ))}
-          </div>
+      <AppPage width="narrow">
+        <div className="rounded-xl border bg-card p-5" role="alert">
+          <h1 className="text-base font-semibold">Scrape schedules</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
+          </p>
         </div>
-      </div>
+      </AppPage>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-        <div className="flex items-start justify-between gap-4 animate-in">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
-              Scrape Schedules
-            </h1>
-            <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
-            <p className="text-sm text-muted-foreground max-w-lg">
-              Manage system-wide permit-refresh schedule settings. Administrator access is required.
-            </p>
-          </div>
+    <AppPage width="narrow" testId="page-schedules">
+      <PageHeader
+        title={<span data-testid="text-page-title">Scrape schedules</span>}
+        description="Automatic permit refreshes for live-searchable portals. Admins only."
+        actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-add-schedule">
                 <Plus className="h-4 w-4 mr-2" />
-                Add Schedule
+                Add schedule
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create Scrape Schedule</DialogTitle>
+                <DialogTitle>Create scrape schedule</DialogTitle>
                 <DialogDescription>
                   Choose a live-searchable permit portal and what to search it for.
                 </DialogDescription>
@@ -168,83 +149,79 @@ export default function SchedulesPage() {
               />
             </DialogContent>
           </Dialog>
-        </div>
+        }
+      />
 
-        {schedules && schedules.length > 0 ? (
-          <div className="space-y-2">
-            {schedules.map((schedule, index) => (
-              <Card
-                key={schedule.id}
-                className="p-4 hover-elevate transition-all duration-200"
-                style={{
-                  boxShadow: 'var(--shadow-2xs)',
-                  animation: `fadeSlideIn 0.3s ease-out ${index * 0.04}s both`,
-                }}
-                data-testid={`card-schedule-${schedule.id}`}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0 space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold">{getDatabaseName(schedule.databaseId)}</span>
-                      <span className="text-xs text-muted-foreground capitalize">{schedule.frequency}</span>
-                      {schedule.isActive ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400"></span>
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
-                          Paused
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="capitalize">{schedule.searchType}</span>: "{schedule.searchValue}"
-                      {schedule.lastRunAt && (
-                        <>
-                          <span className="mx-1.5 text-border">·</span>
-                          Last run {new Date(schedule.lastRunAt).toLocaleDateString()}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Switch
-                      checked={schedule.isActive}
-                      onCheckedChange={(checked) =>
-                        toggleMutation.mutate({ id: schedule.id, isActive: checked })
-                      }
-                      data-testid={`switch-schedule-${schedule.id}`}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setPendingDelete(schedule)}
-                      disabled={deleteMutation.isPending}
-                      aria-label="Delete schedule"
-                      title="Delete schedule"
-                      data-testid={`button-delete-schedule-${schedule.id}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
+      {isLoading ? (
+        <div className="space-y-2" data-testid="schedules-loading">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl border bg-card" />
+          ))}
+        </div>
+      ) : schedules && schedules.length > 0 ? (
+        <div className="rounded-xl border bg-card divide-y">
+          {schedules.map((schedule) => (
+            <div
+              key={schedule.id}
+              className="flex items-center gap-4 px-4 py-3.5"
+              data-testid={`card-schedule-${schedule.id}`}
+            >
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-semibold">{getDatabaseName(schedule.databaseId)}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{schedule.frequency}</span>
+                  {schedule.isActive ? (
+                    <StatusPill tone="success">Active</StatusPill>
+                  ) : (
+                    <StatusPill tone="neutral">Paused</StatusPill>
+                  )}
                 </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 animate-in-delay-1">
-            <Clock className="h-8 w-8 text-muted-foreground/20" />
-            <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">No schedules yet</p>
-              <p className="text-xs text-muted-foreground/70 max-w-sm">
-                Schedules run automatically on their frequency against portals that support live search.
-              </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="capitalize">{schedule.searchType}</span>: "{schedule.searchValue}"
+                  {schedule.lastRunAt && (
+                    <>
+                      <span className="mx-1.5 text-border">·</span>
+                      Last run {new Date(schedule.lastRunAt).toLocaleDateString()}
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Switch
+                  checked={schedule.isActive}
+                  onCheckedChange={(checked) =>
+                    toggleMutation.mutate({ id: schedule.id, isActive: checked })
+                  }
+                  data-testid={`switch-schedule-${schedule.id}`}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setPendingDelete(schedule)}
+                  disabled={deleteMutation.isPending}
+                  aria-label="Delete schedule"
+                  title="Delete schedule"
+                  data-testid={`button-delete-schedule-${schedule.id}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState
+          icon={Clock}
+          title="No schedules yet"
+          description="Schedules run automatically on their frequency against portals that support live search."
+          action={
+            <Button variant="outline" onClick={() => setDialogOpen(true)} data-testid="button-empty-add-schedule">
+              <Plus className="h-4 w-4 mr-2" />
+              Add schedule
+            </Button>
+          }
+        />
+      )}
 
       <AlertDialog open={!!pendingDelete} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
         <AlertDialogContent>
@@ -268,7 +245,7 @@ export default function SchedulesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPage>
   );
 }
 
@@ -389,7 +366,7 @@ function AddScheduleForm({
         ) : (
           <Plus className="h-4 w-4 mr-2" />
         )}
-        Create Schedule
+        Create schedule
       </Button>
     </form>
   );

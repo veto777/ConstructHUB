@@ -5,7 +5,6 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { Link } from "wouter";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { AppPage, PageHeader, Section, Notice } from "@/components/app-ui";
 import {
   Select,
   SelectContent,
@@ -1233,194 +1233,191 @@ export default function PhotosPage() {
   const isProcessing = uploadMutation.isPending || processMutation.isPending || !!processingStep;
 
   return (
-    <div className="h-full overflow-y-auto" data-testid="page-photos">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-8">
-        <div className="space-y-2 animate-in">
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-photos-title">
-            SEO Photo Optimizer
-          </h1>
-          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
-          <p className="text-sm text-muted-foreground max-w-lg">
-            Add watermarks, write EXIF details and GPS geotags, generate descriptions, and give your job photos clear, keyword-rich filenames in one batch. Google strips EXIF on upload to a Business Profile, so geotags and metadata are for your own files and other sites — they don't promise a ranking benefit.
-          </p>
-        </div>
+    <AppPage width="narrow" testId="page-photos">
+      <PageHeader
+        title={<span data-testid="text-photos-title">SEO photo optimizer</span>}
+        description="Watermark, geotag and rename job photos in one batch."
+      />
 
-        {processingBlock && (
-          <Card className="p-4 flex flex-wrap items-center justify-between gap-3 border-[#4A6CF7]/30 bg-[#4A6CF7]/5" role="status" data-testid="notice-photos-access">
-            <p className="text-sm min-w-0 flex-1">
-              {processingBlock === "sign-in"
-                ? "Sign in to process photos. The Photo Optimizer is included with every ConstructHUB plan."
-                : `Processing photos is included with every plan, starting with ${PLANS[PLAN_KEYS[0]].name}. Choose a plan to process this batch.`}
-            </p>
-            <Button asChild size="sm" className="shrink-0">
-              {processingBlock === "sign-in"
-                ? <Link href={`/auth?next=${encodeURIComponent("/photos")}`} data-testid="link-photos-sign-in">Sign in</Link>
-                : <Link href="/pricing" data-testid="link-photos-plans">See plans</Link>}
-            </Button>
-          </Card>
-        )}
+      {processingBlock && (
+        <Notice tone="info" testId="notice-photos-access" action={
+          <Button asChild size="sm" variant="outline">
+            {processingBlock === "sign-in"
+              ? <Link href={`/auth?next=${encodeURIComponent("/photos")}`} data-testid="link-photos-sign-in">Sign in</Link>
+              : <Link href="/pricing" data-testid="link-photos-plans">See plans</Link>}
+          </Button>
+        }>
+          {processingBlock === "sign-in"
+            ? "Sign in to process photos. The Photo Optimizer is included with every ConstructHUB plan."
+            : `Processing photos is included with every plan, starting with ${PLANS[PLAN_KEYS[0]].name}. Choose a plan to process this batch.`}
+        </Notice>
+      )}
 
-        <Card className="p-5 space-y-4 animate-in-delay-1" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Templates</span>
-              {templates.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {templates.length} saved
-                </span>
-              )}
+      <Section
+        title="Templates"
+        actions={
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setEditingTemplateId(null);
+              setTemplateMode("new");
+              setTemplateName(categories.join(", ") || "");
+              setShowSaveTemplate(true);
+            }}
+            data-testid="button-save-template"
+          >
+            <Save className="h-3.5 w-3.5 mr-1.5" />
+            Save current
+          </Button>
+        }
+      >
+        {showSaveTemplate && (
+          <div className="flex items-end gap-2" data-testid="template-save-form">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-xs">
+                {templateMode === "rename" ? "New template name" : "Template name"}
+                {templateMode === "overwrite" && (
+                  <span className="text-muted-foreground font-normal"> — replaces this template's settings with your current ones</span>
+                )}
+              </Label>
+              <Input
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSaveTemplate()}
+                placeholder="e.g. Roofing, Siding, Windows..."
+                autoFocus
+                data-testid="input-template-name"
+              />
             </div>
+            <Button size="sm" onClick={handleSaveTemplate} data-testid="button-confirm-save-template">
+              {templateMode === "rename" ? "Rename" : templateMode === "overwrite" ? "Overwrite" : "Save"}
+            </Button>
             <Button
               size="sm"
-              variant="outline"
-              onClick={() => {
-                setEditingTemplateId(null);
-                setTemplateMode("new");
-                setTemplateName(categories.join(", ") || "");
-                setShowSaveTemplate(true);
-              }}
-              data-testid="button-save-template"
+              variant="ghost"
+              onClick={closeTemplateForm}
+              aria-label="Cancel"
+              data-testid="button-cancel-save-template"
             >
-              <Save className="h-3.5 w-3.5 mr-1.5" />
-              Save Current
+              <X className="h-4 w-4" />
             </Button>
           </div>
+        )}
 
-          {showSaveTemplate && (
-            <div className="flex items-end gap-2" data-testid="template-save-form">
-              <div className="flex-1 space-y-1.5">
-                <Label className="text-xs">
-                  {templateMode === "rename" ? "New template name" : "Template name"}
-                  {templateMode === "overwrite" && (
-                    <span className="text-muted-foreground font-normal"> — replaces this template's settings with your current ones</span>
-                  )}
-                </Label>
-                <Input
-                  value={templateName}
-                  onChange={e => setTemplateName(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSaveTemplate()}
-                  placeholder="e.g. Roofing, Siding, Windows..."
-                  autoFocus
-                  data-testid="input-template-name"
-                />
-              </div>
-              <Button size="sm" onClick={handleSaveTemplate} data-testid="button-confirm-save-template">
-                {templateMode === "rename" ? "Rename" : templateMode === "overwrite" ? "Overwrite" : "Save"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={closeTemplateForm}
-                aria-label="Cancel"
-                data-testid="button-cancel-save-template"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-
-          {templates.length === 0 && !showSaveTemplate ? (
-            <p className="text-xs text-muted-foreground">
-              No templates yet. Set up your business info, category, and keywords, then save as a template for quick reuse.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {templates.map(tpl => (
-                <div key={tpl.id} className="flex items-center gap-0.5" data-testid={`template-${tpl.id}`}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => loadTemplate(tpl)}
-                    className="text-xs h-8 pr-1.5"
-                    data-testid={`button-load-template-${tpl.id}`}
-                  >
-                    {tpl.name}
-                    {tpl.category && (
-                      <span className="text-[10px] text-muted-foreground ml-1.5 opacity-70">
-                        {tpl.category}
-                      </span>
-                    )}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-6 px-0" data-testid={`button-template-menu-${tpl.id}`}>
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => loadTemplate(tpl)} data-testid={`menu-load-template-${tpl.id}`}>
-                        <FolderOpen className="h-3.5 w-3.5 mr-2" /> Load
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => startEditTemplate(tpl, "rename")} data-testid={`menu-rename-template-${tpl.id}`}>
-                        <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => startEditTemplate(tpl, "overwrite")}
-                        data-testid={`menu-overwrite-template-${tpl.id}`}
-                      >
-                        <Save className="h-3.5 w-3.5 mr-2" /> Overwrite with current
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => setTemplateToDelete(tpl)}
-                        data-testid={`menu-delete-template-${tpl.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <AlertDialog open={!!templateToDelete} onOpenChange={o => { if (!o) setTemplateToDelete(null); }}>
-            <AlertDialogContent data-testid="dialog-delete-template">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete template “{templateToDelete?.name}”?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Its saved business info, categories, keywords and watermark settings will be removed from this browser. Your current page settings stay as they are. This cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-delete-template">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={() => { if (templateToDelete) deleteTemplate(templateToDelete.id); setTemplateToDelete(null); }}
-                  data-testid="button-confirm-delete-template"
+        {templates.length === 0 && !showSaveTemplate ? (
+          <p className="text-xs text-muted-foreground">
+            No templates yet. Set up your business info, category, and keywords, then save as a template for quick reuse.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {templates.map(tpl => (
+              <div key={tpl.id} className="flex items-center gap-0.5" data-testid={`template-${tpl.id}`}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadTemplate(tpl)}
+                  className="text-xs h-8 pr-1.5"
+                  data-testid={`button-load-template-${tpl.id}`}
                 >
-                  Delete template
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </Card>
+                  {tpl.name}
+                  {tpl.category && (
+                    <span className="text-[10px] text-muted-foreground ml-1.5 opacity-70">
+                      {tpl.category}
+                    </span>
+                  )}
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-6 px-0" data-testid={`button-template-menu-${tpl.id}`}>
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => loadTemplate(tpl)} data-testid={`menu-load-template-${tpl.id}`}>
+                      <FolderOpen className="h-3.5 w-3.5 mr-2" /> Load
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => startEditTemplate(tpl, "rename")} data-testid={`menu-rename-template-${tpl.id}`}>
+                      <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => startEditTemplate(tpl, "overwrite")}
+                      data-testid={`menu-overwrite-template-${tpl.id}`}
+                    >
+                      <Save className="h-3.5 w-3.5 mr-2" /> Overwrite with current
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => setTemplateToDelete(tpl)}
+                      data-testid={`menu-delete-template-${tpl.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <Card className="p-5 animate-in-delay-1" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <button
-            type="button"
-            onClick={() => setBusinessCollapsed(!businessCollapsed)}
-            className="flex items-center justify-between gap-2 w-full text-left"
-            data-testid="button-toggle-business"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-semibold">Business Info</span>
-              {businessInfo.companyName && (
-                <span className="text-xs text-muted-foreground truncate">
-                  {businessInfo.companyName}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1">
-              {businessInfo.companyName && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="inline-flex items-center h-7 px-2 text-xs text-muted-foreground hover:text-destructive cursor-pointer rounded-md hover:bg-accent"
-                  onClick={(e) => {
+        <AlertDialog open={!!templateToDelete} onOpenChange={o => { if (!o) setTemplateToDelete(null); }}>
+          <AlertDialogContent data-testid="dialog-delete-template">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete template "{templateToDelete?.name}"?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Its saved business info, categories, keywords and watermark settings will be removed from this browser. Your current page settings stay as they are. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-cancel-delete-template">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => { if (templateToDelete) deleteTemplate(templateToDelete.id); setTemplateToDelete(null); }}
+                data-testid="button-confirm-delete-template"
+              >
+                Delete template
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </Section>
+
+      <Section>
+        <button
+          type="button"
+          onClick={() => setBusinessCollapsed(!businessCollapsed)}
+          className="flex items-center justify-between gap-2 w-full text-left"
+          data-testid="button-toggle-business"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base font-semibold leading-6">Business info</span>
+            {businessInfo.companyName && (
+              <span className="text-xs text-muted-foreground truncate">
+                {businessInfo.companyName}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {businessInfo.companyName && (
+              <span
+                role="button"
+                tabIndex={0}
+                className="inline-flex items-center h-7 px-2 text-xs text-muted-foreground hover:text-destructive cursor-pointer rounded-md hover:bg-accent"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setBusinessInfo({
+                    companyName: "", phone: "", address: "", city: "",
+                    countyState: "", website: "", services: "", copyright: "",
+                    lat: null, lon: null,
+                  });
+                  setWatermarkText("");
+                  localStorage.removeItem("gmb-business-info");
+                  toast({ title: "Business info cleared" });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
                     e.stopPropagation();
+                    e.preventDefault();
                     setBusinessInfo({
                       companyName: "", phone: "", address: "", city: "",
                       countyState: "", website: "", services: "", copyright: "",
@@ -1429,1543 +1426,1508 @@ export default function PhotosPage() {
                     setWatermarkText("");
                     localStorage.removeItem("gmb-business-info");
                     toast({ title: "Business info cleared" });
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      setBusinessInfo({
-                        companyName: "", phone: "", address: "", city: "",
-                        countyState: "", website: "", services: "", copyright: "",
-                        lat: null, lon: null,
-                      });
-                      setWatermarkText("");
-                      localStorage.removeItem("gmb-business-info");
-                      toast({ title: "Business info cleared" });
-                    }
-                  }}
-                  data-testid="button-clear-business"
-                >
-                  Clear
-                </span>
-              )}
-              {businessCollapsed ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-          </button>
-
-          {!businessCollapsed && (
-            <div className="mt-4 space-y-4">
-              {savedLocations && savedLocations.length > 0 && (
-                <div className="space-y-2 pb-3 border-b border-border/50">
-                  <Label className="text-xs font-medium flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" />
-                    Load from Saved Location
-                  </Label>
-                  <Select
-                    onValueChange={(val) => {
-                      const loc = savedLocations.find((l: any) => String(l.id) === val);
-                      if (loc) {
-                        setBusinessInfo({
-                          companyName: loc.businessName || "",
-                          phone: loc.phone || "",
-                          address: loc.address || "",
-                          city: loc.city || "",
-                          countyState: [loc.state].filter(Boolean).join(", "),
-                          website: loc.website || "",
-                          services: (loc.categories || []).join(", "),
-                          copyright: `\u00A9 ${new Date().getFullYear()} ${loc.businessName || ""}`,
-                          lat: loc.lat ?? null,
-                          lon: loc.lon ?? null,
-                        });
-                        if (loc.businessName) setWatermarkText(loc.businessName);
-                        setBusinessCollapsed(true);
-                        toast({ title: "Location loaded", description: `${loc.businessName} info applied.` });
-                      }
-                    }}
-                    data-testid="select-saved-location"
-                  >
-                    <SelectTrigger className="h-9" data-testid="select-saved-location-trigger">
-                      <SelectValue placeholder="Select a saved location..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedLocations.map((loc: any) => {
-                        const detail = loc.address || loc.city || loc.serviceArea || "";
-                        return (
-                          <SelectItem key={loc.id} value={String(loc.id)} data-testid={`select-location-${loc.id}`}>
-                            <div className="flex flex-col">
-                              <span>{loc.businessName}</span>
-                              {detail && <span className="text-[10px] text-muted-foreground leading-tight">{detail}</span>}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              {(!savedLocations || savedLocations.length === 0) && (
-                <div className="text-xs text-muted-foreground pb-3 border-b border-border/50 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span>No saved locations.</span>
-                  <Link href="/locations" className="text-primary hover:underline" data-testid="link-add-locations">
-                    Add locations
-                  </Link>
-                </div>
-              )}
-              <div className="space-y-3">
-                <Label className="text-xs font-medium">Search Business (Google)</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={businessQuery}
-                      onChange={e => { setBusinessQuery(e.target.value); if (businessSearchError) setBusinessSearchError(""); }}
-                      onKeyDown={e => e.key === "Enter" && searchBusiness()}
-                      placeholder="Business name + city, or Google Maps URL..."
-                      className="pl-9"
-                      aria-invalid={!!businessSearchError}
-                      aria-describedby={businessSearchError ? "business-search-error" : undefined}
-                      data-testid="input-business-search"
-                    />
-                  </div>
-                  <Button
-                    onClick={searchBusiness}
-                    disabled={businessSearching || !businessQuery.trim()}
-                    size="sm"
-                    data-testid="button-business-search"
-                  >
-                    {businessSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-                  </Button>
-                </div>
-                {businessSearchError && (
-                  <p id="business-search-error" role="alert" className="text-xs text-destructive" data-testid="text-business-search-error">{businessSearchError}</p>
-                )}
-                {businessResults.length > 0 && (
-                  <div className="space-y-2" data-testid="business-results">
-                    {businessResults.map((r: any, i: number) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => selectBusinessResult(r)}
-                        className="w-full text-left p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors"
-                        data-testid={`button-business-result-${i}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          <Building2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-sm truncate">{r.companyName}</p>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                              <p className="text-xs text-muted-foreground truncate">
-                                {r.address
-                                  ? r.address
-                                  : r.serviceAreaBusiness
-                                    ? "Service-area business — no public address"
-                                    : r.needsManualAddress
-                                      ? "Add address manually below"
-                                      : "Location unknown"}
-                              </p>
-                            </div>
-                            {(r.phone || r.website) && (
-                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                                {[r.phone, r.website?.replace(/^https?:\/\//, "").replace(/\/$/, "")].filter(Boolean).join(" · ")}
-                              </p>
-                            )}
-                            {r.category && (
-                              <p className="text-xs text-muted-foreground mt-0.5 truncate">{r.category}</p>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                    {businessNextPageToken && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-1"
-                        onClick={loadMoreBusinessResults}
-                        disabled={businessLoadingMore}
-                        data-testid="button-load-more-results"
-                      >
-                        {businessLoadingMore ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : null}
-                        {businessLoadingMore ? "Loading..." : "Show More Results"}
-                      </Button>
-                    )}
-                  </div>
-                )}
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-                  <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or enter manually</span></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="companyName">Company Name</Label>
-                  <Input
-                    id="companyName"
-                    value={businessInfo.companyName}
-                    onChange={e => updateBusiness("companyName", e.target.value)}
-                    placeholder="Acme Roofing"
-                    data-testid="input-company-name"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={businessInfo.phone}
-                    onChange={e => updateBusiness("phone", e.target.value)}
-                    placeholder="(555) 123-4567"
-                    data-testid="input-phone"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs" htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    value={businessInfo.address}
-                    onChange={e => updateBusiness("address", e.target.value)}
-                    placeholder="123 Main St"
-                    data-testid="input-address"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={businessInfo.city}
-                    onChange={e => updateBusiness("city", e.target.value)}
-                    placeholder="Seattle"
-                    data-testid="input-city"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="countyState">County / State</Label>
-                  <Input
-                    id="countyState"
-                    value={businessInfo.countyState}
-                    onChange={e => updateBusiness("countyState", e.target.value)}
-                    placeholder="King County, WA"
-                    data-testid="input-county-state"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    value={businessInfo.website}
-                    onChange={e => updateBusiness("website", e.target.value)}
-                    placeholder="https://acmeroofing.com"
-                    data-testid="input-website"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs" htmlFor="services">Services</Label>
-                  <Input
-                    id="services"
-                    value={businessInfo.services}
-                    onChange={e => updateBusiness("services", e.target.value)}
-                    placeholder="Roofing, Siding"
-                    data-testid="input-services"
-                  />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs" htmlFor="copyright">Copyright Text</Label>
-                  <Input
-                    id="copyright"
-                    value={businessInfo.copyright}
-                    onChange={e => updateBusiness("copyright", e.target.value)}
-                    placeholder="© 2026 Acme Roofing"
-                    data-testid="input-copyright"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card className="p-5 space-y-4 animate-in-delay-1 overflow-visible" style={{ boxShadow: "var(--shadow-sm)" }} data-testid="card-service-areas">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Service Area Cities</span>
-              <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Optional</span>
-            </div>
-            <Switch
-              checked={serviceAreaEnabled}
-              onCheckedChange={setServiceAreaEnabled}
-              data-testid="switch-service-area-enabled"
-            />
-          </div>
-
-          {!serviceAreaEnabled && (
-            <p className="text-xs text-muted-foreground">
-              Turn on to auto-discover surrounding cities, towns, neighborhoods, or counties around your business address and embed them into photo SEO data.
-            </p>
-          )}
-
-          {serviceAreaEnabled && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-xs">Area Types</Label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: "locality", label: "Cities & Towns" },
-                    { id: "neighborhood", label: "Neighborhoods" },
-                    { id: "administrative_area_level_3", label: "Townships" },
-                    { id: "administrative_area_level_2", label: "Counties" },
-                  ].map(t => {
-                    const active = serviceAreaTypes.has(t.id);
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => {
-                          setServiceAreaTypes(prev => {
-                            const next = new Set(prev);
-                            if (next.has(t.id)) {
-                              if (next.size > 1) next.delete(t.id);
-                            } else {
-                              next.add(t.id);
-                            }
-                            return next;
-                          });
-                          setServiceAreaResults([]);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background text-muted-foreground border-border hover-elevate"
-                        }`}
-                        data-testid={`chip-area-type-${t.id}`}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                Auto-discover the area types you've selected around your business address. Each photo's filename, description, EXIF tags, and SEO keywords rotate through your chosen areas.
-              </p>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Radius: <span className="font-semibold text-foreground">{serviceAreaRadius} miles</span></Label>
-              <span className="text-[11px] text-muted-foreground">5–50 mi</span>
-            </div>
-            <Slider
-              value={[serviceAreaRadius]}
-              onValueChange={(v) => setServiceAreaRadius(v[0])}
-              min={5}
-              max={50}
-              step={5}
-              data-testid="slider-service-radius"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Search Density</Label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { id: "low", label: "Low", desc: "Big cities only, fast" },
-                { id: "medium", label: "Medium", desc: "Most cities & towns" },
-                { id: "high", label: "High", desc: "Small enclaves" },
-                { id: "max", label: "Max", desc: "Tiny neighborhoods" },
-              ].map(d => {
-                const active = serviceAreaDensity === d.id;
-                return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => setServiceAreaDensity(d.id as any)}
-                    title={d.desc}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      active
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background text-muted-foreground border-border hover-elevate"
-                    }`}
-                    data-testid={`chip-density-${d.id}`}
-                  >
-                    {d.label}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Higher density catches small embedded cities (Highland Park, University Park) but uses more API calls.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={async () => {
-                let lat = businessInfo.lat ?? null;
-                let lon = businessInfo.lon ?? null;
-                if ((!lat || !lon) && businessInfo.address) {
-                  try {
-                    const geoAddress = [businessInfo.address, businessInfo.city, businessInfo.countyState].filter(Boolean).join(", ");
-                    const geoRes = await apiRequest("POST", "/api/media/geocode", { address: geoAddress });
-                    const geoData = await geoRes.json();
-                    if (geoData.lat && geoData.lon) {
-                      lat = geoData.lat; lon = geoData.lon;
-                      setBusinessInfo(prev => ({ ...prev, lat, lon }));
-                    }
-                  } catch {}
-                }
-                if (!lat || !lon) {
-                  toast({ title: "Address required", description: "Enter a business address first.", variant: "destructive" });
-                  return;
-                }
-                setServiceAreaLoading(true);
-                try {
-                  const res = await apiRequest("POST", "/api/photos/nearby-cities", { lat, lon, radiusMiles: serviceAreaRadius, types: Array.from(serviceAreaTypes), density: serviceAreaDensity });
-                  const data = await res.json();
-                  const results = (data.results || []) as { name: string; state: string; distance: number }[];
-                  setServiceAreaResults(results);
-                  setSelectedServiceAreas(new Set(results.map(serviceAreaKey)));
-                  toast({ title: `Found ${results.length} areas`, description: `Within ${serviceAreaRadius} miles of your address.` });
-                } catch (err: any) {
-                  toast({ title: "Lookup failed", description: apiErrorMessage(err, "Could not fetch nearby areas"), variant: "destructive" });
-                } finally {
-                  setServiceAreaLoading(false);
-                }
-              }}
-              disabled={serviceAreaLoading}
-              data-testid="button-find-service-areas"
-            >
-              {serviceAreaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-              {serviceAreaResults.length > 0 ? "Refresh Areas" : "Find Nearby Areas"}
-            </Button>
-            {serviceAreaResults.length > 0 && (
-              <>
-                <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set(serviceAreaResults.map(serviceAreaKey)))} data-testid="button-select-all-areas">
-                  Select All
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set())} data-testid="button-clear-areas">
-                  Clear
-                </Button>
-              </>
+                  }
+                }}
+                data-testid="button-clear-business"
+              >
+                Clear
+              </span>
+            )}
+            {businessCollapsed ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronUp className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
+        </button>
 
-          <div className="space-y-2 pt-2 border-t border-border">
-            <Label className="text-xs">Or add specific cities manually</Label>
-            <div className="flex gap-2">
-              <Input
-                value={manualCityInput}
-                onChange={(e) => setManualCityInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") { e.preventDefault(); addManualCities(); }
-                }}
-                placeholder="e.g. Plano, TX, Frisco, TX, McKinney, TX"
-                className="h-8 text-xs"
-                data-testid="input-manual-cities"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={addManualCities}
-                disabled={!manualCityInput.trim()}
-                data-testid="button-add-manual-cities"
-                className="h-8"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Comma-separated. Pairs like "City, ST" are detected automatically. State-less entries (just "Plano") use your business state.
-            </p>
-          </div>
-
-          {serviceAreaResults.length > 0 && (() => {
-            const filterText = serviceAreaNameFilter.trim().toLowerCase();
-            const filtered = filterText
-              ? serviceAreaResults.filter(r => r.name.toLowerCase().includes(filterText) || r.state.toLowerCase().includes(filterText))
-              : serviceAreaResults;
-            return (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
+        {!businessCollapsed && (
+          <div className="mt-4 space-y-4">
+            {savedLocations && savedLocations.length > 0 && (
+              <div className="space-y-2 pb-3 border-b border-border/50">
+                <Label className="text-xs font-medium flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Load from saved location
+                </Label>
+                <Select
+                  onValueChange={(val) => {
+                    const loc = savedLocations.find((l: any) => String(l.id) === val);
+                    if (loc) {
+                      setBusinessInfo({
+                        companyName: loc.businessName || "",
+                        phone: loc.phone || "",
+                        address: loc.address || "",
+                        city: loc.city || "",
+                        countyState: [loc.state].filter(Boolean).join(", "),
+                        website: loc.website || "",
+                        services: (loc.categories || []).join(", "),
+                        copyright: `© ${new Date().getFullYear()} ${loc.businessName || ""}`,
+                        lat: loc.lat ?? null,
+                        lon: loc.lon ?? null,
+                      });
+                      if (loc.businessName) setWatermarkText(loc.businessName);
+                      setBusinessCollapsed(true);
+                      toast({ title: "Location loaded", description: `${loc.businessName} info applied.` });
+                    }
+                  }}
+                  data-testid="select-saved-location"
+                >
+                  <SelectTrigger className="h-10" data-testid="select-saved-location-trigger">
+                    <SelectValue placeholder="Select a saved location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {savedLocations.map((loc: any) => {
+                      const detail = loc.address || loc.city || loc.serviceArea || "";
+                      return (
+                        <SelectItem key={loc.id} value={String(loc.id)} data-testid={`select-location-${loc.id}`}>
+                          <div className="flex flex-col">
+                            <span>{loc.businessName}</span>
+                            {detail && <span className="text-[10px] text-muted-foreground leading-tight">{detail}</span>}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(!savedLocations || savedLocations.length === 0) && (
+              <div className="text-xs text-muted-foreground pb-3 border-b border-border/50 flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>No saved locations.</span>
+                <Link href="/locations" className="text-primary hover:underline" data-testid="link-add-locations">
+                  Add locations
+                </Link>
+              </div>
+            )}
+            <div className="space-y-3">
+              <Label className="text-xs font-medium">Search business (Google)</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    value={serviceAreaNameFilter}
-                    onChange={(e) => setServiceAreaNameFilter(e.target.value)}
-                    placeholder="Filter areas by name…"
-                    className="h-8 text-xs"
-                    data-testid="input-area-filter"
+                    value={businessQuery}
+                    onChange={e => { setBusinessQuery(e.target.value); if (businessSearchError) setBusinessSearchError(""); }}
+                    onKeyDown={e => e.key === "Enter" && searchBusiness()}
+                    placeholder="Business name + city, or Google Maps URL..."
+                    className="pl-9"
+                    aria-invalid={!!businessSearchError}
+                    aria-describedby={businessSearchError ? "business-search-error" : undefined}
+                    data-testid="input-business-search"
                   />
-                  {serviceAreaNameFilter && (
-                    <Button variant="ghost" size="sm" onClick={() => setServiceAreaNameFilter("")} data-testid="button-clear-area-filter" className="h-8">
-                      <X className="h-3.5 w-3.5" />
+                </div>
+                <Button
+                  onClick={searchBusiness}
+                  disabled={businessSearching || !businessQuery.trim()}
+                  size="sm"
+                  variant="outline"
+                  data-testid="button-business-search"
+                >
+                  {businessSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                </Button>
+              </div>
+              {businessSearchError && (
+                <p id="business-search-error" role="alert" className="text-xs text-destructive" data-testid="text-business-search-error">{businessSearchError}</p>
+              )}
+              {businessResults.length > 0 && (
+                <div className="space-y-2" data-testid="business-results">
+                  {businessResults.map((r: any, i: number) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => selectBusinessResult(r)}
+                      className="w-full text-left p-3 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors"
+                      data-testid={`button-business-result-${i}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Building2 className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{r.companyName}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <p className="text-xs text-muted-foreground truncate">
+                              {r.address
+                                ? r.address
+                                : r.serviceAreaBusiness
+                                  ? "Service-area business — no public address"
+                                  : r.needsManualAddress
+                                    ? "Add address manually below"
+                                    : "Location unknown"}
+                            </p>
+                          </div>
+                          {(r.phone || r.website) && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {[r.phone, r.website?.replace(/^https?:\/\//, "").replace(/\/$/, "")].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                          {r.category && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{r.category}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {businessNextPageToken && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-1"
+                      onClick={loadMoreBusinessResults}
+                      disabled={businessLoadingMore}
+                      data-testid="button-load-more-results"
+                    >
+                      {businessLoadingMore ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : null}
+                      {businessLoadingMore ? "Loading..." : "Show more results"}
                     </Button>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {selectedServiceAreas.size} of {serviceAreaResults.length} selected
-                  {filterText && ` · showing ${filtered.length}`}
-                </div>
-                <div className="max-h-64 overflow-y-auto rounded-md border border-border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                  {filtered.map((r, i) => {
-                    const key = serviceAreaKey(r);
-                    const checked = selectedServiceAreas.has(key);
-                    return (
-                      <label key={`${key}-${i}`} className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer" data-testid={`label-area-${i}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            setSelectedServiceAreas(prev => {
-                              const next = new Set(prev);
-                              if (e.target.checked) next.add(key); else next.delete(key);
-                              return next;
-                            });
-                          }}
-                          data-testid={`checkbox-area-${i}`}
-                        />
-                        <span className="flex-1 truncate">{r.name}{r.state ? `, ${r.state}` : ""}</span>
-                        {r.distance != null && (
-                          <span className="text-[11px] text-muted-foreground shrink-0">{r.distance} mi</span>
-                        )}
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-            </>
-          )}
-        </Card>
-
-        <Card className="p-5 space-y-4 animate-in-delay-1 overflow-visible" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Category & Keywords</span>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Category</Label>
-            <div className="relative" data-testid="select-category">
-              <button
-                ref={categoryBtnRef}
-                type="button"
-                aria-haspopup="dialog"
-                aria-expanded={categoryDropdownOpen}
-                onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
-                className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                <span className={categories.length === 0 ? "text-muted-foreground" : "truncate"}>
-                  {categories.length === 0 ? "Select categories" : categories.join(", ")}
-                </span>
-                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-              </button>
-              {categoryDropdownOpen && createPortal(
-                <>
-                  <div className="fixed inset-0" style={{ zIndex: 99998 }} onClick={() => { setCategoryDropdownOpen(false); setCategorySearch(""); }} />
-                  <div className="fixed rounded-md border bg-popover shadow-lg flex flex-col" style={{ zIndex: 99999, width: categoryBtnRef.current?.offsetWidth, top: (categoryBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4, left: categoryBtnRef.current?.getBoundingClientRect().left, maxHeight: 360 }}>
-                    <div className="p-2 border-b">
-                      <Input
-                        autoFocus
-                        value={categorySearch}
-                        onChange={(e) => setCategorySearch(e.target.value)}
-                        placeholder="Search Google categories..."
-                        className="h-8 text-xs"
-                        data-testid="input-category-search"
-                      />
-                    </div>
-                    <div className="overflow-y-auto p-1 flex-1">
-                      {(() => {
-                        const q = categorySearch.trim().toLowerCase();
-                        const allConstruction = Object.keys(categoryKeywords);
-                        const modifierSet = new Set<string>(MODIFIER_CATEGORIES as readonly string[]);
-                        const buildingTypes = allConstruction.filter(c => modifierSet.has(c));
-                        const trades = allConstruction.filter(c => !modifierSet.has(c));
-                        const constructionSet = new Set(allConstruction);
-                        const otherAll = GBP_CATEGORIES.filter(c => !constructionSet.has(c));
-                        const filterFn = (c: string) => !q || c.toLowerCase().includes(q);
-                        const filteredBuildingTypes = buildingTypes.filter(filterFn);
-                        const filteredTrades = trades.filter(filterFn);
-                        const filteredOther = otherAll.filter(filterFn).slice(0, q ? 200 : 100);
-                        const renderRow = (cat: string, hasKw: boolean) => (
-                          <label
-                            key={cat}
-                            className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                            data-testid={`category-option-${cat.toLowerCase().replace(/\s+/g, "-")}`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={categories.includes(cat)}
-                              onChange={() => {
-                                setCategories(prev => {
-                                  const next = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
-                                  const allKws = [...new Set(next.flatMap(c => categoryKeywords[c] ?? []))];
-                                  setSelectedKeywords(prevSel => {
-                                    const merged = new Set(prevSel);
-                                    allKws.forEach(k => merged.add(k));
-                                    return merged;
-                                  });
-                                  setRemovedKeywords(new Set());
-                                  return next;
-                                });
-                              }}
-                              className="accent-primary"
-                            />
-                            <span className="flex-1 truncate">{cat}</span>
-                            {hasKw && <span className="text-[10px] uppercase tracking-wide text-muted-foreground">auto kw</span>}
-                          </label>
-                        );
-                        return (
-                          <>
-                            {filteredBuildingTypes.length > 0 && (
-                              <>
-                                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Building Type (combine with a trade)</div>
-                                {filteredBuildingTypes.map(c => renderRow(c, true))}
-                                <div className="my-1 border-t border-border" />
-                              </>
-                            )}
-                            {filteredTrades.length > 0 && (
-                              <>
-                                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Trade / Service (auto keywords)</div>
-                                {filteredTrades.map(c => renderRow(c, true))}
-                              </>
-                            )}
-                            {filteredOther.length > 0 && (
-                              <>
-                                <div className="my-1 border-t border-border" />
-                                <div className="px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">All Google categories</div>
-                                {filteredOther.map(c => renderRow(c, false))}
-                                {!q && otherAll.length > filteredOther.length && (
-                                  <div className="px-2 py-1.5 text-[11px] text-muted-foreground italic">
-                                    Showing first {filteredOther.length} of {otherAll.length}. Type to search…
-                                  </div>
-                                )}
-                              </>
-                            )}
-                            {filteredBuildingTypes.length === 0 && filteredTrades.length === 0 && filteredOther.length === 0 && (
-                              <div className="px-2 py-3 text-xs text-muted-foreground text-center">No categories match "{q}"</div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </>,
-                document.body
               )}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or enter manually</span></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="companyName">Company name</Label>
+                <Input
+                  id="companyName"
+                  value={businessInfo.companyName}
+                  onChange={e => updateBusiness("companyName", e.target.value)}
+                  placeholder="Acme Roofing"
+                  data-testid="input-company-name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  value={businessInfo.phone}
+                  onChange={e => updateBusiness("phone", e.target.value)}
+                  placeholder="(555) 123-4567"
+                  data-testid="input-phone"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs" htmlFor="address">Address</Label>
+                <Input
+                  id="address"
+                  value={businessInfo.address}
+                  onChange={e => updateBusiness("address", e.target.value)}
+                  placeholder="123 Main St"
+                  data-testid="input-address"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={businessInfo.city}
+                  onChange={e => updateBusiness("city", e.target.value)}
+                  placeholder="Seattle"
+                  data-testid="input-city"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="countyState">County / state</Label>
+                <Input
+                  id="countyState"
+                  value={businessInfo.countyState}
+                  onChange={e => updateBusiness("countyState", e.target.value)}
+                  placeholder="King County, WA"
+                  data-testid="input-county-state"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={businessInfo.website}
+                  onChange={e => updateBusiness("website", e.target.value)}
+                  placeholder="https://acmeroofing.com"
+                  data-testid="input-website"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs" htmlFor="services">Services</Label>
+                <Input
+                  id="services"
+                  value={businessInfo.services}
+                  onChange={e => updateBusiness("services", e.target.value)}
+                  placeholder="Roofing, Siding"
+                  data-testid="input-services"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs" htmlFor="copyright">Copyright text</Label>
+                <Input
+                  id="copyright"
+                  value={businessInfo.copyright}
+                  onChange={e => updateBusiness("copyright", e.target.value)}
+                  placeholder="© 2026 Acme Roofing"
+                  data-testid="input-copyright"
+                />
+              </div>
             </div>
           </div>
+        )}
+      </Section>
 
-          {(keywords.length > 0 || customKeywords.length > 0) && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs">Keywords</Label>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    onClick={selectAllKeywords}
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid="button-select-all-keywords"
-                  >
-                    Select all
-                  </button>
-                  <span className="text-muted-foreground/40">|</span>
-                  <button
-                    type="button"
-                    onClick={clearKeywords}
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                    data-testid="button-clear-keywords"
-                  >
-                    Clear
-                  </button>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1 max-h-52 overflow-y-auto">
-                {allKeywords.map(kw => {
-                  const isCustom = customKeywords.includes(kw);
+      <Section
+        testId="card-service-areas"
+        title={
+          <span className="flex items-center gap-2">
+            Service area cities
+            <Badge variant="secondary" className="text-[10px] font-normal">Optional</Badge>
+          </span>
+        }
+        actions={
+          <Switch
+            checked={serviceAreaEnabled}
+            onCheckedChange={setServiceAreaEnabled}
+            data-testid="switch-service-area-enabled"
+          />
+        }
+      >
+        {!serviceAreaEnabled && (
+          <p className="text-xs text-muted-foreground">
+            Turn on to auto-discover surrounding cities, towns, neighborhoods, or counties around your business address and embed them into photo SEO data.
+          </p>
+        )}
+
+        {serviceAreaEnabled && (
+          <>
+            <div className="space-y-2">
+              <Label className="text-xs">Area types</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "locality", label: "Cities & towns" },
+                  { id: "neighborhood", label: "Neighborhoods" },
+                  { id: "administrative_area_level_3", label: "Townships" },
+                  { id: "administrative_area_level_2", label: "Counties" },
+                ].map(t => {
+                  const active = serviceAreaTypes.has(t.id);
                   return (
-                    <label
-                      key={kw}
-                      className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer group transition-colors"
-                      data-testid={`keyword-row-${kw.toLowerCase().replace(/\s+/g, "-")}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedKeywords.has(kw)}
-                        onChange={() => toggleKeyword(kw)}
-                        className="accent-primary h-3.5 w-3.5 shrink-0"
-                        data-testid={`checkbox-keyword-${kw.toLowerCase().replace(/\s+/g, "-")}`}
-                      />
-                      <span className="text-xs flex-1">{kw}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (isCustom) {
-                            setCustomKeywords(prev => prev.filter(k => k !== kw));
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setServiceAreaTypes(prev => {
+                          const next = new Set(prev);
+                          if (next.has(t.id)) {
+                            if (next.size > 1) next.delete(t.id);
                           } else {
-                            setRemovedKeywords(prev => new Set([...prev, kw]));
+                            next.add(t.id);
                           }
-                          setSelectedKeywords(prev => { const next = new Set(prev); next.delete(kw); return next; });
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                        data-testid={`button-remove-keyword-${kw.toLowerCase().replace(/\s+/g, "-")}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </label>
+                          return next;
+                        });
+                        setServiceAreaResults([]);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-background text-muted-foreground border-border hover-elevate"
+                      }`}
+                      data-testid={`chip-area-type-${t.id}`}
+                    >
+                      {t.label}
+                    </button>
                   );
                 })}
               </div>
-              <div className="flex gap-2">
-                <Input
-                  value={newCustomKeyword}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNewCustomKeyword(val);
-                    if (val.includes(",")) {
-                      const trailing = val.endsWith(",");
-                      addKeywordsFromInput(val);
-                      if (!trailing) {
-                        const last = val.split(",").pop()?.trim() ?? "";
-                        if (last) setNewCustomKeyword(last);
-                      }
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newCustomKeyword.trim()) {
-                      e.preventDefault();
-                      addKeywordsFromInput(newCustomKeyword);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData("text");
-                    if (text.includes(",") || text.includes("\n")) {
-                      e.preventDefault();
-                      addKeywordsFromInput((newCustomKeyword + " " + text).trim());
-                    }
-                  }}
-                  placeholder="Add keywords (paste comma-separated, e.g. Floor Installation, Tile Repair)"
-                  className="text-xs h-8"
-                  data-testid="input-custom-keyword"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 shrink-0"
-                  disabled={!newCustomKeyword.trim()}
-                  onClick={() => addKeywordsFromInput(newCustomKeyword)}
-                  data-testid="button-add-custom-keyword"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add
-                </Button>
-              </div>
             </div>
-          )}
 
-          {keywords.length === 0 && customKeywords.length === 0 && categories.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Auto-discover the area types you've selected around your business address. Each photo's filename, description, EXIF tags, and SEO keywords rotate through your chosen areas.
+            </p>
+
             <div className="space-y-2">
-              <Label className="text-xs">Keywords</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newCustomKeyword}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNewCustomKeyword(val);
-                    if (val.includes(",")) {
-                      const trailing = val.endsWith(",");
-                      addKeywordsFromInput(val);
-                      if (!trailing) {
-                        const last = val.split(",").pop()?.trim() ?? "";
-                        if (last) setNewCustomKeyword(last);
-                      }
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && newCustomKeyword.trim()) {
-                      e.preventDefault();
-                      addKeywordsFromInput(newCustomKeyword);
-                    }
-                  }}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData("text");
-                    if (text.includes(",") || text.includes("\n")) {
-                      e.preventDefault();
-                      addKeywordsFromInput((newCustomKeyword + " " + text).trim());
-                    }
-                  }}
-                  placeholder="Add keywords (paste comma-separated, e.g. Floor Installation, Tile Repair)"
-                  className="text-xs h-8"
-                  data-testid="input-custom-keyword-empty"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 shrink-0"
-                  disabled={!newCustomKeyword.trim()}
-                  onClick={() => addKeywordsFromInput(newCustomKeyword)}
-                  data-testid="button-add-custom-keyword-empty"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add
-                </Button>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Radius: <span className="font-semibold text-foreground">{serviceAreaRadius} miles</span></Label>
+                <span className="text-[11px] text-muted-foreground">5–50 mi</span>
               </div>
+              <Slider
+                value={[serviceAreaRadius]}
+                onValueChange={(v) => setServiceAreaRadius(v[0])}
+                min={5}
+                max={50}
+                step={5}
+                data-testid="slider-service-radius"
+              />
             </div>
-          )}
-        </Card>
 
-        <Card className="p-5 space-y-4 animate-in-delay-2" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Camera className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Photos</span>
-              {uploadedFiles.length > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {uploadedFiles.length} file{uploadedFiles.length !== 1 ? "s" : ""}
-                </span>
+            <div className="space-y-2">
+              <Label className="text-xs">Search density</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "low", label: "Low", desc: "Big cities only, fast" },
+                  { id: "medium", label: "Medium", desc: "Most cities & towns" },
+                  { id: "high", label: "High", desc: "Small enclaves" },
+                  { id: "max", label: "Max", desc: "Tiny neighborhoods" },
+                ].map(d => {
+                  const active = serviceAreaDensity === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setServiceAreaDensity(d.id as any)}
+                      title={d.desc}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-primary/10 text-primary border-primary/30"
+                          : "bg-background text-muted-foreground border-border hover-elevate"
+                      }`}
+                      data-testid={`chip-density-${d.id}`}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Higher density catches small embedded cities (Highland Park, University Park) but uses more API calls.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  let lat = businessInfo.lat ?? null;
+                  let lon = businessInfo.lon ?? null;
+                  if ((!lat || !lon) && businessInfo.address) {
+                    try {
+                      const geoAddress = [businessInfo.address, businessInfo.city, businessInfo.countyState].filter(Boolean).join(", ");
+                      const geoRes = await apiRequest("POST", "/api/media/geocode", { address: geoAddress });
+                      const geoData = await geoRes.json();
+                      if (geoData.lat && geoData.lon) {
+                        lat = geoData.lat; lon = geoData.lon;
+                        setBusinessInfo(prev => ({ ...prev, lat, lon }));
+                      }
+                    } catch {}
+                  }
+                  if (!lat || !lon) {
+                    toast({ title: "Address required", description: "Enter a business address first.", variant: "destructive" });
+                    return;
+                  }
+                  setServiceAreaLoading(true);
+                  try {
+                    const res = await apiRequest("POST", "/api/photos/nearby-cities", { lat, lon, radiusMiles: serviceAreaRadius, types: Array.from(serviceAreaTypes), density: serviceAreaDensity });
+                    const data = await res.json();
+                    const results = (data.results || []) as { name: string; state: string; distance: number }[];
+                    setServiceAreaResults(results);
+                    setSelectedServiceAreas(new Set(results.map(serviceAreaKey)));
+                    toast({ title: `Found ${results.length} areas`, description: `Within ${serviceAreaRadius} miles of your address.` });
+                  } catch (err: any) {
+                    toast({ title: "Lookup failed", description: apiErrorMessage(err, "Could not fetch nearby areas"), variant: "destructive" });
+                  } finally {
+                    setServiceAreaLoading(false);
+                  }
+                }}
+                disabled={serviceAreaLoading}
+                data-testid="button-find-service-areas"
+              >
+                {serviceAreaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+                {serviceAreaResults.length > 0 ? "Refresh areas" : "Find nearby areas"}
+              </Button>
+              {serviceAreaResults.length > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set(serviceAreaResults.map(serviceAreaKey)))} data-testid="button-select-all-areas">
+                    Select all
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedServiceAreas(new Set())} data-testid="button-clear-areas">
+                    Clear
+                  </Button>
+                </>
               )}
             </div>
-            {uploadedFiles.length > 0 && (
-              <button
-                type="button"
-                onClick={clearAllFiles}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                data-testid="button-clear-photos"
-              >
-                <Trash2 className="h-3 w-3" />
-                Clear all
-              </button>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <Label className="text-xs">Or add specific cities manually</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={manualCityInput}
+                  onChange={(e) => setManualCityInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); addManualCities(); }
+                  }}
+                  placeholder="e.g. Plano, TX, Frisco, TX, McKinney, TX"
+                  className="h-9 text-xs"
+                  data-testid="input-manual-cities"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addManualCities}
+                  disabled={!manualCityInput.trim()}
+                  data-testid="button-add-manual-cities"
+                  className="h-9"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Comma-separated. Pairs like "City, ST" are detected automatically. State-less entries (just "Plano") use your business state.
+              </p>
+            </div>
+
+            {serviceAreaResults.length > 0 && (() => {
+              const filterText = serviceAreaNameFilter.trim().toLowerCase();
+              const filtered = filterText
+                ? serviceAreaResults.filter(r => r.name.toLowerCase().includes(filterText) || r.state.toLowerCase().includes(filterText))
+                : serviceAreaResults;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={serviceAreaNameFilter}
+                      onChange={(e) => setServiceAreaNameFilter(e.target.value)}
+                      placeholder="Filter areas by name…"
+                      className="h-9 text-xs"
+                      data-testid="input-area-filter"
+                    />
+                    {serviceAreaNameFilter && (
+                      <Button variant="ghost" size="sm" onClick={() => setServiceAreaNameFilter("")} data-testid="button-clear-area-filter" className="h-9">
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {selectedServiceAreas.size} of {serviceAreaResults.length} selected
+                    {filterText && ` · showing ${filtered.length}`}
+                  </div>
+                  <div className="max-h-64 overflow-y-auto rounded-md border border-border p-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    {filtered.map((r, i) => {
+                      const key = serviceAreaKey(r);
+                      const checked = selectedServiceAreas.has(key);
+                      return (
+                        <label key={`${key}-${i}`} className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer" data-testid={`label-area-${i}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setSelectedServiceAreas(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(key); else next.delete(key);
+                                return next;
+                              });
+                            }}
+                            data-testid={`checkbox-area-${i}`}
+                          />
+                          <span className="flex-1 truncate">{r.name}{r.state ? `, ${r.state}` : ""}</span>
+                          {r.distance != null && (
+                            <span className="text-[11px] text-muted-foreground shrink-0">{r.distance} mi</span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+      </Section>
+
+      <Section title="Category & keywords">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Category</Label>
+          <div className="relative" data-testid="select-category">
+            <button
+              ref={categoryBtnRef}
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={categoryDropdownOpen}
+              onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            >
+              <span className={categories.length === 0 ? "text-muted-foreground" : "truncate"}>
+                {categories.length === 0 ? "Select categories" : categories.join(", ")}
+              </span>
+              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+            </button>
+            {categoryDropdownOpen && createPortal(
+              <>
+                <div className="fixed inset-0" style={{ zIndex: 99998 }} onClick={() => { setCategoryDropdownOpen(false); setCategorySearch(""); }} />
+                <div className="fixed rounded-md border bg-popover shadow-lg flex flex-col" style={{ zIndex: 99999, width: categoryBtnRef.current?.offsetWidth, top: (categoryBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 4, left: categoryBtnRef.current?.getBoundingClientRect().left, maxHeight: 360 }}>
+                  <div className="p-2 border-b">
+                    <Input
+                      autoFocus
+                      value={categorySearch}
+                      onChange={(e) => setCategorySearch(e.target.value)}
+                      placeholder="Search Google categories..."
+                      className="h-8 text-xs"
+                      data-testid="input-category-search"
+                    />
+                  </div>
+                  <div className="overflow-y-auto p-1 flex-1">
+                    {(() => {
+                      const q = categorySearch.trim().toLowerCase();
+                      const allConstruction = Object.keys(categoryKeywords);
+                      const modifierSet = new Set<string>(MODIFIER_CATEGORIES as readonly string[]);
+                      const buildingTypes = allConstruction.filter(c => modifierSet.has(c));
+                      const trades = allConstruction.filter(c => !modifierSet.has(c));
+                      const constructionSet = new Set(allConstruction);
+                      const otherAll = GBP_CATEGORIES.filter(c => !constructionSet.has(c));
+                      const filterFn = (c: string) => !q || c.toLowerCase().includes(q);
+                      const filteredBuildingTypes = buildingTypes.filter(filterFn);
+                      const filteredTrades = trades.filter(filterFn);
+                      const filteredOther = otherAll.filter(filterFn).slice(0, q ? 200 : 100);
+                      const renderRow = (cat: string, hasKw: boolean) => (
+                        <label
+                          key={cat}
+                          className="flex items-center gap-2 px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
+                          data-testid={`category-option-${cat.toLowerCase().replace(/\s+/g, "-")}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={categories.includes(cat)}
+                            onChange={() => {
+                              setCategories(prev => {
+                                const next = prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat];
+                                const allKws = [...new Set(next.flatMap(c => categoryKeywords[c] ?? []))];
+                                setSelectedKeywords(prevSel => {
+                                  const merged = new Set(prevSel);
+                                  allKws.forEach(k => merged.add(k));
+                                  return merged;
+                                });
+                                setRemovedKeywords(new Set());
+                                return next;
+                              });
+                            }}
+                            className="accent-primary"
+                          />
+                          <span className="flex-1 truncate">{cat}</span>
+                          {hasKw && <span className="text-[10px] text-muted-foreground">auto keywords</span>}
+                        </label>
+                      );
+                      return (
+                        <>
+                          {filteredBuildingTypes.length > 0 && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] text-muted-foreground">Building type — combine with a trade</div>
+                              {filteredBuildingTypes.map(c => renderRow(c, true))}
+                              <div className="my-1 border-t border-border" />
+                            </>
+                          )}
+                          {filteredTrades.length > 0 && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] text-muted-foreground">Trade / service (auto keywords)</div>
+                              {filteredTrades.map(c => renderRow(c, true))}
+                            </>
+                          )}
+                          {filteredOther.length > 0 && (
+                            <>
+                              <div className="my-1 border-t border-border" />
+                              <div className="px-2 py-1 text-[10px] text-muted-foreground">All Google categories</div>
+                              {filteredOther.map(c => renderRow(c, false))}
+                              {!q && otherAll.length > filteredOther.length && (
+                                <div className="px-2 py-1.5 text-[11px] text-muted-foreground italic">
+                                  Showing first {filteredOther.length} of {otherAll.length}. Type to search…
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {filteredBuildingTypes.length === 0 && filteredTrades.length === 0 && filteredOther.length === 0 && (
+                            <div className="px-2 py-3 text-xs text-muted-foreground text-center">No categories match "{q}"</div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </>,
+              document.body
             )}
           </div>
+        </div>
 
-          <div
-            onDragOver={e => e.preventDefault()}
-            onDrop={handleFileDrop}
-            className="border-2 border-dashed border-border rounded-md p-8 text-center space-y-3 transition-colors hover:border-muted-foreground/40"
-            data-testid="dropzone-photos"
-          >
-            <Upload className="h-8 w-8 mx-auto text-muted-foreground/40" />
-            <div>
-              <p className="text-sm text-muted-foreground">
-                Drag and drop photos here, or
-              </p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  data-testid="button-browse-files"
+        {(keywords.length > 0 || customKeywords.length > 0) && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs">Keywords</Label>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={selectAllKeywords}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-select-all-keywords"
                 >
-                  <FileImage className="h-3.5 w-3.5 mr-1.5" />
-                  Browse Files
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = "image/jpeg,image/png";
-                    input.capture = "environment";
-                    input.multiple = true;
-                    input.onchange = (e: any) => {
-                      const files = Array.from(e.target.files || []) as File[];
-                      addFiles(files.filter(f => /\.(jpe?g|png)$/i.test(f.name)));
-                    };
-                    input.click();
-                  }}
-                  data-testid="button-camera-capture"
+                  Select all
+                </button>
+                <span className="text-muted-foreground/40">|</span>
+                <button
+                  type="button"
+                  onClick={clearKeywords}
+                  className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                  data-testid="button-clear-keywords"
                 >
-                  <Camera className="h-3.5 w-3.5 mr-1.5" />
-                  Camera
-                </Button>
+                  Clear
+                </button>
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground/60">JPG, JPEG, PNG accepted</p>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
-            multiple
-            onChange={handleFileSelect}
-            className="hidden"
-            data-testid="input-file-upload"
-          />
-
-          {uploadedFiles.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  {uploadedFiles.length} photo{uploadedFiles.length !== 1 ? "s" : ""} — click a photo to preview &amp; edit
-                </p>
-                {uploadedFiles.length > 1 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={autoEnhanceAll}
-                    disabled={enhancingPhotos.size > 0}
-                    className="text-xs h-7"
-                    data-testid="button-auto-enhance-all"
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1 max-h-52 overflow-y-auto">
+              {allKeywords.map(kw => {
+                const isCustom = customKeywords.includes(kw);
+                return (
+                  <label
+                    key={kw}
+                    className="flex items-center gap-2.5 py-1.5 px-2 rounded-md hover:bg-muted/50 cursor-pointer group transition-colors"
+                    data-testid={`keyword-row-${kw.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    {enhancingPhotos.size > 0 ? (
-                      <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Enhancing...</>
-                    ) : (
-                      <><Wand2 className="h-3 w-3 mr-1" /> Auto Enhance All</>
-                    )}
-                  </Button>
-                )}
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {uploadedFiles.map(file => {
-                  const isSelected = selectedPhotoId === file.id;
-                  const f = getPhotoFilter(file.id);
-                  const hasCustomFilter = f.brightness !== 1.0 || f.contrast !== 1.0 || f.saturation !== 1.0;
-                  return (
-                    <div
-                      key={file.id}
-                      className={`relative group rounded-md overflow-visible aspect-square cursor-pointer ring-2 transition-all ${isSelected ? "ring-primary" : "ring-transparent hover:ring-primary/40"}`}
-                      onClick={() => setSelectedPhotoId(isSelected ? null : file.id)}
-                      data-testid={`photo-thumbnail-${file.id}`}
+                    <input
+                      type="checkbox"
+                      checked={selectedKeywords.has(kw)}
+                      onChange={() => toggleKeyword(kw)}
+                      className="accent-primary h-3.5 w-3.5 shrink-0"
+                      data-testid={`checkbox-keyword-${kw.toLowerCase().replace(/\s+/g, "-")}`}
+                    />
+                    <span className="text-xs flex-1">{kw}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isCustom) {
+                          setCustomKeywords(prev => prev.filter(k => k !== kw));
+                        } else {
+                          setRemovedKeywords(prev => new Set([...prev, kw]));
+                        }
+                        setSelectedKeywords(prev => { const next = new Set(prev); next.delete(kw); return next; });
+                      }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      data-testid={`button-remove-keyword-${kw.toLowerCase().replace(/\s+/g, "-")}`}
                     >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={newCustomKeyword}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewCustomKeyword(val);
+                  if (val.includes(",")) {
+                    const trailing = val.endsWith(",");
+                    addKeywordsFromInput(val);
+                    if (!trailing) {
+                      const last = val.split(",").pop()?.trim() ?? "";
+                      if (last) setNewCustomKeyword(last);
+                    }
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCustomKeyword.trim()) {
+                    e.preventDefault();
+                    addKeywordsFromInput(newCustomKeyword);
+                  }
+                }}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData("text");
+                  if (text.includes(",") || text.includes("\n")) {
+                    e.preventDefault();
+                    addKeywordsFromInput((newCustomKeyword + " " + text).trim());
+                  }
+                }}
+                placeholder="Add keywords (paste comma-separated, e.g. Floor Installation, Tile Repair)"
+                className="text-xs h-9"
+                data-testid="input-custom-keyword"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 px-3 shrink-0"
+                disabled={!newCustomKeyword.trim()}
+                onClick={() => addKeywordsFromInput(newCustomKeyword)}
+                data-testid="button-add-custom-keyword"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {keywords.length === 0 && customKeywords.length === 0 && categories.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-xs">Keywords</Label>
+            <div className="flex gap-2">
+              <Input
+                value={newCustomKeyword}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNewCustomKeyword(val);
+                  if (val.includes(",")) {
+                    const trailing = val.endsWith(",");
+                    addKeywordsFromInput(val);
+                    if (!trailing) {
+                      const last = val.split(",").pop()?.trim() ?? "";
+                      if (last) setNewCustomKeyword(last);
+                    }
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newCustomKeyword.trim()) {
+                    e.preventDefault();
+                    addKeywordsFromInput(newCustomKeyword);
+                  }
+                }}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData("text");
+                  if (text.includes(",") || text.includes("\n")) {
+                    e.preventDefault();
+                    addKeywordsFromInput((newCustomKeyword + " " + text).trim());
+                  }
+                }}
+                placeholder="Add keywords (paste comma-separated, e.g. Floor Installation, Tile Repair)"
+                className="text-xs h-9"
+                data-testid="input-custom-keyword-empty"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-9 px-3 shrink-0"
+                disabled={!newCustomKeyword.trim()}
+                onClick={() => addKeywordsFromInput(newCustomKeyword)}
+                data-testid="button-add-custom-keyword-empty"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Photos"
+        actions={
+          uploadedFiles.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearAllFiles}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              data-testid="button-clear-photos"
+            >
+              <Trash2 className="h-3 w-3" />
+              Clear all
+            </button>
+          ) : undefined
+        }
+      >
+        <div
+          onDragOver={e => e.preventDefault()}
+          onDrop={handleFileDrop}
+          className="border-2 border-dashed border-border rounded-xl p-8 text-center space-y-3 transition-colors hover:border-muted-foreground/40"
+          data-testid="dropzone-photos"
+        >
+          <Upload className="h-8 w-8 mx-auto text-muted-foreground/40" />
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Drag and drop photos here, or
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-browse-files"
+              >
+                <FileImage className="h-3.5 w-3.5 mr-1.5" />
+                Browse files
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/jpeg,image/png";
+                  input.capture = "environment";
+                  input.multiple = true;
+                  input.onchange = (e: any) => {
+                    const files = Array.from(e.target.files || []) as File[];
+                    addFiles(files.filter(f => /\.(jpe?g|png)$/i.test(f.name)));
+                  };
+                  input.click();
+                }}
+                data-testid="button-camera-capture"
+              >
+                <Camera className="h-3.5 w-3.5 mr-1.5" />
+                Camera
+              </Button>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground/60">JPG, JPEG, PNG accepted</p>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+          multiple
+          onChange={handleFileSelect}
+          className="hidden"
+          data-testid="input-file-upload"
+        />
+
+        {uploadedFiles.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {uploadedFiles.length} photo{uploadedFiles.length !== 1 ? "s" : ""} — click a photo to preview &amp; edit
+              </p>
+              {uploadedFiles.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={autoEnhanceAll}
+                  disabled={enhancingPhotos.size > 0}
+                  className="text-xs h-8"
+                  data-testid="button-auto-enhance-all"
+                >
+                  {enhancingPhotos.size > 0 ? (
+                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Enhancing...</>
+                  ) : (
+                    <><Wand2 className="h-3 w-3 mr-1" /> Auto enhance all</>
+                  )}
+                </Button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {uploadedFiles.map(file => {
+                const isSelected = selectedPhotoId === file.id;
+                const f = getPhotoFilter(file.id);
+                const hasCustomFilter = f.brightness !== 1.0 || f.contrast !== 1.0 || f.saturation !== 1.0;
+                return (
+                  <div
+                    key={file.id}
+                    className={`relative group rounded-md overflow-visible aspect-square cursor-pointer ring-2 transition-all ${isSelected ? "ring-primary" : "ring-transparent hover:ring-primary/40"}`}
+                    onClick={() => setSelectedPhotoId(isSelected ? null : file.id)}
+                    data-testid={`photo-thumbnail-${file.id}`}
+                  >
+                    <img
+                      src={file.preview}
+                      alt={file.name}
+                      className="w-full h-full object-cover rounded-md"
+                      style={getFilterStyle(file.id)}
+                    />
+                    {/* Remove/expand: always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); removeFile(file.id); if (isSelected) setSelectedPhotoId(null); }}
+                      aria-label={`Remove ${file.name}`}
+                      title="Remove photo"
+                      className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                      data-testid={`button-remove-photo-${file.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    <div className="absolute top-1 left-1 flex items-center gap-1">
+                      {hasCustomFilter && (
+                        <div className="w-2 h-2 rounded-full bg-primary" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setSelectedPhotoId(file.id); }}
+                        aria-label={`Open ${file.name} in the editor`}
+                        title="Open editor"
+                        className="p-1 rounded-full bg-black/50 text-white opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-black/70"
+                        data-testid={`button-expand-photo-${file.id}`}
+                      >
+                        <Maximize2 className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 bg-background/70 px-1 py-0.5 rounded-b-md">
+                      <p className="text-[10px] text-foreground truncate">{file.name}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {selectedPhotoId && (() => {
+              const file = uploadedFiles.find(f => f.id === selectedPhotoId);
+              if (!file) return null;
+              const f = getPhotoFilter(file.id);
+              const currentIdx = uploadedFiles.findIndex(uf => uf.id === selectedPhotoId);
+              const prevPhoto = currentIdx > 0 ? uploadedFiles[currentIdx - 1] : null;
+              const nextPhoto = currentIdx < uploadedFiles.length - 1 ? uploadedFiles[currentIdx + 1] : null;
+              return createPortal(
+                <div className="fixed inset-0 z-[9999] bg-black/90 flex" onClick={() => setSelectedPhotoId(null)} data-testid="modal-photo-editor">
+                  <div className="flex flex-col lg:flex-row w-full h-full" onClick={e => e.stopPropagation()}>
+                    <div className="flex-1 flex items-center justify-center relative p-4 min-h-0">
+                      {prevPhoto && (
+                        <button
+                          onClick={() => setSelectedPhotoId(prevPhoto.id)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors z-10"
+                          data-testid="button-prev-photo"
+                        >
+                          <ChevronDown className="h-5 w-5 -rotate-90" />
+                        </button>
+                      )}
                       <img
                         src={file.preview}
                         alt={file.name}
-                        className="w-full h-full object-cover rounded-md"
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-200"
                         style={getFilterStyle(file.id)}
+                        data-testid="img-photo-preview-large"
                       />
-                      {/* Remove/expand: always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); removeFile(file.id); if (isSelected) setSelectedPhotoId(null); }}
-                        aria-label={`Remove ${file.name}`}
-                        title="Remove photo"
-                        className="absolute top-1 right-1 p-1 rounded-full bg-background/80 text-foreground opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
-                        data-testid={`button-remove-photo-${file.id}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <div className="absolute top-1 left-1 flex items-center gap-1">
-                        {hasCustomFilter && (
-                          <div className="w-2 h-2 rounded-full bg-primary" />
-                        )}
+                      {nextPhoto && (
                         <button
-                          type="button"
-                          onClick={e => { e.stopPropagation(); setSelectedPhotoId(file.id); }}
-                          aria-label={`Open ${file.name} in the editor`}
-                          title="Open editor"
-                          className="p-1 rounded-full bg-black/50 text-white opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-black/70"
-                          data-testid={`button-expand-photo-${file.id}`}
+                          onClick={() => setSelectedPhotoId(nextPhoto.id)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors z-10"
+                          data-testid="button-next-photo"
                         >
-                          <Maximize2 className="h-2.5 w-2.5" />
+                          <ChevronDown className="h-5 w-5 rotate-90" />
                         </button>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-background/70 px-1 py-0.5 rounded-b-md">
-                        <p className="text-[10px] text-foreground truncate">{file.name}</p>
+                      )}
+                      <button
+                        onClick={() => setSelectedPhotoId(null)}
+                        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors lg:hidden"
+                        data-testid="button-close-preview-mobile"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-white text-xs">
+                        {currentIdx + 1} / {uploadedFiles.length} — {file.name}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
 
-              {selectedPhotoId && (() => {
-                const file = uploadedFiles.find(f => f.id === selectedPhotoId);
-                if (!file) return null;
-                const f = getPhotoFilter(file.id);
-                const currentIdx = uploadedFiles.findIndex(uf => uf.id === selectedPhotoId);
-                const prevPhoto = currentIdx > 0 ? uploadedFiles[currentIdx - 1] : null;
-                const nextPhoto = currentIdx < uploadedFiles.length - 1 ? uploadedFiles[currentIdx + 1] : null;
-                return createPortal(
-                  <div className="fixed inset-0 z-[9999] bg-black/90 flex" onClick={() => setSelectedPhotoId(null)} data-testid="modal-photo-editor">
-                    <div className="flex flex-col lg:flex-row w-full h-full" onClick={e => e.stopPropagation()}>
-                      <div className="flex-1 flex items-center justify-center relative p-4 min-h-0">
-                        {prevPhoto && (
-                          <button
-                            onClick={() => setSelectedPhotoId(prevPhoto.id)}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors z-10"
-                            data-testid="button-prev-photo"
-                          >
-                            <ChevronDown className="h-5 w-5 -rotate-90" />
-                          </button>
-                        )}
+                    <div className="w-full lg:w-80 bg-background border-t lg:border-t-0 lg:border-l border-border p-5 space-y-5 overflow-y-auto shrink-0" data-testid="panel-photo-editor">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm">Photo editor</h3>
+                        <button
+                          onClick={() => setSelectedPhotoId(null)}
+                          className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors hidden lg:flex"
+                          data-testid="button-close-editor"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
                         <img
                           src={file.preview}
                           alt={file.name}
-                          className="max-w-full max-h-full object-contain rounded-lg shadow-2xl transition-all duration-200"
+                          className="w-12 h-12 object-cover rounded-md shrink-0"
                           style={getFilterStyle(file.id)}
-                          data-testid="img-photo-preview-large"
                         />
-                        {nextPhoto && (
-                          <button
-                            onClick={() => setSelectedPhotoId(nextPhoto.id)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors z-10"
-                            data-testid="button-next-photo"
-                          >
-                            <ChevronDown className="h-5 w-5 rotate-90" />
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setSelectedPhotoId(null)}
-                          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm flex items-center justify-center text-white transition-colors lg:hidden"
-                          data-testid="button-close-preview-mobile"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1.5 text-white text-xs">
-                          {currentIdx + 1} / {uploadedFiles.length} — {file.name}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{file.name}</p>
+                          <p className="text-[11px] text-muted-foreground">Adjust filters below — preview updates live</p>
                         </div>
                       </div>
 
-                      <div className="w-full lg:w-80 bg-background border-t lg:border-t-0 lg:border-l border-border p-5 space-y-5 overflow-y-auto shrink-0" data-testid="panel-photo-editor">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-semibold text-sm flex items-center gap-2">
-                            <Settings className="h-4 w-4 text-primary" />
-                            Photo Editor
-                          </h3>
-                          <button
-                            onClick={() => setSelectedPhotoId(null)}
-                            className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors hidden lg:flex"
-                            data-testid="button-close-editor"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
-                          <img
-                            src={file.preview}
-                            alt={file.name}
-                            className="w-12 h-12 object-cover rounded-md shrink-0"
-                            style={getFilterStyle(file.id)}
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs font-medium">Brightness</Label>
+                            <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.brightness.toFixed(2)}</span>
+                          </div>
+                          <Slider
+                            value={[f.brightness]}
+                            onValueChange={([v]) => updatePhotoFilter(file.id, "brightness", v)}
+                            min={0.5} max={2.0} step={0.05}
+                            data-testid="slider-brightness"
                           />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{file.name}</p>
-                            <p className="text-[11px] text-muted-foreground">Adjust filters below — preview updates live</p>
-                          </div>
                         </div>
-
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <Label className="text-xs font-medium">Brightness</Label>
-                              <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.brightness.toFixed(2)}</span>
-                            </div>
-                            <Slider
-                              value={[f.brightness]}
-                              onValueChange={([v]) => updatePhotoFilter(file.id, "brightness", v)}
-                              min={0.5} max={2.0} step={0.05}
-                              data-testid="slider-brightness"
-                            />
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs font-medium">Contrast</Label>
+                            <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.contrast.toFixed(2)}</span>
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <Label className="text-xs font-medium">Contrast</Label>
-                              <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.contrast.toFixed(2)}</span>
-                            </div>
-                            <Slider
-                              value={[f.contrast]}
-                              onValueChange={([v]) => updatePhotoFilter(file.id, "contrast", v)}
-                              min={0.5} max={2.0} step={0.05}
-                              data-testid="slider-contrast"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <Label className="text-xs font-medium">Saturation</Label>
-                              <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.saturation.toFixed(2)}</span>
-                            </div>
-                            <Slider
-                              value={[f.saturation]}
-                              onValueChange={([v]) => updatePhotoFilter(file.id, "saturation", v)}
-                              min={0.5} max={2.0} step={0.05}
-                              data-testid="slider-saturation"
-                            />
-                          </div>
+                          <Slider
+                            value={[f.contrast]}
+                            onValueChange={([v]) => updatePhotoFilter(file.id, "contrast", v)}
+                            min={0.5} max={2.0} step={0.05}
+                            data-testid="slider-contrast"
+                          />
                         </div>
-
-                        <div className="space-y-2 pt-1">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => autoEnhancePhoto(file.id)}
-                            disabled={enhancingPhotos.has(file.id)}
-                            className="w-full text-xs h-8"
-                            data-testid="button-auto-enhance"
-                          >
-                            {enhancingPhotos.has(file.id) ? (
-                              <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Analyzing...</>
-                            ) : (
-                              <><Wand2 className="h-3 w-3 mr-1.5" /> Auto Enhance</>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => resetPhotoFilter(file.id)}
-                            className="w-full text-xs h-8"
-                            data-testid="button-reset-filter"
-                          >
-                            Reset to Defaults
-                          </Button>
-                          {uploadedFiles.length > 1 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => applyFiltersToAll(file.id)}
-                              className="w-full text-xs h-8"
-                              data-testid="button-apply-filters-all"
-                            >
-                              Apply to All Photos
-                            </Button>
-                          )}
-                        </div>
-
-                        {uploadedFiles.length > 1 && (
-                          <div className="pt-2 border-t border-border/50">
-                            <p className="text-[11px] text-muted-foreground mb-2 font-medium">All Photos</p>
-                            <div className="grid grid-cols-4 gap-1.5">
-                              {uploadedFiles.map(uf => (
-                                <button
-                                  key={uf.id}
-                                  onClick={() => setSelectedPhotoId(uf.id)}
-                                  className={`aspect-square rounded-md overflow-hidden ring-2 transition-all ${uf.id === selectedPhotoId ? "ring-primary" : "ring-transparent hover:ring-primary/40"}`}
-                                  data-testid={`button-switch-photo-${uf.id}`}
-                                >
-                                  <img src={uf.preview} alt={uf.name} className="w-full h-full object-cover" style={getFilterStyle(uf.id)} />
-                                </button>
-                              ))}
-                            </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-xs font-medium">Saturation</Label>
+                            <span className="text-xs text-muted-foreground tabular-nums bg-muted px-1.5 py-0.5 rounded">{f.saturation.toFixed(2)}</span>
                           </div>
-                        )}
+                          <Slider
+                            value={[f.saturation]}
+                            onValueChange={([v]) => updatePhotoFilter(file.id, "saturation", v)}
+                            min={0.5} max={2.0} step={0.05}
+                            data-testid="slider-saturation"
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </div>,
-                  document.body
-                );
-              })()}
-            </div>
-          )}
-        </Card>
 
-        <Card className="p-5 space-y-4 animate-in-delay-2" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Wand2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Watermark</span>
-            </div>
-            <Switch
-              checked={watermarkEnabled}
-              onCheckedChange={setWatermarkEnabled}
-              data-testid="switch-watermark"
-            />
-          </div>
-
-          {watermarkEnabled && (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Button
-                  variant={watermarkType === "text" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setWatermarkType("text")}
-                  data-testid="button-watermark-text-mode"
-                >
-                  Text
-                </Button>
-                <Button
-                  variant={watermarkType === "image" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setWatermarkType("image")}
-                  data-testid="button-watermark-image-mode"
-                >
-                  Image / Logo
-                </Button>
-              </div>
-
-              {watermarkType === "text" ? (
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Watermark text</Label>
-                  <Input
-                    value={watermarkText}
-                    onChange={e => setWatermarkText(e.target.value)}
-                    placeholder={businessInfo.companyName || "Company Name"}
-                    data-testid="input-watermark-text"
-                  />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Label className="text-xs">Watermark image (PNG or JPEG)</Label>
-                  <input
-                    ref={watermarkInputRef}
-                    type="file"
-                    accept=".png,.jpg,.jpeg"
-                    onChange={handleWatermarkImageSelect}
-                    className="hidden"
-                  />
-                  {watermarkImagePreview ? (
-                    <div className="flex items-center gap-3">
-                      <div className="relative w-20 h-20 rounded-lg border border-border overflow-hidden bg-muted/30 flex items-center justify-center">
-                        <img
-                          src={watermarkImagePreview}
-                          alt="Watermark preview"
-                          className="max-w-full max-h-full object-contain"
-                          style={{ opacity: watermarkOpacity }}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                          {watermarkImageFile?.name}
-                        </p>
+                      <div className="space-y-2 pt-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={removeWatermarkImage}
-                          data-testid="button-remove-watermark-image"
+                          onClick={() => autoEnhancePhoto(file.id)}
+                          disabled={enhancingPhotos.has(file.id)}
+                          className="w-full text-xs h-8"
+                          data-testid="button-auto-enhance"
                         >
-                          <X className="h-3 w-3 mr-1" /> Remove
+                          {enhancingPhotos.has(file.id) ? (
+                            <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Analyzing...</>
+                          ) : (
+                            <><Wand2 className="h-3 w-3 mr-1.5" /> Auto enhance</>
+                          )}
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => resetPhotoFilter(file.id)}
+                          className="w-full text-xs h-8"
+                          data-testid="button-reset-filter"
+                        >
+                          Reset to defaults
+                        </Button>
+                        {uploadedFiles.length > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => applyFiltersToAll(file.id)}
+                            className="w-full text-xs h-8"
+                            data-testid="button-apply-filters-all"
+                          >
+                            Apply to all photos
+                          </Button>
+                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => watermarkInputRef.current?.click()}
-                      data-testid="button-upload-watermark-image"
-                    >
-                      <Upload className="h-4 w-4 mr-2" /> Upload Logo
-                    </Button>
-                  )}
-                </div>
-              )}
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs">Opacity</Label>
-                  <span className="text-xs text-muted-foreground tabular-nums">{Math.round(watermarkOpacity * 100)}%</span>
-                </div>
-                <Slider
-                  value={[watermarkOpacity]}
-                  onValueChange={([v]) => setWatermarkOpacity(v)}
-                  min={0.1}
-                  max={1.0}
-                  step={0.05}
-                  data-testid="slider-watermark-opacity"
+                      {uploadedFiles.length > 1 && (
+                        <div className="pt-2 border-t border-border/50">
+                          <p className="text-[11px] text-muted-foreground mb-2 font-medium">All photos</p>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {uploadedFiles.map(uf => (
+                              <button
+                                key={uf.id}
+                                onClick={() => setSelectedPhotoId(uf.id)}
+                                className={`aspect-square rounded-md overflow-hidden ring-2 transition-all ${uf.id === selectedPhotoId ? "ring-primary" : "ring-transparent hover:ring-primary/40"}`}
+                                data-testid={`button-switch-photo-${uf.id}`}
+                              >
+                                <img src={uf.preview} alt={uf.name} className="w-full h-full object-cover" style={getFilterStyle(uf.id)} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>,
+                document.body
+              );
+            })()}
+          </div>
+        )}
+      </Section>
+
+      <Section
+        title="Watermark"
+        actions={
+          <Switch
+            checked={watermarkEnabled}
+            onCheckedChange={setWatermarkEnabled}
+            data-testid="switch-watermark"
+          />
+        }
+      >
+        {watermarkEnabled && (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWatermarkType("text")}
+                className={watermarkType === "text" ? "border-primary/30 bg-primary/10 text-primary" : ""}
+                data-testid="button-watermark-text-mode"
+              >
+                Text
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWatermarkType("image")}
+                className={watermarkType === "image" ? "border-primary/30 bg-primary/10 text-primary" : ""}
+                data-testid="button-watermark-image-mode"
+              >
+                Image / logo
+              </Button>
+            </div>
+
+            {watermarkType === "text" ? (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Watermark text</Label>
+                <Input
+                  value={watermarkText}
+                  onChange={e => setWatermarkText(e.target.value)}
+                  placeholder={businessInfo.companyName || "Company Name"}
+                  data-testid="input-watermark-text"
                 />
               </div>
-            </div>
-          )}
-        </Card>
+            ) : (
+              <div className="space-y-3">
+                <Label className="text-xs">Watermark image (PNG or JPEG)</Label>
+                <input
+                  ref={watermarkInputRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg"
+                  onChange={handleWatermarkImageSelect}
+                  className="hidden"
+                />
+                {watermarkImagePreview ? (
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-20 h-20 rounded-lg border border-border overflow-hidden bg-muted/30 flex items-center justify-center">
+                      <img
+                        src={watermarkImagePreview}
+                        alt="Watermark preview"
+                        className="max-w-full max-h-full object-contain"
+                        style={{ opacity: watermarkOpacity }}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                        {watermarkImageFile?.name}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={removeWatermarkImage}
+                        data-testid="button-remove-watermark-image"
+                      >
+                        <X className="h-3 w-3 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => watermarkInputRef.current?.click()}
+                    data-testid="button-upload-watermark-image"
+                  >
+                    <Upload className="h-4 w-4 mr-2" /> Upload logo
+                  </Button>
+                )}
+              </div>
+            )}
 
-        <Card className="p-5 space-y-3 animate-in-delay-3" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <FlipHorizontal className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Mirror Photos</span>
-            </div>
-            <Switch
-              checked={mirrorPhotos}
-              onCheckedChange={setMirrorPhotos}
-              data-testid="switch-mirror-photos"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Flips every photo horizontally (a mirror image). Only use photos of your own work that you have the rights to.
-          </p>
-        </Card>
-
-        <Card className="p-5 space-y-4 animate-in-delay-3" style={{ boxShadow: "var(--shadow-sm)" }}>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Download className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Process & Download</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground" htmlFor="ai-toggle">AI Descriptions</Label>
-              <Switch
-                id="ai-toggle"
-                checked={useAIDescriptions}
-                onCheckedChange={setUseAIDescriptions}
-                data-testid="switch-ai-descriptions"
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Opacity</Label>
+                <span className="text-xs text-muted-foreground tabular-nums">{Math.round(watermarkOpacity * 100)}%</span>
+              </div>
+              <Slider
+                value={[watermarkOpacity]}
+                onValueChange={([v]) => setWatermarkOpacity(v)}
+                min={0.1}
+                max={1.0}
+                step={0.05}
+                data-testid="slider-watermark-opacity"
               />
             </div>
           </div>
+        )}
 
-          {!useAIDescriptions && (
-            <p className="text-xs text-muted-foreground">
-              Using smart templates for SEO descriptions (free, instant). Toggle on AI for unique OpenAI-generated descriptions.
+        <div className="flex items-start justify-between gap-4 pt-4 border-t border-border/60">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Mirror photos</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Flips every photo horizontally. Only use photos of your own work that you have the rights to.
             </p>
-          )}
-          {useAIDescriptions && (
-            <p className="text-xs text-muted-foreground">
-              Using OpenAI to generate unique descriptions per photo. This uses API credits.
-            </p>
-          )}
+          </div>
+          <Switch
+            checked={mirrorPhotos}
+            onCheckedChange={setMirrorPhotos}
+            data-testid="switch-mirror-photos"
+          />
+        </div>
+      </Section>
 
-          <div className="flex flex-wrap gap-2">
+      <Section
+        title="Process & download"
+        actions={
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground" htmlFor="ai-toggle">AI descriptions</Label>
+            <Switch
+              id="ai-toggle"
+              checked={useAIDescriptions}
+              onCheckedChange={setUseAIDescriptions}
+              data-testid="switch-ai-descriptions"
+            />
+          </div>
+        }
+      >
+        {!useAIDescriptions && (
+          <p className="text-xs text-muted-foreground">
+            Using smart templates for SEO descriptions (free, instant). Toggle on AI for unique OpenAI-generated descriptions.
+          </p>
+        )}
+        {useAIDescriptions && (
+          <p className="text-xs text-muted-foreground">
+            Using OpenAI to generate unique descriptions per photo. This uses API credits.
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button
+            onClick={handleProcess}
+            disabled={isProcessing || uploadedFiles.length === 0}
+            className="w-full sm:w-auto"
+            data-testid="button-process-photos"
+          >
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4 mr-2" />
+            )}
+            {isProcessing ? (processingStep || "Processing...") : "Process photos"}
+          </Button>
+
+          {processedFiles.length > 0 && (
             <Button
-              onClick={handleProcess}
-              disabled={isProcessing || uploadedFiles.length === 0}
-              data-testid="button-process-photos"
+              variant="outline"
+              onClick={() =>
+                downloadAllMutation.mutate(processedFiles.map(f => f.processedId))
+              }
+              disabled={downloadAllMutation.isPending}
+              data-testid="button-download-all"
             >
-              {isProcessing ? (
+              {downloadAllMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Wand2 className="h-4 w-4 mr-2" />
+                <Download className="h-4 w-4 mr-2" />
               )}
-              {isProcessing ? (processingStep || "Processing...") : "Process Photos"}
+              Download all (ZIP)
             </Button>
-
-            {processedFiles.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  downloadAllMutation.mutate(processedFiles.map(f => f.processedId))
-                }
-                disabled={downloadAllMutation.isPending}
-                data-testid="button-download-all"
-              >
-                {downloadAllMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Download All (ZIP)
-              </Button>
-            )}
-
-            {processedFiles.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() => { fetchFolders(); setShowSaveToLibrary(true); }}
-                data-testid="button-save-to-library"
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                Save to Media Library
-              </Button>
-            )}
-          </div>
-
-          {showSaveToLibrary && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setShowSaveToLibrary(false)}>
-              <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()} data-testid="modal-save-to-library">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-sm flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-amber-500" />
-                    Save to Media Library
-                  </h3>
-                  <button onClick={() => setShowSaveToLibrary(false)} className="text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Save {processedFiles.length} processed photo{processedFiles.length !== 1 ? "s" : ""} to a folder. These photos will be stored permanently and available to attach to review requests.
-                </p>
-                {mediaFolders.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">Select Existing Folder</Label>
-                    <div className="max-h-32 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
-                      {mediaFolders.map(f => (
-                        <button
-                          key={f.id}
-                          onClick={() => { setSelectedFolderId(f.id); setNewFolderName(""); }}
-                          className={`w-full text-left text-xs px-2 py-1.5 rounded-md flex items-center gap-2 transition-colors ${selectedFolderId === f.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"}`}
-                          data-testid={`folder-option-${f.id}`}
-                        >
-                          <FolderOpen className="h-3.5 w-3.5 shrink-0" />
-                          {f.name}
-                          {selectedFolderId === f.id && <Check className="h-3 w-3 ml-auto" />}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label className="text-xs">{mediaFolders.length > 0 ? "Or Create New Folder" : "Create a Folder"}</Label>
-                  <Input
-                    value={newFolderName}
-                    onChange={e => { setNewFolderName(e.target.value); if (e.target.value) setSelectedFolderId(null); }}
-                    placeholder="e.g. Roofing Project - 123 Main St"
-                    className="text-sm"
-                    data-testid="input-new-folder-name"
-                  />
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowSaveToLibrary(false)} data-testid="button-cancel-save">
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
-                    onClick={handleSaveToLibrary}
-                    disabled={savingToLibrary || (!selectedFolderId && !newFolderName.trim())}
-                    data-testid="button-confirm-save-library"
-                  >
-                    {savingToLibrary ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                    {savingToLibrary ? "Saving..." : "Save Photos"}
-                  </Button>
-                </div>
-              </div>
-            </div>
           )}
 
           {processedFiles.length > 0 && (
-            <div ref={processedRef} className="space-y-2">
+            <Button
+              variant="outline"
+              onClick={() => { fetchFolders(); setShowSaveToLibrary(true); }}
+              data-testid="button-save-to-library"
+            >
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Save to media library
+            </Button>
+          )}
+        </div>
+
+        {showSaveToLibrary && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50" onClick={() => setShowSaveToLibrary(false)}>
+            <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()} data-testid="modal-save-to-library">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  Save to media library
+                </h3>
+                <button onClick={() => setShowSaveToLibrary(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
               <p className="text-xs text-muted-foreground">
-                {processedFiles.length} photo{processedFiles.length !== 1 ? "s" : ""} processed
+                Save {processedFiles.length} processed photo{processedFiles.length !== 1 ? "s" : ""} to a folder. These photos will be stored permanently and available to attach to review requests.
               </p>
-              <div className="space-y-1.5">
-                {processedFiles.map(pf => (
-                  <div
-                    key={pf.processedId}
-                    className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md bg-muted/50"
-                    data-testid={`processed-file-${pf.processedId}`}
-                  >
-                    <span className="text-xs truncate flex-1">{pf.fileName}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => downloadSingle(pf.processedId, pf.fileName)}
-                      data-testid={`button-download-${pf.processedId}`}
-                    >
-                      <Download className="h-3.5 w-3.5" />
-                    </Button>
+              {mediaFolders.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs">Select existing folder</Label>
+                  <div className="max-h-32 overflow-y-auto space-y-1 border border-border rounded-lg p-2">
+                    {mediaFolders.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => { setSelectedFolderId(f.id); setNewFolderName(""); }}
+                        className={`w-full text-left text-xs px-2 py-1.5 rounded-md flex items-center gap-2 transition-colors ${selectedFolderId === f.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"}`}
+                        data-testid={`folder-option-${f.id}`}
+                      >
+                        <FolderOpen className="h-3.5 w-3.5 shrink-0" />
+                        {f.name}
+                        {selectedFolderId === f.id && <Check className="h-3 w-3 ml-auto" />}
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label className="text-xs">{mediaFolders.length > 0 ? "Or create new folder" : "Create a folder"}</Label>
+                <Input
+                  value={newFolderName}
+                  onChange={e => { setNewFolderName(e.target.value); if (e.target.value) setSelectedFolderId(null); }}
+                  placeholder="e.g. Roofing Project - 123 Main St"
+                  className="text-sm"
+                  data-testid="input-new-folder-name"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowSaveToLibrary(false)} data-testid="button-cancel-save">
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleSaveToLibrary}
+                  disabled={savingToLibrary || (!selectedFolderId && !newFolderName.trim())}
+                  data-testid="button-confirm-save-library"
+                >
+                  {savingToLibrary ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {savingToLibrary ? "Saving..." : "Save photos"}
+                </Button>
               </div>
             </div>
-          )}
-
-          {uploadedFiles.length === 0 && processedFiles.length === 0 && (
-            <p className="text-xs text-muted-foreground">
-              Upload photos and configure settings above, then click Process to optimize your images.
-            </p>
-          )}
-        </Card>
-
-        {recentBatches.length > 0 && (
-          <Card className="p-5 space-y-4" style={{ boxShadow: "var(--shadow-sm)" }} data-testid="card-recent-batches">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wand2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Recent Batches</span>
-                <Badge variant="outline" className="text-[10px]">Last {recentBatches.length}</Badge>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => persistRecentBatches([])}
-                data-testid="button-clear-recent-batches"
-              >
-                Clear all
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              If processing succeeds but the page is reloaded or the server restarts, your last 3 batches are saved here so you can re-download without starting over.
-            </p>
-            <div className="space-y-2">
-              {recentBatches.map(batch => {
-                const date = new Date(batch.savedAt);
-                const dateStr = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-                return (
-                  <div
-                    key={batch.id}
-                    className="flex items-center justify-between gap-3 p-3 rounded-md border border-border bg-muted/30"
-                    data-testid={`row-batch-${batch.id}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium truncate" data-testid={`text-batch-name-${batch.id}`}>
-                        {batch.companyName}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {batch.files.length} photo{batch.files.length !== 1 ? "s" : ""} · {dateStr}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setProcessedFiles(batch.files);
-                          toast({ title: "Batch restored", description: "Scroll up to the processed photos section to download." });
-                          setTimeout(() => processedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
-                        }}
-                        data-testid={`button-restore-batch-${batch.id}`}
-                      >
-                        Restore
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          downloadAllMutation.mutate(batch.files.map(f => f.processedId));
-                        }}
-                        disabled={downloadAllMutation.isPending}
-                        data-testid={`button-download-batch-${batch.id}`}
-                      >
-                        <Download className="h-3.5 w-3.5 mr-1" />
-                        Download ZIP
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => persistRecentBatches(recentBatches.filter(b => b.id !== batch.id))}
-                        data-testid={`button-remove-batch-${batch.id}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
+          </div>
         )}
 
         {processedFiles.length > 0 && (
-          <Card className="p-5 space-y-4 animate-in-delay-5" style={{ boxShadow: "var(--shadow-sm)" }}>
-            <div className="flex items-center gap-2">
-              <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Upload to Platforms</span>
-            </div>
+          <div ref={processedRef} className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              Download your optimized photos above, then upload them directly to your business profiles.
+              {processedFiles.length} photo{processedFiles.length !== 1 ? "s" : ""} processed
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open("https://business.google.com/locations", "_blank")}
-                data-testid="button-upload-google"
-              >
-                <img src="https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png" alt="" className="h-4 w-4 mr-2" />
-                Upload to Google Business Profile
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open("https://biz.yelp.com", "_blank")}
-                data-testid="button-upload-yelp"
-              >
-                <span className="mr-2 text-red-500 font-bold text-sm">Y</span>
-                Upload to Yelp Business
-              </Button>
+            <div className="space-y-1.5">
+              {processedFiles.map(pf => (
+                <div
+                  key={pf.processedId}
+                  className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md bg-muted/50"
+                  data-testid={`processed-file-${pf.processedId}`}
+                >
+                  <span className="text-xs truncate flex-1">{pf.fileName}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => downloadSingle(pf.processedId, pf.fileName)}
+                    data-testid={`button-download-${pf.processedId}`}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
             </div>
-          </Card>
+          </div>
         )}
-      </div>
-    </div>
+
+        {uploadedFiles.length === 0 && processedFiles.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Upload photos and configure settings above, then click Process to optimize your images.
+          </p>
+        )}
+
+        <p className="text-[11px] text-muted-foreground">
+          Google strips EXIF on upload to a Business Profile — geotags and metadata are for your own files and other sites, and don't promise a ranking benefit.
+        </p>
+      </Section>
+
+      {recentBatches.length > 0 && (
+        <Section
+          testId="card-recent-batches"
+          title="Recent batches"
+          actions={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => persistRecentBatches([])}
+              data-testid="button-clear-recent-batches"
+            >
+              Clear all
+            </Button>
+          }
+        >
+          <p className="text-xs text-muted-foreground">
+            If processing succeeds but the page is reloaded or the server restarts, your last 3 batches are saved here so you can re-download without starting over.
+          </p>
+          <div className="space-y-2">
+            {recentBatches.map(batch => {
+              const date = new Date(batch.savedAt);
+              const dateStr = `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+              return (
+                <div
+                  key={batch.id}
+                  className="flex items-center justify-between gap-3 p-3 rounded-md border border-border bg-muted/30"
+                  data-testid={`row-batch-${batch.id}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate" data-testid={`text-batch-name-${batch.id}`}>
+                      {batch.companyName}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {batch.files.length} photo{batch.files.length !== 1 ? "s" : ""} · {dateStr}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setProcessedFiles(batch.files);
+                        toast({ title: "Batch restored", description: "Scroll up to the processed photos section to download." });
+                        setTimeout(() => processedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+                      }}
+                      data-testid={`button-restore-batch-${batch.id}`}
+                    >
+                      Restore
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        downloadAllMutation.mutate(batch.files.map(f => f.processedId));
+                      }}
+                      disabled={downloadAllMutation.isPending}
+                      data-testid={`button-download-batch-${batch.id}`}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1" />
+                      Download ZIP
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => persistRecentBatches(recentBatches.filter(b => b.id !== batch.id))}
+                      data-testid={`button-remove-batch-${batch.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {processedFiles.length > 0 && (
+        <Section title="Upload to platforms">
+          <p className="text-xs text-muted-foreground">
+            Download your optimized photos above, then upload them directly to your business profiles.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("https://business.google.com/locations", "_blank")}
+              data-testid="button-upload-google"
+            >
+              <img src="https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png" alt="" className="h-4 w-4 mr-2" />
+              Upload to Google Business Profile
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open("https://biz.yelp.com", "_blank")}
+              data-testid="button-upload-yelp"
+            >
+              <span className="mr-2 text-red-500 font-bold text-sm">Y</span>
+              Upload to Yelp Business
+            </Button>
+          </div>
+        </Section>
+      )}
+    </AppPage>
   );
 }

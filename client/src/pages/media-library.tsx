@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +10,7 @@ import {
   MapPin, Pencil, ArrowLeft, Download, Search, MoreVertical, ChevronRight,
   FolderPlus, ImagePlus, Navigation, CheckCircle2, Grid3X3, List,
 } from "lucide-react";
+import { AppPage, PageHeader, EmptyState } from "@/components/app-ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -310,53 +310,51 @@ export default function MediaLibraryPage() {
     document.title = activeFolderId ? `${activeFolder?.name || "Folder"} — Media Library | ConstructHUB` : "Media Library | ConstructHUB";
   }, [activeFolderId, activeFolder]);
 
-  return (
-    <div className="min-h-full p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6" data-testid="page-media-library">
-      <div className="flex items-center gap-3">
-        {activeFolderId && (
-          <Button variant="ghost" size="sm" onClick={goBack} data-testid="button-back-folders">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <FolderOpen className="h-5 w-5 text-amber-500 shrink-0" />
-            <h1 className="text-xl font-bold truncate" data-testid="heading-media-library">
-              {activeFolderId ? activeFolder?.name || "Folder" : "Media Library"}
-            </h1>
-            {activeFolderId && activeFolder?.clientAddress && (
-              <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
-                <MapPin className="h-2.5 w-2.5" />
-                {activeFolder.lat ? "GPS Embedded" : "Address Set"}
-              </Badge>
-            )}
-          </div>
-          {!activeFolderId && (
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Organize your project photos into folders. Set a client address to embed GPS coordinates into photos.
-            </p>
-          )}
-          {activeFolderId && activeFolder?.clientAddress && (
-            <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-              <MapPin className="h-3 w-3 shrink-0" />
-              {activeFolder.clientAddress}
-              {activeFolder.lat && <span className="text-[10px] text-green-600 dark:text-green-400 ml-1">({activeFolder.lat.toFixed(4)}, {activeFolder.lon?.toFixed(4)})</span>}
-            </p>
-          )}
-        </div>
+  const startEditFolder = (folder: Folder) => {
+    setEditingFolder(folder);
+    setEditFolderName(folder.name);
+    setEditFolderAddress(folder.clientAddress || "");
+    setEditGeoResult(folder.lat ? { lat: folder.lat, lon: folder.lon!, formattedAddress: folder.clientAddress || "" } : null);
+  };
 
-        <div className="flex items-center gap-2 shrink-0">
-          {activeFolderId && (
-            <>
+  return (
+    <AppPage width="wide" testId="page-media-library">
+      {activeFolderId ? (
+        <header className="space-y-3">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+            data-testid="button-back-folders"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 rotate-180" aria-hidden="true" /> Folders
+          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-9 truncate" data-testid="heading-media-library">
+                  {activeFolder?.name || "Folder"}
+                </h1>
+                {activeFolder?.clientAddress && (
+                  <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
+                    <MapPin className="h-2.5 w-2.5" />
+                    {activeFolder.lat ? "GPS embedded" : "Address set"}
+                  </Badge>
+                )}
+              </div>
+              {activeFolder?.clientAddress && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  {activeFolder.clientAddress}
+                  {activeFolder.lat && <span className="text-xs text-muted-foreground/70 ml-1">({activeFolder.lat.toFixed(4)}, {activeFolder.lon?.toFixed(4)})</span>}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setEditingFolder(activeFolder);
-                  setEditFolderName(activeFolder?.name || "");
-                  setEditFolderAddress(activeFolder?.clientAddress || "");
-                  setEditGeoResult(activeFolder?.lat ? { lat: activeFolder.lat, lon: activeFolder.lon!, formattedAddress: activeFolder.clientAddress || "" } : null);
-                }}
+                onClick={() => activeFolder && startEditFolder(activeFolder)}
                 data-testid="button-edit-folder"
               >
                 <Pencil className="h-3.5 w-3.5 mr-1.5" />
@@ -366,68 +364,75 @@ export default function MediaLibraryPage() {
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="bg-amber-500 hover:bg-amber-600 text-white"
                 data-testid="button-upload-photos"
               >
                 {uploading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
-                Upload Photos
+                Upload photos
               </Button>
               <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleUpload} className="hidden" data-testid="input-upload-photos" />
-            </>
-          )}
-          {!activeFolderId && (
+            </div>
+          </div>
+        </header>
+      ) : (
+        <PageHeader
+          title={<span data-testid="heading-media-library">Media library</span>}
+          description="Project photo folders. Set a client address to embed GPS coordinates into photos."
+          actions={
             <Button
               size="sm"
               onClick={() => setShowNewFolder(true)}
-              className="bg-amber-500 hover:bg-amber-600 text-white"
               data-testid="button-new-folder"
             >
               <FolderPlus className="h-3.5 w-3.5 mr-1.5" />
-              New Folder
+              New folder
             </Button>
-          )}
-        </div>
-      </div>
+          }
+        />
+      )}
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative flex-1 sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={activeFolderId ? "Search photos..." : "Search folders..."}
-            className="pl-9 h-9"
+            className="pl-9 h-10"
             data-testid="input-search-media"
           />
         </div>
         {activeFolderId && (
-          <div className="flex items-center gap-1 border border-border rounded-lg p-0.5">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-amber-500/10 text-amber-600" : "text-muted-foreground hover:text-foreground"}`}
-              data-testid="button-view-grid"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-amber-500/10 text-amber-600" : "text-muted-foreground hover:text-foreground"}`}
-              data-testid="button-view-list"
-            >
-              <List className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === "grid" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                aria-label="Grid view"
+                data-testid="button-view-grid"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-1.5 rounded-lg transition-colors ${viewMode === "list" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                aria-label="List view"
+                data-testid="button-view-list"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+            {filteredPhotos.length > 0 && (
+              <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">
+                {selectedPhotos.size === filteredPhotos.length ? "Deselect all" : "Select all"}
+              </Button>
+            )}
+            {selectedPhotos.size > 0 && (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmBulkDelete(true)} data-testid="button-delete-selected">
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete ({selectedPhotos.size})
+              </Button>
+            )}
           </div>
-        )}
-        {activeFolderId && filteredPhotos.length > 0 && (
-          <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all">
-            {selectedPhotos.size === filteredPhotos.length ? "Deselect All" : "Select All"}
-          </Button>
-        )}
-        {selectedPhotos.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={() => setConfirmBulkDelete(true)} data-testid="button-delete-selected">
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Delete ({selectedPhotos.size})
-          </Button>
         )}
       </div>
 
@@ -436,8 +441,8 @@ export default function MediaLibraryPage() {
           <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()} data-testid="modal-new-folder">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2">
-                <FolderPlus className="h-4 w-4 text-amber-500" />
-                Create New Folder
+                <FolderPlus className="h-4 w-4 text-muted-foreground" />
+                New folder
               </h3>
               <button onClick={() => setShowNewFolder(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -446,7 +451,7 @@ export default function MediaLibraryPage() {
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Folder Name</Label>
+                <Label className="text-xs font-medium">Folder name</Label>
                 <Input
                   value={newFolderName}
                   onChange={e => setNewFolderName(e.target.value)}
@@ -459,8 +464,8 @@ export default function MediaLibraryPage() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <MapPin className="h-3 w-3 text-amber-500" />
-                  Client Address (optional)
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  Client address (optional)
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -475,20 +480,21 @@ export default function MediaLibraryPage() {
                     size="sm"
                     onClick={() => geocodeAddress(newFolderAddress, "create")}
                     disabled={geocodingAddress || !newFolderAddress.trim()}
+                    aria-label="Verify address"
                     data-testid="button-verify-address"
                   >
                     {geocodingAddress ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  GPS coordinates will be embedded into photos in this folder — just like when a phone takes a photo with location on. Google strips this data when photos are uploaded to a Business Profile, so it's for your own records and other sites, not a ranking boost.
+                  GPS coordinates are embedded into photos in this folder — just like when a phone takes a photo with location on. Google strips this data when photos are uploaded to a Business Profile, so it's for your own records and other sites, not a ranking boost.
                 </p>
                 {geocodedResult && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     <div className="text-[11px]">
-                      <p className="font-medium text-green-700 dark:text-green-300">{geocodedResult.formattedAddress}</p>
-                      <p className="text-green-600/70 dark:text-green-400/70">GPS: {geocodedResult.lat.toFixed(6)}, {geocodedResult.lon.toFixed(6)}</p>
+                      <p className="font-medium text-emerald-700 dark:text-emerald-300">{geocodedResult.formattedAddress}</p>
+                      <p className="text-emerald-600/70 dark:text-emerald-400/70">GPS: {geocodedResult.lat.toFixed(6)}, {geocodedResult.lon.toFixed(6)}</p>
                     </div>
                   </div>
                 )}
@@ -501,13 +507,13 @@ export default function MediaLibraryPage() {
               </Button>
               <Button
                 size="sm"
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
+                className="flex-1"
                 onClick={createFolder}
                 disabled={creatingFolder || !newFolderName.trim()}
                 data-testid="button-confirm-create-folder"
               >
                 {creatingFolder ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FolderPlus className="h-4 w-4 mr-2" />}
-                Create Folder
+                Create folder
               </Button>
             </div>
           </div>
@@ -519,8 +525,8 @@ export default function MediaLibraryPage() {
           <div className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()} data-testid="modal-edit-folder">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2">
-                <Pencil className="h-4 w-4 text-amber-500" />
-                Edit Folder
+                <Pencil className="h-4 w-4 text-muted-foreground" />
+                Edit folder
               </h3>
               <button onClick={() => setEditingFolder(null)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
@@ -529,13 +535,13 @@ export default function MediaLibraryPage() {
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Folder Name</Label>
+                <Label className="text-xs font-medium">Folder name</Label>
                 <Input value={editFolderName} onChange={e => setEditFolderName(e.target.value)} data-testid="input-edit-folder-name" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium flex items-center gap-1.5">
-                  <MapPin className="h-3 w-3 text-amber-500" />
-                  Client Address
+                  <MapPin className="h-3 w-3 text-muted-foreground" />
+                  Client address
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -550,15 +556,16 @@ export default function MediaLibraryPage() {
                     size="sm"
                     onClick={() => geocodeAddress(editFolderAddress, "edit")}
                     disabled={editGeocoding || !editFolderAddress.trim()}
+                    aria-label="Verify address"
                     data-testid="button-verify-edit-address"
                   >
                     {editGeocoding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Navigation className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
                 {(editGeoResult || (editingFolder.lat && !editGeoResult)) && (
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                    <p className="text-[11px] font-medium text-green-700 dark:text-green-300">
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                       GPS: {(editGeoResult?.lat ?? editingFolder.lat)?.toFixed(6)}, {(editGeoResult?.lon ?? editingFolder.lon)?.toFixed(6)}
                     </p>
                   </div>
@@ -570,13 +577,13 @@ export default function MediaLibraryPage() {
               <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditingFolder(null)}>Cancel</Button>
               <Button
                 size="sm"
-                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"
+                className="flex-1"
                 onClick={updateFolder}
                 disabled={savingEdit || !editFolderName.trim()}
                 data-testid="button-save-edit-folder"
               >
                 {savingEdit ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
-                Save Changes
+                Save changes
               </Button>
             </div>
           </div>
@@ -603,48 +610,40 @@ export default function MediaLibraryPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-3" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
           <p className="text-sm text-muted-foreground">Loading your library...</p>
         </div>
       ) : !activeFolderId ? (
         <>
           {filteredFolders.length === 0 && !searchQuery ? (
-            <Card className="p-10 text-center" style={{ boxShadow: "var(--shadow-sm)" }}>
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-                <FolderOpen className="h-8 w-8 text-amber-500" />
-              </div>
-              <h3 className="font-semibold text-lg mb-1" data-testid="text-empty-state">No folders yet</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
-                Create your first folder to start organizing project photos. You can add a client address to embed GPS coordinates into every photo, just like a phone does when location is enabled. Google strips EXIF on upload, so geotags don't promise a ranking benefit.
-              </p>
-              <Button
-                onClick={() => setShowNewFolder(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-white"
-                data-testid="button-empty-new-folder"
-              >
-                <FolderPlus className="h-4 w-4 mr-2" />
-                Create Your First Folder
-              </Button>
-            </Card>
-          ) : filteredFolders.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No folders match "{searchQuery}"</p>
+            <div data-testid="text-empty-state">
+              <EmptyState
+                icon={FolderOpen}
+                title="No folders yet"
+                description="Create your first folder to start organizing project photos. You can add a client address to embed GPS coordinates into every photo — Google strips EXIF on upload, so geotags don't promise a ranking boost."
+                action={
+                  <Button variant="outline" onClick={() => setShowNewFolder(true)} data-testid="button-empty-new-folder">
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    Create your first folder
+                  </Button>
+                }
+              />
             </div>
+          ) : filteredFolders.length === 0 ? (
+            <EmptyState compact icon={Search} title={`No folders match "${searchQuery}"`} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="folder-grid">
               {filteredFolders.map(folder => (
-                <Card
+                <div
                   key={folder.id}
-                  className="group relative cursor-pointer hover:border-amber-400 dark:hover:border-amber-600 transition-all duration-200 hover:shadow-md overflow-hidden"
-                  style={{ boxShadow: "var(--shadow-sm)" }}
+                  className="group relative cursor-pointer rounded-xl border bg-card transition-colors hover:border-primary/40 overflow-hidden"
                   onClick={() => openFolder(folder)}
                   data-testid={`folder-card-${folder.id}`}
                 >
                   <div className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 group-hover:bg-amber-500/20 transition-colors">
-                        <FolderOpen className="h-5 w-5 text-amber-500" />
+                      <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                        <FolderOpen className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-sm truncate" data-testid={`folder-name-${folder.id}`}>{folder.name}</h3>
@@ -657,14 +656,9 @@ export default function MediaLibraryPage() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                          <DropdownMenuItem onClick={() => {
-                            setEditingFolder(folder);
-                            setEditFolderName(folder.name);
-                            setEditFolderAddress(folder.clientAddress || "");
-                            setEditGeoResult(folder.lat ? { lat: folder.lat, lon: folder.lon!, formattedAddress: folder.clientAddress || "" } : null);
-                          }}>
+                          <DropdownMenuItem onClick={() => startEditFolder(folder)}>
                             <Pencil className="h-3.5 w-3.5 mr-2" />
-                            Edit Folder
+                            Edit folder
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-red-600 dark:text-red-400"
@@ -673,7 +667,7 @@ export default function MediaLibraryPage() {
                             data-testid={`menu-delete-folder-${folder.id}`}
                           >
                             {deletingFolder === folder.id ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-2" />}
-                            Delete Folder
+                            Delete folder
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -681,10 +675,10 @@ export default function MediaLibraryPage() {
 
                     {folder.clientAddress && (
                       <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                        <MapPin className="h-3 w-3 text-amber-500 shrink-0" />
+                        <MapPin className="h-3 w-3 shrink-0" />
                         <span className="truncate">{folder.clientAddress}</span>
                         {folder.lat && (
-                          <Badge variant="outline" className="text-[9px] px-1 py-0 ml-auto shrink-0 border-green-300 text-green-600 dark:border-green-700 dark:text-green-400">
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 ml-auto shrink-0 border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400">
                             GPS
                           </Badge>
                         )}
@@ -696,10 +690,10 @@ export default function MediaLibraryPage() {
                         <Image className="h-3 w-3" />
                         Click to view photos
                       </span>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-amber-500 transition-colors" />
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
                   </div>
-                </Card>
+                </div>
               ))}
             </div>
           )}
@@ -708,40 +702,32 @@ export default function MediaLibraryPage() {
         <>
           {photosLoading ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-amber-500 mb-2" />
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">Loading photos...</p>
             </div>
           ) : filteredPhotos.length === 0 && !searchQuery ? (
-            <Card className="p-10 text-center" style={{ boxShadow: "var(--shadow-sm)" }}>
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
-                <ImagePlus className="h-8 w-8 text-amber-500" />
-              </div>
-              <h3 className="font-semibold text-lg mb-1" data-testid="text-empty-photos">This folder is empty</h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
-                Upload photos directly, or process them in the Photo Optimizer and save them here.
-                {activeFolder?.clientAddress && " GPS coordinates from the folder's address will be embedded into photos."}
-              </p>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-amber-500 hover:bg-amber-600 text-white"
-                data-testid="button-empty-upload"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Photos
-              </Button>
-            </Card>
-          ) : filteredPhotos.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Search className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No photos match "{searchQuery}"</p>
+            <div data-testid="text-empty-photos">
+              <EmptyState
+                icon={ImagePlus}
+                title="This folder is empty"
+                description={`Upload photos directly, or process them in the Photo Optimizer and save them here.${activeFolder?.clientAddress ? " GPS coordinates from the folder's address will be embedded into photos." : ""}`}
+                action={
+                  <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-empty-upload">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload photos
+                  </Button>
+                }
+              />
             </div>
+          ) : filteredPhotos.length === 0 ? (
+            <EmptyState compact icon={Search} title={`No photos match "${searchQuery}"`} />
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3" data-testid="photo-grid">
               {filteredPhotos.map(photo => (
                 <div
                   key={photo.id}
                   className={`group relative rounded-xl overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
-                    selectedPhotos.has(photo.id) ? "border-amber-500 ring-2 ring-amber-500/30 shadow-md" : "border-border hover:border-amber-300 dark:hover:border-amber-600 hover:shadow-md"
+                    selectedPhotos.has(photo.id) ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/40"
                   }`}
                   data-testid={`photo-card-${photo.id}`}
                 >
@@ -752,7 +738,7 @@ export default function MediaLibraryPage() {
                   <button
                     onClick={e => { e.stopPropagation(); toggleSelect(photo.id); }}
                     className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      selectedPhotos.has(photo.id) ? "bg-amber-500 border-amber-500 text-white" : `bg-white/80 dark:bg-zinc-800/80 border-white dark:border-zinc-600 ${REVEAL_ON_HOVER}`
+                      selectedPhotos.has(photo.id) ? "bg-primary border-primary text-primary-foreground" : `bg-white/80 dark:bg-zinc-800/80 border-white dark:border-zinc-600 ${REVEAL_ON_HOVER}`
                     }`}
                     aria-label={selectedPhotos.has(photo.id) ? `Deselect ${photo.name}` : `Select ${photo.name}`}
                     aria-pressed={selectedPhotos.has(photo.id)}
@@ -807,7 +793,7 @@ export default function MediaLibraryPage() {
                           onKeyDown={e => { if (e.key === "Enter") renamePhoto(photo.id); if (e.key === "Escape") setRenamingPhoto(null); }}
                           autoFocus
                         />
-                        <button onClick={() => renamePhoto(photo.id)} className="text-green-400 hover:text-green-300">
+                        <button onClick={() => renamePhoto(photo.id)} className="text-emerald-400 hover:text-emerald-300">
                           <Check className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => setRenamingPhoto(null)} className="text-red-400 hover:text-red-300">
@@ -823,16 +809,16 @@ export default function MediaLibraryPage() {
               ))}
             </div>
           ) : (
-            <div className="space-y-1" data-testid="photo-list">
+            <div className="rounded-xl border bg-card divide-y" data-testid="photo-list">
               {filteredPhotos.map(photo => (
                 <div
                   key={photo.id}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer ${
-                    selectedPhotos.has(photo.id) ? "bg-amber-500/10 border border-amber-500/30" : "hover:bg-muted border border-transparent"
+                  className={`flex items-center gap-3 px-4 py-2.5 transition-colors cursor-pointer ${
+                    selectedPhotos.has(photo.id) ? "bg-primary/5" : "hover:bg-muted/50"
                   }`}
                   data-testid={`photo-list-item-${photo.id}`}
                 >
-                  <button onClick={() => toggleSelect(photo.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selectedPhotos.has(photo.id) ? "bg-amber-500 border-amber-500 text-white" : "border-border"}`}>
+                  <button onClick={() => toggleSelect(photo.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${selectedPhotos.has(photo.id) ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
                     {selectedPhotos.has(photo.id) && <Check className="h-3 w-3" />}
                   </button>
                   <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0 cursor-pointer" onClick={() => setPreviewPhoto(photo)}>
@@ -848,7 +834,7 @@ export default function MediaLibraryPage() {
                           onKeyDown={e => { if (e.key === "Enter") renamePhoto(photo.id); if (e.key === "Escape") setRenamingPhoto(null); }}
                           autoFocus
                         />
-                        <button onClick={() => renamePhoto(photo.id)} className="text-green-600"><Check className="h-4 w-4" /></button>
+                        <button onClick={() => renamePhoto(photo.id)} className="text-emerald-600"><Check className="h-4 w-4" /></button>
                         <button onClick={() => setRenamingPhoto(null)} className="text-red-500"><X className="h-4 w-4" /></button>
                       </div>
                     ) : (
@@ -888,7 +874,7 @@ export default function MediaLibraryPage() {
           )}
 
           {!photosLoading && filteredPhotos.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2">
               <span>{filteredPhotos.length} photo{filteredPhotos.length !== 1 ? "s" : ""}</span>
               <span>{formatFileSize(filteredPhotos.reduce((sum, p) => sum + (p.size || 0), 0))} total</span>
             </div>
@@ -900,7 +886,7 @@ export default function MediaLibraryPage() {
         <AlertDialogContent data-testid="dialog-delete-folder">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete folder “{confirmFolder?.folder.name}”
+              Delete folder "{confirmFolder?.folder.name}"
               {confirmFolder?.photoCount != null && confirmFolder.photoCount > 0
                 ? ` and its ${confirmFolder.photoCount} photo${confirmFolder.photoCount === 1 ? "" : "s"}`
                 : ""}?
@@ -946,6 +932,6 @@ export default function MediaLibraryPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AppPage>
   );
 }
