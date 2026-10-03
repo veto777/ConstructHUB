@@ -14,10 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AppPage, PageHeader, StatusPill, EmptyState } from "@/components/app-ui";
 import {
   Search,
   MapPin,
@@ -44,7 +44,6 @@ import {
   Eye,
   Building,
   ExternalLink,
-  Info,
   Globe,
 } from "lucide-react";
 import type { PermitDatabase, County } from "@shared/schema";
@@ -67,7 +66,7 @@ const searchTypes = [
   { value: "address", label: "Address", icon: MapPin },
   { value: "keyword", label: "Keyword", icon: Tag },
   { value: "name", label: "Name", icon: User },
-  { value: "company", label: "Company Name", icon: Building2 },
+  { value: "company", label: "Company name", icon: Building2 },
   { value: "license", label: "License #", icon: FileText },
   { value: "permit", label: "Permit #", icon: FileText },
 ];
@@ -535,21 +534,16 @@ export default function SearchPage() {
   const portalWord = (n: number) => `${n} portal${n === 1 ? "" : "s"}`;
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-12 space-y-10">
-        <div className="space-y-2 animate-in">
-          <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
-            Search Permits
-          </h1>
-          <div className="h-1 w-16 rounded-full bg-gradient-to-r from-[#4A6CF7] to-[#F97316]" />
-          <p className="text-sm text-muted-foreground max-w-lg">
-            Search available permit records and find official portals by jurisdiction. Live search coverage varies by portal.
-          </p>
-        </div>
+    <AppPage width="narrow" testId="page-search">
+      <PageHeader
+        title={<span data-testid="text-page-title">Search permits</span>}
+        description="Search live permit portals by address, name, company or permit number."
+      />
 
-        <Card className="p-5 space-y-5 animate-in-delay-1" style={{ boxShadow: 'var(--shadow-sm)' }}>
-          <div className="space-y-3">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Search area</label>
+      <section className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Search area</label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               value={scopeState}
               onValueChange={(val) => {
@@ -560,10 +554,10 @@ export default function SearchPage() {
             >
               <SelectTrigger data-testid="select-scope-state" className="w-full">
                 <Globe className="h-3.5 w-3.5 text-muted-foreground mr-1.5" />
-                <SelectValue placeholder="All States" />
+                <SelectValue placeholder="All states" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" data-testid="select-state-all">All States</SelectItem>
+                <SelectItem value="all" data-testid="select-state-all">All states</SelectItem>
                 {allStates.map((state) => (
                   <SelectItem key={state.code} value={state.code} data-testid={`select-state-${state.code.toLowerCase()}`}>
                     {state.name}
@@ -576,7 +570,7 @@ export default function SearchPage() {
               onValueChange={(val) => {
                 setScopeLocation(val);
                 setLocationSearch("");
-                // Picking a county under "All States" narrows to its state so its portals load.
+                // Picking a county under "All states" narrows to its state so its portals load.
                 if (val.startsWith("county-") && scopeState === "all") {
                   const county = counties?.find(c => `county-${c.id}` === val);
                   if (county) setScopeState(county.stateCode);
@@ -584,7 +578,7 @@ export default function SearchPage() {
               }}
             >
               <SelectTrigger data-testid="select-scope-location" className="w-full">
-                <SelectValue placeholder="All Counties & Cities" />
+                <SelectValue placeholder="All counties & cities" />
               </SelectTrigger>
               <SelectContent>
                 <div className="px-2 pb-2">
@@ -602,7 +596,7 @@ export default function SearchPage() {
                   </div>
                 </div>
                 <SelectItem value="all">
-                  {scopeState === "all" ? "All Counties & Cities" : `All ${selectedStateName} Counties & Cities`}
+                  {scopeState === "all" ? "All counties & cities" : `All ${selectedStateName} counties & cities`}
                 </SelectItem>
                 {filteredLocationOptions.counties.map((county) => {
                   // Counties here already matched the filter (by name, state or one of their portals).
@@ -611,7 +605,7 @@ export default function SearchPage() {
                     <SelectGroup key={county.id}>
                       <SelectItem value={`county-${county.id}`}>
                         <span className="font-medium">{county.name} County{scopeState === "all" ? `, ${county.stateCode}` : ""}</span>
-                        {/* Per-county counts need the state's portals; under All States they aren't loaded. */}
+                        {/* Per-county counts need the state's portals; under All states they aren't loaded. */}
                         {scopeState !== "all" && databases && (
                           <span className="text-muted-foreground ml-1">({portalCount(countyDbs.length)})</span>
                         )}
@@ -627,530 +621,527 @@ export default function SearchPage() {
               </SelectContent>
             </Select>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Search by</label>
-              <Select value={searchType} onValueChange={setSearchType}>
-                <SelectTrigger data-testid="select-search-type" className="w-full md:w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {searchTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      <span className="flex items-center gap-2">
-                        <type.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                        {type.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Search by</label>
+            <Select value={searchType} onValueChange={setSearchType}>
+              <SelectTrigger data-testid="select-search-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {searchTypes.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <span className="flex items-center gap-2">
+                      <type.icon className="h-3.5 w-3.5 text-muted-foreground" />
+                      {type.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Search value</label>
+            <div className="relative">
+              <IconComponent className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder={
+                  searchType === "address" ? "911, 3520 malland, etc." :
+                  searchType === "keyword" ? "siding, roofing, electrical, plumbing..." :
+                  "Enter search value..."
+                }
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="pl-9"
+                data-testid="input-search-value"
+              />
             </div>
+          </div>
+        </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Search value</label>
-              <div className="relative">
-                <IconComponent className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <button
+          type="button"
+          onClick={() => setShowFilters(!showFilters)}
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+          data-testid="button-toggle-filters"
+        >
+          <SlidersHorizontal className="h-3 w-3" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-foreground text-background text-[10px] leading-none font-semibold">
+              {activeFilterCount}
+            </span>
+          )}
+          {showFilters ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
+        </button>
+
+        {showFilters && (
+          <div className="space-y-3 pt-1 border-t border-border/40">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <CalendarDays className="h-3 w-3" />
+                  Date from
+                </label>
                 <Input
-                  placeholder={
-                    searchType === "address" ? "911, 3520 malland, etc." :
-                    searchType === "keyword" ? "siding, roofing, electrical, plumbing..." :
-                    "Enter search value..."
-                  }
-                  value={searchValue}
-                  onChange={(e) => setSearchValue(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                  className="pl-9"
-                  data-testid="input-search-value"
+                  type="date"
+                  value={filterDateFrom}
+                  max={filterDateTo || undefined}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  aria-invalid={dateRangeInverted}
+                  className="h-9 text-xs"
+                  data-testid="input-filter-date-from"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <CalendarDays className="h-3 w-3" />
+                  Date to
+                </label>
+                <Input
+                  type="date"
+                  value={filterDateTo}
+                  min={filterDateFrom || undefined}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  aria-invalid={dateRangeInverted}
+                  className="h-9 text-xs"
+                  data-testid="input-filter-date-to"
                 />
               </div>
             </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
-            data-testid="button-toggle-filters"
-          >
-            <SlidersHorizontal className="h-3 w-3" />
-            Filters
-            {activeFilterCount > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-foreground text-background text-[10px] leading-none font-semibold">
-                {activeFilterCount}
-              </span>
+            {dateRangeInverted && (
+              <p className="text-xs text-destructive" role="alert" data-testid="text-date-range-error">
+                End date is before start date, so no permits can match. Adjust one of the dates.
+              </p>
             )}
-            {showFilters ? <ChevronUp className="h-3 w-3 ml-auto" /> : <ChevronDown className="h-3 w-3 ml-auto" />}
-          </button>
 
-          {showFilters && (
-            <div className="space-y-3 pt-1 border-t border-border/40" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <CalendarDays className="h-3 w-3" />
-                    Date from
-                  </label>
-                  <Input
-                    type="date"
-                    value={filterDateFrom}
-                    max={filterDateTo || undefined}
-                    onChange={(e) => setFilterDateFrom(e.target.value)}
-                    aria-invalid={dateRangeInverted}
-                    className="h-8 text-xs"
-                    data-testid="input-filter-date-from"
-                  />
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {filterDateFrom && (
+                  <Badge variant="secondary" className="text-xs gap-1 no-default-hover-elevate no-default-active-elevate">
+                    From: {filterDateFrom}
+                    <X className="h-2.5 w-2.5 cursor-pointer" onClick={() => setFilterDateFrom("")} />
+                  </Badge>
+                )}
+                {filterDateTo && (
+                  <Badge variant="secondary" className="text-xs gap-1 no-default-hover-elevate no-default-active-elevate">
+                    To: {filterDateTo}
+                    <X className="h-2.5 w-2.5 cursor-pointer" onClick={() => setFilterDateTo("")} />
+                  </Badge>
+                )}
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-5 text-[10px] gap-1 text-muted-foreground px-1.5" data-testid="button-clear-filters">
+                  <X className="h-2.5 w-2.5" />
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground" data-testid="text-scope-count">
+            {scopedDbCount !== null
+              ? `${portalCount(scopedDbCount)} ${scopePlace}`
+              : scopeState !== "all" && databasesLoading
+                ? `Counting searchable portals ${scopePlace}…`
+                : "Searches every live-searchable portal nationwide"}
+          </p>
+          <Button
+            onClick={handleSearch}
+            disabled={searchMutation.isPending || !searchValue.trim()}
+            className="w-full sm:w-auto"
+            data-testid="button-search"
+          >
+            {searchMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
+            Search
+          </Button>
+        </div>
+      </section>
+
+      {(searchId || searchMutation.isPending) && (
+        <div className="space-y-5">
+          {liveStatus && (
+            <section className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  {isSearching ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : failedDbs === 0 ? (
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  ) : searchedDbs === 0 ? (
+                    <XCircle className="h-4 w-4 text-destructive" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  )}
+                  <span className="text-sm font-semibold" role="status" data-testid="text-search-status">
+                    {isSearching
+                      ? "Searching databases..."
+                      : failedDbs === 0
+                        ? "Search complete"
+                        : searchedDbs === 0
+                          ? `Search failed: ${failedDbs === 1 ? "the portal could not be searched" : `none of the ${portalWord(failedDbs)} could be searched`}`
+                          : `Search finished: ${portalWord(failedDbs)} of ${totalDbs} could not be searched`}
+                  </span>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                    <CalendarDays className="h-3 w-3" />
-                    Date to
-                  </label>
-                  <Input
-                    type="date"
-                    value={filterDateTo}
-                    min={filterDateFrom || undefined}
-                    onChange={(e) => setFilterDateTo(e.target.value)}
-                    aria-invalid={dateRangeInverted}
-                    className="h-8 text-xs"
-                    data-testid="input-filter-date-to"
-                  />
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <span className="tabular-nums" title="Portals finished">{finishedDbs}/{totalDbs}</span>
+                  {liveStatus.elapsedMs > 0 && (
+                    <span className="tabular-nums">{(liveStatus.elapsedMs / 1000).toFixed(1)}s</span>
+                  )}
                 </div>
               </div>
-              {dateRangeInverted && (
-                <p className="text-xs text-destructive" role="alert" data-testid="text-date-range-error">
-                  End date is before start date, so no permits can match. Adjust one of the dates.
-                </p>
-              )}
 
-              {activeFilterCount > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {filterDateFrom && (
-                    <Badge variant="secondary" className="text-xs gap-1 no-default-hover-elevate no-default-active-elevate">
-                      From: {filterDateFrom}
-                      <X className="h-2.5 w-2.5 cursor-pointer" onClick={() => setFilterDateFrom("")} />
-                    </Badge>
-                  )}
-                  {filterDateTo && (
-                    <Badge variant="secondary" className="text-xs gap-1 no-default-hover-elevate no-default-active-elevate">
-                      To: {filterDateTo}
-                      <X className="h-2.5 w-2.5 cursor-pointer" onClick={() => setFilterDateTo("")} />
-                    </Badge>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="h-5 text-[10px] gap-1 text-muted-foreground px-1.5" data-testid="button-clear-filters">
-                    <X className="h-2.5 w-2.5" />
-                    Clear all
-                  </Button>
-                </div>
-              )}
+              <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
+                <div
+                  className="bg-foreground h-full rounded-full transition-all duration-500"
+                  style={{ width: `${totalDbs > 0 ? (finishedDbs / totalDbs) * 100 : 0}%` }}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
+                {liveStatus.databases.map((db) => (
+                  <div
+                    key={db.id}
+                    className="flex items-start gap-2 px-2 py-1.5 rounded text-xs"
+                    data-testid={`status-db-${db.id}`}
+                    data-status={db.status}
+                  >
+                    {db.status === "completed" && (
+                      <CheckCircle2 className="h-3 w-3 mt-0.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" aria-label="Searched" />
+                    )}
+                    {db.status === "running" && (
+                      <Loader2 className="h-3 w-3 mt-0.5 animate-spin text-muted-foreground flex-shrink-0" aria-label="Searching" />
+                    )}
+                    {db.status === "pending" && (
+                      <Database className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Waiting" />
+                    )}
+                    {db.status === "error" && (
+                      <XCircle className="h-3 w-3 mt-0.5 text-destructive flex-shrink-0" aria-label="Not searched" />
+                    )}
+                    {db.status === "skipped" && (
+                      <SkipForward className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Skipped" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className={`block truncate ${db.status === "running" ? "font-medium" : db.status === "pending" || db.status === "skipped" ? "text-muted-foreground/60" : ""}`}>
+                        {db.name}
+                      </span>
+                      {db.status === "error" && db.message && (
+                        <span className="block text-destructive break-words" data-testid={`status-db-message-${db.id}`}>{db.message}</span>
+                      )}
+                    </div>
+                    {(db.status === "completed" || db.status === "error") && db.resultsFound > 0 && (
+                      <span className="ml-auto font-semibold tabular-nums flex-shrink-0">{db.resultsFound}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {!liveStatus && searchMutation.isPending && (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Starting search...</p>
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-4 pt-1">
-            <p className="text-xs text-muted-foreground" data-testid="text-scope-count">
-              {scopedDbCount !== null
-                ? `${portalCount(scopedDbCount)} ${scopePlace}`
-                : scopeState !== "all" && databasesLoading
-                  ? `Counting searchable portals ${scopePlace}…`
-                  : "Searches every live-searchable portal nationwide"}
-            </p>
-            <Button
-              onClick={handleSearch}
-              disabled={searchMutation.isPending || !searchValue.trim()}
-              className="px-6"
-              data-testid="button-search"
-            >
-              {searchMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Search className="h-4 w-4 mr-2" />
-              )}
-              Search
-            </Button>
-          </div>
-        </Card>
-
-        {(searchId || searchMutation.isPending) && (
-          <div className="space-y-5">
-            {liveStatus && (
-              <Card className="p-5 space-y-4 animate-scale-in" style={{ boxShadow: 'var(--shadow-2xs)' }}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    {isSearching ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                    ) : failedDbs === 0 ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    ) : searchedDbs === 0 ? (
-                      <XCircle className="h-4 w-4 text-destructive" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    )}
-                    <span className="text-sm font-semibold" role="status" data-testid="text-search-status">
-                      {isSearching
-                        ? "Searching databases..."
-                        : failedDbs === 0
-                          ? "Search complete"
-                          : searchedDbs === 0
-                            ? `Search failed: ${failedDbs === 1 ? "the portal could not be searched" : `none of the ${portalWord(failedDbs)} could be searched`}`
-                            : `Search finished: ${portalWord(failedDbs)} of ${totalDbs} could not be searched`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="tabular-nums" title="Portals finished">{finishedDbs}/{totalDbs}</span>
-                    {liveStatus.elapsedMs > 0 && (
-                      <span className="tabular-nums">{(liveStatus.elapsedMs / 1000).toFixed(1)}s</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="w-full bg-muted rounded-full h-1 overflow-hidden">
-                  <div
-                    className="bg-foreground h-full rounded-full transition-all duration-500"
-                    style={{ width: `${totalDbs > 0 ? (finishedDbs / totalDbs) * 100 : 0}%` }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-0.5">
-                  {liveStatus.databases.map((db) => (
-                    <div
-                      key={db.id}
-                      className="flex items-start gap-2 px-2 py-1.5 rounded text-xs"
-                      data-testid={`status-db-${db.id}`}
-                      data-status={db.status}
-                    >
-                      {db.status === "completed" && (
-                        <CheckCircle2 className="h-3 w-3 mt-0.5 text-green-600 dark:text-green-400 flex-shrink-0" aria-label="Searched" />
-                      )}
-                      {db.status === "running" && (
-                        <Loader2 className="h-3 w-3 mt-0.5 animate-spin text-muted-foreground flex-shrink-0" aria-label="Searching" />
-                      )}
-                      {db.status === "pending" && (
-                        <Database className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Waiting" />
-                      )}
-                      {db.status === "error" && (
-                        <XCircle className="h-3 w-3 mt-0.5 text-destructive flex-shrink-0" aria-label="Not searched" />
-                      )}
-                      {db.status === "skipped" && (
-                        <SkipForward className="h-3 w-3 mt-0.5 text-muted-foreground/30 flex-shrink-0" aria-label="Skipped" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <span className={`block truncate ${db.status === "running" ? "font-medium" : db.status === "pending" || db.status === "skipped" ? "text-muted-foreground/60" : ""}`}>
-                          {db.name}
-                        </span>
-                        {db.status === "error" && db.message && (
-                          <span className="block text-destructive break-words" data-testid={`status-db-message-${db.id}`}>{db.message}</span>
-                        )}
-                      </div>
-                      {(db.status === "completed" || db.status === "error") && db.resultsFound > 0 && (
-                        <span className="ml-auto font-semibold tabular-nums flex-shrink-0">{db.resultsFound}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {!liveStatus && searchMutation.isPending && (
-              <div className="flex flex-col items-center justify-center py-12 gap-4 animate-fade-in">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Starting search...</p>
+          {rawResults.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="text-base font-semibold" data-testid="text-results-header">
+                  Results
+                </h2>
+                <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
+                  {filteredResults.length === rawResults.length
+                    ? `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`
+                    : `${filteredResults.length} of ${rawResults.length}`}
+                </span>
               </div>
-            )}
 
-            {rawResults.length > 0 && (
-              <div className="space-y-4 animate-in">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h2 className="text-lg font-semibold" data-testid="text-results-header">
-                    Results
-                  </h2>
-                  <div className="flex items-center gap-3">
-                    {availableStatuses.length > 0 && (
-                      <div className="flex flex-wrap gap-x-3 gap-y-1 items-center">
-                        <label className="flex items-center gap-1.5 cursor-pointer" data-testid="checkbox-status-all">
-                          <Checkbox
-                            checked={isAllStatuses}
-                            onCheckedChange={toggleAllStatuses}
-                            className="h-3.5 w-3.5"
-                          />
-                          <span className="text-xs font-medium">All</span>
-                        </label>
-                        {availableStatuses.map(({ status, count }) => (
-                          <label key={status} className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-status-${status.toLowerCase().replace(/[^a-z]/g, '-')}`}>
-                            <Checkbox
-                              checked={filterStatuses.has(status)}
-                              onCheckedChange={() => toggleStatus(status)}
-                              className="h-3.5 w-3.5"
-                            />
-                            <span className="text-xs">{status}</span>
-                            <span className="text-[10px] text-muted-foreground tabular-nums">({count})</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                    <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
-                      {filteredResults.length === rawResults.length
-                        ? `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`
-                        : `${filteredResults.length} of ${rawResults.length}`}
-                    </span>
+              {availableStatuses.length > 0 && (
+                <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
+                  <div className="flex w-max items-center gap-x-3 gap-y-1 pb-1">
+                    <label className="flex items-center gap-1.5 cursor-pointer" data-testid="checkbox-status-all">
+                      <Checkbox
+                        checked={isAllStatuses}
+                        onCheckedChange={toggleAllStatuses}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className="text-xs font-medium">All</span>
+                    </label>
+                    {availableStatuses.map(({ status, count }) => (
+                      <label key={status} className="flex items-center gap-1.5 cursor-pointer" data-testid={`checkbox-status-${status.toLowerCase().replace(/[^a-z]/g, '-')}`}>
+                        <Checkbox
+                          checked={filterStatuses.has(status)}
+                          onCheckedChange={() => toggleStatus(status)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className="text-xs">{status}</span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">({count})</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  {filteredResults.length === 0 && activeFilterCount > 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 text-center">
-                      <SlidersHorizontal className="h-6 w-6 text-muted-foreground/30" />
-                      <p className="text-sm text-muted-foreground">No results match your filters</p>
+              <div className="space-y-3">
+                {filteredResults.length === 0 && activeFilterCount > 0 ? (
+                  <EmptyState
+                    compact
+                    icon={SlidersHorizontal}
+                    title="No results match your filters"
+                    action={
                       <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs" data-testid="button-clear-filters-empty">
                         Clear filters
                       </Button>
-                    </div>
-                  ) : (
-                    filteredResults.map((result: any, index: number) => (
-                      <Card
-                        key={result.id}
-                        className="p-4 hover-elevate transition-all duration-200"
-                        style={{
-                          boxShadow: 'var(--shadow-2xs)',
-                          animation: `fadeSlideIn 0.3s ease-out ${Math.min(index * 0.02, 0.3)}s both`,
-                        }}
-                        data-testid={`card-result-${result.id}`}
-                      >
-                        <div className="space-y-2.5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0 space-y-2">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {result.permitNumber && (
-                                  <span className="text-sm font-semibold" data-testid={`text-permit-number-${result.id}`}>{result.permitNumber}</span>
-                                )}
-                                {result.permitType && (
-                                  <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{result.permitType}</Badge>
-                                )}
-                                <StatusBadge status={result.status} />
-                              </div>
-                              {result.address && (
-                                <p className="text-sm flex items-center gap-1.5">
-                                  <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                  {result.address}
-                                </p>
+                    }
+                  />
+                ) : (
+                  filteredResults.map((result: any) => (
+                    <div
+                      key={result.id}
+                      className="rounded-xl border bg-card p-4"
+                      data-testid={`card-result-${result.id}`}
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {result.permitNumber && (
+                                <span className="text-sm font-semibold" data-testid={`text-permit-number-${result.id}`}>{result.permitNumber}</span>
                               )}
-                              {result.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2">{result.description}</p>
+                              {result.permitType && (
+                                <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{result.permitType}</Badge>
                               )}
+                              <StatusBadge status={result.status} />
                             </div>
-                            <div className="text-right shrink-0 space-y-1">
-                              {result.issuedDate && (
-                                <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums block">{result.issuedDate}</span>
-                              )}
-                              {result.databaseName && (
-                                <span className="text-[11px] text-muted-foreground whitespace-nowrap block">
-                                  {result.jurisdiction || result.databaseName}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
-                            {result.applicantName && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3 flex-shrink-0" />
-                                {result.applicantName}
-                              </span>
-                            )}
-                            {result.contractorName && (
-                              <span className="flex items-center gap-1">
-                                <Building2 className="h-3 w-3 flex-shrink-0" />
-                                {result.contractorName}
-                              </span>
-                            )}
-                            {result.parcelNumber && (
-                              <span className="flex items-center gap-1">
-                                <Hash className="h-3 w-3 flex-shrink-0" />
-                                {result.parcelNumber}
-                              </span>
-                            )}
-                            {result.district && (
-                              <span className="flex items-center gap-1">
-                                <Globe className="h-3 w-3 flex-shrink-0" />
-                                {result.district}
-                              </span>
-                            )}
-                          </div>
-
-                          {(result.expirationDate || result.finalizedDate) && (
-                            <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
-                              {result.expirationDate && (
-                                <span className="flex items-center gap-1">
-                                  <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                  Expires {result.expirationDate}
-                                </span>
-                              )}
-                              {result.finalizedDate && (
-                                <span className="flex items-center gap-1">
-                                  <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                  Finalized {result.finalizedDate}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {result.contacts && Array.isArray(result.contacts) && result.contacts.length > 0 && (
-                            <div className="border-t border-border/40 pt-2.5 mt-1">
-                              <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-2">
-                                <Users className="h-3 w-3" />
-                                Contacts ({result.contacts.length})
+                            {result.address && (
+                              <p className="text-sm flex items-center gap-1.5">
+                                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                {result.address}
                               </p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                {(result.contacts as any[]).map((contact: any, ci: number) => (
-                                  <div key={ci} className="flex items-start gap-2 text-xs px-2.5 py-2 rounded-md bg-muted/40">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="text-[10px] text-muted-foreground">{contact.type}</span>
-                                        <span className="font-medium truncate">
-                                          {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-                                        </span>
-                                      </div>
-                                      {contact.company && (
-                                        <p className="text-muted-foreground mt-0.5 truncate">{contact.company}</p>
-                                      )}
-                                      <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
-                                        {contact.phone && (
-                                          <span className="flex items-center gap-1">
-                                            <Phone className="h-2.5 w-2.5" />
-                                            {contact.phone}
-                                          </span>
-                                        )}
-                                        {contact.email && (
-                                          <span className="flex items-center gap-1">
-                                            <Mail className="h-2.5 w-2.5" />
-                                            {contact.email}
-                                          </span>
-                                        )}
-                                      </div>
+                            )}
+                            {result.description && (
+                              <p className="text-xs text-muted-foreground line-clamp-2">{result.description}</p>
+                            )}
+                          </div>
+                          <div className="text-right shrink-0 space-y-1">
+                            {result.issuedDate && (
+                              <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums block">{result.issuedDate}</span>
+                            )}
+                            {result.databaseName && (
+                              <span className="text-[11px] text-muted-foreground whitespace-nowrap block">
+                                {result.jurisdiction || result.databaseName}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
+                          {result.applicantName && (
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3 flex-shrink-0" />
+                              {result.applicantName}
+                            </span>
+                          )}
+                          {result.contractorName && (
+                            <span className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              {result.contractorName}
+                            </span>
+                          )}
+                          {result.parcelNumber && (
+                            <span className="flex items-center gap-1">
+                              <Hash className="h-3 w-3 flex-shrink-0" />
+                              {result.parcelNumber}
+                            </span>
+                          )}
+                          {result.district && (
+                            <span className="flex items-center gap-1">
+                              <Globe className="h-3 w-3 flex-shrink-0" />
+                              {result.district}
+                            </span>
+                          )}
+                        </div>
+
+                        {(result.expirationDate || result.finalizedDate) && (
+                          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
+                            {result.expirationDate && (
+                              <span className="flex items-center gap-1">
+                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                                Expires {result.expirationDate}
+                              </span>
+                            )}
+                            {result.finalizedDate && (
+                              <span className="flex items-center gap-1">
+                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
+                                Finalized {result.finalizedDate}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {result.contacts && Array.isArray(result.contacts) && result.contacts.length > 0 && (
+                          <div className="border-t border-border/40 pt-2.5 mt-1">
+                            <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-2">
+                              <Users className="h-3 w-3" />
+                              Contacts ({result.contacts.length})
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                              {(result.contacts as any[]).map((contact: any, ci: number) => (
+                                <div key={ci} className="flex items-start gap-2 text-xs px-2.5 py-2 rounded-md bg-muted/40">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-muted-foreground">{contact.type}</span>
+                                      <span className="font-medium truncate">
+                                        {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
+                                      </span>
                                     </div>
+                                    {contact.company && (
+                                      <p className="text-muted-foreground mt-0.5 truncate">{contact.company}</p>
+                                    )}
+                                    <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
+                                      {contact.phone && (
+                                        <span className="flex items-center gap-1">
+                                          <Phone className="h-2.5 w-2.5" />
+                                          {contact.phone}
+                                        </span>
+                                      )}
+                                      {contact.email && (
+                                        <span className="flex items-center gap-1">
+                                          <Mail className="h-2.5 w-2.5" />
+                                          {contact.email}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleDetails(result.id)}
+                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                            data-testid={`button-details-${result.id}`}
+                          >
+                            {loadingDetails.has(result.id) ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Eye className="h-3 w-3" />
+                            )}
+                            {expandedResults.has(result.id) ? "Hide details" : "View details"}
+                            {expandedResults.has(result.id) ? (
+                              <ChevronUp className="h-3 w-3" />
+                            ) : (
+                              <ChevronDown className="h-3 w-3" />
+                            )}
+                          </button>
+                          {result.countyId && (
+                            <a
+                              href={`/property?countyId=${result.countyId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                              data-testid={`button-property-lookup-${result.id}`}
+                            >
+                              <Building className="h-3 w-3" />
+                              Property lookup
+                              <ExternalLink className="h-2.5 w-2.5 opacity-50" />
+                            </a>
+                          )}
+                        </div>
+
+                        {expandedResults.has(result.id) && (
+                          <div className="border-t border-border/40 pt-3 mt-1">
+                            {loadingDetails.has(result.id) ? (
+                              <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Fetching permit details...
+                              </div>
+                            ) : permitDetails[result.id] && Object.keys(permitDetails[result.id]).length > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                                {Object.entries(permitDetails[result.id]).map(([key, value]) => (
+                                  <div key={key} className="flex items-baseline gap-2 text-xs py-1.5 border-b border-dashed border-border/30">
+                                    <span className="font-medium text-muted-foreground min-w-[110px] flex-shrink-0">{key}</span>
+                                    <span className="text-foreground break-all">{String(value || "—")}</span>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-3 pt-1">
-                            <button
-                              type="button"
-                              onClick={() => toggleDetails(result.id)}
-                              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                              data-testid={`button-details-${result.id}`}
-                            >
-                              {loadingDetails.has(result.id) ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <Eye className="h-3 w-3" />
-                              )}
-                              {expandedResults.has(result.id) ? "Hide details" : "View details"}
-                              {expandedResults.has(result.id) ? (
-                                <ChevronUp className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                            </button>
-                            {result.countyId && (
-                              <a
-                                href={`/property?countyId=${result.countyId}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                data-testid={`button-property-lookup-${result.id}`}
-                              >
-                                <Building className="h-3 w-3" />
-                                Property lookup
-                                <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-                              </a>
-                            )}
+                            ) : permitDetails[result.id] ? (
+                              <p className="text-xs text-muted-foreground py-2">No additional details available.</p>
+                            ) : null}
                           </div>
-
-                          {expandedResults.has(result.id) && (
-                            <div className="border-t border-border/40 pt-3 mt-1" style={{ animation: 'fadeSlideIn 0.2s ease-out both' }}>
-                              {loadingDetails.has(result.id) ? (
-                                <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                  Fetching permit details...
-                                </div>
-                              ) : permitDetails[result.id] && Object.keys(permitDetails[result.id]).length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                                  {Object.entries(permitDetails[result.id]).map(([key, value]) => (
-                                    <div key={key} className="flex items-baseline gap-2 text-xs py-1.5 border-b border-dashed border-border/30">
-                                      <span className="font-medium text-muted-foreground min-w-[110px] flex-shrink-0">{key}</span>
-                                      <span className="text-foreground break-all">{String(value || "—")}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : permitDetails[result.id] ? (
-                                <p className="text-xs text-muted-foreground py-2">No additional details available.</p>
-                              ) : null}
-                            </div>
-                          )}
-                        </div>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {isComplete && rawResults.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center animate-scale-in" data-testid="empty-search-results">
-                <AlertCircle className="h-6 w-6 text-muted-foreground/40" />
-                {searchedDbs === 0 && failedDbs > 0 ? (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">No portal could be searched</p>
-                    <p className="text-xs text-muted-foreground max-w-sm">
-                      The live search didn't reach any portal, so there may be permits it couldn't see. Try again later, or open a portal directly from the Directory.
-                    </p>
-                    <Button asChild variant="outline" size="sm" className="mt-2">
-                      <Link href="/databases" data-testid="link-browse-directory-failed">Browse the Directory</Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">No results found</p>
-                    <p className="text-xs text-muted-foreground max-w-sm">
-                      {failedDbs > 0
-                        ? `${portalWord(searchedDbs)} searched with no matches; ${portalWord(failedDbs)} could not be searched, so results may be incomplete.`
-                        : "Try a different search term or search type."}
-                    </p>
-                  </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {!searchId && !searchMutation.isPending && noPortalsMessage && (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-center" role="status" data-testid="empty-no-searchable-portals">
-            <Database className="h-8 w-8 text-muted-foreground/30" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Nothing to search here yet</p>
-              <p className="text-xs text-muted-foreground max-w-sm">{noPortalsMessage}</p>
             </div>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/databases" data-testid="link-browse-directory">Browse the Directory</Link>
-            </Button>
-          </div>
-        )}
+          )}
 
-        {!searchId && !searchMutation.isPending && !noPortalsMessage && (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 animate-in-delay-2">
-            <Search className="h-8 w-8 text-muted-foreground/20" />
-            <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">Ready to search</p>
-              <p className="text-xs text-muted-foreground/70 max-w-xs">
-                Enter a search term above. Results from each portal appear as they're found.
-              </p>
+          {isComplete && rawResults.length === 0 && (
+            <div data-testid="empty-search-results">
+              {searchedDbs === 0 && failedDbs > 0 ? (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="No portal could be searched"
+                  description="The live search didn't reach any portal, so there may be permits it couldn't see. Try again later, or open a portal directly from the Directory."
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/databases" data-testid="link-browse-directory-failed">Browse the Directory</Link>
+                    </Button>
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={AlertCircle}
+                  title="No results found"
+                  description={failedDbs > 0
+                    ? `${portalWord(searchedDbs)} searched with no matches; ${portalWord(failedDbs)} could not be searched, so results may be incomplete.`
+                    : "Try a different search term or search type."}
+                />
+              )}
             </div>
-          </div>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      )}
+
+      {!searchId && !searchMutation.isPending && noPortalsMessage && (
+        <div role="status" data-testid="empty-no-searchable-portals">
+          <EmptyState
+            icon={Database}
+            title="Nothing to search here yet"
+            description={noPortalsMessage}
+            action={
+              <Button asChild variant="outline" size="sm">
+                <Link href="/databases" data-testid="link-browse-directory">Browse the Directory</Link>
+              </Button>
+            }
+          />
+        </div>
+      )}
+
+      {!searchId && !searchMutation.isPending && !noPortalsMessage && (
+        <EmptyState
+          icon={Search}
+          title="Ready to search"
+          description="Enter a search term above. Results from each portal appear as they're found."
+        />
+      )}
+    </AppPage>
   );
 }
 
@@ -1158,13 +1149,13 @@ function StatusBadge({ status }: { status?: string | null }) {
   if (!status) return null;
   const s = status.toLowerCase();
   if (s.includes("issued") || s.includes("approved") || s.includes("complete") || s.includes("closed")) {
-    return <Badge className="bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-400 border-green-200/60 dark:border-green-800/40 no-default-hover-elevate no-default-active-elevate text-[11px]">{status}</Badge>;
+    return <StatusPill tone="success" className="text-[11px]">{status}</StatusPill>;
   }
   if (s.includes("pending") || s.includes("review") || s.includes("applied")) {
-    return <Badge className="bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200/60 dark:border-amber-800/40 no-default-hover-elevate no-default-active-elevate text-[11px]">{status}</Badge>;
+    return <StatusPill tone="warning" className="text-[11px]">{status}</StatusPill>;
   }
   if (s.includes("expired") || s.includes("denied") || s.includes("cancel") || s.includes("void")) {
-    return <Badge className="bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border-red-200/60 dark:border-red-800/40 no-default-hover-elevate no-default-active-elevate text-[11px]">{status}</Badge>;
+    return <StatusPill tone="danger" className="text-[11px]">{status}</StatusPill>;
   }
-  return <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-[11px]">{status}</Badge>;
+  return <StatusPill tone="neutral" className="text-[11px]">{status}</StatusPill>;
 }
