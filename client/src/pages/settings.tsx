@@ -1,3 +1,4 @@
+import { AppPage, PageHeader } from "@/components/app-ui";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -60,13 +61,9 @@ export default function SettingsPage() {
   useEffect(() => { root.current?.scrollTo?.({ top: 0 }); }, [section]);
 
   return (
-    <div ref={root} className="h-full overflow-y-auto bg-background">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="mb-6 sm:mb-8 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">Account settings</h1>
-            <p className="text-sm text-muted-foreground mt-1">Your profile and security, and your workspace's billing, limits, API access, activity and connections.</p>
-          </div>
+    <div ref={root} className="min-w-0">
+      <AppPage>
+        <PageHeader title={<span data-testid="text-settings-title">Account settings</span>} description="Manage your account and workspace." actions={
           <button
             type="button"
             onClick={() => {
@@ -76,25 +73,25 @@ export default function SettingsPage() {
                 navigate("/");
               }
             }}
-            className="inline-flex items-center justify-center rounded-md h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
             aria-label="Close settings"
             data-testid="button-close-settings"
           >
             <X className="h-5 w-5" />
           </button>
-        </div>
+        } />
 
         <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
           <SettingsNav active={section} onSelect={(id) => go(id)} />
 
           <div className="flex-1 min-w-0" data-testid={`settings-section-${section}`}>
             <SettingsSectionHeader title={def.label} description={def.description} infoKey={def.infoKey} />
-            <div className="mt-6">
+            <div className="mt-4">
               <Section user={user} section={section} view={view} go={go} />
             </div>
           </div>
         </div>
-      </div>
+      </AppPage>
     </div>
   );
 }

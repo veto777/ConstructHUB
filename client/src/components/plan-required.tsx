@@ -144,24 +144,24 @@ export function PlanRequired({ module, error, className }: { module: ModuleKey; 
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 id={headingId} className="text-xl font-semibold leading-none tracking-tight">{MODULE_NAMES[module]}</h2>
+          <h2 id={headingId} className="text-base font-semibold leading-none tracking-tight">{MODULE_NAMES[module]}</h2>
           <Badge variant="secondary">{plan.name} plan</Badge>
         </div>
         <p className="text-sm" data-testid="text-plan-required-message">{message}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div>
-          <h3 className="text-sm font-medium">What it does</h3>
+        <details>
+          <summary className="cursor-pointer py-2 text-sm font-medium">What it does</summary>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {MODULE_DETAILS[module].map((line) => <li key={line}>{line}</li>)}
           </ul>
-        </div>
+        </details>
         {showsPrice(plan.monthlyCents) && (
           <p className="text-sm">
             {plan.name} plan: {dollars(plan.monthlyCents)} a month, {locations} location{locations === 1 ? "" : "s"} included.
           </p>
         )}
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/pricing" data-testid="link-plan-required-pricing">See plans and pricing</Link>
         </Button>
         <SavedConnections module={module} />

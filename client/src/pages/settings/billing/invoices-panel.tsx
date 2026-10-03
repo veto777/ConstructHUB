@@ -39,7 +39,7 @@ export function InvoicesPanel({ pageSize = 20 }: InvoicesPanelProps = {}) {
   return (
     <Card data-testid="card-invoices">
       <CardHeader>
-        <CardTitle className="text-lg">Invoices</CardTitle>
+        <CardTitle className="text-base">Invoices</CardTitle>
         <CardDescription>Every invoice for your subscription and add-ons. Each one is also emailed to you when it's paid.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

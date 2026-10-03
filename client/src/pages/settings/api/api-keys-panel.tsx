@@ -149,7 +149,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
           <Card data-testid="card-api-keys">
             <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
               <div>
-                <CardTitle className="text-lg">API keys</CardTitle>
+                <CardTitle className="text-base">API keys</CardTitle>
                 <CardDescription>Each key is shown in full once, when it's created. Revoke a key you no longer use.</CardDescription>
               </div>
               <Button size="sm" onClick={() => setGenerateOpen(true)} disabled={!apiEnabled} data-testid="button-generate-key">

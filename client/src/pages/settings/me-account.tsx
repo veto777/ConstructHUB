@@ -145,7 +145,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
         // The profile accepts an inline image, so the logo is still kept — but
         // only once the form is saved.
         setCompanyLogoUrl(dataUrl);
-        toast({ title: "Logo not uploaded to storage", description: `${apiErrorMessage(err).replace(/\.?\s*$/, ".")} The image is kept in this form; click Save Changes to store it with your profile.`, variant: "destructive" });
+        toast({ title: "Logo not uploaded to storage", description: `${apiErrorMessage(err).replace(/\.?\s*$/, ".")} The image is kept in this form; click Save changes to store it with your profile.`, variant: "destructive" });
       } finally {
         setLogoUploading(false);
       }
@@ -156,7 +156,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
     <div className="space-y-6">
       <Card data-testid="card-profile">
         <CardHeader>
-          <CardTitle className="text-lg">Profile Information</CardTitle>
+          <CardTitle className="text-base">Profile Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
@@ -295,20 +295,20 @@ function ProfileSection({ user }: { user: SettingsUser }) {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end [&>button]:w-full sm:[&>button]:w-auto">
             <Button
               onClick={() => updateProfileMutation.mutate()}
               disabled={updateProfileMutation.isPending || nameMissing}
               data-testid="button-save-profile"
             >
               <Save className="h-4 w-4 mr-2" />
-              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateProfileMutation.isPending ? "Saving..." : "Save changes"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <ReviewReferralSettings />
+      <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Review referral settings</summary><div className="mt-4"><ReviewReferralSettings /></div></details>
       <GmbProfilesSection />
     </div>
   );
@@ -416,10 +416,10 @@ function GmbProfilesSection() {
     <Card data-testid="card-gmb-profiles">
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <div className="min-w-0">
-          <CardTitle className="text-lg">Google Business Profiles</CardTitle>
+          <CardTitle className="text-base">Google Business Profiles</CardTitle>
           <p className="text-sm text-muted-foreground mt-1">Manage your GMB locations for review requests</p>
         </div>
-        <Button size="sm" className="shrink-0" onClick={() => setShowDialog(true)} data-testid="button-add-gmb-profile">
+        <Button size="sm" variant="outline" className="shrink-0" onClick={() => setShowDialog(true)} data-testid="button-add-gmb-profile">
           <Plus className="h-4 w-4 mr-1" /> Add Profile
         </Button>
       </CardHeader>
@@ -579,7 +579,7 @@ function GmbProfilesSection() {
               disabled={!name.trim() || !googleProfileUrl.trim() || urlInvalid || createMutation.isPending || updateMutation.isPending}
               data-testid="button-save-gmb"
             >
-              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save Changes" : "Add Profile"}
+              {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : editingTemplate ? "Save changes" : "Add Profile"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -601,7 +601,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
     <div className="space-y-6">
       <Card data-testid="card-account">
         <CardHeader>
-          <CardTitle className="text-lg">Account Details</CardTitle>
+          <CardTitle className="text-base">Account details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-border/50">
@@ -615,7 +615,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-border/50">
             <div>
-              <p className="text-sm font-medium">Member Since</p>
+              <p className="text-sm font-medium">Member since</p>
               <p className="text-xs text-muted-foreground mt-0.5">When you joined ConstructHUB</p>
             </div>
             <span className="text-sm" data-testid="text-member-since">
@@ -624,7 +624,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-border/50">
             <div>
-              <p className="text-sm font-medium">Login Method</p>
+              <p className="text-sm font-medium">Login method</p>
               <p className="text-xs text-muted-foreground mt-0.5">How you sign in</p>
             </div>
             <Badge variant="outline" className="gap-1" data-testid="text-login-method">
@@ -642,16 +642,16 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
         </CardContent>
       </Card>
 
-      <BetaAccessSection user={user} />
+      <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>
 
       <Card className="border-destructive/20" data-testid="card-danger-zone">
         <CardHeader>
-          <CardTitle className="text-lg text-destructive">Danger Zone</CardTitle>
+          <CardTitle className="text-base text-destructive">Delete account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium">Delete Account</p>
+              <p className="text-sm font-medium">Delete account</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Ask our support team to permanently delete your account and its data.
               </p>
@@ -807,9 +807,9 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
 
   return (
     <>
-      <Card className="border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-teal-500/5" data-testid="card-beta-access">
+      <Card className="border-border bg-card" data-testid="card-beta-access">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
             <Gift className="h-5 w-5 text-emerald-500" />
             Trial Access Code
           </CardTitle>
@@ -855,10 +855,10 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
       </Card>
 
       {isAdmin && (
-        <Card className="border-violet-500/30 bg-gradient-to-br from-violet-500/5 to-purple-500/5" data-testid="card-admin-beta">
+        <Card className="border-border bg-card" data-testid="card-admin-beta">
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2">
                 <Shield className="h-5 w-5 text-violet-500" />
                 Admin: Trial Management
               </CardTitle>

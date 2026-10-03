@@ -129,9 +129,9 @@ export function CartSheet() {
           <>
             <div className="flex-1 overflow-y-auto space-y-3 py-4">
               {salesItems.length > 0 && (
-                <div className="space-y-2 rounded-lg border border-[#4A6CF7]/30 bg-[#4A6CF7]/5 p-3" data-testid="section-cart-sales">
+                <div className="space-y-2 rounded-lg border border-border bg-card p-3" data-testid="section-cart-sales">
                   <p className="flex items-center gap-1.5 text-sm font-semibold">
-                    <MessageSquare className="h-4 w-4 text-[#4A6CF7]" /> Talk to a sales rep
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" /> Talk to a sales rep
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Anything {formatUsd(SALES_THRESHOLD_CENTS)} or more is priced with a sales rep, so it can't be checked out here.
@@ -145,7 +145,7 @@ export function CartSheet() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 shrink-0 text-muted-foreground"
+                        className="h-10 w-10 shrink-0 text-muted-foreground"
                         aria-label={`Dismiss ${item.name}`}
                         onClick={() => dismissSalesItem(item.id)}
                         data-testid={`button-dismiss-sales-${item.id}`}
@@ -169,9 +169,9 @@ export function CartSheet() {
                     )}
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                        {item.type === "course_module" ? "Course Module" :
-                         item.type === "course_bundle" ? "Course Bundle" :
-                         item.type === "dfy_bundle" ? "Service Bundle" : "Service"}
+                        {item.type === "course_module" ? "Course module" :
+                         item.type === "course_bundle" ? "Course bundle" :
+                         item.type === "dfy_bundle" ? "Service bundle" : "Service"}
                       </Badge>
                     </div>
                   </div>
@@ -182,7 +182,7 @@ export function CartSheet() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      className="h-10 w-10 text-muted-foreground hover:text-destructive"
                       aria-label={`Remove ${item.name}`}
                       onClick={() => { clearCartError(); removeItem(item.id); }}
                       data-testid={`button-remove-cart-item-${item.id}`}
@@ -211,7 +211,7 @@ export function CartSheet() {
                   )}
 
                   <Button
-                    className="w-full bg-[#F97316] hover:bg-[#ea6c10] text-white shadow-lg shadow-orange-500/25"
+                    className="w-full"
                     size="lg"
                     onClick={handleCheckout}
                     disabled={isProcessing}
@@ -224,7 +224,7 @@ export function CartSheet() {
                       </>
                     ) : (
                       <>
-                        Proceed to Checkout
+                        Proceed to checkout
                         <ArrowRight className="h-4 w-4 ml-2" />
                       </>
                     )}
@@ -240,7 +240,7 @@ export function CartSheet() {
                 data-testid="button-clear-cart"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                Clear Cart
+                Clear cart
               </Button>
             </div>
           </>

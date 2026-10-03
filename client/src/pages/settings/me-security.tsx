@@ -24,7 +24,7 @@ export function PasswordSecuritySection({ user }: SettingsSectionProps) {
       ) : user ? (
         <Card data-testid="card-no-password">
           <CardHeader>
-            <CardTitle className="text-lg">Password</CardTitle>
+            <CardTitle className="text-base">Password</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground flex items-start gap-2" data-testid="text-no-password">
@@ -71,11 +71,11 @@ function ChangePasswordCard() {
   return (
     <Card data-testid="card-change-password">
       <CardHeader>
-        <CardTitle className="text-lg">Change Password</CardTitle>
+        <CardTitle className="text-base">Change Password</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="currentPassword">Current Password</Label>
+          <Label htmlFor="currentPassword">Current password</Label>
           <div className="relative">
             <Input
               id="currentPassword"
@@ -97,7 +97,7 @@ function ChangePasswordCard() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="newPassword">New Password</Label>
+          <Label htmlFor="newPassword">New password</Label>
           <div className="relative">
             <Input
               id="newPassword"
@@ -119,7 +119,7 @@ function ChangePasswordCard() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm New Password</Label>
+          <Label htmlFor="confirmPassword">Confirm new password</Label>
           <Input
             id="confirmPassword"
             type="password"
@@ -137,7 +137,7 @@ function ChangePasswordCard() {
             data-testid="button-change-password"
           >
             <Lock className="h-4 w-4 mr-2" />
-            {changePasswordMutation.isPending ? "Updating..." : "Update Password"}
+            {changePasswordMutation.isPending ? "Updating..." : "Update password"}
           </Button>
         </div>
       </CardContent>
@@ -204,7 +204,7 @@ function TwoFactorSection({ user }: { user: SettingsUser | undefined }) {
   return (
     <Card data-testid="card-two-factor">
       <CardHeader>
-        <CardTitle className="text-lg">Two-Factor Authentication</CardTitle>
+        <CardTitle className="text-base">Two-Factor Authentication</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {recoveryCodes.length > 0 && (

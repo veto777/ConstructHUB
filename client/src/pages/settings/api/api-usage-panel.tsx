@@ -62,7 +62,7 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
     <div className="space-y-6">
       <Card data-testid="card-api-usage">
         <CardHeader>
-          <CardTitle className="text-lg">API usage</CardTitle>
+          <CardTitle className="text-base">API usage</CardTitle>
           <CardDescription>Units and requests over the last {days} days, by key. A read is 1 unit (+1 per 100 rows); a write is 5.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

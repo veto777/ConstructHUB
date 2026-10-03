@@ -1,3 +1,4 @@
+import { AppTabsList } from "@/components/app-ui";
 /**
  * API panels (Settings → API keys, Settings → API usage). Each is a standalone
  * component that reads its own endpoints; `ApiPanel` composes them behind
@@ -37,7 +38,7 @@ export function ApiPanel({ tab, onTabChange, keys, usage }: ApiPanelProps = {}) 
   };
   return (
     <Tabs value={active} onValueChange={change} className="space-y-4" data-testid="tabs-api">
-      <TabsList className="h-auto w-full justify-start flex-wrap gap-1 bg-transparent p-0 border-b rounded-none">
+      <AppTabsList>
         {API_TABS.map((t) => (
           <TabsTrigger
             key={t.id}
@@ -48,7 +49,7 @@ export function ApiPanel({ tab, onTabChange, keys, usage }: ApiPanelProps = {}) 
             {t.label}
           </TabsTrigger>
         ))}
-      </TabsList>
+      </AppTabsList>
       <TabsContent value="keys" className="mt-0"><ApiKeysPanel {...keys} /></TabsContent>
       <TabsContent value="usage" className="mt-0"><ApiUsagePanel {...usage} /></TabsContent>
     </Tabs>

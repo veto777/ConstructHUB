@@ -107,7 +107,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
     <div className="space-y-6" data-testid="section-billing">
       <Card data-testid="card-current-plan">
         <CardHeader>
-          <CardTitle className="text-lg">Current plan</CardTitle>
+          <CardTitle className="text-base">Current plan</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-primary/5 border border-primary/10 rounded-lg">
@@ -178,7 +178,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                   {PLANS[key].name}
                   {plan?.key === key && <Badge variant="outline" className="text-[9px] px-1 py-0">{view.isLegacy ? "Matches" : "Current"}</Badge>}
                 </div>
-                <p className="text-lg font-bold text-primary mt-1">{formatUsd(planPriceCents(PLANS[key], interval))}{intervalSuffix(interval)}</p>
+                <p className="text-base font-bold text-primary mt-1">{formatUsd(planPriceCents(PLANS[key], interval))}{intervalSuffix(interval)}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{PLANS[key].tagline}</p>
               </a>
             ))}
@@ -191,7 +191,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
       {plan && (
         <Card data-testid="card-addons">
           <CardHeader>
-            <CardTitle className="text-lg">Add-ons</CardTitle>
+            <CardTitle className="text-base">Add-ons</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
@@ -331,7 +331,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
 
       <Card data-testid="card-payment-method">
         <CardHeader>
-          <CardTitle className="text-lg">Payment method &amp; invoices</CardTitle>
+          <CardTitle className="text-base">Payment method &amp; invoices</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-muted/50 rounded-lg">
@@ -396,7 +396,7 @@ export function UsageCard({ entitlements }: { entitlements: EntitlementsInfo }) 
   return (
     <Card data-testid="card-usage">
       <CardHeader>
-        <CardTitle className="text-lg">Usage this month</CardTitle>
+        <CardTitle className="text-base">Usage this month</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {admin && (

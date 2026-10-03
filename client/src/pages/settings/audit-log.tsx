@@ -161,7 +161,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
       <Card>
         <CardContent className="p-0">
           {/* The four-column table needs ~34rem; below xl (app sidebar + this page's padding) a row stacks its fields instead. */}
-          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold  text-muted-foreground">
             <span>Time</span><span>Event</span><span>IP</span><span>Device</span>
           </div>
           {rows.length > 0 && shown.length === 0 && (
