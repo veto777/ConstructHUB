@@ -356,7 +356,7 @@ function AdSpyTab() {
         <div>
           <h2 className="text-base font-semibold flex items-center gap-2">
             <Megaphone className="w-5 h-5 text-orange-500" />
-            Public Ad activity
+            Public ad activity
           </h2>
           <p className="text-sm text-muted-foreground">Track who's advertising on Google for your target keywords.</p>
         </div>
@@ -410,7 +410,7 @@ function AdSpyTab() {
                 data-testid="button-add-keyword"
               >
                 {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Add Keyword
+                Add keyword
               </Button>
             </div>
           </div>
@@ -892,7 +892,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-sm font-semibold">All Competitors</h3>
+                <h3 className="text-sm font-semibold">All competitors</h3>
                 <div className="space-y-2 max-h-[800px] overflow-y-auto pr-1">
                   {listings.map((listing: any, idx: number) => {
                     const bsBadge = getBsBadge(listing.bsScore || 0);
@@ -962,7 +962,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                               data-testid={`button-review-analysis-${listing.id}`}
                             >
                               <Eye className="w-3 h-3 mr-1" />
-                              {isExpanded ? "Hide" : "View"} Review Analysis
+                              {isExpanded ? "Hide" : "View"} Review analysis
                               {isExpanded ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                             </Button>
                             {isExpanded && <ReviewAnalysisPanel analysis={listing.reviewAnalysis} />}
