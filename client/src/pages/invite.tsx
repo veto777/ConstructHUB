@@ -36,9 +36,9 @@ export default function InvitePage() {
 
   const card = (body: React.ReactNode) => (
     <AppPage width="narrow">
-      <Section contentClassName="space-y-4" testId="card-invite">
+      <div className="space-y-4" data-testid="card-invite">
         {body}
-      </Section>
+      </div>
     </AppPage>
   );
 
