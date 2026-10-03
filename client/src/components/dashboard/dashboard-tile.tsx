@@ -14,7 +14,7 @@ import { formatCount, formatMetricValue, percentOf, toneBar, toneText, DASH } fr
 const usedOf = (m: DashboardMetric): number | null => (typeof m.value === "number" ? m.value : null);
 
 /** The metric a tile leads with: label, big tabular number, then the meter or hint. */
-const HERO_SIZE = { lg: "text-3xl", md: "text-2xl", sm: "text-xl" } as const;
+const HERO_SIZE = { lg: "text-2xl", md: "text-2xl", sm: "text-xl" } as const;
 
 export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; metric: DashboardMetric; size?: keyof typeof HERO_SIZE }) {
   const value = formatMetricValue(metric);
@@ -117,7 +117,7 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
     >
       <div className="flex items-start gap-3">
         <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${muted ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground`}
           aria-hidden="true"
         >
           <Icon className="h-[18px] w-[18px]" />
@@ -128,7 +128,7 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
         <div className="shrink-0 pt-1"><StatusPill tile={tile} /></div>
       </div>
 
-      <div className="mt-4 flex flex-1 flex-col">
+      <div className="mt-3 flex flex-1 flex-col">
         {tile.status === "ok" && hero ? (
           <dl>
             <MetricHero tileKey={tile.key} metric={hero} />

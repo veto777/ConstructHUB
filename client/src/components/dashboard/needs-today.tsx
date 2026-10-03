@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlarmClock, ArrowRight, Check, CircleCheck, RotateCcw, TriangleAlert, X } from "lucide-react";
+import { MoreHorizontal, AlarmClock, ArrowRight, Check, CircleCheck, RotateCcw, TriangleAlert, X } from "lucide-react";
 import type { DashboardAttentionItem } from "@shared/dashboard";
 import { dashboardItemSnoozeOnly, snoozeUntil, type DashboardClearedItem } from "@shared/dashboard-prefs";
 import { Card } from "@/components/ui/card";
@@ -192,13 +192,13 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
           )}
         </div>
       </div>
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <ul className="mt-3 divide-y">
         {items.map((item) => {
           const name = `${item.label} (${item.source})`;
           return (
             <li
               key={item.key}
-              className="group/item flex h-full items-stretch rounded-lg border transition-colors hover:bg-accent/60"
+              className="group/item flex items-center transition-colors hover:bg-accent/60"
               data-testid={`needs-${item.key}`}
               data-tone={item.tone}
             >
@@ -213,41 +213,29 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs text-muted-foreground">{item.source}</span>
                   <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-                    <span className={`text-lg font-semibold tabular-nums leading-tight ${toneText(item.tone)}`}>{amount(item)}</span>
+                    <span className={`text-sm font-semibold tabular-nums leading-tight ${toneText(item.tone)}`}>{amount(item)}</span>
                     <span className="text-sm font-medium">{item.label}</span>
                   </span>
                   {item.hint && <span className="mt-0.5 block text-xs text-muted-foreground">{item.hint}</span>}
                 </span>
                 <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
               </DashLink>
-              <span className="flex shrink-0 items-center gap-0.5 border-l p-1 sm:flex-col sm:justify-center">
-                {!dashboardItemSnoozeOnly(item.key) && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={ICON_BTN}
-                    title="Done"
-                    aria-label={`Done: ${name}`}
-                    onClick={() => clear([item], null)}
-                    data-testid={`button-needs-done-${item.key}`}
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                )}
+              <span className="flex shrink-0 items-center">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
                       className={ICON_BTN}
-                      title="Snooze"
-                      aria-label={`Snooze: ${name}`}
+                      title="More actions"
+                      aria-label={`More actions: ${name}`}
                       data-testid={`button-needs-snooze-${item.key}`}
                     >
-                      <AlarmClock className="h-4 w-4" aria-hidden="true" />
+                      <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {!dashboardItemSnoozeOnly(item.key) && <DropdownMenuItem onSelect={() => clear([item], null)} data-testid={`button-needs-done-${item.key}`} aria-label={`Done: ${name}`}>Done</DropdownMenuItem>}
                     <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Snooze “{item.label}”</DropdownMenuLabel>
                     <DropdownMenuItem onSelect={() => clear([item], snoozeUntil("tomorrow"))} data-testid={`menu-needs-snooze-tomorrow-${item.key}`}>
                       Until tomorrow

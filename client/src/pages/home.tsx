@@ -13,6 +13,7 @@ import {
 } from "@shared/dashboard";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { useToast } from "@/hooks/use-toast";
+import { AppPage } from "@/components/app-ui";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DashboardHeader, UsageCard } from "@/components/dashboard/dashboard-header";
@@ -119,8 +120,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-screen-2xl px-4 py-6 font-sans sm:px-6" data-testid="page-dashboard">
+    <AppPage testId="page-dashboard">
       {body}
-    </div>
+    </AppPage>
   );
 }
