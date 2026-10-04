@@ -19,6 +19,21 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 🔁 2026-10-04 — Alpine's CRM re-synced from Housecall Pro
+- A fresh read-only export (`analysis/hcp-export-2026-10-04/`, gitignored) was imported into the Alpine Exteriors org
+  with `scripts/import-hcp.ts`, after a database backup. Zero errors. It created 33 customers, 48 estimates,
+  21 invoices and 16 jobs, and updated 62 estimates and 12 invoices. The CRM now matches HCP's dashboard: 40
+  unscheduled jobs ($1,321,532.67) and 35 open invoices ($744,576.96). Open estimates also match at 36 once one
+  record is set aside.
+- That record is estimate **#2686** (Karen Belli, $21,150, status sent), which was deleted in HCP after July. It was
+  left in place; the owner decides whether to remove it.
+- How to repeat the sync: HCP's API is MAX-only and Alpine is on Essentials, so the session comes from the owner's
+  browser. In DevTools, open Application → Cookies → pro.housecallpro.com and copy the value of
+  `_housecall-web_session_with_domain` (Chrome strips cookies from "Copy as cURL"). Load it into the scraper profile
+  `analysis/hcp-crawl/profile` and run `dump.js` (with the `package.json` that says commonjs) in a new folder. Then
+  run `import-hcp.ts`: first on a test-DB org, then on production through an SSH tunnel to vb11:5433, after a
+  pg_dump.
+
 ## 🎨 2026-10-03 — every signed-in platform page redesigned ("less is more")
 - Owner: "All these pages are so clunky and not user friendly … make them flow and look cleaner simpler and better!
   Less is more … Better design too." Scope: the ~37 signed-in platform pages. The CRM and marketing pages are separate.
