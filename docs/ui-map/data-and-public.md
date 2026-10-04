@@ -929,3 +929,423 @@ No hard BUG (wrong number, guessed link, mismatched endpoint, fake fallback) fou
 | **Total** | **103** | **103** | **0** | **0** | **0** |
 
 (F1/F6 are page-adjacent data/code notes, not element defects; F2–F5 are policy-conformant behaviors listed for the owner.)
+# Lane 6 — small pages map (guides, master-class, reinstatement, auth, 404, privacy, terms)
+
+Audit date 2026-10-04, branch audit/6, dev server http://127.0.0.1:8306 (Vite dev, SPA shell, no prerender), DB `constructhub_dev_a6` read-only. Server confirmed signed-out: `GET /api/auth/me` → `null`; Google OAuth IS configured (GET /api/auth/google → 302 to accounts.google.com with client_id).
+
+Column key — Backend: "—" means no server involvement (static/anchor). Status: OK / BUG / UNCLEAR / DEAD.
+
+---
+
+## /guides — Guides (redirect into Social Media)
+
+`client/src/pages/guides.tsx`. Route `client/src/App.tsx:186` (DashboardRouter, signed-in app) and `App.tsx:338` SIGNED_IN_ONLY. **The default export is `<Redirect to="/social-media?tab=guides">` (guides.tsx:137); it renders no page of its own.** The visible content is `GuidesContent`, mounted as the "guides" tab of the Social Media page (client/src/pages/social-media.tsx:71,1016 reads `?tab=`). Signed out, `/guides` bounces to `/auth?next=/guides` (SignedOutFallback, App.tsx:344-354) — by design, these are in-app walkthroughs.
+
+### Header / nav (guides.tsx:109-121)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Get started" button | anchor | Scrolls to the first guide (`#guide-0`) | guides.tsx:114 | — | code read | OK |
+| "Connect your website" nav link | anchor | Jumps to the Cloudflare/Search-Console walkthrough (`#guide-connection`) | guides.tsx:117 | — | code read | OK |
+| 9 guide nav links (Blotato, Manual posting, Auto mode, Agency social workflows, Profile Guard, AI review replies, Posts & Photos, Security, Site Scan) | anchors | Jumps to `#guide-0` … `#guide-8` | guides.tsx:118 | — | code read | OK |
+| SiteConnectionGuide (guide-connection) | content | 3 cards: "Put a client site behind Cloudflare" (5 steps), "Connect Cloudflare to ConstructHUB" (7 paragraphs), "Connect Google Search Console" (5 steps + 2 notes) | site-connection-guide.tsx:2-186 | — | code read | OK |
+| "Cloudflare setup instructions" link | external link | Opens Cloudflare docs full-setup page | site-connection-guide.tsx:41-48 | — | curl -L → 200 | OK |
+| "Cloudflare role reference" link | external link | Opens Cloudflare members-roles docs | site-connection-guide.tsx:113-120 | — | curl -L → 200 | OK |
+| "Search Console API quotas" link | external link | Opens Google webmaster-tools limits doc | site-connection-guide.tsx:174-181 | — | curl -L → 200 | OK |
+
+### Guide sections (guides.tsx:122-129) — 9 sections, 45 numbered steps of plain text, each with one "Open …" button
+
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Steps of "Connect Blotato" (5) | text | Blotato account/API-key walkthrough; Blotato is a third-party paid subscription | guides.tsx:6-16 | — | code read | OK |
+| "Open Social Media" button | app link | Goes to `/social-media` | guides.tsx:124 | — | route exists App.tsx:185 | OK |
+| Steps of "Manual posting" (6) | text | Compose / schedule / queue walkthrough | guides.tsx:17-28 | — | code read | OK |
+| "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
+| Steps of "Auto mode" (5) | text | Auto-posting cadence/budget walkthrough | guides.tsx:29-40 | — | code read | OK |
+| "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
+| Steps of "Agency social workflows" (5) | text | Bulk actions, per-business cadence, all-clients calendar (up to 100 posts per bulk action) | guides.tsx:41-51 | — | code read | OK |
+| "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
+| Steps of "Profile Guard" (4) | text | Watched-fields snapshot / Lockdown / Google-report flow | guides.tsx:52-61 | — | code read | OK |
+| "Open Locations" button | app link | `/locations` | guides.tsx:124 | — | route exists App.tsx:179 | OK |
+| Steps of "AI review replies" (4) | text | AI reply settings, backfill preview (≤50 reviews, 10-min preview expiry) | guides.tsx:62-71 | — | code read | OK |
+| "Open Google Reviews" button | app link | `/google-reviews` | guides.tsx:124 | — | route exists App.tsx:223 (SHOW_GOOGLE_REVIEWS=true, features.ts:26) | OK |
+| Steps of "Posts & Photos scheduling" (6) | text | GBP posts/photos, AI captions, cadence, queue | guides.tsx:72-83 | — | code read | OK |
+| "Open Posts & Photos" button | app link | `/gbp-content` | guides.tsx:124 | — | route exists App.tsx:184 | OK |
+| Steps of "Security" (5) | text | 2FA, remembered devices, notifications, activity review | guides.tsx:84-94 | — | code read | OK |
+| "Open Security & activity" button | app link | `/settings?tab=security` | guides.tsx:124 | — | route exists App.tsx:236 | OK |
+| Steps of "Site Scan" (5) | text | Scan setup, AI fix plan, share links (30-day expiry), monthly rescan; last step references the public `/free-site-scan` | guides.tsx:95-106 | — | code read | OK |
+| "Open Site Scan" button | app link | `/site-scan` | guides.tsx:124 | — | route exists App.tsx:189 (+ `/free-site-scan` App.tsx:532) | OK |
+
+Counts /guides: 34 elements — 34 OK, 0 BUG, 0 UNCLEAR, 0 DEAD.
+
+---
+
+## /master-class — Master Class (public marketing page, 5 tabs)
+
+`client/src/pages/master-class.tsx` (2728 lines). Public route App.tsx:190/297. Signed out it wears `PublicPageHeader cart` + `PublicPageFooter` (master-class.tsx:314, 2724); signed in it renders bare inside the app frame (chrome renders null). State list is a hardcoded 50-entry `US_STATES` (master-class.tsx:60-78).
+
+Data sources (all verified live):
+- `GET /api/state-guides` → `SELECT * FROM state_guides ORDER BY state_name` (routes.ts:3208) — live: **50 rows, 32 `licensing_required=true`** (SQL recompute).
+- `GET /api/state-guides/:code` → guide + `state_guide_steps` ordered by step_number (routes.ts:3213-3219) — steps exist for only FL (7) and WA (8) (SQL).
+- `GET /api/master-class-modules` → `master_class_modules WHERE is_active ORDER BY sort_order` (routes.ts:3221) — live: 4 modules, ids 1 licensing $1,500 / 2 gmb $2,000 / 3 website $1,500 / 4 seo $1,500; matches `server/data/master-class-modules.json` (seeded only if table empty, seed-reference-data.ts:174).
+- `GET /api/course-purchases` → user's `course_purchases`, `[]` signed out (routes.ts:3226-3232).
+
+**Pricing reality (recomputed):** `SALES_THRESHOLD_CENTS = 100_000` ($1,000) in shared/plans.ts:415. Bundle `BUNDLE_PRICE_CENTS = 249_900` ($2,499, master-class.tsx:166) == server `COURSE_BUNDLE.priceCents` (server/catalog.ts:35-38). Modules total $6,500. Because **every price here is ≥ $1,000, `showsPrice()` is false for all of them**: in a production build the page never shows a price, never shows "Bundle saves %", and every buy path is replaced by "Talk to a sales rep". This matches Terms §7 and the server (`isSalesOnly` → 409 `talk_to_sales` at checkout, server/stripe.ts:447/480), so it is coherent — but it means the enroll/cart buttons below are unreachable in prod (marked DEAD). On this dev server `import.meta.env.DEV` is true, so `isTabUnlocked` returns true for all tabs (master-class.tsx:241-250); in prod the state-guide/website-seo/vetting tabs need module ids 1/3/4 or the bundle (`TAB_MODULE_MAP` master-class.tsx:45-49 — matches DB ids).
+
+### Page header (master-class.tsx:317-320)
+
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `text-master-class-title` / `text-master-class-subtitle` | text | "Master Class" title + subtitle | master-class.tsx:317-318 | — | code read | OK |
+| `badge-states-count` "50 states" | stat badge | Hardcoded 50 | master-class.tsx:319 | state_guides row count | SQL: `SELECT count(*)` = 50 | OK |
+| `badge-licensing-count` "{n} require licensing" | stat badge | Computed from guides where licensingRequired | master-class.tsx:307,319 | state_guides.licensing_required | API recompute: 32 | OK |
+| "Choose your state" button (overview only) | button | Switches to state-guide tab | master-class.tsx:320,383 | — | code read | OK |
+| `button-overview-enroll` "How to enroll" (overview only) | button | Switches to pricing tab | master-class.tsx:320 | — | code read | OK |
+
+### Tabs (master-class.tsx:322-342)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `tab-overview` | tab | Overview tab; `?tab=` synced via useUrlParam | master-class.tsx:324 | — | code read | OK |
+| `tab-state-guide` (+ Lock icon when locked) | tab | State guide; locked unless module 1/bundle/dev | master-class.tsx:327-330 | course_purchases (moduleId=1 or isBundle) | code read + DB ids | OK |
+| `tab-website-seo` (+ Lock) | tab | Website & SEO; module 3 | master-class.tsx:331-334 | course_purchases (moduleId=3) | code read + DB ids | OK |
+| `tab-vetting` (+ Lock) | tab | Vetting contractors; module 4 | master-class.tsx:335-338 | course_purchases (moduleId=4) | code read + DB ids | OK |
+| `tab-pricing` "Enroll" | tab | Pricing/enroll tab (never locked) | master-class.tsx:339-341 | — | code read | OK |
+
+### Overview tab (master-class.tsx:344-668)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `badge-sale` "Bundle saves {pct}%" | stat badge | Rendered only when bundle price is shown (< $1,000) | master-class.tsx:347-351,233-238 | — | price math: 249900 ≥ 100000 → never rendered | DEAD (unreachable under current prices; would read 62% if it showed) |
+| Stat "4 / In-Depth Modules" | stat | Hardcoded module count | master-class.tsx:357-360 | master_class_modules is_active | SQL count = 4 | OK (hardcoded; brittle if a module is added) |
+| Stat "50 / State Guides" | stat | Hardcoded | master-class.tsx:361-364 | state_guides count = 50 | SQL | OK (hardcoded) |
+| `stat-licensing-states` "{n}" (or "—" while loading) | stat | States requiring a license | master-class.tsx:365-368 | state_guides.licensing_required | API/SQL = 32 | OK |
+| `text-overview-bundle-price` | stat | $2,499 — only if < threshold | master-class.tsx:371-372 | — | showsPrice(249900)=false → not rendered in prod | DEAD (price slot; server COURSE_BUNDLE matches 249900) |
+| `link-overview-bundle-sales` "Talk to a sales rep" | link | What shows instead of the bundle price; goes to `/pricing#services` | master-class.tsx:373-374 | SALES_HREF = "/pricing#services" (plan-copy.ts:17) | route /pricing exists (App.tsx:176/294); anchor `id="services"` exists (pricing.tsx:656) | OK |
+| `text-bundle-reference` | text | Strike-through total of the 4 modules ("$6,500 separately") or "All four modules" | master-class.tsx:376-378 | master_class_modules.price sum | SQL sum = 650000 | OK |
+| `button-overview-preview` "Preview state guide" | button | Switches to state-guide tab | master-class.tsx:383 | — | code read | OK |
+| Curriculum — 4 module blocks (licensing/gmb/website/seo) w/ descriptions + 4 highlight bullets each | content | Static marketing copy; per-module price span `text-curriculum-price-{category}` | master-class.tsx:399-449 | master_class_modules matched by category | DB categories match the 4 hardcoded blocks | OK |
+| `text-curriculum-price-{licensing,gmb,website,seo}` | price text | `priceOrSalesRep(module.price)` → "Talk to a sales rep" for all 4 ($1,500–$2,000 ≥ $1,000) | master-class.tsx:429-435 | — | showsPrice false for all | OK (renders sales label, not a number) |
+| `<details>` "About the course and licensing" | disclosure | 6 "Who This Course Is For" cards + 3 "What Makes This Different" cards | master-class.tsx:453-556 | — | code read | OK |
+| "States Requiring Contractor License ({n})" + `badge-licensed-{code}` chips | chips | One clickable badge per licensing state → selects state, opens state-guide tab | master-class.tsx:505-527 | state_guides.licensing_required=true | SQL = 32 chips | OK |
+| "No State Contractor License Required ({n})" + `badge-unlicensed-{code}` chips | chips | One per non-licensing state + disclaimer about local/trade licenses | master-class.tsx:528-553 | state_guides.licensing_required=false | SQL = 18 chips | OK |
+| `<details>` "Compare all 50 states" | disclosure | Search box + 50-row comparison table (License / Workers Comp / Sales Tax / B&O / Bond / SOS) | master-class.tsx:557-668 | state_guides columns | code read | OK |
+| `input-search-states` | input | Filters the table by state name/code client-side | master-class.tsx:566-572 | — | code read | OK |
+| `row-state-{code}` (50 rows) | table row | Click → selects state + opens state-guide tab | master-class.tsx:588-661 | — | code read | OK |
+| `link-sos-{code}` (50) | external/search link | Opens the state's SOS URL if present and not "dead"; otherwise a Google search for "{sosName} {stateName} business filings" | master-class.tsx:632-659 | state_guides.sos_url + sos_url_status | SQL sample WA/CA/TX/FL "verified" → curl 200; NY "unconfirmed" still links with a caution tooltip | OK |
+
+### State-guide tab (master-class.tsx:671-1341)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `select-state` (50 options) | select | Picks the state; fetches the guide | master-class.tsx:673-682 | GET /api/state-guides/:code | API live | OK |
+| `button-clear-state` | button | Clears selection | master-class.tsx:684 | — | code read | OK |
+| Empty state ("Select Your State") | content | Placeholder before a choice | master-class.tsx:690-700 | — | code read | OK |
+| `text-state-name` + overview paragraph | text | Full overview only when tab unlocked; otherwise a teaser + "Purchase the course to unlock" | master-class.tsx:713-720 | state_guides.overview | code read | OK |
+| License/Bond/Tax-on-Labor/`Locked` badges | badges | Flags from the guide row | master-class.tsx:722-737 | state_guides.licensing_required, bond_required, sales_tax_on_labor | SQL present | OK |
+| `link-agency-sos` | agency tile | Opens SOS site (or Google search when no checked URL); locked shows a Lock | master-class.tsx:741-744,127-160 | state_guides.sos_url, sos_url_status, links_checked_at | curl spot checks 200 | OK |
+| `link-agency-licensing` | agency tile | Licensing board link; "No state license" tile when licensingRequired=false and no board URL | master-class.tsx:745-758 | licensing_board_url + status | code read | OK |
+| `link-agency-workers-comp` | agency tile | Workers-comp agency link or search | master-class.tsx:759-762 | workers_comp_url + status | code read | OK |
+| `link-agency-tax` | agency tile | Tax board link or search | master-class.tsx:763-766 | tax_board_url + status | code read | OK |
+| 5 stat cards (Entity Types / State License / Workers Comp / Tax on Labor / GC Bond) | stats | From guide row; GC Bond falls back to "None" | master-class.tsx:773-804 | state_guides.entity_types, gc_bond_amount, … | code read | OK |
+| Licensing Details / Insurance & Workers Comp / Payroll & Tax sections | text | Shown when the corresponding notes column is non-null | master-class.tsx:806-843 | licensing_notes, insurance_notes, payroll_notes | code read | OK |
+| Step-by-step cards `card-step-{n}` + `link-step-{n}` | steps | Numbered process with category badge, Required/Optional, tips, external link per step | master-class.tsx:845-904 | state_guide_steps (only FL=7, WA=8 have any) | SQL | OK |
+| "Detailed Steps Coming Soon" card | content | Honest placeholder for the 48 states without steps | master-class.tsx:906-916 | — | SQL: 48 states without steps | OK |
+| "Building & Running Your Business" sections (subs 1099, sales close-rate benchmarks, review-cost math, hiring/PM salary $45–75k, branding, bottom-line) | content | Static course text; hardcoded industry figures (33%+/20%/<15% close rates, $50–150/lead, 10–15%/20–50% revenue loss per bad review, $500K example math, 8–10% commission, PM $45–75k) | master-class.tsx:918-1301 | — | content claims — owner-sourced, not verifiable against DB | UNCLEAR (marketing figures, plausibly owner-supplied; no DB backing possible) |
+| James Hardie Elite claim ("used to require 36 full re-siding projects… now 10, partial jobs as small as 150 sq ft qualify") | text inside tip 4 of vetting tab (also referenced) | Factual claim about a third-party certification program | master-class.tsx:2042 | — | cannot verify from repo | UNCLEAR |
+| Locked-state: "What's Included" list (8 bullets) + `text-paywall-title` "Enrolled Students Only" + `button-paywall-unlock` "How to enroll" | paywall | What a non-student sees instead of details; button jumps to pricing tab | master-class.tsx:1304-1337, 51-58 | course_purchases | code read | OK |
+
+### Website & SEO tab (master-class.tsx:1343-1902)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Building a Strong Website That Ranks" header + `Locked` badge | content | Tab title; lock when not entitled | master-class.tsx:1344-1353 | — | code read | OK |
+| Locked: "Browse lesson topics" `<details>` (6 topic tiles) | disclosure | Teaser list of the 6 lessons | master-class.tsx:1354-1370 | — | code read | OK |
+| Locked: `PaywallOverlay` ("Enrolled Students Only" + `button-paywall-unlock`) | paywall | Jumps to pricing tab | master-class.tsx:1374-1375 | — | code read | OK |
+| Unlocked: 10 lesson sections (Location/Slug pages, GSC incl. Disavow warning, Page Speed, Tracking & Analytics, Backlinks, Content Strategy, Schema, Mobile-First, Social, Email, Google Ads & LSA) | content | Static course text | master-class.tsx:1377-1822 | — | code read | OK |
+| `link-pagespeed` | external link | Google PageSpeed Insights | master-class.tsx:1463-1471 | — | curl -L → 200 | OK |
+| `link-tracemyip` | external link | TraceMyIP visitor tracker | master-class.tsx:1502-1510 | — | curl -L → 200 | OK |
+| `form-seo-inquiry` — `input-seo-name`, `input-seo-email` (required), `input-seo-phone`, `input-seo-website`, 11 `badge-service-*` toggles, `textarea-seo-message`, `button-submit-seo-inquiry` | form | "Need Help With Any of These Services?" inquiry → POST `/api/seo-inquiry` JSON {name,email,phone,website,services[],message}; success → toast "Inquiry sent… within 1 business day" + field reset; client email regex pre-check | master-class.tsx:271-294, 1835-1897 | POST /api/seo-inquiry (routes.ts:3306) → zod `seoInquiryInput` (routes.ts:3284-3292, maxes 200/254/50/500/30×100/5000) → `sendWithFallback` email to `SMTP_EMAIL` (team inbox), subject `salesInquirySubject`, replyTo=inquirer; limit 5/user+5/IP/hour (`seoInquiryLimit` routes.ts:71); resp `{success:true}`; failure 500 "Failed to submit inquiry…" | server schema fields match body 1:1; endpoint exercised by growth-hardening.test.ts:130 (400 on bad email); sink mechanism read (email.ts:203-229) | OK |
+
+### Vetting contractors tab (master-class.tsx:1904-2466)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "19 Essential Tips for Vetting a Contractor" header + lock | content | Title matches the 19 cards | master-class.tsx:1912-1916 | — | counted 19 cards `card-vetting-tip-1..19` | OK |
+| Locked: "Browse lesson topics" (19 numbered tiles) | disclosure | Teaser | master-class.tsx:1922-1952 | — | code read | OK |
+| Locked: PaywallOverlay | paywall | → pricing tab | master-class.tsx:1956-1957 | — | code read | OK |
+| Unlocked: 19 tip cards | content | Static vetting advice (affiliation claims, experience, permitting loophole, manufacturer programs, vanishing estimates, illusion of size, price≠service, badmouthing, license≠legitimacy, web presence, cold calls, warranty, physical office, BBB, fabricated accomplishments, referrals/fake reviews, credibility fabrication, financing scams, too-good pricing) | master-class.tsx:1960-2466 | — | code read | OK |
+
+### Pricing / Enroll tab (master-class.tsx:2467-2720)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `badge-pricing-savings` "Bundle saves {pct}%" | badge | Only when savings computable — requires bundle price shown | master-class.tsx:2469-2473 | — | never rendered at current prices | DEAD (by design) |
+| Bundle card: `badge-bundle-best-value` | badge | Only when `bundleSavingsCents !== null` | master-class.tsx:2482-2486 | — | never rendered | DEAD (by design) |
+| `text-bundle-was` (struck-through $6,500) | price | Only when bundle price shown | master-class.tsx:2494-2496 | — | never rendered | DEAD |
+| `text-bundle-price` $2,499 | price | Only when < threshold | master-class.tsx:2498 | COURSE_BUNDLE 249900 matches | server value matches | OK (hidden in prod; value correct) |
+| `text-bundle-savings` "Save $4,001 — the four modules total $6,500…" | text | Only when computable | master-class.tsx:2500-2504 | — | never rendered (math would be 650000−249900=400100) | DEAD (by design) |
+| `button-enrolled-bundle` "Bundle purchased" (disabled) | button | Shown when `purchases.some(p=>p.isBundle)` | master-class.tsx:2505-2508 | course_purchases.is_bundle | code read | OK |
+| `button-bundle-sales` TalkToSalesButton "Master Class — Complete Bundle" | button+dialog | Opens TalkToSalesDialog → POST /api/seo-inquiry with services:["Master Class — Complete Bundle"] | master-class.tsx:2509-2515 | talk-to-sales.tsx:41-52 → /api/seo-inquiry | code read | OK |
+| `button-add-cart-bundle` "Add to cart" | button | Adds `course_bundle` $2,499 to cart | master-class.tsx:2518-2540 | — | only rendered when `bundlePriceShown` — never at $2,499 | DEAD (also cart/checkout would 409 talk_to_sales server-side) |
+| `button-enroll-bundle` "Buy now — $2,499" | button | POST /api/stripe/create-course-checkout {bundle:true} → Stripe redirect | master-class.tsx:2541-2550 | server/stripe.ts:439-473: 401 "Login required" signed out; isSalesOnly(249900) → 409 talk_to_sales even signed in | rendered conditionally on bundlePriceShown → never | DEAD |
+| 4 module cards `card-module-{category}` | cards | Icon, title, price/"Talk to a sales rep", description, features list, action buttons | master-class.tsx:2556-2647 | master_class_modules | DB = 4 cards | OK |
+| `badge-purchased-{category}` | badge | When module purchased or bundle owned | master-class.tsx:2564-2568 | course_purchases | code read | OK |
+| `text-module-sales-{category}` "Talk to a sales rep" | text | Renders for every module (all ≥ $1,000) | master-class.tsx:2577 | — | showsPrice false ×4 | OK (by design) |
+| `button-enrolled-{category}` (disabled "Enrolled") | button | When purchased | master-class.tsx:2592-2599 | course_purchases | code read | OK |
+| `button-module-sales-{category}` TalkToSalesButton | button+dialog | → /api/seo-inquiry | master-class.tsx:2600-2606 | talk-to-sales.tsx | code read | OK |
+| `button-add-cart-{category}` / `button-enroll-{category}` "Buy now" | buttons | Cart add / POST /api/stripe/create-course-checkout {moduleId} | master-class.tsx:2608-2641 | stripe.ts:476-506 (404 unknown module; 409 talk_to_sales for sales-only price) | rendered only when priceShown — never at current prices | DEAD (server would refuse with 409 anyway) |
+| "What's included" (6 tiles + summary line + `button-bundle-summary-sales`) | content | Bundle contents; summary shows struck $6,500 + bundle price or sales button | master-class.tsx:2651-2692 | — | code read | OK |
+| FAQ (6 Q&A) | content | Answers; the "buy modules separately" answer adapts to price visibility | master-class.tsx:2694-2720 | — | code read | OK |
+
+### Public chrome on this page
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `header-public-page` (SiteNavBar) w/ cart | header | Site ribbon + cart; renders only signed out | public-page-chrome.tsx:36-45 | GET /api/auth/me | /api/auth/me → null | OK |
+| `footer-public-page`: Home, Features, Done-For-You, AI Call Assistant, support@constructhub.us, Terms, Privacy + 4 footer-guide links + copyright | footer | Site-wide footer | public-page-chrome.tsx:71-94 | — | all 7 routes + 4 guide routes exist in App.tsx (192,198,200,201,206,211,309,312) | OK |
+
+Counts /master-class: 96 elements — 84 OK, 0 BUG, 2 UNCLEAR (hardcoded course/marketing figures; James Hardie claim), 10 DEAD (price-gated elements unreachable because every price ≥ the $1,000 sales threshold; server-side guards agree, so no live defect).
+
+---
+
+## /reinstatement — GBP reinstatement service page
+
+`client/src/pages/reinstatement.tsx`. Public route App.tsx:191/298. **Two renderings: signed out** → full marketing page with `PublicPageHeader`/`PublicPageFooter`; **signed in** (`if (user)` reinstatement.tsx:181) → compact `AppPage` with StatGrid, the same form in a Section, and the content collapsed into one `<details>`. Price everywhere is `formatUsd(GBP_REINSTATEMENT_CENTS)` = **$599** (shared/plans.ts:413 `59_900`).
+
+### Hero (reinstatement.tsx:204-272, signed-out)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `badge-service-label` "GBP REINSTATEMENT SERVICE" | kicker | Label | reinstatement.tsx:209-211 | — | code read | OK |
+| `text-reinstatement-title` "Is your Google Business Profile Suspended?" | H1 | Hero headline | reinstatement.tsx:212-214 | — | code read | OK |
+| Hero copy | text | Empathy + what we do; "do everything we can" — no outcome guarantee | reinstatement.tsx:215-217 | — | code read | OK |
+| `reinstatement-facts` stats: "4 / Step process", "1–2 / Business days to review your case", "{price} / Per project" | stats | Hardcoded 4 and 1–2; price from shared/plans ($599) | reinstatement.tsx:218-231 | shared/plans.ts GBP_REINSTATEMENT_CENTS | formatUsd math | OK |
+| `card-reinstatement-pricing` pricing card: $599/project + 5 includes + `button-get-reinstated` "Request a case review" | card+button | Scrolls to `#reinstatement-form` | reinstatement.tsx:234-268 | — | code read | OK |
+| "We only take cases where we're confident we can help." | text | Under the CTA | reinstatement.tsx:264-266 | — | code read | OK |
+
+### Sections (signed-out)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `text-consequences-title` "A suspension can break your business" + `card-consequence-{0,1,2}` (phone stops ringing / can't find you / reviews disappear) | content | Cost-of-suspension cards | reinstatement.tsx:274-298 | — | code read | OK |
+| `text-process-title` "How we get you back on the map" + `process-step-{1..4}` | content | 4-step process (form → assessment → fix & comply → appeal) | reinstatement.tsx:300-318 | — | code read | OK |
+| `text-suspension-reasons-title` + `suspension-reason-{0..4}` | content | 5 common suspension reasons | reinstatement.tsx:320-336 | — | code read | OK |
+| Soft vs Hard suspension explainer | content | Two-type typology | reinstatement.tsx:338-350 | — | code read | OK |
+| `text-trust-title` "Why trust ConstructHUB with your GBP" + `card-trust-{0..3}` | content | 4 trust points — deliberately no track-record numbers (comment reinstatement.tsx:46-48) | reinstatement.tsx:356-378 | — | code read | OK |
+| Form-side reassurance list (Quick response / Honest assessment / No obligation) | content | 3 bullets | reinstatement.tsx:389-403 | — | code read | OK |
+
+### Request form (both renderings; reinstatement.tsx:106-180)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `form-reinstatement` | form | POST `/api/reinstatement/request` with the whole state object | reinstatement.tsx:106,73-77 | POST /api/reinstatement/request (routes.ts:3342) → zod `reinstatementInput` (routes.ts:3293-3302: name≤200*, email, businessName≤300*, websiteUrl≤500 opt, businessAddress≤500*, businessType≤200*, multipleLocations≤20 opt, problemDescription≤5000*; * = required) → `sendWithFallback` email from SMTP_EMAIL to SMTP_EMAIL (the team inbox), subject "GBP Reinstatement Request — {businessName}", replyTo=inquirer; limit 5/user + 5/IP per hour (`reinstatementLimit` routes.ts:72, growth-limits.ts:29); success `{success:true}` → toast "Request submitted… within 1-2 business days" + full field reset; 400 zod message / 500 "Failed to submit request…" → destructive toast | field names match 1:1; **live AUDIT submission returned `{"success":true}`** and the email landed in the dev sink `tmp/email-outbox.jsonl` (to support@constructhub.us, subject "GBP Reinstatement Request — AUDIT-Lane6-Test-Business", all fields present in HTML) | OK |
+| `input-reinstate-name` | input | Your name (required) | reinstatement.tsx:110 | users — none; email only | code read | OK |
+| `input-reinstate-email` | input | Email (required, type=email + client regex `/^[^\s@]+@[^\s@]+\.[^\s@]+$/`) | reinstatement.tsx:114 | server z.email | code read | OK |
+| `input-reinstate-business` | input | Business name (required) | reinstatement.tsx:120 | businessName | code read | OK |
+| `input-reinstate-website` | input | Website URL (optional) | reinstatement.tsx:124 | websiteUrl optional | code read | OK |
+| `input-reinstate-address` | input | Business address (required; "even if hidden") | reinstatement.tsx:130 | businessAddress | code read | OK |
+| `select-business-type` | select | storefront / service-area / hybrid / other (required) | reinstatement.tsx:134-144 | businessType | code read | OK |
+| `radio-multi-no` / `radio-multi-yes` | radios | Multiple locations? default "no" (optional) | reinstatement.tsx:148-157 | multipleLocations | code read | OK |
+| `textarea-problem-description` | textarea | What happened (required) | reinstatement.tsx:161-168 | problemDescription | code read | OK |
+| `button-submit-reinstatement` "Submit" | button | Disabled until all required fields non-empty; pending spinner | reinstatement.tsx:170-179 | — | code read | OK |
+
+Signed-in variant extras: `button-get-reinstated` (anchor `#request`), `card-reinstatement-pricing` Stat ($599), "Initial review 1–2 days", and a single `<details>` "How reinstatement works" carrying `badge-service-label`, `text-process-title`, `text-suspension-reasons-title`, `text-consequences-title`, `text-trust-title` and the same lists (reinstatement.tsx:181-198). Same form, same endpoint.
+
+**Endpoint trace note:** this endpoint writes **no table** — the "request" is the email to the team inbox (plus rate-limit budget rows). There is no CRM row, no notification record, no user-visible history. If SMTP fails the client correctly shows the failure toast (500 path).
+
+Counts /reinstatement: 29 elements — 29 OK, 0 BUG, 0 UNCLEAR, 0 DEAD.
+
+---
+
+## /auth — Sign in / sign up / password reset / 2FA / Google
+
+`client/src/pages/auth.tsx` (746 lines). Route in every router (App.tsx:237/289/428/455/607). Initial mode from URL: `?mode=2fa` → 2fa; `?mode=reset-password&token=` → reset; `?mode=forgot-password` → forgot; `?mode=signup` or `?beta=` → signup; else login (auth.tsx:51-55). Mode changes sync `?mode=` into the URL (auth.tsx:71-82). `?next=` is validated client-side with the same-origin rule as server `safeNextPath` (auth.tsx:40-41 vs server/auth.ts:34-41); a signed-in visitor without `?beta=` is redirected to `next ?? "/"` (auth.tsx:43-49). Error toasts from `?error=` (auth.tsx:84-96): invalid-token, token-expired, google-failed, google-unavailable, verification-failed.
+
+Server: all auth endpoints in `server/auth.ts`. Rate limit on signup/login/forgot/reset/2fa: 30/user + 60/IP per 15 min, plus 10 attempts per email per 15 min (auth.ts:240-247). No passport-local strategy exists — password login is a manual bcrypt compare in `/api/auth/login`; passport is used only for Google OAuth and session serialization. **Dev bypass:** `server/test-auth.ts` auto-attaches user 1 when `DEV_AUTH_BYPASS_USER1=true` (non-production) or `CRM_DEMO_AUTOLOGIN=true` — **off on this dev server** (`/api/auth/me` → null), so these flows were verified signed-out.
+
+### Sign-in mode (auth.tsx:357-438)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `text-form-title` "Welcome back" + lede | text | Mode header | auth.tsx:360-361 | — | code read | OK |
+| `link-google-login` "Continue with Google" | OAuth link | `GET /api/auth/google` (+`?next=` when present) → passport Google → callback → redirect `next ?? /?auth=success`; failures → `/auth?error=google-failed` (or `google-unavailable` when not configured); 2FA-enabled accounts → `/auth?mode=2fa` | auth.tsx:364 | GET /api/auth/google (auth.ts:251-291) → GET /api/auth/google/callback (auth.ts:293-362); session.authNext stashed via safeNextPath | live: GET /api/auth/google → 302 to accounts.google.com (configured on dev); code read of callback | OK |
+| `OrRule` | divider | Visual | auth.tsx:369 | — | — | OK |
+| `input-login-email` / `input-login-password` (+ show/hide toggle) | inputs | Credentials, both required | auth.tsx:376-402 | — | code read | OK |
+| `button-login` "Sign In" | button | POST `/api/auth/login` {email,password} → 401 "Invalid email or password" (toast); 403 "Please verify your email…" (message shown + resend button); `{requires2FA:true}` → switch to 2fa mode; success → invalidate `/api/auth/me`, navigate `next ?? "/"` | auth.tsx:405-408,132-153 | POST /api/auth/login (auth.ts:421-470) → users by email, bcrypt.compare, email_verified check, totp → pending2FAUserId + 10-min expiry; req.login + activity log + member login notify | endpoint present, shape matches (auth.ts:448 `requires2FA`); code read | OK |
+| `button-resend-verification` "Resend verification email" (conditional) | button | POST `/api/auth/resend-verification` {email} | auth.tsx:411-417,223-234 | POST /api/auth/resend-verification (auth.ts:574-599) → new verification token (24h), email; generic message if no account | code read | OK |
+| `link-forgot-password` | text button | Switches to forgot-password mode | auth.tsx:420-427 | — | code read | OK |
+| `link-goto-signup` "Create an account" | text button | Switches to signup mode | auth.tsx:428-435 | — | code read | OK |
+
+### Sign-up mode (auth.tsx:440-559)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `text-form-title` "Create your account" | text | Header | auth.tsx:443-445 | — | code read | OK |
+| `banner-beta-invite` (when `?beta=`) | banner | "You're invited to the ConstructHub CRM beta — unlimited access during beta." | auth.tsx:447-451 | beta token consumed server-side | code read | OK |
+| `link-google-signup` "Sign up with Google" | OAuth link | `GET /api/auth/google?beta=…` or `?next=…`; beta token rides the session through OAuth | auth.tsx:453 | auth.ts:265-267 (session.betaToken), 291-362 callback → `crm/beta consumeBetaInvite` on completion | code read | OK |
+| `input-signup-name` | input | Full name (optional → displayName) | auth.tsx:477-486 | users.display_name | code read | OK |
+| `input-signup-email` | input | Required, type=email | auth.tsx:492-501 | — | code read | OK |
+| `input-signup-password` / `input-signup-confirm` (+toggle) | inputs | ≥8 chars, must match (client checks) | auth.tsx:505-536 | password ≥8 enforced server-side too (auth.ts:370) | code read | OK |
+| `checkbox-agree-terms` + `link-signup-terms` (`/terms` or `/crm-terms` on portal) + `link-signup-privacy` (`/privacy` or `/crm-privacy`) | checkbox+links | Must be checked to submit; links open the legal pages in a new tab | auth.tsx:537-540,236-237 | — | routes exist App.tsx:227-230,323-326,447-448,473-474 | OK |
+| `button-signup` "Create Account" | button | POST `/api/auth/signup` {email,password,displayName?,beta?,next?} → 409 if email exists; success → server creates unverified user + 24h verification token, sends verification email; client shows "Check your email" panel with `button-resend-signup` | auth.tsx:541-544,98-130 | POST /api/auth/signup (auth.ts:364-419) → insert users (email lowercased, bcrypt 12, email_verified=false, verification_token/expiry, account_id, betaAt via consumeBetaInvite); session.authNext stashed from `next`; resp `{message, userId}` | endpoint present; body fields match | OK |
+| Post-signup "Check your email" panel + `button-resend-signup` | panel+button | Same resend endpoint | auth.tsx:460-470 | /api/auth/resend-verification | code read | OK |
+| `link-goto-login` | text button | Back to sign-in | auth.tsx:548-557 | — | code read | OK |
+| `text-signup-agreement` + inline Terms/Privacy links | text+links | "By signing up — including with Google — you agree…" | auth.tsx:658-665 | — | code read | OK |
+| Signed-in + `?beta=` → `card-beta-signed-in` with `button-beta-signout` (POST /api/auth/logout + reload) and `button-beta-continue` (→ "/") | choice card | Explains a beta invite never opens an existing workspace | auth.tsx:240-274 | POST /api/auth/logout (auth.ts:924) | code read | OK |
+
+### Email verification (not a page mode; link from the signup email)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Verification link in email `{baseUrl}/api/auth/verify-email?token=…` | email link | GET → invalid/expired redirect `/auth?error=invalid-token|token-expired`; success → welcome email, marks email verified, logs in, redirects `session.authNext ?? /?auth=verified`; totp-enabled accounts → `/auth?mode=2fa` instead | (email) server/email.ts:311 | GET /api/auth/verify-email (auth.ts:524-572) → users.verification_token/expiry (24h), single-use UPDATE … RETURNING | code read | OK |
+
+### Forgot-password mode (auth.tsx:561-606)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Back to login" + "Reset your password" header | text | — | auth.tsx:563-573 | — | code read | OK |
+| `input-forgot-email` | input | Email, required | auth.tsx:587-596 | — | code read | OK |
+| `button-send-reset` "Send Reset Link" | button | POST `/api/auth/forgot-password` {email} → always generic success message (no account enumeration); client swaps to "Check your email" panel | auth.tsx:599-602,182-195 | POST /api/auth/forgot-password (auth.ts:601-626) → if user with passwordHash: randomBytes(32) hex `resetToken`, `resetExpiry = now + 1h` → users.reset_token/reset_expiry (columns confirmed in information_schema); `sendPasswordResetEmail` | **live curl with unknown email → 200 `{message:"If an account exists, a password reset email has been sent."}`** (no mail sent for unknown address) | OK |
+| Reset email link `{baseUrl}/auth?mode=reset-password&token=…` | email link | Carries the token into the consume flow | server/email.ts:617-618 | sendPasswordResetEmail builds exactly `/auth?mode=reset-password&token=${token}` — matches the mode the page consumes (auth.tsx:53) | code read | OK |
+
+### Reset-password mode (auth.tsx:608-655) — the `/auth?token=` consume flow
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Set new password" header | text | — | auth.tsx:610-613 | — | code read | OK |
+| `input-reset-password` / `input-reset-confirm` (+toggle) | inputs | New password ≥8, must match | auth.tsx:616-648 | password ≥8 (auth.ts:632) | code read | OK |
+| `button-reset-password` "Reset Password" | button | POST `/api/auth/reset-password` {token: tokenParam, password} → success toast "Password reset!" + back to login mode; 400 "Invalid or expired reset link" / "Reset link has expired…" → destructive toast | auth.tsx:649-652,197-221 | POST /api/auth/reset-password (auth.ts:628-666) → users by reset_token; expiry check (1h); tx: bcrypt hash, clear token, set email_verified=true, DELETE sessions of that user; revoke devices; security notification; resp `{message:"Password reset successfully. You can now log in."}` | **live curl with bogus token → 400 `{message:"Invalid or expired reset link"}`**; expiry enforced both in code and by the atomic `reset_expiry>now()` UPDATE | OK |
+
+### 2FA mode (auth.tsx:311-356)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `button-2fa-back` / `text-form-title` "Two-factor sign-in" | button+text | Back to sign-in clears the code | auth.tsx:314-325 | — | code read | OK |
+| `input-2fa-code` | input | 6-digit TOTP or 16-char recovery code | auth.tsx:330-339 | regex `^(?:[0-9]{6}\|[a-fA-F0-9]{16})$` (auth.ts:479) | code read | OK |
+| "Remember this device for 30 days" checkbox | checkbox | Sets rememberDevice | auth.tsx:340-343 | req.body.rememberDevice === true → rememberDevice cookie (auth.ts:510) | code read | OK |
+| `button-2fa-verify` | button | POST `/api/auth/2fa/login` {code, rememberDevice} → success → `/api/auth/me` invalidate + navigate `next ?? "/"`; 400 "No pending login. Please start over." → client returns to sign-in with an expiry toast | auth.tsx:344-347,160-180 | POST /api/auth/2fa/login (auth.ts:472-522) → session.pending2FAUserId + 10-min expiry; TOTP validate (window 1) or consume one recovery code; 10 tries/15 min; resp user object | code read | OK |
+| `link-2fa-start-over` | text button | Back to sign-in | auth.tsx:349-354 | — | code read | OK |
+
+### Chrome (auth.tsx:276-310, 658-688)
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `PublicPageHeader next={nextParam ?? "/"}` | header | Ribbon; sign-in link returns here after auth | auth.tsx:281 | — | code read | OK |
+| Logo `link-auth-logo-home` → `/` (ConstructHUB) or CrmLogo on the CRM portal | link | Brand home | auth.tsx:290-293 | — | code read | OK |
+| `text-auth-title` ConstructHUB / ConstructHub CRM | text | Brand | auth.tsx:294-298 | — | code read | OK |
+| `text-auth-bubble-small` / `text-auth-bubble` gator lines | content | Per-mode mascot copy (BUBBLE map auth.tsx:695-701) | auth.tsx:306,683 | — | code read | OK |
+| `link-auth-home` "Back to ConstructHUB home" (non-portal) | link | `/` | auth.tsx:667-673 | — | code read | OK |
+
+Counts /auth: 38 elements — 38 OK, 0 BUG, 0 UNCLEAR, 0 DEAD. All five flows (register / login / reset request / reset consume / Google) hit existing endpoints with matching method+body; response shapes the page reads (`{message}`, `{requires2FA}`, user object) match the server.
+
+---
+
+## Catch-all route — 404 (NotFound)
+
+`client/src/pages/not-found.tsx`. Registered as `<Route component={NotFound}>` at the end of DashboardRouter (App.tsx:245) and as the SignedOutFallback default (App.tsx:353 — unknown signed-out URLs that aren't in SIGNED_IN_ONLY render it). Signed out it fills the window with `PublicPageHeader next={location}` + `PublicPageFooter`; signed in it sits in the app frame (chrome renders null, not-found.tsx:16-20).
+
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Kicker "404 / Error" | text | — | not-found.tsx:26 | — | code read | OK |
+| H1 "Page Not Found" + paragraph | text | Explains the miss | not-found.tsx:27-32 | — | code read | OK |
+| `link-back-home` "Back to home" | link | `/` | not-found.tsx:34-36 | — | route exists | OK |
+| `link-not-found-features` "See every feature" | link | `/features` | not-found.tsx:37-39 | — | route exists App.tsx:208/310 | OK |
+| `text-not-found-bubble` "This page wandered off the job site." + StandingGator | content | Mascot panel | not-found.tsx:42-52 | — | code read | OK |
+| Page testid `page-not-found`; `/api/auth/me` query decides signed-out chrome | query | — | not-found.tsx:17-20 | GET /api/auth/me (auth.ts:668) | live: null signed out | OK |
+| Behavior check: unknown signed-out URL not in SIGNED_IN_ONLY renders 404 (no redirect to landing) | route | SignedOutFallback default | App.tsx:328-354 | — | code read | OK |
+
+Counts 404: 7 elements — 7 OK.
+
+---
+
+## /privacy — Privacy Policy
+
+`client/src/pages/privacy-policy.tsx`, frame `client/src/components/legal-page.tsx` ("Back to Home" → `/`, Kicker "Legal", auto-built TOC from `<section>` headings with anchor jump, mobile Contents `<details>`, `PublicPageHeader`/`PublicPageFooter`, copyright footer). Route App.tsx:229/325. **Effective Date: September 30, 2026** (privacy-policy.tsx:16).
+
+Sections (each is one container; text is static): intro (`text-intro`); 1. Information We Collect (1.1 personal — incl. Stripe billing, Google OAuth data, signatures; 1.2 usage data; 1.3 cookies); 2. Tracking Tools (Click Guard 2.1, IP Tracker 2.2, VPN Shield 2.3, embeddable scripts 2.4); 3. Review Request Email Tracking (open/click tracking, unsubscribe); 4. Google Business Profile Data & APIs (business.manage scope, Places API distinction, 4.1 Limited Use, 4.2 Revoking Access — claims synced GBP data is deleted on disconnect); 5. Third-Party Services (Google OAuth, Stripe, Places, GBP API, OpenAI, Cloudflare R2, Gmail SMTP); 6. How We Use; 7. Data Sharing ("do not sell"); 8. Data Retention (24mo tracking, 7yr payments, 12mo email logs, GBP data deleted on disconnect); 9. Data Security (TLS, hashing); 10. Your Rights (30-day response); 11. CCPA; 12. GDPR; 13. Children's Privacy (under 13); 14. Changes; 15. Contact Us.
+
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `link-contact-email` support@constructhub.us | mailto | Contact | privacy-policy.tsx:29 | — | mailto scheme | OK |
+| `link-google-user-data-policy` | external link | Google API Services User Data Policy | privacy-policy.tsx:158 | — | curl -L → 200 | OK |
+| `link-google-permissions` | external link | myaccount.google.com/permissions (revocation) | privacy-policy.tsx:170 | — | curl -L → 200 | OK |
+| "Stripe's Privacy Policy" stripe.com/privacy | external link | — | privacy-policy.tsx:185 | — | curl -L → 200 | OK |
+| "OpenAI's Privacy Policy" openai.com/privacy | external link | — | privacy-policy.tsx:195 | — | curl -L → **403** (bot-block; the page exists in a browser) | OK (note: 403 to curl = anti-bot, not dead) |
+| `link-rights-email` / CCPA / children / `link-bottom-email` mailto links (4 more) | mailto | support@constructhub.us | privacy-policy.tsx:273,291,316,335 | — | mailto scheme | OK |
+| Claim: billing via Stripe | factual | — | privacy-policy.tsx:43,77-84 | server/stripe.ts exists (whole billing module) | code read | OK |
+| Claim: email via Gmail SMTP | factual | — | privacy-policy.tsx:201 | server/email.ts:146-156 nodemailer SMTP transport w/ SMTP_EMAIL/SMTP_APP_PASSWORD | code read | OK |
+| Claim: Cloudflare R2 photo storage | factual | — | privacy-policy.tsx:198 | server/r2.ts uploadToR2 used for media (routes.ts:36,1843) | code read | OK |
+| Claim: OpenAI for AI features | factual | — | privacy-policy.tsx:194 | server/ai-config.ts OpenAI-compatible client | code read | OK |
+| Claim: review-request open/click tracking + unsubscribe | factual | — | privacy-policy.tsx:121-134 | /review/:token/unsubscribe route exists App.tsx:224 | code read | OK |
+| Claim: GBP sync data deleted on disconnect | factual | — | privacy-policy.tsx:171,241 | not deeply traced (GBP lane) — consistent w/ routes.ts:1781 deleteFromR2 for photos | code read (partial) | UNCLEAR (delete-on-disconnect of reviews/metrics not fully traced in this lane) |
+| Effective date "September 30, 2026" | date | Current (≤ today 2026-10-04) | privacy-policy.tsx:16 | — | — | OK |
+
+Counts /privacy: 13 mapped elements — 12 OK, 1 UNCLEAR. (15 section containers are static text; all headings feed the TOC correctly.)
+
+---
+
+## /terms — Terms of Use
+
+`client/src/pages/terms-of-use.tsx`, same LegalPage frame. Route App.tsx:230/326. **Last updated: September 30, 2026** (terms-of-use.tsx:11). All prices are rendered from `shared/plans.ts`/`shared/plan-copy.ts` at build time — nothing hardcoded — so terms and the pricing page cannot drift by editing one file. Recomputed values: Starter $29/mo ($290/yr), Pro $79 ($790), Growth $199 ($1,990), Agency $349 ($3,490); annual = 10× monthly (ANNUAL_MONTHS=10, and each plan's annualCents = 10× monthlyCents — verified all four); add-ons from ADDONS with setup fees; CRM seats line; Agency-only modules; SALES_THRESHOLD_LABEL = $1,000; TRIAL_LABEL = "1-day trial" (TRIAL_DAYS=1); SEO 6-month minimum + 50% early-termination penalty; liability cap = 12 months of payments; arbitration; 7-day pro-rated refund discretion; data-loss disclaimer referencing Settings → Backups.
+
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| `list-plans` (4 plan lines from PLANS) | dynamic list | planPriceLine(key) for each PLAN_KEY | terms-of-use.tsx:49-53, plan-copy.ts:59-63 | shared/plans.ts PLANS | values recomputed from PLANS; annual=10× verified | OK |
+| Agency locations sentence (10 included + agencyBandsLine) | dynamic text | Per-location pricing bands | terms-of-use.tsx:54, plan-copy.ts:73 | AGENCY_LOCATION_BANDS (plans.ts:178-183: $15/$10/$7 per location over 10, up to 500) | matches PLANS.agency.limits.locations=10 | OK |
+| CRM seats line | dynamic text | seats per plan | terms-of-use.tsx:55, plan-copy.ts:65 | PLANS.limits.crmSeats (1/3/10/10) | recomputed | OK |
+| Trial sentence | dynamic text | "no free plan… starts with a 1-day trial" | terms-of-use.tsx:56 | TRIAL_DAYS=1 (plans.ts:411) | recomputed | OK |
+| §4 Add-ons list (from ADDONS) | dynamic list | name — $/month (+setup fee) (availableOn) | terms-of-use.tsx:63-71 | ADDONS record (plans.ts:330) | recomputed | OK |
+| §6 sales threshold sentence | dynamic text | ≥ $1,000 quoted by sales rep | terms-of-use.tsx:89 | SALES_THRESHOLD_CENTS=100_000 | recomputed; matches catalog isSalesOnly | OK |
+| §7 Master Class sentence | dynamic text | ≥ $1,000 quoted; under shows checkout price | terms-of-use.tsx:95 | same threshold | consistent with /master-class behavior (all items ≥ $1,000 → all quoted) | OK |
+| Google API Services User Data Policy link | external link | — | terms-of-use.tsx:158 | — | curl -L → 200 | OK |
+| `link-contact-email` support@constructhub.us (also §10 refund line, §18, §21) | mailto | — | terms-of-use.tsx:116,210,227 | — | mailto scheme | OK |
+| §14 "exclusive property of Construction Hub" | text | Legal entity name | terms-of-use.tsx:169 | — | — | OK |
+| Last updated "September 30, 2026" | date | Current | terms-of-use.tsx:11 | — | — | OK |
+
+Price-discrepancy check against shared/plans.ts: **none found** — terms are generated from the same source of truth. One note: §15 says backups "retained for no more than a few days" while §8 (privacy) says tracking data 24 months etc. — different topics, no conflict.
+
+Counts /terms: 11 mapped elements — 11 OK, 0 BUG.
+
+---
+
+## Findings
+
+### BUG
+None.
+
+### UNCLEAR
+1. **/master-class static course figures** (master-class.tsx:1005-1149, 1238-1251): close-rate benchmarks (33%+/20%/<15%), $50–150/lead, bad-review revenue loss (10–15%/20–50%), $500K worked example, 8–10% sales commission, PM salary $45–75k/yr — owner-sourced marketing claims with no repo/DB backing possible. Also the James Hardie Elite requirements claim (master-class.tsx:2042: "used to require 36 … now 10 … 150 sq ft"). Flag for the owner to fact-check, not code defects.
+2. **Privacy §4.2/§8 delete-on-disconnect claim** (privacy-policy.tsx:171,241): "we stop accessing your Google Business Profile data and delete the reviews, performance metrics and sync records" — partially traced only (photo deletes from R2 at routes.ts:1781); the reviews/metrics deletion path lives in the GBP lane and was not confirmed here.
+
+### DEAD (unreachable code paths, current data/prices)
+All on /master-class, all consequences of every course price being ≥ the $1,000 sales threshold (`showsPrice` false → the conditional branches never render in any build; the server independently refuses checkout with 409 `talk_to_sales`, so nothing user-facing is broken):
+1. `badge-sale` "Bundle saves %" (master-class.tsx:347-351)
+2. `text-overview-bundle-price` $2,499 (master-class.tsx:371-372)
+3. `badge-pricing-savings` (master-class.tsx:2469-2473)
+4. `badge-bundle-best-value` (master-class.tsx:2482-2486)
+5. `text-bundle-was` struck $6,500 (master-class.tsx:2494-2496)
+6. `text-bundle-savings` (master-class.tsx:2500-2504)
+7. `button-add-cart-bundle` (master-class.tsx:2518-2540)
+8. `button-enroll-bundle` "Buy now — $2,499" (master-class.tsx:2541-2550)
+9. `button-add-cart-{category}` ×4 (master-class.tsx:2608-2631)
+10. `button-enroll-{category}` "Buy now" ×4 (master-class.tsx:2632-2641)
+
+If the owner ever wants online course checkout again, either drop module/bundle prices below $1,000 or lower SALES_THRESHOLD_CENTS — the UI will light up without code changes.
+
+### Hardening notes (not bugs)
+- `/guides` is in SIGNED_IN_ONLY (App.tsx:338): a signed-out visitor is asked to sign in before the redirect to the Social Media guides tab lands. Intended for in-app walkthroughs, but there is no public guides page.
+- Master-class hardcoded "4 modules" / "50 states" (master-class.tsx:357-364) match the DB today; they will silently drift if a module/guide is added (the licensing-count stat next to them is computed).
+- Effective behavior worth the owner knowing: **no Master Class item can currently be purchased online at any price** — modules ($1,500–$2,000) and bundle ($2,499) are all "Talk to a sales rep". Terms §7 codifies this, so it is consistent, but the enroll/cart UI is dead weight until then.
+- Reinstatement request form writes no DB row — the request exists only as an email to the team inbox (plus rate-limit counters). No CRM follow-up record is created server-side.
+
+### AUDIT- test rows created (safe, not deleted)
+1. **POST /api/reinstatement/request** (2026-10-04) — business `AUDIT-Lane6-Test-Business`, email `audit-lane6@example.com`, address "123 Audit St, Testville TS 00000", type `service-area`, multipleLocations `no`. Response `{"success":true}`; email captured in the dev sink `tmp/email-outbox.jsonl` (to support@constructhub.us, subject "GBP Reinstatement Request — AUDIT-Lane6-Test-Business", all fields present). No DB rows (endpoint is email-only). Safe to ignore/delete the outbox line.
+2. **POST /api/auth/forgot-password** with unknown email `no-such-audit-user@example.com` — no user touched, no mail sent (generic 200). Not a data row.
+3. **POST /api/auth/reset-password** with token `bogus` — rejected 400; no user touched.
+
+### Unverifiable from this lane
+- Full Stripe purchase path for courses (dev has no Stripe; 401 "Login required" confirmed signed-out; per-env expectation "Stripe not configured" holds by code: sendStripeError).
+- Google OAuth callback end-to-end (requires a Google account; the authorize redirect and callback code path were verified by code read + the live 302).
+- Email deliverability (dev forces the sink, email.ts:203-229).
+- GBP delete-on-disconnect completeness (see UNCLEAR #2).
