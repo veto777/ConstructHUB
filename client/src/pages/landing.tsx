@@ -231,11 +231,11 @@ export default function LandingPage() {
   });
   const { data: counts } = usePermitDirectoryCounts();
   const hasVerified = typeof counts?.verifiedPortals === "number";
+  // Only jurisdictions with a real permit portal behind them are counted (audit lane 6, owner 2026-10-04: the old
+  // "Jurisdictions Listed" headline counted all 32,853 directory rows although only ~2% have a portal).
   const stats: { value: number | undefined; suffix?: string; label: string }[] = [
-    { value: counts?.total, label: "Jurisdictions Listed" },
-    hasVerified
-      ? { value: counts?.verifiedPortals, label: "Verified Portal Links" }
-      : { value: counts?.county, label: "County Offices Listed" },
+    { value: counts?.withPortal, label: "Permit Portals Linked" },
+    { value: counts?.verifiedPortals, label: "Checked Live" },
     { value: 51, label: "States + DC Listed" },
     { value: GROWTH_TOOLS.length, label: "Pro Tools Built In" },
   ];

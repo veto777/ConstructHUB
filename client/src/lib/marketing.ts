@@ -22,6 +22,8 @@ export interface PermitDirectoryCounts {
   total: number;
   county: number;
   city: number;
+  /** Jurisdictions with a permit portal link (verified, live or unconfirmed — never guessed). */
+  withPortal?: number;
   verifiedPortals?: number;
 }
 
