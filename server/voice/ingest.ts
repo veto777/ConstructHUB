@@ -238,9 +238,13 @@ export async function externalReceptionist(orgId: string, timezone?: unknown): P
   const row = (r as any).rows?.[0];
   if (!row?.last_call || !Number(row.recent)) return null;
   const p = String(row.persona || "janice");
+  // db.execute hands back the raw UTC wall string ("2026-10-04 23:20:00"); `new Date` on it reads the
+  // SERVER'S local zone (a 4h shift on an EDT box — the overview's "last call" date was a day late for
+  // late-evening calls). Read it as UTC, the CRM's convention for timestamp-without-tz columns.
+  const lastCall = row.last_call instanceof Date ? row.last_call : new Date(`${String(row.last_call).replace(" ", "T")}Z`);
   return {
     name: p.charAt(0).toUpperCase() + p.slice(1),
-    lastCallAt: new Date(row.last_call).toISOString(),
+    lastCallAt: lastCall.toISOString(),
     callsLast30Days: Number(row.recent),
     lines: ((row.lines ?? []) as string[]).sort(),
     thisMonth: { calls: Number(row.month_calls ?? 0), minutes: Number(row.month_minutes ?? 0), spam: Number(row.month_spam ?? 0) },
