@@ -739,6 +739,7 @@ export async function registerRoutes(
     res.json(results);
   });
 
+  // The /schedules admin page list: every automatic permit-portal refresh schedule (shared across accounts).
   app.get("/api/scrape-schedules", async (_req, res) => {
     const schedules = await storage.getScrapeSchedules();
     res.json(schedules);
@@ -982,6 +983,8 @@ export async function registerRoutes(
     }
   });
 
+  // Business search shared by the Photos tool, the GMB Edit Monitor and the Ranking Grid: queries
+  // Google's Places database by name, address or Maps link; no DB write.
   app.post("/api/photos/business-search", async (req, res) => {
     try {
       const { query, pageToken } = req.body ?? {};
@@ -1331,6 +1334,8 @@ export async function registerRoutes(
     }
   });
 
+  // The Photos tool's "Process photos" button: watermarks, renames and writes EXIF into the uploaded set
+  // on a background job the page polls; the monthly photo quota is reserved up front and refunded for failures.
   app.post("/api/photos/process", async (req, res) => {
     try {
       const {
@@ -1578,6 +1583,7 @@ export async function registerRoutes(
   });
 
   // Media Library Routes
+  // The Media Library folder grid (and the folder pickers on other pages): the owner's folders, newest first.
   app.get("/api/media/folders", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1589,6 +1595,8 @@ export async function registerRoutes(
     }
   });
 
+  // The Media Library "New folder" modal (also "Save to media library" on the Photos tool): creates a
+  // folder, optionally with a verified client address used for GPS embedding.
   app.post("/api/media/folders", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1789,6 +1797,8 @@ export async function registerRoutes(
     }
   });
 
+  // An open Media Library folder: its photos, newest first (also the per-folder count shown in the
+  // delete-folder dialog and the pickers elsewhere).
   app.get("/api/media/folders/:id/photos", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1920,6 +1930,7 @@ export async function registerRoutes(
 
   const GENERIC_PLACE_TYPES = new Set(["establishment", "point_of_interest", "premise", "political", "store", "food", "health", "finance", "place_of_worship", "local_government_office"]);
   // GMB Edit Monitoring Routes
+  // The monitor page's listing cards: the owner's monitored listings with the last data fetched from Google.
   app.get("/api/gmb/listings", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1931,6 +1942,7 @@ export async function registerRoutes(
     }
   });
 
+  // The monitor's "Add" on a search result: saves it as a monitored listing (included in Check All).
   app.post("/api/gmb/listings", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2053,6 +2065,7 @@ export async function registerRoutes(
     }
   });
 
+  // The monitor's "Edit History" panel on a listing card: every field change detected, newest first.
   app.get("/api/gmb/listings/:id/history", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2068,6 +2081,7 @@ export async function registerRoutes(
     }
   });
 
+  // The monitor's delete button: removes the listing and its edit history (nothing changes on Google).
   app.delete("/api/gmb/listings/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2165,6 +2179,8 @@ export async function registerRoutes(
   });
 
   // Ranking Grid Routes
+  // The Ranking Grid scan history cards: the owner's scans, newest first (the page polls every few
+  // seconds while one is running).
   app.get("/api/ranking-grid/scans", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
@@ -2175,6 +2191,8 @@ export async function registerRoutes(
     }
   });
 
+  // An expanded scan card and its full report: the scan row plus every grid-point result (rank and top
+  // competitors per point).
   app.get("/api/ranking-grid/scans/:id", async (req, res) => {
     if (!getDevUser(req, res)) return;
     try {
@@ -2356,6 +2374,7 @@ export async function registerRoutes(
     }
   }
 
+  // The monitor's "Include in Check All" switch on a listing card.
   app.patch("/api/gmb/listings/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2383,6 +2402,8 @@ export async function registerRoutes(
     } catch (err) { planCheckFailed(res, err); return false; }
   }
 
+  // The Competitors market-scan cards (plan-gated — a 402 here is the page's plan-locked screen): the
+  // owner's scans, newest first.
   app.get("/api/competitors/scans", async (req, res) => {
     if (!(await requireCompetitorIntel(req, res))) return;
     try {
@@ -2392,6 +2413,8 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // An expanded competitor scan: the scan row plus its indexed listings (rating order), with the
+  // displayed signal scores recomputed at read time.
   app.get("/api/competitors/scans/:id", async (req, res) => {
     if (!(await requireCompetitorIntel(req, res))) return;
     try {
@@ -2669,6 +2692,8 @@ export async function registerRoutes(
     } catch (err) { planCheckFailed(res, err); return false; }
   }
 
+  // The owner's plain location list (e.g. the Photos tool's "Load from saved location"); the agency
+  // middleware registered above serves the paged/filtered envelope most pages use.
   app.get("/api/locations", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2678,6 +2703,8 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // One location row for the detail view: the header and all 8 tabs, and the not-found alert on a
+  // stale or foreign ?location=.
   app.get("/api/locations/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -2760,6 +2787,8 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // The Add location dialog's "Search Google" tab: queries Google's Places database by name, address or
+  // Maps link (a Maps link is resolved to a place first); a clicked result becomes a location via POST /api/locations.
   app.post("/api/locations/search-google", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3061,6 +3090,7 @@ export async function registerRoutes(
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
+  // The Citations tab "New Campaign" form: creates a citation campaign for one location (paid plans).
   app.post("/api/citations/campaigns", async (req, res) => {
     if (!(await requireCitationsPlan(req, res))) return;
     try {
@@ -3071,6 +3101,7 @@ export async function registerRoutes(
     } catch (err: any) { res.status(400).json({ message: err.message }); }
   });
 
+  // The campaign card's delete button: removes the campaign and its checklist rows.
   app.delete("/api/citations/campaigns/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3121,6 +3152,8 @@ export async function registerRoutes(
   const LEGACY_CITATION_NAMES: Record<string, string> = { "Google My Business": "Google Business Profile" };
   const citationRank = new Map(CITATION_DIRECTORIES.map((d, i) => [d.name, i]));
 
+  // The campaign detail's site rows: the 30-directory checklist ordered Google first, for marking each
+  // site listed / listed-wrong / missing.
   app.get("/api/citations/campaigns/:id/results", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3178,6 +3211,8 @@ export async function registerRoutes(
     }).where(eq(citationCampaigns.id, campaignId));
   }
 
+  // A checklist row's status select and listing-URL save: records listed/wrong/missing/unchecked and
+  // recounts the campaign's count tiles.
   app.patch("/api/citations/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4921,6 +4956,8 @@ function main() {
     }
   });
 
+  // The Google Reviews "Send" button: stores the review request (or schedules it for later) and emails the
+  // client the personal feedback link; unsubscribed addresses are refused with 409.
   app.post("/api/reviews/create", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -4998,6 +5035,8 @@ function main() {
     }
   });
 
+  // The Google Reviews request cards and the four stat tiles (total sent, Google links opened, positive
+  // feedback, awaiting response): every non-trashed request for the account.
   app.get("/api/reviews/list", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5009,6 +5048,7 @@ function main() {
     }
   });
 
+  // The "Google Business Profiles" template cards and the profile picker inside the send dialog.
   app.get("/api/review-templates", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5125,6 +5165,8 @@ function main() {
     }
   });
 
+  // The Google Reviews trash section: soft-deleted requests (purging any older than 14 days first), with
+  // the count badge and days-left labels.
   app.get("/api/reviews/trash", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5283,6 +5325,8 @@ function main() {
     }
   });
 
+  // The Resend button on a request card: emails the client again; a customer who already answered keeps
+  // their recorded answer and gets no re-armed reminders.
   app.post("/api/reviews/:id/resend", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5409,6 +5453,8 @@ function main() {
     }
   });
 
+  // The customer's 1-10 rating submit on /review/<token>: records the private rating and improvement
+  // notes, stops reminders, and marks the request positive/negative feedback (9+ is positive).
   app.post("/api/review/:token/feedback", async (req, res) => {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));

@@ -60,6 +60,8 @@ export function registerAgencyAccess(app:Express) {
         const {rows:schedules}=await pool.query(`SELECT s.* FROM sitescan_schedules s LEFT JOIN business_locations l ON l.id=s.location_id AND l.user_id=s.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND s.user_id=$1 AND l.id IS NULL)) ORDER BY s.url LIMIT 50`,w.values);
         return void res.json({jobs,locations:locations.map(({total,...l})=>l),locationTotal:locations[0]?.total??0,schedules,total:jobs[0]?.total??0});
       }
+      // The Locations Citations tab campaign cards: the owner's citation campaigns (newest first), scoped
+      // to an agency member's assigned clients like every location list here.
       if(req.path==='/api/citations/campaigns'&&req.method==='GET') {
         const f=filters.parse(req.query),w=locationFilter(a,f),id=req.query.locationId?z.coerce.number().int().positive().parse(req.query.locationId):null;
         const {rows}=await pool.query(`SELECT p.*,count(*) OVER()::int total FROM citation_campaigns p JOIN business_locations l ON l.id=p.location_id AND l.user_id=p.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ${w.sql} AND ($8::int IS NULL OR l.id=$8) ORDER BY p.id DESC LIMIT 50 OFFSET $9`,[...w.values,id,f.offset]);

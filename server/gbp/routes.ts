@@ -57,6 +57,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       res.redirect('/locations?gbp=connected');
     }catch {res.redirect('/locations?gbp=consent-failed');}
   });
+  // The Google-connection banner (Locations, Posts & photos, Google Reviews): which Google accounts are
+  // connected, plus the per-linked-location sync rows behind "Sync details".
   route('get','/api/gbp/status',async(_req,res,id)=>{
     const visible=_req.query.locationId ? {items:[await locationAccess(await accessFor(id),z.coerce.number().int().positive().parse(_req.query.locationId))]} : await listLocations(await accessFor(id),filters.parse(_req.query));
     const {rows:locations}=await pool.query(`SELECT l.id,l.business_name AS name,g.email AS account_email,s.kind,s.last_success,s.last_attempt,s.last_error FROM business_locations l
@@ -97,6 +99,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     }
     res.json({accounts:status.accounts,locations:rows.map(r=>({...r.data,grantSubject:r.subject,grantEmail:r.email})),errors:[],cached:true,refreshing});
   };
+  // The Locations "Import from GBP" tab: the owner's Business Profiles found in their connected Google
+  // account (agency_discovery cache); asks the worker to look again when nothing has been discovered yet.
   route('get','/api/gbp/accounts',cached);
   route('get','/api/gbp/locations',cached);
   // Per-location answer to "which Google account is this synced through, and which still need one?"
@@ -113,6 +117,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.email,listing:{accountResource:match.data.accountResource,gbpName:match.data.gbpName,grantSubject:match.subject}}:{id:l.id,state:'unlinked'};
     })});
   });
+  // The Locations "Import N Locations" button (and the banner's "Link & sync ready locations"): turns the
+  // selected discovered listings into locations and queues a Google sync for each.
   route('post','/api/gbp/import',async(req,res,id)=>{
     if(!(await grantStatus(id)).connected)throw new GoogleError('auth','Google Business Profile not connected',401);
     const requested=z.array(z.object({accountResource:z.string().max(300),gbpName:z.string().max(300),grantSubject:z.string().max(255)})).min(1).max(100).safeParse(req.body.locations);
@@ -122,6 +128,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const result=await importVerifiedLocations(id,selected);for(const l of result.locations)await queueSync(id,l.id);
     res.status(202).json({...result,queued:true,synced:{}});
   });
+  // The Locations detail "Photos" tab grid: photos synced from the Business Profile (business or customer
+  // source), newest first, with the total count and last sync time for "Show more".
   route('get','/api/gbp/locations/:id/media',async(req,res,userId)=>{
     const id=Number(req.params.id),source=req.query.source==='customer'?'customer':'business';
     const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
@@ -132,10 +140,18 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const {rows:[t]}=await pool.query('SELECT count(*)::int n, max(synced_at) synced FROM gbp_media WHERE location_id=$1 AND source=$2',[id,source]);
     res.json({total:t.n,syncedAt:t.synced,items:rows});
   });
+  // The Google-connection widget's "Unlink" on a linked location: removes the Google link (and that
+  // listing's synced Google data) while keeping the location.
   route('post','/api/gbp/locations/:id/unlink',async(req,res,id)=>res.json(await unlinkLocation(id,Number(req.params.id))));
+  // The "Sync now" button in the connection banner's "Sync details": queues a sync when an account is
+  // connected, runs it inline when the account was disconnected.
   route('post','/api/gbp/locations/:id/sync',async(req,res,id)=>{const location=Number(req.params.id);await locationAccess(await accessFor(id),location);if(!(await grantStatus(id)).connected)return res.json(await syncLocation(id,location));await queueSync(id,location);res.status(202).json({queued:true,message:'Sync queued'});});
+  // The Google Reviews "Google profile reviews" tab reply editor: save a reply draft, publish it to
+  // Google, or delete it.
   route('patch','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),req.body.replyComment,req.body.action==='publish'?'publish':'draft',undefined,{req})));
   route('delete','/api/google-profile-reviews/:id/reply',async(req,res,id)=>res.json(await reply(id,Number(req.params.id),'','delete',undefined,{req})));
+  // The Locations detail "Insights" tab performance table: daily Google metrics grouped by day/week/month
+  // over the chosen range; the last few days read as not-final because Google reports with a delay.
   route('get','/api/gbp/locations/:id/performance',async(req,res,userId)=>{
     const id=Number(req.params.id);
     const {rows:[l]}=await pool.query('SELECT id FROM business_locations WHERE id=$1 AND user_id=$2',[id,userId]);
