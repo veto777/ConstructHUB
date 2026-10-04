@@ -458,8 +458,8 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
   const pageSize = 50;
 
   const { data: accountsData, isLoading } = useQuery<{ accounts: LsaAccount[]; total: number; limit: number; offset: number }>({
-    queryKey: ["/api/admin/lsa/accounts", page],
-    queryFn: () => fetch(`/api/admin/lsa/accounts?limit=${pageSize}&offset=${page * pageSize}`).then(r => r.json()),
+    queryKey: ["/api/admin/lsa/accounts", page, search],
+    queryFn: () => fetch(`/api/admin/lsa/accounts?limit=${pageSize}&offset=${page * pageSize}&q=${encodeURIComponent(search)}`).then(r => r.json()),
   });
 
   const accounts = accountsData?.accounts || [];
@@ -476,17 +476,13 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/accounts", page] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lsa/accounts"] });
       toast({ title: "Account added" });
       setShowAdd(false);
       setNewCustomerId(""); setNewAccountName("");
     },
     onError: (e: any) => toast({ title: "Failed to add account", description: e.message, variant: "destructive" }),
   });
-
-  const filtered = accounts.filter(a =>
-    !search || a.customerId.includes(search) || (a.accountName || "").toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="space-y-4">
@@ -496,7 +492,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
           <Input
             placeholder="Search by customer ID or name..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setSearch(e.target.value); setPage(0); }}
             className="pl-8"
             data-testid="input-search-accounts"
           />
@@ -533,7 +529,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin h-6 w-6 border-2 border-[#4285F4] border-t-transparent rounded-full" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : accounts.length === 0 ? (
         <Section flush>
           <CardContent className="p-12 text-center">
             <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
@@ -560,7 +556,7 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
               </tr>
             </thead>
             <tbody>
-              {filtered.map(account => (
+              {accounts.map(account => (
                 <tr key={account.id} className={appTableCards.tr + " border-b border-border last:border-0 hover:bg-muted/30 transition-colors"} data-testid={`row-account-${account.id}`}>
                   <td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Account: </span>{account.accountName || "—"}</td>
                   <td className={appTableCards.td + " min-w-0 break-words"} data-testid={`text-customer-id-${account.id}`}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Customer ID: </span>{account.customerId}</td>

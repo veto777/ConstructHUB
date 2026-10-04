@@ -6158,8 +6158,9 @@ function main() {
     try {
       const limit = Math.min(Number(req.query.limit) || 50, 200);
       const offset = Number(req.query.offset) || 0;
-      const accounts = await storage.getLsaAccountsWithMetrics(limit, offset);
-      const total = await storage.countLsaAccounts();
+      const q = typeof req.query.q === "string" && req.query.q.trim() ? req.query.q.trim().slice(0, 100) : undefined;
+      const accounts = await storage.getLsaAccountsWithMetrics(limit, offset, q);
+      const total = await storage.countLsaAccounts(q);
       res.json({ accounts, total, limit, offset });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

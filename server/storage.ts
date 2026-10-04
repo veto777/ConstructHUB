@@ -52,6 +52,11 @@ export interface PermitDirectoryCounts {
   searchable: number;
 }
 
+// Admin LSA registry search: matches the manager-accounts search box on the
+// LSA account manager page (customer ID digits or any part of the account name).
+const lsaAccountSearch = (q: string) =>
+  or(ilike(lsaAccounts.customerId, `%${q}%`), ilike(lsaAccounts.accountName, `%${q}%`));
+
 export interface IStorage {
   getCounties(): Promise<County[]>;
   createCounty(data: InsertCounty): Promise<County>;
@@ -173,8 +178,8 @@ export interface IStorage {
   disconnectLsaManagerConnection(): Promise<void>;
 
   getLsaAccounts(limit?: number, offset?: number): Promise<LsaAccount[]>;
-  countLsaAccounts(): Promise<number>;
-  getLsaAccountsWithMetrics(limit?: number, offset?: number): Promise<Array<LsaAccount & { chargedLeads: number; disputedLeads: number; ownerEmail: string | null }>>;
+  countLsaAccounts(q?: string): Promise<number>;
+  getLsaAccountsWithMetrics(limit?: number, offset?: number, q?: string): Promise<Array<LsaAccount & { chargedLeads: number; disputedLeads: number; ownerEmail: string | null }>>;
   getLsaAccountById(id: number): Promise<LsaAccount | undefined>;
   getLsaAccountByCustomerId(customerId: string): Promise<LsaAccount | undefined>;
   getLsaAccountsByUser(userId: number): Promise<LsaAccount[]>;
@@ -901,13 +906,13 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(lsaAccounts).orderBy(desc(lsaAccounts.createdAt)).limit(limit).offset(offset);
   }
 
-  async countLsaAccounts(): Promise<number> {
-    const [row] = await db.select({ count: count() }).from(lsaAccounts);
+  async countLsaAccounts(q?: string): Promise<number> {
+    const [row] = await db.select({ count: count() }).from(lsaAccounts).where(q ? lsaAccountSearch(q) : undefined);
     return Number(row?.count ?? 0);
   }
 
-  async getLsaAccountsWithMetrics(limit = 50, offset = 0): Promise<Array<LsaAccount & { chargedLeads: number; disputedLeads: number; ownerEmail: string | null }>> {
-    const accounts = await db.select().from(lsaAccounts).orderBy(desc(lsaAccounts.createdAt)).limit(limit).offset(offset);
+  async getLsaAccountsWithMetrics(limit = 50, offset = 0, q?: string): Promise<Array<LsaAccount & { chargedLeads: number; disputedLeads: number; ownerEmail: string | null }>> {
+    const accounts = await db.select().from(lsaAccounts).where(q ? lsaAccountSearch(q) : undefined).orderBy(desc(lsaAccounts.createdAt)).limit(limit).offset(offset);
     if (accounts.length === 0) return [];
     const accountIds = accounts.map(a => a.id);
     const ownerIds = [...new Set(accounts.map(a => a.userId).filter(Boolean))] as number[];
