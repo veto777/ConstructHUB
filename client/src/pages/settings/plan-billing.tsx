@@ -25,7 +25,7 @@ import type { SettingsSectionProps } from "./types";
 
 const STATUS_LABELS: Record<string, string> = {
   active: "Active", trialing: "Trial", past_due: "Payment past due", unpaid: "Unpaid",
-  canceled: "Canceled", incomplete: "Incomplete", incomplete_expired: "Expired", inactive: "Inactive",
+  canceled: "Canceled", incomplete: "Incomplete", incomplete_expired: "Expired", inactive: "Inactive", paused: "Paused",
 };
 
 /**
