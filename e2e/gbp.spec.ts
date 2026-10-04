@@ -52,3 +52,20 @@ test('photo counts show the stored number once a sync has succeeded (audit 2026-
   await expect(page.getByTestId('text-business-photo-count')).toHaveText('7');
   await expect(page.getByTestId('text-customer-photo-count')).toHaveText('2');
 });
+test('insights empty state does not tell a linked owner to link again (audit 2026-10-04)',async({page})=>{
+  const loc={id:987,businessName:'Fixture business',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture'};
+  await page.route((u:URL)=>u.pathname==='/api/locations',r=>r.fulfill({json:[loc]}));
+  await page.route('**/api/locations/987',r=>r.fulfill({json:loc}));
+  await page.route('**/api/gbp/locations/987/performance*',r=>r.fulfill({json:{available:false,metrics:[],rows:[],firstDate:null,lastDate:null,pendingAfter:'2026-10-01'}}));
+  await page.goto('/locations?location=987&tab=insights');
+  await expect(page.getByText('No performance data yet.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Link this location to Google',{exact:false})).toHaveCount(0);
+});
+test('insights empty state still points an unlinked owner at linking (audit 2026-10-04)',async({page})=>{
+  const loc={id:987,businessName:'Fixture business'};
+  await page.route((u:URL)=>u.pathname==='/api/locations',r=>r.fulfill({json:[loc]}));
+  await page.route('**/api/locations/987',r=>r.fulfill({json:loc}));
+  await page.route('**/api/gbp/locations/987/performance*',r=>r.fulfill({json:{available:false,metrics:[],rows:[],firstDate:null,lastDate:null,pendingAfter:'2026-10-01'}}));
+  await page.goto('/locations?location=987&tab=insights');
+  await expect(page.getByText('Performance unavailable. Link this location to Google and sync to retrieve real metrics.')).toBeVisible();
+});

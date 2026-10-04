@@ -499,7 +499,9 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
         </div>
       </div>
       {isLoading ? <p>Loading performance…</p> : error ? <p role="alert">Unable to load performance.</p> : !data?.available ? (
-        <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
+        location.gbpLocationName
+          ? <p>No performance data yet. Metrics appear after the first successful Google sync.</p>
+          : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="table-performance">
