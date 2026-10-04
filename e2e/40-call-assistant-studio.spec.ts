@@ -377,6 +377,19 @@ test.describe("Call Assistant — Agent Studio", () => {
     expect(mock.puts).toHaveLength(1);
   });
 
+  test("wizard: Skip to the editor opens the draft the wizard just saved (no stale cache)", async ({ page }) => {
+    const mock = await mockVoice(page);
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-wizard")).toBeVisible();
+    await page.getByTestId("input-company-name").fill("Acme Siding");
+    await page.getByTestId("button-wizard-next").click(); // saves the draft
+    expect(mock.puts).toHaveLength(1);
+    await page.getByTestId("button-wizard-skip").click();
+    await expect(page.getByTestId("studio-editor")).toBeVisible();
+    // The editor must show what the wizard saved — not the cached pre-wizard copy.
+    await expect(page.getByTestId("input-company-name")).toHaveValue("Acme Siding");
+  });
+
   test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
     await mockVoice(page, { published: true });
     await gotoCrm(page, "/call-assistant?tab=studio");

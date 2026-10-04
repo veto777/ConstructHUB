@@ -31,6 +31,11 @@ export function SetupWizard({ initial, onDone, onSkip }: { initial: VoiceProfile
 
   const save = useMutation({
     mutationFn: () => saveDraft(draft),
+    // Every Next writes the draft — refresh the cache too, or "Skip to the
+    // editor" opens on the stale pre-wizard copy and the next Save silently
+    // overwrites what the wizard just stored (queries never refetch on their
+    // own: staleTime Infinity in lib/queryClient.ts).
+    onSuccess: () => invalidateProfile(),
     onError: (e) => toast({ title: "Couldn't save the draft", description: profileIssueText(e), variant: "destructive" }),
   });
   const publish = useMutation({
