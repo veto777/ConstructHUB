@@ -13,15 +13,63 @@
  *     <EmptyState …/>                              re-exported from crm-ui
  * Tables: `appTable` / `appTableCards` (rows become cards below sm).
  */
-import { useState, type ReactNode } from "react";
-import { Link } from "wouter";
-import { AlertTriangle, ArrowRight, CheckCircle2, Info, SlidersHorizontal, XCircle } from "lucide-react";
+import { Children, cloneElement, isValidElement, useState, type ReactElement, type ReactNode } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  AlertTriangle, ArrowRight, CheckCircle2, Info, SlidersHorizontal, XCircle, type LucideIcon,
+  LayoutDashboard, Search, Database, Home, CalendarClock, History, Camera, Images, Eye, Grid3x3, Swords, Briefcase,
+  MapPin, Store, Globe, MailWarning, Newspaper, Megaphone, BookOpen, Cloud, LineChart, ScanSearch, GraduationCap,
+  LifeBuoy, Building2, MousePointerClick, BarChart3, Users, Fingerprint, Phone, ShieldCheck, Star, Settings,
+  KeyRound, Bug, LayoutGrid, Kanban,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 export { EmptyState, StatusPill, ErrorCard, statusTone, crmTable as appTable, crmTableCards as appTableCards } from "@/components/crm-ui";
+
+/* ── Color ──────────────────────────────────────────────────────────────────── */
+/* Owner, 2026-10-04: "the pages you redesigned are much better but they are now bland and need a little color".
+   One small palette, used the same way everywhere: a tinted chip for a page or section icon, a soft tint and a
+   colored label on number tiles. Orange stays the action color; the others only label and decorate. */
+
+export type Accent = "orange" | "sky" | "emerald" | "violet" | "amber" | "rose" | "teal" | "indigo" | "slate";
+const ACCENTS: Record<Accent, { chip: string; tint: string; border: string; label: string; dot: string; bar: string }> = {
+  orange: { chip: "bg-orange-100 text-orange-600 dark:bg-orange-500/15 dark:text-orange-400", tint: "from-orange-50 dark:from-orange-500/[0.09]", border: "border-orange-200/80 dark:border-orange-500/25", label: "text-orange-700 dark:text-orange-300", dot: "bg-orange-500", bar: "bg-orange-500" },
+  sky: { chip: "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400", tint: "from-sky-50 dark:from-sky-500/[0.09]", border: "border-sky-200/80 dark:border-sky-500/25", label: "text-sky-700 dark:text-sky-300", dot: "bg-sky-500", bar: "bg-sky-500" },
+  emerald: { chip: "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400", tint: "from-emerald-50 dark:from-emerald-500/[0.09]", border: "border-emerald-200/80 dark:border-emerald-500/25", label: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500", bar: "bg-emerald-500" },
+  violet: { chip: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400", tint: "from-violet-50 dark:from-violet-500/[0.09]", border: "border-violet-200/80 dark:border-violet-500/25", label: "text-violet-700 dark:text-violet-300", dot: "bg-violet-500", bar: "bg-violet-500" },
+  amber: { chip: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400", tint: "from-amber-50 dark:from-amber-500/[0.09]", border: "border-amber-200/80 dark:border-amber-500/25", label: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500", bar: "bg-amber-500" },
+  rose: { chip: "bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400", tint: "from-rose-50 dark:from-rose-500/[0.09]", border: "border-rose-200/80 dark:border-rose-500/25", label: "text-rose-700 dark:text-rose-300", dot: "bg-rose-500", bar: "bg-rose-500" },
+  teal: { chip: "bg-teal-100 text-teal-600 dark:bg-teal-500/15 dark:text-teal-400", tint: "from-teal-50 dark:from-teal-500/[0.09]", border: "border-teal-200/80 dark:border-teal-500/25", label: "text-teal-700 dark:text-teal-300", dot: "bg-teal-500", bar: "bg-teal-500" },
+  indigo: { chip: "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400", tint: "from-indigo-50 dark:from-indigo-500/[0.09]", border: "border-indigo-200/80 dark:border-indigo-500/25", label: "text-indigo-700 dark:text-indigo-300", dot: "bg-indigo-500", bar: "bg-indigo-500" },
+  slate: { chip: "bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300", tint: "from-slate-50 dark:from-slate-500/[0.09]", border: "border-slate-200/80 dark:border-slate-500/25", label: "text-slate-700 dark:text-slate-300", dot: "bg-slate-500", bar: "bg-slate-500" },
+};
+export const accentClasses = (a: Accent) => ACCENTS[a];
+/** Number tiles without an accent of their own take these in turn, so a row of numbers is never grey. */
+const STAT_CYCLE: Accent[] = ["orange", "sky", "emerald", "violet", "amber", "rose"];
+
+/** Each page's icon and color, by route (the sidebar's families: Google = sky, ads = amber, permits = emerald …). */
+const PAGE_ICONS: [string, LucideIcon, Accent][] = [
+  ["/call-assistant", Phone, "orange"], ["/google-reviews", Star, "amber"], ["/google-profile", Store, "sky"],
+  ["/google-business", Store, "sky"], ["/locations", MapPin, "sky"], ["/gmb-monitor", Eye, "sky"],
+  ["/ranking-grid", Grid3x3, "sky"], ["/gbp-content", Newspaper, "sky"], ["/reinstatement", LifeBuoy, "sky"],
+  ["/agency", Building2, "indigo"], ["/competitors", Swords, "rose"], ["/google-ads", MousePointerClick, "amber"],
+  ["/ads-manager", BarChart3, "amber"], ["/lsa-leads", Users, "amber"], ["/lsa-account-manager", Briefcase, "amber"],
+  ["/search", Search, "emerald"], ["/databases", Database, "emerald"], ["/property", Home, "emerald"],
+  ["/schedules", CalendarClock, "emerald"], ["/history", History, "emerald"], ["/photos", Camera, "teal"],
+  ["/media-library", Images, "teal"], ["/domains", Globe, "violet"], ["/mail-alerts", MailWarning, "violet"],
+  ["/cloudflare", Cloud, "violet"], ["/search-console", LineChart, "violet"], ["/site-scan", ScanSearch, "violet"],
+  ["/vpn-shield", ShieldCheck, "violet"], ["/ip-tracker", Fingerprint, "violet"], ["/social-media", Megaphone, "rose"],
+  ["/guides", BookOpen, "rose"], ["/master-class", GraduationCap, "indigo"], ["/settings", Settings, "slate"],
+  ["/admin/access", KeyRound, "slate"], ["/admin/issues", Bug, "slate"], ["/admin/feature-pages", LayoutGrid, "slate"],
+  ["/crm-app", Kanban, "orange"], ["/", LayoutDashboard, "orange"],
+];
+function pageIconFor(path: string): { icon: LucideIcon; accent: Accent } | null {
+  const hit = PAGE_ICONS.find(([p]) => (p === "/" ? path === "/" : path === p || path.startsWith(`${p}/`)));
+  return hit ? { icon: hit[1], accent: hit[2] } : null;
+}
 
 /* ── Page frame ─────────────────────────────────────────────────────────────── */
 
@@ -35,7 +83,11 @@ export function AppPage({ children, width = "default", className, testId }: {
   testId?: string;
 }) {
   return (
-    <div className={cn("mx-auto w-full px-4 pb-10 pt-5 sm:px-6 sm:pt-8 space-y-5 sm:space-y-6", WIDTHS[width], className)} data-testid={testId}>
+    <div className={cn(
+      "relative isolate mx-auto w-full px-4 pb-10 pt-5 sm:px-6 sm:pt-8 space-y-5 sm:space-y-6",
+      // a soft warm glow behind the header — color without noise
+      "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-64 before:bg-[radial-gradient(55%_100%_at_12%_0%,hsl(25_95%_53%/0.11),transparent_72%),radial-gradient(45%_90%_at_88%_0%,hsl(199_89%_48%/0.08),transparent_72%)]",
+      WIDTHS[width], className)} data-testid={testId}>
       {children}
     </div>
   );
@@ -43,8 +95,11 @@ export function AppPage({ children, width = "default", className, testId }: {
 
 /* ── Page header ────────────────────────────────────────────────────────────── */
 
-export function PageHeader({ title, description, actions, meta, back, testId }: {
+export function PageHeader({ title, description, actions, meta, back, testId, icon, accent }: {
   title: ReactNode;
+  /** The page's icon chip. Defaults to the route's icon (PAGE_ICONS); pass null for none. */
+  icon?: LucideIcon | null;
+  accent?: Accent;
   /** One short sentence: what this page is for. Never a paragraph. */
   description?: ReactNode;
   /** The page's actions, primary first. On phones they sit on their own row under the title. */
@@ -55,6 +110,10 @@ export function PageHeader({ title, description, actions, meta, back, testId }: 
   back?: { href: string; label: string };
   testId?: string;
 }) {
+  const [location] = useLocation();
+  const auto = pageIconFor(location);
+  const Icon = icon === null ? null : icon ?? auto?.icon ?? null;
+  const tone = ACCENTS[accent ?? auto?.accent ?? "orange"];
   return (
     <header className="space-y-3" data-testid={testId}>
       {back && (
@@ -63,12 +122,19 @@ export function PageHeader({ title, description, actions, meta, back, testId }: 
         </Link>
       )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-9">{title}</h1>
-            {meta}
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+          {Icon && (
+            <span className={cn("mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ring-1 ring-black/5 sm:h-12 sm:w-12 sm:rounded-2xl", tone.chip)} aria-hidden="true">
+              <Icon className="h-5 w-5 sm:h-6 sm:w-6" strokeWidth={1.9} />
+            </span>
+          )}
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.75rem] sm:leading-9">{title}</h1>
+              {meta}
+            </div>
+            {description && <p className="max-w-2xl text-sm text-muted-foreground sm:text-[0.9375rem]">{description}</p>}
           </div>
-          {description && <p className="max-w-2xl text-sm text-muted-foreground sm:text-[0.9375rem]">{description}</p>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end [&>*]:flex-1 sm:[&>*]:flex-none">{actions}</div>}
       </div>
@@ -80,10 +146,18 @@ export function PageHeader({ title, description, actions, meta, back, testId }: 
 
 export function StatGrid({ children, cols = 4, className }: { children: ReactNode; cols?: 2 | 3 | 4 | 5; className?: string }) {
   const lg = { 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5" }[cols];
-  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3", lg, className)}>{children}</div>;
+  let i = 0;
+  const colored = Children.map(children, (child) => {
+    if (!isValidElement(child) || child.type !== Stat) return child;
+    const el = child as ReactElement<StatProps>;
+    const accent = el.props.accent ?? STAT_CYCLE[i % STAT_CYCLE.length];
+    i++;
+    return cloneElement(el, { accent });
+  });
+  return <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3", lg, className)}>{colored}</div>;
 }
 
-export function Stat({ label, value, hint, href, tone = "default", testId }: {
+type StatProps = {
   label: ReactNode;
   value: ReactNode;
   /** One short line under the number ("of 2,000 included", "3 need a reply"). */
@@ -91,12 +165,25 @@ export function Stat({ label, value, hint, href, tone = "default", testId }: {
   /** A number that stands for a list links to it. */
   href?: string;
   tone?: "default" | "good" | "warn" | "bad";
+  /** The tile's color; StatGrid gives each tile one in turn when not set. */
+  accent?: Accent;
+  icon?: LucideIcon;
   testId?: string;
-}) {
+};
+
+export function Stat({ label, value, hint, href, tone = "default", accent, icon: Icon, testId }: StatProps) {
   const toneClass = { default: "", good: "text-emerald-600 dark:text-emerald-400", warn: "text-amber-600 dark:text-amber-400", bad: "text-red-600 dark:text-red-400" }[tone];
+  const a = accent ? ACCENTS[accent] : null;
   const body = (
-    <div className={cn("h-full rounded-xl border bg-card p-3.5 sm:p-4", href && "transition-colors hover:border-primary/40 hover:bg-accent/40")} data-testid={testId}>
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+    <div className={cn(
+      "h-full rounded-xl border bg-card p-3.5 sm:p-4",
+      a && cn("bg-gradient-to-br to-card to-70%", a.tint, a.border),
+      href && "transition-shadow hover:shadow-md",
+    )} data-testid={testId}>
+      <div className={cn("flex items-center gap-1.5 text-xs font-medium", a ? a.label : "text-muted-foreground")}>
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : a ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", a.dot)} aria-hidden="true" /> : null}
+        <span className="truncate">{label}</span>
+      </div>
       <div className={cn("mt-1 truncate text-2xl font-semibold tabular-nums tracking-tight", toneClass)}>{value}</div>
       {hint && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
@@ -106,8 +193,11 @@ export function Stat({ label, value, hint, href, tone = "default", testId }: {
 
 /* ── Sections ───────────────────────────────────────────────────────────────── */
 
-export function Section({ title, description, actions, children, className, contentClassName, flush, testId, id }: {
+export function Section({ title, description, actions, children, className, contentClassName, flush, testId, id, icon: Icon, accent = "orange" }: {
   title?: ReactNode;
+  /** A small colored icon chip before the title; without one the title gets the orange marker. */
+  icon?: LucideIcon;
+  accent?: Accent;
   description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
@@ -124,7 +214,14 @@ export function Section({ title, description, actions, children, className, cont
       {head && (
         <div className={cn("flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 pt-4 sm:px-5 sm:pt-5", flush && "pb-3")}>
           <div className="min-w-0">
-            {title && <h2 className="text-base font-semibold leading-6">{title}</h2>}
+            {title && (
+              <h2 className="flex items-center gap-2 text-base font-semibold leading-6">
+                {Icon
+                  ? <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", ACCENTS[accent].chip)} aria-hidden="true"><Icon className="h-4 w-4" /></span>
+                  : <span className={cn("h-4 w-1 shrink-0 rounded-full", ACCENTS[accent].bar)} aria-hidden="true" />}
+                <span className="min-w-0">{title}</span>
+              </h2>
+            )}
             {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -217,7 +314,7 @@ export function Notice({ tone = "info", title, children, action, testId }: {
 export function AppTabsList({ children, className, ...rest }: React.ComponentProps<typeof TabsList>) {
   return (
     <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-      <TabsList className={cn("inline-flex h-10 w-max min-w-full justify-start gap-1 rounded-xl bg-muted p-1 sm:min-w-0", className)} {...rest}>
+      <TabsList className={cn("inline-flex h-10 w-max min-w-full justify-start gap-1 rounded-xl bg-muted p-1 sm:min-w-0 [&>[data-state=active]]:text-primary [&>[data-state=active]]:font-semibold", className)} {...rest}>
         {children}
       </TabsList>
     </div>

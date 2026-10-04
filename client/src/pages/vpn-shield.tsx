@@ -639,7 +639,7 @@ export default function VpnShieldPage() {
             <Button
               key={tab.id}
               variant="ghost"
-              className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${activeTab === tab.id ? "bg-background text-foreground shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
+              className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${activeTab === tab.id ? "bg-background text-primary font-semibold shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
               onClick={() => setActiveTab(tab.id)}
               role="tab"
               aria-selected={activeTab === tab.id}

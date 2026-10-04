@@ -13,6 +13,7 @@ import { CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { accentClasses, type Accent } from "@/components/app-ui";
 
 export type ResultsRange = "7d" | "30d" | "month" | "all";
 export type ResultsPick = "lead_submitted" | "alerted" | "info" | "declined" | "hangup" | "spam";
@@ -30,13 +31,13 @@ type Summary = {
 const RANGE_LABELS: Record<ResultsRange, string> = { "7d": "Last 7 days", "30d": "Last 30 days", month: "This month", all: "All time" };
 
 /** The tiles, in the order an owner reads them: what made money first, spam last. */
-const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: string }[] = [
-  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "text-foreground" },
-  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "text-amber-600 dark:text-amber-400" },
-  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "text-sky-600 dark:text-sky-400" },
-  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "text-muted-foreground" },
-  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup", "voicemail"], icon: PhoneMissed, tone: "text-muted-foreground" },
-  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "text-violet-600 dark:text-violet-400" },
+const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: Accent }[] = [
+  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "emerald" },
+  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "amber" },
+  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "sky" },
+  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "slate" },
+  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup", "voicemail"], icon: PhoneMissed, tone: "rose" },
+  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "violet" },
 ];
 
 const sum = (o: Record<string, number>, keys: string[]) => keys.reduce((n, k) => n + (o[k] ?? 0), 0);
@@ -96,10 +97,13 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                     <button
                       type="button"
                       onClick={() => onPick(t.key)}
-                      className="h-full w-full rounded-lg p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className={cn("h-full w-full rounded-xl border bg-gradient-to-br to-card to-70% p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", accentClasses(t.tone).tint, accentClasses(t.tone).border)}
                       data-testid={`tile-results-${t.key}`}
                     >
-                      <span className="block text-xs font-medium text-muted-foreground">{t.label}</span>
+                      <span className={cn("flex items-center gap-1.5 text-xs font-medium", accentClasses(t.tone).label)}>
+                        <span className={cn("flex h-6 w-6 items-center justify-center rounded-md", accentClasses(t.tone).chip)} aria-hidden="true"><t.icon className="h-3.5 w-3.5" /></span>
+                        {t.label}
+                      </span>
                       <span className="mt-1 block text-2xl font-semibold tabular-nums" data-testid={`text-results-${t.key}`}>{n.toLocaleString("en-US")}</span>
                       <span className="block text-xs text-muted-foreground">{t.hint}</span>
                     </button>
@@ -115,7 +119,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                   {d.lines.map((l) => (
                     <li key={l.label} className="text-sm" data-testid="row-results-line">
                       <div className="flex justify-between gap-2"><span className="truncate">{l.label}</span><span className="tabular-nums text-muted-foreground">{l.calls} calls · {l.leads} estimate {l.leads === 1 ? "request" : "requests"}</span></div>
-                      <div className="mt-1 h-1.5 rounded bg-muted"><div className="h-1.5 rounded bg-foreground/30" style={{ width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
+                      <div className="mt-1 h-1.5 rounded bg-muted"><div className="h-1.5 rounded bg-primary" style={{ width: `${maxLine ? Math.max(4, Math.round((l.calls / maxLine) * 100)) : 0}%` }} /></div>
                     </li>
                   ))}
                 </ul>
