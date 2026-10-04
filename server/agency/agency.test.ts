@@ -4,6 +4,7 @@ import { ensureAgencySchema } from './schema';
 import { accessFor,clientAccess,locationAccess,listLocations,filters,dashboard } from './access';
 import { queueBulk,runAgencyJobs,performJob } from './jobs';
 import { createOnboarding,pollInvitations,matchesRequest,sendOnboarding,hash } from './onboarding';
+import { encryptToken } from '../gbp/token-crypto';
 import { registerAgencyRoutes,csvCell } from './routes';
 import { registerAgencyAccess } from './middleware';
 import { GoogleClient,GBP_SCOPE,Limiter } from '../gbp/client';
@@ -140,6 +141,16 @@ describe('Agency access and 5,000-location scale',()=>{
     await pool.query("INSERT INTO gbp_sync_status(location_id,kind,last_success,profile_snapshot) VALUES($1,'profile',now(),'{\"website\":\"https://example.invalid\"}')",[id]);
     const scan:any=await performJob(job('scan'));expect(scan.id).toMatch(/^[a-f0-9-]+$/);
     await performJob(job('unlink'));expect((await pool.query('SELECT gbp_location_name FROM business_locations WHERE id=$1',[id])).rows[0].gbp_location_name).toBeNull();
+  });
+  it('lists onboarding requests with a real total (the Pager no longer guesses)',async()=>{
+    const token='fixture-'+crypto.randomUUID().replace(/-/g,'');
+    await pool.query("INSERT INTO agency_onboarding(id,user_id,client_id,subject,agency_email,contact_email,business_name,token_hash,token_enc) VALUES($1,$2,$3,'agency','agency@example.invalid','client@example.invalid','Total fixture',$4,$5)",[crypto.randomUUID(),owner,client,hash(token),encryptToken(token)]);
+    const r=await call('get','/api/agency/onboarding',owner,{},{});
+    expect(r.status).toBe(200);
+    expect(typeof r.data.total).toBe('number');
+    expect(r.data.total).toBe(r.data.items.length);
+    expect(r.data.total).toBeGreaterThanOrEqual(1);
+    for(const item of r.data.items){expect(item.token_hash).toBeUndefined();expect(item.link).toContain('/api/agency-onboarding/');}
   });
   it('uses the shared Guard reauthentication requirement and CSV formula escaping',async()=>{
     expect((await call('post','/api/agency/bulk',owner,{requestKey:crypto.randomUUID(),action:'guard',selection:{ids:[loc]},payload:{mode:'off',watched:[]}})).data.reauth).toBe(true);
