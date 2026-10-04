@@ -141,6 +141,17 @@ describe("feature page registry", () => {
     }
   });
 
+  it("never calls a live add-on 'not on sale yet' (stale preview copy)", () => {
+    // Owner, 2026-10-02: the Call Assistant is live — no add-on is `preview`. Copy
+    // that still says one "isn't on sale yet" is stale and misleading (the
+    // crm-leads FAQ did until the 2026-10-04 audit).
+    if (Object.values(ADDONS).some((a: any) => a.preview === true)) return;
+    for (const page of FEATURE_PAGES) {
+      const text = JSON.stringify(page);
+      expect(text, page.key).not.toMatch(/isn't on sale yet|is not on sale yet|not on sale yet/i);
+    }
+  });
+
   it("an In Depth section is 2–5 paragraphs and 250–500 words (WRITING-GUIDE.md), and Site Scan has the reference one", () => {
     expect(featurePageByKey("siteScan")!.inDepth).toBeDefined();
     for (const page of FEATURE_PAGES) {
