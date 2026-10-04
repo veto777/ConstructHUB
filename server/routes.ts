@@ -423,6 +423,8 @@ export async function registerRoutes(
     console.error("Failed to initialize LSA module:", e?.message || e);
   }
 
+  // Every county in the permit directory; the app sidebar footer's "Counties" total
+  // (/api/databases/counts is its "Directory entries" sibling).
   app.get("/api/counties", async (_req, res) => {
     const counties = await storage.getCounties();
     res.json(counties);
@@ -473,6 +475,7 @@ export async function registerRoutes(
     }
   });
 
+  // Sidebar footer "Directory totals": total permit-database rows plus per-jurisdiction and portal-health counts.
   app.get("/api/databases/counts", async (_req, res) => {
     try {
       const counts = await storage.getDatabaseCounts();
@@ -709,11 +712,15 @@ export async function registerRoutes(
     }
   });
 
+  // Search history for /history: the signed-in account's last 50 saved searches
+  // (search_queries, newest first) — what the list, the rerun links and the delete buttons read.
   app.get("/api/search-queries", async (req, res) => {
     const queries = await storage.getSearchQueries(ownerScope(req));
     res.json(queries);
   });
 
+  // Deletes one history row (the X on a /history row) and its saved results; another account's
+  // row answers 404 (canReadQuery).
   app.delete("/api/search-queries/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -722,6 +729,7 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Clear-all from /history: deletes every one of this account's searches and the results saved with them.
   app.delete("/api/search-queries", async (req, res) => {
     await storage.deleteAllSearchQueries(ownerScope(req));
     res.json({ success: true });
@@ -3481,6 +3489,8 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
+  // The account's Click Guard–tracked domains, scoped to the signed-in user — read by Settings →
+  // Limits & usage ("Protected websites" used count) and the IP Tracker / VPN Shield pages.
   app.get("/api/click-guard/domains", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -5009,6 +5019,9 @@ function main() {
     }
   });
 
+  // Me → My account "Google Business Profiles": the review-request destinations saved for this user
+  // (review_templates), used to seed the profile list and its Default badge; Settings → Limits & usage
+  // counts them ("Review request templates") and the Google Reviews page edits them.
   app.get("/api/review-templates", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5020,6 +5033,8 @@ function main() {
     }
   });
 
+  // "Add profile" in that card: resolves/validates the Google review link, enforces the plan's
+  // template limit under the per-account lock, and marks the first template default.
   app.post("/api/review-templates", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5072,6 +5087,8 @@ function main() {
     }
   });
 
+  // "Set Default" / "Save changes" on a GMB profile: renames, swaps the link (re-validated only
+  // when changed) or moves the default flag; own templates only (404 otherwise).
   app.patch("/api/review-templates/:id", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5111,6 +5128,8 @@ function main() {
     }
   });
 
+  // "Remove profile" (after the confirm dialog): deletes the template row; already-sent review
+  // requests keep their own stored link.
   app.delete("/api/review-templates/:id", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5547,6 +5566,8 @@ function main() {
     }
   });
 
+  // My account → Trials "New Trial" (platform admins): creates a 1–1000-day or until-revoked
+  // beta_access_codes invite, optionally emails the invite link.
   app.post("/api/beta-codes/generate", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5596,6 +5617,7 @@ function main() {
     }
   });
 
+  // The admin trial list: every code plus the display name/email of the account that redeemed it.
   app.get("/api/beta-codes", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5624,6 +5646,7 @@ function main() {
     }
   });
 
+  // "Revoke" on a code row: marks it revoked and ends only the trial this code is keeping alive.
   app.post("/api/beta-codes/revoke/:id", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5646,6 +5669,10 @@ function main() {
     }
   });
 
+  // "Activate" on the trial code box / /invite/<code>'s "Start my trial": validates the code (exists,
+  // not revoked, not used, not past its redeem-by date), turns it into the trial subscriptions row
+  // (server/entitlements.ts redeemTrialCode) and starts the Agency-plan trial grant; refuses a paid
+  // account or one already holding no-end access.
   app.post("/api/beta-codes/redeem", async (req, res) => {
     try {
       const user = (req as any).user;
@@ -5695,10 +5722,12 @@ function main() {
   });
 
   // Review Reminder Settings
+  // My account → "Review referral settings": the customer referral offer shown after rating.
   app.get("/api/review-referral-settings", async (req, res) => {
     const user = getDevUser(req, res); if (!user) return;
     res.json(await getReferralSettings(user.id));
   });
+  // Saves that offer: an enabled offer needs 1–500 characters of terms (referralSettingsInput).
   app.put("/api/review-referral-settings", async (req, res) => {
     const user = getDevUser(req, res); if (!user) return;
     const parsed = referralSettingsInput.safeParse(req.body);
@@ -5944,6 +5973,8 @@ function main() {
     }
   });
 
+  // My account photo/logo uploads: takes a base64 jpeg/png/webp/gif (≤2MB), stores it in R2 under
+  // avatars/ or logos/company, and returns the URL for PATCH /api/auth/profile.
   app.post("/api/upload/logo", async (req, res) => {
     try {
       const user = (req as any).user;

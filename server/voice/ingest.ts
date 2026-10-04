@@ -150,6 +150,10 @@ export async function upsertIngestedCall(orgId: string, c: IngestCall): Promise<
 }
 
 export function registerVoiceIngestRoutes(app: Express): void {
+  /** One outside receptionist's finished call (or {calls:[…]} backfill, ≤100), upserted by call_sid into
+   *  voice_calls with engine='external' — a RECORD ONLY: never metered, never a lead/escalation. Its rows power
+   *  Call Assistant → Calls (log/spam/detail via flags.ingest) and the Overview's "live · Janice" status
+   *  (externalReceptionist below). Tailnet + bearer auth; 409 when the sid belongs to another engine/org. */
   app.post(`${VOICE_INGEST_PATH}/calls`, requireVoiceIngest, async (req: Request, res: Response) => {
     const orgId = (res.locals as any).ingestOrgId as string;
     const body = req.body;
@@ -184,6 +188,9 @@ export function registerVoiceIngestRoutes(app: Express): void {
     res.json({ stored, failed: results.length - stored, results });
   });
 
+  /** Stores the call's WAV (≤40 MB, RIFF-validated) in R2 and links it via voice_calls.recording_key — the
+   *  Recording player in the call detail sheet (Call Assistant → Calls) streams it back through
+   *  GET /api/crm/voice/calls/:id/recording. Call must have been pushed first (404 otherwise). */
   app.put(`${VOICE_INGEST_PATH}/calls/:callSid/recording`, requireVoiceIngest,
     express.raw({ type: ["audio/wav", "audio/x-wav", "application/octet-stream"], limit: RECORDING_MAX_BYTES }),
     async (req: Request, res: Response) => {

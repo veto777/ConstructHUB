@@ -75,12 +75,16 @@ export async function logActivity(req: any | null, userId: number, kind: string,
 }
 
 export function registerAccountEventRoutes(app: Express, auth: (req: any, res: any) => any) {
+  // The top-bar bell (NotificationBell): this account's in-app notifications from the last 30 days
+  // (newest first, 100 max) plus the unread count for the badge.
   app.get("/api/notifications", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     const { rows } = await pool.query(`SELECT id,kind,title,body,link,severity,read_at,created_at FROM user_notifications WHERE user_id=$1 AND created_at > now() - interval '${NOTIFICATION_DAYS} days' ORDER BY created_at DESC LIMIT 100`, [u.id]);
     const { rows: [c] } = await pool.query(`SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND read_at IS NULL AND created_at > now() - interval '${NOTIFICATION_DAYS} days'`, [u.id]);
     res.json({ unread: c.n, notifications: rows });
   });
+  // The bell's "Mark read" / "Mark all read": stamps read_at on the given ids (or every unread row
+  // for the account when no ids are sent).
   app.post("/api/notifications/read", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     if (req.body?.ids !== undefined && (!Array.isArray(req.body.ids) || req.body.ids.length > 500 || req.body.ids.some((id: unknown) => typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0))) return res.status(400).json({ message: 'Invalid notification IDs' });
@@ -88,11 +92,16 @@ export function registerAccountEventRoutes(app: Express, auth: (req: any, res: a
     await pool.query(`UPDATE user_notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL ${ids ? "AND id=ANY($2)" : ""}`, ids ? [u.id, ids] : [u.id]);
     res.json({ ok: true });
   });
+  // Me → Notifications: every notification kind with its channels — the user's
+  // user_notification_prefs row when present, otherwise the registry defaults; security kinds
+  // always report email on.
   app.get("/api/notification-prefs", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     const prefs = await Promise.all((Object.entries(KIND_DEFAULTS) as [NotificationKind, NotificationDefaults][]).map(async ([kind, d]) => ({ kind, label: d.label, security: !!d.security, ...(await channelsFor(u.id, kind)) })));
     res.json({ prefs });
   });
+  // The Notifications toggles: upserts one kind's in_app/email row per entry; unknown kinds and
+  // non-boolean values are refused. Security email stays forced-on at send time regardless.
   app.put("/api/notification-prefs", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     if (!Array.isArray(req.body?.prefs) || req.body.prefs.length > Object.keys(KIND_DEFAULTS).length || req.body.prefs.some((p: any) => !p || !Object.hasOwn(KIND_DEFAULTS,p.kind) || typeof p.inApp !== 'boolean' || typeof p.email !== 'boolean')) return res.status(400).json({ message: 'Invalid notification preferences' });
@@ -104,6 +113,8 @@ export function registerAccountEventRoutes(app: Express, auth: (req: any, res: a
     }
     res.json({ ok: true });
   });
+  // Me → Password & security "Account activity" and Workspace → Audit log: the newest 200
+  // account_activity rows for this user (nothing older is ever deleted — the limit is display-only).
   app.get("/api/account-activity", async (req, res) => {
     const u = auth(req, res); if (!u) return;
     const { rows } = await pool.query("SELECT id,kind,detail,ip,user_agent,created_at FROM account_activity WHERE user_id=$1 ORDER BY created_at DESC LIMIT 200", [u.id]);

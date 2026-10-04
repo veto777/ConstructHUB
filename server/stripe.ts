@@ -220,6 +220,10 @@ export function registerStripeRoutes(app: Express) {
     res.json(priceBook());
   });
 
+  // The signed-in account's subscription as every billing surface reads it (Settings → Billing plan
+  // card + statement, CRM plan gates): stored/effective plan, status, interval, add-on quantities,
+  // Agency locations, period end, cancellation state and start date — from the subscriptions row,
+  // never a hardcoded plan. A Stripe-less grant past its end reports status "inactive".
   app.get("/api/stripe/subscription", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -509,6 +513,9 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
+  // The cart sheet's "Proceed to checkout" (client/src/components/cart-sheet.tsx): re-resolves every
+  // price server-side (catalog/DB, never the client's), refuses sales-only (>= $1,000) and
+  // contract-gated items, then opens a Stripe Checkout session.
   app.post("/api/stripe/create-cart-checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;

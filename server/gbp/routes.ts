@@ -64,6 +64,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       LEFT JOIN gbp_sync_status s ON s.location_id=l.id WHERE l.user_id=$1 AND l.gbp_location_name IS NOT NULL AND l.id=ANY($2::int[]) ORDER BY l.id,s.kind`,[id,visible.items.map(l=>l.id)]);
     res.json({...await grantStatus(id),locations});
   });
+  // Me → Password & security "Wasn't you?": removes one linked Google account (or all) with its
+  // listings' Google data, then tries to revoke the token at Google.
   route('post','/api/gbp/disconnect',async(req,res,id)=>{
     if (!requireRecentAuth(req,res)) return;
     if (req.body?.subject !== undefined && (typeof req.body.subject !== 'string' || !req.body.subject.length || req.body.subject.length>255)) return res.status(400).json({message:'Invalid Google account'});

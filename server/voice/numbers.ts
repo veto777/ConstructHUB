@@ -144,7 +144,7 @@ export async function heldNumberCount(orgId: string, tx: { select: typeof db.sel
   return Number(row?.n ?? 0);
 }
 
-/** The numbers the tier itself includes (Solo 1, Crew 3, Fleet 5); every one above that is a call_number unit. */
+/** The numbers the tier itself includes (Lite 1, Solo 1, Crew 5, Fleet 20); every one above that is a call_number unit. */
 function includedNumbers(v: VoiceContext): number {
   return Math.max(0, v.allowance.numbers - (v.ent.addons.call_number ?? 0));
 }
@@ -240,7 +240,9 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     }
   });
 
-  /** GET → { numbers, allowance, forwarding: { carriers, advice }, webhooks, configured, mock } */
+  /** The Numbers tab's data: every voice_numbers row for the org (view via numberView), the allowance
+   *  (used = held rows only — pending/active/releasing minus final releases), forwarding copy, and whether
+   *  buying is possible here (configured/mock/paused/canManage). Used by client NumbersPanel + ForwardingInstructions. */
   app.get("/api/crm/voice/numbers", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
@@ -262,7 +264,9 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     });
   });
 
-  /** POST { phoneNumber, label?, location?, forwardingFrom? } → 201 { number, mock } */
+  /** POST { phoneNumber, label?, location?, forwardingFrom?, state?, locality? } → 201 { number, mock }.
+   *  Reserves the voice_numbers row under the org's advisory lock, then purchases from the carrier; a 5xx
+   *  during purchase keeps a 'failed' row so the number is never forgotten. */
   app.post("/api/crm/voice/numbers", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { perm: "manageSettings" });
     if (!v) return;
@@ -360,7 +364,9 @@ export function registerVoiceNumberRoutes(app: Express, getDevUser: GetUser): vo
     res.json({ number: numberView(row) });
   });
 
-  /** DELETE → { released: true, number } · { released: false, dismissed: true } for an unfinished purchase · 409 { code: "too_early", releaseEligibleAt } */
+  /** DELETE → { released: true, number } · { released: false, dismissed: true } for an unfinished purchase · 409 { code: "too_early", releaseEligibleAt }.
+   *  A 'pending' row stale > 10 min is dismissed the same way as 'failed' (STALE_PENDING_MS), so a crashed
+   *  purchase can be cleared without calling the carrier. */
   app.delete("/api/crm/voice/numbers/:id", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { perm: "manageSettings" });
     if (!v) return;

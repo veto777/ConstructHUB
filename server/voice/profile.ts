@@ -236,7 +236,8 @@ export function registerVoiceProfileRoutes(app: Express, getDevUser: GetUser): v
     return res.json(profileResponse(row));
   });
 
-  /** POST wizard payload → { profile, …, published?: { version } } */
+  /** POST wizard payload → { profile, …, published?: { version } }. Used by tests/API clients — the Studio
+   *  UI wizard edits the full profile via PUT /profile and publishes via POST /publish. */
   app.post("/api/crm/voice/profile/setup", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { perm: "manageSettings" });
     if (!v) return;

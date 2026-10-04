@@ -128,7 +128,9 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
   // The reminder loop (production only: VOICE_ESCALATION_WORKER_ENABLED=true).
   startVoiceEscalationWorker();
 
-  /** GET ?outcome=&spam=1&numberId=&from=&to=&q=&page=&limit= → { calls: [...], total, page, limit } */
+  /** GET ?outcome=&spam=1&numberId=&from=&to=&q=&page=&limit= → { calls: [...], total, page, limit }.
+   *  No outcome and no spam flag = the non-spam log the Overview's "Recent calls" and the Calls tab show;
+   *  ?spam=1 narrows the same list to spam outcomes. */
   app.get("/api/crm/voice/calls", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
@@ -181,7 +183,8 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     }
   });
 
-  /** GET → VoiceCallRow + { customer, project, number, escalations } */
+  /** GET → VoiceCallRow + { customer, project, number, escalations }. Powers the Call
+   *  Assistant call detail sheet (data-testid sheet-call-detail — every row and button in calls-detail.tsx). */
   app.get("/api/crm/voice/calls/:id", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
@@ -247,6 +250,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
    * GET → { entries: VoiceSpamRow[], blocked, thisMonth } — `thisMonth` is the
    * month's spam count from the meter (spam + blocked calls, and how many of
    * the free spam calls are used: billing-usage.ts).
+   * Feeds the Calls → Spam tab (badge-spam-this-month, the thisMonth summary stats, table-spam-ledger).
    */
   app.get("/api/crm/voice/spam", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
@@ -292,7 +296,8 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     res.status(201).json({ blocked: true, entry: presentSpamRow(row) });
   });
 
-  /** GET ?open=1 → { escalations: [...] } */
+  /** GET ?open=1 → { escalations: [...] }. Feeds the Calls → Escalations tab
+   *  and its open-count badge (which queries ?open=1). */
   app.get("/api/crm/voice/escalations", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;

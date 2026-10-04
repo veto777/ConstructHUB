@@ -18,9 +18,10 @@
  * A subscription row without a Stripe subscription is a grant (a trial code, or
  * a manual grant). It stops counting once its current_period_end has passed; a
  * grant with no end date stays open until an admin ends it. Stripe-managed rows
- * follow their Stripe status only (the webhook keeps it current): active,
- * trialing and past_due (Stripe still retrying the card) have access —
- * ACCESS_STATUSES in shared/plans.ts.
+ * follow their Stripe status only (the webhook keeps it current): active and
+ * trialing have access — ACCESS_STATUSES in shared/plans.ts. past_due (Stripe
+ * still retrying the card) has NO plan access: the plan pauses until the
+ * payment goes through, the same rule as the add-on modules below.
  *
  * Add-on MODULES (the AI Call Assistant) are stricter: they run only while the
  * subscription is active or trialing (ADDON_MODULE_RUN_STATUSES). Owner,

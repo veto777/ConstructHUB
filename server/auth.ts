@@ -665,6 +665,11 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Who is signed in: the app shell's session check — every signed-in page (the home dashboard,
+  // settings, the tools) renders behind this answer; null = signed out (the client shows the
+  // public site / sign-in). Re-reads the users row so a deleted or changed account is reflected
+  // at once; /settings reads it as SettingsUser and /invite/:code uses it to pick the
+  // signed-out vs signed-in card.
   app.get("/api/auth/me", async (req, res) => {
     if (req.isAuthenticated() && req.user) {
       try {
@@ -695,6 +700,9 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Me → My account "Save changes": display name, company name/logo, avatar, review link.
+  // Blank display name and oversized/foreign-logo URLs are refused; a review link is only
+  // re-validated when it changed, so an unrelated save is never blocked by an old link.
   app.patch("/api/auth/profile", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -766,6 +774,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Me → Password & security "Update password": checks the current password, rewrites
+  // users.password_hash, signs out every remembered device and logs/notifies security.password_changed.
   app.post("/api/auth/change-password", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -800,6 +810,8 @@ export async function setupAuth(app: Express) {
   });
 
 
+  // Me → Password & security "Enable 2FA": stores an encrypted (not yet active) TOTP secret and
+  // returns the QR data URL + manual key. Requires a recent identity check (403 {reauth:true}).
   app.post("/api/auth/2fa/setup", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -839,6 +851,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Me → Password & security "Verify & Enable": validates the first authenticator code, then
+  // enables 2FA and returns 10 one-time recovery codes in the same transaction.
   app.post("/api/auth/2fa/verify", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
@@ -880,6 +894,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Me → Password & security "Confirm Disable": one valid authenticator code turns 2FA off and
+  // wipes the secret, recovery codes and remembered devices.
   app.post("/api/auth/2fa/disable", async (req, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Not authenticated" });
