@@ -303,3 +303,10 @@ Platform page (not CRM): the SEO-services agreement the client signs before payi
 | Footer: E-SIGN/UETA, contract id, generated date, support contact | footer | Legal footer | contract-sign.tsx:463-467 | — | CODE | OK |
 
 BUG-shaped finding (reported, not fixed — business rule): POST /api/contracts/create is sales-only-refused (409 talk_to_sales) for ALL four SEO packages (every total ≥ $7,500 ≥ the $1,000 SALES_THRESHOLD — owner decision 2026-09-30), so no NEW pending contract can ever be created and this page is only reachable for legacy contracts (all 4 in the DB are expired). The page itself handles that honestly (410 → "Contract Not Found" with the expiry message). If the sales-only rule is meant to retire this flow, the page/link is dead code; if not, the threshold and the package prices contradict each other. Owner's call.
+
+## Amendments
+
+- 2026-10-04 (audit fix `4458cca`): §8's header no longer depends only on the cached pipeline list.
+  The page falls back to the new `GET /api/crm/projects/:id` when the project is past the list's
+  2000-card cap, so direct links to older projects load instead of reading "Project not found"
+  (BUG 1 in the lane's BUGS.md).
