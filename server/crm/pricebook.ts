@@ -190,6 +190,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
   // ── Reference data ────────────────────────────────────────────────────────
 
+  // Reference data for the item editors: units, pricing modes and the formula
+  // cheat-sheet shown under the price book's formula tester (/crm/pricebook).
   app.get("/api/crm/pricebook/meta", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -199,6 +201,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     });
   });
 
+  // The org's item categories — feeds the category filter and the parent
+  // pickers on the Price book page.
   app.get("/api/crm/pricebook/categories", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -207,6 +211,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     res.json(rows);
   });
 
+  // Create a category — the "new category" action in the price book's
+  // category manager.
   app.post("/api/crm/pricebook/categories", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "managePriceBook");
     if (!ctx) return;
@@ -220,6 +226,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     res.status(201).json(row);
   });
 
+  // Active labor rates, default first — the Labor tab of the Price book page.
   app.get("/api/crm/pricebook/labor-rates", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -282,6 +289,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
   // ── Materials ─────────────────────────────────────────────────────────────
 
+  // Active materials — the Materials tab of the Price book page (search by
+  // name/SKU, filter by category).
   app.get("/api/crm/pricebook/materials", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -447,6 +456,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     return dupe ?? null;
   };
 
+  // The price book itself — the items tab on /crm/pricebook: search (name or
+  // code), category/division filters, newest-first, capped at 500 rows.
   app.get("/api/crm/pricebook/items", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;

@@ -585,6 +585,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
 
   // ── Company logo upload ───────────────────────────────────────────────────
 
+  // Logo upload for the workspace — the company-profile card on the Settings
+  // page (2MB cap, image sniffing, stored on org.custom_fields/logo_url).
   app.post("/api/crm/org/logo", (req: any, res, next: any) => {
     // multer errors (e.g. LIMIT_FILE_SIZE) must become a clean 400, not a 500.
     logoUpload.single("logo")(req, res, (err: any) => {
