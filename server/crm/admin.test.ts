@@ -70,6 +70,28 @@ describe("platform admin gating", () => {
     expect(detail.seats.limit).toBeTypeOf("number");
   });
 
+  it("payments tile: the charge count and the dollars cover the same rows", async () => {
+    // Sample SQL and API back-to-back (with one retry) — the dev DB is shared,
+    // so a concurrent write between the two reads is the only flake source.
+    for (let attempt = 0; ; attempt++) {
+      const { rows } = await q(
+        `select count(*) filter (where status = 'succeeded')::int as succeeded,
+                count(*)::int as total from crm_payments`);
+      const row = rows[0];
+      const overview = await (await fetch(`${BASE}/api/admin/overview`)).json();
+      const money = await q(
+        `select coalesce(sum(amount_cents) filter (where status = 'succeeded'), 0)::int as cents from crm_payments`);
+      if (overview.payments.count === row.succeeded && overview.payments.succeededCents === money.rows[0].cents) {
+        expect(overview.payments.count).toBeLessThanOrEqual(row.total);
+        return;
+      }
+      if (attempt >= 2) {
+        expect(overview.payments.count, "count covers succeeded charges only").toBe(row.succeeded);
+        expect(overview.payments.succeededCents).toBe(money.rows[0].cents);
+      }
+    }
+  });
+
   it("every /api/admin/* route 403s a non-admin", async () => {
     await withDevEmail("not-an-admin@example.com", async () => {
       const me = await (await fetch(`${BASE}/api/crm/me`)).json();

@@ -285,6 +285,8 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     res.json(rows);
   });
 
+  // Create a division — the Divisions card on the Settings page (the first
+  // division becomes headquarters; codes are unique per org).
   app.post("/api/crm/divisions", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageSettings");
     if (!ctx) return;
@@ -313,6 +315,8 @@ export function registerCrmDivisionRoutes(app: Express, getDevUser: GetUser): vo
     res.status(201).json(row);
   });
 
+  // Rename/re-scope a division or edit its address/tax rates — the Divisions
+  // card's edit dialog on the Settings page.
   app.patch("/api/crm/divisions/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageSettings");
     if (!ctx) return;

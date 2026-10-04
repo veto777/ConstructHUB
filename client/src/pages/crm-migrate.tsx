@@ -166,6 +166,7 @@ export default function CrmMigratePage() {
       setResult(data);
       if (entity === "customers") queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       if (entity === "estimates") queryClient.invalidateQueries({ queryKey: ["/api/crm/estimates"] });
+      if (entity === "invoices") queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
     },
     onError: (e: any) =>
       toast({ title: "Import failed", description: apiErrorMessage(e), variant: "destructive" }),
@@ -199,6 +200,8 @@ export default function CrmMigratePage() {
     }
     return m;
   }, [preview]);
+  // The server emits one error per PROBLEM; the pill counts affected ROWS.
+  const attentionRows = errorByRow.size;
 
   return (
     <CrmPage>
@@ -281,8 +284,8 @@ export default function CrmMigratePage() {
           <CardContent className="space-y-5">
             <div className="flex flex-wrap items-center gap-2" data-testid="text-preview-summary">
               <StatusPill tone="info" dot={false}>{preview.totalRows} rows</StatusPill>
-              <StatusPill tone={preview.errors.length ? "warning" : "success"} dot={false}>
-                {preview.errors.length ? `${preview.errors.length} rows need attention` : "all rows valid"}
+              <StatusPill tone={attentionRows ? "warning" : "success"} dot={false}>
+                {attentionRows ? `${attentionRows} ${attentionRows === 1 ? "row needs" : "rows need"} attention` : "all rows valid"}
               </StatusPill>
             </div>
 
@@ -399,6 +402,9 @@ export default function CrmMigratePage() {
                     </div>
                   ))}
               </div>
+            )}
+            {result.hint && (
+              <p className="text-xs text-muted-foreground" data-testid="text-import-hint">{result.hint}</p>
             )}
             <div className="flex flex-wrap gap-3">
               {entity === "customers" && (

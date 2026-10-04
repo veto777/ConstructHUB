@@ -40,6 +40,50 @@ test.describe("/portal/:token (client portal)", () => {
     guards.assertClean("public portal invalid token");
   });
 
+  test("curated: the license badge renders when the company has one on file", async ({ page }) => {
+    const guards = watchPage(page);
+    const { customerId } = await makeEstimate(page);
+    const rows = await q<{ portal_token: string }>(
+      `select portal_token from crm_customers where id = $1`, [customerId]);
+    const token = rows[0].portal_token;
+
+    // Park a license on the org, render, then put the column back.
+    const [before] = await q<{ license_number: string | null; license_state: string | null }>(
+      `select license_number, license_state from crm_orgs where id = $1`, [ORGS.aspire]);
+    await q(`update crm_orgs set license_number = 'E2E-LIC-777', license_state = 'WA' where id = $1`, [ORGS.aspire]);
+    try {
+      await gotoCrm(page, `/portal/${token}`);
+      await expect(page.getByText(/License E2E-LIC-777 \(WA\)/)).toBeVisible();
+    } finally {
+      await q(`update crm_orgs set license_number = $1, license_state = $2 where id = $3`,
+        [before.license_number, before.license_state, ORGS.aspire]);
+    }
+    guards.assertClean("public portal license badge");
+  });
+
+  test("curated: expired and cancelled estimates are not advertised as 'to review'", async ({ page }) => {
+    const guards = watchPage(page);
+    const { customerId, estimateId } = await makeEstimate(page);
+    const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
+    expect(send.ok()).toBeTruthy();
+    // Let the estimate lapse — the /e page would now show only an expiry notice.
+    await q(`update crm_estimates set expires_at = now() - interval '1 day' where id = $1`, [estimateId]);
+    try {
+      const rows = await q<{ portal_token: string }>(
+        `select portal_token from crm_customers where id = $1`, [customerId]);
+      await gotoCrm(page, `/portal/${rows[0].portal_token}`);
+      // The action banner must not count an estimate the client can't act on…
+      await expect(page.getByText(/estimate to review/)).toHaveCount(0);
+      await expect(page.locator('[data-testid^="portal-estimate-"]')).toHaveCount(0);
+      // …but the estimate itself stays listed in the history.
+      await expect(page.getByText(/Your estimates/)).toBeVisible();
+      await expect(page.getByText("E2E throwaway estimate").first()).toBeVisible();
+    } finally {
+      await q(`update crm_estimates set expires_at = now() + interval '30 days' where id = $1`, [estimateId]);
+    }
+    guards.assertClean("public portal expired banner");
+  });
+
   test("sweep: every button and link", async ({ page }) => {
     const { customerId, estimateId } = await makeEstimate(page);
     await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });

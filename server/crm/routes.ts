@@ -638,6 +638,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
   // ── Company profile ───────────────────────────────────────────────────────
 
+  // The active workspace's profile — what the CRM shell shows (org name,
+  // logo) and what every Settings card reads before you edit it.
   app.get("/api/crm/org", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -646,6 +648,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     res.json(presentOrg(ctx.org));
   });
 
+  // Saves workspace settings — every "save" card on the Settings page
+  // (/crm/settings: company profile, defaults, footers, notifications).
   app.patch("/api/crm/org", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -721,6 +725,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
   // ── Team ──────────────────────────────────────────────────────────────────
 
+  // Team roster + seat usage — the Team & Company page (/crm/team) and the
+  // schedule's "whose visits am I looking at" picker.
   app.get("/api/crm/members", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -739,6 +745,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     });
   });
 
+  // Edits a member's role, status and profile — the Team page's member cards
+  // (role changes, permission switches, disable/remove).
   app.patch("/api/crm/members/:id", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -923,6 +931,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
 
   // ── Invitations ───────────────────────────────────────────────────────────
 
+  // Pending invites — the "invited" rows on the Team page (the raw token is
+  // stripped from this list response).
   app.get("/api/crm/invitations", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -939,6 +949,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     res.json(rows.map(({ token, ...rest }) => rest));
   });
 
+  // Invite a teammate (Team page) — creates the invitation, emails the
+  // /crm/join link, and holds a seat while the invite is pending.
   app.post("/api/crm/invitations", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1090,6 +1102,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     res.json({ invitation: safe, link, emailed });
   });
 
+  // Revoke an invite (Team page row action) — deletes the row, so the emailed
+  // link stops working immediately, and releases the held seat.
   app.delete("/api/crm/invitations/:id", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;

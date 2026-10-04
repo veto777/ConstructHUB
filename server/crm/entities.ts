@@ -1513,6 +1513,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json({ ok: true, deleted: e.id });
   });
 
+  // Active lead sources — the "lead source" pickers (new client/lead dialogs)
+  // and the Sources card on the Settings page.
   app.get("/api/crm/lead-sources", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;

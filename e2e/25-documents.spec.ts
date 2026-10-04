@@ -60,6 +60,14 @@ test.describe("/crm/estimates", { tag: "@serial" }, () => {
     await expect(summary).toHaveText(`${all.total} of ${all.total}`);
     await expect(page.getByTestId("filter-status-draft")).not.toBeChecked();
 
+    // "Cancelled" is a real stored status (scope-option pulls, withdrawn bids)
+    // and its box must match the API exactly, like the others.
+    const cancelled = await docQuery(page, "/api/crm/estimates", "&status=cancelled");
+    await page.getByTestId("filter-status-cancelled").check();
+    await expect(summary).toHaveText(`${cancelled.filtered} of ${all.total}`);
+    await page.getByTestId("filter-status-cancelled").uncheck();
+    await expect(summary).toHaveText(`${all.total} of ${all.total}`);
+
     // Custom date range in the far future narrows to nothing — with the
     // honest empty state, not a crash.
     await page.getByTestId("select-date-range").selectOption("custom");

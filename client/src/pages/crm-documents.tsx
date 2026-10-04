@@ -86,6 +86,10 @@ const CONFIG: Record<"estimates" | "invoices", DocKindConfig> = {
       { key: "approved", label: "Approved" },
       { key: "declined", label: "Declined" },
       { key: "expired", label: "Expired" },
+      // CRM_ESTIMATE_STATUSES includes cancelled (scope-option pulls and
+      // withdrawn bids) — without a box here those rows are only reachable
+      // via "All", and ?status=cancelled in the URL is silently dropped.
+      { key: "cancelled", label: "Cancelled" },
     ],
   },
   invoices: {

@@ -355,6 +355,8 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
 
   // ── Google Calendar push ─────────────────────────────────────────────────
 
+  // Connection state for the Google Calendar card on the Settings page:
+  // org-wide "company calendar" plus this member's own connection.
   app.get("/api/crm/calendar/google/status", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -383,6 +385,8 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     });
   });
 
+  // "Connect Google Calendar" (Settings page) — starts the OAuth redirect;
+  // scope=me links the member's own calendar, otherwise the company calendar.
   app.get("/api/crm/calendar/google/connect", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -585,6 +589,8 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     }
   });
 
+  // "Disconnect" on the Settings Google Calendar card — drops the stored
+  // connection; visits stop syncing both ways.
   app.post("/api/crm/calendar/google/disconnect", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;

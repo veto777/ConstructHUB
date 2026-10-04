@@ -115,6 +115,29 @@ describe("guessMapping", () => {
     expect(m.total).toBe("Total");
     expect(m.status).toBe("Status");
   });
+
+  it("an exact alias always beats another field's prefix fallback", () => {
+    // Jobber/QuickBooks exports carry "Customer Email" / "Client Email" as the
+    // only client identifier — customerName's prefix "customer" must not steal
+    // it and leave customerEmail unmapped (every import row then fails to
+    // match a client).
+    const jobber = guessMapping("invoices", ["Customer Email", "Invoice #", "Total", "Paid"]);
+    expect(jobber.customerEmail).toBe("Customer Email");
+    expect(jobber.customerName).toBeNull();
+    expect(jobber.number).toBe("Invoice #");
+    expect(jobber.total).toBe("Total");
+    expect(jobber.paid).toBe("Paid");
+
+    const qbo = guessMapping("estimates", ["Client Email", "Quote #", "Total"]);
+    expect(qbo.customerEmail).toBe("Client Email");
+    expect(qbo.customerName).toBeNull();
+
+    // A bare "Customer"/"Client" header still maps the name when no exact
+    // email alias is present — the prefix fallback survives.
+    const bare = guessMapping("invoices", ["Customer", "Invoice #", "Total"]);
+    expect(bare.customerName).toBe("Customer");
+    expect(bare.customerEmail).toBeNull();
+  });
 });
 
 describe("applyMapping + validateRecord", () => {

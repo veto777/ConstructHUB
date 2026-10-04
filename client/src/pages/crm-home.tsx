@@ -286,16 +286,18 @@ export default function CrmHomePage() {
 
       {/* The headline numbers — count on top, dollars underneath. */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* Open estimates counts sent+viewed — land on that filter, like Jobs won does. */}
         <HeadlineCard icon={FileText} label="Open estimates" stat={stats?.openEstimates}
-          showMoney={canSeePrices} href="/crm/estimates" testid="card-stat-open-estimates" />
+          showMoney={canSeePrices} href="/crm/estimates?status=sent,viewed" testid="card-stat-open-estimates" />
         {/* Jobs won counts APPROVED ESTIMATES — link to that list, not the board. */}
         <HeadlineCard icon={Trophy} label="Jobs won" stat={stats?.jobsWon}
           showMoney={canSeePrices} href="/crm/estimates?status=approved" testid="card-stat-jobs-won" />
         {/* Unscheduled = the board's Approved column; land on (and ring) it. */}
         <HeadlineCard icon={CalendarClock} label="Unscheduled jobs" stat={stats?.unscheduledJobs}
           showMoney={canSeePrices} href="/crm/pipeline?stage=approved" testid="card-stat-unscheduled" />
+        {/* Open invoices counts sent+partial — land on that filter, not the whole list. */}
         <HeadlineCard icon={ReceiptText} label="Open invoices" stat={stats?.openInvoices}
-          showMoney={canSeePrices} href={canSeePrices ? "/crm/invoices" : undefined} testid="card-stat-open-invoices" />
+          showMoney={canSeePrices} href={canSeePrices ? "/crm/invoices?status=sent,partial" : undefined} testid="card-stat-open-invoices" />
       </div>
 
       {/* The numbers row */}

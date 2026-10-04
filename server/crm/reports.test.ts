@@ -218,6 +218,19 @@ describe("report import (dev server)", () => {
     const r = await api("/api/crm/reports/upload", { method: "POST", body: JSON.stringify({ text: "nothing useful here at all" }) });
     expect(r.status).toBe(422);
   });
+
+  it("lists newest by the date the column shows (completed_at ?? created_at)", async () => {
+    // The Date column renders completed_at ?? created_at, so the sort must use
+    // the same expression — ordering by created_at alone puts a report that
+    // was imported one day and confirmed the next below a same-day draft.
+    const list = await api("/api/crm/reports");
+    expect(list.status).toBe(200);
+    expect(list.body.length).toBeGreaterThan(1);
+    const dates = list.body.map((r: any) => new Date(r.date).getTime());
+    for (let i = 1; i < dates.length; i++) {
+      expect(dates[i - 1], `row ${i - 1} (${list.body[i - 1].id}) sorts above row ${i} (${list.body[i].id})`).toBeGreaterThanOrEqual(dates[i]);
+    }
+  });
 });
 
 describe("measurements webhook — API key auth", () => {
