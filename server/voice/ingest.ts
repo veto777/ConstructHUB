@@ -23,6 +23,7 @@ import { db } from "../db";
 import { bearerMatches } from "../ops/internal-auth";
 import { CALL_SID_RE, RECORDING_MAX_BYTES } from "./internal-calls";
 import { putRecording, recordingsConfigured } from "./recordings";
+import { SPAM_OUTCOMES, summaryTimezone } from "./calls";
 
 export const VOICE_INGEST_PATH = "/api/voice-ingest";
 export const INGEST_ENGINE = "external";
@@ -213,10 +214,24 @@ export function registerVoiceIngestRoutes(app: Express): void {
  * it pushes here — or null when none has pushed a call in 30 days. Owner, 2026-10-04: "we are using janice already
  * but it still shows draft".
  */
-export async function externalReceptionist(orgId: string): Promise<{ name: string; lastCallAt: string; callsLast30Days: number; lines: string[] } | null> {
+export type ExternalReceptionist = {
+  name: string; lastCallAt: string; callsLast30Days: number; lines: string[];
+  /** This calendar month (the org's time zone), counted from her calls, the same way as the Results panel. Her
+   *  calls are never on ConstructHUB's minute meter (voice_usage), so the overview's minutes and spam tiles use these
+   *  (owner 2026-10-04: "why are the stats not updated such as spam this month and min"). */
+  thisMonth: { calls: number; minutes: number; spam: number };
+};
+
+export async function externalReceptionist(orgId: string, timezone?: unknown): Promise<ExternalReceptionist | null> {
+  const tz = summaryTimezone(timezone);
+  const monthStart = sql`(date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC'`;
+  const spam = sql.join(SPAM_OUTCOMES.map((o) => sql`${o}`), sql`, `);
   const r = await db.execute(sql`
     SELECT max(started_at) AS last_call,
            count(*) FILTER (WHERE started_at >= (now() AT TIME ZONE 'UTC') - interval '30 days')::int AS recent,
+           count(*) FILTER (WHERE started_at >= ${monthStart})::int AS month_calls,
+           coalesce(round(sum(coalesce(duration_seconds, 0)) FILTER (WHERE started_at >= ${monthStart}) / 60.0), 0)::int AS month_minutes,
+           count(*) FILTER (WHERE started_at >= ${monthStart} AND outcome IN (${spam}))::int AS month_spam,
            (array_agg(persona ORDER BY started_at DESC))[1] AS persona,
            array_remove(array_agg(DISTINCT nullif(flags->'ingest'->>'market', '')), NULL) AS lines
       FROM voice_calls WHERE org_id = ${orgId} AND engine = ${INGEST_ENGINE}`);
@@ -228,6 +243,7 @@ export async function externalReceptionist(orgId: string): Promise<{ name: strin
     lastCallAt: new Date(row.last_call).toISOString(),
     callsLast30Days: Number(row.recent),
     lines: ((row.lines ?? []) as string[]).sort(),
+    thisMonth: { calls: Number(row.month_calls ?? 0), minutes: Number(row.month_minutes ?? 0), spam: Number(row.month_spam ?? 0) },
   };
 }
 

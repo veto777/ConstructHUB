@@ -64,7 +64,7 @@ export type VoiceStatus = {
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
   /** An outside receptionist answering these lines and pushing her calls here (null when none in 30 days). */
-  external?: { name: string; lastCallAt: string; callsLast30Days: number; lines: string[] } | null;
+  external?: { name: string; lastCallAt: string; callsLast30Days: number; lines: string[]; thisMonth?: { calls: number; minutes: number; spam: number } } | null;
   usage: {
     month: string; minutes: number; calls: number; overageMinutes: number;
     /** What the overage costs so far: each call's minutes at its own tier's rate. */

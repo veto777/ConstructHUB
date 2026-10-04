@@ -128,8 +128,11 @@ export function numbersKeptFor(row: SubscriptionLike | null | undefined, admin: 
   if (grantExpired(row, now)) return { keep: 0, reason: "subscription_ended" };
   if (row.status === "unpaid") return { keep: 0, reason: "payment_failed" };
   if (NUMBER_RELEASE_STATUSES.includes(row.status)) return { keep: 0, reason: "subscription_ended" };
-  if (!ACCESS_STATUSES.includes(row.status)) return null;
-  const plan = activePlanKey(row, now);
+  // A failed payment (past_due) pauses the plan (shared/plans.ts ACCESS_STATUSES) while Stripe retries the card, but
+  // the numbers are held as if paid: a failed payment never releases one (only `unpaid`, above, does).
+  const held = row.status === "past_due" ? { ...row, status: "active" } : row;
+  if (!ACCESS_STATUSES.includes(held.status!)) return null;
+  const plan = activePlanKey(held as typeof row, now);
   if (!plan) return null;
   const addons = parseAddons(row.addons);
   // The held tier (Lite 1, Solo 1, Crew 5, Fleet 20 numbers) plus every extra number; a tier the plan doesn't sell counts as none.

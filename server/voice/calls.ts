@@ -68,6 +68,18 @@ export function summaryTimezone(raw: unknown): string {
   try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } catch { return "America/New_York"; }
 }
 
+/** Spam an outside receptionist screened out this calendar month (org time zone); never on the minute meter.
+ *  engine 'external' = server/voice/ingest.ts INGEST_ENGINE (not imported: ingest.ts imports this file). */
+export async function outsideSpamThisMonth(orgId: string, timezone: unknown): Promise<number> {
+  const tz = summaryTimezone(timezone);
+  const r = await db.execute(sql`
+    SELECT count(*)::int AS n FROM voice_calls
+     WHERE org_id = ${orgId} AND engine = 'external'
+       AND outcome IN (${sql.join(SPAM_OUTCOMES.map((o) => sql`${o}`), sql`, `)})
+       AND started_at >= (date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC'`);
+  return Number((r as any).rows?.[0]?.n ?? 0);
+}
+
 export type CallResultsRange = "7d" | "30d" | "month" | "all";
 
 /** The Results panel's numbers for one org, counted from voice_calls (see the /calls/summary route). */
@@ -240,14 +252,19 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
     const month = voiceMonthKey();
-    const [ledger, usage] = await Promise.all([listSpamLedger(v.ctx.org.id), getVoiceUsageRow(v.ctx.org.id, month)]);
+    const [ledger, usage, outside] = await Promise.all([
+      listSpamLedger(v.ctx.org.id), getVoiceUsageRow(v.ctx.org.id, month),
+      outsideSpamThisMonth(v.ctx.org.id, (v.ctx.org as any).timezone),
+    ]);
     const entries = ledger.map(presentSpamRow);
     const u = summarizeVoiceUsage(usage, month, v.allowance.minutes, v.allowance.overageCentsPerMinute);
     sendUnlogged(res, {
       entries,
       blocked: entries.filter((e) => e.blocked).length,
       thisMonth: {
-        month, spamCalls: u.spamCallsThisMonth, screened: u.spamCalls, rejected: u.blockedCalls,
+        // The meter only counts calls ConstructHUB's engine answered; an outside receptionist's (Alpine's Janice)
+        // screened calls are added from her pushed calls (owner 2026-10-04: "why are the stats not updated").
+        month, spamCalls: u.spamCallsThisMonth + outside, screened: u.spamCalls + outside, rejected: u.blockedCalls,
         freeSpamCalls: u.freeSpamCalls, freeSpamMinutes: u.freeSpamMinutes, freeSpamCallsLimit: u.freeSpamCallsLimit,
       },
     });

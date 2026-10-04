@@ -145,7 +145,7 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       db.select({ status: voiceProfiles.status, publishedVersion: voiceProfiles.publishedVersion, setupCompletedAt: voiceProfiles.setupCompletedAt, updatedAt: voiceProfiles.updatedAt })
         .from(voiceProfiles).where(eq(voiceProfiles.orgId, orgId)).limit(1).then((r) => r[0] ?? null),
       getVoiceUsageRow(orgId, month),
-      externalReceptionist(orgId).catch(() => null),
+      externalReceptionist(orgId, (v.ctx.org as any).timezone).catch(() => null),
     ]);
     const held = rows.filter(countsAgainstAllowance).length;
     // For the "paused" banner: can a fixed card still keep the number ("releasing"),

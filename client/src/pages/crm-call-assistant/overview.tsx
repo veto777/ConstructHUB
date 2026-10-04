@@ -58,6 +58,9 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   // the account is live through her even though ConstructHUB's own assistant was never published.
   const ext = status.external ?? null;
   const ownLive = status.profile?.publishedVersion != null;
+  // Her calls never touch ConstructHUB's minute meter, so the minutes and spam tiles count her calls instead
+  // (owner 2026-10-04: "why are the stats not updated such as spam this month and min").
+  const extMonth = ext && !ownLive ? ext.thisMonth ?? null : null;
   const nextStep: { text: string; href: string; testid: string; label: string } =
     ext && !ownLive ? { text: `${ext.name} answers your calls — ${ext.callsLast30Days.toLocaleString("en-US")} in the last 30 days`, href: "/call-assistant?tab=calls", testid: "link-overview-next-calls", label: "View calls" }
     : !ownLive ? { text: "Set up and publish your assistant", href: "/call-assistant?tab=studio", testid: "link-overview-next-studio", label: "Continue" }
@@ -99,13 +102,23 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           <Stat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
             hint={`${status.allowance.numbers} included`} />
         )}
-        <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
-          hint={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
-        <Stat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
-          hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
+        {extMonth ? (
+          <Stat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+            hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
+        ) : (
+          <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+            hint={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
+        )}
+        {extMonth ? (
+          <Stat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+            hint={`Screened out by ${ext!.name}`} />
+        ) : (
+          <Stat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+            hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
+        )}
       </StatGrid>
       {/* "Calls this month" folded into the minutes tile (less is more); the testid stays for links/tests. */}
-      <span className="sr-only" data-testid="metric-overview-calls">{status.usage?.calls ?? 0} calls this month</span>
+      <span className="sr-only" data-testid="metric-overview-calls">{extMonth ? extMonth.calls : status.usage?.calls ?? 0} calls this month</span>
 
       <CallResults onPick={(p) => {
         if (onPickResult) onPickResult(p);

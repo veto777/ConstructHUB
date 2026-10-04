@@ -9,6 +9,7 @@ import type { AddressInfo } from "net";
 import { randomUUID } from "crypto";
 import { pool } from "../db";
 import { registerVoiceIngestRoutes, normalizeTurn, toRow, ingestCallSchema, externalReceptionist } from "./ingest";
+import { outsideSpamThisMonth } from "./calls";
 import { ensureVoiceSchema } from "./schema";
 
 const SECRET = "ingest-test-secret-0123456789abcdef";
@@ -153,6 +154,12 @@ describe("the outside receptionist on the status (owner 2026-10-04: \"we are usi
     const ext = await externalReceptionist(ORG);
     expect(ext).toMatchObject({ name: "Janice", lines: ["FL"] });
     expect(ext!.callsLast30Days).toBeGreaterThan(0);
+    // This month's tiles come from her calls (never the minute meter): the same counts as the Results panel.
+    expect(ext!.thisMonth.calls).toBeGreaterThan(0);
+    expect(ext!.thisMonth.minutes).toBeGreaterThanOrEqual(0);
+    expect(ext!.thisMonth.spam).toBeGreaterThanOrEqual(1); // "b2", pushed as spam above
+    expect(await outsideSpamThisMonth(ORG, "America/New_York")).toBe(ext!.thisMonth.spam);
+    expect(await outsideSpamThisMonth(`nobody-${RUN}`, null)).toBe(0);
     expect(await externalReceptionist(`nobody-${RUN}`)).toBeNull();
   });
 });
