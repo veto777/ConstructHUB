@@ -104,13 +104,20 @@ async function fetchOpenApi(): Promise<OpenApiDoc> {
 export default function DevelopersPage() {
   const { data: doc, isLoading, error } = useQuery<OpenApiDoc>({ queryKey: ["/api/v1/openapi.json"], queryFn: fetchOpenApi });
   const endpoints = useMemo(() => flatten(doc), [doc]);
+  // One card per resource: the document mixes spellings of the same tag
+  // ("account"/"Account", "locations"/"Locations", "social-posts"/"Social posts",
+  // "site-scans"/"Site scans"), which used to render near-duplicate sections and
+  // split reads from their write operations. Group on a normalized key.
+  const tagKey = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const prettyTag = (t: string) => t.replace(/[-_]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const tags = useMemo(() => {
-    // One card per resource: the document mixes casings/spellings of the same
-    // tag ("account" vs "Account", "locations" vs "Locations"), which used to
-    // render near-duplicate sections and split reads from their write ops.
     const groups = new Map<string, string>();
-    for (const t of doc?.tags ?? []) if (!groups.has(t.name.toLowerCase())) groups.set(t.name.toLowerCase(), t.name);
-    for (const e of endpoints) if (!groups.has(e.tag.toLowerCase())) groups.set(e.tag.toLowerCase(), e.tag.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+    for (const t of doc?.tags ?? []) {
+      const k = tagKey(t.name);
+      // Prefer a display name with real capitalization ("Account", not "account").
+      if (!groups.has(k) || (!/[A-Z]/.test(groups.get(k)!) && /[A-Z]/.test(t.name))) groups.set(k, t.name);
+    }
+    for (const e of endpoints) if (!groups.has(tagKey(e.tag))) groups.set(tagKey(e.tag), prettyTag(e.tag));
     return Array.from(groups.values());
   }, [doc, endpoints]);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://constructhub.us";
@@ -229,7 +236,7 @@ export default function DevelopersPage() {
                   {doc?.tags?.find((t) => t.name === tag)?.description && <CardDescription>{doc.tags.find((t) => t.name === tag)!.description}</CardDescription>}
                 </CardHeader>
                 <CardContent className="divide-y">
-                  {endpoints.filter((e) => e.tag.toLowerCase() === tag.toLowerCase()).map((e) => <EndpointRow key={`${e.method} ${e.path}`} e={e} doc={doc} base={base} />)}
+                  {endpoints.filter((e) => tagKey(e.tag) === tagKey(tag)).map((e) => <EndpointRow key={`${e.method} ${e.path}`} e={e} doc={doc} base={base} />)}
                 </CardContent>
               </Card>
             ))
