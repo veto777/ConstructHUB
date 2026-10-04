@@ -277,8 +277,8 @@ export type CallAssistantTier = {
 };
 /**
  * Cheapest first. The order is the upgrade order.
- * Lite's $149/mo and 1,000 minutes are the owner's (2026-10-02); its $1,199/yr is a PLACEHOLDER the owner
- * has not set yet (confirm before the tiers leave preview).
+ * Lite's $149/mo and 1,000 minutes are the owner's (2026-10-02); its $1,199/yr was confirmed by the owner on
+ * 2026-10-04 ("thats fine").
  */
 export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
   { tier: "lite", addon: "call_assistant_lite", name: "Lite", monthlyCents: 14900, annualCents: 119900, includedMinutes: 1000, includedNumbers: 1, overageCentsPerMinute: 10 },
