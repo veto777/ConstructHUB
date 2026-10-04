@@ -158,24 +158,29 @@ export function guessMapping(entity: MigrateEntity, headers: string[]): Record<s
   const used = new Set<number>();
   const mapping: Record<string, string | null> = {};
 
+  // Pass 1: exact alias hits claim headers across ALL fields first. A prefix
+  // match must never steal a header that is some field's exact alias — e.g.
+  // customerName's prefix "customer" used to claim "Customer Email", leaving
+  // customerEmail unmapped and every estimate/invoice row failing to match a
+  // client at import.
   for (const f of fields) {
-    let hit = -1;
     const aliases = f.aliases.map(normHeader);
     for (let i = 0; i < normed.length; i++) {
       if (used.has(i)) continue;
-      if (aliases.includes(normed[i])) { hit = i; break; }
+      if (aliases.includes(normed[i])) { used.add(i); mapping[f.key] = headers[i]; break; }
     }
-    if (hit === -1) {
-      const candidates = normed
-        .map((h, i) => ({ h, i }))
-        .filter(({ h, i }) => !used.has(i) && aliases.some((a) => h.startsWith(a) || a.startsWith(h)));
-      if (candidates.length === 1) hit = candidates[0].i;
-    }
-    if (hit !== -1) {
-      used.add(hit);
-      mapping[f.key] = headers[hit];
-    } else {
-      mapping[f.key] = null;
+    if (!(f.key in mapping)) mapping[f.key] = null;
+  }
+  // Pass 2: unique-prefix fallback on the headers that are still unclaimed.
+  for (const f of fields) {
+    if (mapping[f.key] !== null) continue;
+    const aliases = f.aliases.map(normHeader);
+    const candidates = normed
+      .map((h, i) => ({ h, i }))
+      .filter(({ h, i }) => !used.has(i) && aliases.some((a) => h.startsWith(a) || a.startsWith(h)));
+    if (candidates.length === 1) {
+      used.add(candidates[0].i);
+      mapping[f.key] = headers[candidates[0].i];
     }
   }
   return mapping;
