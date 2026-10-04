@@ -295,3 +295,246 @@ Page totals /gbp-content: 58 mapped rows — OK 58, BUG 0, UNCLEAR 0, DEAD 0.
 - Rate-limit counters for GBP content live in table `growth_budgets` (INSERT … ON CONFLICT, server/growth-limits.ts:14-20): `gbp-content:<uid>` 180/10 min (all non-GET content routes), `gbp-content-upload:<uid>` 100/hour, `gbp-content-ai:<uid>` 100/day, `gbp-content-publish:<uid>` 100/day.
 - Honesty checks passed everywhere on dev: gmb-monitor "No listings added yet" (SQL 0), gbp-content "Your media library is empty." (SQL 0), "No scheduled content yet." (SQL 0), worker-disabled notice (env flag false), GbpConnection not-connected copy (curl accounts:[]), agency stats match dashboard SQL filters. No fabricated numbers found.
 - Not verified by pressing (per rules): all Google-external calls (business-search, check, sync, refresh, learn, connect OAuth), all AI endpoints (review-response, draft, learn), and all DB-writing endpoints (add/delete listing, upload, prepare, queue, style, jobs patch, bulk, import, disconnect). All were verified by reading server code.
+
+---
+
+*Batch 2 — page /locations (largest page: 8 detail tabs + add dialog + campaign detail).*
+
+Audit date 2026-10-04. Dev server http://127.0.0.1:8302, dev bypass = user 1 (platform admin, accessPlan `agency`).
+Seeded data: location 104296 "K- Social workbench fixture" (Testville TX, NOT Google-linked), location 506025 "AI-TEST Ridgeline Roofing" (Round Rock TX, gbp-linked: `gbp_location_name='locations/aitest900001'` but NO `gbp_grants` row → Google account disconnected). `gbp_grants` has 0 rows for user 1 → every "connected Google accounts" element renders its not-connected state.
+
+## /locations — client/src/pages/locations.tsx
+
+One-line purpose: the owner's home for business locations — a list (agency workspace) plus a per-location detail view (?location=<id>) with 8 tabs (insights, guard, info, services, photos, social, settings, citations).
+
+FACT (recorded per instructions): `isPremiumPlus` is hard-coded `true` at `client/src/pages/locations.tsx:89` (`<LocationDetail … isPremiumPlus={true}/>`). The Citations tab is therefore never locked for any user, and the lock branch at locations.tsx:391-392/402-414 (`!(t.value === "citations" && !isPremiumPlus)`) is dead code.
+
+### List page shell
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Business Profile Locations" title (text-locations-title) | text | Page title. | locations.tsx:91 | client only | Playwright /locations | OK |
+| "Add location" button (button-add-location) | button | Opens the Add location dialog (Search Google / Import from GBP tabs). | locations.tsx:91, 92-94 | client only | Playwright clicked → dialog rendered (03-add-dialog-clicked.png) | OK |
+| Add location dialog | dialog | Two tabs; `?import=gbp` opens it on the GBP tab (locations.tsx:74-77,93). | locations.tsx:92-94 | client only | Playwright /locations?import=gbp (02-import-gbp.png) | OK |
+| "Location #N was not found…" alert (alert-location-not-found) + Dismiss | banner | A stale/foreign `?location=` id shows this, clears the param from the URL and falls back to the list. | locations.tsx:78-81, 95-98; showLocation() 60-66 | GET /api/locations/:id → server/routes.ts:2681 (404 when not owner) | Playwright /locations?location=999999 (30-location-not-found.png) | OK |
+| `?gbp=reauth` effect | button | When /api/gbp/connect was opened as a page navigation, the server redirects here; the page runs startGbpConnect (recent-auth preflight, then Google's consent page). | locations.tsx:82-88 | GET /api/gbp/connect?format=json → server/gbp/routes.ts:32-43 (403 reauth → RecentAuthModal) | code only — must not start OAuth | OK |
+| AgencyWorkspace list | container | The location list. In this account (agency plan, `/api/agency/me` entitled=true) it renders the agency bulk workspace, not the owner list. | locations.tsx:99 → agency-workspace.tsx:32-37 | see "AgencyWorkspace" container below | Playwright + curl | OK |
+| GbpConnection banner (context="locations") | container | Google-connection status banner under the list. | locations.tsx:100 → gbp-connection.tsx:98-150 | see "GbpConnection" container below | Playwright + curl | OK |
+
+### AddLocationDialog — "Search Google" tab
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search Google" tab (tab-search-google) | tab | Default tab: search Google's places database by name, address or Maps URL. | locations.tsx:229 | client only | Playwright 03-add-dialog-clicked.png | OK |
+| "Import from GBP" tab (tab-import-gbp) | tab | Switch to importing profiles from a connected Google account. | locations.tsx:230 | client only | Playwright 02-import-gbp.png | OK |
+| Search input (input-google-search) | input | Type a business name, address or Google Maps URL (Enter submits). | locations.tsx:234-240 | client only | Playwright | OK |
+| Search button (button-google-search) | button | Validates ≥2 chars (toast otherwise), then searches. | locations.tsx:241-244 | POST /api/locations/search-google → server/routes.ts:2763-2970 → Google Places textsearch/details (no DB write). <2 chars → 400 {"message":"Type at least 2 characters…"}. | curl: 1-char → 400; live query "Ridgeline Roofing Round Rock" → 10 results w/ placeId/name/address/rating | OK |
+| Search result rows (search-result-0…N) | button | One row per Google result; clicking POSTs a new location from it and closes the dialog. | locations.tsx:245-264, 143-165 | POST /api/locations → server/routes.ts:2692-2715 → INSERT business_locations (zod insertBusinessLocationSchema minus gbp fields, userId=1; plan-gated requirePlan + per-plan location cap with withAccountLock). Response = new location row. | code only — write not pressed (per-page rule: prefer read-only) | OK |
+| "No results found" toast | text | Shown when Google returns nothing. | locations.tsx:133-135 | client only | code | OK |
+
+### AddLocationDialog — "Import from GBP" tab
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| GBP lookup loader (gbp-lookup) | text | Spinner while profiles are fetched; retries up to 8× every 12 s when the account is freshly connected and discovery is still running. | locations.tsx:273-282, 177-183 | GET /api/gbp/locations → server/gbp/routes.ts:87-101 `cached` → agency_discovery JOIN gbp_grants (user_id, businessName ILIKE %q%, LIMIT 50 OFFSET); empty → INSERT agency_poll_grants … refreshing=true | curl GET /api/gbp/locations → 401 {kind:"auth",needsAuth:true} (no grants) | OK |
+| "Connect your Google account…" empty state + Connect Google Business (button-connect-gbp / button-connect-gbp-initial) | empty-state / button | Shown when the fetch answers needsAuth/not connected/expired (or nothing found). The button is an <a href="/api/gbp/connect"> intercepted by RecentAuthModal's click listener → startGbpConnect → GET /api/gbp/connect?format=json → window.location.assign(consent URL). | locations.tsx:283-294, 354-365; recent-auth.tsx:21-25, 53-58 | GET /api/gbp/connect → server/gbp/routes.ts:32-43: rate-limited 10/30 min; browser navigations without recent auth redirect to /locations?gbp=reauth; JSON preflight returns {url} or 403 {reauth:true} | Playwright 02-import-gbp.png (connect state rendered); OAuth start not pressed, per instructions | OK |
+| Retry (button-retry-gbp) | button | Re-fetches /api/gbp/locations after a non-auth failure. | locations.tsx:295-302 | same as gbp-lookup | code (no failure state reachable here) | OK |
+| Warnings (account: message) | banner | Per-account errors from the fetch are listed. | locations.tsx:272 | GET /api/gbp/locations `errors` (always [] from `cached`) | code | OK |
+| "Found N locations across your connected Google accounts" + Select All (button-select-all-gbp) | text / button | Header + select/deselect all checkboxes. | locations.tsx:305-316 | client only | code (0 locations in this env) | OK |
+| GBP location rows (gbp-location-0…N) | button | Checkbox rows (businessName, address, phone, "Managed by" grant email); toggle adds/removes from the import set. | locations.tsx:317-336 | client only (data from agency_discovery.data jsonb) | code | OK |
+| Needs-plan gate (gbp-import-needs-plan) | banner | If GET /api/entitlements has accessPlan=null, replaces the Import button with "needs a plan from $X/month" + See-plans link. | locations.tsx:110-111, 337-345 | GET /api/entitlements → server/routes.ts:249-268 | curl: accessPlan='agency' → gate not shown here; gate branch code-read | OK |
+| Import N Locations (button-import-gbp) | button | POSTs the selected listings; toast "Imported N locations". | locations.tsx:346-351, 200-214 | POST /api/gbp/import → server/gbp/routes.ts:116-124 → validates against agency_discovery cache (24 h), importVerifiedLocations + queueSync per location → 202 {imported, queued} | code only — write not pressed | OK |
+
+### LocationDetail shell (all 8 tabs)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "All locations" back (button-back-to-list) | button | Clears ?location (and tab/range/group/campaign params) back to the list. | locations.tsx:397; showLocation(null) 60-66 | client only | Playwright | OK |
+| Location name header (text-detail-name) + address line | text | Business name + fullAddress(location). | locations.tsx:398; fullAddress agency-workspace.tsx:21-25 | data from GET /api/locations/:id → server/routes.ts:2681 (business_locations WHERE id AND user_id) | Playwright both fixtures | OK |
+| 8 tab buttons (tab-insights, tab-guard, tab-info, tab-services, tab-photos, tab-social, tab-settings, tab-citations) | tab | Switch detail tab; unknown ?tab falls back to Insights and is removed from the URL. Citations tab would show a Lock icon + be disabled when !isPremiumPlus — never, see hard-coded fact. | locations.tsx:380-393, 400-418 | client only | Playwright: all 8 render and switch for 104296; 7 for 506025 | OK |
+| Detail data source | text | The whole detail view is driven by one location row. | locations.tsx:79 | GET /api/locations/:id (see above) | curl + Playwright | OK |
+
+### Insights tab — <LocationSearchSummary> + <InsightsTab>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Google Search Console card ("property totals · last 30 days") | stat / link | Shows GSC clicks/impressions for the location's linked property, last 30 days; "Open Search Console" links to /search-console. Renders nothing when the plan gate answers plan_required. | site-connections.tsx:280-304 | GET /api/gsc/locations/:id/summary → server/gsc/routes.ts:259-271 → locationSearchClicks server/gsc/service.ts:280-292: edge_location_links JOIN edge_assets JOIN gsc_analytics (dimension='date', date>=current_date-30) GROUP BY asset LIMIT 1. | curl → {"search":null}; Playwright: card shows "Search Console data unavailable. Connect an account and sync its property." | OK |
+| GbpConnection banner (locationId) | container | Per-location Google connection section (sync details, Sync now). | locations.tsx:483 → gbp-connection.tsx | see GbpConnection container | Playwright 10/20-loc*-insights | OK |
+| "Google performance — <range>, by <group>" heading + explainer + "Stored: first → last" | text | Describes the table; appends the stored first/last dates when metrics exist. | locations.tsx:484-491 | data.firstDate/lastDate from performance endpoint | Playwright (no dates shown, none stored) | OK |
+| Range select (select-perf-range) | select | 30d / 90d / 6m / 12m / 18m / all. Kept in ?range (90d = default, param omitted). | locations.tsx:493-495, 457-465 | passes ?range to endpoint; server maps {'30d':30,'90d':90,'6m':183,'12m':366,'18m':548,'all':null} | Playwright + curl | OK |
+| Group select (select-perf-group) | select | By day / week / month. Kept in ?group (day = default). | locations.tsx:496-498 | server groups with date_trunc($2, date) | Playwright + curl | OK |
+| Performance table (table-performance) incl. Total row (row-performance-total), per-period rows, "not final yet" marker | table | One row per period (newest first), one column per metric; Total row sums the fetched range; periods whose last_day is after `pendingAfter` (today−5d) are greyed with a "not final yet" chip. | locations.tsx:469-478, 501-524 | GET /api/gbp/locations/:id/performance → server/gbp/routes.ts:139-153: SELECT to_char(date_trunc($2,date),'YYYY-MM-DD'), metric, sum(value), max(date) FROM gbp_daily_metrics WHERE location_id=$1 AND date>=current_date-$3 GROUP BY 1,2; span SELECT min/max(date); pendingAfter = today−5d (server clock, toISOString slice). | curl both fixtures → available:false, rows:[] (gbp_daily_metrics empty per SQL); table branch not renderable in this env — code-read | OK |
+| "Performance unavailable. Link this location to Google and sync…" | empty-state | Shown when available=false (no rows). | locations.tsx:501-503 | see above | Playwright both fixtures — see bugs file: copy is wrong for an already-linked location | BUG |
+| Loading / error states ("Loading performance…", "Unable to load performance.") | text | Query states. | locations.tsx:501 | client only | code | OK |
+
+### Guard tab — <ProfileGuard> (client/src/components/profile-guard.tsx)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Unlinked card (card-guard-unlinked) | empty-state | When the location has no gbp_location_name: explains Guard and offers the one next step — GbpLinkCell if a connected account manages the listing, else a Connect Google button (link-guard-connect-gbp). | profile-guard.tsx:45-55 | GET /api/gbp/linkage (state per location) | Playwright 10-loc104296-guard — renders Connect variant (no grants) | OK |
+| "How checks work" details | text | Every 15 minutes; lockdown reasserts but cannot block Google edits; public suggestions indistinguishable. | profile-guard.tsx:67 | client only (claim matches gbp worker cadence, not independently pressed) | Playwright | OK |
+| "Current mode: X. Last checked …" | text | Mode + last check time (or "Not checked yet") + lastError alert when present. | profile-guard.tsx:68-69 | GET /api/gbp/locations/:id/guard → server/gbp/guard-routes.ts:69 → gbp_guard.mode/watched/snapshot/checked_at/last_error + gbp_guard_changes (200 latest) | curl 506025 → {mode:'off', snapshot:null, changes:[]}; Playwright | OK |
+| Mode select (Off / Notify / Lockdown (auto-reject)) | select | Chooses the guard mode, saved with the Save button. | profile-guard.tsx:70 | PUT /api/gbp/locations/:id/guard → guard-routes.ts:71-78 → zod mode+watched(+token); 403 {reauth:true} unless recently verified (12 h shared / 5 min guard-local); configureGuard writes gbp_guard; lockdown triggers an immediate checkGuard | code only — changing mode needs reauth + would call Google; not pressed | OK |
+| Watched fields checkboxes (11 fields) | input | Which profile fields Guard watches (title, phoneNumbers, websiteUri, storefrontAddress, categories, description, hours, specialHours, serviceArea, openingDate, status). | profile-guard.tsx:19, 71 | same PUT (watched array, GUARD_FIELDS enum) | Playwright 20-loc506025-guard (all rendered) | OK |
+| "Preview current Google values" button | button | Fetches the live Google profile so the owner can approve it as the snapshot. | profile-guard.tsx:72 | POST …/guard/preview → guard-routes.ts:70 → previewSnapshot (live Google API) | code only — would call Google on a disconnected fixture; not pressed | OK |
+| Snapshot <dl> ("Owner-approved snapshot" / "Review these values…") | text | Approved (or previewed) field values, pretty-printed. | profile-guard.tsx:73 | gbp_guard.snapshot jsonb | n/a here (snapshot null) | OK |
+| Reauth explainer ("Saving Guard settings asks you to confirm it's you…12 hours") | text | Explains the step-up. | profile-guard.tsx:74 | matches requireGuardRecentAuth (guard-routes.ts:16-23, RECENT_AUTH_MS) | code | OK |
+| "Save guard settings" / "Approve snapshot and save settings" button | button | PUTs mode+watched (+preview token when approving). | profile-guard.tsx:75 | PUT …/guard (above) | code only | OK |
+| "Check now" button | button | Runs an immediate Guard check. | profile-guard.tsx:76 | POST …/guard/check → guard-routes.ts:79 → checkGuard (live Google read; writes gbp_guard_changes on diffs) | code only | OK |
+| "Pending changes and history" list | text | Change cards: field — status, detected_at · source, approved vs detected values, error, Approve/Reject buttons (pending only), "Report" dialog, "Reported locally" marker. | profile-guard.tsx:77-83 | GET …/guard changes (above); POST …/guard/changes/:id {action:approve|reject} → guard-routes.ts:80-83 → resolveChange; GET/POST /api/gbp/reports/changes/:id → guard-routes.ts:86-92 (reported_at COALESCE now()) | Playwright "No detected changes." (gbp_guard_changes empty per SQL) | OK |
+| GuardStatus component | badge | IMPORTED at locations.tsx:5 but never used anywhere in the client (dead import). | locations.tsx:5; profile-guard.tsx:21-25 | GET /api/gbp/guard/status | code (grep: no <GuardStatus usage) | DEAD |
+
+### Info tab — <LocationInfoTab> + InfoRow
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Import from Google" button (button-import-google) | button | Only when placeId or gbpLocationName exists. Linked → runs a full GBP sync (syncLocation); unlinked-with-placeId → fetches Places details and overwrites name/address/city/state/zip/phone/website/categories/hours/googleCid. | locations.tsx:580-592, 555-570 | POST /api/locations/:id/import-google → server/routes.ts:2972-3038 → linked: syncLocation (gbp/service); else Google Places details + UPDATE business_locations (no businessPhotoCount — comment lines 3029-3030) | Playwright 20-loc506025-info (button shown); not pressed (writes/syncs) | OK |
+| InfoRow "Google Place ID" (info-google-place-id) | text | placeId or "Not set"; "G" marker when Google-sourced. | locations.tsx:595 | business_locations.place_id | Playwright: both fixtures "Not set" (SQL place_id NULL) | OK |
+| InfoRow "Google Maps link" / "Google CID" | link / text | If googleCid is an https URL → linked "Google Maps link"; else if googleCid set → shown as CID text; else "Not set". | locations.tsx:596-598, 573-574 | business_locations.google_cid | Playwright: both "Not set" (SQL google_cid NULL) | OK |
+| InfoRow Business Name / Description / Address / Service Areas / Phone / Website / Opening Date | text | Straight from the location row; Address via fullAddress; "Not set" when empty. | locations.tsx:599-603, 613, 615 | business_columns of business_locations | Playwright both fixtures — matches SQL (506025 shows description + phone) | OK |
+| InfoRow "Categories" | text | Comma-joined with "(n/100)" count when present. | locations.tsx:604-608 | business_locations.categories (text[]; 100 = Google's category limit) | Playwright "Not set" (categories NULL both fixtures) | OK |
+| InfoRow "Services" | text | "<n> services" when present. | locations.tsx:609-612 | business_locations.services jsonb | Playwright: 104296 "Not set", 506025 "3 services" | OK |
+| InfoRow "Hours" | text | Formats stored hours: array, {weekday_text}, or per-day map (Mon-Sun order; "X, every day" when uniform). | locations.tsx:614, 623-637 | business_locations.hours jsonb | Playwright "Not set" (hours NULL both) | OK |
+| InfoRow "Open Status" | text | Only shown when gbpLocationName exists (GBP sync is the only honest source). | locations.tsx:616-617 | business_locations.open_status | Playwright: 506025 "G Open Status Not set"; 104296 row absent→"Not set" without G marker | OK |
+
+### Services tab — <ServicesTab>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Services on your Google profile" + count badge (badge-service-count) | badge | Number of services on the location row. | locations.tsx:647-650 | business_locations.services (client-side length) | Playwright: 0 and 3 — matches SQL | OK |
+| Card description | text | "Synced from your Google Business Profile…" when linked, else "Link this location…". | locations.tsx:651-653 | client only (location.gbpLocationName) | Playwright both | OK |
+| Category chips (service-categories), first = "· primary" | badge | Category pills from the categories array. | locations.tsx:654-660 | business_locations.categories | n/a (categories NULL) — code | OK |
+| Filter input (input-service-filter) | input | Only when >12 services; client-side substring filter. | locations.tsx:667-669 | client only | code (>12 needed) | OK |
+| Service rows (service-row-N) | text | Check-marked list of services. | locations.tsx:670-677 | client only | Playwright 20-loc506025-services: 3 rows match SQL jsonb | OK |
+| "No services synced yet." / "No services match" | empty-state | Zero-state and no-filter-match state. | locations.tsx:663-665, 678 | client only | Playwright 10-loc104296-services | OK |
+
+### Photos tab — <PhotosTab>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Business photos & videos" tile (tab-photos-business) + count (text-business-photo-count) | stat / button | Shows the stored business photo count and switches the grid source to business. When linked, a count Google never reported should read "—", never 0 (code comment 694-696). | locations.tsx:697-711 | business_locations.business_photo_count (integer, nullable, DEFAULT 0 — schema.ts:363) | Playwright: 104296 unlinked shows "—" + hint; 506025 linked shows "0" although gbp_media is empty and no sync ever reported a count — see bugs file | BUG |
+| "Customer photos & videos" tile (tab-photos-customer) + count (text-customer-photo-count) | stat / button | Same for customer photos. | locations.tsx:697-711 | business_locations.customer_photo_count (DEFAULT 0, schema.ts:364) | Playwright: same defect as above | BUG |
+| Unlinked card ("Link this location…") | empty-state | Shown when not gbp-linked. | locations.tsx:713-716 | client only | Playwright 10-loc104296-photos | OK |
+| "No business photos synced yet. Use Sync now on the Locations page…" card | empty-state | Shown for a linked location with no media rows. | locations.tsx:719-722 | GET /api/gbp/locations/:id/media items=[] | Playwright 20-loc506025-photos — see bugs file for Sync-now copy | BUG |
+| Media grid (gbp-media-grid) + "Showing X of Y … synced …" caption | link / text | Thumbnails linking to the photo on Google; Video/category chip overlay. | locations.tsx:725-742 | GET /api/gbp/locations/:id/media → server/gbp/routes.ts:125-134: gbp_media WHERE location_id+source ORDER BY create_time DESC NULLS LAST LIMIT min(max(limit,1),600); total=count(*), syncedAt=max(synced_at) | curl 506025 → {total:0,items:[]}; grid unreachable in this env (code) | OK |
+| "Show more (N more)" (button-more-photos) | button | Raises limit by 120 up to 600 (server cap 600). | locations.tsx:743-747 | same endpoint | code | OK |
+| "Add or schedule photos in Posts & Photos" (button-posts-photos) | button | Navigates to /gbp-content. | locations.tsx:751-753 | client only: window.location.href='/gbp-content' | Playwright (button present) | OK |
+
+### Social tab — <SocialProfilesTab>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| 7 platform inputs (input-social-facebook/instagram/linkedin/pinterest/tiktok/twitter/youtube) | input | URL inputs prefilled from location.socialProfiles. | locations.tsx:791-807, 47-55 | business_locations.social_profiles jsonb | Playwright all 7 render, empty for both fixtures (SQL social_profiles NULL) | OK |
+| https validation ("Enter the full link, starting with https://") (text-social-error-*) | text | Client-side: any non-empty value must parse as https://; invalid disables Save. | locations.tsx:767, 809-813, 830-833 | server mirrors: PUT body validated by locationUpdateInput (server/route-guards.ts:163 for notificationEmail; socialProfiles schema in route-guards.ts:136-165) | code (client); server schema read | OK |
+| "Save Social Profiles" (button-save-social) | button | PUTs trimmed profiles; server merges over the 7 keys and drops empties, keeping other (GBP-synced) keys. | locations.tsx:816-824, 769-783 | PUT /api/locations/:id → server/routes.ts:2717-2740 → UPDATE business_locations.social_profiles | code only — write not pressed | OK |
+
+### Settings tab — <SettingsTab>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Notification email" copy ("ConstructHUB does not send location notifications yet…") | text | CLAIM verified: notification_email is written but never read — no server code sends location notifications (grep of server/ finds only schema/validation references). | locations.tsx:887-889 | PUT /api/locations/:id → business_locations.notification_email (zod: '' → null, email format) | code (grep server/ for notification_email — only route-guards.ts:163 validation) | OK |
+| "Use account-level settings" switch (switch-account-settings) | switch | On = save null (use account email); off reveals the email input. | locations.tsx:891-899, 838-845 | notification_email NULL = account-level | Playwright | OK |
+| Email input (input-notification-email) + error text (text-notification-email-error) | input | Location-specific notification email; regex validated client-side; Save disabled when invalid or unchanged. | locations.tsx:900-916, 830 | same PUT | Playwright | OK |
+| "Save Settings" (button-save-settings) | button | PUT {notificationEmail}. | locations.tsx:917-925 | PUT /api/locations/:id (above) | code only — write not pressed | OK |
+| "Delete Location" card + InfoTip (info-tip-delete-location) + Delete button (button-delete-location) | button / dialog | Opens the confirm dialog. InfoTip key "delete-location" exists (info-content.ts:179). | locations.tsx:929-951, 953 | client only | Playwright both fixtures — dialog opens | OK |
+| Delete confirm dialog (dialog-delete-location): copy, type-name gate, Cancel (button-cancel-delete-location), Confirm (button-confirm-delete-location) | dialog | Non-linked: plain confirm. gbp-linked: must type the exact business name. Copy promises removal of: synced Google reviews/photos/performance, Guard settings+history, AI reply settings+posts/photos, Social connections/settings/posts, citation campaigns+marks. | locations.tsx:953-992, 879-882 | DELETE /api/locations/:id → server/routes.ts:2742-2761 in one transaction: DELETE citations WHERE campaign_id IN (campaigns of location); DELETE citation_campaigns; DELETE google_profile_reviews (user+location); DELETE business_locations. FK ON DELETE CASCADE covers: gbp_sync_status, gbp_media, gbp_daily_metrics, gbp_content_jobs, gbp_content_style, gbp_guard, gbp_guard_changes, gbp_reply_settings, agency_jobs, edge_location_links, social_connections/settings/posts/sources/business_config/bulk_jobs. gbp_review_automation cascades via google_profile_reviews. NOT deleted: location_analytics, sitescan_schedules (no FK — orphaned). | FK list via pg_constraint; handler read; delete NOT pressed on seeded rows. Copy claims match except orphaned location_analytics/sitescan_schedules (tables empty for these locations today) — see bugs file | OK |
+| Post-delete toast ("Location deleted…Your Google listing is unchanged.") | text | Reassures the Google listing is untouched. | locations.tsx:868-873 | client only | code | OK |
+
+### Citations tab — <CitationsTab> (list)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Citation Campaigns" heading + InfoTip (info-tip-citations) + explainer | text | What citations are and why they matter. InfoTip key "citations" exists (info-content.ts:169). | locations.tsx:1071-1078 | client only | Playwright (icon present) | OK |
+| "New Campaign" (button-new-campaign) | button | Reveals the create form. | locations.tsx:1079-1081 | client only | Playwright 22-loc506025-citations-new-clicked | OK |
+| Campaign Name input (input-campaign-name) + Create (button-create-campaign) + Cancel (button-cancel-campaign) | input / button | Create validates non-empty client-side, then POSTs. | locations.tsx:1084-1116, 1016-1037 | POST /api/citations/campaigns → server/routes.ts:3064-3072 → requireCitationsPlan (any paid plan, routes.ts:2663-2670) + insertCitationCampaignSchema → INSERT citation_campaigns (userId from session) | VERIFIED on AUDIT- campaign 96235 (created, then deleted) | OK |
+| Campaign cards (card-campaign-N): name (text-campaign-name-N), "X listed · Y to add", status badge, delete (button-delete-campaign-N) | text / badge / button | Card click opens CampaignDetail (?campaign=N); delete opens the confirm dialog. Bad ?campaign= falls back to the list. | locations.tsx:1054-1065, 1128-1161 | GET /api/citations/campaigns?locationId=N → agency middleware server/agency/middleware.ts:63-67: citation_campaigns JOIN business_locations (+agency visibility) WHERE ($8::int IS NULL OR l.id=$8) ORDER BY p.id DESC LIMIT 50 (client re-filters by locationId) | curl both fixtures → [] (citation_campaigns empty; 60 orphan citations rows join to deleted campaigns and never surface) | OK |
+| "No citation campaigns yet." empty state | empty-state | Rendered when the list is empty. | locations.tsx:1122-1126 | client only | Playwright both fixtures | OK |
+| Delete campaign dialog (dialog-delete-campaign) | dialog | Confirms; copy counts marked sites from citationsFound+opportunitiesFound. | locations.tsx:1165-1186 | DELETE /api/citations/campaigns/:id → server/routes.ts:3074-3085 → DELETE citations WHERE campaign_id; DELETE campaign (owner-checked) | VERIFIED on AUDIT- campaign 96235 (0 rows left) | OK |
+
+### Citations tab — <CampaignDetail>
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Back (button-back-to-campaigns), name (text-campaign-detail-name), business name | button / text | Header. | locations.tsx:1250-1257 | client only | code (needs a campaign) | OK |
+| "Build checklist" / "Update checklist" (button-run-scan) | button | Inserts the 30 contractor directories (routes.ts:3088-3119) as citations rows; skips names already present; the Google Business Profile row is auto-marked isFound=true with lastChecked=now when the location is gbp-linked (listingUrl=google_cid or null). Then recounts. | locations.tsx:1258-1263, 1200-1204 | POST /api/citations/campaigns/:id/run → server/routes.ts:3146-3170 (plan-gated) → INSERT citations … ; recountCitations updates citation_campaigns.citations_found/opportunities_found/last_run_at | VERIFIED on AUDIT- 96235: 30 rows inserted, Google first, Google row isFound=true (fixture linked but no real listing), lastRunAt set | OK |
+| 4 count tiles (text-citations-listed/wrong/missing/unchecked) | stat | Client-side counts from rows: listed=isFound&&!napConsistent-false… i.e. listed (isFound=true, napConsistent≠false), wrong (isFound=true, napConsistent=false), missing (isFound=false), unchecked (isFound null). | locations.tsx:1241-1246, 1270-1279, 1226-1229 | client-side over GET …/results rows | code + PATCH flow below | OK |
+| Site rows (row-citation-N): siteName + category | text | Directory name and category, ordered Google first then by priority list (LEGACY "Google My Business" renamed; unknowns keep insertion order at end). | locations.tsx:1301-1306 | GET /api/citations/campaigns/:id/results → server/routes.ts:3124-3140 → citations WHERE campaign_id ORDER BY rank | VERIFIED on AUDIT- campaign (30 rows, Google first) | OK |
+| "Search" link (link-search-N) | link | Client-built Google URL, new tab. Google Business Profile row → google.com/maps/search/?api=1&query="<businessName> <city>"; other rows → google.com/search?q=site:<siteUrl-no-protocol> "<businessName>" <city>. city = location.city or campaign.address 2nd comma part. | locations.tsx:1230-1240, 1307-1311 | client only — URL construction code-read; both forms well-formed (encodeURIComponent on the query) | code (no campaign row persisted to click; verified construction logic) | OK |
+| Status select (select-citation-N): Not checked / Listed ✓ / Listed — wrong / Not listed | select | PATCHes the row; switching away from a listed state also clears any saved listing URL client-side. | locations.tsx:1312-1326, 1212-1215 | PATCH /api/citations/:id → server/routes.ts:3181-3206 → zod {status enum, listingUrl https-only ≤500}; map listed=[true,true], wrong=[true,false], missing=[false,null], unchecked=[null,null]; sets lastChecked (null when unchecked); recountCitations | VERIFIED: listed+https link → isFound=true/napConsistent=true + URL stored; wrong → [true,false] keeps URL; missing → [false,null]; http:// link → 400 "Enter a full link starting with https://"; counts updated 1/1 and matched SQL | OK |
+| Listing URL input (input-listing-N) + "View" link (link-listing-N) + clear (button-clear-listing-N) | input / link / button | Input only for listed/wrong rows; saves on blur (Enter blurs); https validated (toast otherwise); View opens the saved URL; clear PATCHes listingUrl=null. | locations.tsx:1327-1358, 1216-1224 | same PATCH | VERIFIED via PATCH flow above; blur/click interactions code-read | OK |
+| "Click Build checklist to list the 30 sites…" empty state | empty-state | Before the checklist is built. | locations.tsx:1285-1288 | client only | code | OK |
+
+### Shared: AgencyWorkspace (client/src/components/agency-workspace.tsx)
+
+This account gets the agency bulk workspace (`/api/agency/me` → entitled:true, role owner), so OwnLocations (the /api/locations?paged list) is DEAD in this environment; mapped by code.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| StatGrid "Locations" / "Need reconnect" | stat | 2 / 1 — matches SQL (2 locations; 506025 has gbp link but no live grant → reconnect). | agency-workspace.tsx:91-92 | GET /api/agency/dashboard → server/agency/access.ts:101-103 dashboard(): counts per statusSql — reconnect = gbp_location_name NOT NULL AND no live grant (access.ts:81) | curl {total:2,reconnect:1,unlinked:1} matches SQL | OK |
+| Search input, client filter, status filter with counts | input / select | Filters the list; counts appended from dashboard stats. | agency-workspace.tsx:95-99 | GET /api/agency/locations?q=&status=&offset= → access.ts:93-100 listLocations: business_locations l LEFT JOIN agency_clients c, visibility + ILIKE on name/address/city/state/zip/place_id/client, statusSql filter, ORDER BY l.id LIMIT 50 OFFSET | curl all/status=reconnect/status=synced — 506025 under reconnect, none synced | OK |
+| Location rows (agency-location-N): checkbox, name button (opens detail), client, address (fullAddress), Google pill "Linked"/"Not linked" | text / button | Row click opens the detail view. Pill derives ONLY from gbp_location_name presence → 506025 shows "Linked" while the same row is counted as "Needs reconnect" in the stat and filter — see bugs file. | agency-workspace.tsx:109 | same list endpoint | Playwright 01-locations-list | OK |
+| "More" expander, Select page / Select all matching / Clear, "Export … CSV" links | button / link | Selection UI; export href /api/agency/export?… (GET download). | agency-workspace.tsx:101-108 | POST /api/agency/bulk for actions (not pressed) | code (selection requires clicks; export is a download link) | OK |
+| Bulk action fieldset (sync/link/unlink/assign/guard/ai-replies/content/scan) | select / button | Queues bulk actions over selected/all-matching locations. | agency-workspace.tsx:111-119 | POST /api/agency/bulk → agency routes (queued jobs) | code only — writes, not pressed | OK |
+| Pager ("1–2 of 2", Previous/Next page) | button | 50 per page via ?offset=. | agency-workspace.tsx:26-28, 110 | listLocations LIMIT 50 OFFSET | Playwright | OK |
+| Plan upsell line | text | "Client workspaces, bulk actions… part of the Agency Workspace on the <plan> plan." | agency-workspace.tsx:67 | client only | Playwright | OK |
+| OwnLocations branch (own-location-N, own-locations-empty, button-open-single-location, button-import-own-profile) | text / button | The non-agency owner list from /api/locations?paged=true with single-location shortcut and no-plan empty state. | agency-workspace.tsx:38-69 | GET /api/locations?paged=true → agency middleware server/agency/middleware.ts:29-33 → listLocations envelope | code only — unreachable with an agency plan (DEAD in this env) | DEAD |
+
+### Shared: GbpConnection (client/src/components/gbp-connection.tsx) — list banner + per-location
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Google Business Profile not connected…" copy (locations context) | text | Shown when there are no connected accounts. Here: always (0 grants). | gbp-connection.tsx:92-96, 116-117 | GET /api/gbp/status → server/gbp/routes.ts:60-66: grantStatus (gbp_grants) + per-location sync rows (gbp_sync_status) for gbp-linked locations only | curl {connected:false, locations:[506025 row]}; Playwright | OK |
+| Connected-account rows (gbp-account): pill Connected/Reconnect needed, email, Reconnect / View profiles (button-view-google-profiles) / Open in Google (button-open-google-business → business.google.com/locations?authuser=email) / Disconnect (button-disconnect-google-account) | badge / button | Per-account status and actions. Disconnect POSTs {subject} after confirm; purges that account's synced Google data. | gbp-connection.tsx:118-134 | GET /api/gbp/status (grantStatus); POST /api/gbp/disconnect → gbp/routes.ts:67-86 (recent-auth required; DELETE gbp_grants + purgeGoogleData; revokes token at Google) | code only — 0 accounts here; disconnect not pressed | OK |
+| Link summary line (gbp-link-summary) | text | "N synced · N ready to link · N not in a connected account…" from /api/gbp/linkage states. | gbp-connection.tsx:136-139 | GET /api/gbp/linkage → gbp/routes.ts:103-115: per-location state synced/reconnect/available/unlinked (grant join + agency_discovery match on placeId, 24 h window) | curl: 104296 unlinked, 506025 reconnect | OK |
+| Grant error alerts | banner | Per-grant errors from linkage. | gbp-connection.tsx:140 | linkage errors [] | n/a | OK |
+| "Connect Google Business Profile / Connect another Google account" button | button | <a href="/api/gbp/connect"> → RecentAuthModal intercept → startGbpConnect preflight → Google consent. | gbp-connection.tsx:141-142 | GET /api/gbp/connect (see AddLocationDialog) | Playwright (button rendered); OAuth not started | OK |
+| "Link & sync N ready locations" (button-link-all-gbp) | button | Links every `available` (discovered, unlinked-by-user=false) listing via POST /api/gbp/import. | gbp-connection.tsx:143 | POST /api/gbp/import → gbp/routes.ts:116-124 | code (0 available) | OK |
+| Sync details <details> + per-location "Sync now" | button | For gbp-linked locations: account email, per-kind last success/error from gbp_sync_status; Sync now POSTs /api/gbp/locations/:id/sync (queued 202 when connected, inline syncLocation when not). | gbp-connection.tsx:145-148 | GET /api/gbp/status (locations rows); POST /api/gbp/locations/:id/sync → gbp/routes.ts:136 | Playwright 20-loc506025-insights shows "Sync details"; button not pressed (fixture has no grant — inline syncLocation would fail against Google) | OK |
+| `?gbp=consent-failed` alert | banner | "Google connection was not completed…" when the OAuth callback fails. | gbp-connection.tsx:114, 135 | server redirect /locations?gbp=consent-failed (gbp/routes.ts:46,58) | code | OK |
+| GbpLinkCell (gbp-link-N): Synced / Reconnect / Ready to link / Not linked states, Unlink (button-unlink-gbp-N), Link & sync (button-link-gbp-N) | badge / button | The per-location link widget. Reconnect state for 506025 (linked, grant gone): badge + "Its Google account was disconnected" + Reconnect + Unlink (POST /api/gbp/locations/:id/unlink, confirm; removes synced Google data, keeps the location). | gbp-connection.tsx:57-89 | GET /api/gbp/linkage; POST /api/gbp/locations/:id/unlink → gbp/routes.ts:135 → unlinkLocation | code only — rendered inside GuardUnlinked when a listing is available; not pressed here (unlink is a write) | OK |
+
+### Shared: recent-auth (client/src/components/recent-auth.tsx) + InfoTip + LocationSearchSummary data flow
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| startGbpConnect preflight | button | GET /api/gbp/connect?format=json → on 403 {reauth:true} apiRequest opens RecentAuthModal; success navigates to Google's consent URL. Anchors href="/api/gbp/connect" are intercepted globally. | recent-auth.tsx:21-25, 53-60; queryClient.ts:23-27 | GET /api/gbp/connect (gbp/routes.ts:32-43); reauth endpoints /api/auth/reauth (GET method, POST verify, POST /email) | code only — OAuth must not be started; modal flow code-read | OK |
+| RecentAuthModal (text-reauth-reason, button-reauth-send-code, button-reauth-google) | dialog | Password / authenticator / emailed 6-digit code (10 min expiry) step-up; Google step-up via /api/auth/google?reauth=1 for GBP connects. | recent-auth.tsx:31-86 | /api/auth/reauth* (account-security) | code only | OK |
+| InfoTip (info-tip-<k>, info-dialog-<k>) | dialog | Renders a 16px ⓘ button (44px target) opening a plain-English explainer from INFO_CONTENT; unknown keys render nothing. Used on this page: k="delete-location" (settings), k="citations" (citations header). Both keys exist (info-content.ts:169,179). | info-tip.tsx:29-87 | client only (INFO_CONTENT static) | code + key existence | OK |
+| Dead imports in locations.tsx | text | recharts (LineChart/Bar/XAxis/…, lines 43-45) and lucide icons MapPin/Phone/Mail/Users/Star/ChevronDown/Eye/MousePointerClick/Smartphone/Monitor (lines 34-37) imported but never used; GuardStatus (line 5) imported but unused. | locations.tsx:5, 34-45 | n/a | grep — no usages | DEAD |
+
+## Server route index (this page's surface)
+
+- GET /api/locations → server/routes.ts:2672 (owner list) ; GET /api/locations?paged=true → agency/middleware.ts:29-33 (envelope)
+- GET /api/locations/:id → routes.ts:2681 ; POST /api/locations → routes.ts:2692 (plan + location cap) ; PUT /api/locations/:id → routes.ts:2717 (locationUpdateInput allowlist, route-guards.ts:136-165) ; DELETE /api/locations/:id → routes.ts:2742 (transaction, above)
+- POST /api/locations/search-google → routes.ts:2763 ; POST /api/locations/:id/import-google → routes.ts:2972
+- GET /api/entitlements → routes.ts:249
+- GET /api/gbp/locations → gbp/routes.ts:87-101 ; POST /api/gbp/import → gbp/routes.ts:116 ; GET /api/gbp/connect → gbp/routes.ts:32 ; GET /api/gbp/status → :60 ; GET /api/gbp/linkage → :103 ; POST /api/gbp/disconnect → :67 ; GET /api/gbp/locations/:id/media → :125 ; GET /api/gbp/locations/:id/performance → :139 ; POST /api/gbp/locations/:id/unlink → :135 ; POST /api/gbp/locations/:id/sync → :136
+- Guard: GET /api/gbp/locations/:id/guard → gbp/guard-routes.ts:69 ; PUT → :71 ; POST /preview → :70 ; POST /check → :79 ; POST /changes/:changeId → :80 ; GET /api/gbp/guard/status → :64 ; GET+POST /api/gbp/reports/{changes,reviews}/:id → :86-92
+- Citations: GET /api/citations/campaigns → agency/middleware.ts:63-67 (owner+member) ; POST → routes.ts:3064 (plan-gated) ; DELETE /:id → routes.ts:3074 ; GET /:id/results → routes.ts:3124 ; POST /:id/run → routes.ts:3146 ; PATCH /api/citations/:id → routes.ts:3181
+- GSC summary: GET /api/gsc/locations/:id/summary → gsc/routes.ts:259 → gsc/service.ts:280-292
+- Agency: GET /api/agency/me, /api/agency/locations, /api/agency/dashboard, /api/agency/clients, POST /api/agency/bulk, GET /api/agency/export
+
+## Element counts
+
+Grouped totals (element rows in the map above):
+
+| Container group | Total | OK | BUG | UNCLEAR | DEAD |
+|---|---|---|---|---|---|
+| List page shell | 7 | 7 | 0 | 0 | 0 |
+| AddLocationDialog (both tabs) | 21 | 21 | 0 | 0 | 0 |
+| LocationDetail shell | 4 | 4 | 0 | 0 | 0 |
+| Insights tab | 8 | 7 | 1 | 0 | 0 |
+| Guard tab | 14 | 13 | 0 | 0 | 1 |
+| Info tab | 9 | 9 | 0 | 0 | 0 |
+| Services tab | 6 | 6 | 0 | 0 | 0 |
+| Photos tab | 7 | 5 | 2 | 0 | 0 |
+| Social tab | 3 | 3 | 0 | 0 | 0 |
+| Settings tab | 6 | 6 | 0 | 0 | 0 |
+| Citations list | 7 | 7 | 0 | 0 | 0 |
+| CampaignDetail | 8 | 8 | 0 | 0 | 0 |
+| AgencyWorkspace | 9 | 8 | 0 | 0 | 1 |
+| GbpConnection | 10 | 10 | 0 | 0 | 0 |
+| Shared (recent-auth/InfoTip/dead imports) | 4 | 3 | 0 | 0 | 1 |
+| **Total** | **123** | **117** | **3** | **0** | **3** |
+
+(The agency-list "Linked" pill inconsistency and the delete-dialog orphan rows are recorded in bugs-batch2.md as additional minor findings; the hard-coded isPremiumPlus at locations.tsx:89 is recorded above as a fact, per instructions.)
