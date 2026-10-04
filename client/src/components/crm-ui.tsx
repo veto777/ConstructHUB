@@ -163,6 +163,7 @@ export function StatusPill({
         PILL_TONE[tone],
         className,
       )}
+      data-pill-tone={tone}
       {...rest}
     >
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />}

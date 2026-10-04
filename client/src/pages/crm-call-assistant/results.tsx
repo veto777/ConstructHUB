@@ -32,12 +32,12 @@ const RANGE_LABELS: Record<ResultsRange, string> = { "7d": "Last 7 days", "30d":
 
 /** The tiles, in the order an owner reads them: what made money first, spam last. */
 const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]; icon: typeof BellRing; tone: Accent }[] = [
-  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "emerald" },
-  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "amber" },
-  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "sky" },
-  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "slate" },
-  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup", "voicemail"], icon: PhoneMissed, tone: "rose" },
-  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "violet" },
+  { key: "lead_submitted", label: "Estimate requests", hint: "Forms filed for your team", outcomes: ["lead_submitted", "booked"], icon: ClipboardCheck, tone: "orange" },
+  { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "orange" },
+  { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "orange" },
+  { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "orange" },
+  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup", "voicemail"], icon: PhoneMissed, tone: "orange" },
+  { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "orange" },
 ];
 
 const sum = (o: Record<string, number>, keys: string[]) => keys.reduce((n, k) => n + (o[k] ?? 0), 0);
@@ -97,10 +97,10 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
                     <button
                       type="button"
                       onClick={() => onPick(t.key)}
-                      className={cn("h-full w-full rounded-xl border bg-gradient-to-br to-card to-70% p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", accentClasses(t.tone).tint, accentClasses(t.tone).border)}
+                      className="h-full w-full rounded-xl border bg-card p-3 text-left transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       data-testid={`tile-results-${t.key}`}
                     >
-                      <span className={cn("flex items-center gap-1.5 text-xs font-medium", accentClasses(t.tone).label)}>
+                      <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                         <span className={cn("flex h-6 w-6 items-center justify-center rounded-md", accentClasses(t.tone).chip)} aria-hidden="true"><t.icon className="h-3.5 w-3.5" /></span>
                         {t.label}
                       </span>

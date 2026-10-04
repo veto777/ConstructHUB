@@ -30,7 +30,8 @@ import { cn } from "@/lib/utils";
 export { EmptyState, StatusPill, ErrorCard, statusTone, crmTable as appTable, crmTableCards as appTableCards } from "@/components/crm-ui";
 
 /* ── Color ──────────────────────────────────────────────────────────────────── */
-/* Owner, 2026-10-04: "the pages you redesigned are much better but they are now bland and need a little color".
+/* Owner, 2026-10-04: "…need a little color", then "i didnt ask for every color of the fucking rainbow" — ONE accent:
+   the brand orange, used lightly; green/amber/red only where they mean a status.
    One small palette, used the same way everywhere: a tinted chip for a page or section icon, a soft tint and a
    colored label on number tiles. Orange stays the action color; the others only label and decorate. */
 
@@ -48,22 +49,22 @@ const ACCENTS: Record<Accent, { chip: string; tint: string; border: string; labe
 };
 export const accentClasses = (a: Accent) => ACCENTS[a];
 /** Number tiles without an accent of their own take these in turn, so a row of numbers is never grey. */
-const STAT_CYCLE: Accent[] = ["orange", "sky", "emerald", "violet", "amber", "rose"];
+const STAT_CYCLE: Accent[] = ["orange"];
 
 /** Each page's icon and color, by route (the sidebar's families: Google = sky, ads = amber, permits = emerald …). */
 const PAGE_ICONS: [string, LucideIcon, Accent][] = [
-  ["/call-assistant", Phone, "orange"], ["/google-reviews", Star, "amber"], ["/google-profile", Store, "sky"],
-  ["/google-business", Store, "sky"], ["/locations", MapPin, "sky"], ["/gmb-monitor", Eye, "sky"],
-  ["/ranking-grid", Grid3x3, "sky"], ["/gbp-content", Newspaper, "sky"], ["/reinstatement", LifeBuoy, "sky"],
-  ["/agency", Building2, "indigo"], ["/competitors", Swords, "rose"], ["/google-ads", MousePointerClick, "amber"],
-  ["/ads-manager", BarChart3, "amber"], ["/lsa-leads", Users, "amber"], ["/lsa-account-manager", Briefcase, "amber"],
-  ["/search", Search, "emerald"], ["/databases", Database, "emerald"], ["/property", Home, "emerald"],
-  ["/schedules", CalendarClock, "emerald"], ["/history", History, "emerald"], ["/photos", Camera, "teal"],
-  ["/media-library", Images, "teal"], ["/domains", Globe, "violet"], ["/mail-alerts", MailWarning, "violet"],
-  ["/cloudflare", Cloud, "violet"], ["/search-console", LineChart, "violet"], ["/site-scan", ScanSearch, "violet"],
-  ["/vpn-shield", ShieldCheck, "violet"], ["/ip-tracker", Fingerprint, "violet"], ["/social-media", Megaphone, "rose"],
-  ["/guides", BookOpen, "rose"], ["/master-class", GraduationCap, "indigo"], ["/settings", Settings, "slate"],
-  ["/admin/access", KeyRound, "slate"], ["/admin/issues", Bug, "slate"], ["/admin/feature-pages", LayoutGrid, "slate"],
+  ["/call-assistant", Phone, "orange"], ["/google-reviews", Star, "orange"], ["/google-profile", Store, "orange"],
+  ["/google-business", Store, "orange"], ["/locations", MapPin, "orange"], ["/gmb-monitor", Eye, "orange"],
+  ["/ranking-grid", Grid3x3, "orange"], ["/gbp-content", Newspaper, "orange"], ["/reinstatement", LifeBuoy, "orange"],
+  ["/agency", Building2, "orange"], ["/competitors", Swords, "orange"], ["/google-ads", MousePointerClick, "orange"],
+  ["/ads-manager", BarChart3, "orange"], ["/lsa-leads", Users, "orange"], ["/lsa-account-manager", Briefcase, "orange"],
+  ["/search", Search, "orange"], ["/databases", Database, "orange"], ["/property", Home, "orange"],
+  ["/schedules", CalendarClock, "orange"], ["/history", History, "orange"], ["/photos", Camera, "orange"],
+  ["/media-library", Images, "orange"], ["/domains", Globe, "orange"], ["/mail-alerts", MailWarning, "orange"],
+  ["/cloudflare", Cloud, "orange"], ["/search-console", LineChart, "orange"], ["/site-scan", ScanSearch, "orange"],
+  ["/vpn-shield", ShieldCheck, "orange"], ["/ip-tracker", Fingerprint, "orange"], ["/social-media", Megaphone, "orange"],
+  ["/guides", BookOpen, "orange"], ["/master-class", GraduationCap, "orange"], ["/settings", Settings, "orange"],
+  ["/admin/access", KeyRound, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
   ["/crm-app", Kanban, "orange"], ["/", LayoutDashboard, "orange"],
 ];
 function pageIconFor(path: string): { icon: LucideIcon; accent: Accent } | null {
@@ -86,7 +87,7 @@ export function AppPage({ children, width = "default", className, testId }: {
     <div className={cn(
       "relative isolate mx-auto w-full px-4 pb-10 pt-5 sm:px-6 sm:pt-8 space-y-5 sm:space-y-6",
       // a soft warm glow behind the header — color without noise
-      "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-64 before:bg-[radial-gradient(55%_100%_at_12%_0%,hsl(25_95%_53%/0.11),transparent_72%),radial-gradient(45%_90%_at_88%_0%,hsl(199_89%_48%/0.08),transparent_72%)]",
+      "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-64 before:bg-[radial-gradient(60%_100%_at_15%_0%,hsl(25_95%_53%/0.08),transparent_72%)]",
       WIDTHS[width], className)} data-testid={testId}>
       {children}
     </div>
@@ -172,15 +173,15 @@ type StatProps = {
 };
 
 export function Stat({ label, value, hint, href, tone = "default", accent, icon: Icon, testId }: StatProps) {
-  const toneClass = { default: "", good: "text-emerald-600 dark:text-emerald-400", warn: "text-amber-600 dark:text-amber-400", bad: "text-red-600 dark:text-red-400" }[tone];
+  const toneClass = { default: "", good: "text-primary", warn: "text-primary", bad: "text-red-600 dark:text-red-400" }[tone];
   const a = accent ? ACCENTS[accent] : null;
   const body = (
     <div className={cn(
       "h-full rounded-xl border bg-card p-3.5 sm:p-4",
-      a && cn("bg-gradient-to-br to-card to-70%", a.tint, a.border),
+      // one brand color, used lightly: a white tile, an orange dot (owner, 2026-10-04: no rainbow)
       href && "transition-shadow hover:shadow-md",
     )} data-testid={testId}>
-      <div className={cn("flex items-center gap-1.5 text-xs font-medium", a ? a.label : "text-muted-foreground")}>
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : a ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", a.dot)} aria-hidden="true" /> : null}
         <span className="truncate">{label}</span>
       </div>
@@ -282,10 +283,12 @@ export function Toolbar({ search, filters, activeFilters = 0, actions, className
 /* ── Notices ────────────────────────────────────────────────────────────────── */
 
 const NOTICE = {
-  info: { icon: Info, cls: "border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-100" },
-  warning: { icon: AlertTriangle, cls: "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100" },
+  // Three colors on the platform (owner, 2026-10-04: "2-3 colors tops"): ink/neutral, the brand orange, and red
+  // only for real errors.
+  info: { icon: Info, cls: "border-border bg-muted/60 text-foreground [&>svg]:text-primary" },
+  warning: { icon: AlertTriangle, cls: "border-orange-200 bg-orange-50 text-orange-950 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-100 [&>svg]:text-primary" },
   danger: { icon: XCircle, cls: "border-red-200 bg-red-50 text-red-950 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-100" },
-  success: { icon: CheckCircle2, cls: "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-100" },
+  success: { icon: CheckCircle2, cls: "border-border bg-muted/60 text-foreground [&>svg]:text-primary" },
 } as const;
 
 export function Notice({ tone = "info", title, children, action, testId }: {
