@@ -400,6 +400,9 @@ export default function CrmMigratePage() {
                   ))}
               </div>
             )}
+            {result.hint && (
+              <p className="text-xs text-muted-foreground" data-testid="text-import-hint">{result.hint}</p>
+            )}
             <div className="flex flex-wrap gap-3">
               {entity === "customers" && (
                 <Link href="/crm/clients" data-testid="link-view-clients"

@@ -64,9 +64,12 @@ test.describe("/crm/migrate", () => {
     await page.getByTestId("button-run-import").click();
     await expect(page.getByTestId("text-import-summary")).toContainText("0 created");
     await expect(page.getByTestId("text-import-summary")).toContainText("2 skipped");
+    // The server's remedy for skipped rows is shown, not swallowed.
+    await expect(page.getByTestId("text-import-hint")).toContainText("Re-run with ?force=1");
 
     guards.assertClean("migrate curated");
   });
+
 
   test("sweep: every button and link", async ({ page }) => {
     const { clicked, labels } = await sweepPage(page, "/crm/migrate", {
