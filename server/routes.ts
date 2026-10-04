@@ -3577,7 +3577,9 @@ export async function registerRoutes(
       const endDate = endParam ? new Date(endParam) : new Date();
 
       const visits = await storage.getClickVisits(domain.id, startDate, endDate);
-      const blocked = await storage.getBlockedIps(domain.id);
+      // Same window as the visit stats: the dashboard "Blocked IPs" tile sits in the
+      // range-filtered stat grid, so an all-time count would never move with the range.
+      const blocked = await storage.getBlockedIps(domain.id, startDate, endDate);
 
       const uniqueIps = new Set(visits.map(v => v.ipAddress)).size;
       const suspiciousCount = visits.filter(v => v.isSuspicious).length;

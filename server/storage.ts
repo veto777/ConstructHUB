@@ -126,7 +126,7 @@ export interface IStorage {
   getVisitsByIp(domainId: number, ip: string): Promise<ClickVisit[]>;
   getRecentVisitsByIp(domainId: number, ip: string, since: Date): Promise<ClickVisit[]>;
 
-  getBlockedIps(domainId: number): Promise<BlockedIp[]>;
+  getBlockedIps(domainId: number, startDate?: Date, endDate?: Date): Promise<BlockedIp[]>;
   createBlockedIp(data: InsertBlockedIp): Promise<BlockedIp>;
   deleteBlockedIp(id: number): Promise<void>;
   isIpBlocked(domainId: number, ip: string): Promise<boolean>;
@@ -679,8 +679,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(clickVisits).where(and(eq(clickVisits.domainId, domainId), eq(clickVisits.ipAddress, ip), gte(clickVisits.visitedAt, since))).orderBy(desc(clickVisits.visitedAt));
   }
 
-  async getBlockedIps(domainId: number): Promise<BlockedIp[]> {
-    return db.select().from(blockedIps).where(and(eq(blockedIps.domainId, domainId), eq(blockedIps.isActive, true))).orderBy(desc(blockedIps.blockedAt));
+  async getBlockedIps(domainId: number, startDate?: Date, endDate?: Date): Promise<BlockedIp[]> {
+    const conditions = [eq(blockedIps.domainId, domainId), eq(blockedIps.isActive, true)];
+    if (startDate) conditions.push(gte(blockedIps.blockedAt, startDate));
+    if (endDate) conditions.push(lte(blockedIps.blockedAt, endDate));
+    return db.select().from(blockedIps).where(and(...conditions)).orderBy(desc(blockedIps.blockedAt));
   }
 
   async createBlockedIp(data: InsertBlockedIp): Promise<BlockedIp> {
