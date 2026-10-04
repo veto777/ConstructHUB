@@ -216,6 +216,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     res.json(await invoiceRefundTotals(ctx.org.id, rows));
   });
 
+  /** Standalone invoice (no estimate behind it) for the client page; line items are stored and totaled exactly like an estimate-converted invoice. */
   app.post("/api/crm/invoices", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;

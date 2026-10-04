@@ -72,7 +72,16 @@ export default function CrmProjectPage() {
   const canSendCo = perms.approveChangeOrders === true;
 
   const { data: projects, isLoading, isError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
-  const project = projects?.projects?.find((p: any) => p.id === id);
+  const inList = projects?.projects?.find((p: any) => p.id === id);
+  // The board list caps at the newest 2000 — a direct link to an older project
+  // falls back to the single-record route instead of reading "not found".
+  const listSettled = !isLoading && !!projects;
+  const { data: direct, isError: directError, isLoading: directLoading } = useQuery<any>({
+    queryKey: [`/api/crm/projects/${id}`],
+    enabled: !!id && listSettled && !inList,
+    retry: false,
+  });
+  const project = inList ?? (direct && direct.id === id ? direct : null);
   // Children only load once the project is known to exist (and be visible) —
   // a bad id renders "Project not found" without six 404s behind it.
   const ready = !!project;
@@ -186,10 +195,10 @@ export default function CrmProjectPage() {
   };
 
   if (!id) return null;
-  if (isLoading) {
+  if (isLoading || (listSettled && !inList && directLoading)) {
     return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
-  if (isError || !project) {
+  if (isError || directError || !project) {
     return (
       <ErrorCard
         title={isError ? "Couldn't load this project" : "Project not found"}
