@@ -90,4 +90,8 @@ test("the CRM no longer lists the Call Assistant", async ({ page }) => {
   await page.goto(`${PORTAL}/crm`);
   await expect(page.getByTestId("link-portal-nav-clients")).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId("link-portal-nav-call-assistant")).toHaveCount(0);
+  // …and links back to the platform with every other tool (owner, 2026-10-04). On a forced-portal dev server the
+  // platform face is the same host with ?portal=0 (lib/site.ts marketingUrl); in production it is constructhub.us.
+  await expect(page.getByTestId("link-portal-nav-platform")).toBeVisible();
+  await expect(page.getByTestId("link-portal-nav-platform")).toHaveAttribute("href", /^(https?:\/\/[^/]+)?\/(\?portal=0)?$/);
 });

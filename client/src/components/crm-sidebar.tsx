@@ -1,9 +1,10 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
-  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone,
+  Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone, LayoutGrid, ArrowUpRight,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { marketingUrl } from "@/lib/site";
 import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
 import { StandingGator } from "@/components/mascot";
@@ -182,6 +183,27 @@ export function CrmSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* The way back to the platform and every other tool (owner, 2026-10-04: "where is the link to get to the
+            ConstructHUB original that has all the other features?"). A full navigation: it's another host. */}
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-4">
+            ConstructHUB
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu className="px-2 gap-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="All ConstructHUB tools" className="h-9 rounded-lg px-3">
+                  <a href={marketingUrl("/")} data-testid="link-portal-nav-platform" className="flex items-center gap-3 w-full">
+                    <LayoutGrid className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                    <span className="text-[13px] font-medium">All ConstructHUB tools</span>
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={1.9} aria-hidden="true" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
