@@ -151,7 +151,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
             <p className="text-xs text-muted-foreground" data-testid="text-audit-count">
               {rows.length === 0
                 ? "No activity recorded yet."
-                : `${shown.length.toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")} events · the most recent 200 are kept. IP and device describe the request and may reflect a proxy.`}
+                : `${shown.length.toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")} events · the most recent 200 are shown. IP and device describe the request and may reflect a proxy.`}
             </p>
             <Button size="sm" variant="outline" onClick={exportCsv} disabled={shown.length === 0} data-testid="button-audit-export">
               <Download className="h-4 w-4 mr-2" /> Export CSV

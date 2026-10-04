@@ -251,6 +251,9 @@ test.describe("settings shell — desktop", () => {
     await expect(rows.nth(3)).toContainText("fixture@example.invalid");
     await expect(rows.nth(3)).toContainText("Unavailable");
     await expect(page.getByTestId("text-audit-count")).toContainText(`${ACTIVITY.length} of ${ACTIVITY.length} events`);
+    // The API returns (never prunes) the newest 200 rows — the count line must not claim older events are deleted.
+    await expect(page.getByTestId("text-audit-count")).toContainText("the most recent 200 are shown");
+    await expect(page.getByTestId("text-audit-count")).not.toContainText("are kept");
 
     await page.getByTestId("select-audit-area").selectOption("security");
     await expect(rows).toHaveCount(1);
