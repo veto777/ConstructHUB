@@ -36,8 +36,14 @@ export function governmentPermitForDisplay<T extends {
 }
 
 /** Dates describe actual checks, never the boot/seed time. */
+// The calendar date in the visitor's own time zone, so "Last checked" agrees
+// with the browser-local "Last scraped" dates shown beside it (a UTC date can
+// sit one day ahead for US visitors).
+const localDay = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export function governmentLinkNotice(row: { linkStatus?: string | null; lastVerifiedAt?: string | Date | null }): string | null {
   if (row.linkStatus !== 'unconfirmed') return null;
   const date = row.lastVerifiedAt ? new Date(row.lastVerifiedAt) : null;
-  return `Official site · not auto-verified · ${date && !Number.isNaN(date.getTime()) ? `Last checked ${date.toISOString().slice(0, 10)}` : 'Check date unavailable'}`;
+  return `Official site · not auto-verified · ${date && !Number.isNaN(date.getTime()) ? `Last checked ${localDay(date)}` : 'Check date unavailable'}`;
 }

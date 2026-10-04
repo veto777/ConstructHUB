@@ -40,3 +40,17 @@ it('keeps source-listed unconfirmed links visible with an honest dated label', (
   expect(governmentLinksAvailable({...row,linkStatus:'verified'})).toBe(true);
   expect(governmentLinksAvailable({...row,isActive:false})).toBe(false);
 });
+
+it('dates the label in the visitor\'s time zone, not UTC', () => {
+  // 2026-09-30 23:30 UTC is still 2026-09-30 in US time zones; a UTC date read
+  // one day ahead (the old toISOString slice). Pin the zone so the assertion
+  // holds on any machine.
+  const previousTz = process.env.TZ;
+  process.env.TZ = 'America/New_York';
+  try {
+    const row = { linkStatus: 'unconfirmed', lastVerifiedAt: '2026-10-01T01:30:00Z' };
+    expect(governmentLinkNotice(row)).toBe('Official site · not auto-verified · Last checked 2026-09-30');
+  } finally {
+    if (previousTz === undefined) delete process.env.TZ; else process.env.TZ = previousTz;
+  }
+});
