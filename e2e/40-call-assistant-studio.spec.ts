@@ -390,6 +390,20 @@ test.describe("Call Assistant — Agent Studio", () => {
     await expect(page.getByTestId("input-company-name")).toHaveValue("Acme Siding");
   });
 
+  test("editor: the setup wizard is disabled while there are unsaved edits", async ({ page }) => {
+    await mockVoice(page, { published: true });
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-editor")).toBeVisible();
+    await page.getByTestId("studio-nav-persona").click();
+    await page.getByTestId("textarea-greeting").fill("A greeting I have not saved");
+    await expect(page.getByTestId("text-studio-dirty")).toHaveText("Unsaved changes");
+    // Entering the wizard now would seed it from the SAVED draft and drop this edit silently.
+    await expect(page.getByTestId("button-studio-wizard")).toBeDisabled();
+    await page.getByTestId("button-studio-save").click();
+    await expect(page.getByTestId("text-studio-dirty")).toHaveText("All changes saved");
+    await expect(page.getByTestId("button-studio-wizard")).toBeEnabled();
+  });
+
   test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
     await mockVoice(page, { published: true });
     await gotoCrm(page, "/call-assistant?tab=studio");

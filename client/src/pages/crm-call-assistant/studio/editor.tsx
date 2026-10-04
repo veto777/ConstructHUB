@@ -98,7 +98,9 @@ export function StudioEditor({ data, canManage, onRunWizard }: { data: VoiceProf
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {!disabled && (
               <>
-                <Button variant="ghost" size="sm" onClick={onRunWizard} data-testid="button-studio-wizard"><Wand2 className="h-4 w-4 mr-1" /> Setup wizard</Button>
+                {/* Disabled while dirty: the wizard starts from the SAVED draft, so entering it
+                    with unsaved edits would drop them without a word. Save first. */}
+                <Button variant="ghost" size="sm" onClick={onRunWizard} disabled={dirty} title={dirty ? "Save your changes first" : undefined} data-testid="button-studio-wizard"><Wand2 className="h-4 w-4 mr-1" /> Setup wizard</Button>
                 {data.publishedVersion != null && (
                   <Button variant="outline" size="sm" onClick={() => pause.mutate()} disabled={pause.isPending} data-testid="button-studio-pause">
                     {data.status === "paused" ? <><Play className="h-4 w-4 mr-1" /> Resume</> : <><Pause className="h-4 w-4 mr-1" /> Pause</>}
