@@ -175,8 +175,8 @@ export function registerAgencyRoutes(app:Express) {
   });
   route('post','/onboarding',async(req,res,a)=>res.status(202).json(await createOnboarding(a,req.body)));
   route('get','/onboarding',async(req,res,a)=>{
-    const f=filters.parse(req.query);const {rows}=await pool.query(`SELECT r.* FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE r.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=r.user_id AND m.member_id=$3 AND m.client_id=r.client_id)) AND ($4::int IS NULL OR r.client_id=$4) AND r.business_name ILIKE $5 ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q}%`,f.offset]);
-    res.json({items:rows.map(({token_hash,token_enc,...r})=>({...r,link:onboardingLink({...r,token_enc})}))});
+    const f=filters.parse(req.query);const {rows}=await pool.query(`SELECT r.*,count(*) OVER()::int total FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE r.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=r.user_id AND m.member_id=$3 AND m.client_id=r.client_id)) AND ($4::int IS NULL OR r.client_id=$4) AND r.business_name ILIKE $5 ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q}%`,f.offset]);
+    res.json({items:rows.map(({token_hash,token_enc,total,...r})=>({...r,link:onboardingLink({...r,token_enc})})),total:rows[0]?.total??0});
   });
   route('post','/onboarding/:id/remind',async(req,res,a)=>{requireWrite(a);const id=z.string().uuid().parse(req.params.id);const {rows:[r]}=await pool.query('SELECT client_id FROM agency_onboarding WHERE user_id=$1 AND id=$2',[a.owner,id]);if(!r)throw missing();await clientAccess(a,r.client_id);
     if(!await takeBudget(`agency-reminder:${id}`,1,1,86400000))throw new GoogleError('quota','One manual reminder per day',429);
