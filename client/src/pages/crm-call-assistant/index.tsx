@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { AppPage, AppTabsList, PageHeader, StatusPill } from "@/components/app-ui";
+import { AppPage, AppTabsList, Notice, PageHeader, StatusPill } from "@/components/app-ui";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,8 @@ export type VoiceStatus = {
   engine: { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
+  /** An outside receptionist answering these lines and pushing her calls here (null when none in 30 days). */
+  external?: { name: string; lastCallAt: string; callsLast30Days: number; lines: string[] } | null;
   usage: {
     month: string; minutes: number; calls: number; overageMinutes: number;
     /** What the overage costs so far: each call's minutes at its own tier's rate. */
@@ -155,7 +157,9 @@ export default function CrmCallAssistantPage() {
       <PageHeader
         title={<span data-testid="text-call-assistant-title">Call Assistant</span>}
         description="Answer calls, capture leads and keep your team informed."
-        meta={status.data?.profile?.status ? (
+        meta={status.data?.external && status.data.profile?.publishedVersion == null ? (
+          <StatusPill tone="success" data-testid="badge-call-assistant-status">live · {status.data.external.name}</StatusPill>
+        ) : status.data?.profile?.status ? (
           <StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
             {status.data.profile.status}
           </StatusPill>
@@ -181,7 +185,17 @@ export default function CrmCallAssistantPage() {
             navigate(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`, { replace: true });
           }} /></TabsContent>
           <TabsContent value="numbers"><NumbersPanel canManage={canManage} /></TabsContent>
-          <TabsContent value="studio"><StudioPanel canManage={canManage} /></TabsContent>
+          <TabsContent value="studio">
+            {status.data?.external && (
+              <div className="pt-4">
+                <Notice tone="info" title={`${status.data.external.name} answers your phones today`} testId="notice-studio-external">
+                  {status.data.external.name} runs from your own system, so nothing here changes how she answers. This studio sets up
+                  ConstructHUB's built-in assistant, for numbers you get on the Numbers tab.
+                </Notice>
+              </div>
+            )}
+            <StudioPanel canManage={canManage} />
+          </TabsContent>
           <TabsContent value="simulator"><SimulatorPanel /></TabsContent>
           <TabsContent value="calls"><CallsPanel canManage={canManage} /></TabsContent>
         </Tabs>

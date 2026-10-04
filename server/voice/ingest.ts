@@ -207,3 +207,27 @@ export function registerVoiceIngestRoutes(app: Express): void {
       }
     });
 }
+
+/**
+ * The receptionist that answers this org's phones from outside ConstructHUB (Alpine's Janice), seen through the calls
+ * it pushes here — or null when none has pushed a call in 30 days. Owner, 2026-10-04: "we are using janice already
+ * but it still shows draft".
+ */
+export async function externalReceptionist(orgId: string): Promise<{ name: string; lastCallAt: string; callsLast30Days: number; lines: string[] } | null> {
+  const r = await db.execute(sql`
+    SELECT max(started_at) AS last_call,
+           count(*) FILTER (WHERE started_at >= (now() AT TIME ZONE 'UTC') - interval '30 days')::int AS recent,
+           (array_agg(persona ORDER BY started_at DESC))[1] AS persona,
+           array_remove(array_agg(DISTINCT nullif(flags->'ingest'->>'market', '')), NULL) AS lines
+      FROM voice_calls WHERE org_id = ${orgId} AND engine = ${INGEST_ENGINE}`);
+  const row = (r as any).rows?.[0];
+  if (!row?.last_call || !Number(row.recent)) return null;
+  const p = String(row.persona || "janice");
+  return {
+    name: p.charAt(0).toUpperCase() + p.slice(1),
+    lastCallAt: new Date(row.last_call).toISOString(),
+    callsLast30Days: Number(row.recent),
+    lines: ((row.lines ?? []) as string[]).sort(),
+  };
+}
+

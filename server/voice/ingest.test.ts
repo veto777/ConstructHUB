@@ -8,7 +8,7 @@ import type { Server } from "http";
 import type { AddressInfo } from "net";
 import { randomUUID } from "crypto";
 import { pool } from "../db";
-import { registerVoiceIngestRoutes, normalizeTurn, toRow, ingestCallSchema } from "./ingest";
+import { registerVoiceIngestRoutes, normalizeTurn, toRow, ingestCallSchema, externalReceptionist } from "./ingest";
 import { ensureVoiceSchema } from "./schema";
 
 const SECRET = "ingest-test-secret-0123456789abcdef";
@@ -145,6 +145,15 @@ describe("recordings", () => {
     const wav = Buffer.alloc(64); wav.write("RIFF", 0, "ascii"); wav.write("WAVE", 8, "ascii");
     expect((await http("PUT", `/api/voice-ingest/calls/${sid("never")}/recording`, { raw: wav })).status).toBe(404);
     expect((await http("PUT", `/api/voice-ingest/calls/${sid("theirs")}/recording`, { raw: wav })).status).toBe(404);
+  });
+});
+
+describe("the outside receptionist on the status (owner 2026-10-04: \"we are using janice already but it still shows draft\")", () => {
+  it("names her, her lines and her recent calls once she has pushed calls; nothing for an org without any", async () => {
+    const ext = await externalReceptionist(ORG);
+    expect(ext).toMatchObject({ name: "Janice", lines: ["FL"] });
+    expect(ext!.callsLast30Days).toBeGreaterThan(0);
+    expect(await externalReceptionist(`nobody-${RUN}`)).toBeNull();
   });
 });
 

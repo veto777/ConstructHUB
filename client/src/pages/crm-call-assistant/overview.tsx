@@ -54,10 +54,15 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
     : !status.engine.reachable ? { tone: "danger", text: "Engine down", hint: "The voice engine is not answering; calls to your numbers can't be picked up right now." }
     : !status.engine.models ? { tone: "warning", text: "Engine starting", hint: "The engine is up but its speech models are still loading." }
     : { tone: "success", text: "Engine up", hint: "The voice engine is answering." };
-  const nextStep =
-    !status.profile || status.profile.publishedVersion == null ? { text: "Set up and publish your assistant", href: "/call-assistant?tab=studio", testid: "link-overview-next-studio" }
-    : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant?tab=numbers", testid: "link-overview-next-numbers" }
-    : { text: "Try a test conversation", href: "/call-assistant?tab=simulator", testid: "link-overview-next-simulator" };
+  // An outside receptionist (Alpine's Janice) answering these lines and pushing her calls here (server/voice/ingest.ts):
+  // the account is live through her even though ConstructHUB's own assistant was never published.
+  const ext = status.external ?? null;
+  const ownLive = status.profile?.publishedVersion != null;
+  const nextStep: { text: string; href: string; testid: string; label: string } =
+    ext && !ownLive ? { text: `${ext.name} answers your calls — ${ext.callsLast30Days.toLocaleString("en-US")} in the last 30 days`, href: "/call-assistant?tab=calls", testid: "link-overview-next-calls", label: "View calls" }
+    : !ownLive ? { text: "Set up and publish your assistant", href: "/call-assistant?tab=studio", testid: "link-overview-next-studio", label: "Continue" }
+    : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant?tab=numbers", testid: "link-overview-next-numbers", label: "Continue" }
+    : { text: "Try a test conversation", href: "/call-assistant?tab=simulator", testid: "link-overview-next-simulator", label: "Continue" };
 
   const paymentPaused = !status.enabled && status.paused === true;
   const tiers = callAssistantTiers();
@@ -75,15 +80,25 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             <div className="text-xs  text-muted-foreground">Next step</div>
             <div className="font-medium" data-testid="text-overview-next-step">{nextStep.text}</div>
           </div>
-          <Button asChild className="w-full sm:w-auto"><Link href={nextStep.href} data-testid={nextStep.testid}>Continue <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+          <Button asChild className="w-full sm:w-auto"><Link href={nextStep.href} data-testid={nextStep.testid}>{nextStep.label} <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
         </div>
       </Section>
       <StatGrid cols={4}>
-        <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
-          value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
-          hint={paymentPaused ? "Waiting for a payment" : status.profile?.publishedVersion != null ? `Version ${status.profile.publishedVersion} is live` : "Not published yet"} />
-        <Stat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
-          hint={`${status.allowance.numbers} included`} />
+        {ext && !ownLive ? (
+          <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=calls" tone="good"
+            value="Live" hint={`${ext.name}, your own receptionist · last call ${new Date(ext.lastCallAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`} />
+        ) : (
+          <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
+            value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
+            hint={paymentPaused ? "Waiting for a payment" : ownLive ? `Version ${status.profile!.publishedVersion} is live` : "Not published yet"} />
+        )}
+        {ext && numbers.length === 0 ? (
+          <Stat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant?tab=calls"
+            hint={`${ext.lines.length ? ext.lines.join(" & ") + " · " : ""}answered by ${ext.name}`} />
+        ) : (
+          <Stat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
+            hint={`${status.allowance.numbers} included`} />
+        )}
         <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
           hint={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
         <Stat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"

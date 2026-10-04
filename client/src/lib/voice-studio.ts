@@ -258,7 +258,7 @@ export function studioIssues(p: VoiceProfile): StudioIssue[] {
   const out: StudioIssue[] = [];
   if (!p.company.name.trim()) out.push({ section: "company", message: "Company name is required." });
   if (p.company.officePhone && !E164.test(p.company.officePhone)) out.push({ section: "company", message: "Office phone must look like +13605551234." });
-  if (p.company.services.length === 0) out.push({ section: "services", message: "Add at least one service the assistant can take calls about." });
+  if (p.company.services.length === 0) out.push({ section: "services", message: "Add at least one service: click \u201cAdd service\u201d and type what you sell, e.g. \u201cSiding replacement\u201d." });
   p.company.services.forEach((s, i) => { if (!s.name.trim()) out.push({ section: "services", message: `Service #${i + 1} has no name.` }); });
   p.company.declines.forEach((d, i) => { if (!d.what.trim()) out.push({ section: "services", message: `Decline #${i + 1} says nothing.` }); });
   if (p.serviceArea.counties.length === 0 && p.serviceArea.spokenAreas.length === 0)

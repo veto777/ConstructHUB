@@ -37,6 +37,7 @@ import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, nu
 import { signalwireConfig } from "./numbers-signalwire";
 import { releaseIsFinal } from "./number-release";
 import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
+import { externalReceptionist } from "./ingest";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -139,11 +140,12 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
     if (!enabled && !paused) return res.json({ ...base, numbers: [], profile: null, usage: null });
     const orgId = v.ctx.org.id;
     const month = voiceMonthKey();
-    const [rows, profile, usageRow] = await Promise.all([
+    const [rows, profile, usageRow, external] = await Promise.all([
       listOrgNumbers(orgId),
       db.select({ status: voiceProfiles.status, publishedVersion: voiceProfiles.publishedVersion, setupCompletedAt: voiceProfiles.setupCompletedAt, updatedAt: voiceProfiles.updatedAt })
         .from(voiceProfiles).where(eq(voiceProfiles.orgId, orgId)).limit(1).then((r) => r[0] ?? null),
       getVoiceUsageRow(orgId, month),
+      externalReceptionist(orgId).catch(() => null),
     ]);
     const held = rows.filter(countsAgainstAllowance).length;
     // For the "paused" banner: can a fixed card still keep the number ("releasing"),
@@ -158,6 +160,8 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       numberAllowance: numberAllowance(v, held),
       profile: profile ? { status: profile.status, publishedVersion: profile.publishedVersion, setupCompletedAt: profile.setupCompletedAt?.toISOString() ?? null, updatedAt: profile.updatedAt?.toISOString() ?? null } : null,
       usage: summarizeVoiceUsage(usageRow, month, v.allowance.minutes, v.allowance.overageCentsPerMinute),
+      // An outside receptionist (e.g. Alpine's Janice) answering this org's lines and pushing her calls here.
+      external,
     });
   });
 
