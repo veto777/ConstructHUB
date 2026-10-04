@@ -4,7 +4,7 @@ Every element of every page in audit lane 6, what it does, and how it was verifi
 Lane dir (logs, fragments, BUGS.md, REPORT.md): /tmp/claude-1000/-home-veto-ConstructHUB/b63db1cc-791d-4d76-a373-8b7b67c0c5d0/scratchpad/audit/lane6
 Audited 2026-10-04 against the dev DB (constructhub_dev_a6) and a signed-out dev server.
 
-# Lane 6 / Map-07 — Public chrome audit (site-nav, public-page-chrome, cart, page coverage, signed-in/out frames)
+## Lane 6 / Map-07 — Public chrome audit (site-nav, public-page-chrome, cart, page coverage, signed-in/out frames)
 
 Repo: /home/veto/ConstructHUB-audit6 (branch audit/6). Read-only audit; no repo files modified.
 Date: 2026-10-04. Dev server at http://127.0.0.1:8306 serves the Vite dev shell (no prerendered
@@ -182,7 +182,7 @@ GET /api/auth/me → server/auth.ts:668. `AppContent` gates the whole tree on th
 - **Unverifiable in this environment:** rendered HTML/DOM spot-checks (dev server serves the Vite
   shell only; prerender is a production step), and an end-to-end Stripe checkout round-trip (Stripe is
   OFF on dev, by design).
-# Lane 6 map — pages 05: landing.tsx + call-assistant-landing.tsx
+## Lane 6 map — pages 05: landing.tsx + call-assistant-landing.tsx
 
 Audit date 2026-10-04, branch audit/6. Dev server http://127.0.0.1:8306 (signed-out Vite shell; body is the SPA mount, so numbers were verified by SQL against the same DB the API reads, plus `curl /api/databases/counts`).
 
@@ -592,7 +592,7 @@ Observations (not counted as bugs):
 - The "Add to cart" branch of the DFY service cards (`pricing.tsx:756-772`) is unreachable by design — every DFY catalog price is ≥ $5,500, above the $1,000 sales threshold — so a `dfy_service` cart line can never be created from /pricing; the server's DFY branch of `create-cart-checkout` (stripe.ts:537) is defensive only.
 - Signed-in-only elements (current-plan banner, change-plan dialog, portal, Manage add-ons) and the actual Stripe session creation could not be exercised live (Stripe is OFF on dev → 503 "Online payments aren't set up on this server yet", server/billing/client.ts:11-17); they are verified by code trace and the server billing test suite (server/stripe-billing.test.ts, server/stripe-not-configured.test.ts).
 - No `/api/plans` or `/api/catalog` JSON API exists; both URLs return the SPA shell. The only plan-price API is `GET /api/stripe/plans` (curl-verified identical to shared/plans.ts).
-# Lane 6 — map-04: /done-for-you catalogue + every /done-for-you/<slug> service page
+## Lane 6 — map-04: /done-for-you catalogue + every /done-for-you/<slug> service page
 
 Branch: audit/6. Read-only audit; no repo files modified, no commits.
 
@@ -697,7 +697,7 @@ Renderer `client/src/components/feature-landing/dfy-landing.tsx` (all 5 template
 - vitest: `server/marketing-seo.test.ts` + `server/feature-pages.test.ts` → 46/46 passed (includes "covers every done-for-you catalog item exactly once", "no typed prices ≥ $1,000", catalogue-path checks). `server/stripe-billing.test.ts -t "cart refuses"` → 8/8 passed (one refusal per DFY_CATALOG id).
 
 **Out of lane / handed off:** the /reinstatement page itself (linked from the GBP Reinstatement catalogue card), /features/* related targets, /pricing#services (SALES_HREF — referenced only in `featurePriceSummary`'s unused-on-DFY `link` field), and the admin index /admin/feature-pages.
-# Lane 6 element map — /databases, /property, /search
+## Lane 6 element map — /databases, /property, /search
 
 Audit date 2026-10-04, branch audit/6, dev server http://127.0.0.1:8306 (signed out; `GET /api/auth/me` → `null`). No repo files modified.
 
@@ -929,7 +929,7 @@ No hard BUG (wrong number, guessed link, mismatched endpoint, fake fallback) fou
 | **Total** | **103** | **103** | **0** | **0** | **0** |
 
 (F1/F6 are page-adjacent data/code notes, not element defects; F2–F5 are policy-conformant behaviors listed for the owner.)
-# Lane 6 — small pages map (guides, master-class, reinstatement, auth, 404, privacy, terms)
+## Lane 6 — small pages map (guides, master-class, reinstatement, auth, 404, privacy, terms)
 
 Audit date 2026-10-04, branch audit/6, dev server http://127.0.0.1:8306 (Vite dev, SPA shell, no prerender), DB `constructhub_dev_a6` read-only. Server confirmed signed-out: `GET /api/auth/me` → `null`; Google OAuth IS configured (GET /api/auth/google → 302 to accounts.google.com with client_id).
 
@@ -1349,7 +1349,7 @@ If the owner ever wants online course checkout again, either drop module/bundle 
 - Google OAuth callback end-to-end (requires a Google account; the authorize redirect and callback code path were verified by code read + the live 302).
 - Email deliverability (dev forces the sink, email.ts:203-229).
 - GBP delete-on-disconnect completeness (see UNCLEAR #2).
-# Lane 6 — /features catalogue + 30 feature pages (map-03-features)
+## Lane 6 — /features catalogue + 30 feature pages (map-03-features)
 
 Scope: `client/src/pages/features.tsx` (`/features`, `/features/:slug`, `LegacyLanding`), all 30 content
 files in `shared/feature-pages/*.ts` + `types.ts` + `pricing.ts`, and the shared template
