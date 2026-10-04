@@ -1394,6 +1394,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
       company: {
         name: org.name, phone: org.phone, email: org.email,
         website: org.website, logoUrl: org.logoUrl,
+        // The license badge under the contact line reads these (public-portal).
+        licenseNumber: org.licenseNumber, licenseState: org.licenseState,
       },
       estimates: estimates.map((e) => ({
         id: e.id, number: e.number, title: e.title, status: e.status,

@@ -40,6 +40,27 @@ test.describe("/portal/:token (client portal)", () => {
     guards.assertClean("public portal invalid token");
   });
 
+  test("curated: the license badge renders when the company has one on file", async ({ page }) => {
+    const guards = watchPage(page);
+    const { customerId } = await makeEstimate(page);
+    const rows = await q<{ portal_token: string }>(
+      `select portal_token from crm_customers where id = $1`, [customerId]);
+    const token = rows[0].portal_token;
+
+    // Park a license on the org, render, then put the column back.
+    const [before] = await q<{ license_number: string | null; license_state: string | null }>(
+      `select license_number, license_state from crm_orgs where id = $1`, [ORGS.aspire]);
+    await q(`update crm_orgs set license_number = 'E2E-LIC-777', license_state = 'WA' where id = $1`, [ORGS.aspire]);
+    try {
+      await gotoCrm(page, `/portal/${token}`);
+      await expect(page.getByText(/License E2E-LIC-777 \(WA\)/)).toBeVisible();
+    } finally {
+      await q(`update crm_orgs set license_number = $1, license_state = $2 where id = $3`,
+        [before.license_number, before.license_state, ORGS.aspire]);
+    }
+    guards.assertClean("public portal license badge");
+  });
+
   test("sweep: every button and link", async ({ page }) => {
     const { customerId, estimateId } = await makeEstimate(page);
     await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
