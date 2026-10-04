@@ -88,15 +88,15 @@ export function registerDomainRoutes(
     const p = pageInput.parse(req.query),
       values = [id, `%${p.q}%`, p.registrar, p.locationId || null];
     const filter =
-      "user_id=$1 AND domain ILIKE $2 AND ($3='' OR registrar=$3) AND ($4::int IS NULL OR location_id=$4)";
+      "m.user_id=$1 AND m.domain ILIKE $2 AND ($3='' OR m.registrar=$3) AND ($4::int IS NULL OR m.location_id=$4)";
     const { rows } = await pool.query(
-      `SELECT id,domain,registrar,location_id,state - 'records' AS state,checked_at FROM managed_domains WHERE ${filter} ORDER BY domain,id LIMIT $5 OFFSET $6`,
+      `SELECT m.id,m.domain,m.registrar,m.location_id,bl.business_name AS location_name,m.state - 'records' AS state,m.checked_at FROM managed_domains m LEFT JOIN business_locations bl ON bl.id=m.location_id AND bl.user_id=m.user_id WHERE ${filter} ORDER BY m.domain,m.id LIMIT $5 OFFSET $6`,
       [...values, p.limit, (p.page - 1) * p.limit],
     );
     const {
       rows: [n],
     } = await pool.query(
-      `SELECT count(*)::int total FROM managed_domains WHERE ${filter}`,
+      `SELECT count(*)::int total FROM managed_domains m WHERE ${filter}`,
       values,
     );
     res.json({ items: rows, total: n.total, page: p.page });
