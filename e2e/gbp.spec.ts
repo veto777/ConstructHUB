@@ -52,6 +52,15 @@ test('photo counts show the stored number once a sync has succeeded (audit 2026-
   await expect(page.getByTestId('text-business-photo-count')).toHaveText('7');
   await expect(page.getByTestId('text-customer-photo-count')).toHaveText('2');
 });
+test('photos empty state includes the connect step before Sync now (audit 2026-10-04)',async({page})=>{
+  const loc={id:987,businessName:'Fixture business',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture',businessPhotoCount:0,customerPhotoCount:0};
+  await page.route((u:URL)=>u.pathname==='/api/locations',r=>r.fulfill({json:[loc]}));
+  await page.route('**/api/locations/987',r=>r.fulfill({json:loc}));
+  await page.route('**/api/gbp/locations/987/media*',r=>r.fulfill({json:{total:0,syncedAt:null,items:[]}}));
+  await page.route('**/api/gbp/status*',r=>r.fulfill({json:{connected:false,reconnectRequired:false,email:null,scopes:[],expiresAt:null,accounts:[],locations:[{id:987,name:'Fixture business',account_email:null,kind:'profile',last_success:null,last_attempt:null,last_error:null}]}}));
+  await page.goto('/locations?location=987&tab=photos');
+  await expect(page.getByText('connect your Google account if prompted',{exact:false})).toBeVisible();
+});
 test('insights empty state does not tell a linked owner to link again (audit 2026-10-04)',async({page})=>{
   const loc={id:987,businessName:'Fixture business',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture'};
   await page.route((u:URL)=>u.pathname==='/api/locations',r=>r.fulfill({json:[loc]}));

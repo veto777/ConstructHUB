@@ -728,7 +728,7 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
         <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : !data?.items.length ? (
         <Card><CardContent className="p-4 text-sm text-muted-foreground">
-          No {source} photos synced yet. Use <strong>Sync now</strong> on the Locations page — photos sync along with reviews and performance.
+          No {source} photos synced yet. Sync from the Locations page — connect your Google account if prompted, then use <strong>Sync now</strong>. Photos sync along with reviews and performance.
         </CardContent></Card>
       ) : (
         <>
