@@ -137,7 +137,9 @@ function ReviewStep({ draft, issues, noticeForced, onJump }: { draft: VoiceProfi
     { section: "policies", label: "Policies", value: `prices: ${draft.policies.pricing} · ${draft.policies.repairs.replace(/_/g, " ")} · emergencies ${draft.policies.emergencies.handle ? "on" : "off"}` },
     { section: "persona", label: "Persona", value: `${draft.persona.assistantName || persona.name} (${persona.name}, ${persona.gender}) · recording notice ${noticeForced ? "on (required in your state)" : draft.persona.recordingNotice ? "on" : "off"}` },
     { section: "intake", label: "Questions", value: `${draft.intake.questions.length}: ${draft.intake.questions.map((q) => q.key).join(" → ")}` },
-    { section: "escalations", label: "Escalations", value: draft.escalations.rules.length ? draft.escalations.rules.map((r) => `${r.recipientName || r.id} (${r.channel})`).join(", ") : "owners only (CRM channels)" },
+    // No rules: with the owner fallback on everything goes to the owners; with it off only
+    // emergencies and "I want a person" do (server/voice/escalations.ts always pages owners for those).
+    { section: "escalations", label: "Escalations", value: draft.escalations.rules.length ? draft.escalations.rules.map((r) => `${r.recipientName || r.id} (${r.channel})`).join(", ") : draft.escalations.fallbackToOwner ? "owners only (CRM channels)" : "owners only for emergencies and 'I want a person'" },
     { section: "leadDelivery", label: "Lead delivery", value: [draft.leadDelivery.crm.enabled ? "CRM" : null, draft.leadDelivery.email.enabled ? "email" : null, draft.leadDelivery.sms.enabled ? "text" : null].filter(Boolean).join(" + ") || "nowhere (!)" },
   ];
   return (

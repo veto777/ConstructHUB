@@ -404,6 +404,21 @@ test.describe("Call Assistant — Agent Studio", () => {
     await expect(page.getByTestId("button-studio-wizard")).toBeEnabled();
   });
 
+  test("wizard review: with no rules and the owner fallback off, it says who really hears about escalations", async ({ page }) => {
+    await mockVoice(page);
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-wizard")).toBeVisible();
+    // Reach the Delivery step: one service is enough to pass the Services validation.
+    await page.getByTestId("wizard-step-services").click();
+    await page.getByTestId("button-add-service").click();
+    await page.getByTestId("input-service-name-0").fill("Siding replacement");
+    await page.getByTestId("wizard-step-delivery").click();
+    await page.getByTestId("switch-fallback-owner").click(); // off
+    await page.getByTestId("wizard-step-review").click();
+    // urgent/human always page the owners (server/voice/escalations.ts); every other kind is unassigned.
+    await expect(page.getByTestId("review-row-escalations-9")).toContainText("owners only for emergencies and 'I want a person'");
+  });
+
   test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
     await mockVoice(page, { published: true });
     await gotoCrm(page, "/call-assistant?tab=studio");
