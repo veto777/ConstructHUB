@@ -142,7 +142,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Every estimate your company has ever sent, in one searchable list. Filter by status, search by client or title, and sort by date or dollar amount.",
       "The status tells the story: Draft means you're still working on it, Sent means the client has the link, Viewed means they opened it, Approved means you won, Declined means you didn't, Expired means they let it lapse.",
-      "Click any row to open the client it belongs to and see the full picture.",
+      "Click a row to open the estimate itself — line items, photos and the client's answer live there. (On the Invoices list, a row opens the client it belongs to.)",
       "Example: at the end of the month you filter to \"Approved\" and sort by largest — instant bragging rights and a quick check on which salesperson is closing.",
     ],
   },
