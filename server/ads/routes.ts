@@ -116,7 +116,7 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
         await c.query('UPDATE ads_accounts SET domain_id=$3 WHERE user_id=$1 AND customer_id=$2',[user,m.customerId,m.domainId]);
       } await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}
     });
-    await logActivity(req,user,'ads.domain_mapped',{count:p.mappings.length});res.json({mapped:p.mappings.length});
+    await logActivity(req,user,'ads.domain_mapped',{count:p.mappings.length});res.json({mapped:p.mappings.length,message:`Saved ${p.mappings.length} domain mapping(s).`});
   });
   route('get','/accounts/:cid/campaigns',async(req,res,user)=>{
     const cid=customerId.parse(req.params.cid),p=pageInput.parse(req.query);await account(user,cid);
