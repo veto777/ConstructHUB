@@ -61,6 +61,29 @@ test.describe("/portal/:token (client portal)", () => {
     guards.assertClean("public portal license badge");
   });
 
+  test("curated: expired and cancelled estimates are not advertised as 'to review'", async ({ page }) => {
+    const guards = watchPage(page);
+    const { customerId, estimateId } = await makeEstimate(page);
+    const send = await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });
+    expect(send.ok()).toBeTruthy();
+    // Let the estimate lapse — the /e page would now show only an expiry notice.
+    await q(`update crm_estimates set expires_at = now() - interval '1 day' where id = $1`, [estimateId]);
+    try {
+      const rows = await q<{ portal_token: string }>(
+        `select portal_token from crm_customers where id = $1`, [customerId]);
+      await gotoCrm(page, `/portal/${rows[0].portal_token}`);
+      // The action banner must not count an estimate the client can't act on…
+      await expect(page.getByText(/estimate to review/)).toHaveCount(0);
+      await expect(page.locator('[data-testid^="portal-estimate-"]')).toHaveCount(0);
+      // …but the estimate itself stays listed in the history.
+      await expect(page.getByText(/Your estimates/)).toBeVisible();
+      await expect(page.getByText("E2E throwaway estimate").first()).toBeVisible();
+    } finally {
+      await q(`update crm_estimates set expires_at = now() + interval '30 days' where id = $1`, [estimateId]);
+    }
+    guards.assertClean("public portal expired banner");
+  });
+
   test("sweep: every button and link", async ({ page }) => {
     const { customerId, estimateId } = await makeEstimate(page);
     await page.request.post(`/api/crm/estimates/${estimateId}/send`, { data: {} });

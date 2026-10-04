@@ -41,7 +41,13 @@ export default function PublicPortalPage() {
   }
 
   const { customer, company, estimates, invoices = [], projects } = data;
-  const needsAction = estimates.filter((e: any) => !e.approvedAt && !e.declinedAt);
+  // "To review" means the client can actually act: not answered, not
+  // cancelled, not expired (same rule as the estimate page itself — an
+  // expired estimate's Review click is a dead-end notice).
+  const needsAction = estimates.filter((e: any) =>
+    !e.approvedAt && !e.declinedAt &&
+    e.status !== "cancelled" && e.status !== "expired" &&
+    !(e.expiresAt && new Date(e.expiresAt).getTime() < Date.now()));
   const openInvoices = invoices.filter((i: any) => !i.paidAt && i.dueCents > 0);
   // Every sent invoice, paid ones included — paying one must not make it vanish.
   const invoiceStatus = (i: any) => (i.paidAt ? "paid" : i.status);
