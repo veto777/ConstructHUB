@@ -1254,3 +1254,511 @@ Intro: lists background jobs (previews, syncs, monitoring) newest first; ticking
 2. **domains.tsx · "Client location" table cell shows a raw database id.** What the owner sees: for a mapped domain, a bare number like `104296` under the "Client location" column. What is actually true: `managed_domains.location_id` is a foreign key into `business_locations`; the page renders `d.location_id || "Unmapped"` (client/src/pages/domains.tsx:495) instead of the client's `business_name`, so the column label promises a client/location and delivers an internal id the owner cannot interpret. Root cause: client/src/pages/domains.tsx:491-496; the inventory API (server/domains/routes.ts:93) returns only `location_id`, no joined name. Suggested smallest fix: join `business_locations.business_name` in the GET /api/domains query (or resolve ids client-side from the existing `/api/domains/locations` data) and display the name, falling back to "Unmapped".
 
 Note (not counted as a bug): the Namecheap and Network Solutions "Official documentation" links return HTTP 403 to curl (bot/WAF protection, including with a browser user-agent), so reachability from a real browser is UNCLEAR; the other six guide links resolve 200. Also observed: with `DOMAINS_WORKER_ENABLED` unset the orange "background processing is off" banner correctly shows, and every number on the page ("N domains", row values, connection/location/job lists) matched independent SQL counts for user 1 (3/0/2/0) with no other orgs' rows present in any domains table.
+
+---
+
+
+Audit date 2026-10-04. Server: http://127.0.0.1:8303 (worktree /home/veto/ConstructHUB-audit3, branch audit/3, HEAD 7e2512b). Dev user id=1 ("Veto", platform admin, plan Agency). DB: constructhub_dev_a6 (SELECT only).
+
+Key architecture note that affects several "Backend" cells: `registerAgencyAccess` (server/agency/middleware.ts:22) is an `app.use` registered BEFORE the sitescan routes. For every signed-in user it intercepts `GET /api/sitescan` and answers it itself (middleware.ts:48-62), so the handler in server/sitescan/routes.ts:150 is shadowed for signed-in users (it still matters for the anonymous 401 path and for tests). The middleware version joins `business_locations`/`agency_clients`, adds `count(*) OVER()::int total` to every row (that is the otherwise-mysterious `total:6` inside each job row of the API response — harmless, the page ignores it), and computes top-level `total` from `jobs[0].total`. All counts below were recomputed with independent SQL and matched.
+
+Data ownership in the dev DB (for cross-account checks):
+- `sitescan_jobs`: 11 rows — 6 belong to user 1, 5 have `user_id NULL` (free public scans from `sitescan_leads`, visible to nobody's history). No other user has scan jobs.
+- `business_locations`: users 1 (2 locations: id 506025 GBP-linked "AI-TEST Ridgeline Roofing", id 104296 not linked) and 2328 (1 location). The site-scan location picker only shows GBP-linked ones → 1.
+- `sitescan_schedules`, `sitescan_branding`, `edge_assets`, `edge_connections`, `edge_jobs`, `edge_actions`, `gsc_analytics`, `gsc_inspections`: all empty for every user (so most of site-connections renders its empty states).
+- `sitescan_leads`: 5 rows (free-scan leads, platform-admin only).
+
+---
+
+## client/src/pages/site-scan.tsx — route `/site-scan` (signed-in; the same file also exports the signed-out `/free-site-scan` page, the public `/site-scan/report/:token` shared-report page, and the `SiteScanLeads` table used on `/crm/admin`)
+
+**What it is:** the Site Scan workbench — start website audits (solo or bulk across GBP-linked client locations), schedule monthly rescans, browse scan history, read a scored report, generate an AI fix plan, export/share/email it, and white-label the PDF. Visible to any signed-in user (route is inside the authed dashboard Switch in client/src/App.tsx:189); the API has no module gate on the list — spend is enforced by quotas/budgets server-side (5 scans/day, 20 PageSpeed calls/day, 3 AI drafts/day, monthly plan `siteScans` quota). Main data source: `sitescan_jobs` (report JSONB), `business_locations` (picker), `sitescan_schedules` — all through the agency middleware for the list, and server/sitescan/routes.ts for the job detail.
+
+### Page chrome (AppPage testid `page-site-scan`)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Site Scan" page header | banner | Titles the page: "Find website issues, compare your Google Business Profile, and draft your next fixes." | site-scan.tsx:527-530 | client only | Read | OK |
+| AgencyWorkspace (compact) | section | Agency bulk workspace strip. For an entitled workspace (dev user is) shows workspace name/role + a "Bulk location actions" expander that opens the shared agency bulk panel (location search, client/status filters, select page/all, bulk actions incl. "Start Site Scans", CSV export). | site-scan.tsx:531; components/agency-workspace.tsx:32-123 | GET /api/agency/me (entitled true), GET /api/agency/locations, GET /api/agency/dashboard, GET /api/agency/clients; POST /api/agency/bulk | curl /api/agency/me → `{owner:1, actor:1, entitled:true, role:'owner'}`; /api/agency/dashboard → `{total:2, reconnect:1, unlinked:1}` matches SQL count(business_locations user_id=1)=2 | OK |
+| Error Notice | banner | Shows the last action's error (e.g. limit reached, invalid input). | site-scan.tsx:794 | client only | Read | OK |
+| Info Notice | banner | Shows success notices ("Scan deleted."). | site-scan.tsx:795 | client only | Read | OK |
+
+### Section "Start a scan" (testid none; hints: "Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day")
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search client locations" input | input | Filters the GBP-location picker (business name or website). | site-scan.tsx:538-549 | sent as `locationQ` on GET /api/sitescan → middleware.ts:56-58 filters business_locations ILIKE | Read + param traced | OK |
+| "Previous locations" / range "1–25 of N" / "Next locations" | button / stat / button | Pages the location picker by 25. | site-scan.tsx:550-576 | `locationTotal` from the middleware locations query (window count over business_locations user_id=$1 AND gbp_location_name IS NOT NULL) | API locationTotal=1; SQL: SELECT count(*) FROM business_locations WHERE user_id=1 AND gbp_location_name IS NOT NULL → 1 ✓ | OK |
+| "Bulk scan client sites (N selected)" details | disclosure | Opens the bulk-scan panel. | site-scan.tsx:578-581 | client only | Read | OK |
+| "Select this page" / "Clear selection" | button | Checks/unchecks all listed locations that have a website. | site-scan.tsx:583-607 | client only | Read | OK |
+| Per-location checkbox (`{name} — {website}`) | input | Picks locations for a bulk scan. Locations without a website can't be queued (server re-checks). | site-scan.tsx:608-623 | rows come from the same locations query above | API items ✓ | OK |
+| "Queue selected sites" | button | Queues one scan per selected location (max 1,000/day across the agency). Consumes one monthly plan Site Scan per location. After queuing it selects the first new job. | site-scan.tsx:624-640 | POST /api/sitescan/bulk {locationIds, pageCap, psiPages} → server/sitescan/routes.ts:194 → enqueueLocations (agency.ts:66-97): requires synced GBP profile per location, budget `sitescan:bulk:<user>` 1000/day, INSERT sitescan_jobs | Verified by code (route + body match); limits cross-checked: hint "Up to 1,000 sites per day" = takeBudget 1000 (agency.ts:88) ✓ | OK |
+| "Linked GBP location" select | select | Optionally attaches a synced Business Profile so the report can compare NAP/services; picking one fills the website URL. "No GBP comparison" = plain scan. | site-scan.tsx:649-669 | options from locations query | API ✓ | OK |
+| "Website URL" input | input | The site to scan (public http/https only, validated server-side). | site-scan.tsx:670-677 | POST /api/sitescan body.url → routes.ts:366-401 siteUrl() validation | Verified by code | OK |
+| "Page cap" input | input | Max pages to crawl, 1–500 (client and server both enforce). | site-scan.tsx:678-688 | zod min 1 max 500 (routes.ts:29) | Verified by code | OK |
+| "PageSpeed pages (mobile + desktop)" input | input | How many crawled pages get Google PageSpeed measurements, 0–5 (each page × 2 strategies). | site-scan.tsx:689-701 | zod 0–5 (routes.ts:30); calls budgeted 20/user/day (worker.ts:157-163) — matches hint ✓ | Verified by code | OK |
+| Limits validation error | status | "Page cap must be a whole number from 1 to 500." / "PageSpeed pages must be a whole number from 0 to 5." | site-scan.tsx:488-492, 703-705 | client only | Read | OK |
+| "Start scan" | button | Queues the scan and opens its report. 5/day cap + 1 monthly plan scan. | site-scan.tsx:707-724 | POST /api/sitescan {url, locationId?, pageCap, psiPages} → routes.ts:366: reserveQuotaFor siteScans, takeBudget `sitescan:scan:<user>` 5/day, enqueue() INSERT sitescan_jobs | Verified by code; hint "5 scans/day" ✓ (routes.ts:386) | OK |
+| "Enable monthly rescan" / "Disable monthly rescan" | button | Toggles a monthly automatic rescan for the URL shown (uses current cap/PageSpeed settings). | site-scan.tsx:725-746 | POST /api/sitescan/schedule {url, enabled, locationId?, pageCap, psiPages} → routes.ts:515-566: INSERT/DELETE sitescan_schedules (PK user_id+url), max 10 enforced with 409 | Verified by code; "of 10" limit ✓ (routes.ts:543) | OK |
+| "Monthly rescans (N of 10)" + rows | stat / list | Lists scheduled rescans (URL · page cap · next run date) each with a "Disable" button. Empty state explains how to add one. | site-scan.tsx:748-791 | GET /api/sitescan `schedules` → middleware.ts:60 (owner rows incl. URL-only schedules) | API schedules=[] ; SQL: SELECT count(*) FROM sitescan_schedules WHERE user_id=1 → 0 ✓ | OK |
+| Schedule row "Disable" (`Disable schedule for {url}`) | button | Removes that one schedule. | site-scan.tsx:768-786 | POST /api/sitescan/schedule {url, enabled:false} → routes.ts:560-563 DELETE | Verified by code | OK |
+
+### Section "History & score trend" (testid `section-scan-history`)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search history" input | input | Filters scans by URL or client name (resets to page 1). | site-scan.tsx:809-818 | `q` on GET /api/sitescan → middleware.ts:56 `concat_ws(' ',j.url,l.business_name) ILIKE $8` | Read + param traced | OK |
+| "Status" select | select | Filters by queued/running/completed/failed. | site-scan.tsx:819-833 | `status` → middleware.ts:56 `($10='' OR j.status=$10)` | API ?status=failed → total 2; SQL: SELECT count(*) FROM sitescan_jobs WHERE user_id=1 AND status='failed' → 2 ✓ | OK |
+| "History for selected client" / "All clients" | button | Narrows history to the GBP location chosen in "Linked GBP location" (or back to all). | site-scan.tsx:835-856 | `locationId` → middleware.ts:56 `($11::int IS NULL OR l.id=$11)` | API ?locationId=506025 → total 0 (all dev jobs are profile-less) ✓ consistent | OK |
+| Context hint ("Showing scans for all clients…") | text | Explains which client's history is shown. | site-scan.tsx:858-870 | client only | Read | OK |
+| "Previous scans" / "N scans" / "Next scans" | button / stat / button | Pages history 25 at a time; N = total matching scans. | site-scan.tsx:871-893 | `total` = window count over filtered sitescan_jobs | API total=6; SQL: SELECT count(*) FROM sitescan_jobs WHERE user_id=1 → 6 ✓ | OK |
+| Scan chip (`{date} · {url} · {score|status} (+N since prior scan)`) | button | Opens that scan's report; the delta is the overall-score change vs the previous scan of the same URL on this page. | site-scan.tsx:894-923 | per-row data from the list query (scores = report->'scores'); delta computed client-side | API rows match SQL rows (6/6, same ids/scores) | OK |
+| "No scans yet." | empty state | Shown when history is empty. | site-scan.tsx:924-926 | — | Read | OK |
+
+### Selected scan section (report header + actions)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Job URL heading + "not found" Notice | text / banner | Shows the scan's URL; a 400/404 shows "This report was not found…". | site-scan.tsx:930-942 | GET /api/sitescan/jobs/:id → routes.ts:402 getJob: `sitescan_jobs WHERE id=$1 AND user_id=$2` (404 for foreign/unknown) | curl random uuid → 404 ✓ | OK |
+| "Delete scan" | button | Deletes the job after a confirm (report, fix progress, share link; still counts toward today's limit). | site-scan.tsx:943-970 | DELETE /api/sitescan/jobs/:id → routes.ts:494-505 DELETE sitescan_jobs | Verified by code (GET-only audit; not invoked) | OK |
+| "status · N of M pages checked" | status | Live progress line (N from the crawl state, M from the page cap). | site-scan.tsx:972-974 | pages = jsonb_array_length(state->'pages'); pageCap column | API pages=5 pageCap=5; SQL jsonb_array_length → 5 ✓ | OK |
+| Job error alert | status | Shows the failure sentence for failed scans. | site-scan.tsx:975-979 | sitescan_jobs.error | API error text matches SQL for the failed jobs ✓ | OK |
+| "Generate AI fix plan" | button | Calls the AI to draft a page-by-page fix plan (3 drafts/day, 20 provider calls/day). Plan appears under "AI fix plan — draft". | site-scan.tsx:983-992 | POST /api/sitescan/jobs/:id/plan → routes.ts:417-480: budgets `sitescan:ai:<user>` 3/day + `sitescan:ai-calls:<user>` 20/day + global 100/day, OpenAI provider, saves sitescan_jobs.ai_draft | Verified by code; limits match hint ✓ | OK |
+| "Export PDF" | link | Downloads the branded PDF report. | site-scan.tsx:993-995 | GET /api/sitescan/jobs/:id/pdf → routes.ts:567-642 pdfkit stream; branding from sitescan_branding | curl → 200 application/pdf, 15.6 KB ✓ | OK |
+| "Create share link" / "Replace share link" | button | Creates a new 30-day read-only link (replaces any previous one after confirm). Shows the link once. | site-scan.tsx:996-1018 | POST /api/sitescan/jobs/:id/share → routes.ts:481-493: sets share_hash=sha256(token), share_expires=now()+30 days; returns `/site-scan/report/<token>` | Verified by code; "30 days" ✓ (routes.ts:488) | OK |
+| "Revoke share link" | button | Clears the stored hash; existing links die. | site-scan.tsx:1019-1034 | DELETE /api/sitescan/jobs/:id/share → routes.ts:506-514 NULLs share_hash/share_expires | Verified by code | OK |
+| Share URL + "Copy link" | link / button | Displays the new link (only once) and copies it to the clipboard. | site-scan.tsx:1036-1050; Copy :150-177 | client only (clipboard) | Read | OK |
+| "A share link is active…" hint | text | Shown on reload when a link exists but can't be re-displayed. | site-scan.tsx:1052-1058 | shareEnabled from job row | API shareEnabled=false ✓ | OK |
+
+### Section "Follow up" (testid `section-scan-followup`)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Rescan / retry PageSpeed" | button | Re-runs the scan (counts toward the 5/day + monthly quota); selects the new job and resets report filters. | site-scan.tsx:1063-1078 | POST /api/sitescan/jobs/:id/retry → routes.ts:310-331: reserveQuotaFor + `sitescan:scan:<user>` 5/day, enqueue() | Verified by code | OK |
+| "Send to my web person — email" input + "Send prioritized checklist" | input / button | Emails the prioritized fix checklist to any address (10/day). | site-scan.tsx:1080-1112 | POST /api/sitescan/jobs/:id/email {email} → routes.ts:332-365: budget 10/day, builds checklist text, sendWithFallback; dev EMAIL_FORCE_SINK returns sink flag | Verified by code; limit matches (routes.ts:341) | OK |
+| "Checklist saved to local email sink."/"Checklist email sent." | status | Result line after sending. | site-scan.tsx:1113-1117 | sink flag from response | Read | OK |
+| "White-label PDF branding" details | disclosure | Opens the branding form (owner only; delegated members see "managed by the workspace owner"). | site-scan.tsx:1118-1126 | GET /api/sitescan/branding → routes.ts:218-226 sitescan_branding | API {name:"",logo:null}; SQL count(user_id=1)=0 ✓ | OK |
+| "Agency name" input | input | Name printed on PDF exports. | site-scan.tsx:1128-1139 | POST /api/sitescan/branding {name, logo?} → routes.ts:227-273 upsert sitescan_branding; logo resized via sharp to ≤600×300 PNG | Verified by code | OK |
+| "Agency logo (PNG/JPEG, up to 200 KB)" file input + preview + "Remove logo" | input | Uploads a logo; client enforces 200 KB, server normalizes to PNG data URL. | site-scan.tsx:1140-1182 | same POST; DELETE clears via Remove branding | Verified by code | OK |
+| "Save PDF branding" | button | Saves name (logo kept if unchanged). | site-scan.tsx:1184-1210 | POST /api/sitescan/branding | Verified by code | OK |
+| "Remove branding" | button | Deletes the saved branding after confirm; PDFs revert to the ConstructHUB title. | site-scan.tsx:1211-1237 | DELETE /api/sitescan/branding → routes.ts:276-279 | Verified by code | OK |
+| Branding notice + "No remote logo URL is fetched" hint | status / text | Confirms save/remove. | site-scan.tsx:1239-1247 | client only | Read | OK |
+
+### ReportFilters (shared component, components/site-scan-fixes.tsx:159-250)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search findings and fixes" (Toolbar search) | input | Filters findings/fixes by any text (sent to server with the report request). | site-scan-fixes.tsx:170-176 | GET /api/sitescan/jobs/:id `q` → reportView (agency.ts:13-58) JSON-substring match | Read | OK |
+| "Category" select | select | Keeps one of technical/performance/local/content/ai-readiness. | site-scan-fixes.tsx:179-199 | `category` → reportView filter | Read | OK |
+| "Verification" select | select | Filters fixes by rescan verdict: new / still present / fixed / not checked. | site-scan-fixes.tsx:200-219 | `verification` → reportView filter | Read | OK |
+| "Previous findings" / range "A–B of N" / "Next findings" | button / stat / button | Pages findings+fixes together, 25 per server page; N = max(fixTotal, findingTotal). | site-scan-fixes.tsx:223-247 | `offset` → reportView slices both lists | API findingTotal=10 fixTotal=16; SQL jsonb_array_length(report->'findings')=10, fixes=16 ✓ | OK |
+
+### ScanReport (shared component, site-scan.tsx:179-404) — rendered for the selected job
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Score tiles: Overall / Local / Content / Technical / Performance / AI Readiness | stat (6 tiles) | The scan's category scores 0–100; "N/A" when a category wasn't scored (Performance is N/A without PageSpeed data). | site-scan.tsx:199-213 | report.scores from the job row | API scores overall 90 / 86 / 92 / 84 / null / 96 = SQL report->'scores' ✓ | OK |
+| "{n} pages checked. … URLs remain outside this report." | stat | Coverage line: pages crawled and how many URLs were left uncrawled by the cap. | site-scan.tsx:214-220 | report.pages / report.remaining | API pages 5, remaining 24; SQL report->>'remaining'=24 ✓ | OK |
+| "What raised or lowered these scores?" details | disclosure | Plain-language score explanations per category. | site-scan.tsx:221-232 | report.scoreExplanation | present in API ✓ | OK |
+| "Why Performance is N/A" note | notice | Explains missing PageSpeed data; tells the owner to add PAGESPEED_API_KEY when relevant, else "Use Rescan / retry PageSpeed". | site-scan.tsx:233-257 | report.psi[].unavailable / reason | API psi[0].unavailable="PageSpeed was not selected (0 pages). Retry with PageSpeed enabled." reason="disabled" → non-summary shows "Use Rescan…" branch ✓ | OK |
+| Category sections (Technical, Performance, Local, Content, AI Readiness) with finding cards: impact/severity badge, title, "Why it matters for SEO", "Authoritative guidance" source link, numbered steps, "How to fix", "Affected URLs (n)" | list | The actual findings, sorted by guidance impact (High/Medium/Low) else severity. Guidance links open the cited doc (e.g. Google/Cloudflare) in a new tab. Empty states distinguish "no findings" vs "filtered out" vs "not scored". | site-scan.tsx:258-363 | report.findings[] (stored JSONB; generated by the worker's audit+guidance pipeline) | API findings=10 across categories; counts match SQL ✓ | OK |
+| "Older report: rescan to add cited guidance…" | notice | Shown for pre-v2 reports without cited guidance. | site-scan.tsx:193-198 | report.version | API version=2 → hidden ✓ | OK |
+| FixChecklist: "Mark this page done" / "Mark this page not done", per-fix cards (title, why, Source link, steps, "Done (reported) · Rescan: {verification}", page/target, evidence JSON, platform click path, draft code + "Copy code", "Mark done"/"Mark not done") | list / button | The prioritized how-to-fix checklist; "done" is the user's own work tracking, rescan verification is separate. | components/site-scan-fixes.tsx:7-158; wired at site-scan.tsx:364, 1264-1271 | POST /api/sitescan/jobs/:id/fixes {keys, done} → routes.ts:280-309: validates keys against report.fixes, merges into sitescan_jobs.fix_done jsonb; shown state = fix_done ?? report.fixes.done | Verified by code (shape matches); fix count 16 verified via SQL ✓ | OK |
+| "GBP comparison: … / No synced GBP profile…" | status | Which synced Business Profile the NAP/service comparison used. | site-scan.tsx:365-371 | report.profile (job.profile) | API profile=null → "No synced GBP profile…" shown ✓ (SQL profile NULL) | OK |
+| "PageSpeed measurements and field data" details (+ inner "Raw data") | disclosure | Per PageSpeed run: score, lab metrics (LCP/CLS/TBT…), real-user CrUX field data with 75th percentiles. | site-scan.tsx:65-131, 372 | report.psi[] (worker pageSpeed()) | API psi len 1 ✓ | OK |
+| "GBP JSON-LD draft" section + "Copy draft" | section / button | A factual JSON-LD markup draft from the GBP snapshot. Hidden when absent. | site-scan.tsx:373-383 | report.jsonLdDraft | API jsonLdDraft=null → hidden ✓ | OK |
+| "AI fix plan — draft" section + "Copy draft" | section / button | The AI-drafted plan (after Generate AI fix plan). Review-before-publishing warning. | site-scan.tsx:384-398 | job.ai_draft | API aiDraft empty → hidden ✓ | OK |
+| Coverage notes line | text | Crawl caveats (heuristic scores, HTML-only crawl, sampling). | site-scan.tsx:399-401 | report.coverage.notes | API coverage.notes present ✓ | OK |
+
+### ScanIndexingSummary card (component lives in site-connections.tsx:1275-1303, rendered at site-scan.tsx:1273)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search Console indexing" card + "Scanned URL indexing" list | list | For each URL the scan crawled, the latest Google index-inspection result ("Not inspected" when none). | site-connections.tsx:1275-1296 | GET /api/gsc/scans/:id/indexing → server/gsc/routes.ts:233-258: expands sitescan_jobs.state->'pages', latest gsc_inspections per URL owned by user | curl → {total:5} = pages count 5 ✓ (gsc_inspections empty → all "Not inspected") | OK |
+| "Queue inspections in Search Console" | link | Jumps to the Search Console page (Sites tab, where bulk inspection lives). | site-connections.tsx:1297-1299 | route /search-console registered (App.tsx:188) | Route exists ✓ | OK |
+
+(Hidden entirely — renders null — when the plan lacks the Search Console module: the component's probe of /api/gsc/connections?limit=1 answers 402 plan_required, planRequiredFrom swallows it. Dev user has the module, so the card shows.)
+
+### SharedSiteScanPage — route `/site-scan/report/:token` (public; handled before the auth gate in App.tsx:533)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Shared Site Scan" + unavailable alert | heading / banner | Public read-only report viewer; bad/expired token → "This report link is unavailable or revoked." | site-scan.tsx:1281-1296 | GET /api/sitescan/shared/:token → routes.ts:663-676: `share_hash=sha256(token) AND share_expires>now()` (404 otherwise) | curl with zeros → 404 ✓; 30-day window from routes.ts:488 ✓ | OK |
+| ReportFilters + full ScanReport (no mark-done buttons, no follow-up actions) | filter / report | Same report chrome as the owner view, filtered/paged server-side. | site-scan.tsx:1297-1305 | same reportView | Read | OK |
+
+### FreeSiteScanPage — route `/free-site-scan` (public marketing page; also what signed-out visitors get for `/site-scan`)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| PublicPageHeader (`header-public-page`) | header | Signed-out marketing nav (Features, sign in/get started); renders nothing when signed in. | site-scan.tsx:1361; components/public-page-chrome.tsx:36-45 | client only | Read | OK |
+| "ConstructHUB" link | link | Back to the marketing home page. | site-scan.tsx:1363-1365 | route / (App.tsx:166) | Route exists ✓ | OK |
+| "Free 60-second website scan" + explainer | heading / text | Marketing copy; "We check up to 11 pages; slow sites can take longer." | site-scan.tsx:1366-1371 | copy | 11 pages = enqueue(null,url,11,1) at routes.ts:743 ✓ | OK |
+| "Website URL" + "Email" inputs | input | Lead capture; both required. | site-scan.tsx:1398-1415 | POST /api/sitescan/public/start {url, email, captchaToken} → routes.ts:685-761: siteUrl validation, optional reCAPTCHA verify, per-IP 3/day + per-email 2/day + global 100/day, enqueue (11 pages), INSERT sitescan_leads, verification email (7-day expiry) | Verified by code; captcha only when RECAPTCHA_SECRET_KEY set (dev unset) | OK |
+| reCAPTCHA widget (`#sitescan-captcha`) | widget | Anti-abuse challenge; script only injected when a site key is configured. | site-scan.tsx:1316-1345 | GET /api/sitescan/public/config → captchaSiteKey | curl → {captchaSiteKey:null} → widget stays empty, button enabled ✓ | OK |
+| "Scan my website" | button | Starts the free scan; then polls status. | site-scan.tsx:1417-1423 | disabled until config loads and (if a key exists) a CAPTCHA token is held | Read | OK |
+| Privacy policy link | link | /privacy | site-scan.tsx:1424-1429 | route exists (App.tsx:229) | ✓ | OK |
+| "Check your email for the verification link…" / "Scan queued/running/completed" / failure box + "Scan another site" | status / button | Progress and error states; failure suggests retrying. | site-scan.tsx:1432-1462 | GET /api/sitescan/public/status/:access (poll 3s) and POST /api/sitescan/public/verify {token} from the ?verify= link → routes.ts:762-802 (leads row must be unexpired) | Verified by code | OK |
+| Summary report (first 5 findings) then full report after email verification | report | Teaser scores + 5 findings until verified; full ScanReport after. | site-scan.tsx:1463-1464 | status response slices findings to 5 (routes.ts:774-780); verify returns the full report | Read ✓ ("Verify your email for all findings") | OK |
+
+### SiteScanLeads (exported here, rendered on `/crm/admin` — platform admin only; listed for completeness)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Site Scan leads" card (`section-sitescan-leads`), table Email/Website/Verified/Status, "latest 500" | table | Lists free-scan lead emails for platform admins; others see "Platform admin access required." | site-scan.tsx:1469-1523 | GET /api/admin/sitescan-leads → routes.ts:803-809: requirePlatformAdmin, JOIN sitescan_leads+sitescan_jobs ORDER BY created_at DESC LIMIT 500 | curl (dev user is platform admin) → 5 rows; SQL count(sitescan_leads)=5 ✓ | OK |
+
+---
+
+## client/src/pages/site-connections.tsx — routes `/cloudflare` (CloudflarePage) and `/search-console` (SearchConsolePage)
+
+**What it is:** one component parameterized by provider — "Cloudflare protection" (`cf=true`) and "Google Search Console". Connect provider accounts, discover/sync client sites, review queued work, and (Cloudflare) preview/apply edge rules with undo; (Search Console) bulk sitemap submission/inspection. Visible to any signed-in user, but every `/api/cloudflare` and `/api/gsc` route except saved-connection list/disconnect is gated by `requireModule("cloudflareSearchConsole")` (server/cloudflare/routes.ts:103-112 → server/entitlements.ts:611) answering 402 `plan_required`, which the page turns into a PlanRequired upgrade card (client/src/components/plan-required.tsx:136). Dev user has the module, so the real page renders. Main data sources: `edge_connections`, `edge_assets`, `edge_jobs`, `edge_actions`, `edge_invites`, `business_locations`, plus `gsc_analytics`/`gsc_inspections` for the details panels. The dev DB has zero rows in all edge/gsc tables, so every list shows its honest empty state; totals below were verified as 0 via both API and SQL.
+
+### Page chrome
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| PageHeader "Cloudflare protection" / "Google Search Console" | banner | Titles + one-line description of the module. | site-connections.tsx:391-400 | client only | Read | OK |
+| PlanRequired card (`plan-required-cloudflaresearchconsole`) | card | Shown instead of the page when the plan lacks the module: message from the server's 402, "What it does" details, price line, "See plans and pricing" (or "Update card" after a failed payment), plus removable saved connections. | site-connections.tsx:409-419; plan-required.tsx:136-182 | 402 body from requireModule | Read; gate verified in server code | OK |
+| "Background processing is disabled…" Notice (`Notice` tone warning) | banner | Warns that queued work won't run until the owner enables the site integration worker. | site-connections.tsx:423-428 | `workerEnabled` = EDGE_SEARCH_WORKER_ENABLED==='true' on GET /api/{provider}/connections (routes.ts:145) | curl connections → workerEnabled=false → Notice shows ✓ | OK |
+| "Google consent failed…" Notice | banner | Shown when the OAuth callback redirects back with ?connection=failed. | site-connections.tsx:429-434 | set by /api/gsc/callback redirect (gsc/routes.ts:80,109) | Read | OK |
+| Tab strip: Sites / Connections / Onboarding / Work queue / Edge audit (Cloudflare only) / Guide (`tab-connection-*` testids) | tab | Switches the panel below. Plain buttons (role=button) so e2e can reach them. | site-connections.tsx:401-408, 435; TabStrip :45-68 | client only | Read | OK |
+
+### Tab "Connections"
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Cloudflare: "Cloudflare login email" + "Global API Key" fields, "Find zone by domain" | input | Collects the Global Key (used once, never stored) and an optional zone-name filter. | site-connections.tsx:449-468 | — | Read | OK |
+| "Verify and choose zones" | button | Verifies the key with Cloudflare and lists accounts/zones (50/page) to pick from. | site-connections.tsx:469-475 | POST /api/cloudflare/key-discovery {email,key,page,q} → cloudflare/routes.ts:416-445: calls Cloudflare /user + /zones (key wiped from the body after) | Verified by code (matches shape) | OK |
+| Zones result box: "N zones · page N", account names, zone checkboxes, "Previous zones"/"Next zones", "Create limited key" | list / button | Picks zones, then mints a limited ConstructHUB token (Zone Read, Analytics Read, Zone WAF Edit) scoped to those zones. | site-connections.tsx:476-547 | POST /api/cloudflare/exchange {email,key,zones} → routes.ts:446-462 → service.exchangeKey; INSERT edge_connections; notification logged | Verified by code | OK |
+| "Permissions: Zone Read, Analytics Read, Zone WAF Edit…" | text | States the limited key's scope. | site-connections.tsx:543-546 | matches permissions requested in exchangeKey (service.ts) | Read | OK |
+| "Fallback: paste a scoped API token" details: instructions, token field, "Connect scoped token" | disclosure / input / button | Alternative connect path with a manually created token. | site-connections.tsx:549-584 | POST /api/cloudflare/token {token} → routes.ts:463-482: verifies /user/tokens/verify, saves edge_connections (method 'paste') | Verified by code | OK |
+| "Agency member email: …" + "Enable agency membership connection" | text / button | Ops-only: connects the preconfigured agency membership (env CLOUDFLARE_AGENCY_*). Button is enabled for everyone, but the server 503s unless that env is configured. | site-connections.tsx:585-602 | POST /api/cloudflare/agency → routes.ts:483-518 | curl connections → agencyEmail=null ("Not configured"); env not set in dev, so click would toast an error. Conditional/ops-only | UNCLEAR (works only with server env; UI doesn't disable) |
+| Google: "Connect Google Search Console" | button | Starts Google OAuth (scope = Search Console only), then discovers properties. | site-connections.tsx:605-617 | GET /api/gsc/connect → gsc/routes.ts:46-69: builds consent URL (requires recent auth); callback /api/gsc/callback exchanges code, saveGscGrant → edge_connections + queued 'discover' | Verified by code | OK |
+| "Connections" DataList: search, "N results", rows (radio, email/subject, token name/method, permissions), "Discover sites", "Disconnect", pager | list / button / input | Lists saved connections. Discover re-imports sites/properties; Disconnect (recent-auth required) deletes local data, revokes a ConstructHUB-created token when possible, and shows per-connection instructions. | site-connections.tsx:619-684; DataList :69-171 | GET /api/{p}/connections (routes.ts:124-147: edge_connections WHERE user_id, ILIKE) ; POST /discover {connectionIds} (routes.ts:152-169 → queue 'discover'/'memberships'); POST /disconnect {ids} (routes.ts:234-284: deletes edge_invites+edge_connections, cf self-revoke) | curl connections → total 0; SQL count(edge_connections)=0 ✓. Endpoints match client bodies | OK |
+
+### Tab "Sites"
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Search sites" (Toolbar) | input | Filters the site list by name. | site-connections.tsx:689-699; app-ui Toolbar :238 | `q` on GET /api/{p}/assets → common.ts listAssets: edge_assets name ILIKE (escaped) | Read | OK |
+| "Site status" select | select | cf: active/pending; gsc: siteOwner/siteFullUser/siteRestrictedUser/access_removed. | site-connections.tsx:700-724 | `status` → listAssets `($4='' OR status=$4)` | Read | OK |
+| "Sync from (up to 16 months)" + "Sync through" (Search Console only) | input | Date range for the analytics backfill. | site-connections.tsx:727-742 | POST /sync {start,end} → cloudflare/routes.ts:170-217: start ≥ UTC month−16 enforced (400), end ≤ today enforced | Verified by code; 16-month floor ✓ | OK |
+| "Sync selected (N)" / "Sync all matching sites" | button | Queues a background sync of the checked sites (or everything matching the current search+status, respecting the date range). | site-connections.tsx:743-775 | POST /api/{p}/sync {ids?|allMatching, q, status, start?, end?} → routes.ts:170-217: INSERT edge_jobs kind='sync' (dedup vs queued/running); hourly work budget 500 | Verified by code | OK |
+| "N sites" + "Select this page" checkbox + site rows (checkbox, name link, "ID · status · N linked locations · Synced …", error, per-row "Sync") | stat / list / button | Lists connected zones/properties; clicking the name opens the analytics details panel below; per-row Sync re-queues one site. | site-connections.tsx:784-855 | GET /api/{p}/assets (listAssets; `locations` = count(edge_location_links)); per-row Sync → POST /sync {ids:[id]} | curl assets → total 0 → "No connected sites. Open Connections to get started." ✓ SQL edge_assets count=0 ✓ | OK |
+| "Previous sites" / "Page N" / "Next sites" | button / stat / button | Pagination, 25 per page. | site-connections.tsx:856-876 | page/limit on listAssets | Read | OK |
+| Cloudflare only — "Preview edge protection for selected zones": "Rule pack" select (Ads door / Site-wide bad user agents / Flagged IPs), "Ads path", "Flagged IP addresses", "Office IP exemptions", "Check office-IP exemptions in Cloudflare first.", "Preview rules" | select / input / button | Builds Click Guard/VPN Shield edge rules for the selected zones and shows them for review before anything touches Cloudflare. | site-connections.tsx:879-938 | POST /api/cloudflare/preview {ids, kind, path, ips, officeIps} → routes.ts:527-559: builds rulePack, INSERT edge_actions state='preview' | Verified by code | OK |
+| "Review before applying" panel: per-zone rules + expressions, "Confirm and queue edge changes", "Cancel preview" | panel / button | Confirms the previewed rules (recent-auth required; previews expire after 1h) → queued to the worker, which writes WAF rules to Cloudflare. Cancel just clears the panel. | site-connections.tsx:939-980 | POST /api/cloudflare/confirm {ids} → routes.ts:560-615: edge_actions state='queued' + edge_jobs kind='apply' | Verified by code | OK |
+| Search Console only — "Bulk sitemap submission or inspection": "Selected IDs: …", property-ID/URL textarea, "Queue inspections", "Review and submit sitemaps" | textarea / button | One `assetId, url` per line; inspection queues URL inspections, sitemap asks for a confirm dialog then submits to Google (sitemap requires Full access). | site-connections.tsx:983-1041 | POST /api/gsc/urls {kind, confirm, items:[{assetId,url}]} → gsc/routes.ts:152-185: URL must belong to the property (withinProperty), restricted users blocked for sitemaps, queue 'inspect'/'sitemap' jobs | Verified by code | OK |
+| Details panel ("Close details"): Cloudflare → notice, "Flagged IPs" list with "Add to preview" (pulls Click Guard blocked IPs + VPN Shield blocked visits for the zone's domain), bot-traffic share, per-day traffic rows, five raw lists (traffic/events/paths/bots/countries); Search Console → MetricRows below | panel | Per-site analytics from the last sync (or "Analytics unavailable. Queue a sync…" when never synced). | site-connections.tsx:1042-1064; CloudflareDetails :1185-1267 | GET /api/cloudflare/assets/:id (routes.ts:148-151 → ownedAsset); GET /api/cloudflare/assets/:id/flagged-ips (hooks.ts:4-25, UNION of blocked_ips + vpn_visits by domain); GET …/cache?field=… (routes.ts:393-415, expands edge_assets.data) | Verified by code; no assets in dev to open | OK |
+
+### MetricRows (Search Console details, site-connections.tsx:172-279)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Breakdown" (date/query/page/device/country) + "Group" (day/week/month) + "From"/"To" date fields | select / input | Chooses the analytics cut; From defaults to 31 days ago, To to today. | site-connections.tsx:181-219 | dimension/group/start/end sent to the analytics endpoint | Read | OK |
+| "Search analytics" DataList: rows `date key — Clicks · Impressions · CTR% · Position` | list | Search-performance rows from the synced Google data (CTR/position impression-weighted server-side). | site-connections.tsx:221-240 | GET /api/gsc/assets/:id/analytics → gsc/routes.ts:112-151: gsc_analytics WHERE asset_id+dimension, date BETWEEN start AND end, GROUP BY date_trunc(group), ILIKE q | Verified by code; gsc_analytics empty in dev | OK |
+| Google-data disclaimer note | text | "Google provides top rows and may omit anonymized queries… Indexing API supports only JobPosting and BroadcastEvent pages." | site-connections.tsx:241-246 | matches server notice (gsc/routes.ts:148-150) | Read | OK |
+| "Sitemaps" DataList (`path · Submitted · Errors`) | list | Sitemaps known to Search Console for the property. | site-connections.tsx:247-256 | GET /api/gsc/assets/:id/sitemaps → gsc/routes.ts:214-232: edge_assets.data->'sitemaps' expanded | Verified by code | OK |
+| "Inspections" DataList with PASS/FAIL/NEUTRAL filter (`url · coverageState · verdict · Checked …`) | list / filter | URL inspection results. | site-connections.tsx:257-271 | GET /api/gsc/assets/:id/inspections → gsc/routes.ts:186-213: gsc_inspections, verdict filter | Verified by code; filter values match verdict enum ✓ | OK |
+| "Inspected URL coverage: Verdict: n · …" | stat | Summary counts of inspection verdicts for the property. | site-connections.tsx:1305-1319 (InspectionCoverage) | `coverage` array from the inspections endpoint (GROUP BY verdict) | Read | OK |
+
+### Tab "Onboarding"
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Explainer ("Select a connection… Active connection: N") | text | Reminds you to pick a connection in the Connections tab first (radio state). | site-connections.tsx:1069-1074 | client only | Read | OK |
+| "Locations" DataList (`id · name · website|Website required`) | list | Your locations with IDs, for composing invitation lines. | site-connections.tsx:1075-1083 | GET /api/{p}/locations → cloudflare/routes.ts:349-363: business_locations WHERE user_id, ILIKE | curl gsc+cloudflare locations → total 2, matches SQL count(business_locations user_id=1)=2 ✓ (104296 shows "Website required", 506025 has no website either — both null → both show "Website required") | OK |
+| "Client invitations" textarea + "Send onboarding emails" | textarea / button | One `email, locationId(, cloudflare accountId)` per line; emails the client steps to grant access (Cloudflare also needs the account ID + agency env). | site-connections.tsx:1084-1121 | POST /api/{p}/invites {connectionId, clients:[{email,locationId,accountId?}]} → routes.ts:285-348: validates owned location with website, INSERT edge_invites state='pending', queue 'invite' | Verified by code; state default 'pending' matches the Invitations filter values ✓ (schema.ts:39-42) | OK |
+| "Invitations" DataList (`email · domain · state`, filter pending/accepted) | list / filter | Tracks sent invitations and their acceptance state. | site-connections.tsx:1122-1131 | GET /api/{p}/invites → routes.ts:364-380: edge_invites WHERE user_id+provider | Verified by code; table empty in dev | OK |
+
+### Tab "Work queue"
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Work queue" DataList (`#id · kind · state — error`, filter queued/running/done/failed/uncertain) | list / filter | Background integration jobs for this provider. | site-connections.tsx:1134-1145 | GET /api/{p}/jobs → cloudflare/routes.ts:218-233: edge_jobs JOIN edge_connections (kind or error ILIKE) | curl → total 0; SQL edge_jobs=0 ✓ | OK |
+
+### Tab "Edge audit" (Cloudflare only)
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Edge audit" DataList (`name · kind · state`, before/latest snapshot sample-block counts) | list | Every previewed/applied edge change, with a warning that sampled events don't prove causation. | site-connections.tsx:1146-1180 | GET /api/cloudflare/actions → cloudflare/routes.ts:616-631: edge_actions JOIN edge_assets | curl → total 0; SQL edge_actions=0 ✓ | OK |
+| "Undo ConstructHUB rules" (rows in state applied/uncertain) | button | Queues removal of ConstructHUB-managed rules for that zone. | site-connections.tsx:1166-1177 | POST /api/cloudflare/undo {ids:[id]} → routes.ts:560-615: state='reverting' + edge_jobs kind='undo' (recent-auth) | Verified by code | OK |
+
+### Other exports in this file (not elements of these two pages)
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| LocationSearchSummary | card | "Google Search Console · property totals · last 30 days" card used on the Locations page insights tab (client/src/pages/locations.tsx:421), not on these pages. | site-connections.tsx:280-304 | GET /api/gsc/locations/:id/summary → gsc/routes.ts:259-271 → service.locationSearchClicks: gsc_analytics dimension='date', date ≥ current_date−30, one property per location (ORDER BY a.id LIMIT 1) | Read (out of scope page) | OK |
+| ScanIndexingSummary | card | (Mapped above under site-scan.) | site-connections.tsx:1275-1303 | — | — | OK |
+
+---
+
+## client/src/pages/site-connection-guide.tsx — no route of its own; rendered as the "Guide" tab of both `/cloudflare` and `/search-console` (site-connections.tsx:436)
+
+**What it is:** static how-to content for the two integrations. No data, no buttons except three external documentation links; same content on both provider pages. Client-only.
+
+### Card "Put a client site behind Cloudflare"
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| 5-step onboarding list (create account, DNS review, nameservers, registrar steps, wait for Active) | text | Walks a contractor through moving a client domain onto Cloudflare. | site-connection-guide.tsx:10-40 | client only | Read | OK |
+| "Cloudflare setup instructions" | link | Official Cloudflare full-setup doc (new tab). | site-connection-guide.tsx:41-48 | https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/ | curl -sI -L → 200 ✓ | OK |
+
+### Card "Connect Cloudflare to ConstructHUB"
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Paragraphs: recommended Global-Key flow, what the limited token can/cannot do, agency-membership option and its breadth, fallback custom token, what Disconnect does, rule-preview caveats | text | Explains the connection security model (Global Key used once, never saved) and warns that rules can block real customers. | site-connection-guide.tsx:56-112 | client only | Read | OK |
+| "Cloudflare role reference" | link | Cloudflare roles doc. | site-connection-guide.tsx:113-120 | https://developers.cloudflare.com/fundamentals/manage-members/roles/ | curl -sI -L → 200 ✓ | OK |
+
+### Card "Connect Google Search Console"
+| Element | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| 5-step list (connect agency account, invite client user Full, worker maps properties by domain, sync up to 16 months, sitemaps/inspection) + owner-setup and disconnect paragraphs | text | How the Search Console integration works, including the property-overlap choice and the Indexing API limitation. | site-connection-guide.tsx:128-173 | client only | Read | OK |
+| "Search Console API quotas" | link | Google's Search Console limits doc. | site-connection-guide.tsx:174-181 | https://developers.google.com/webmaster-tools/limits | curl -sI -L → 200 ✓ | OK |
+
+---
+
+## Suspected bugs
+
+1. **site-scan.tsx · location picker count on an empty page (`locationTotal`)** — the owner sees "No Business Profile-linked locations" (and loses the "N of total" range) if they page past the end of the location list, even when locations exist. What is true: `locationTotal` comes from `locations[0].total` — a window function read off the rows of the *current page* — so an empty page (OFFSET ≥ total) reports 0. Evidence: GET /api/sitescan?locationOffset=25 → `locationTotal:0` while SQL `SELECT count(*) FROM business_locations WHERE user_id=1 AND gbp_location_name IS NOT NULL` = 1. Root cause: server/agency/middleware.ts:58 and :61 (`locationTotal: locations[0]?.total ?? 0`). Smallest fix: compute `locationTotal` with a separate `count(*)` query (or `COALESCE((SELECT total FROM locations LIMIT 1), (SELECT count(*) ...))` when the page is empty).
+
+2. **Delegated-agency path · "Queue selected sites" (POST /api/sitescan/bulk) always 404s for delegated members** — a team member working in an owner's workspace sees the bulk-scan checkboxes (the location list is workspace-wide via the middleware) but the POST falls through the access layer: middleware.ts:83 only delegates POSTs to exact paths `/api/sitescan`, `/api/sitescan/schedule`, `/api/citations/campaigns`; `/api/sitescan/bulk` reaches line 86 (`member` → no early next), matches no object regex, and hits `if (id === undefined) throw missing()` → 404 "Record not found". Root cause: server/agency/middleware.ts:83 (path allowlist omits `/api/sitescan/bulk`). Smallest fix: include `/api/sitescan/bulk` in the allowlist with a locationIds→locationAccess loop (or an explicit "any of these locations" check). NOTE: verified by code only — the dev session is an owner, and creating a member session would need writes.
+
+3. **Scan history silently drops scans whose linked Business Profile location was deleted (owner and member)** — a scan started with a GBP profile (`sitescan_jobs.profile` set) disappears from "History & score trend" if the `business_locations` row it points at is later deleted, because the list query only keeps profile-less jobs via the OR fallback `j.profile IS NULL`; a job with a dangling `profile->>'id'` fails `l.user_id=$1` on the LEFT JOIN and is filtered out (the shadowed owner route in server/sitescan/routes.ts:150-193 would have listed it). Root cause: server/agency/middleware.ts:56 (WHERE clause). Cannot verify with dev data — all 6 user-1 jobs have `profile IS NULL` — so this is code-derived; smallest fix: add `OR (j.user_id=$1 AND l.id IS NULL)`-style branch for owner-visible rows.
+
+4. **Cloudflare "Enable agency membership connection" button is enabled for everyone but only works with server env** — the owner sees an enabled button; on click the server answers 503 "Agency owner, token and email are not configured" unless `CLOUDFLARE_AGENCY_USER_ID/TOKEN/EMAIL` are set. The page does show "Agency member email: Not configured" next to it, so it fails honestly rather than silently. Root cause: site-connections.tsx:590-601 (no disable on `!config.data?.agencyEmail`) + cloudflare/routes.ts:483-493. Smallest fix: disable the button (with the same tooltip) when `agencyEmail` is null. Classified UNCLEAR-by-design rather than a hard BUG.
+
+Not bugs but noted: the GET /api/sitescan response carries a `total` field inside every job row (window-function artifact of the agency middleware, middleware.ts:56); the page ignores it. The history/status filter, per-client filter, search, and both counts were independently reproduced by SQL and matched the API exactly (6/6 jobs, 1/1 location, 0 schedules, 2 failed, 5 admin leads; all edge/gsc tables empty).
+
+## Element counts
+
+- client/src/pages/site-scan.tsx (incl. free/shared/admin exports): 91 elements mapped — OK 88, BUG 0, UNCLEAR 1 (agency-membership button is on site-connections), DEAD 0; +3 conditional-bug entries listed above that are server-side, not element status.
+- client/src/pages/site-connections.tsx (both providers): 71 elements mapped — OK 70, UNCLEAR 1 ("Enable agency membership connection"), DEAD 0.
+- client/src/pages/site-connection-guide.tsx: 6 elements mapped — OK 6.
+- Suspected bugs: 4 (1 minor count bug, 2 delegated-member code-path bugs, 1 env-gated button), of which #2/#3 are code-verified only (no delegated-member session possible under SELECT-only rules).
+
+---
+
+
+Audited 2026-10-04 against worktree /home/veto/ConstructHUB-audit3 (branch audit/3), dev server http://127.0.0.1:8303 (dev bypass = user id 1, "Veto", isPlatformAdmin, company "Alpine Exteriors Test", accessPlan "agency" per /api/entitlements). DB: constructhub_dev_a6, SELECT only. Every number recomputed with SQL and compared to the live API JSON.
+
+---
+
+## client/src/pages/developers.tsx — route /developers
+
+Public API reference page. It renders static documentation (authentication, limits, the no-AI rule, CRM API note) plus a live endpoint reference generated from `GET /api/v1/openapi.json`. The route is registered twice in client/src/App.tsx:235 (signed-in dashboard router) and App.tsx:316 (public router) — no guard, anyone can view it; there is no server-side access check on openapi.json (server/public-api/index.ts:51 serves it publicly, `Cache-Control: public, max-age=300`). Main data source: `GET /api/v1/openapi.json` (assembled by server/public-api/openapi.ts:64 `buildOpenApiDocument` from the registered resource fragments). Signed in, the public masthead/footer render nothing (public-page-chrome.tsx:37,72 return null when a session exists).
+
+### Public masthead (signed-out visitors only, data-testid="header-public-page")
+
+Rendered by PublicPageHeader → SiteNavBar (client/src/components/public-page-chrome.tsx:36-45, client/src/components/site-nav.tsx:321-357). Hidden when signed in (verified: dev session → header absent). The two dropdown panels are generated from the feature/service catalogues (shared/feature-pages, shared/dfy-pages), so individual dropdown items are data-driven (`nav-item-*` per catalogue entry); the stable chrome is mapped row by row.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| ConstructHUB logo (link-public-home) | link | Goes to the home page. | site-nav.tsx:326 | client only: wouter Link to `/` | Route `/` in App.tsx:166 (dashboard) / App.tsx:288 (public) | OK |
+| Features ▾ (nav-dropdown-features) | menu | Opens a panel listing every feature page from the catalogue, plus "See every feature". | site-nav.tsx:150-175 | client only; entries from shared/feature-pages FEATURE_CATALOGUE | Code read; catalogue import verified | OK |
+| Done-For-You ▾ (nav-dropdown-dfy) | menu | Opens a panel listing every done-for-you service, plus "See all services". | site-nav.tsx:176-195 | client only; entries from shared/dfy-pages DFY_CATALOGUE | Code read | OK |
+| Plans (link-nav-plans) | link | Jumps to the Plans section of the home page (`/#plans`). | site-nav.tsx:64-84,331-333 | client only | Code read | OK |
+| Results (link-nav-stats) | link | Jumps to the Results section of the home page (`/#stats`). | site-nav.tsx:331-333 | client only | Code read | OK |
+| Coverage (link-nav-coverage) | link | Jumps to the Coverage section of the home page (`/#coverage`). | site-nav.tsx:331-333 | client only | Code read | OK |
+| Sign In (link-nav-signin) | link | Goes to the sign-in page, returning here after (`/auth?next=%2Fdevelopers`). | site-nav.tsx:345-347 | client only; /auth route App.tsx:237/289 | Code read | OK |
+| Get Started (link-nav-getstarted) | link | Goes to the sign-up mode of the auth page. | site-nav.tsx:348-350 | client only; /auth route | Code read | OK |
+| ☰ menu button (button-landing-menu) | button | Opens the slide-over mobile menu with the same links (fold-out Features/Done-For-You groups, Pricing, Sign In, theme toggle). | site-nav.tsx:242-251, 237-315 | client only | Code read | OK |
+| "See every feature" (nav-features-all) / "See all services" (nav-dfy-all) | link | Footer of each dropdown panel; goes to /features and /done-for-you. | site-nav.tsx:169, 189 | client only; routes App.tsx:208-212/310-313 | Code read | OK |
+
+### Hero (title, description, Manage API keys)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Kicker "Developers" | text | Small orange section label above the headline. | developers.tsx:126 (Kicker primitive feature-landing/primitives.tsx:27) | client only | Code read | OK |
+| Page title (text-developers-title) | text | Shows the API document's title ("ConstructHUB API" — same as the fallback, so it never visibly changes). | developers.tsx:127 | GET /api/v1/openapi.json → info.title; live value "ConstructHUB API" | curl /api/v1/openapi.json (200 JSON, 66,025 bytes) | OK |
+| Description paragraph | text | Two-sentence intro; comes from the OpenAPI document's description, with "Version v1." appended from info.version. | developers.tsx:128-131 | same doc, info.description + info.version="v1" | curl; version string present | OK |
+| Manage API keys (link-developers-keys) | link | Orange button to the API-keys settings section (Account → API keys). | developers.tsx:133 | client only: `/settings/api` → SettingsApiRedirect (App.tsx:145-152) → `/settings?tab=api-keys` | /settings/api route App.tsx:234; tab "api-keys" exists (pages/settings/sections.tsx:33,45,91) | OK |
+
+### Alert banner "What the API doesn't do" (data-testid="banner-developers-no-ai")
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Banner text (text-developers-no-ai) | text | States that API keys don't get AI features, and that posts/replies/social posts sent through the API are stored exactly as sent (source: api) with no AI rewriting; AI settings can't be read or changed via the API. Sentence constant is shared with the API-keys settings panel. | developers.tsx:139-148; API_NO_AI_NOTICE at pages/settings/api/api-keys-panel.tsx:31 | Claim enforced server-side: server/public-api has no AI imports (no-ai.test.ts walks the import graph); openapi.ts:98 documents the same rule; writes stamp source: api (gbp-write.ts ensurePublicApiWriteSchema / content jobs) | curl openapi.json info.description (same rule); code read of public-api dir | OK |
+
+### Card "Authentication" (data-testid="card-developers-auth")
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Base URL (text-developers-base-url) | text | Shows the API base: window origin + `/api/v1` (https://constructhub.us in prod, http://127.0.0.1:8303 in dev). | developers.tsx:157-158 | matches server mount: app.use("/api/v1", router) — server/public-api/index.ts:106-110 (PUBLIC_API_BASE guard.ts:13) | curl http://127.0.0.1:8303/api/v1 → 200 CRM index JSON | OK |
+| Header line `Authorization: Bearer chub_<prefix>_<secret>` | text | Shows how a key is sent; keys are created in Settings → API keys. | developers.tsx:159-160 | server/public-api/auth.ts authenticates the bearer (chub_ prefix enforced, guard.ts rejectApiKeysOutsidePublicApi) | Code read (auth.ts, guard.ts) | OK |
+| Scopes badges `read` / `write` | badge | Explains the two scopes: read lists/exports, write creates/updates. | developers.tsx:161-162 | server/public-api/auth.ts scopeByMethod: GET/HEAD=read, others=write → 403 insufficient_scope | Code read (index.ts:58, auth.ts) | OK |
+| curl example (text-developers-curl) | text | Copy-paste curl that fetches the OpenAPI document with a bearer key. | developers.tsx:164-167 | GET /api/v1/openapi.json is public (served before authenticate — index.ts:51-56) | curl without key → 200 | OK |
+| Footnote about keys never signing in to the app | text | Explains a key only works under /api/v1 and can be revoked. | developers.tsx:168-170 | keys are API-only credentials (account/api-keys.ts); no session is created | Code read | OK |
+
+### Card "Limits and units" (data-testid="card-developers-limits")
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Rate limit bullet: "60 requests per minute per key … 429 with Retry-After" | text | States the per-key rate limit and the over-limit error. | developers.tsx:181 | server/public-api/rate-limit.ts:15 DEFAULT_RATE_PER_MINUTE=60; 429 rate_limited with Retry-After (rate-limit.ts:69-75); per-account cap 300/min across all keys | grep constants; code read | OK |
+| Units bullet: "a read costs 1 unit plus 1 per 100 rows; a write 5" | text | Explains how API usage is metered. | developers.tsx:182 | server/public-api/quota.ts:21-23,28-31 READ_UNITS=1, ROWS_PER_UNIT=100, WRITE_UNITS=5 | grep constants | OK |
+| Monthly quota bullet: plan units, optional per-key cap, 429 quota_exceeded / 402 plan_required | text | Explains the monthly unit quota and what error you get when exhausted or when the plan has no API access. | developers.tsx:183 | quota.ts:72-78 (unitsPerMonth<=0 → 402 plan_required), 86-100 (429 quota_exceeded, Retry-After until the 1st); month resets 1st UTC (account/api-keys.ts:248 apiMonthResetsAt) | grep; code read | OK |
+| Headers bullet: X-RateLimit-Limit / -Remaining / X-Units-Remaining | text | Lists the metering headers on responses. | developers.tsx:184 | rate-limit.ts:60-61 sets X-RateLimit-*; quota.ts:101 sets X-Units-Remaining | grep | OK |
+| Plan units table (table-developers-plan-units), one row-plan-units-<key> per plan | table | Shows each plan's monthly API units; a 0 shows as "No API access". Rendered only when every plan carries the value (true today). | developers.tsx:186-200; planUnits() 83-89; PLAN_KEYS order starter/pro/growth/agency (shared/plans.ts:16) | Shared price book shared/plans.ts limits.apiUnitsPerMonth: Starter 0, Pro 10,000, Growth 50,000, Agency 250,000 (plans.ts:102,125,148,171). Same numbers the server enforces via ctx.plan.unitsPerMonth (quota.ts) | Compared table source values to plans.ts lines; server uses the same PLANS map (openapi.ts:5,113) | OK |
+| Fallback line (text-developers-plan-units) | text | "Your plan's monthly units are shown in Settings → API keys." — only shown if a plan lacks the units value (not reachable today). | developers.tsx:198-199 | client only | Code read | OK |
+
+### Endpoints reference (data-testid="section-developers-endpoints")
+
+One `<Card>` per OpenAPI tag (`card-developers-tag-<slug>`), each containing one expandable `<details>` row per operation (`endpoint-<method>-<path>`, developers.tsx:254-316: method pill, path, scope/Deprecated badges, summary; expanding shows description, unit cost, parameters, request body, responses, and a curl snippet for GETs). Live document on this server has 24 paths / 27 operations grouped under 12 tags. Loading shows 2 skeletons; failure or an empty path list shows the honest unpublished note (text-developers-unpublished, developers.tsx:214-219) — fetchOpenApi (developers.tsx:95-102) treats a non-JSON 200 as "not published". Tag grouping BUG noted in Suspected bugs: built-in `/me` is tagged `account` while the account resource uses `Account`, and the four write operations carry lowercase resource-name tags (`locations`, `reviews`, `site-scans`, `social-posts`) so they render as separate one-operation sections apart from their Title-case read sections.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Generated from /api/v1/openapi.json" (link-developers-openapi) | link | Raw JSON of the same document, for API clients / your own AI to read. | developers.tsx:209 | GET /api/v1/openapi.json → server/public-api/index.ts:51-54 → openapi.ts:64 buildOpenApiDocument | curl → 200 application/json; parsed 24 paths/27 ops | OK |
+| Skeleton rows (2) | text | Placeholder while the document loads. | developers.tsx:212-213 | n/a | Code read | OK |
+| Unpublished note (text-developers-unpublished) | text | Shown when the reference can't be loaded or lists nothing; static auth/limits info still applies. | developers.tsx:214-219 | n/a (fetch error path) | Code read | OK |
+| GET /me (endpoint-get-me) | link | Expandable doc for "the account and key behind this token, with this month's usage". | developers.tsx:260-315 | GET /api/v1/me → public-api/index.ts:61-81 → account/api-keys.ts monthlyUsage (account_api_usage.units summed for UTC month, key + account) | Operation present in live doc; handler code read | OK |
+| GET /account (endpoint-get-account) | link | Expandable doc for your account, plan, limits and API usage. | same row pattern | GET /api/v1/account → resources/account.ts (accountResource) | Live doc; resources/index.ts:23,36-39 | OK |
+| GET /locations, /locations/{id}, /locations/{id}/reviews, /locations/{id}/insights, /locations/{id}/media, /locations/{id}/posts | link | Expandable docs for listing/reading locations and their reviews, daily metrics, media, post queue. | developers.tsx:254-316 | GET /api/v1/locations* → resources/locations.ts (locationsResource) | Live doc lists all 6; resources/index.ts:9-10,24 | OK |
+| GET /reviews, /reviews/{id} | link | Expandable docs for listing/reading reviews. | same | GET /api/v1/reviews* → resources/reviews.ts | Live doc | OK |
+| GET /insights | link | Expandable doc for daily metrics for one location (?locationId=). | same | GET /api/v1/insights → resources/insights.ts | Live doc | OK |
+| GET /photos, /photos/folders | link | Expandable docs for the media library. | same | GET /api/v1/photos* → resources/photos.ts | Live doc | OK |
+| GET /gbp-posts, /gbp-posts/{id} | link | Expandable docs for the Business Profile post/photo queue. | same | GET /api/v1/gbp-posts* → resources/gbp-posts.ts | Live doc | OK |
+| GET /social-posts, /social-posts/{id} | link | Expandable docs for scheduled social posts. | same | GET /api/v1/social-posts* → resources/social-posts.ts | Live doc | OK |
+| GET /site-scans, /site-scans/{id}, /site-scans/{id}/report | link | Expandable docs for site scans and their full reports. | same | GET /api/v1/site-scans* → resources/site-scans.ts | Live doc | OK |
+| GET /citations, /citations/campaigns, /citations/campaigns/{id} | link | Expandable docs for citations and campaigns. | same | GET /api/v1/citations* → resources/citations.ts | Live doc | OK |
+| POST /locations/{id}/posts (scope badge "write", 5 units) | link | Expandable doc for scheduling a Google Business Profile update with your own text. | same | POST /api/v1/locations/:id/posts → resources/gbp-write.ts gbpPostsWriteRouter (compose: resources/index-write.ts:29; registered per register.ts) | Live doc (tag `locations` — see bugs); index-write.ts | OK |
+| POST /reviews/{id}/reply (write, 5 units) | link | Expandable doc for replying to a Google review with your own text. | same | POST /api/v1/reviews/:id/reply → resources/gbp-write.ts gbpReplyWriteRouter (index-write.ts:30) | Live doc | OK |
+| POST /social-posts (write, 5 units) | link | Expandable doc for scheduling a social post with your own text. | same | POST /api/v1/social-posts → resources/social-write.ts (index-write.ts:31) | Live doc | OK |
+| POST /site-scans (write, 5 units) | link | Expandable doc for starting a Site Scan (uses one of the plan's monthly scans). | same | POST /api/v1/site-scans → resources/sitescan-write.ts (index-write.ts:32) | Live doc | OK |
+
+### Card "CRM API" (data-testid implicit; card at developers.tsx:235)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| CRM API card text | text | Explains the CRM's separate `chk_…` keys (created in the portal under Integrations) for customers, projects, estimates, invoices, payments; both key types share the /api/v1 base and bearer header; webhooks are signed `ConstructHUB-Signature`. | developers.tsx:235-243 | GET /api/v1 → server/crm/integrations.ts:311 returns the CRM index JSON (name ConstructHub CRM Public API, resources list, webhook signature scheme) | curl http://127.0.0.1:8303/api/v1 → 200 JSON matching every claim (auth chk_, pagination, 5 resources, ConstructHUB-Signature webhooks) | OK |
+| `/api/v1` link inside the text | link | Opens the CRM API index JSON. | developers.tsx:241 | same as above | curl 200 | OK |
+
+### Public footer (signed-out visitors only, data-testid="footer-public-page")
+
+Rendered by PublicPageFooter (public-page-chrome.tsx:71-94); null when signed in (verified).
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Home | link | Goes to the home page. | public-page-chrome.tsx:76 | client only | Route App.tsx:166/288 | OK |
+| Features (link-public-footer-features) | link | Goes to the features catalogue. | public-page-chrome.tsx:78 | client only | Route App.tsx:208/310 | OK |
+| Done-For-You (link-public-footer-dfy) | link | Goes to the services catalogue. | public-page-chrome.tsx:80 | client only | Route App.tsx:211/312 | OK |
+| AI Call Assistant (link-public-footer-call-assistant) | link | Goes to the Call Assistant marketing page. | public-page-chrome.tsx:82 | client only | Route App.tsx:206/309 | OK |
+| support@constructhub.us | link | Opens the user's mail client. | public-page-chrome.tsx:84 | mailto: | Code read | OK |
+| Terms / Privacy | link | Legal pages. | public-page-chrome.tsx:86-88 | client only | Routes App.tsx:229-230/325-326 | OK |
+| Footer guides (footer-guides): Google Ads Guide (link-footer-guide-google-ads-guide), LSA Guide, Click Fraud, Google Business Profile Tools | link | Four free guides linked from every public footer. | public-page-chrome.tsx:51-69 | client only | Routes exist: App.tsx:199-202 (dashboard), 303-306 (public) for the guide pages; /google-business App.tsx:192/299 | OK |
+| Copyright line | text | © notice from lib/marketing copyrightNotice(). | public-page-chrome.tsx:91 | client only | Code read | OK |
+
+---
+
+## client/src/pages/agency.tsx — route /agency
+
+The Agency workspace: an agency (or a contractor wearing an agency hat) manages client records, client business locations in bulk, team roles, Google onboarding emails, a background job queue, and workspace settings. Route /agency is signed-in only (App.tsx:178; listed in SIGNED_IN_ONLY App.tsx:339, redirected to /auth when signed out). Access is workspace-based: every `/api/agency/*` call (except /me and /workspace) requires the workspace OWNER's plan to include the Agency workspace module — server/agency/routes.ts:56-58 (`workspaceEntitled`, 402 plan_required otherwise); membership/role checks in server/agency/access.ts (accessFor, requireAdmin/requireWrite). Dev user 1 is owner of workspace "Agency" with the Agency plan: /api/agency/me → `{owner:1, actor:1, role:"owner", entitled:true}`. Main data sources: `/api/agency/me` (role/entitlement), `/api/agency/locations` + `/api/agency/dashboard` (locations tab), `/api/agency/clients`, `/api/agency/team`, `/api/agency/onboarding`, `/api/agency/jobs`, `/api/agency/google`. All list endpoints are scoped to `user_id = workspace owner` (SQL verified: agency_clients/agency_members/agency_onboarding/agency_jobs have rows only for user 1; business_locations has rows for users 1 (2 rows) and 2328 (1 row) — no cross-org leakage for this user).
+
+### Page header + workspace switcher (all tabs)
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Add location" button (header action, Locations tab only) | button | Opens the Locations page with the "import from Google" dialog. | agency.tsx:64 | client only: link to `/locations?import=gbp` → LocationsPage opens AddLocationDialog with the gbp tab (pages/locations.tsx:74-77,92-93) | Route /locations App.tsx:179; locations.tsx reads `import` param | OK |
+| Workspace select (aria-label "Workspace") | select | Switches between your own workspace and agency workspaces you belong to; saves the choice, clears cached data and reloads. | agency.tsx:57 | POST /api/agency/workspace {owner} → server/agency/routes.ts:71-76 → sets session.agencyOwner (accessFor(actor,owner) verifies membership; plan check for others' workspaces) | Route exists with matching body (zod {owner:positiveId}); /me shows workspaces:[{user_id:1}] so only "My workspace" is listed for user 1 | OK |
+| Role label next to the switcher | text | Shows your role in the open workspace (owner/admin/manager/viewer). | agency.tsx:57 | from /api/agency/me role | API shows role "owner" | OK |
+| Tab bar: Locations · Clients · Team (admin+) · Onboarding · Jobs · Settings (owner only) (AppTabsList) | tab | Switches the section below; ?tab= persists the choice in the URL (bad values fall back to Locations). | agency.tsx:25-27,66 | Team tab requires admin, Settings requires owner — matches server (GET /api/agency/team requireAdmin routes.ts:100; PUT /settings owner-only routes.ts:78) | Code both sides; dev user is owner so all 6 tabs render | OK |
+| Message line (role=status / role=alert) | text | Success ("Saved. Queued work appears in Jobs or Onboarding.") or error feedback from the last action; scrolls into view. | agency.tsx:32-35,67 | client only | Code read | OK |
+
+### Not-entitled state (PlanRequired card) — conditional, not shown for this user
+
+Shown when /api/agency/me says entitled=false (owner lacks the Agency plan): a short "you're a member of agency workspace(s)" note + switcher when applicable, then the PlanRequired card (components/plan-required.tsx:136-182: module heading + plan badge, message from /api/entitlements paymentNeeded or the 402 body, "What it does" details, price line, "See plans and pricing" (or "Update card" when the last payment failed) and removable saved connections). Server gate for everything below is the same Agency-plan check.
+
+| Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| plan-required-agencyWorkspace card (text-plan-required-message, link-plan-required-pricing / link-plan-required-billing) | card/button | Tells the owner the Agency workspace needs the Agency plan ($349/mo, 10 locations) and links to /pricing (or to billing when a payment failed). | plan-required.tsx:136-182 | server/entitlements getEntitlements + sendPlanRequired (402 {code:plan_required, requiredPlan:"agency"}); plan facts from shared/plans.ts agency monthlyCents 34900, limits.locations 10 | plans.ts:152-174 read; entitlements API answers accessPlan "agency" for user 1 so card not rendered in dev | OK |
+
+### Locations tab → AgencyWorkspace → AgencyBulkWorkspace (client/src/components/agency-workspace.tsx:70-123)
+
+Rendered because /api/agency/me entitled=true. Data: `GET /api/agency/locations?q=&status=&offset=&clientId=` (listLocations, server/agency/access.ts:93-100) and `GET /api/agency/dashboard` (dashboard(), access.ts:101-104). Both scope to the owner's rows via visibility() (access.ts:63-64: `l.user_id=$1` plus per-member client assignment).
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Stat "Locations" = 2 | number | Count of locations in the open workspace matching the current search/client filter (any status). | agency-workspace.tsx:91 (Stat app-ui.tsx:175) | GET /api/agency/locations → count(*) FROM business_locations l LEFT JOIN agency_clients c … WHERE l.user_id=1 AND (visibility) AND (filters) | API total=2; SQL: SELECT count(*) FROM business_locations WHERE user_id=1 → 2. Match | OK |
+| Stat "Need reconnect" = 1 | number | Count of locations whose Google listing is linked but the connected Google account/grant is missing or needs reconnect. | agency-workspace.tsx:91 | GET /api/agency/dashboard → count(*) FILTER (gbp_location_name IS NOT NULL AND NOT EXISTS(SELECT 1 FROM gbp_grants g WHERE g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject AND NOT g.reconnect_required)) | API reconnect=1; SQL recompute (same FILTER) → 1 (location 506025 "AI-TEST Ridgeline Roofing"). Match | OK |
+| "Agency" crumb + workspace name · role | link/text | Breadcrumb back to /agency and the open workspace's name/role. | agency-workspace.tsx:92 | /api/agency/me workspace.name = "Agency" | API | OK |
+| Search input (placeholder "Global location search") | input | Filters the location list (and the status counts) by text matched against business name, address, city, state, ZIP, place ID and client name. | agency-workspace.tsx:95 (Toolbar app-ui.tsx:238) | passed as q to /api/agency/locations and /api/agency/dashboard: concat_ws(' ',l.business_name,l.address,l.city,l.state,l.zip_code,l.place_id,c.name) ILIKE '%q%' (escapes %,_) | Code read; tested ?q=roofing → 1 row (506025) | OK |
+| "Find client…" input | input | Filters the client dropdown options below it. | agency-workspace.tsx:96 | client only (filters the /api/agency/clients?q= query that fills the selects) | Code read | OK |
+| Client filter select (aria-label "Client filter") | select | Limits the list/counts to one accessible client ("All accessible clients" = everything your role can see). | agency-workspace.tsx:97 | clientId param → `l.agency_client_id=$4` in locationFilter (access.ts:88-89) | Code read | OK |
+| Location status select (aria-label "Location status", 7 options with live counts) | select | Filters by Google/Guard/review/post status; each non-All option shows its count from the dashboard. Options: All statuses, Synced, Needs reconnect, Not linked, Guard alerts, Unanswered reviews, Failed posts. | agency-workspace.tsx:98; statusLabels:29 | statusSql map access.ts:78-86 (synced=linked+live grant+successful sync ever; reconnect=linked but grant missing/reconnect_required; unlinked=gbp_location_name IS NULL; guard=pending gbp_guard_changes; unanswered=reviews without a reply not google_deleted; failed=gbp_content_jobs in failed/uncertain/rejected). Counts from /api/agency/dashboard which forces status 'all' but keeps q/clientId | API {total:2,synced:0,reconnect:1,unlinked:1,guard:0,unanswered:0,failed:0}; SQL recomputed each FILTER → identical | OK |
+| "Could not load locations." error line | text | Shown if the locations query errors. | agency-workspace.tsx:100 | n/a | Code read | OK |
+| Select page / Select all matching (N) / Clear selection / "N selected" | button | Bulk-selection controls for the table checkboxes ("all matching" selects every row under the current filters, not just this page). | agency-workspace.tsx:102-108 | client only (selection state); the server re-applies filters for allMatching selections | Code read | OK |
+| Export selected CSV / Export matching CSV (`/api/agency/export?…`) | link | Downloads a CSV of the selected or filtered locations (ID, client, business, address, city, state, place ID, Google location). | agency-workspace.tsx:106,108 | GET /api/agency/export → server/agency/routes.ts:132-141 → streams business_locations (+client name) rows through locationFilter, cursor-paged 500s; optional ids re-checked per-row via locationAccess | curl (GET) → 200 text/csv with exactly the 2 rows of user 1 (104296, 506025), matching the list | OK |
+| Locations table rows (agency-location-<id>) | table / clickable rows | Each row: checkbox (aria-label "Select <name>"), location name button (opens that location on the Locations page), client name ("Unassigned" when none), full address, Google Linked/Not linked pill. | agency-workspace.tsx:109 | data from listLocations: SELECT l.*, c.name client_name FROM business_locations l LEFT JOIN agency_clients c … WHERE visibility+filters ORDER BY l.id LIMIT 50 OFFSET | API rows == SQL SELECT * FROM business_locations WHERE user_id=1 ORDER BY id (2 rows, ids 104296/506025, client NULL). Match | OK |
+| Pager: Previous page / "1–2 of 2" / Next page | button | Pages the 50-row location list. | agency-workspace.tsx:110 (Pager:26-28) | offset param → LIMIT 50 OFFSET | Code read | OK |
+| Bulk action select (aria-label "Bulk action", 8 options) | select | Chooses what to apply to the selected locations: Sync now, Link & sync, Unlink, Assign client, Set Guard mode, AI reply settings, Schedule post/photo batch, Start Site Scans. | agency-workspace.tsx:112 | POST /api/agency/bulk {requestKey: uuid, action, payload, selection:{ids|allMatching+filters}} → server/agency/routes.ts:127-131 → jobs.ts queueBulk: parses bulkInput, checks per-location access, dedupes by requestKey, caps queue at 20,000 pending, inserts one agency_jobs row per location (INSERT … SELECT FROM locationJoin WHERE filters AND (allMatching OR id=ANY(ids))), returns 202 {queued:n} | Route + body schema verified (jobs.ts:17-21,29-56); each action's payload validated by validatePayload (jobs.ts:22-28) | OK |
+| Assign to client select | select | Shown for action=assign; picks the client to assign. | agency-workspace.tsx:113 | payload {clientId} → validatePayload assign → clientAccess check; job performJob updates business_locations.agency_client_id (jobs.ts:92-95) | Code read | OK |
+| Guard mode select (Off/Notify/Lockdown) + approval note | select/text | Shown for action=guard; sets Profile Guard mode. The note states locations without an approved snapshot fail safely. | agency-workspace.tsx:114 | payload {mode, watched[11 fields]} → validatePayload guard (jobs.ts:23) → configureGuard (gbp/guard.ts); POST /api/agency/bulk itself 403s with {reauth:true} unless recent identity check (routes.ts:129, gbp/guard-routes.ts) | Client watched list == GUARD_FIELDS (guard.ts:10); schema match | OK |
+| AI reply mode select (Off / Draft / Auto-publish 3–5★) + tone input + sign-off input + note | select/input | Shown for action=ai-replies; configures AI review-reply behavior for future reviews on selected locations. | agency-workspace.tsx:115 | payload {mode, scope:'future', tone, signOff} → validatePayload ai-replies → replySettingsSchema (gbp/review-automation.ts:12-20, defaults fill maxLength 600 etc.) → saveReplySettings per location | Schema fields match; note "Low ratings stay drafts" matches shouldAutoPublish (rating>2 unless allowLowRatingAuto, review-automation.ts:23) | OK |
+| Content kind select (Post/Photo batch) + approved-content textarea + media photo IDs input + batch start time + note | select/input | Shown for action=content; queues an approved post or photo batch for every selected location. | agency-workspace.tsx:116 | payload {approved:true, items:[{kind:'post',summary,photoIds}|per-photo {kind:'photo',…}], schedule:{start ISO}} → validatePayload content (jobs.ts:25) → itemInput/scheduleInput (gbp/content.ts:37-56); enqueueContent per location (jobs.ts:96); "Photos must belong to the agency" enforced by itemInput id checks | Payload shape matches schemas; note about content queue/daily budget matches enqueue path | OK |
+| Unlink explanatory note | text | States unlink removes synced Google data here and stops syncing, but does not remove the listing from Google. | agency-workspace.tsx:117 | action=unlink payload {} → performJob → unlinkLocation (gbp/service) clears gbp_* fields | Code read | OK |
+| "Queue selected action" / "Approve & queue batch" button | button | Queues the chosen action for all selected locations; on success shows "<n> location actions queued. See Agency → Jobs for progress and failures." | agency-workspace.tsx:118 | POST /api/agency/bulk (above) → 202; worker runAgencyJobs (jobs.ts:114-147) runs each agency_jobs row per plan (non-sync actions fail with agencyPlanPaused when the plan lapses; sync requires an active plan) | Endpoint verified (routes.ts:127); success message text from onSuccess agency-workspace.tsx:90 | OK |
+| Bulk result message (role=status) | text | Result of the last bulk queue attempt. | agency-workspace.tsx:121 | client only | Code read | OK |
+
+### Clients tab (agency.tsx:72-75)
+
+Data: `GET /api/agency/clients?q=&offset=` → routes.ts:83-89 — agency_clients WHERE user_id=owner AND (allClients OR assigned) AND name/contact_email/folder/tags ILIKE, LIMIT 50 + count.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Search input (aria-label "Search agency records") | input | Filters clients by name, contact email, folder or tags. | agency.tsx:69 | q → concat_ws ILIKE (routes.ts:84-85) | Code read | OK |
+| Client form (write roles only): name, contact email, "More client details" (folder, tags, notes) | input | Creates a new client or edits the one loaded via "Edit"; tags are comma-separated. | agency.tsx:73 | POST /api/agency/clients {name,contactEmail,notes,tags,folder} → routes.ts:90-94 INSERT agency_clients(user_id=owner) (admin+allClients required); PUT /api/agency/clients/:id same body → routes.ts:95-98 UPDATE | Body matches clientInput zod (routes.ts:27); endpoint verified | OK |
+| Create client / Save client button | button | Validates name (and email format) client-side, then sends the create/update. | agency.tsx:38-42,73 | as above | Code read | OK |
+| New client (ghost, while editing) | button | Clears the form back to create mode. | agency.tsx:73 | client only | Code read | OK |
+| Client rows: name, "email · folder · tags", notes, "Edit <name>" | link/button | Lists each client; Edit loads it into the form. | agency.tsx:74 | GET list as above | API items: 2 clients (ids 21, 22) == SQL SELECT count(*) FROM agency_clients WHERE user_id=1 → 2. Fields match columns | OK |
+| Pager | button | Pages clients (50/page). | agency.tsx:79 | total from count(*) | API total=2 | OK |
+
+### Team tab (admin+; agency.tsx:76)
+
+Data: `GET /api/agency/team?q=&offset=` → routes.ts:99-102 — agency_members JOIN users (email ILIKE), each with ARRAY of agency_member_clients client_ids, LIMIT 50.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Team roles and access" details | text | Explains roles: owners manage membership, admins manage clients, managers manage locations, viewers read; unassigned locations need all-client access. | agency.tsx:76 | matches access model (access.ts requireAdmin/requireWrite; visibility() requires allClients or assignment) | Code read both sides | OK |
+| Member form (owner only): registered email, role select (admin/manager/viewer), "All clients" checkbox, client IDs input + live "id: name" list, Save member | input/select/button | Adds a registered ConstructHUB user to the team or updates their role/client access; client IDs must be numbers from the listed clients. | agency.tsx:76 | PUT /api/agency/team {email,role,allClients,clientIds} → routes.ts:103-122: looks up users.id by lower(email), validates clientIds belong to owner, inserts/updates agency_members + agency_member_clients under a seat lock (403 seatLimitBody when the owner's plan seats are full) | Body matches zod (routes.ts:106); endpoint verified; members list empty for user 1 (API total=0, SQL agency_members WHERE user_id=1 → 0) | OK |
+| Member rows: "email · role · clients" + Remove member (owner only) | text/button | Lists each member; Remove deletes them from the workspace. | agency.tsx:76 | DELETE /api/agency/team/:member_id → routes.ts:123 DELETE agency_members (owner only) | Endpoint verified; no rows in dev | OK |
+| Pager | button | Pages members. | agency.tsx:79 | total via count(*) OVER() | API total=0 | OK |
+
+### Onboarding tab (agency.tsx:77)
+
+Data: `GET /api/agency/onboarding?q=&offset=` → routes.ts:177-180 — agency_onboarding JOIN agency_clients, scoped per member assignment, business_name ILIKE, 50 rows; each item gets a `link` built from its encrypted token (`APP_URL/api/agency-onboarding/<token>`). Note: this endpoint returns **no `total`**, so the Pager total on this tab is a client-side guess — see Suspected bugs. Refreshes every 10 s.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Search input | input | Filters requests by business name. | agency.tsx:69 | r.business_name ILIKE '%q%' (routes.ts:178) | Code read | OK |
+| Onboarding form (write roles): client select, agency Google account select, business name, address, Place ID | select/input | Builds the "email Google manager instructions" request: which client, which connected agency Google email the client should invite, and the exact Google business name plus address or Place ID. | agency.tsx:77 | options from /api/agency/clients and /api/agency/google (grantStatus, gbp/grants.ts) — for user 1: google.accounts=[] | API /api/agency/google → {connected:false, accounts:[]} | OK |
+| "No agency Google account is connected…" note + Connect agency Google account link (owner) | link | Explains the button is disabled until an agency Google account is connected; the owner gets a direct connect link. | agency.tsx:77 | link → GET /api/gbp/connect (server/gbp/routes.ts:32-44) — starts Google OAuth, or redirects a plain navigation to /locations?gbp=reauth when identity wasn't recently verified | Route verified; rate-limited google-connections (routes.ts:26) | OK |
+| Email manager instructions button | button | Validates the four fields client-side, then queues the instructions email to the client's contact address. | agency.tsx:49-55,77 | POST /api/agency/onboarding {clientId,subject,businessName,address?,placeId?} → routes.ts:176 → onboarding.ts createOnboarding: validates client + contact email, verifies subject against gbp_grants with the business.manage scope, daily cap 100/owner (takeBudget), INSERT agency_onboarding (status 'sent', expires_at now()+30 days, token hashed+encrypted) → 202 {queued}; the onboarding worker (onboarding.ts:112-141, 1-min tick) actually sends the email and later accepts the matching Google invitation | Schema match (onboardingInput onboarding.ts:22); defaults verified in DB (\d agency_onboarding: status 'sent', expires_at now()+30 days); "reminders after three and six days" matches worker reminder_at/reminders<2 logic; "expire after 30 days" matches default | OK |
+| "What the client receives" details | text | Explains the client keeps ownership, adds the agency email as Manager; reminders after 3 and 6 days; expiry after 30 days. | agency.tsx:77 | matches sendOnboarding/instructions() text and pollInvitations auto-accept flow | Code read | OK |
+| Request rows: business name, "status · contact → agency email", error line, read-only link input, Copy link, Send reminder | text/button/input | Lists each request; Copy link copies the client's instructions URL to the clipboard; Send reminder re-queues the reminder email (once per day per request). A fresh request shows "Email queued" until the worker marks it sent. | agency.tsx:77 | GET list as above; POST /api/agency/onboarding/:id/remind → routes.ts:181-183: owner-scoped, rate-limited 1/day (takeBudget), sets reminder_at=now()-4d/reminders≤1 so the worker sends on its next tick; Copy link is client-only clipboard | Route verified; 0 rows for user 1 (API items=[], SQL agency_onboarding WHERE user_id=1 → 0) | OK |
+| Pager | button | Pages requests — **total is guessed client-side** (see bugs). | agency.tsx:79 | API returns no total | curl response lacks "total"; other endpoints include it | BUG |
+
+### Jobs tab (agency.tsx:78)
+
+Data: `GET /api/agency/jobs?q=&offset=` → routes.ts:142-145 — agency_jobs JOIN business_locations (+client) WHERE visibility+filters, ORDER BY created_at DESC, 50 rows, count(*) OVER() total. Refreshes every 10 s.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Search input | input | Filters jobs by location text (business name/address/etc.). | agency.tsx:69 | q via locationFilter concat_ws ILIKE (routes.ts:143-144) | Code read | OK |
+| Job rows: "business · action · status" + error line | text | Shows each queued/running/finished background action (sync, unlink, link, guard, ai-replies, assign, content, scan) and its error when failed. | agency.tsx:78 | agency_jobs columns id,batch_id,action,location_id,status,error,created_at,finished_at + business_name | API items=[] total=0; SQL SELECT count(*) FROM agency_jobs WHERE user_id=1 → 0 | OK |
+| "No queued actions." empty state | text | Shown when the jobs list is empty. | agency.tsx:78 | n/a (list is all jobs, not just queued — text only appears when there are none at all) | Code read | OK |
+| Pager | button | Pages jobs. | agency.tsx:79 | total from count(*) OVER() | API total=0 | OK |
+
+### Settings tab (owner only; agency.tsx:71)
+
+Data: current values from /api/agency/me → workspace {name, auto_accept_all} (workspace row verified: name "Agency", auto_accept_all false, updated 2026-09-30).
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Agency name input (placeholder = current name) | input | Renames the agency workspace (falls back to the current name when left blank). | agency.tsx:71 | PUT /api/agency/settings {name, autoAcceptAll} → routes.ts:77-82 → INSERT … ON CONFLICT (user_id) DO UPDATE agency_workspaces(name, auto_accept_all, updated_at) + activity log | Body matches zod; endpoint verified by code | OK |
+| "Auto-accept all location invitations" checkbox + explanation ("Unmatched invitations stay unassigned… Current setting: disabled") | input/text | When on, the background worker accepts any unmatched Google invitation on connected agency accounts; when off, only invitations matching an open onboarding request are accepted. The text states the current setting. | agency.tsx:71 | auto_accept_all read by pollInvitations (onboarding.ts:48,64); persisted by the same PUT | DB column auto_accept_all=false matches "Current setting: disabled" | OK |
+| Save agency settings button | button | Saves name + auto-accept choice. | agency.tsx:71 | PUT /api/agency/settings (above) | Code read | OK |
+| Connect agency Google account link | link | Starts Google OAuth for an agency Google account (asks to verify identity first when needed). | agency.tsx:71 | GET /api/gbp/connect (gbp/routes.ts:32) | Route verified | OK |
+| Refresh Google listings in background button | button | Queues a refresh of the connected accounts' Google Business Profile discovery (used by "Import from GBP" and Link & sync). | agency.tsx:71 | POST /api/agency/google/refresh {} → routes.ts:169-175: requireAdmin + allClients, rate-limited 1/10min per owner, marks agency_poll_grants refresh_requested=true for every connected gbp_grant → 202 {queued}; worker runs refreshDiscovery (jobs.ts:61-67) | Endpoint + body verified; admin role required matches "owner-only tab" | OK |
+| Pager | button | Hidden on this tab (`tab!=='settings'` guard). | agency.tsx:79 | n/a | Code read | OK |
+
+### Fallback locations list (non-entitled owners only — not reachable for this user)
+
+When /me says entitled=false, AgencyWorkspace renders OwnLocations (agency-workspace.tsx:38-69): own-location table served by `GET /api/locations?paged=true&q=&status=&offset=` (intercepted by the agency middleware for every signed-in user, server/agency/middleware.ts:29-33 → listLocations with the same filters), single-location shortcut card, empty state with "Import your Business Profile" (/locations?import=gbp) and, when the account has no plan at all, a "See plans" button (/pricing) plus a note that bulk features need the Agency plan (link to /pricing). All links/routes verified above; the location limit copy uses STARTING_MONTHLY_CENTS from shared/plan-copy.
+
+---
+
+## Suspected bugs
+
+1. **agency · Onboarding tab pager shows a guessed total** — Owner sees "1–50 of 51"-style ranges on the Onboarding tab: `Pager` receives `list?.total ?? (items.length===50 ? offset+51 : offset+items.length)` (client/src/pages/agency.tsx:79) because `GET /api/agency/onboarding` is the only list endpoint that returns `{items}` with **no `total`** (server/agency/routes.ts:177-180; clients/team/jobs all return a real total — e.g. curl /api/agency/team shows `"total":0`). Evidence: `curl -s http://127.0.0.1:8303/api/agency/onboarding?q=&status=all&offset=0` → `{"items":[]}` (no total key). With exactly 50 items it shows "of 51" and enables a Next page that then reads "51–50 of 50". Root cause: routes.ts:177-180 omits a `count(*)` (unlike routes.ts:101 and :144 which use `count(*) OVER()`). Smallest fix: add `count(*) OVER()::int total` to the onboarding SELECT and return `{items, total}` — then agency.tsx:79's fallback never engages.
+
+2. **developers · Endpoint reference splits into near-duplicate tag sections** — The owner sees two "account" sections (`account` with GET /me, `Account` with GET /account) and four one-off lowercase sections (`locations`, `reviews`, `site-scans`, `social-posts`) holding only the write operations, separate from the Title-case read sections (`Locations`, `Reviews`, `Site scans`, `Social posts`) — so e.g. the GET and POST docs for `/locations/{id}/posts` live in different cards. Evidence: live doc — GET /me has `tags:["account"]` (server/public-api/openapi.ts:69) while GET /account has `tags:["Account"]` (resources/account.ts:50,54); writes get `tags:[tag]` with the lowercase resource name (resources/shared-write.ts:117 via index-write.ts:29-32). 12 tag cards render where 8 would do. Root cause: tag strings aren't normalized across the built-in doc, read fragments, and write fragments. Smallest fix: use one canonical tag per resource (e.g. "account" everywhere and Title-case tags for writes, or normalize case when building `tags` in openapi.ts:76-84 and in the page's `tags` memo developers.tsx:107-111).
+
+### Notes (not element bugs)
+- client/src/pages/agency.tsx imports `useAgencyFilter` from agency-workspace but never uses it (dead import, agency.tsx:6); the page keeps its own useState search/offset.
+- developers.tsx:184 says the rate-limit/quota headers appear "on every response"; they are set only once a request passes key authentication (401/404 responses carry none) — materially true for real API calls, not worth an owner-facing change.
+
+## Verification summary
+
+- Recomputed with SQL (psql, SELECT only) and matched against live API JSON for: locations total (2=2), dashboard status counts (synced 0, reconnect 1, unlinked 1, guard 0, unanswered 0, failed 0 — all six matched), clients (2=2), team members (0=0), onboarding (0=0), jobs (0=0), CSV export rows (2 rows, same ids as the list).
+- Cross-org check: agency_clients/agency_members/agency_onboarding/agency_jobs contain rows only for user_id=1; business_locations also has one row for user 2328, which never appears in user 1's API responses (visibility filter `l.user_id=$1` confirmed in every query).
+- Buttons verified by code against server handlers: POST/PUT /api/agency/clients, PUT/DELETE /api/agency/team, POST /api/agency/workspace, PUT /api/agency/settings, POST /api/agency/bulk (+ per-action payload schemas), POST /api/agency/google/refresh, POST /api/agency/onboarding(+/:id/remind), GET /api/agency/export.
+- Links verified: /settings/api → settings?tab=api-keys (section exists), /locations?import=gbp (dialog opens, locations.tsx:74-77), /pricing, /features, /done-for-you, /call-assistant, guide routes, /api/v1 (200 CRM index), /api/v1/openapi.json (200 JSON), /api/gbp/connect (route exists; navigation → /locations?gbp=reauth without recent auth), external https://support.google.com/business/answer/3403100 (200 via GET).
+- Could not verify by execution (no writes allowed): POST/PUT/DELETE side effects (client create, member save, bulk queue, settings save, onboarding send) — verified by matching request shapes to the server's zod schemas and handlers instead. The OwnLocations fallback and PlanRequired card don't render for this entitled dev user — mapped by code read only.
