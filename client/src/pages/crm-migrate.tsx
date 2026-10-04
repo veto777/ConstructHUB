@@ -166,6 +166,7 @@ export default function CrmMigratePage() {
       setResult(data);
       if (entity === "customers") queryClient.invalidateQueries({ queryKey: ["/api/crm/customers"] });
       if (entity === "estimates") queryClient.invalidateQueries({ queryKey: ["/api/crm/estimates"] });
+      if (entity === "invoices") queryClient.invalidateQueries({ queryKey: ["/api/crm/invoices"] });
     },
     onError: (e: any) =>
       toast({ title: "Import failed", description: apiErrorMessage(e), variant: "destructive" }),
