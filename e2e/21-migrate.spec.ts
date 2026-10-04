@@ -71,6 +71,24 @@ test.describe("/crm/migrate", () => {
   });
 
 
+  test("curated: 'rows need attention' counts rows, not problems", async ({ page }) => {
+    const guards = watchPage(page);
+    await gotoCrm(page, "/crm/migrate");
+
+    // One data row with TWO problems (no name, bad email) — the pill must say
+    // "1 row needs attention", not "2".
+    const csv = ["Name,Email", ',not-an-email'].join("\n");
+    await page.getByTestId("input-migrate-file").setInputFiles({
+      name: "bad-rows.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(csv),
+    });
+    await page.getByTestId("button-preview").click();
+    await expect(page.getByTestId("text-preview-summary")).toContainText("1 row needs attention");
+
+    guards.assertClean("migrate attention rows");
+  });
+
   test("sweep: every button and link", async ({ page }) => {
     const { clicked, labels } = await sweepPage(page, "/crm/migrate", {
       ready: 'h1:has-text("Bring your data with you")',
