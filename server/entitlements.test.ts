@@ -42,15 +42,15 @@ describe("plan resolution", () => {
     expect((await getEntitlements(7)).modules.adsManager).toBe(false);
   });
 
-  it("keeps a past-due subscription's plan while Stripe retries the card", async () => {
+  it("a failed payment (past_due) pauses the plan until Stripe collects (owner, 2026-10-04)", async () => {
     mocks.row = customer("growth", { status: "past_due", addons: { competitor_pack: 1 } });
     const ent = await getEntitlements(7);
-    expect(ent.plan).toBe("growth");
-    expect(ent.allowances?.competitorScans).toBe(18);
+    expect(ent.plan).toBeNull();
+    expect(ent.subscriptionStatus).toBe("past_due");
     const { pool } = await import("./db");
     const [sql, values] = (pool.query as any).mock.calls.at(-1);
     expect(sql).toMatch(/x\.status = ANY\(\$2::text\[\]\)/);
-    expect(values[1]).toEqual(["active", "trialing", "past_due"]);
+    expect(values[1]).toEqual(["active", "trialing"]);
   });
 
   it("has no plan for missing, inactive or unknown subscriptions", async () => {
@@ -203,7 +203,7 @@ describe("module helpers", () => {
     });
     const before = query.mock.calls.length;
     const allowed = await usersWithModule([1, 2, 3, 4, 5, 6, 6, Number.NaN], "domainsMailAlerts");
-    expect([...allowed].sort()).toEqual([1, 3, 5, 6]);
+    expect([...allowed].sort()).toEqual([1, 5, 6]);   // 3 is past_due: paused until paid
     expect(query.mock.calls.length - before).toBe(1);
     expect(await usersWithModule([], "adsManager")).toEqual(new Set());
   });

@@ -439,7 +439,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
 
     // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." A failed renewal
-    // (past_due — the plan itself keeps access while Stripe retries) pauses the assistant on the
+    // (past_due — the plan pauses too, owner 2026-10-04) pauses the assistant on the
     // very next call: no cache between the subscription row and the engine's per-call fetch.
     await pool.query("update subscriptions set status = 'past_due' where user_id = $1", [owner.id]);
     try {
@@ -462,8 +462,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       expect(nums.status).toBe(200);
       expect(nums.body.paused).toBe(true);
       expect((await api("/api/crm/voice/numbers/search?state=WA", owner)).body.code).toBe("payment_required");
-      // The plan's own features are untouched by past_due (only the add-on stops).
-      expect((await api("/api/entitlements", owner)).body).toMatchObject({ plan: "pro", addonModules: { callAssistant: false }, addonModulesPaused: { callAssistant: true } });
+      // The plan is paused too until the payment goes through (owner, 2026-10-04), and the app says so.
+      expect((await api("/api/entitlements", owner)).body).toMatchObject({ plan: null, paymentNeeded: true, subscriptionStatus: "past_due", addonModules: { callAssistant: false }, addonModulesPaused: { callAssistant: true } });
     } finally {
       await pool.query("update subscriptions set status = 'active' where user_id = $1", [owner.id]);
     }

@@ -753,9 +753,9 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(mocks.sql.some((q) => /SELECT cancel_at_period_end/.test(q.text))).toBe(false);
   });
 
-  it("a past-due subscription keeps its plan while Stripe retries the card; unpaid or canceled do not", async () => {
+  it("no plan access while a payment is owed (past_due, unpaid) or after it ended (owner, 2026-10-04)", async () => {
     mocks.rows.push([liveRow({ status: "past_due" })]);
-    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "past_due", effectivePlan: "pro" });
+    expect((await request("GET /api/stripe/subscription")).body).toMatchObject({ status: "past_due", effectivePlan: null });
     for (const status of ["unpaid", "canceled", "incomplete_expired", "incomplete"]) {
       mocks.rows.push([liveRow({ status })]);
       expect((await request("GET /api/stripe/subscription")).body.effectivePlan, status).toBeNull();

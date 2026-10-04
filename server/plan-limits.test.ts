@@ -70,8 +70,8 @@ describe("trial codes", () => {
 
     const dunning = await account("growth", { status: "past_due" });
     expect(await redeemTrialCode(dunning, c)).toMatchObject({ status: 409 });
-    // Past due keeps the plan while Stripe retries the card.
-    expect((await getEntitlements(dunning)).plan).toBe("growth");
+    // A failed payment pauses the plan until it's paid (owner, 2026-10-04); a trial code still can't paper over it.
+    expect((await getEntitlements(dunning)).plan).toBeNull();
 
     const granted = await account("platinum", { stripe: null });
     expect(await redeemTrialCode(granted, c)).toMatchObject({ status: 409 });

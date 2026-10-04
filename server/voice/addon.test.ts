@@ -167,8 +167,8 @@ describe("entitlements: the callAssistant add-on module", () => {
     expect(callAssistantAllowance(ent)).toEqual(on || paused
       ? { numbers: 3, minutes: callAssistantTier("solo").includedMinutes, overageCentsPerMinute: callAssistantTier("solo").overageCentsPerMinute }
       : { numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
-    // past_due keeps the PLAN's own access (only the add-on stops).
-    if (status === "past_due") expect(ent.plan).toBe("pro");
+    // past_due pauses the plan too (owner, 2026-10-04); the add-on shows "paused for payment", not "ended".
+    if (status === "past_due") expect(ent.plan).toBeNull();
   });
 
   it("platform admins keep the module whatever their own subscription says", async () => {

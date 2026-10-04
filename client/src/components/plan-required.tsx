@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { Lock } from "lucide-react";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { CREDENTIAL_SOURCES, disconnectMessage, fetchOptionalList, type SavedCredential } from "@/lib/saved-credentials";
 import { VerificationCancelled } from "@/components/recent-auth";
@@ -136,7 +136,12 @@ const dollars = (cents: number) =>
 export function PlanRequired({ module, error, className }: { module: ModuleKey; error?: unknown; className?: string }) {
   const body = planRequiredFrom(error);
   const plan = PLANS[body?.requiredPlan ?? planForModule(module)];
-  const message = body?.message || `${MODULE_NAMES[module]} is included with the ${plan.name} plan.`;
+  // A paying customer whose last payment failed is not asked to buy a plan: they're asked to fix the card.
+  const { data: ent } = useQuery<{ paymentNeeded?: boolean }>({ queryKey: ["/api/entitlements"], staleTime: 60_000 });
+  const paymentNeeded = ent?.paymentNeeded === true;
+  const message = paymentNeeded
+    ? `Your last payment didn't go through, so ${MODULE_NAMES[module]} is paused. Update your card in Billing and it turns back on by itself.`
+    : body?.message || `${MODULE_NAMES[module]} is included with the ${plan.name} plan.`;
   const locations = plan.limits.locations;
   const headingId = `plan-required-${module}`;
   return (
@@ -161,9 +166,15 @@ export function PlanRequired({ module, error, className }: { module: ModuleKey; 
             {plan.name} plan: {dollars(plan.monthlyCents)} a month, {locations} location{locations === 1 ? "" : "s"} included.
           </p>
         )}
-        <Button asChild className="w-full sm:w-auto">
-          <Link href="/pricing" data-testid="link-plan-required-pricing">See plans and pricing</Link>
-        </Button>
+        {paymentNeeded ? (
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/settings?tab=billing" data-testid="link-plan-required-billing">Update card</Link>
+          </Button>
+        ) : (
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/pricing" data-testid="link-plan-required-pricing">See plans and pricing</Link>
+          </Button>
+        )}
         <SavedConnections module={module} />
       </CardContent>
     </Card>

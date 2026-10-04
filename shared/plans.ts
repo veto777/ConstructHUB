@@ -424,23 +424,20 @@ export const LEGACY_PLAN_MAP: Record<string, PlanKey> = {
 };
 
 /**
- * Subscription statuses that keep the plan's features. `past_due` is a Stripe
- * subscription whose renewal payment failed while Stripe retries the card:
- * access stays on through the retries. When the retries fail, Stripe moves the
- * subscription to canceled or unpaid (both without access) only if the Stripe
- * Dashboard's failed-payment setting says so; "leave the subscription past-due"
- * would keep access on with no end, so that setting must not be chosen. `incomplete`
- * (the first payment never went through), `incomplete_expired`, `unpaid`,
- * `paused` and `canceled` have no access.
+ * Subscription statuses that keep the plan's features: paid up (`active`) or in the trial (`trialing`). Owner,
+ * 2026-10-04: "when a payment fails … did you fix that" — a failed payment no longer keeps the plan on. `past_due`
+ * (Stripe retrying a failed renewal), `unpaid`, `incomplete`, `paused` and `canceled` have no access; the app shows
+ * "Your last payment didn't go through · Update card" (PAYMENT_NEEDED_STATUSES) and the moment Stripe collects, the
+ * webhook moves the subscription back to active and everything returns — nothing to re-buy, nothing lost. This no
+ * longer depends on the Stripe Dashboard's failed-payment setting.
  */
-export const ACCESS_STATUSES: readonly string[] = ["active", "trialing", "past_due"];
+export const ACCESS_STATUSES: readonly string[] = ["active", "trialing"];
 
 /**
  * Subscription statuses under which an add-on MODULE runs (the AI Call
  * Assistant answers calls). Stricter than ACCESS_STATUSES on purpose — owner,
  * 2026-10-02: "As soon as they stop paying the agent stops working." The plan
- * itself keeps its features through Stripe's retries (past_due); the
- * assistant, which costs GPU, AI and carrier minutes per call, does not.
+ * itself now stops on past_due too (ACCESS_STATUSES).
  */
 export const ADDON_MODULE_RUN_STATUSES: readonly string[] = ["active", "trialing"];
 /**

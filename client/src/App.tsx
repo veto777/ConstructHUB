@@ -1,6 +1,7 @@
 import AgencyPage from "@/pages/agency";
 import GoogleProfilePage from "@/pages/google-profile";
 import InvitePage from "@/pages/invite";
+import { PaymentNeededBanner } from "@/components/payment-needed-banner";
 import { CloudflarePage, SearchConsolePage } from "@/pages/site-connections";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
@@ -691,6 +692,7 @@ function AppContent() {
               <ThemeToggle />
             </div>
           </header>
+          <PaymentNeededBanner />
           <main className="flex-1 min-h-0 overflow-auto flex flex-col">
             <div className="flex-1">
               <DashboardRouter />

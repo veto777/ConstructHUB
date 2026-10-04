@@ -2,7 +2,7 @@ import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmen
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
 import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
-import { PLANS, fitsLimit } from "@shared/plans";
+import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
@@ -258,6 +258,9 @@ export async function registerRoutes(
           planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
           isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
           limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addonModulesPaused: ent.addonModulesPaused, addons: ent.addons,
+          // A failed payment pauses the plan (shared/plans.ts ACCESS_STATUSES): the shell's banner says so.
+          subscriptionStatus: ent.subscriptionStatus ?? null,
+          paymentNeeded: !ent.isPlatformAdmin && PAYMENT_NEEDED_STATUSES.includes(ent.subscriptionStatus ?? ""),
           locations: { used: locations, limit: ent.allowances?.locations ?? 0 },
           usage, resetsAt: resetsAt(),
         });
