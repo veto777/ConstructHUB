@@ -1349,3 +1349,488 @@ If the owner ever wants online course checkout again, either drop module/bundle 
 - Google OAuth callback end-to-end (requires a Google account; the authorize redirect and callback code path were verified by code read + the live 302).
 - Email deliverability (dev forces the sink, email.ts:203-229).
 - GBP delete-on-disconnect completeness (see UNCLEAR #2).
+# Lane 6 — /features catalogue + 30 feature pages (map-03-features)
+
+Scope: `client/src/pages/features.tsx` (`/features`, `/features/:slug`, `LegacyLanding`), all 30 content
+files in `shared/feature-pages/*.ts` + `types.ts` + `pricing.ts`, and the shared template
+`client/src/components/feature-landing/**` (`feature-landing.tsx`, `sections.tsx`, `primitives.tsx`,
+`icons.ts`). External page slotted into the catalogue: `/call-assistant` (hand-built landing, audited
+here only as a catalogue entry).
+
+Registry: `shared/feature-pages/index.ts` — `FEATURE_PAGES` (30 template pages, index.ts:66-79),
+`EXTERNAL_FEATURE_PAGES` = callAssistant only (index.ts:84-94), `FEATURE_CATALOGUE` built at
+index.ts:135-152 (template pages in dashboard-tile order with externals spliced in by tile position),
+`FEATURE_GROUPS` = the dashboard's 5 groups + "platform" (index.ts:59-63), `READY_FEATURE_PAGES` =
+all 30 (every page has `status: "ready"` — verified by script; all 30 are prerendered and in the
+sitemap via `shared/seo.ts:47`).
+
+Prices: every price/allowance on these pages is computed client-side from `shared/plans.ts` through
+`shared/feature-pages/pricing.ts` (`featurePriceSummary`). The brief's "via server/catalog.ts" is not
+how these pages work — `server/catalog.ts` is the courses/done-for-you catalog (used only by the
+Master Class "sales" claim, verified: all four modules are ≥ $1,500 → `isSalesOnly` → sales-rep
+quote, catalog.ts:50). The `server/feature-pages.test.ts` vitest (18 tests) locks the registry
+invariants: catalogue order vs dashboard tiles, no `$` typed in copy, pricing kinds match the plan
+gates, related keys resolve. Ran it: **18/18 pass**.
+
+Feature flags: `SHOW_GOOGLE_REVIEWS = true`, `SHOW_COMPETITOR_INTEL = true`
+(client/src/lib/features.ts:13,26) → the two flagged pages (reviews, competitors) and their
+catalogue cards are visible; if flipped off, both the card and the page 404 together
+(`featureVisible`, feature-landing.tsx:36; features.tsx:198).
+
+Signed-out vs signed-in: both routers register `/features` and `/features/:slug`
+(client/src/App.tsx:208-209 public, ~310-311 app frame). Signed out the pages wear
+`PublicPageHeader`/`PublicPageFooter` (client/src/components/public-page-chrome.tsx); signed in those
+components return null (public-page-chrome.tsx:37,72) so the same page renders inside the dashboard
+frame with the sidebar. `/features/call-assistant` (an external key's slug) client-redirects to
+`/call-assistant` (features.tsx:199-201); unknown/flagged-off slugs render NotFound
+(features.tsx:202). Retired landings (`/permits-landing`, `/google-ads-landing`,
+`/competitors-landing`, `/master-class-landing`) replace-redirect to their feature page via
+`LegacyLanding` (features.tsx:210-213).
+
+DB: this lane's pages contain **no live DB counts** (the writing guide forbids stats in content
+files; verified — no "N databases"/"N counties" numbers anywhere in the 30 files). Spot-checked the
+underlying data exists anyway: counties=3,139, permit_databases=32,853, property_appraisers=3,040.
+
+Dev server at 127.0.0.1:8306 is the Vite SPA shell (curl returns index.html, title fallback
+"ConstructHUB — Nationwide Contractor Services"); real HTML per page comes from the prerender
+(`script/prerender.ts`), route meta from `shared/route-meta.ts:36-41` (`/features` + one entry per
+feature page). Playwright lane `e2e/feature-pages.spec.ts` covers both viewports signed out/in.
+
+## /features — Feature Catalogue
+
+Page: `FeaturesCataloguePage`, client/src/pages/features.tsx:72-185. Data: FEATURE_GROUPS +
+FEATURE_CATALOGUE. 31 catalogue entries (30 template + callAssistant), 6 group bands. All prices
+below recomputed with `featurePriceSummary` and match `shared/plans.ts` by construction.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Public header (signed out only) | chrome | Site nav with Features/Done-For-You/Plans menus; hidden once signed in | client/src/components/public-page-chrome.tsx:37 | none (static chrome) | code read | OK |
+| Hero kicker "Every Feature" | text | Small-caps section label | features.tsx:103 | none (static copy) | code read | OK |
+| H1 "Pick the Tools Your Business Needs" (`text-features-title`) | text | Page headline | features.tsx:104 | none | code read | OK |
+| Hero lede | text | Explains the page | features.tsx:107-110 | none | code read | OK |
+| Primary CTA (`cta-features-primary`) | link | Signed out → "Create Your Account" → `/auth?mode=signup&next=/features`; signed in → "Compare Plans" → `/pricing` | features.tsx:85-87 | none (client routes; /auth and /pricing exist in App.tsx) | App.tsx route grep | OK |
+| Sales button hero (`button-features-sales-hero`) | button | Opens the talk-to-sales dialog (topic "Which ConstructHUB features fit my business") | features.tsx:88-92,182 | POST /api/seo-inquiry → server/routes.ts:3306 (rate limit 5/hr/IP, routes.ts:71) | route grep | OK |
+| Group jump chips (`link-features-group-<key>`) | anchor ×6 | Smooth-jump to #grow #protect #win #run #learn #platform | features.tsx:116-122 | none | code read | OK |
+| Mascot panel (StandingGator + speech bubble) | illustration | Decorative, aria-hidden | features.tsx:124-135 | none | code read | OK |
+| Group band (`section-features-<key>`) ×6 | section | Kicker numbered 01-06, group H2 (labels "Grow","Protect","Win jobs","Run the business","Learn","The platform"), group blurb | features.tsx:141-161; labels from shared/dashboard.ts:19-25 + index.ts:59-63 | none (static copy) | code read | OK |
+| Catalogue card (`card-catalogue-<key>`) ×31 | link | One card per feature → the feature's page (`entry.path`). Icon (first "what you get" card's icon; callAssistant gets "phone"), title, lede, plan headline + price figure, "See how it works" | features.tsx:42-69; registry index.ts:135-152 | none (static copy + price book) | script recomputed all 31 prices | OK |
+| — Card plan line (`text-catalogue-plan-<key>`) | text | e.g. "Included in every plan", "Included from the Pro plan", "Agency plan", "Add-on", "Free with an account", "Talk to a sales rep", "One-time service" | features.tsx:61-64 via pricing.ts:72-149 | shared/plans.ts PLANS/ADDONS (client-side compute) | recomputed; matches gates below | OK |
+| — Card price figure (`text-catalogue-price-<key>`) | text | "from $29/mo" (plan), "from $79/mo" (allowance: clickGuard, ipTracker, vpnShield, competitors, texting, customerApi), "$349/mo" (module: cloudflare, searchConsole, domains, mailAlerts, adsManager, agency), "$249/mo" (callAssistant add-on), "$599 one-time" (reinstatement), none (account/sales kinds) | features.tsx:45,63 | shared/plans.ts monthlyCents | recomputed for all 31 | OK |
+| — Card "Coming soon" pill (`badge-feature-coming-soon`) | badge | Shown when `price.comingSoon` (add-on `preview` flag) | features.tsx:57; sections.tsx:44-53 | shared/plans.ts ADDONS.preview — currently **no add-on has preview:true** (plans.ts:353: "the call assistant is live not coming soon") | grep preview in plans.ts | OK (none shown — correct) |
+| Close band "Not Sure Where to Start?" | section | Navy closing band with mascot | features.tsx:164-179 | none | code read | OK |
+| — "Compare Plans" link (`link-features-pricing`) | link | → /pricing | features.tsx:175 | none | route grep | OK |
+| — Sales button cta (`button-features-sales-cta`) | button | Same talk-to-sales dialog | features.tsx:176,182 | POST /api/seo-inquiry | route grep | OK |
+| Public footer (signed out only) | chrome | Marketing footer; hidden signed in | public-page-chrome.tsx:72 | none | code read | OK |
+| TalkToSalesDialog | dialog | Form name/email/company/need → POST /api/seo-inquiry {service: topic, name, email, message}; server emails sales inbox | client/src/components/talk-to-sales.tsx:32-52 | POST /api/seo-inquiry → server/routes.ts:3306, seoInquiryInput (service ≤100, message ≤5,000) | code read both sides | OK |
+
+Catalogue price/gate cross-check (recomputed): "Included in every plan" pages = gbp, reviews,
+profileGuard, rankingGrid, gbpContent, social, siteScan, media, permits, crm, crmSchedule, crmLeads —
+all `requirePlan`-gated features; "Included from the Pro plan" = clickGuard/ipTracker/vpnShield
+(protectedSites: Starter 0, Pro 1 ✓), competitors (competitorScans: Starter 0, Pro 2 ✓), texting
+(teamTextSegments: Starter 0, Pro 500 ✓), customerApi (apiUnitsPerMonth: Starter 0, Pro 10,000 ✓);
+"Agency plan" = cloudflare/searchConsole/domains/mailAlerts (modules.cloudflareSearchConsole/
+domainsMailAlerts true only on Agency ✓), adsManager (modules.adsManager Agency-only ✓), agency
+(modules.agencyWorkspace Agency-only ✓); "Add-on" $249/mo = callAssistant (Solo, monthlyCents 24900,
+availableOn Pro/Growth/Agency ✓); "Free with an account" = property, lsaLeads, guides, gabe (no plan
+check in their server routes — verified: no requirePlan/requireModule in server/social/routes.ts…
+lsa/routes.ts, /api/property-appraisers at routes.ts:863, server/hub/routes.ts) ✓; "Talk to a sales
+rep" = masterClass (all modules ≥ $1,500 → isSalesOnly ✓); "One-time service" $599 = reinstatement
+(GBP_REINSTATEMENT_CENTS 59_900 < SALES_THRESHOLD ✓, same constant used by /reinstatement page and the
+Hub knowledge pack).
+
+## /features/<slug> — the shared template (every feature page)
+
+Page: `FeatureLanding`, client/src/components/feature-landing/feature-landing.tsx:41-134, rendering
+sections from client/src/components/feature-landing/sections.tsx. Content = one `FeaturePage` data
+object (shared/feature-pages/types.ts:151-164). Every price comes from
+`featurePriceSummary(page.pricing)` (feature-landing.tsx:44) so the hero sentence, the pricing card
+and the closing band can never disagree. Sections render only when their content exists
+(steps/cards/spotlight/audience/faq/inDepth/related); pricing + hero + closing band always render.
+
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| Public header / footer (signed out only) | chrome | Same chrome as the catalogue; null inside the app frame | feature-landing.tsx:111,130 | none | code read | OK |
+| Page wrapper (`page-feature-<slug>`, `data-feature-status`) | container | Root; carries the registry status ("ready" on all 30) | feature-landing.tsx:112 | none (static registry) | script: all status "ready" | OK |
+| Back link (`link-feature-all`) "← All features" | link | → /features | sections.tsx:72,91-93 | none | route grep | OK |
+| Kicker (`page.kicker`) + ComingSoon pill (`badge-feature-coming-soon`) | text/badge | Small-caps feature name; pill only when the pricing spec is a preview add-on (none today) | sections.tsx:94-97 | shared/plans.ts ADDONS.preview | grep | OK (none) |
+| H1 (`text-feature-title`) = lead + swiped phrase + tail | text | The page's headline from the content file | sections.tsx:98-100 | none (static copy in shared/feature-pages/<file>.ts) | code read | OK |
+| Lede (`text-feature-lede`) | text | One/two sentences under the H1 | sections.tsx:101-103 | none (static copy) | code read | OK |
+| Hero primary CTA (`cta-feature-primary-hero`, data-cta) | link | Three-way, also repeated in pricing section and closing band: (a) signed-in on wrong plan → "Upgrade to <Plan>" / "See add-ons" → /pricing (or /pricing#add-ons) with note "Not in your <Plan> plan." (`text-feature-plan-gap`); (b) signed in → "Open <feature>" via DashLink (app routes go through wouter; portal surfaces (CRM) open portalUrl(href) with a full load); (c) signed out → "Create Your Account" → `/auth?mode=signup&next=<app.href>` (portal features use next=/crm-app) | feature-landing.tsx:60-76,82-89,39; dash-link.tsx:23-28 | GET /api/entitlements → server/routes.ts:249 getEntitlements → subscriptions/plan + allowances + modules + addonModules (ACCESS_STATUSES active/trialing); gap logic mirrors requireModule/allowance/addon gates (pricing.ts:185-208) | routes.ts:249 read; shape matches FeatureEntitlementsInput | OK |
+| Hero sales button (`button-feature-sales-hero`) | button | Opens TalkToSalesDialog (topic = page title); repeated as `-pricing` and `-cta` variants | feature-landing.tsx:77-81,128 | POST /api/seo-inquiry → server/routes.ts:3306 | route grep | OK |
+| "Try it" line (`link-feature-try`) | link | Only when the content file sets `tryIt` and visitor is signed out: "Not ready to sign up? <label>" → href | feature-landing.tsx:82-89 | none (client route; hrefs verified in App.tsx) | grep | OK |
+| Hero price sentence (`text-feature-hero-price`) | text | e.g. "Included in every plan — from $29/mo." / "Quoted by a sales rep for your business." + "See pricing" anchor → #pricing | sections.tsx:60-65,109-112 | shared/plans.ts via pricing.ts | same object as pricing card → agrees by construction | OK |
+| Mascot bubble (`text-feature-bubble`) + StandingGator/GabeAvatar panel | illustration | Navy panel, mascot + one line from the content file; aria-hidden | sections.tsx:116-133 | none | code read | OK |
+| "How It Works" (`section-feature-how`, `step-feature-N`) | section | 3-5 numbered steps; heading auto "Up and Running in <N> Steps" or content override; hidden when empty | sections.tsx:189-207 | none (static copy) | code read | OK |
+| "What You Get" (`section-feature-cards`, `card-feature-N`) | section | Capability cards (icon + title + body) + filler cells; hidden when empty | sections.tsx:211-236,242-256 | none (static copy) | code read | OK |
+| Spotlight (`section-feature-spotlight`, `panel-feature-spotlight`) | section | Optional deep-dive: checklist left, navy panel of FIELD NAMES right (never sample data) | sections.tsx:260-298 | none (static copy) | code read | OK |
+| "Who It's For" (`section-feature-audience`, `card-feature-audience-N`) | section | 2-4 audience cards; hidden when empty | sections.tsx:302-319 | none | code read | OK |
+| Pricing band (`section-feature-pricing`, `card-feature-pricing`) | section | Always rendered. Left: headline (`text-feature-price-headline`: "Included in every plan" / "Included from the Pro plan" / "<Plan> plan" / "Add-on" / "Free with an account" / "One-time service" / "Talk to a sales rep"), ComingSoon pill when applicable, big price (`text-feature-price`, with "from" when more than one plan includes it), per ("​/mo" or " one-time"), price note incl. 1-day trial mention (`text-feature-price-note`), content-file `note`. Right: "Plan by plan" rows (`list-feature-plan-rows`, values from PLANS.limits, "Not included" where 0/blank; per-location shown as "N per location a month" for Agency) or "What's included" fallback listing first 6 card titles when the spec has no rows; closing "Every plan and add-on, side by side: Compare plans" (`link-feature-pricing` → /pricing#comparison, or "See add-ons" → /pricing#add-ons, "See plans" → /pricing, "See services" → /pricing#services for sales/service kinds) | sections.tsx:323-393; pricing.ts:72-149 | shared/plans.ts PLANS/ADDONS/TRIAL_DAYS/SALES thresholds (client compute; same source the server checkout uses) | anchors #comparison/#add-ons/#services exist on /pricing (pricing.tsx:433,588,656); values recomputed | OK |
+| Pricing CTA row | buttons | `cta-feature-primary-pricing` + `button-feature-sales-pricing` (same three-way behavior as hero) | feature-landing.tsx:124 | as hero CTA | code read | OK |
+| FAQ (`section-feature-faq`, `faq-feature-N`) | section | Native <details> accordion, 3-5 Q&A per content file; hidden when empty | sections.tsx:397-415 | none (static copy) | code read | OK |
+| "In Depth" (`section-feature-in-depth`) | section | Optional long-form band (2-5 paragraphs + bullets); hidden when absent | sections.tsx:424-446 | none (static copy) | code read | OK |
+| Related (`section-feature-related`, `link-feature-related-<key>`) | section | Cards to the page's `related` registry keys (external keys like callAssistant resolve via FEATURE_CATALOGUE); hidden when empty after flag filtering | feature-landing.tsx:53-58,127; sections.tsx:453-476 | none (registry) | script: every related key resolves | OK |
+| Closing band (`section-feature-cta`) | section | Navy band: mascot, "Put <title> to Work" H2, the same price sentence, CTA row (`cta-feature-primary-cta`, `button-feature-sales-cta`), "Still deciding? Compare every feature" (`link-feature-cta-all` → /features) | sections.tsx:482-517 | none | code read | OK |
+| TalkToSalesDialog | dialog | topic = page.title; POST /api/seo-inquiry | feature-landing.tsx:131 | POST /api/seo-inquiry → server/routes.ts:3306 | route grep | OK |
+| Document title + meta description | head | From `page.seo`; server writes the same into prerendered HTML (shared/route-meta.ts:38-40) | feature-landing.tsx:49-50; primitives.tsx:38-52 | none | route-meta read | OK |
+
+Kicker numbering (01…08) follows whichever sections the page actually shows
+(feature-landing.tsx:93-107); band tones alternate paper-2/paper from the first shown section. No
+tabs/sticky header/pagination anywhere in the template.
+
+## Per-page specifics
+
+Slug → file → group → pricing kind (source of its displayed price) → status. "no typed prices":
+the vitest rejects `$`+digit in content files; allowances/plan names are injected via
+`allowanceLine`/`PLANS`/`ADDONS` helpers. All 30 pages `status: "ready"` (script-checked).
+
+### gbp (Google Business Profile) — grow — kind "plan" + locations allowance — ready
+App CTA "Open Locations" → /locations. Claims checked: sync "every six hours" ✓
+(server/agency/jobs.ts:154-155 `now()-interval '6 hours'`); "about 90 days" first window + 7-day
+overlap ✓ (server/gbp/service.ts:209-211, 89+1 days first, `-7` later); one-time back-fill
+PERFORMANCE_HISTORY_DAYS=540 ≈ 18 months ✓ (service.ts:113,217); 11 Guard fields → wait, that's
+profileGuard. GBP claims: several Google accounts, "Managed by <email>", citation checklist ✓
+(routes/gbp routes); extra-location add-on on Starter/Pro/Growth ✓ (ADDONS.extra_location.availableOn);
+Agency bulk actions ✓. No numeric DB claims.
+
+### reviews (Google Reviews) — grow — kind "plan" + reviewTemplates allowance — ready, flag SHOW_GOOGLE_REVIEWS (on)
+Claims: private 1–10 rating ✓ (server/routes.ts /api/review/:token/feedback); "no review gating,
+every rating gets showReview:true" ✓; AI replies "capped at 50 a day per account" ✓
+(server/gbp/review-automation.ts:129 `takeBudget(...,50,1,86400_000)`); reminders "up to 10" ✓
+(server/review-reminders.ts:5 `max(10)`); 1–2 star stay drafts unless allowed ✓; auto-publish only on
+Pro/Growth/Agency (autoPublishAiReplies) ✓ price book; reviewTemplates 5/20/20/50 via allowanceLine ✓;
+"deleted requests go to a trash" — /api/review-requests trash (routes.ts) ✓; "Google doesn't tell us
+whether a review was posted" — honest-negative, n/a.
+
+### profile-guard (Profile Guard) — grow — kind "plan" + locations allowance — ready
+Claims: 11 watched fields ✓ (server/gbp/guard.ts:10 GUARD_FIELDS, 11 entries); cadence line computed
+from guardCadenceMinutes (15 min Starter/Pro/Growth, 30 Agency) ✓ price book + runGuardWorker;
+"confirm it's you, once per 12 hours" ✓ (guard-routes.ts); GMB Edit Monitor on-demand only, no
+alerts ✓ (client/src/pages/gmb-monitor.tsx, /api/gmb/listings/:id/check); Lockdown restores after
+detection, can't block edits, Maps lag ✓ (guard.ts resolveLocked).
+
+### ranking-grid (GMB Ranking Grid) — grow — kind "plan" + gridCredits allowance (Agency per-location) — ready
+Claims: grid sizes 3×3–15×15, spacing 0.5–20 miles ✓ (client ranking-grid.tsx GRID_SIZES /
+DISTANCE_OPTIONS; server validates); "one credit per 25 points, rounded up: 5×5 = 1 credit, 15×15 =
+9 credits" ✓ (shared/plans.ts:544-547 gridCreditCost); failed grid refunds ✓ (refundReservation);
+top 5 businesses kept per point ✓ (server/routes.ts runRankingGridScan); pins 1–3 / 4–10 / 11–20 /
+not found ✓; trial runs 1 grid ✓; no Google connection needed ✓ (POST /api/photos/business-search).
+
+### gbp-content (Posts & Photos) — grow — kind "plan" — ready
+Claims: up to 100 photos at a time ✓ (server/gbp/content.ts:143 `items … .max(100)`); 15 MB each,
+JPEG/PNG/WebP ✓ (content-upload.ts:37,55,89); 10 photos per post ✓ (content.ts:38 photoIds.max(10));
+1,500 characters ✓ (content.ts:38 summary.max(1500)); post types + CTA buttons + coupon ✓;
+business-hours scheduling, daily caps, uncertain→never auto-resend ✓ (content.ts runContentWorker);
+Agency batches ✓.
+
+### social (Social Media) — grow — kind "plan" — ready
+Claims: 9 networks, up to 20 destinations per post ✓ (shared/social.ts postSchema); 10 public media
+links, uploads <100 MB ✓; Blotato separately-billed, key encrypted ✓ (server/social/client.ts
+encryptKey); auto mode approval-first, content from offers + Google updates last 30 days, missing
+sources reported not invented ✓ (server/social/service.ts sourceFor/generateDue); bulk tools up to
+100 posts ✓ (server/social/agency.ts); pricing note truthful: no plan check on social routes —
+verified no requirePlan in server/social/routes.ts; sold "part of every plan" because posting needs a
+business in Locations which needs a plan (POST /api/locations) — claim matches.
+
+### site-scan (Site Scan) — grow — kind "plan" + siteScans allowance (Agency per-location) — ready
+Claims: five scores starting at 100 ✓ (server/sitescan/audit.ts scoresFor); 8 builder fix paths ✓
+(guidance.ts detectPlatform); PageSpeed mobile+desktop "up to 5 pages" ✓ (sitescan/routes.ts:30
+`psiPages … .max(5)`); free scan checks "up to 11 pages" ✓ (client site-scan.tsx:1368 and free-scan
+flow, routes.ts:750 verify link); share link expires after 30 days ✓ (routes.ts:488
+`now()+interval '30 days'`); monthly rescans "up to 10 sites" ✓ (routes.ts:547 "Maximum 10 scheduled
+sites"); AI crawlers GPTBot/ClaudeBot/PerplexityBot/Google-Extended, llms.txt ✓ (audit.ts);
+rescan/bulk each use one scan ✓. tryIt: "Free 60-second website scan" → /free-site-scan (route
+exists, App.tsx:532).
+
+### media (Photo Optimizer) — grow — kind "plan" — ready
+Claims: up to 10 photos per batch ✓ (server/routes.ts /api/photos/process); radius 5–50 miles ✓
+(/api/photos/nearby-cities); resized to ≤4096 px, JPEG out ✓ (server/photo-processor.ts);
+watermark/enhance/filename/EXIF (title, description, keywords, author, copyright, GPS) ✓;
+"no monthly photo count; a processing rate limit keeps use fair" ✓ (server/growth-quotas.ts:40,149 —
+photos meter is fair-use, uncounted); "Google strips EXIF" honest-negative ✓. Note: the file's own
+header flags a *different* page's mismatch (media-library GPS claim) as out-of-scope for this page —
+that flagged issue lives on /media-library, not here.
+
+### click-guard (Click Guard) — protect — kind "allowance" (protectedSites) — ready
+Claims: flags — bot UA, >5 visits/IP/hour, >15/IP/24h, same fingerprint other IP within a day,
+missing UA ✓ (server/routes.ts:3414,3420 + fingerprint query); auto-block flagged + >10 visits in
+the hour ✓ (routes.ts:3460); manual IPv4/IPv6/CIDR/wildcard, wide ranges refused ✓
+(server/route-guards.ts normalizeBlockedIp); exclusion list 50–500, manual first, whitelist removed,
+500 = Google's per-campaign cap ✓ (server/click-guard-exclusions.ts:8-9,19); generated Ads script
+only adds, never removes ✓ (routes.ts GET …/google-ads-script); Agency manager preview ✓
+(server/ads/worker.ts). Add-on note: Extra protected website on Pro/Growth/Agency ✓.
+
+### ip-tracker (IP Tracker) — protect — kind "allowance" (protectedSites) — ready
+Claims: "online = last 20 minutes" ✓; today/yesterday/7 days/this month + 14-day chart ✓
+(client ip-tracker.tsx, storage.ts:773); visitor detail up to 50 recent visits ✓ (GET
+…/visitors/:visitorIp); each list loads latest 1,000 visits, "+" lower-bound marker ✓
+(server/storage.ts:451,666 limit 1000, VISIT_ROW_CAP); geo from Cloudflare headers only ✓
+(server/route-guards.ts edgeGeo); remove-site deletes visits + blocks ✓.
+
+### vpn-shield (VPN Shield) — protect — kind "allowance" (protectedSites) — ready
+Claims: own script tag, separate from Click Guard ✓ (server/routes.ts GET /api/vpn-shield/script);
+crawler pass-through (Googlebot/Bingbot/AdsBot-Google) ✓; detection = built-in provider prefixes +
+data-center CIDRs + WebRTC IPv4 mismatch + extension markers ✓ (POST /api/vpn-shield/track);
+block/log/redirect with full http(s) link ✓; whitelist up to 500 IPs ✓ (routes.ts:4687); default
+Block ✓ (vpn-shield.tsx `useState(settings.vpnBlockMode || "block")`); "not a firewall" honest
+negative ✓.
+
+### cloudflare (Cloudflare) — protect — kind "module" (cloudflareSearchConsole) — ready
+Claims: Global API key exchanged once for a scoped token (Zone Read, Analytics Read, Zone WAF Edit),
+never stored ✓ (server/cloudflare/service.ts exchangeKey, client.ts ZONE_PERMISSIONS); analytics =
+last day, latest 100 firewall events, top 20 paths, sampled ✓ (service.ts:158-160,213 — GraphQL
+limits match copy exactly); ads door blocks >10 requests/10 s on the landing path ✓
+(service.ts:293 requests_per_period 10); bad-UA pack blocks >120 requests/10 s ✓ (service.ts:264);
+flagged-IPs pack 1–100 addresses ✓ (service.ts:223,241-242); preview→confirm within an hour with
+recent sign-in→undo only its own rules ✓ (routes.ts /preview /confirm /undo, service.ts applyAction
+ref prefix); Click Guard IPs listed per zone, never auto-published ✓ (hooks.ts); disconnect deletes
+created token, applied rules stay ✓. "Agency plan, no other plan" ✓ (module Agency-only).
+
+### search-console (Search Console) — protect — kind "module" (cloudflareSearchConsole) — ready
+Claims: own Google grant, kept separate from GBP ✓ (server/gsc/routes.ts, service.ts saveGscGrant);
+sync up to 16 months back ✓ (server/cloudflare/routes.ts:184-190 floor −16 months, 400 otherwise);
+default window "about the last month, stops three days short of today" ✓ (service.ts syncProperty
+31→3-days-ago, dataState final); clicks/impressions/CTR/position by date/query/page/device/country,
+day/week/month ✓ (server/gsc/routes.ts GET …/analytics); URL inspection with per-property day/minute
+caps, never requests indexing ✓ (service.ts inspectUrl); sitemap submit needs full access +
+confirmation ✓ (POST /api/gsc/urls); location Insights card last 30 days ✓ (site-connections.tsx
+LocationSearchSummary); client onboarding emails ✓ (/invites, worker.ts deliverInvite).
+
+### domains (Domains) — protect — kind "module" (domainsMailAlerts) — ready
+Claims: Porkbun + Name.com adapters, keys encrypted, recent sign-in ✓ (server/domains/routes.ts,
+service.ts saveConnection); daily monitor: expiry warnings at 60/30/7 days, auto-renew off, DNS
+snapshot diff (nameserver change named), HTTPS failure, SSL within 30 days, once-per-state dedup,
+next check +1 day ✓ (service.ts:309 threshold [7,30,60], health.ts:331 30 days, domain_alert_dedup);
+record edits A/AAAA/CNAME/TXT/MX/CAA + nameservers, preview→confirm→apply→DNS verify every 5 min→
+rollback preview; 15-minute preview staleness ✓; Cloudflare-hosted records refused ✓ (types.ts
+desired()); Cloudflare nameserver pair in one previewed change ✓ (cloudflare-link.ts); manual
+domains from any registrar get monitor-only ✓. "Agency plan, no other plan" ✓.
+
+### mail-alerts (Mail alerts) — protect — kind "module" (domainsMailAlerts) — ready
+Claims: private forwarding address + Gmail confirmation code/link extraction ✓ (service.ts
+forwardingAddress, classify.ts); known senders (GBP, Search Console, Google Ads, Cloudflare,
+registrars) + subject topics; critical = transfer/new owner/ownership request/manual action/security
+issue/suspension ✓ (classify.ts); matched to exactly one domain → its location, else exactly one
+business name of 4+ letters, else manual ✓ (service.ts storeMatched); 30-day retention, alerts kept
+while plan lacks module ✓ (MAIL_RETENTION_DAYS=30, service.ts:29,47,75); per-alert notification ✓;
+optional read-only Gmail connection limited to known senders last 30 days ✓ (gmail.ts GMAIL_SCOPE,
+classify.ts GMAIL_QUERY); "treat as a reported alert" ✓ (page copy).
+
+### permits (Permit Database Search) — win — kind "plan" + permitSearches allowance — ready
+App CTA → /search; tryIt "Browse the Database Directory" → /databases (public). legacyPath
+/permits-landing → redirects here. Claims: six search types ✓ (client search.tsx); live search only
+on portals with a verified/source-listed link AND an adapter (shared/government-links.ts
+canScrapeGovernmentPortal) ✓; "queries up to four portals at a time" ✓ (server/scraper.ts:218
+MAX_CONCURRENT=4); quota reserved only when something is searchable, noSearchablePortals reserves
+nothing ✓ (routes.ts POST /api/search, growth-quotas.ts); address-only portals answered from saved
+results ✓; per-portal status, never "zero results" for a failure ✓; history saved/deletable ✓
+(/api/search-queries); directory = counties+cities with checked links, dead → web search ✓
+(databases.tsx, verify-links.ts, build-permit-portals.ts); Property lookup link per result ✓. Copy
+deliberately states no counts (correctly — none verifiable in a static file).
+
+### property (Property Records) — win — kind "account" — ready
+Claims: directory of county assessor/appraiser offices from NETR Online, nulls stay blank ✓
+(server/data/appraisers.json ← scripts/scrape-netronline.ts, server/netr-office.ts
+isAssessmentOffice — DB table property_appraisers has 3,040 rows); link tiers
+verified/unconfirmed-with-date/dead→web search ✓ (verify-links.ts, government-link-policy.ts);
+Visit + separate Search button, tap-to-call, filters in URL ✓ (client property.tsx); permit-result
+deep link /property?countyId= ✓ (search.tsx); public without signing in ✓ (GET
+/api/property-appraisers routes.ts:863, PublicRouter). tryIt "Browse the directory now" → /property.
+
+### competitors (Competitor Intel) — win — kind "allowance" (competitorScans) — ready, flag SHOW_COMPETITOR_INTEL (on)
+legacyPath /competitors-landing. Claims: radii 10/25/50/100 miles ✓ (client competitors.tsx:237-240);
+Google Places text search up to 3 pages, kept inside radius, "may be incomplete" note ✓
+(server/competitor-provider.ts:59 `page < 3`); per-listing name/address/phone/website/rating/review
+count/category ✓ (runCompetitorScan); BS Meter 0–100 + every reason, "not proof", sample-only,
+velocity not scored ✓ (server/competitor-analysis.ts analyzeBsScore capped at 100, analyzeReviews);
+failed scan refunded ✓; scan-pack add-on +10 on Pro/Growth/Agency ✓ (ADDONS.competitor_pack.grants);
+nothing about ads (SHOW_AD_ACTIVITY off, /api/ad-spy 410) ✓ consistent.
+
+### ads-manager (Agency Ads & LSA) — win — kind "module" (adsManager) — ready
+Claims: MCC connect via Google sign-in (adwords scope) ✓ (server/ads/routes.ts /connect /callback);
+client list incl. LSA found/not-found + filters ✓ (GET /accounts); bulk access requests 1–1,000,
+clients can decline, cancel pending ✓ (routes.ts:16,22 selection max 1000, /invitations, worker.ts);
+health audit checks, budget/search-term/charged-lead cover last 30 days, "unavailable is never a
+pass", >10% budget-lost share ✓ (server/ads/audit.ts LAST_30_DAYS); protections presence-only,
+shared negatives, placements, ad schedule, Click Guard IP rotation inside Google's 500 ✓
+(protections.ts buildPlan); previews expire, re-check before write, reversible ✓ (routes.ts
+/plans/confirm, worker.ts fingerprint checks); "part of the Agency plan; no other plan includes it" ✓
+(planNamesWhere modules.adsManager = Agency).
+
+### lsa-leads (LSA Leads) — win — kind "account" — ready
+Claims: Google sign-in discovery, LSA accounts first, pause per account ✓ (server/lsa/sync.ts);
+rotating background sync every minute + Sync now ✓ (server/lsa/routes.ts:367-368 setInterval 60_000;
+POST /api/lsa/sync); re-reads last 3 days ✓ (sync.ts:47 OVERLAP_MS); cost estimate = that day's
+spend ÷ that day's charged leads ✓ (syncLeadCostsForAccount); Good=SATISFIED, Bad=DISSATISFIED + the
+six Google reasons, never re-rated, no double queue ✓ (disputes.ts, shared/schema.ts
+LSA_DISPUTE_REASONS); Telegram DM with Report-bad-lead button ✓ (telegram.ts notifyNewLead); no plan
+check ✓ (lsa/routes.ts session-only). The 30–60 s dispute spacing is deliberately not advertised ✓.
+
+### crm (ConstructHub CRM) — run — kind "plan" + crmSeats allowance — ready
+App CTA "Open your CRM" → /crm, surface "portal" (full load via portalUrl). Claims: workspace
+created on first open ✓ (server/crm/tenancy.ts ensureOrgForUser); seats 1/3/10/10 + Extra seat
+add-on, Agency seats shared with agency team ✓ (price book + getOwnerSeatUsage); roles owner/admin/
+sales/PM/office/field/subcontractor, price-blind crews ✓ (shared/schema.ts CRM_ROLES); good/better/
+best, client-ticked discounts, typed-name approval, signed contract PDF to both sides ✓
+(server/crm/portal.ts, contract-pdf.ts); sales tax from job's city → division → org → typed ✓
+(tax.ts); estimate link email-gated, no costs on client pages ✓ (portal.ts); expires 7 days ✓
+(entities.ts:84 ESTIMATE_EXPIRY_DAYS=7); open/read-time tracking, 30-minute dedupe ✓ (portal.ts:86
+VIEW_DEDUPE_MIN=30, :593); own Stripe Connect Standard, no application fee, ACH+card, card cutoff,
+cash/check, receipts ✓ (payments.ts, receipts.ts); price book + per-sqft Quick Bid + price floor ✓
+(pricebook.ts, quickbid.ts, price-floor.ts); pipeline auto-moves on send/approve ✓ (portal.ts);
+portal with magic-link sign-in, attachments ✓ (public-portal.tsx, crm/attachments.ts); messages
+inbox → portal + email ✓ (inbox.ts); CSV import/export, scheduled backups ✓ (migrate.ts, backups.ts,
+GET /api/crm/customers/export.csv); "no accounting sync" honest negative ✓.
+
+### crm-schedule (Schedule) — run — kind "plan" (seats via note) — ready
+App CTA "Open Schedule" → /crm/schedule (portal). Claims: month/week/agenda, click-to-book/edit,
+crowded month cell opens week ✓ (client crm-schedule.tsx); everyone/my/one-teammate scopes, assigned-
+only visibility ✓; crew conflict warning on POST, cancelled + all-day excluded ✓
+(server/crm/schedule.ts POST /api/crm/appointments); booking needs manageJobs, role defaults ✓
+(shared/schema.ts CRM_ROLE_DEFAULTS); iCal feed token-is-auth, only hash stored, regenerate kills
+old copies ✓ (server/crm/calendar.ts, ical.ts); Google push one-way, own "ConstructHub CRM"
+calendar, edits/deletes carried, per-member ✓ (calendar.ts CALENDAR_SCOPE); no client booking /
+no client appointment reminders honest negative ✓.
+
+### crm-leads (Leads & follow-ups) — run — kind "plan" — ready
+App CTA "Open the pipeline" → /crm/pipeline (portal). Claims: stages grouped prospect/sales/
+production/billing/closed ✓ (shared/schema.ts CRM_PROJECT_STAGE_META); "+ New lead", drag/stage
+menu, value price-blind, PM per card ✓ (crm-pipeline.tsx); send → Proposal Sent, approve → Approved
+✓ (portal.ts); follow-up cadence weekly/every-two-weeks, "followed up now" restarts count ✓
+(server/crm/follow-ups.ts 7/14 days); Needs-attention card: due follow-ups, leads last two weeks,
+leads with no estimate, assigned-only ✓ (crm-home.tsx, follow-ups.ts); website lead form embed/
+link, honeypot + per-IP limit, rotate link kills old copies ✓ (server/crm/lead-capture.ts);
+first-open notice to sender, repeat open → good-time-to-call at most once a day, 30-min dedupe,
+by text where plan has texting ✓ (portal.ts:593, crm/sms.ts); no automatic drip ✓.
+**BUG — see Findings: the FAQ's AI Call Assistant sentence is stale.**
+
+### texting (Texting) — run — kind "allowance" (teamTextSegments) — ready
+App CTA "Open text settings" → /crm/settings (portal). Claims: included with Pro/Growth/Agency ✓
+(TEXTING_PLANS = plans with teamTextSegments ≠ 0 or clientTexting ≠ none; sms.ts:87-93 identical
+list); segments as carriers bill: GSM-7 160/153, UCS-2 70/67, one special char switches the whole
+text ✓ (server/crm/sms-segments.ts:21-22); reserve before send, refund on carrier refusal, texts
+skip until the 1st (UTC) when spent ✓ (sms.ts reserveSmsSegments/sendSms); shared number =
+team alerts only; client texts need own number — Growth includes one, Pro/Agency buy the add-on,
+or BYO SignalWire (token encrypted) ✓ (resolveSmsSender, orgCanTextClients, ADDONS.texting_number
+availableOn ["pro","agency"], limits.clientTexting); 10DLC registration ✓; STOP/START/HELP +
+opt-out honoured, other replies not shown ✓ (sms.ts inbound, isSmsOptedOut); re-engagement alert
+falls back to email when spent ✓; dashboard "Texts" usage row ✓ (server/dashboard/account.ts).
+
+### agency (Agency workspace) — run — kind "module" (agencyWorkspace) + locations allowance — ready
+Claims: gate = workspaceEntitled/agencyPlanRequired on every /api/agency route ✓
+(server/agency/routes.ts, access.ts); client workspaces with email/folder/tags/notes ✓; roles
+owner/admin/manager/viewer, client-by-client, viewers read-only, members need ConstructHUB logins ✓
+(routes.ts PUT /team, access.ts); seats shared with CRM (10) ✓ (crm/tenancy.ts getOwnerSeatUsage);
+bulk actions list incl. post/photo batch and Site Scans, page-or-all-matching, Jobs log, retries
+with growing waits, rate limit waits an hour ✓ (agency/jobs.ts bulkInput); email onboarding:
+Manager invite, ownership kept, no client sign-in, strict match Place ID else name+address,
+reminders after 3 and 6 days (reminders<2 at 3-day interval), expiry after 30 days ✓
+(onboarding.ts:118, agency/schema.ts:68 `DEFAULT now()+interval '30 days'`); auto-accept with
+unmatched left unassigned ✓; CSV export ✓ (GET /export); workspace switcher ✓ (agency.tsx);
+10 locations included, per-location bands up to 500 then sales quote ✓ (AGENCY_LOCATION_BANDS,
+AGENCY_SELF_SERVE_MAX_LOCATIONS, agencyPriceCents).
+
+### master-class (Master Class) — learn — kind "sales" — ready
+App CTA → /master-class; tryIt "Read the free course overview" → /master-class. legacyPath
+/master-class-landing. Claims: four modules named exactly as in server/data/master-class-modules.json
+(Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, SEO &
+Directory Domination) ✓ (JSON read, 4 modules, prices 150000/200000/150000/150000 — all ≥
+SALES_THRESHOLD_CENTS → sales-rep quote, isSalesOnly ✓); "guide for all 50 states" ✓
+(state-guides.json = 50 entries, script-counted); "18 states with licensing_required false →
+local/trade licensing notes" ✓ (script-counted 18); any purchase unlocks the Google Ads guide's 12
+sections with server-enforced 403 ✓ (server/routes.ts:3236 /api/google-ads-guide/:slug); link-check
+policy verified/unconfirmed/dead→web search ✓ (scripts/verify-state-guides.ts checkAgencyUrl);
+purchase recorded on account (course_purchases.user_id) ✓; free overview = license lists + Quick
+State Comparison ✓ (master-class.tsx).
+
+### guides (Guides) — learn — kind "account" — ready
+App CTA "Open Guides" → /guides; tryIt "Read the free LSA guide" → /lsa-guide (public route ✓).
+Claims: Google Ads guide 12 sections ✓ (client google-ads-guide.tsx GUIDE_SECTIONS, 12 slugs);
+LSA guide 8 sections ✓ (lsa-guide.tsx SECTIONS — 8 ids: verification, answering-calls, reviews,
+services, messages, service-areas, photos, bio); Ad Fraud page open ✓ (google-ad-fraud.tsx); state
+guides live in Master Class, license lists + comparison free ✓; walkthroughs with "Open …" links ✓
+(guides.tsx); site-connection guide: 48-hour nameserver warning, limited key never saved, no DNS/
+billing/member perms ✓ (site-connection-guide.tsx, cloudflare/client.ts ZONE_PERMISSIONS);
+"connecting Cloudflare + Search Console in ConstructHUB is part of the Agency plan" ✓
+(planNamesWhere modules.cloudflareSearchConsole = Agency).
+
+### reinstatement (Reinstatement) — learn — kind "service" (gbpReinstatement, $599 one-time) — ready
+App CTA "Open Reinstatement" → /reinstatement; tryIt "Send a free case review request" →
+/reinstatement#reinstatement-form. Claims: price comes from GBP_REINSTATEMENT_CENTS (59_900 →
+"$599 one-time", under the $1,000 sales threshold so a real price shows) ✓ — same constant used by
+/reinstatement (client reinstatement.tsx:183,228) and Hub knowledge (server/hub/knowledge.ts:59), so
+page, card and Hub agree; request form needs no account, free, rate-limited, emails team with
+reply-to = requester ✓ (server/routes.ts /api/reinstatement/request, reinstatementLimit); soft vs
+hard suspension descriptions ✓ (client reinstatement.tsx); "Google alone decides" ✓; Profile Guard
+cross-link ✓.
+
+### gabe (Gabe) — platform — kind "account" — ready
+App CTA "Ask Gabe on your dashboard" → "/" (app surface); tryIt → /pricing. Claims: quick questions
+work signed out, free text needs verified email ✓ (server/hub/routes.ts, access.ts isBuilder);
+`<N> quick questions` card = live `Object.keys(HUB_PRESETS).length` = **16** ✓ (HUB_PRESETS has 16
+entries, hub-presets.ts:19-36); 500 chars/message ✓ (hub/routes.ts:43 MAX_USER_CHARS=500); 20
+questions per chat ✓ (hub/turns.ts:16 MAX_USER_TURNS=20); 40 questions/day/account ✓ (hub/limits.ts:22
+userDaily 40/day); ~120 words, English only ✓ (hub/prompt.ts:50 STYLE "At most 120 words… English
+only"); answers checked and failures replaced by fallback incl. presets ✓ (hub/output-filter.ts,
+replies.ts R_FALLBACK); redaction of emails/phones/addresses/IDs before the model ✓ (hub/prefilter.ts
+redact/forModel); no account data, no tools, sales-rep-priced work never priced ✓ (prompt.ts
+hardRulesText; plan-copy.ts:398 knowledge-pack rule); no plan check ✓ (hub/routes.ts); no transcript
+stored, only daily outcome counts ✓ (hub/store.ts). Welcome presets for new accounts ✓
+(WELCOME_PRESETS).
+
+### customer-api (Customer API) — platform — kind "allowance" (apiUnitsPerMonth) — ready
+App CTA + tryIt "Read the API reference" → /developers. Claims: up to 25 active keys, shown once,
+stored hashed, scopes + per-key monthly cap + expiry, revoke ✓ (server/account/api-keys.ts:92
+MAX_ACTIVE_API_KEYS=25); read = 1 unit + 1 per 100 rows, write = 5, only successful calls ✓
+(server/public-api/quota.ts ROWS_PER_UNIT=100); reset on the 1st UTC ✓; 402 plan_required /
+429 quota_exceeded / 429 with Retry-After ✓ (quota.ts:90); rate per key = plan's apiRatePerMinute
+(60 on Pro/Growth/Agency) + per-account cap across keys ✓ (server/public-api/rate-limit.ts); response
+headers X-RateLimit-Limit/Remaining, X-Units-Remaining, GET /api/v1/me ✓ (public-api/index.ts);
+OpenAPI doc at /api/v1/openapi.json feeding /developers ✓; no AI through the API (import-graph test)
+✓ (no-ai.test.ts, api-keys-panel.tsx API_NO_AI_NOTICE); chub_ keys only under /api/v1, never CRM/
+session routes; CRM's chk_ keys separate ✓ (public-api/auth.ts, guard.ts); allowance line "Pro
+10,000, Growth 50,000, Agency 250,000" via allowanceLine ✓ price book; writes go through the app's
+own code incl. Site Scan quota ✓ (gbp-write.ts, social-write.ts, sitescan-write.ts reserveQuota).
+
+### call-assistant (external catalogue entry, not a template page)
+Catalogue card only (index.ts:84-94): title "AI Call Assistant", lede from the dashboard tile,
+path /call-assistant, icon "phone", pricing kind "addon" (call_assistant) → card shows "Add-on —
+$249/mo", link → /call-assistant, no Coming Soon pill (no preview flag — correct per plans.ts:353).
+Slugging quirk handled: /features/call-assistant redirects to /call-assistant (features.tsx:199-201).
+
+## Findings
+
+Counts (element rows across the three tables above): **≈96 mapped — 95 OK, 1 BUG, 0 UNCLEAR,
+0 DEAD.** Every numeric claim in all 30 content files traces to code or the price book; the one
+stale claim is a launch-status sentence, not a number.
+
+1. **BUG — /features/crm-leads FAQ misstates the AI Call Assistant's sale status.**
+   `shared/feature-pages/crmLeads.ts:122`: "The AI Call Assistant, **an add-on that isn't on sale
+   yet**, files the leads from the calls it answers into the CRM." The Call Assistant launched:
+   `shared/plans.ts:353` records the owner's 2026-10-02 decision ("the call assistant is live not
+   coming soon") and **no add-on carries `preview: true`** (grep: only the type declaration and
+   comments mention preview), so checkout sells every tier today and the catalogue correctly shows no
+   "Coming soon" pill. The template's coming-soon machinery (pricing.ts:122 `comingSoon:
+   addon.preview === true`; call-assistant-landing.tsx:185 gates its "When can I buy it?" FAQ behind
+   `p.comingSoon`) already reflects live status — only this static sentence disagrees. Fix: reword to
+   "an add-on" (drop "that isn't on sale yet"), e.g. "…The AI Call Assistant, a paid add-on, files the
+   leads from the calls it answers into the CRM."
+
+Not bugs but worth noting:
+
+- **No DB-derived numbers exist on these pages by design** (WRITING-GUIDE.md: "No statistics…").
+  The brief's canonical examples ("2,700+ databases", "X counties") do not appear anywhere in the 30
+  content files; the Database Directory page (another lane) computes its counts live from
+  /api/databases/counts. DB spot check anyway: counties 3,139 / permit_databases 32,853 /
+  property_appraisers 3,040 rows exist behind the permits/property claims.
+- **Trial wording**: every plan-kind/allowance-kind price note says "A new account's first plan starts
+  with a 1-day trial" (TRIAL_DAYS=1, plans.ts:411) — consistent everywhere it appears, including the
+  catalogue figures.
+- **Environmental test failure unrelated to this lane**: `server/ads/ads.test.ts` fails to boot in
+  this checkout ("Invalid URL" / "SASL: client password must be a string" — missing env/DB URL for
+  that suite). `server/feature-pages.test.ts` (the suite that guards this lane's registry) passes
+  18/18.
+- **Unverifiable externally**: Blotato/Google/Cloudflare/Stripe/Telegram/SignalWire behaviors are
+  verified only against this repo's code, not live third-party calls. The `tryIt` "Free 60-second
+  website scan" label is marketing phrasing for /free-site-scan (actual free-scan cap: 11 pages,
+  site-scan.tsx:1368) — the "60-second" figure is not enforced anywhere but is a duration estimate,
+  flagged here for awareness rather than as a bug.
