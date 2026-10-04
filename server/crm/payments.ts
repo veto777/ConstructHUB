@@ -329,6 +329,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     res.json({ ok: true });
   });
 
+  /** Payment history for the /crm/payments Recent list and the client page Payments card (?customerId=); refunds joined from crm_payment_refunds, client/invoice/estimate names from this org's own rows. */
   app.get("/api/crm/payments", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;

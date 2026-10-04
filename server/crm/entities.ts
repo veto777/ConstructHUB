@@ -455,6 +455,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
   // ── Customers ─────────────────────────────────────────────────────────────
 
+  /** The client book for /crm/clients: paged rows (?paged=1) with whole-book
+   *  bid-outcome tab counts (bidCounts) and ?q= search; without paged params it
+   *  returns the legacy newest-500 array every picker relies on. */
   app.get("/api/crm/customers", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -544,6 +547,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json(present(rows, await outcomesFor(rows.map((c) => c.id))));
   });
 
+  /** Creates the client (portal token minted with the row) for the New-client
+   *  dialog on /crm/clients and the quick-builder step 1; a 409 names existing
+   *  email/phone matches unless ?force=1. */
   app.post("/api/crm/customers", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
@@ -617,6 +623,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.send(csv);
   });
 
+  /** One client for /crm/clients/:id (identity card, projects, estimates) and
+   *  every picker's prefetch; portalPath is included only for seats that may
+   *  share the whole-client portal. */
   app.get("/api/crm/customers/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -640,6 +649,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     });
   });
 
+  /** Field edits from the client page's Edit dialog; the activity log names
+   *  only the fields that actually changed. */
   app.patch("/api/crm/customers/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageCustomers");
     if (!ctx) return;
@@ -818,6 +829,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
   // ── Projects ──────────────────────────────────────────────────────────────
 
+  /** The pipeline board's payload: the newest 2000 cards plus UNcapped
+   *  per-stage counts and totalProjects, so tall columns still count true. */
   app.get("/api/crm/projects", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -856,6 +869,9 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     });
   });
 
+  /** New project/lead for the client page's Add-to-pipeline and the pipeline's
+   *  New-lead dialog; numbered P-#### under the per-org lock, lands in the
+   *  first stage. */
   app.post("/api/crm/projects", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageJobs");
     if (!ctx) return;
@@ -882,6 +898,8 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.status(201).json(presentProject(row, ctx));
   });
 
+  /** Card moves (board drag&drop / stage menu), the edit dialog and contract
+   *  value; stageChangedAt restarts only when the status actually changes. */
   app.patch("/api/crm/projects/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageJobs");
     if (!ctx) return;
@@ -982,6 +1000,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
 
   // ── Estimates ─────────────────────────────────────────────────────────────
 
+  /** The /crm/estimates Documents Center list: doc-mode (statuses/date range/search/sort + filtered/total counts) with a single status, otherwise the legacy newest-500 array the client page and pickers use. */
   app.get("/api/crm/estimates", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -1192,6 +1211,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     });
   });
 
+  /** Creates the estimate (client-page dialog, quick builder, /crm/estimates/new); totals are always recomputed server-side, and a tax hook fills an omitted taxRateBps from the job address before this runs. */
   app.post("/api/crm/estimates", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageEstimates");
     if (!ctx) return;
@@ -1260,6 +1280,7 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.status(201).json(presentEstimate(fresh ?? est, ctx));
   });
 
+  /** Estimate detail for /crm/estimates/:id: estimate + line items + event trail + customer + publicPath (the /e/<token> client link). */
   app.get("/api/crm/estimates/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
