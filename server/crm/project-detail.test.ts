@@ -66,5 +66,6 @@ describe("GET /api/crm/projects/:id (the project page's fallback)", () => {
   it("404s a made-up id", async () => {
     const r = await api(`/api/crm/projects/${crypto.randomUUID()}`);
     expect(r.status).toBe(404);
+    expect((await api("/api/crm/projects/not-a-uuid")).status).toBe(404);
   });
 });

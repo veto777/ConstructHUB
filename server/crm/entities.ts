@@ -943,6 +943,10 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
   app.get("/api/crm/projects/:id", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
+    // A malformed id (a mistyped link) is simply not found — never a Postgres uuid error.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.params.id))) {
+      return res.status(404).json({ message: "Project not found" });
+    }
     const [row] = await db.select().from(crmProjects)
       .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
     if (!row || !(await objectPolicy(ctx).visible("projects", row.id))) {
