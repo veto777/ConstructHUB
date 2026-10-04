@@ -938,6 +938,19 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
     res.json(presentProject(row, ctx));
   });
 
+  /** One project for /crm/projects/:id — the board list caps at the newest
+   *  2000, so a direct link to an older project must not depend on it. */
+  app.get("/api/crm/projects/:id", async (req: any, res) => {
+    const ctx = await ctxFor(req, res);
+    if (!ctx) return;
+    const [row] = await db.select().from(crmProjects)
+      .where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, req.params.id))).limit(1);
+    if (!row || !(await objectPolicy(ctx).visible("projects", row.id))) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+    res.json(presentProject(row, ctx));
+  });
+
   // ── Jobs (per-trade scopes) ───────────────────────────────────────────────
 
   app.get("/api/crm/jobs", async (req: any, res) => {
