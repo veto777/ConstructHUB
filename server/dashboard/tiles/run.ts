@@ -28,8 +28,37 @@ const NO_ORG: TileOutcome = {
   cta: { label: "Set up the CRM", href: "/crm-app", surface: "app" },
 };
 
-/** Midnight UTC today: CRM `timestamp` columns hold UTC wall time. */
+/** Midnight UTC on `d`'s UTC calendar (the clock CRM `timestamp` columns keep). */
 const startOfUtcDay = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+
+/** The org clock's offset from UTC at `at`, in ms (positive east of Greenwich). */
+function offsetMs(at: Date, timeZone: string): number {
+  const f = new Intl.DateTimeFormat("en-US", {
+    timeZone, hourCycle: "h23",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const parts: Record<string, number> = {};
+  for (const p of f.formatToParts(at)) if (p.type !== "literal") parts[p.type] = Number(p.value);
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - at.getTime();
+}
+
+/**
+ * Midnight of the ORG's own calendar day containing `d`, as a UTC wall Date.
+ * Appointments are booked and the schedule page is numbered by the local
+ * clock, so "Today" must be the org timezone's day, not UTC's: at 6pm in
+ * Los Angeles a UTC "today" already counts tomorrow morning's visits and has
+ * dropped this evening's. Falls back to the UTC day when the org has no
+ * usable timezone.
+ */
+export function startOfOrgDay(d: Date, timeZone: string | null | undefined): Date {
+  const tz = typeof timeZone === "string" && timeZone.trim() ? timeZone : null;
+  if (!tz) return startOfUtcDay(d);
+  try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); } catch { return startOfUtcDay(d); }
+  const reading = new Date(d.getTime() + offsetMs(d, tz)); // what the org clock reads at `d`
+  const midnight = Date.UTC(reading.getUTCFullYear(), reading.getUTCMonth(), reading.getUTCDate());
+  return new Date(midnight - offsetMs(new Date(midnight), tz));
+}
 
 /** The member's visible, not-cancelled appointments starting in [from, to). */
 async function visibleAppointments(crm: OrgContext, from: Date, to: Date, ownOnly: boolean) {
@@ -58,7 +87,7 @@ export const runTiles: TileSources = {
     if (!crm) return NO_ORG;
     if (!crm.permissions.seeReporting) {
       // Not a reporting seat: no org money, just their own day.
-      const today = startOfUtcDay(ctx.now);
+      const today = startOfOrgDay(ctx.now, crm.org.timezone);
       const visits = await visibleAppointments(crm, today, new Date(today.getTime() + DAY), true);
       return ok([metric("todayVisits", "Today's visits", visits.length, "count")], openCrm);
     }
@@ -76,7 +105,7 @@ export const runTiles: TileSources = {
   async crmSchedule(ctx) {
     const crm = ctx.crm;
     if (!crm) return NO_ORG;
-    const today = startOfUtcDay(ctx.now);
+    const today = startOfOrgDay(ctx.now, crm.org.timezone);
     const visits = await visibleAppointments(crm, today, new Date(today.getTime() + 7 * DAY), false);
     const tomorrow = today.getTime() + DAY;
     return ok([
