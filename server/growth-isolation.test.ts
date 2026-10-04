@@ -109,6 +109,17 @@ describe("review funnel provenance", () => {
     expect(row.review_submitted).toBe(false);
     expect(row.status).toBe("negative_feedback");
   });
+
+  it("a trashed request's link stops working, but its unsubscribe still does (audit lane 2)", async () => {
+    const token = randomUUID(); reviewTokens.push(token);
+    await pool.query("insert into review_requests(user_id,client_name,client_email,google_profile_url,token,deleted_at) values($1,'Fixture','trashed@example.invalid','https://www.google.com/',$2,now())", [users[0], token]);
+    expect((await api(`/api/review/${token}`)).status).toBe(404);
+    expect((await api(`/api/review/${token}/feedback`, "", "POST", { rating: 2 })).status).toBe(404);
+    expect((await api(`/api/review/${token}/unsubscribe`, "", "POST", {})).status).toBe(200);
+    const { rows: [trashed] } = await pool.query("select unsubscribed, status from review_requests where token=$1", [token]);
+    expect(trashed.unsubscribed).toBe(true);
+    expect(trashed.status).not.toBe("negative_feedback"); // the refused feedback never landed
+  });
 });
 
 describe("recipient-wide opt-out", () => {

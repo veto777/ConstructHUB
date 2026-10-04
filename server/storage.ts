@@ -141,7 +141,7 @@ export interface IStorage {
   updateSeoContract(id: number, data: Partial<SeoContract>): Promise<SeoContract | undefined>;
 
   createReviewRequest(data: InsertReviewRequest): Promise<ReviewRequest>;
-  getReviewRequestByToken(token: string): Promise<ReviewRequest | undefined>;
+  getReviewRequestByToken(token: string, opts?: { includeTrashed?: boolean }): Promise<ReviewRequest | undefined>;
   getReviewRequestsByUser(userId: number): Promise<ReviewRequest[]>;
   getTrashedReviewRequests(userId: number): Promise<ReviewRequest[]>;
   updateReviewRequest(id: number, data: Partial<ReviewRequest>): Promise<ReviewRequest | undefined>;
@@ -739,8 +739,12 @@ export class DatabaseStorage implements IStorage {
     return request;
   }
 
-  async getReviewRequestByToken(token: string): Promise<ReviewRequest | undefined> {
-    const [request] = await db.select().from(reviewRequests).where(eq(reviewRequests.token, token)).limit(1);
+  /** A customer's review link. A request the owner moved to the trash no longer works (audit lane 2): the page, the
+   *  feedback form and every tracker answer 404 until it is restored. Only the unsubscribe routes pass
+   *  includeTrashed — an opt-out is always honoured. */
+  async getReviewRequestByToken(token: string, opts: { includeTrashed?: boolean } = {}): Promise<ReviewRequest | undefined> {
+    const cond = opts.includeTrashed ? eq(reviewRequests.token, token) : and(eq(reviewRequests.token, token), isNull(reviewRequests.deletedAt));
+    const [request] = await db.select().from(reviewRequests).where(cond).limit(1);
     return request;
   }
 

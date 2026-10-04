@@ -2423,7 +2423,7 @@ export async function registerRoutes(
       res.status(401).json({ message: "Login required" }); return false;
     }
     try {
-      return !!(await requirePlan(res, req.user.id, "Competitor Intel", (a) => a.competitorScans > 0));
+      return !!(await requirePlan(res, req.user.id, "Competitor Intel", (a) => a.competitorScans !== 0)); // -1 = unlimited (platform admins), like the other gates
     } catch (err) { planCheckFailed(res, err); return false; }
   }
 
@@ -5819,7 +5819,7 @@ function main() {
   // Unsubscribe page data
   app.get("/api/review/:token/unsubscribe-info", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(String(req.params.token));
+      const request = await storage.getReviewRequestByToken(String(req.params.token), { includeTrashed: true });
       if (!request) return res.status(404).json({ message: "Not found" });
       res.json({
         clientName: request.clientName,
@@ -5835,7 +5835,7 @@ function main() {
   // Unsubscribe + optional feedback
   app.post("/api/review/:token/unsubscribe", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(String(req.params.token));
+      const request = await storage.getReviewRequestByToken(String(req.params.token), { includeTrashed: true });
       if (!request) return res.status(404).json({ message: "Not found" });
 
       const { feedback } = req.body;
@@ -5856,7 +5856,7 @@ function main() {
   // GET on the same path keeps serving the unsubscribe page.
   app.post("/review/:token/unsubscribe", async (req, res) => {
     try {
-      const request = await storage.getReviewRequestByToken(String(req.params.token));
+      const request = await storage.getReviewRequestByToken(String(req.params.token), { includeTrashed: true });
       if (!request) return res.status(404).end();
       await unsubscribeRecipient(request.userId, request.clientEmail);
       await storage.updateReviewRequest(request.id, { unsubscribed: true, nextReminderAt: null });
@@ -5869,7 +5869,7 @@ function main() {
 
   app.post("/api/review/:token/resubscribe", async (req, res) => {
     if (req.body.confirm !== true) return res.status(400).json({ message: "Explicit confirmation is required" });
-    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    const request = await storage.getReviewRequestByToken(String(req.params.token), { includeTrashed: true });
     if (!request) return res.status(404).json({ message: "Not found" });
     if (req.user?.id === request.userId) return res.status(403).json({ message: "Only the customer can resubscribe from their email link" });
     await resubscribeRecipient(request.userId, request.clientEmail);
