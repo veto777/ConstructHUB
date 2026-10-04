@@ -3,6 +3,10 @@ import App from "./App";
 import { queryClient } from "./lib/queryClient";
 import { installClientErrorReporting } from "./lib/report-client-errors";
 import "./index.css";
+import { inNativeApp } from "./lib/app-shell";
+
+// Inside the iPhone apps: mark <html class="in-app"> before the first render (lib/app-shell.ts).
+inNativeApp();
 
 // Uncaught errors and unhandled rejections reach the issue desk (/admin/issues).
 installClientErrorReporting();

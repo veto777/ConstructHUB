@@ -19,6 +19,8 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmRibbon } from "@/components/crm-ribbon";
+import { AppTabBar } from "@/components/app-tabbar";
+import { inNativeApp } from "@/lib/app-shell";
 import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
 import { CookieConsent } from "@/components/cookie-consent";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -579,7 +581,7 @@ function AppContent() {
     if (location === "/admin" || location === "/crm/admin") {
       return (
         <div className="min-h-screen bg-muted/30 flex flex-col">
-          <header className="h-12 px-4 flex items-center justify-between bg-sidebar text-sidebar-foreground border-b border-sidebar-border sticky top-0 z-50">
+          <header className="box-content h-12 px-4 pt-[env(safe-area-inset-top)] flex items-center justify-between bg-sidebar text-sidebar-foreground border-b border-sidebar-border sticky top-0 z-50">
             <div className="flex items-center gap-2.5">
               <CrmLogo height={20} />
               <span className="text-[11px] font-semibold uppercase tracking-widest rounded bg-sidebar-primary text-sidebar-primary-foreground px-1.5 py-0.5">
@@ -632,7 +634,7 @@ function AppContent() {
         <div className="flex h-screen w-full">
           <CrmSidebar />
           <div className="flex flex-col flex-1 min-w-0">
-            <header className="flex items-center gap-3 px-4 h-12 border-b border-border/40 bg-background/80 backdrop-blur sticky top-0 z-50">
+            <header className="box-content flex items-center gap-3 px-4 h-12 pt-[env(safe-area-inset-top)] border-b border-border/40 bg-background/80 backdrop-blur sticky top-0 z-50">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <span className="text-sm text-muted-foreground" data-testid="text-crm-section">{section}</span>
               <div className="ml-auto flex items-center">
@@ -680,7 +682,7 @@ function AppContent() {
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 min-w-0">
-          <header className="flex items-center justify-between gap-2 px-4 h-14 shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
+          <header className="box-content flex items-center justify-between gap-2 px-4 h-14 pt-[env(safe-area-inset-top)] shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-1.5">
               <RecentAuthModal /><NotificationBell />
@@ -688,17 +690,19 @@ function AppContent() {
                 className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
                 <Settings className="h-4 w-4" />
               </Link>
-              <CartSheet />
+              {/* The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no cart there. */}
+              {!inNativeApp() && <CartSheet />}
               <ThemeToggle />
             </div>
           </header>
           <PaymentNeededBanner />
-          <main className="flex-1 min-h-0 overflow-auto flex flex-col">
+          {/* Phones: bottom padding keeps content clear of the tab bar (AppTabBar); desktop is unchanged. */}
+          <main className="flex-1 min-h-0 overflow-auto flex flex-col pb-[calc(60px+env(safe-area-inset-bottom))] md:pb-0">
             <div className="flex-1">
               <DashboardRouter />
             </div>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
-            <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 sm:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
+            <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 md:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
               <a href="mailto:support@constructhub.us" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-email">support@constructhub.us</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>
@@ -710,6 +714,7 @@ function AppContent() {
           </main>
         </div>
       </div>
+      <AppTabBar />
       {/* The Google Ads pages keep their own consultant chat; everywhere else Gabe helps. */}
       {showAdsChat ? <AdsConsultantChat /> : <HubWidget surface="growth" signedIn />}
     </SidebarProvider>

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 import { analyticsPath } from "@shared/analytics-path";
 import { isClientPortal, isPortal } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -51,12 +52,13 @@ export function CookieConsent() {
   // paths (/e/<token>, /i/<token>, …) are normalized so the tokens never land
   // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
-    if (consent !== "granted") return;
+    // Inside the iPhone apps nothing is tracked and no banner shows (App Store 5.1.2(i); docs/app/APP-STORE-PLAN.md).
+    if (consent !== "granted" || inNativeApp()) return;
     const path = analyticsPath(location);
     sendPageview(path);
   }, [location, consent]);
 
-  if (consent) return null;
+  if (consent || inNativeApp()) return null;
 
   const answer = async (granted: boolean) => {
     setSaving(true);

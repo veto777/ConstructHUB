@@ -90,7 +90,7 @@ export default function AdsConsultantChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-gradient-to-r from-[#F97316] to-[#EF4444] text-white rounded-full p-4 shadow-2xl shadow-orange-500/30 hover:scale-105 transition-transform group"
+          className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6 right-6 z-50 bg-gradient-to-r from-[#F97316] to-[#EF4444] text-white rounded-full p-4 shadow-2xl shadow-orange-500/30 hover:scale-105 transition-transform group"
           data-testid="button-open-chat"
         >
           <div className="relative">
@@ -104,7 +104,7 @@ export default function AdsConsultantChat() {
       )}
 
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-6rem)] flex flex-col rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-white/[0.1]" data-testid="chat-window">
+        <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-6rem)] flex flex-col rounded-2xl overflow-hidden shadow-2xl shadow-black/50 border border-white/[0.1]" data-testid="chat-window">
           <div className="bg-gradient-to-r from-[#F97316] to-[#EF4444] px-4 py-3 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="bg-white/20 rounded-full p-1.5">

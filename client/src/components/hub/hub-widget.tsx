@@ -304,7 +304,8 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
   if (!visible || (!meta && !metaFailed)) return null;
   const offline = !meta;
 
-  const portalMobile = surface === "portal";
+  // On phones the CRM ribbon and the platform tab bar (AppTabBar) sit at the bottom: the launcher and panel rise above them.
+  const portalMobile = surface === "portal" || surface === "growth";
   const greeting = offline
     ? "Hi, I'm Gabe! My radio's down right now, so I can't take questions. Please try again in a minute."
     : welcome
