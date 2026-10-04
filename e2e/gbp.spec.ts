@@ -30,7 +30,6 @@ test('performance renders unavailable separately from zero',async({page})=>{
   await page.route('**/api/gbp/locations/987/performance*',r=>r.fulfill({json:{available:true,source:'Google',metrics:['CALL_CLICKS','WEBSITE_CLICKS'],rows:[{date:'2026-09-25',metric:'CALL_CLICKS',value:'0',last_day:'2026-09-25'}],pendingAfter:'2026-09-28'}}));
   await page.goto('/locations?location=987');await expect(page.getByTestId('row-performance-total')).toContainText('Total');await expect(page.getByRole('cell',{name:'0',exact:true}).first()).toBeVisible();await expect(page.getByRole('cell',{name:'—',exact:true}).first()).toBeVisible();
 });
-
 test('photo counts show a dash until a Google sync has actually reported them (audit 2026-10-04)',async({page})=>{
   const loc={id:987,businessName:'Fixture business',gbpAccountName:'accounts/fixture',gbpLocationName:'locations/fixture',businessPhotoCount:0,customerPhotoCount:0};
   await page.route((u:URL)=>u.pathname==='/api/locations',r=>r.fulfill({json:[loc]}));
@@ -77,4 +76,13 @@ test('insights empty state still points an unlinked owner at linking (audit 2026
   await page.route('**/api/gbp/locations/987/performance*',r=>r.fulfill({json:{available:false,metrics:[],rows:[],firstDate:null,lastDate:null,pendingAfter:'2026-10-01'}}));
   await page.goto('/locations?location=987&tab=insights');
   await expect(page.getByText('Performance unavailable. Link this location to Google and sync to retrieve real metrics.')).toBeVisible();
+});
+test('agency list Google pill agrees with the reconnect filter, not just gbpLocationName (audit 2026-10-04)',async({page})=>{
+  await page.route('**/api/agency/me',r=>r.fulfill({json:{entitled:true,role:'owner',workspace:{name:'Fixture workspace'}}}));
+  await page.route('**/api/agency/dashboard*',r=>r.fulfill({json:{total:2,synced:0,reconnect:1,unlinked:1,guard:0,unanswered:0,failed:0}}));
+  await page.route('**/api/agency/locations*',r=>r.fulfill({json:{items:[{id:1,businessName:'Linked Biz',gbpLocationName:'locations/x'},{id:2,businessName:'Plain Biz'}],total:2}}));
+  await page.route('**/api/gbp/linkage',r=>r.fulfill({json:{accounts:[],errors:[],total:2,locations:[{id:1,state:'reconnect',accountEmail:null},{id:2,state:'unlinked'}]}}));
+  await page.goto('/locations');
+  await expect(page.getByTestId('agency-location-1')).toContainText('Needs reconnect');
+  await expect(page.getByTestId('agency-location-2')).toContainText('Not linked');
 });
