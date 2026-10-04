@@ -190,9 +190,11 @@ export function registerCrmAdminRoutes(app: Express, getDevUser: GetUser): void 
       const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(table);
       return row.n;
     };
+    // The dollar figure and the charge count must read from the same filter —
+    // "1,531 charges" next to "$4.3M" implies the charges sum to the money.
     const [pay] = await db
       .select({
-        count: sql<number>`count(*)::int`,
+        count: sql<number>`count(*) filter (where ${crmPayments.status} = 'succeeded')::int`,
         succeededCents: sql<number>`coalesce(sum(case when ${crmPayments.status} = 'succeeded' then ${crmPayments.amountCents} else 0 end), 0)::int`,
       })
       .from(crmPayments);
