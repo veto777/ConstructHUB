@@ -196,7 +196,7 @@ export default function LsaLeadsPage() {
   const syncMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/lsa/sync")).json(),
     onSuccess: (data: any) => {
-      toast({ title: "Sync complete", description: `${data?.imported ?? 0} new lead(s) across ${data?.accountsSynced ?? 0} account(s).` });
+      toast({ title: "Sync complete", description: `${data?.imported ?? 0} new lead(s) across ${data?.accountsScanned ?? 0} account(s).` });
       queryClient.invalidateQueries({ queryKey: ["/api/lsa/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lsa/accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lsa/leads"] });
