@@ -89,7 +89,7 @@ export default function DomainsPage() {
       setNotice(
         d.jobs
           ? "Preview jobs queued. Review their before/after values below before confirming."
-          : "Saved. Background work will appear below.",
+          : "Saved.",
       );
       await refresh();
       return true;
