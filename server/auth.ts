@@ -248,6 +248,8 @@ export async function setupAuth(app: Express) {
 
   app.use(["/api/auth/2fa/setup", "/api/auth/2fa/verify", "/api/auth/2fa/disable", "/api/auth/change-password"], rateLimit("security-changes", 10, 30, 15 * 60_000));
 
+  // The Google button on /auth: starts Google OAuth; the callback signs the user in (making a
+  // Google-only account when needed) and lands them on ?next= (validated) or the home page.
   app.get("/api/auth/google", (req, res, next) => {
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
@@ -361,6 +363,8 @@ export async function setupAuth(app: Express) {
     }
   );
 
+  // The auth page's "Get Started": creates the unverified account, emails a 24-hour
+  // verification link, and applies a beta invite code when present.
   app.post("/api/auth/signup", async (req, res) => {
     try {
       const { email, password, displayName, beta, next } = req.body;
@@ -418,6 +422,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // The auth page's sign-in: checks email and password (and email verification), starts 2FA
+  // when the account has it, otherwise opens the session.
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
@@ -469,6 +475,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // The auth page's second factor: checks the 6-digit code for the pending login and, on
+  // success, finishes the sign-in (remembering the device when asked).
   app.post("/api/auth/2fa/login", async (req, res) => {
     try {
       const { code } = req.body;
@@ -571,6 +579,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // The auth page's "Resend verification email": issues a new 24-hour token and emails it.
   app.post("/api/auth/resend-verification", async (req, res) => {
     try {
       const { email } = req.body;
@@ -598,6 +607,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // The auth page's "Forgot password": emails a 1-hour reset link. Always answers the same
+  // way whether or not the email exists.
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
@@ -625,6 +636,8 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // The reset link's landing page (/auth?mode=reset-password&token=…): checks the token and
+  // expiry, sets the new password, then signs out every session and revokes trusted devices.
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
       const { token, password } = req.body;
@@ -665,6 +678,9 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // "Am I signed in?" — every public page, header and footer asks this to choose between the
+  // signed-out chrome and the app frame; also returns the flags the UI needs (2FA on,
+  // Google linked, platform admin).
   app.get("/api/auth/me", async (req, res) => {
     if (req.isAuthenticated() && req.user) {
       try {
@@ -921,6 +937,7 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Sign out (the account menu and the auth page): ends the session and clears the cookie.
   app.post("/api/auth/logout", (req, res) => {
     // Capture the actor before the session goes away — a sign-out is only
     // worth logging when we know who it was.

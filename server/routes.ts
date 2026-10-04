@@ -423,11 +423,16 @@ export async function registerRoutes(
     console.error("Failed to initialize LSA module:", e?.message || e);
   }
 
+  // Every county in the directory (name, state, stateCode) — the county/state pickers on
+  // the Databases, Search and Property pages.
   app.get("/api/counties", async (_req, res) => {
     const counties = await storage.getCounties();
     res.json(counties);
   });
 
+  // The permit directory. ?filtered=true = the Databases page's paged, filterable list;
+  // ?searchable=true[&stateCode=] = the live-searchable portals (Search page picker and
+  // count); no query = the full directory.
   app.get("/api/databases", async (req, res) => {
     try {
       if (req.query.filtered === "true") {
@@ -473,6 +478,8 @@ export async function registerRoutes(
     }
   });
 
+  // The Directory and Search pages' headline counts: total portals, counties, cities, and
+  // how many are live-searchable.
   app.get("/api/databases/counts", async (_req, res) => {
     try {
       const counts = await storage.getDatabaseCounts();
@@ -483,6 +490,7 @@ export async function registerRoutes(
     }
   });
 
+  // One county's permit portals (display link fields) — a county drill-down.
   app.get("/api/databases/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const databases = await storage.getDatabasesByCounty(countyId);
@@ -507,6 +515,9 @@ export async function registerRoutes(
     next();
   });
 
+  // The Search Permits page (/search): runs a permit search across the chosen county or
+  // state's live-searchable portals, saves the query to history, starts the live search.
+  // Only a live search uses the monthly quota; saved/local results don't.
   app.post("/api/search", async (req, res) => {
     try {
       const { searchType, searchValue, scopeCountyId, scopeState } = req.body;
@@ -580,6 +591,8 @@ export async function registerRoutes(
     }
   });
 
+  // The Search page's live-progress poll (/search): status, portals asked and results so far
+  // for one live permit search; only the search's owner can read it.
   app.get("/api/search/live/:searchId", async (req, res) => {
     const job = getLiveSearchJob(req.params.searchId);
     if (!job || !(await canReadQuery(req, job.queryId))) {
@@ -610,6 +623,8 @@ export async function registerRoutes(
     });
   });
 
+  // The Databases page's refresh button (/databases): refreshes one portal now — checks it is
+  // a verified live, searchable portal, uses one search from the monthly quota, starts the job.
   app.post("/api/scrape", async (req, res) => {
     try {
       const { databaseId, searchTerm, searchType } = req.body;
@@ -657,6 +672,8 @@ export async function registerRoutes(
     }
   });
 
+  // The Databases page's refresh button (/databases): polls one refresh job's progress;
+  // only the job's owner can read it.
   app.get("/api/scrape/status/:jobId", async (req, res) => {
     const progress = getScrapeProgress(req.params.jobId);
     if (!progress || scrapeOwners.get(req.params.jobId) !== req.user!.id) {
@@ -672,6 +689,8 @@ export async function registerRoutes(
     res.json(arr);
   });
 
+  // The Search page's "Permit details" (/search): returns cached details for a result, or
+  // scrapes the portal for that permit and caches them on the result row.
   app.post("/api/permit-details/:resultId", async (req, res) => {
     try {
       const resultId = parseInt(req.params.resultId);
@@ -860,6 +879,8 @@ export async function registerRoutes(
     setTimeout(tick, 60 * 1000).unref();
   }
 
+  // The Property Records page (/property): every county assessor/appraiser office (NETR-sourced
+  // seed data), enriched with the display link fields and its county.
   app.get("/api/property-appraisers", async (_req, res) => {
     const appraisers = await storage.getPropertyAppraisers();
     const counties = await storage.getCounties();
@@ -871,12 +892,16 @@ export async function registerRoutes(
     res.json(enriched);
   });
 
+  // The Property Records page (/property): one county's appraiser offices, with the display
+  // link fields (portalUrl/searchUrl/linkStatus/lastVerifiedAt).
   app.get("/api/property-appraisers/county/:countyId", async (req, res) => {
     const countyId = parseInt(req.params.countyId);
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
     res.json(appraisers.map(governmentLinksForDisplay));
   });
 
+  // The Property Records page (/property): looks up a parcel/address in that county's records
+  // and returns the county appraiser links (with their linkStatus) alongside.
   app.post("/api/property-lookup", async (req, res) => {
     try {
       const { address, countyId, parcelNumber } = req.body;
@@ -3205,11 +3230,13 @@ export async function registerRoutes(
     }
   });
 
+  // The Master Class page (/master-class): the states that have a permit-guide tab.
   app.get("/api/state-guides", async (_req, res) => {
     const guides = await db.select().from(stateGuides).orderBy(asc(stateGuides.stateName));
     res.json(guides);
   });
 
+  // The Master Class page's per-state guide tab (/master-class): one state's guide and its steps.
   app.get("/api/state-guides/:stateCode", async (req, res) => {
     const code = req.params.stateCode.toUpperCase();
     const [guide] = await db.select().from(stateGuides).where(eq(stateGuides.stateCode, code));
@@ -3218,11 +3245,14 @@ export async function registerRoutes(
     res.json({ ...guide, steps });
   });
 
+  // The Master Class page (/master-class): the active course modules (title, price, order).
   app.get("/api/master-class-modules", async (_req, res) => {
     const modules = await db.select().from(masterClassModules).where(eq(masterClassModules.isActive, true)).orderBy(asc(masterClassModules.sortOrder));
     res.json(modules);
   });
 
+  // The Master Class page (/master-class): which course modules this account has bought,
+  // so purchased modules show as owned. Signed out → [].
   app.get("/api/course-purchases", async (req, res) => {
     // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
     const user = req.user ? getDevUser(req, res) : null;
@@ -3303,6 +3333,8 @@ export async function registerRoutes(
   // Multi-line user text: escape, then keep line breaks readable.
   const escapeBlock = (value: unknown) => escapeHtml(value).replace(/\r?\n/g, "<br>");
 
+  // The Master Class page's sales-inquiry form (/master-class): emails the services and
+  // contact details to our own inbox (reply-to the sender). No DB row.
   app.post("/api/seo-inquiry", seoInquiryLimit, async (req, res) => {
     try {
       const parsed = seoInquiryInput.safeParse(req.body ?? {});
@@ -3339,6 +3371,8 @@ export async function registerRoutes(
     }
   });
 
+  // The GBP Reinstatement page's request form (/reinstatement): validates the fields
+  // and emails the request to our own support inbox (reply-to the requester). No DB row.
   app.post("/api/reinstatement/request", reinstatementLimit, async (req, res) => {
     try {
       const parsed = reinstatementInput.safeParse(req.body ?? {});
