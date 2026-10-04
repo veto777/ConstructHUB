@@ -68,6 +68,22 @@ test.describe("/crm home", () => {
     guards.assertClean("home stat card links");
   });
 
+  test("curated: the desktop sidebar links to the schedule", async ({ page }) => {
+    const guards = watchPage(page);
+    await gotoCrm(page, "/crm");
+
+    // Regression: Schedule existed and the mobile ribbon had it, but the
+    // desktop nav didn't — the page was unreachable without the URL.
+    const schedule = page.getByTestId("link-portal-nav-schedule");
+    await expect(schedule).toBeVisible();
+    await expect(schedule).toContainText("Schedule");
+    await schedule.click();
+    await expect(page).toHaveURL(/\/crm\/schedule/);
+    await expect(page.getByTestId("calendar-month")).toBeVisible();
+
+    guards.assertClean("sidebar schedule link");
+  });
+
   test("sweep: every button and link", async ({ page }) => {
     const { clicked, labels } = await sweepPage(page, "/crm", {
       ready: "h1",

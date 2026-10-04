@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
   Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone, LayoutGrid, ArrowUpRight,
+  CalendarDays,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -50,6 +51,10 @@ const NAV: {
   // standalone service (owner, 2026-10-02).
   { title: "Pipeline", url: "/crm/pipeline", icon: KanbanSquare, testid: "link-portal-nav-pipeline",
     active: (l: string) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
+  // The calendar: the mobile ribbon has always had this tab; the desktop list
+  // was missing it, leaving the page reachable only by URL or on a phone.
+  { title: "Schedule", url: "/crm/schedule", icon: CalendarDays, testid: "link-portal-nav-schedule",
+    active: (l: string) => l.startsWith("/crm/schedule") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",
     active: (l: string) => l.startsWith("/crm/estimates") },
   // Invoices carry money — hidden from members without seePrices, like the API.
