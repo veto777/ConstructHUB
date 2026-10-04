@@ -764,3 +764,275 @@ No run-now button exists on this page (and no run-now endpoint); cadence is the 
 - `reviewSubmitted` / review_submitted: returned by APIs, referenced once client-side (google-reviews.tsx:794), never written true by any server path — DEAD data element (see bugs file).
 - Trash purge: storage.purgeExpiredTrash hard-deletes rows with deleted_at < now − 14 days (storage.ts:772-776); client "Nd left" badge uses the same 14-day window.
 - AUDIT residue: review_requests id 928 (AUDIT-Lane2-B3, audit-lane2@example.invalid) soft-deleted in trash; review_recipient_preferences row for audit-lane2@example.invalid (unsubscribed=true — the resubscribe path is customer-only and returns 403 for the owner on this lane, so it stays suppressed); 1 email in tmp/email-outbox.jsonl to the fake address. No seeded rows were mutated (verified: id 12 email_opened/link_clicked unchanged — pixel GET was a no-op because the flags were already set; no feedback submitted against any seeded row).
+
+---
+
+*Batch 4 — pages /photos, /media-library, /social-media, /ranking-grid, /competitors, /mail-alerts.*
+
+Audit date 2026-10-04. Worktree `/home/veto/ConstructHUB-audit2` (branch audit/2), dev server `http://127.0.0.1:8302`, signed in as user 1 (`dev@constructhub.local`, `isPlatformAdmin: true`, `accessPlan: "agency"`). DB: `constructhub_dev_a6` (read-only SQL). Screenshots + Playwright script in the lane2 dir.
+
+**Route check (client/src/App.tsx):** `/photos` :172, `/media-library` :173, `/ranking-grid` :175, `/competitors` :177 (gated `SHOW_COMPETITOR_INTEL`), `/mail-alerts` :183, `/social-media` :185, `/competitors-landing` :221 (legacy landing, noted). `SHOW_COMPETITOR_INTEL = true`, `SHOW_AD_ACTIVITY = false` (client/src/lib/features.ts:13,35 — ad tab hidden because the only "ad source" was fabricated Places data; server `/api/ad-spy` answers 410, server/routes.ts:2454).
+
+**Cross-cutting data facts (SQL, 2026-10-04):** `media_folders` 0, `media_photos` 0, `social_connections` 0, `social_posts` 0, `social_sources` 0, `social_bulk_jobs` 0, `social_settings` 0, `ranking_grid_scans` 0, `ranking_grid_results` 0, `mail_alert_messages` 0, `mail_alert_grants` 0, `mail_alert_addresses` 1 (user 1). `competitor_scans`: exactly 2 rows, both user 1, both **failed** (ids 2 "Tree Service / Forks, WA" and 3 "Roofing Contractor / Tampa, FL", `total_found` 0, error "Competitor search failed (INVALID_REQUEST)…", created 2026-09-29 23:20 UTC). The 596 `competitor_listings` rows are **orphans**: their `scan_id`s (14,15,17,18,20,22,24,25,57,58,120,121,123,124) do not exist in `competitor_scans`, and their `user_id`s are 14 other users (2131,2132,2138,2139,2145,2149,2275,2276,5078,5079,16744,16745,16749,16750) — they are not reachable through the API for user 1 (see /competitors).
+
+---
+
+## /photos — client/src/pages/photos.tsx
+One-line purpose: batch SEO photo tool — watermark, geotag, rename, describe and download job photos.
+
+Note: this page never reads `media_photos`; uploads live in server in-memory maps + disk (`uploadedFiles`, `processedFiles` in server/routes.ts). There is **no filename-pattern input** (filenames are generated server-side, `generateFileName`, routes.ts:1406) and **no link to /media-library** on the page (library integration is the "Save to media library" modal only). "Empty state" for media_photos is therefore N/A.
+
+### Access notice
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| notice-photos-access ("Sign in to process photos…" / "Processing photos is included with every plan…") | conditional notice + link | Shown only when signed out or when `/api/entitlements` returns no accessPlan; links to /auth or /pricing | photos.tsx:1242-1254 | GET /api/entitlements → server/entitlements.ts:getEntitlements (accessPlan) | Playwright (user 1 has agency plan → notice correctly hidden) | OK |
+
+### Templates (client-only)
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| button-save-template / template-save-form / input-template-name / button-confirm-save-template | button + inline form | Saves current business info + categories + keywords + watermark settings as a named template | photos.tsx:1256-1305 | client only: localStorage key `gmb-photo-templates` (photos.tsx:207-221) | code | OK |
+| template chip + menu (button-load-template-*, menu-rename-template-*, menu-overwrite-template-*, menu-delete-template-*) | chips + dropdown | Load / rename / overwrite / delete saved templates; empty text "No templates yet…" | photos.tsx:1308-1361 | client only: localStorage | Playwright (empty text shown) | OK |
+| dialog-delete-template (button-cancel-delete-template / button-confirm-delete-template) | confirm dialog | Deletes template from browser storage | photos.tsx:1363-1382 | client only | code | OK |
+
+### Business info
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| button-toggle-business / button-clear-business | collapsible section + clear | Shows/hides the business form; Clear wipes it (also removes localStorage) | photos.tsx:1385-1442 | client only (persisted `gmb-business-info`) | Playwright | OK |
+| "Load from saved location" select-saved-location | select | Fills the form from one of the owner's Locations | photos.tsx:1446-1493 | GET /api/locations → server/routes.ts:2672 → business_locations WHERE user_id=1 ORDER BY created_at DESC (2 rows for user 1: 104296, 506025) | curl (2 locations) + code | OK |
+| link-add-locations | link | Shown when no saved locations; goes to /locations (route exists) | photos.tsx:1494-1502 | — | code | OK |
+| input-business-search + button-business-search | search input + button | Searches Google's business index by name/address/Maps URL (≥2 chars) | photos.tsx:1504-1528 | POST /api/photos/business-search → server/routes.ts:985 → Google Places text/findplace/details + maps-URL resolver; no DB | code (calls live Google API — not pressed) | OK |
+| business-results list + button-load-more-results | result list | Pick a result to auto-fill the form; pageToken pagination | photos.tsx:1532-1587 | POST /api/photos/business-details → routes.ts:1244 (placeId) → Places details | code | OK |
+| Manual fields (input-company-name, input-phone, input-address, input-city, input-county-state, input-website, input-services, input-copyright) | text inputs | Enter business facts used for watermark text, EXIF, descriptions | photos.tsx:1593-1674 | client only (localStorage) | Playwright | OK |
+
+### Service area cities
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| switch-service-area-enabled | switch | Enables the optional service-area discovery | photos.tsx:1679-1699 | client only | Playwright | OK |
+| chip-area-type-* (locality/neighborhood/administrative_area_level_3/2), slider-service-radius (5–50 mi), chip-density-* (low/medium/high/max) | chips + slider | Choose area types, radius and sampling density for discovery | photos.tsx:1703-1793 | client only | code | OK |
+| button-find-service-areas | button | Reverse-geocodes rings of sample points around the business address and lists nearby cities/counties with distance | photos.tsx:1795-1836 | POST /api/photos/nearby-cities → server/routes.ts:1631 → Google Geocoding (ring sampling, haversine distance, radius clamped 5–50 mi); no DB | code (live Google API — not pressed) | OK |
+| input-manual-cities + button-add-manual-cities, input-area-filter, area checkbox list, button-select-all-areas / button-clear-areas | input + list | Type cities by hand (pairs "City, ST" auto-detected), filter and tick areas; selections rotate into filenames/EXIF per photo | photos.tsx:1849-1931 | client only (sent later in process payload `serviceAreas`) | code | OK |
+
+### Category & keywords
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| select-category portal dropdown + input-category-search + category-option-* | dropdown (portal) | Pick Google categories (22 construction trades with auto-keyword maps + full GBP_CATEGORIES list); typing filters | photos.tsx:1936-2047 | client only: static maps `categoryKeywords` (photos.tsx:80-147), `@/data/gbp-categories` | Playwright (dropdown renders) | OK |
+| keyword rows (checkbox-keyword-*), button-remove-keyword-*, button-select-all-keywords / button-clear-keywords, input-custom-keyword + button-add-custom-keyword | checkbox list + inputs | Generated keyword checklist per category (modifier × trade expansion), custom keywords (comma/paste bulk add) | photos.tsx:2049-2208 | client only | code | OK |
+
+### Photos
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| dropzone-photos + button-browse-files + input-file-upload + button-camera-capture | dropzone + file inputs | Accepts JPG/PNG (others counted and skipped with a toast); camera button opens the phone camera | photos.tsx:2227-2281 | client only until Process (client-side compress if ≥4 MB, photos.tsx:508-548) | Playwright (dropzone renders) | OK |
+| photo thumbnails (photo-thumbnail-*), button-remove-photo-*, button-expand-photo-*, button-clear-photos | thumbnail grid | Preview grid; click opens editor; remove/clear | photos.tsx:2283-2356 | client only (object URLs) | code | OK |
+| modal-photo-editor: img-photo-preview-large, button-prev-photo / button-next-photo, slider-brightness / slider-contrast / slider-saturation, button-auto-enhance, button-reset-filter, button-apply-filters-all, button-switch-photo-* | editor modal | Per-photo brightness/contrast/saturation (0.5–2.0), auto-enhance via server image analysis, reset, copy filters to all | photos.tsx:2358-2529 | POST /api/photos/auto-enhance → server/routes.ts:952 → analyzePhoto (server/photos-* image lib) on the uploaded temp file; no DB | code (AI/analysis endpoint — not called) | OK |
+
+### Watermark
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| switch-watermark | switch | Enables/disables watermarking | photos.tsx:2534-2543 | client only | Playwright | OK |
+| button-watermark-text-mode / button-watermark-image-mode, input-watermark-text | segmented buttons + input | Text watermark (defaults to company name) or logo image | photos.tsx:2544-2577 | client only | code | OK |
+| button-upload-watermark-image / button-remove-watermark-image | file input + remove | Uploads a PNG/JPEG logo; stores id for processing | photos.tsx:2578-2622 | POST /api/photos/upload-watermark → server/routes.ts:971 (multer, in-memory `watermarkImages` map) | code | OK |
+| slider-watermark-opacity (10–100%) | slider | Watermark opacity | photos.tsx:2624-2637 | client only | code | OK |
+| switch-mirror-photos | switch | Flips every photo horizontally (rights warning shown) | photos.tsx:2641-2653 | client only (applied server-side at process) | Playwright | OK |
+
+### Process & download
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| switch-ai-descriptions | switch | Off = 5 built-in template descriptions (server picks randomly); on = OpenAI-generated unique descriptions | photos.tsx:2656-2679 | POST /api/photos/generate-description → server/routes.ts:1302 (useAI→server/ai photoDescription, 502/503 on failure; template path needs companyName+service) | code (AI endpoint — not called) | OK |
+| button-process-photos | primary button | 1) uploads each photo POST /api/photos/upload (multipart "photos", ≤10, in-memory map, 429 if ≥200 pending); 2) generates descriptions; 3) geocodes address if needed POST /api/media/geocode; 4) starts job POST /api/photos/process (1–10 fileIds, max 4 concurrent jobs, monthly "photos" quota reserved, 402 handled via rememberPlanPrompt) then polls GET /api/photos/process/:jobId every 2s; server watermarks/renames/writes EXIF to disk `processedDir` (no DB) | photos.tsx:1079-1200, 999-1075 | server/routes.ts:924, 1334, 1511 | code (write path — not executed) | OK |
+| button-download-all | button | ZIP download of processed set | photos.tsx:2696-2712 | POST /api/photos/download-all/prepare → routes.ts:1541 (token, 10-min TTL) then GET /api/photos/download-all/:token → routes.ts:1551 (archiver zip) | code | OK |
+| processed file rows (processed-file-*) + button-download-* | list + buttons | Per-file download of optimized photos | photos.tsx:2789-2814 | GET /api/photos/download/:fileId → routes.ts:1524 | code | OK |
+| button-save-to-library + modal-save-to-library (folder-option-*, input-new-folder-name, button-confirm-save-library) | button + modal | Copies processed photos into a Media Library folder (creates folder if needed) | photos.tsx:2714-2787, 324-373 | GET /api/media/folders; POST /api/media/folders → routes.ts:1592 (insert media_folders user_id=1); POST /api/media/save-processed → routes.ts:1822 (uploadToR2 + insert media_photos user_id, folder_id, name, url, r2_key, size) | curl (folders []), code for write path | OK |
+| EXIF disclaimer footnote | text | Honest note that Google strips EXIF on GBP upload | photos.tsx:2822-2824 | — | Playwright | OK |
+
+### Recent batches (client-only) & platform links
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| card-recent-batches (row-batch-*, button-restore-batch-*, button-download-batch-*, button-remove-batch-*, button-clear-recent-batches) | local list | Last 3 batches kept in localStorage (`constructhub_recent_photo_batches`) so ZIP links survive reloads; hidden when empty | photos.tsx:2827-2902 | client only (processedIds re-downloaded via download-all/prepare) | code | OK |
+| button-upload-google / button-upload-yelp | external links | Open business.google.com/locations and biz.yelp.com in new tabs | photos.tsx:2904-2929 | — | code | OK |
+
+---
+
+## /media-library — client/src/pages/media-library.tsx
+One-line purpose: project photo folders with optional client GPS address; upload, preview, rename, download, delete photos.
+
+Verified empty: `GET /api/media/folders` → `[]` (curl); Playwright shows "No folders yet" empty state with "Create your first folder" action. `media_folders`/`media_photos` 0 rows.
+
+### Folder list (root view)
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| heading-media-library + button-new-folder | header + button | Page title; opens New folder modal | media-library.tsx:377-391 | — | Playwright | OK |
+| input-search-media | search input | Client-side filter of folder names | media-library.tsx:393-403 | client only | code | OK |
+| text-empty-state ("No folders yet…") | empty state | Honest empty state with create action (button-empty-new-folder) | media-library.tsx:618-631 | — | Playwright + curl [] | OK |
+| folder-grid / folder-card-* / folder-name-* (name + created date + clientAddress + GPS badge + "Click to view photos") | card grid | Folders newest-first; click opens folder | media-library.tsx:635-699 | GET /api/media/folders → server/routes.ts:1581 → SELECT * FROM media_folders WHERE user_id=1 ORDER BY created_at DESC | curl [] | OK |
+| folder-menu-* (Edit folder / menu-delete-folder-*) | dropdown | Edit or delete a folder; delete dialog names the photo count (fetched per-folder) | media-library.tsx:652-673, 885-913 | GET /api/media/folders/:id/photos (count); DELETE /api/media/folders/:id → routes.ts:1772 (deletes R2 objects, media_photos rows, then folder row, all scoped user_id=1) | code (delete not pressed) | OK |
+
+### New / edit folder modals
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| modal-new-folder (input-folder-name, input-folder-address, button-verify-address, button-confirm-create-folder) | modal | Creates a folder; optional client address can be verified to lat/lon (shown to 6 dp) and stored for GPS embedding | media-library.tsx:439-521 | POST /api/media/geocode → routes.ts:1752 (Google Geocoding, 404 if not found); POST /api/media/folders → routes.ts:1592 (insert media_folders: user_id, name, client_address, lat, lon) | code (write not pressed) | OK |
+| modal-edit-folder (input-edit-folder-name, input-edit-folder-address, button-verify-edit-address, button-save-edit-folder) | modal | Renames / re-geocodes folder | media-library.tsx:523-591 | PATCH /api/media/folders/:id → routes.ts:1611 (update name/client_address/lat/lon WHERE id AND user_id=1) | code | OK |
+
+### Folder view (photos)
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| button-back-folders | link button | Returns to folder list | media-library.tsx:324-331 | — | code | OK |
+| Folder header (heading-media-library, "GPS embedded"/"Address set" badge, address + coords, button-edit-folder, button-upload-photos + input-upload-photos) | header | Shows folder name/address; uploads up to 10 photos (any image/*) | media-library.tsx:332-375 | POST /api/media/upload (multipart folderId + photos[]) → routes.ts:1868 → uploadToR2 + insert media_photos (name=originalname, url, r2_key, size) | code (write not pressed) | OK |
+| button-view-grid / button-view-list, button-select-all, button-delete-selected + dialog-delete-selected | view toggle + bulk select | Grid/list modes; multi-select; bulk delete with confirm ("Delete photos" → per-photo DELETE loop, partial-failure toast) | media-library.tsx:404-437, 915-934 | DELETE /api/media/photos/:id → routes.ts:1804 (R2 delete + row delete, user_id-scoped), called once per id | code | OK |
+| text-empty-photos ("This folder is empty…" + button-empty-upload) | empty state | Honest per-folder empty state | media-library.tsx:708-721 | — | code | OK |
+| photo-grid / photo-card-* (img, checkbox-photo-*, photo-menu-*) or photo-list / photo-list-item-* | grid/list of photos | Preview modal on click; per-photo menu: Preview / Rename / Download (direct a[href=photo.url]) / Delete | media-library.tsx:724-873 | GET /api/media/folders/:id/photos → routes.ts:1792 → media_photos WHERE folder_id AND user_id=1 ORDER BY created_at DESC; PATCH /api/media/photos/:id/rename → routes.ts:1905; DELETE /api/media/photos/:id → routes.ts:1804 | code | OK |
+| modal-photo-preview | modal | Full-size preview with name/size overlay | media-library.tsx:593-609 | — | code | OK |
+| Footer count line ("N photos · X MB total") | text | Count and summed size of filtered photos | media-library.tsx:876-881 | client only (sums photo.size) | code | OK |
+
+---
+
+## /social-media — client/src/pages/social-media.tsx
+One-line purpose: compose once, publish/schedule to many social accounts through a Blotato API key; calendar/queue, AI auto-mode, content sources.
+
+Facts: this page uses a **Blotato API key**, not per-platform OAuth; there are no per-platform connect cards. All social tables are empty. Verified via curl for business 104296: `connected:false, accounts:[], posts:[], total:0, defaults:[]`; `/api/social/media` → `[]`; `/api/social/sources` → `[]`. Without `?business=` the page shows the business picker and "Choose a business above. Add or import businesses in Locations" (/locations route exists).
+
+### Header / business selection
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| PageHeader "Social Media" + "How it works" | header + button | Sets `?tab=guides` → renders GuidesContent | social-media.tsx:63-67 | — | Playwright | OK |
+| BusinessSelector (component client/src/components/social-agency.tsx:32) | picker | Search/pick one of the owner's businesses or "All businesses" (all-clients calendar); sets `?business=` | social-media.tsx:68 | GET /api/social/businesses → server/social/routes.ts:93 → listBusinesses (business_locations owned by user) | Playwright (2 businesses listed: 104296 "K- Social workbench fixture", 506025 "AI-TEST Ridgeline Roofing") | OK |
+| "Choose a business above…" hint | text | Shown when no business selected | social-media.tsx:72 | — | Playwright | OK |
+
+### Blotato connection
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Blotato connection" section + StatusPill (Connected / Not connected) | section + pill | Shows effective connection state | social-media.tsx:256-325 | GET /api/social → server/social/routes.ts:148 dashboard → social_connections (user_id,business_id scoped) | curl connected:false; Playwright pill "Not connected" | OK |
+| "Key to manage" scope select + "Effective connection" text | select + text | Choose business-only vs agency shared key; shows which is in effect (`connectionScope`) | social-media.tsx:266-275 | same dashboard payload (`agencyConnected`, `businessConnected`, `connectionScope`) | curl | OK |
+| Blotato API key input + "Connect Blotato" / "Verify / replace key" button | input + button | Sends key to server; server verifies against Blotato and stores it encrypted (never displayed again) | social-media.tsx:276-303 | POST /api/social/connect → server/social/routes.ts:150 → service.ts:connect → INSERT social_connections(user_id,key_enc,accounts,business_id) ON CONFLICT UPDATE | code (would write + call Blotato — not pressed) | OK |
+| Disconnect button | button | Removes the stored key; cancels queued posts/drafts and bulk jobs locally | social-media.tsx:304-313 | POST /api/social/disconnect → routes.ts:158 → DELETE social_connections; UPDATE social_settings enabled=false; UPDATE social_posts queued/draft→cancelled; UPDATE social_bulk_jobs→cancelled | code | OK |
+| Connected accounts line ("name (platform) · …") | text | Lists Blotato accounts for the key | social-media.tsx:317-323 | dashboard `accounts` | curl [] | OK |
+
+### Mapping editor
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| MappingEditor (social-media.tsx:328; client/src/components/social-agency.tsx:126-158) | panel | Map Blotato accounts/pages to the business; refresh pages/boards | social-agency.tsx:126-158 | GET /api/social/accounts; PUT /api/social/mapping; POST /api/social/accounts/:id/pages → server/social/routes.ts:106,102,161 | code | OK |
+
+### Compose tab
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Post to" account checkboxes + per-platform options (refresh pages/boards, page/board select, YouTube title + privacy, TikTok public/branded/own-brand flags) | checkbox cards | Choose destinations; per-platform tweak fields | social-media.tsx:352-488 | POST /api/social/accounts/:id/pages (discoverPages) | code | OK |
+| Post text textarea + per-platform tweak textareas with char counts (`socialLimits`) | textareas | Message + per-platform overrides with limits from @shared/social | social-media.tsx:489-513 | client validation | code | OK |
+| "Public media URLs" textarea + validation + "Search synced business photos" + media library select + "Upload through Blotato" file input | media inputs | Attach up to 10 public HTTPS media URLs; search synced Media Library photos; or upload ≤100 MB via presigned URL | social-media.tsx:514-561 | GET /api/social/media → server/social/routes.ts:205 (media_photos of the business owner); POST /api/social/uploads → routes.ts:214 (presigned PUT, publicUrl) | curl [] for media; code for upload | OK |
+| Schedule time (datetime-local) | input | Blank = post now; otherwise scheduledTime ISO | social-media.tsx:567-575 | client | code | OK |
+| "Post now"/"Schedule post" + "Save draft" buttons + postBlocker hint text | buttons | Disabled with a plain reason until connected + destination + text (+media valid); submit → create posts | social-media.tsx:576-595 | POST /api/social/posts → server/social/routes.ts:164 → createPosts → INSERT social_posts (payload, state draft/queued, due_at) | code (write not pressed); Playwright buttons render disabled with hint "Connect Blotato above to post." | OK |
+
+### Calendar & queue tab
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Toolbar: search, Calendar day date input, Status select (draft/queued/submitting/submitted/published/failed/uncertain/cancelled), Platform select | filters | Filters the post list (server-side via query params) | social-media.tsx:606-627 | GET /api/social?offset&search&state&platform&timezone&businessId&day → dashboard (social_posts WHERE user_id,business_id, filters; LIMIT 25) | curl total:0 | OK |
+| "No posts yet. Compose your first update or generate an AI draft." + "0 matching posts" | empty state + count | Honest empty state | social-media.tsx:628-633 | — | curl; code | OK |
+| Select this page / Approve selected drafts / Cancel selected posts + "N selected (up to 100)" + bulk error list | bulk actions | Bulk approve/cancel over selected draft/queued posts | social-media.tsx:634-639 | POST /api/social/posts/bulk-action → routes.ts:168 | code | OK |
+| Pager + PostRow list (state Badge, business name or "Legacy / unassigned", platform, local time, AI-generated badge, editable draft text, Approve & queue / Cancel, View published post, Open Blotato status, submission id) | post list | Each post row with status pill and per-post actions | social-media.tsx:640-657, 1021-1123 | POST /api/social/posts/:id/action → routes.ts:179 (approve/cancel; UPDATE social_posts state) | code | OK |
+| "Status refreshes every 15 seconds" note | text | Query refetchInterval 15000 | social-media.tsx:603 | — | code | OK |
+
+### Auto mode tab
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| Enable auto mode + Publishing mode (approval queue / fully automatic) | checkbox + select | Enable AI drafting; automatic publishes without review | social-media.tsx:669-692 | PUT /api/social/settings → server/social/routes.ts:197 → saveSettings → INSERT/UPDATE social_settings (settings jsonb) | curl default settings echoed; code for save | OK |
+| Saved destinations + "Use accounts selected in Compose" | text + button | Copies compose destinations into settings | social-media.tsx:693-710 | client + same PUT | code | OK |
+| Cadence (1–7) + period (week/day), content mix checkboxes (project/tips/reviews/offers/gbp), instructions, examples, timezone, blackout start/end (0–23), daily AI budget (0–20) | form | Auto-generation schedule and content controls; client-side zod mirror gives field-specific errors | social-media.tsx:711-839 | PUT /api/social/settings (autoSchema) | code | OK |
+| data.lastError / next generation line | status text | Shows scheduler error / next run when connected+enabled | social-media.tsx:840-853 | dashboard fields | curl (absent, not enabled) | OK |
+| "Save auto settings" + "Generate draft from saved settings" | buttons | Saves settings; enqueues a generation job | social-media.tsx:854-887 | PUT /api/social/settings; POST /api/social/generate → routes.ts:201 → enqueueBulk (INSERT social_bulk_jobs kind='generate') | code (AI endpoint — not called) | OK |
+| "Sync recent GBP updates" button + sync status line | button + text | Queues a GBP-source refresh | social-media.tsx:895-901, 984 | POST /api/social/sources/sync-gbp → routes.ts:231 | code | OK |
+| Content sources: kind select (offer / published GBP update), source text, attached-media list, "Add content source", sources list with Remove, "Sources expire … 30 days" note | source editor | Adds factual source text (+media URLs) the AI can turn into posts | social-media.tsx:902-1010 | POST /api/social/sources → routes.ts:240 (INSERT social_sources, 30-day window); GET /api/social/sources → routes.ts:235 (WHERE created_at > now()-30d); DELETE /api/social/sources/:id → routes.ts:257 | curl [] | OK |
+
+---
+
+## /ranking-grid — client/src/pages/ranking-grid.tsx
+One-line purpose: run a geo-grid scan of Google Maps rankings for a keyword and view rank maps/reports.
+
+Verified empty: `GET /api/ranking-grid/scans` → `[]` (curl); Playwright shows "No scans yet. Start your first ranking scan above." `ranking_grid_scans`/`ranking_grid_results` 0 rows. **GBP connection: the page does not use or hint about GBP at all** — business pick is a Google Places text search; there is no disable/hint tied to GBP.
+
+### Scan form
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| input-business-search + button-search-business | search input + button | Search Google Places for the business (≥2 chars) | ranking-grid.tsx:707-735 | POST /api/photos/business-search → server/routes.ts:985 | code (live API — not pressed) | OK |
+| Search results dropdown (button-select-business-*) | result list | Pick a place → fetch details + geocode | ranking-grid.tsx:737-751 | POST /api/photos/business-details → routes.ts:1244; POST /api/ranking-grid/geocode → routes.ts:2100 (placeId → lat/lon) | code | OK |
+| Selected business chip + button-clear-business | chip + clear | Confirms selection; × clears | ranking-grid.tsx:754-774 | client only | code | OK |
+| input-keyword | text input | Scan keyword, e.g. "Roofing Contractor" | ranking-grid.tsx:777-785 | sent to POST scans | Playwright | OK |
+| Advanced · Grid size (select-grid-size: 3/5/7/9/11/13/15 ×, credit cost labels) + Point spacing (select-grid-distance: 0.5–20 mi) | selects | Grid dimensions; server accepts sizes {3,5,7,9,11,13,15}, spacing 0–20 mi | ranking-grid.tsx:787-818 | POST /api/ranking-grid/scans validation → server/routes.ts:2199 | code | OK |
+| Summary box ("This scan will check N grid points… Total coverage…") + text-grid-credits ("Uses X credits…(0 used · unlimited this month)") | computed text | Client-computed coverage; credits from `gridCreditCost` + `/api/entitlements` usage line | ranking-grid.tsx:819-829 | GET /api/entitlements → server/entitlements.ts (usage.rankings) | Playwright ("0 used · unlimited this month" for admin) | OK |
+| button-start-scan | primary button | Disabled until business+keyword; creates scan, expands it | ranking-grid.tsx:693-705 | POST /api/ranking-grid/scans → server/routes.ts:2190 (validate; trial limit 1 scan; reserveMonthlyQuota "rankings" credits; INSERT ranking_grid_scans status='running'; background runRankingGridScan → Places textsearch per grid point, INSERT ranking_grid_results per point (rank,total_results,top_competitors jsonb); UPDATE scan status + average_rank = mean of ranked points toFixed(1); refund on failure) | code (write + live API — not pressed) | OK |
+
+### Scan history / cards / report
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| text-scan-history + ScanCard list (card-scan-*) | card list | All scans, 5 s polling while any is running | ranking-grid.tsx:834-858 | GET /api/ranking-grid/scans → server/routes.ts:2168 → storage.getRankingGridScans(ownerScope) (ranking_grid_scans by owner, newest first) | curl [] | OK |
+| Scan card header: business name, keyword badge, grid/spacing, "Avg rank" (when set), "% Ranked" badge (completed), status badge (running/completed/failed), Report button, delete button | card header | Row facts straight from the scan row + expanded results | ranking-grid.tsx:906-980 | latestScan from GET /api/ranking-grid/scans/:id → routes.ts:2178 (scan + ranking_grid_results by scan_id) | code | OK |
+| Expanded running progress (indeterminate spinner, "N / total" progress bar) | progress | Honest progress (results count / grid²) | ranking-grid.tsx:982-1009 | ranking_grid_results rows appear as scan runs | code | OK |
+| Expanded completed: StatGrid (Grid points = gridSize², Average rank, Ranked n/total, Top 3) + RankDistributionChart (client-computed buckets 1-3/4-10/11-20/20+ with rounded %) | stats + chart | Client-side aggregates over returned results | ranking-grid.tsx:1011-1022, 315-379 | same GET results | code | OK |
+| MapGridView (img-ranking-map, grid-cell-r*-* dots, zoom in/out/reset buttons, legend, "Zoom: n") | map overlay | Static map image with rank dots per grid cell; colors rank≤3 green, ≤10 yellow, ≤20 red, else gray; center square = business | ranking-grid.tsx:89-280 | GET /api/ranking-grid/map/:scanId?w&h&zoom → server/routes.ts:2122 (proxies Google Static Maps for scan center; ranking_grid_scans.lat/lon) | code | OK |
+| button-full-report-* → ScanReport (text-report-title, summary rows, rank distribution, table-competitors top-10 with Found at / AR (avg rank toFixed(2)) / Best, print button) | report view | Full-page report; competitor table computed client-side from `topCompetitors` of all results (frequency, avg, best); Print → window.print | ranking-grid.tsx:381-560, 1044-1068 | client-side computeCompetitors over GET results | code | OK |
+| button-delete-scan-* + dialog-delete-scan (button-confirm-delete-scan) | delete | Deletes scan + results after confirm | ranking-grid.tsx:861-882 | DELETE /api/ranking-grid/scans/:id → server/routes.ts:2251 (owner-scoped; storage.deleteRankingGridScan removes scan + results) | code (delete not pressed) | OK |
+
+---
+
+## /competitors — client/src/pages/competitors.tsx
+One-line purpose: market scans that index competitors from Google Places and heuristic "signals worth a closer look" review analysis.
+
+**What owner actually sees (verified):** the page is entirely behind the server's Competitor Intel plan gate, and for user 1 (platform admin) that gate answers **402 plan_required**, so the rendered page is the plan-locked state — title "Competitor intelligence", message "Competitor Intel is included with the Pro plan. Upgrade in Pricing to use it.", line "Competitor Intel is included with the Pro, Growth and Agency plans.", button "See the Pro plan" → /pricing. Screenshot `shot-competitors.png`. Root cause and bug entry in bugs-batch4.md. None of the scan UI below renders for user 1. SQL ground truth for the data that *would* render: 2 scans, both failed, `total_found` 0 → cards would show "{industry} — {location}", "10 mile radius • 9/29/2026 • 0 competitors found", Failed badge, error text "Competitor search failed (INVALID_REQUEST). Check provider access and quota." and a "Run this scan again" retry button; expanded state would be "No competitors found in this scan." The 596 `competitor_listings` rows are orphaned (parent scans deleted; owners are 14 other users) and are **not** returned by the API (both scan list and scan detail filter by `user_id`), so no on-screen number can be compared against them.
+
+### Plan gate
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| loader-competitors | spinner | While the scans query loads | competitors.tsx:153-159 | GET /api/competitors/scans | Playwright (not seen — fast 402) | OK |
+| text-locked-title / text-plan-required + plans line + button-upgrade-plan | gated screen | Shown when the scans query errors with 402 {code:"plan_required"} | competitors.tsx:161-184 | GET /api/competitors/scans → server/routes.ts:2386 requireCompetitorIntel → server/entitlements.ts:requirePlan test `(a) => a.competitorScans > 0` → 402 {code:"plan_required", requiredPlan:"pro", message} | curl (402 body), Playwright | BUG (see bugs file) |
+
+### Market scan tab (code-mapped; not rendered for user 1)
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| tab-market-scan / tab-ad-spy (ad-spy hidden: SHOW_AD_ACTIVITY=false) | tabs | Market scan vs ad activity (ad tab dead by design; /api/ad-spy → 410) | competitors.tsx:189-201 | app.use("/api/ad-spy") → server/routes.ts:2454 (410) | code | OK |
+| card-new-scan: select-industry (22 trades), input-location, select-radius (10/25/50/100), button-start-scan | form | Validate industry+location, then start a scan | competitors.tsx:204-257 | POST /api/competitors/scans → server/routes.ts:2407 (zod industry≤120/location≤250/radius 1–100; reserveMonthlyQuota "competitorScans"; INSERT competitor_scans status='running'; background runCompetitorScan → server/routes.ts:2599: competitorPlaces (Places textsearch pages) → per place Places details (reviews,phone,website) → analyzeReviews + analyzeBsScore (server/competitor-analysis.ts) → INSERT competitor_listings (place_id,business_name,address,phone,website,rating text,review_count,category,is_new=false,bs_score,bs_reasons,review_analysis,rank_history); UPDATE scan completed + total_found; on failure DELETE listings + status failed + error_message; refund scan) | code (write + live API — not pressed) | OK |
+| Empty state "No market scans yet. Start your first scan above to index competitors." | empty state | Honest empty state | competitors.tsx:265-270 | — | code | OK |
+| ScanCard (card-scan-*): title "{industry} — {location}", description "{radius} mile radius • {toLocaleDateString(createdAt)} • {totalFound \|\| 0} competitors found", status badges (Scanning…/Completed/Failed), delete button + dialog (button-confirm-delete-scan-*), failed row: text-scan-error-* + button-retry-scan-* ("Run this scan again" re-POSTs same params), completed note text-scan-note-* | scan cards | One card per scan from GET /api/competitors/scans (polls 1.5 s while running); date is browser-local from `created_at` (UTC) | competitors.tsx:750-853 | GET /api/competitors/scans → routes.ts:2386 (SELECT * FROM competitor_scans WHERE user_id=1 ORDER BY created_at DESC); DELETE → routes.ts:2438 (DELETE competitor_listings by scanId, then scan row, user-scoped) | SQL: 2 rows match this shape; code for buttons | OK |
+| Expanded stats (Total Competitors = listings.length; Few signals bsScore<30; Some signals 30–59; More signals ≥60) | stat cards | Client-side counts over the expanded listings | competitors.tsx:873-892 | GET /api/competitors/scans/:id → routes.ts:2395 (scan + competitor_listings WHERE scan_id ORDER BY rating DESC, each passed through presentListing) | SQL (would be 0 listings for scans 2/3) | OK |
+| Competitor cards (card-competitor-*): businessName, NEW badge (isNew), BS badge (Few/Some/More signals by score), "{n} AI" badge (reviewsLookingAi), address, rating + reviewCount, phone, website link, bsReasons list (3 collapsed, up to 20 expanded), button-review-analysis-* → ReviewAnalysisPanel (good/bad/common-phrases/generic %, reviewer photos %, name-pattern %, missing links, oldest sampled, velocity note, sample review quotes), BsMeter (score/100 bar) | listing cards + analysis | Per-competitor heuristic signals; **bsScore/bsReasons are recomputed at read time** by presentListing from name/rating/reviewCount/address + stored reviewAnalysis (velocity forced off) — displayed score can differ from stored `bs_score` | competitors.tsx:894-980, 627-748 | presentListing → server/competitor-analysis.ts:253, analyzeBsScore → :75-250 | code + SQL (columns verified) | OK |
+| "No competitors found in this scan." | empty state | When a completed scan has no listings | competitors.tsx:982-984 | — | code | OK |
+
+---
+
+## /mail-alerts — client/src/pages/mail-alerts.tsx
+One-line purpose: private email-in address that turns forwarded provider mail (Google, Cloudflare, registrars, Blotato) into classified, expiring alerts mapped to client locations.
+
+Verified: `GET /api/mail-alerts/settings?page=1` returns `address: "alerts+1382ddff5f475faf087655fe28a7c76af432a7d4dd538e08@alerts.constructhub.test"`, `oauthEnabled: false`, `grants: []`, sender lists. `mail_alert_addresses` has 1 row (user 1, `token_cipher` length 109, created 2026-09-30 08:59:33 -04). `mail_alert_messages` 0 rows → list endpoint `{items:[],total:0}`. **Factually absent vs the brief: there is no copy button, no regenerate and no delete control for the address** — the address is a read-only input, and the server auto-creates it once (`ON CONFLICT DO NOTHING`, server/mail-alerts/service.ts:13-16) with no regenerate/delete endpoint anywhere in server/mail-alerts.
+
+### Setup sections
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| link-mail-alerts-domains ("Manage domains") | link | Goes to /domains (route exists) | mail-alerts.tsx:74-79 | — | code | OK |
+| "Set up Gmail forwarding" section: readOnly forwarding-address input | read-only input | Shows the owner's private address `alerts+<48-hex token>@<INBOUND_MAIL_DOMAIN>`; falls back to text "Inbound mail domain is not configured" when env missing | mail-alerts.tsx:100-114 | GET /api/mail-alerts/settings → server/mail-alerts/routes.ts:46 → forwardingAddress(id) (service.ts:9-24: INSERT mail_alert_addresses(user_id,token_hash,token_cipher) ON CONFLICT DO NOTHING; returns `alerts+${decryptToken(token_cipher)}@${domain}`) | curl + Playwright (address matches API; token segment 48 hex chars, domain alerts.constructhub.test) | OK |
+| "How to set up" details (4-step Gmail forwarding/filter instructions) | disclosure | Setup guide mentioning the confirmation code/link below | mail-alerts.tsx:115-137 | — | Playwright | OK |
+| "Known senders" details (provider sender addresses + registrar domains + "Only recognized alert subjects are retained") | disclosure | Lists recognized senders from settings.senders / registrarSenders | mail-alerts.tsx:138-150 | same settings payload (SENDERS, REGISTRAR_SENDERS from server/mail-alerts/classify.ts) | curl | OK |
+| Security note ("Treat forwarded email as a reported alert, not proof…") | text | Honest trust warning | mail-alerts.tsx:151-155 | — | Playwright | OK |
+
+### Gmail API section
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| "Optional Gmail API connection" section | section | If `oauthEnabled` false → shows disabled notice (env GMAIL_OAUTH_ENABLED !== "true"); forwarding works without it | mail-alerts.tsx:158-241 | settings.oauthEnabled (env) | curl oauthEnabled:false; Playwright shows disabled notice | OK |
+| "Connect Gmail with read-only access" button | button | Requires recent auth (requestRecentAuth) then navigates to /api/mail-alerts/oauth/connect (Google OAuth — NOT started per rules) | mail-alerts.tsx:165-178 | GET /api/mail-alerts/oauth/connect → server/mail-alerts/gmail.ts:61 (Google OAuth redirect) | code | OK |
+| "Sync all connected Gmail accounts" button (action("/sync")) | button | Sets next_sync=now() on grants (queued sync) | mail-alerts.tsx:179-185 | POST /api/mail-alerts/sync → routes.ts:132 (404 when OAuth disabled) | code | OK |
+| Grants list (email · Connected/Reconnect required · last_error, per-grant Disconnect) + account pager | list | One row per saved Gmail connection (mail_alert_grants — 0 rows) | mail-alerts.tsx:187-232 | settings.grants (SELECT google_subject,email,needs_reconnect,last_error FROM mail_alert_grants WHERE user_id=1 ORDER BY email LIMIT 25); POST /api/mail-alerts/oauth/disconnect | curl grants:[] | OK |
+
+### Provider inbox
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+|---|---|---|---|---|---|---|
+| section-mail-inbox + Toolbar (search q; category select gbp/gsc/ads/cloudflare/registrar/blotato/forwarding; severity select critical/warning/info) | filters | Server-side filtered list; 5 s polling unless plan-gated | mail-alerts.tsx:242-297 | GET /api/mail-alerts?q&page&category&severity → server/mail-alerts/routes.ts:60 → mail_alert_messages WHERE user_id=1 AND expires_at>now() AND (subject ILIKE %q% OR sender ILIKE) AND category/severity/location_id filters ORDER BY received_at DESC, id DESC LIMIT 25 OFFSET (page-1)*25 + count(*) total | curl {items:[],total:0}; SQL count 0 | OK |
+| Select page checkbox + "{n} selected" + "Mark selected as read" (action("/read")) | bulk action | Marks up to 100 alerts read | mail-alerts.tsx:298-332 | POST /api/mail-alerts/read → routes.ts:99 (UPDATE mail_alert_messages SET read_at=now() WHERE user_id AND id=ANY) | code | OK |
+| Client search (GET /api/domains/locations?q&page) + "Unmapped" client select + client pager + "Map selected alerts" (action("/mapping")) | mapping controls | Maps selected alerts to a business location (or null = unmapped) | mail-alerts.tsx:333-388 | GET /api/domains/locations; POST /api/mail-alerts/mapping → routes.ts:110 (validates location belongs to user; UPDATE location_id) | code | OK |
+| Alert cards (card-alert-*): subject; "{category} · {severity} · {sender} · {toLocaleString(received_at)} · Read/Unread · Client location {id} or Unmapped/ambiguous client"; Critical/Warning StatusPill; "Forwarding confirmation code: {code}"; "Confirm forwarding at Google" link; "Read matched message" details with body | message list | One card per retained alert; empty → "No matching provider alerts." | mail-alerts.tsx:391-467 | same GET (columns id,category,severity,sender,subject,body,confirmation_code,confirmation_link,domain_id,location_id,read_at,received_at); retention: expires_at = received_at + 30 days (service.ts MAIL_RETENTION_DAYS=30) | Playwright (empty state) | OK |
+| Pager: "Previous alerts" / "Page {page} · {total} alerts" / "Next alerts" (disabled page*25>=total) | pagination | 25 per page | mail-alerts.tsx:468-494 | LIMIT 25 + total count | Playwright ("Page 1 · 0 alerts") | OK |
+| Plan gate (PlanRequired module "domainsMailAlerts") | gated screen | 402 from settings or messages query → PlanRequired component instead of content | mail-alerts.tsx:82-95 | requireMailModule → server/mail-alerts/gmail.ts (module gate; user 1 agency plan passes) | curl 200 | OK |
+
+---
+
+## In-page links sanity check
+- /photos → /auth?next=/photos, /pricing, /locations (all exist); business.google.com & biz.yelp.com external.
+- /media-library → none internal beyond page itself.
+- /social-media → /locations (exists), blotato.com external, my.blotato.com external, published post URLs external.
+- /ranking-grid → none internal.
+- /competitors → /pricing (exists).
+- /mail-alerts → /domains (exists), Google forwarding confirmation link external.
