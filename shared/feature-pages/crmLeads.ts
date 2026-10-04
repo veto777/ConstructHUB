@@ -119,7 +119,7 @@ const page: FeaturePage = {
     },
     {
       q: "Does it pull in leads from Google, ads or phone calls?",
-      a: "Not by itself. Leads come from New lead and your website form. The AI Call Assistant, an add-on that isn't on sale yet, files the leads from the calls it answers into the CRM.",
+      a: "Not by itself. Leads come from New lead and your website form. The AI Call Assistant add-on files the leads from the calls it answers into the CRM.",
     },
     {
       q: "Does it follow up for me?",

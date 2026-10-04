@@ -220,6 +220,8 @@ export function registerStripeRoutes(app: Express) {
     res.json(priceBook());
   });
 
+  // The Pricing page (/pricing): this account's plan, interval, add-ons and renewal date —
+  // what the plan cards compare against. Signed out → a plain "none" summary.
   app.get("/api/stripe/subscription", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -413,6 +415,7 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
+  // The Pricing page's "Manage billing": sends a signed-in subscriber to Stripe's customer portal.
   app.post("/api/stripe/create-portal", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -436,6 +439,8 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
+  // The Master Class page's buy buttons: one module or the whole bundle — a one-time Stripe
+  // checkout priced from the module row / COURSE_BUNDLE. Sales-only prices reply talk-to-sales.
   app.post("/api/stripe/create-course-checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -509,6 +514,9 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
+  // The cart drawer's checkout (CartSheet): resolves every item's price server-side from the
+  // catalog/DB, rejects duplicates, bundle-overlap and sales-only items, then opens a Stripe
+  // checkout for the resolved total.
   app.post("/api/stripe/create-cart-checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
