@@ -319,11 +319,17 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
             res.status(e instanceof z.ZodError ? 400 : e instanceof GoogleError ? e.status : 500).json({ message: e instanceof z.ZodError ? e.issues.map(i => i.message).join('; ') : e instanceof GoogleError ? e.message : 'Content operation failed' });
         }
     });
+    // The Posts & photos editor for one location: the scheduled/published job queue, the saved style
+    // guidance, and whether the background publishing worker is enabled.
     route('get', '', async (_r, u, l) => ({ jobs: (await pool.query('SELECT * FROM gbp_content_jobs WHERE user_id=$1 AND location_id=$2 ORDER BY due_at DESC LIMIT 1000', [u, l])).rows, style: (await pool.query('SELECT * FROM gbp_content_style WHERE user_id=$1 AND location_id=$2', [u, l])).rows[0] || null, workerEnabled: process.env.GBP_CONTENT_WORKER_ENABLED === 'true' }));
+    // The editor's "Photos and media library" grid: the owner's Media Library photos, with signed
+    // /api/public/gbp-media URLs when no public media base is configured.
     route('get', '/photos', async (_r, u) => {
         const {rows}=await pool.query('SELECT id,name,url,r2_key FROM media_photos WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1000',[u]);
         return rows.map(p=>({id:p.id,name:p.name,url:process.env.GBP_MEDIA_PUBLIC_BASE_URL&&p.r2_key?.startsWith('media/')?publicPhotoUrl(p.r2_key):p.url}));
     });
+    // The editor's "Approve & queue photos/posts" buttons: turns the composed items into scheduled
+    // gbp_content_jobs on the chosen cadence; an identical resubmit with the same key replays safely.
     route('post', '/queue', async (r, u, l) => enqueue(u, l, r.body));
     route('post', '/refresh', async (_r, u, l) => {
         const loc = await ownedLocation(u, l), client = make(u, loc.gbp_google_subject);
@@ -350,6 +356,8 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
         }
         return { refreshed: rows.length };
     });
+    // The Retry/Cancel buttons on a job card: cancel marks it cancelled; retry puts it back in the queue
+    // (uncertain publishes only after the owner confirmed they checked Google first).
     route('patch', '/jobs/:job', async (r, u, l) => {
         const job = z.coerce.number().int().positive().parse(r.params.job), b = z.object({ action: z.enum(['cancel', 'retry']), checkedGoogle: z.boolean().optional() }).parse(r.body);
         const result = await pool.query(`UPDATE gbp_content_jobs SET status=$4,error=NULL,due_at=CASE WHEN $4='queued' THEN now() ELSE due_at END

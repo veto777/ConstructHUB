@@ -43,6 +43,8 @@ export function registerMailAlertRoutes(
           });
       }
     });
+  // The Mail Alerts setup sections: the owner's private forwarding address, the saved Gmail-connection
+  // grants, and the recognized provider sender lists.
   route("get", "/settings", async (req, res, id) => {
     const p = pageInput.parse(req.query);
     const { rows: grants } = await pool.query(
@@ -57,6 +59,8 @@ export function registerMailAlertRoutes(
       registrarSenders: REGISTRAR_SENDERS,
     });
   });
+  // The Mail Alerts provider inbox: the retained alerts (30 days) with search and category/severity/client
+  // filters, read state, and the total used by the pager.
   route("get", "", async (req, res, id) => {
     const p = pageInput
       .extend({

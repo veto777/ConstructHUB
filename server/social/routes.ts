@@ -145,8 +145,12 @@ export function registerSocialRoutes(
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
+  // The Social Media page for the chosen business: Blotato connection state and accounts, auto-mode
+  // settings, and the filtered post queue/calendar (plus the all-businesses calendar view).
   route("get", "", async(req,res,id,businessId)=>dashboard(req,res,id,businessId));
   route("get", "/calendar", async(req,res,id,businessId)=>dashboard(req,res,id,businessId,true));
+  // The "Connect Blotato" / "Verify and replace key" button: verifies the API key with Blotato and stores
+  // it encrypted (business-scoped or agency-shared), returning the connected accounts.
   route("post", "/connect", async (req, res, id, businessId) => {
     const { apiKey } = z
       .object({ apiKey: z.string().trim().min(8).max(512) })
@@ -161,6 +165,8 @@ export function registerSocialRoutes(
   route("post", "/accounts/:id/pages", async (req, res, id, businessId) =>
     res.json(await discoverPages(id, opaqueId.parse(req.params.id), make, businessId)),
   );
+  // The compose tab's "Post now" / "Schedule post" / "Save draft" buttons: creates the queued or draft
+  // social posts for the chosen destinations.
   route("post", "/posts", async (req, res, id, businessId) => {
     if(!businessId)throw new SocialError("Choose a business");
     res.status(201).json({ posts: (await createPosts(id, req.body, businessId)).map(publicPost) });

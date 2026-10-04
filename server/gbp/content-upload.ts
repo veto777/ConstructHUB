@@ -67,6 +67,8 @@ export function registerContentUpload(app: Express, auth: (req: any, res: any) =
             res.status(e instanceof GoogleError ? e.status : 400).json({ message: e instanceof GoogleError ? e.message : 'Unable to process photo; check file and metadata' });
         }
     }));
+    // The editor's "Apply filename and EXIF to selected copies" button: writes renamed, metadata-tagged
+    // copies of the selected library photos back into the library.
     app.post('/api/gbp/content/:location/prepare', async (req, res) => {
         const u = auth(req, res);
         if (!u)

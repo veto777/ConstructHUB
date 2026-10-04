@@ -499,7 +499,9 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
         </div>
       </div>
       {isLoading ? <p>Loading performance…</p> : error ? <p role="alert">Unable to load performance.</p> : !data?.available ? (
-        <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
+        location.gbpLocationName
+          ? <p>No performance data yet. Metrics appear after the first successful Google sync.</p>
+          : <p>Performance unavailable. Link this location to Google and sync to retrieve real metrics.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="table-performance">
@@ -691,14 +693,22 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
     queryKey: [`/api/gbp/locations/${location.id}/media?source=${source}&limit=${limit}`],
     enabled: linked,
   });
+  // The stored count is written only by a successful profile sync (server/gbp/service.ts), but the column
+  // defaults to 0, which reads identically to "Google reported zero". A sync that never succeeded is the
+  // distinguishable signal: counts stay hidden ("—") until Google has actually reported them.
+  const { data: syncStatus } = useQuery<{ locations: { id: number; kind: string; last_success: string | null }[] }>({
+    queryKey: [`/api/gbp/status?locationId=${location.id}`],
+    enabled: linked,
+  });
+  const countsReported = !!syncStatus?.locations?.some((s) => s.kind === "profile" && !!s.last_success);
   // Photo counts come only from a Business Profile sync. Unlinked, the stored value is the schema default (0)
   // or an old capped Places value, so show unknown instead of a number. A linked count Google never
-  // reported (null) is unknown too, never 0.
+  // reported is unknown too, never 0.
   const tile = (n: number | null | undefined, label: string, which: "business" | "customer") => (
     <button type="button" onClick={() => { setSource(which); setLimit(60); }}
       className={`rounded-lg border p-4 text-center transition-colors ${source === which ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
       data-testid={`tab-photos-${which}`}>
-      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{linked && n != null ? n : "—"}</p>
+      <p className="text-2xl font-bold" data-testid={`text-${which}-photo-count`}>{linked && countsReported && n != null ? n : "—"}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
       {!linked && <p className="text-[11px] text-muted-foreground mt-1">Link to Google Business Profile to see photo counts</p>}
     </button>
@@ -718,7 +728,7 @@ function PhotosTab({ location }: { location: BusinessLocation }) {
         <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : !data?.items.length ? (
         <Card><CardContent className="p-4 text-sm text-muted-foreground">
-          No {source} photos synced yet. Use <strong>Sync now</strong> on the Locations page — photos sync along with reviews and performance.
+          No {source} photos synced yet. Sync from the Locations page — connect your Google account if prompted, then use <strong>Sync now</strong>. Photos sync along with reviews and performance.
         </CardContent></Card>
       ) : (
         <>
