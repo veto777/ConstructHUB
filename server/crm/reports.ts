@@ -531,7 +531,7 @@ export function registerCrmReportRoutes(app: Express, getDevUser: GetUser): void
           sql`${crmMeasurements.rawPayload} ->> 'importSource' is not null`,
         ),
       )
-      .orderBy(desc(crmMeasurements.createdAt))
+      .orderBy(desc(sql`coalesce(${crmMeasurements.completedAt}, ${crmMeasurements.createdAt})`))
       .limit(500);
     // A report outlives its customer (clients can be deleted) — never link to
     // a customer row that isn't there.
