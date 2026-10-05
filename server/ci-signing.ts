@@ -5,7 +5,8 @@
  * handing over the Construct Hub LLC App Store Connect key (owner-authorized shared team key, 2026-10-05).
  *
  *   GET /api/ci/ios-signing   Authorization: Bearer <GitHub OIDC JWT, audience "constructhub-ios-signing">
- *   → { keyId, issuerId, teamId, p8 (base64) }        404 for anything that isn't exactly that workflow.
+ *   → { keyId, issuerId, teamId, p8, p12, p12Password, profiles: { bundleId: { name, uuid, content } } }
+ *     (base64 files)   404 for anything that isn't exactly that workflow.
  *
  * Checks: RS256 signature against GitHub's published JWKS, iss, aud, exp/nbf/iat, repository + owner, the workflow
  * file (job_workflow_ref) and the ref (main or an ios-v* tag). The key never leaves except over this route.
@@ -78,8 +79,17 @@ export function registerCiSigningRoutes(app: Express, opts: { jwks?: JwksFetcher
     try {
       const cfg = JSON.parse(readFileSync(join(dir, "asc.json"), "utf8"));
       const p8 = readFileSync(join(dir, `asc-api-${cfg.ascKeyId}.p8`));
+      // ConstructHUB's own distribution certificate (.p12 + password) and one App Store profile per app
+      // (scripts/asc.ts ensure-signing) — manual signing, so no registered devices are needed.
+      const signing = JSON.parse(readFileSync(join(dir, "signing.json"), "utf8"));
+      const profiles = Object.fromEntries(Object.entries(signing.profiles as Record<string, { name: string; uuid: string }>).map(([bundle, p]) =>
+        [bundle, { name: p.name, uuid: p.uuid, content: readFileSync(join(dir, `${bundle}.mobileprovision`)).toString("base64") }]));
       console.log(`[ci-signing] released to ${claims.job_workflow_ref} run ${claims.run_id ?? "?"} (${claims.actor ?? "?"})`);
-      res.json({ keyId: cfg.ascKeyId, issuerId: cfg.ascIssuerId, teamId: cfg.teamId, p8: p8.toString("base64") });
+      res.json({
+        keyId: cfg.ascKeyId, issuerId: cfg.ascIssuerId, teamId: cfg.teamId, p8: p8.toString("base64"),
+        p12: readFileSync(join(dir, "dist.p12")).toString("base64"), p12Password: readFileSync(join(dir, "p12-password.txt"), "utf8").trim(),
+        profiles,
+      });
     } catch (e: any) {
       console.error(`[ci-signing] key unreadable: ${e?.message ?? e}`);
       res.status(500).json({ message: "Signing key unavailable" });

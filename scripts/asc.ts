@@ -6,9 +6,13 @@
  * Run: npx tsx scripts/asc.ts <command>
  *   whoami                 apps + bundle IDs the team key can see
  *   ensure-bundle-ids      register us.constructhub.app / us.constructhub.crm (idempotent)
+ *   ensure-signing         ConstructHUB's own Apple Distribution certificate (key made here) + an App Store
+ *                          profile per app → ~/.constructhub-keys/ios-signing (idempotent; reuses what exists)
  *   get <path>             GET any /v1 path and print the JSON (e.g. "get /v1/apps?limit=5")
  */
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "fs";
+import { execFileSync } from "child_process";
+import { randomBytes } from "crypto";
 import { createSign } from "crypto";
 import { homedir } from "os";
 import { join } from "path";
@@ -53,6 +57,40 @@ async function main() {
       const r = await asc("POST", "/v1/bundleIds", { data: { type: "bundleIds", attributes: { identifier: b.identifier, name: b.name, platform: "IOS" } } });
       console.log(`${b.identifier}: registered #${r.data.id}`);
     }
+  } else if (cmd === "ensure-signing") {
+    const dir = join(homedir(), ".constructhub-keys", "ios-signing");
+    mkdirSync(dir, { recursive: true, mode: 0o700 }); chmodSync(dir, 0o700);
+    const state = existsSync(join(dir, "signing.json")) ? JSON.parse(readFileSync(join(dir, "signing.json"), "utf8")) : { profiles: {} };
+    // 1. The certificate: a private key generated here; Apple signs the CSR.
+    if (!state.certificateId) {
+      const key = join(dir, "dist.key"), csr = join(dir, "dist.csr");
+      execFileSync("openssl", ["genrsa", "-out", key, "2048"], { stdio: "ignore" }); chmodSync(key, 0o600);
+      execFileSync("openssl", ["req", "-new", "-key", key, "-out", csr, "-subj", "/CN=ConstructHUB Distribution/O=Construct Hub LLC/C=US"], { stdio: "ignore" });
+      const csrContent = readFileSync(csr, "utf8").replace(/-----[^-]+-----/g, "").replace(/\s+/g, "");
+      const r = await asc("POST", "/v1/certificates", { data: { type: "certificates", attributes: { certificateType: "DISTRIBUTION", csrContent } } });
+      writeFileSync(join(dir, "dist.cer"), Buffer.from(r.data.attributes.certificateContent, "base64"));
+      execFileSync("openssl", ["x509", "-inform", "DER", "-in", join(dir, "dist.cer"), "-out", join(dir, "dist.pem")]);
+      const pass = randomBytes(18).toString("base64url");
+      writeFileSync(join(dir, "p12-password.txt"), pass, { mode: 0o600 });
+      // Legacy PBE so the macOS keychain on the runner can import it.
+      execFileSync("openssl", ["pkcs12", "-export", "-legacy", "-inkey", key, "-in", join(dir, "dist.pem"), "-out", join(dir, "dist.p12"), "-passout", `pass:${pass}`, "-name", "ConstructHUB Distribution"]);
+      chmodSync(join(dir, "dist.p12"), 0o600);
+      state.certificateId = r.data.id;
+      console.log(`certificate created #${r.data.id} (expires ${r.data.attributes.expirationDate?.slice(0, 10)})`);
+    } else console.log(`certificate #${state.certificateId}: exists`);
+    // 2. An App Store profile per app, tied to that certificate.
+    for (const b of BUNDLES) {
+      if (state.profiles[b.identifier]) { console.log(`${b.identifier}: profile exists`); continue; }
+      const ids = await asc("GET", `/v1/bundleIds?filter[identifier]=${b.identifier}`);
+      const bundle = ids.data.find((x: any) => x.attributes.identifier === b.identifier);
+      const name = `${b.name} App Store`;
+      const r = await asc("POST", "/v1/profiles", { data: { type: "profiles", attributes: { name, profileType: "IOS_APP_STORE" },
+        relationships: { bundleId: { data: { type: "bundleIds", id: bundle.id } }, certificates: { data: [{ type: "certificates", id: state.certificateId }] } } } });
+      writeFileSync(join(dir, `${b.identifier}.mobileprovision`), Buffer.from(r.data.attributes.profileContent, "base64"), { mode: 0o600 });
+      state.profiles[b.identifier] = { name, uuid: r.data.attributes.uuid, id: r.data.id };
+      console.log(`${b.identifier}: profile "${name}" created`);
+    }
+    writeFileSync(join(dir, "signing.json"), JSON.stringify(state, null, 1), { mode: 0o600 });
   } else if (cmd === "get" && arg) {
     console.log(JSON.stringify(await asc("GET", arg), null, 1).slice(0, 4000));
   } else {

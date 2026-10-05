@@ -1,9 +1,10 @@
 name: iOS release (TestFlight)
 
 # Builds, signs and uploads both iPhone apps (ConstructHUB, ConstructHUB CRM) to App Store Connect / TestFlight.
-# Signing: the Construct Hub LLC App Store Connect key is NOT a repo secret — the job proves itself to
-# https://constructhub.us/api/ci/ios-signing with GitHub's OIDC token (server/ci-signing.ts only answers this file on
-# main or an ios-v* tag), uses Xcode's automatic signing with that key, and deletes it at the end.
+# Signing: nothing is a repo secret — the job proves itself to https://constructhub.us/api/ci/ios-signing with GitHub's
+# OIDC token (server/ci-signing.ts only answers this file on main or an ios-v* tag) and receives the Construct Hub LLC
+# App Store Connect key (upload), ConstructHUB's distribution certificate and an App Store profile per app (manual
+# signing — scripts/asc.ts ensure-signing made them); a throwaway keychain, all deleted at the end.
 # Result: ios-results branch, ios-release/<sha>.md (the tower has no GitHub token to read Actions logs).
 
 on:
@@ -63,7 +64,28 @@ jobs:
           KEY_PATH="$RUNNER_TEMP/keys/AuthKey_$KEY_ID.p8"
           echo "$RESP" | python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["p8"]))' > "$KEY_PATH"
           chmod 600 "$KEY_PATH"
-          unset RESP
+          # ConstructHUB's distribution certificate into a throwaway keychain, the App Store profiles into place.
+          echo "$RESP" | python3 -c 'import json,sys,base64; sys.stdout.buffer.write(base64.b64decode(json.load(sys.stdin)["p12"]))' > "$RUNNER_TEMP/keys/dist.p12"
+          P12_PASS=$(echo "$RESP" | python3 -c 'import json,sys; print(json.load(sys.stdin)["p12Password"])')
+          echo "::add-mask::$P12_PASS"
+          KC="$RUNNER_TEMP/keys/build.keychain-db"; KC_PASS=$(openssl rand -hex 16)
+          security create-keychain -p "$KC_PASS" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KC_PASS" "$KC"
+          security import "$RUNNER_TEMP/keys/dist.p12" -k "$KC" -P "$P12_PASS" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KC_PASS" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$RESP" | python3 -c '
+          import json,sys,base64,os
+          d=json.load(sys.stdin)["profiles"]
+          home=os.path.expanduser("~/Library/MobileDevice/Provisioning Profiles")
+          for bundle,p in d.items():
+              open(os.path.join(home,p["uuid"]+".mobileprovision"),"wb").write(base64.b64decode(p["content"]))
+              print(bundle, "->", p["name"])
+          '
+          echo "$RESP" | python3 -c 'import json,sys; d=json.load(sys.stdin)["profiles"]; print("\n".join(b+"="+p["name"] for b,p in d.items()))' > "$RUNNER_TEMP/keys/profiles.txt"
+          unset RESP P12_PASS
           { echo "key_id=$KEY_ID"; echo "issuer=$ISSUER"; echo "team=$TEAM"; echo "key_path=$KEY_PATH"; } >> "$GITHUB_OUTPUT"
 
       - name: Archive, sign and upload both apps
@@ -84,7 +106,12 @@ jobs:
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
             <key>destination</key><string>upload</string>
-            <key>signingStyle</key><string>automatic</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key><dict>
+              <key>us.constructhub.app</key><string>ConstructHUB App Store</string>
+              <key>us.constructhub.crm</key><string>ConstructHUB CRM App Store</string>
+            </dict>
             <key>teamID</key><string>$TEAM</string>
             <key>manageAppVersionAndBuildNumber</key><false/>
             <key>uploadSymbols</key><true/>
@@ -96,11 +123,13 @@ jobs:
             log="$RUNNER_TEMP/out/$slug.log"
             archive="$RUNNER_TEMP/out/$slug.xcarchive"
             echo "== $scheme: archive" | tee "$log"
+            bundle=$([ "$scheme" = "ConstructHUB" ] && echo us.constructhub.app || echo us.constructhub.crm)
+            profile=$(grep "^$bundle=" "$RUNNER_TEMP/keys/profiles.txt" | cut -d= -f2-)
             if xcodebuild -project ios/ConstructHUB.xcodeproj -scheme "$scheme" -configuration Release \
                  -destination 'generic/platform=iOS' -archivePath "$archive" \
-                 DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
-                 CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
-                 "${AUTH[@]}" archive >> "$log" 2>&1 \
+                 DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
+                 PROVISIONING_PROFILE_SPECIFIER="$profile" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+                 archive >> "$log" 2>&1 \
                && echo "== $scheme: export + upload" >> "$log" \
                && xcodebuild -exportArchive -archivePath "$archive" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
                     -exportPath "$RUNNER_TEMP/out/$slug-export" "${AUTH[@]}" >> "$log" 2>&1; then
@@ -111,9 +140,11 @@ jobs:
           done
           exit $status
 
-      - name: Remove the signing key
+      - name: Remove the signing key, certificate and keychain
         if: always()
-        run: rm -rf "$RUNNER_TEMP/keys"
+        run: |
+          security delete-keychain "$RUNNER_TEMP/keys/build.keychain-db" 2>/dev/null || true
+          rm -rf "$RUNNER_TEMP/keys" "$HOME/Library/MobileDevice/Provisioning Profiles"
 
       - name: Write and commit the result to ios-results
         if: always()
