@@ -110,9 +110,10 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
   // (password / authenticator / emailed code, optional Google) so the dialog can offer them.
   app.get('/api/auth/reauth', async (req,res) => {
     const u=auth(req,res); if(!u) return;
-    const {rows:[user]}=await pool.query('SELECT password_hash,totp_enabled,google_id,email FROM users WHERE id=$1',[u.id]);
-    // google: an email-code account can also confirm through its linked Google sign-in.
-    res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email', google:!!user.google_id, email:maskEmail(user.email) });
+    const {rows:[user]}=await pool.query('SELECT password_hash,totp_enabled,google_id,email,EXISTS(SELECT 1 FROM user_apple_ids a WHERE a.user_id=users.id) AS apple FROM users WHERE id=$1',[u.id]);
+    // google / apple: an email-code account can also confirm through its linked Google or Apple sign-in
+    // (Apple only inside the iPhone apps — server/apple-auth.ts purpose "reauth").
+    res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email', google:!!user.google_id, apple:!!user.apple, email:maskEmail(user.email) });
   });
   // RecentAuthModal "Email a verification code": sends the 6-digit code; it lives in the session for 10 minutes, 5 attempts.
   app.post('/api/auth/reauth/email', rateLimit('security-email',3,10,15*60_000), async(req,res)=>{

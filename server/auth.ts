@@ -1,4 +1,5 @@
 import { ensureAppPushSchema, registerAppPushRoutes } from "./app-push";
+import { ensureAppleAuthSchema, registerAppleAuthRoutes } from "./apple-auth";
 import { ensureAppConnectionsSchema, registerAppConnections } from "./app-connections";
 import { safeNextPath } from "./app-shell";
 import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost, appChallenge } from "./app-auth";
@@ -86,6 +87,7 @@ export async function setupAuth(app: Express) {
   await ensureAppAuthSchema();
   await ensureAppConnectionsSchema();
   await ensureAppPushSchema();
+  await ensureAppleAuthSchema();
 
   // SECURITY: never fall back to a hardcoded secret in production — a constant
   // baked into source lets anyone forge signed session cookies. Fail fast so a
@@ -133,6 +135,7 @@ export async function setupAuth(app: Express) {
 
   registerAppConnections(app);
   registerAppPushRoutes(app);
+  registerAppleAuthRoutes(app);
 
   // Google sign-in needs both OAuth client values. Without them passport
   // cannot build the strategy (it throws, which used to stop the whole server

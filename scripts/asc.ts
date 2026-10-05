@@ -8,8 +8,8 @@
  *   ensure-bundle-ids      register us.constructhub.app / us.constructhub.crm (idempotent)
  *   ensure-signing         ConstructHUB's own Apple Distribution certificate (key made here) + an App Store
  *                          profile per app → ~/.constructhub-keys/ios-signing (idempotent; reuses what exists)
- *   ensure-push            push notifications on for both bundle IDs, then remake any App Store profile that lacks
- *                          the aps-environment entitlement (copy the new .mobileprovision files to vb11 keys/ios after)
+ *   ensure-capabilities    Push Notifications + Sign in with Apple on for both bundle IDs, then remake any App Store
+ *                          profile missing their entitlements (copy the new .mobileprovision files to vb11 keys/ios after)
  *   get <path>             GET any /v1 path and print the JSON (e.g. "get /v1/apps?limit=5")
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "fs";
@@ -45,6 +45,12 @@ export async function asc(method: string, path: string, body?: unknown): Promise
 }
 
 const SIGNING_DIR = join(homedir(), ".constructhub-keys", "ios-signing");
+// What the apps use, and the entitlement each puts in the profile (ios/Shared/App.entitlements).
+const CAPABILITIES = [
+  { type: "PUSH_NOTIFICATIONS", entitlement: "aps-environment", settings: undefined },
+  { type: "APPLE_ID_AUTH", entitlement: "com.apple.developer.applesignin",
+    settings: [{ key: "APPLE_ID_AUTH_APP_CONSENT", options: [{ key: "PRIMARY_APP_CONSENT" }] }] },
+];
 
 async function bundleId(identifier: string) {
   const ids = await asc("GET", `/v1/bundleIds?filter[identifier]=${identifier}`);
@@ -104,20 +110,20 @@ async function main() {
       await makeProfile(b, state);
     }
     writeFileSync(join(dir, "signing.json"), JSON.stringify(state, null, 1), { mode: 0o600 });
-  } else if (cmd === "ensure-push") {
+  } else if (cmd === "ensure-capabilities" || cmd === "ensure-push") {
     const state = JSON.parse(readFileSync(join(SIGNING_DIR, "signing.json"), "utf8"));
     for (const b of BUNDLES) {
       const bundle = await bundleId(b.identifier);
       const caps = await asc("GET", `/v1/bundleIds/${bundle.id}/bundleIdCapabilities`);
-      if (caps.data.some((c: any) => c.attributes.capabilityType === "PUSH_NOTIFICATIONS")) console.log(`${b.identifier}: push already on`);
-      else {
-        await asc("POST", "/v1/bundleIdCapabilities", { data: { type: "bundleIdCapabilities", attributes: { capabilityType: "PUSH_NOTIFICATIONS" },
+      for (const cap of CAPABILITIES) {
+        if (caps.data.some((c: any) => c.attributes.capabilityType === cap.type)) { console.log(`${b.identifier}: ${cap.type} already on`); continue; }
+        await asc("POST", "/v1/bundleIdCapabilities", { data: { type: "bundleIdCapabilities", attributes: { capabilityType: cap.type, settings: cap.settings },
           relationships: { bundleId: { data: { type: "bundleIds", id: bundle.id } } } } });
-        console.log(`${b.identifier}: push turned on`);
+        console.log(`${b.identifier}: ${cap.type} turned on`);
       }
-      // A profile made before the capability carries no aps-environment; Apple won't let a pushing build use it.
+      // A profile made before a capability lacks its entitlement; Apple won't let a build that needs it use that profile.
       const file = join(SIGNING_DIR, `${b.identifier}.mobileprovision`);
-      if (existsSync(file) && readFileSync(file).includes("aps-environment")) { console.log(`${b.identifier}: profile has push`); continue; }
+      if (existsSync(file) && CAPABILITIES.every((c) => readFileSync(file).includes(c.entitlement))) { console.log(`${b.identifier}: profile is current`); continue; }
       const old = state.profiles[b.identifier];
       if (old?.id) await asc("DELETE", `/v1/profiles/${old.id}`).catch((e) => { if (e.status !== 404) throw e; });
       await makeProfile(b, state);
@@ -126,7 +132,7 @@ async function main() {
   } else if (cmd === "get" && arg) {
     console.log(JSON.stringify(await asc("GET", arg), null, 1).slice(0, 4000));
   } else {
-    console.log("usage: whoami | ensure-bundle-ids | ensure-signing | ensure-push | get <path>");
+    console.log("usage: whoami | ensure-bundle-ids | ensure-signing | ensure-capabilities | get <path>");
   }
 }
 if (process.argv[1]?.endsWith("asc.ts")) main().catch((e) => { console.error(e.message); process.exit(1); });

@@ -10,6 +10,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { Mail, Lock, User, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
+import { AppleSignInButton } from "@/components/apple-sign-in";
 import { CrmLogo } from "@/components/crm-logo";
 import { CRM_NAME, isPortal } from "@/lib/site";
 import { BRAND_NAME } from "@/lib/marketing";
@@ -361,6 +362,7 @@ export default function AuthPage() {
                     <p className={FORM_LEDE}>Sign in to your account</p>
                   </div>
 
+                  <AppleSignInButton label="Continue with Apple" next={nextParam} testId="button-apple-login" />
                   <a href={nextParam ? `/api/auth/google?next=${encodeURIComponent(nextParam)}` : "/api/auth/google"} className={GOOGLE_BUTTON} data-testid="link-google-login">
                     <GoogleMark />
                     Continue with Google
@@ -450,6 +452,7 @@ export default function AuthPage() {
                     </div>
                   )}
 
+                  <AppleSignInButton label="Sign up with Apple" next={nextParam} testId="button-apple-signup" />
                   <a href={betaParam ? `/api/auth/google?beta=${encodeURIComponent(betaParam)}` : nextParam ? `/api/auth/google?next=${encodeURIComponent(nextParam)}` : "/api/auth/google"} className={GOOGLE_BUTTON} data-testid="link-google-signup">
                     <GoogleMark />
                     Sign up with Google

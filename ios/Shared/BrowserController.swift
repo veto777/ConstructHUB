@@ -23,6 +23,10 @@ final class BrowserController: UIViewController, ObservableObject {
     private var downloadFiles: [ObjectIdentifier: URL] = [:]
     private var pushRequestPending = false
     private var tokenRequestPending = false
+    private var appleController: ASAuthorizationController?
+    private var appleNonce: String?
+    private var applePurpose = "login"
+    private var appleNext: String?
     private(set) var webView: WKWebView!
 
     init() {
@@ -270,6 +274,93 @@ final class BrowserController: UIViewController, ObservableObject {
     }
 }
 
+// Sign in with Apple (App Store guideline 4.8): Apple's own sheet, then the page posts Apple's token to
+// /api/auth/apple so the session cookie lands in this web view (server/apple-auth.ts).
+extension BrowserController: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
+    fileprivate func startAppleSignIn(purpose: String, next: String?) {
+        guard appleController == nil else { return }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            showMessage("Sign-in unavailable", "Please try again.")
+            return
+        }
+        // A fresh nonce per sign-in; Apple signs its SHA-256 into the token and the server checks it against this one.
+        let nonce = Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = purpose == "reauth" ? [] : [.fullName, .email]
+        request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
+        appleNonce = nonce
+        applePurpose = purpose
+        appleNext = next
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = self
+        appleController = controller
+        controller.performRequests()
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        view.window ?? ASPresentationAnchor()
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        appleController = nil
+        let nonce = appleNonce
+        appleNonce = nil
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let tokenData = credential.identityToken, let identityToken = String(data: tokenData, encoding: .utf8),
+              let nonce = nonce, let current = webView.url, URLPolicy.isAllowed(current), current.scheme == "https",
+              let origin = URLPolicy.origin(of: current) else {
+            appleFinished(ok: false, message: "Apple couldn't sign you in. Please try again.")
+            return
+        }
+        let code = credential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        // Relative fetch from the page: the session cookie it sets belongs to this web view.
+        webView.callAsyncJavaScript("""
+            if (location.protocol !== 'https:' || location.origin !== new URL(expectedOrigin).origin) return 'Please try again.';
+            const payload = { identityToken, nonce, purpose };
+            if (code) payload.authorizationCode = code;
+            if (givenName) payload.givenName = givenName;
+            if (familyName) payload.familyName = familyName;
+            if (next) payload.next = next;
+            const response = await fetch('/api/auth/apple', {
+              method: 'POST', credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) return data.message || 'Please try again.';
+            window.dispatchEvent(new CustomEvent('ch-apple-signin', { detail: { purpose, ok: true } }));
+            if (purpose === 'login') location.assign(data.requires2FA ? '/auth?mode=2fa' : (data.next || '/'));
+            return 'ok';
+            """, arguments: ["identityToken": identityToken, "nonce": nonce, "purpose": applePurpose, "code": code,
+                             "givenName": credential.fullName?.givenName ?? "", "familyName": credential.fullName?.familyName ?? "",
+                             "next": appleNext ?? "", "expectedOrigin": origin.absoluteString],
+            in: nil, in: .page) { [weak self] result in
+                switch result {
+                case .success(let value as String) where value == "ok": break
+                case .success(let value as String): self?.appleFinished(ok: false, message: value)
+                default: self?.appleFinished(ok: false, message: "Please try again.")
+                }
+            }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        appleController = nil
+        appleNonce = nil
+        let canceled = (error as? ASAuthorizationError)?.code == .canceled
+        appleFinished(ok: false, message: canceled ? nil : "Apple couldn't sign you in. Please try again.")
+    }
+
+    /// Tells the page (the identity-check dialog waits for it) and shows any error.
+    private func appleFinished(ok: Bool, message: String?) {
+        webView.callAsyncJavaScript("window.dispatchEvent(new CustomEvent('ch-apple-signin', { detail: { purpose, ok, message } }));",
+                                    arguments: ["purpose": applePurpose, "ok": ok, "message": message ?? ""],
+                                    in: nil, in: .page, completionHandler: nil)
+        if let message = message { showMessage("Sign-in unavailable", message) }
+    }
+}
+
 extension BrowserController: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
@@ -371,6 +462,9 @@ extension BrowserController: WKScriptMessageHandler {
               let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
         switch type {
         case "enablePush": requestPush()
+        case "appleSignIn":
+            startAppleSignIn(purpose: body["purpose"] as? String == "reauth" ? "reauth" : "login",
+                             next: body["next"] as? String)
         case "haptic": UIImpactFeedbackGenerator(style: .light).impactOccurred()
         case "share":
             guard let value = body["url"] as? String, let url = URL(string: value),

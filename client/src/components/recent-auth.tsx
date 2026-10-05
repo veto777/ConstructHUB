@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
+import { AppleMark, appleBridge, requestAppleReauth } from '@/components/apple-sign-in';
 let pending: Promise<void> | null = null;
 /** The person closed the verification dialog themselves (Escape, Cancel, outside click). */
 export class VerificationCancelled extends Error {}
@@ -32,7 +33,7 @@ export function RecentAuthModal() {
   const { toast } = useToast();
   const [challenge,setChallenge]=useState<{resolve:()=>void;reject:(e:Error)=>void}|null>(null);
   const [method,setMethod]=useState(''),[value,setValue]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[sent,setSent]=useState(false),[sentTo,setSentTo]=useState('');
-  const [google,setGoogle]=useState(false),[accountEmail,setAccountEmail]=useState(''),[forGbp,setForGbp]=useState(false);
+  const [google,setGoogle]=useState(false),[apple,setApple]=useState(false),[accountEmail,setAccountEmail]=useState(''),[forGbp,setForGbp]=useState(false);
   // Opened from code, not a trigger: remember what had focus so closing returns it there (e.g. into an open dialog).
   const returnFocus=useRef<HTMLElement|null>(null);
   // Back from a Google step-up that failed: say so once and drop the flag from the URL.
@@ -46,8 +47,8 @@ export function RecentAuthModal() {
   useEffect(()=>{
     const listen=(event:Event)=>{
       returnFocus.current=document.activeElement instanceof HTMLElement&&document.activeElement!==document.body?document.activeElement:null;
-      setChallenge((event as CustomEvent).detail);setValue('');setError('');setSent(false);setSentTo('');setMethod('');setGoogle(false);setAccountEmail('');setForGbp(gbpConnectPending);
-      apiRequest('GET','/api/auth/reauth').then(r=>r.json()).then(d=>{setMethod(d.method);setGoogle(d.google===true);setAccountEmail(typeof d.email==='string'?d.email:'');}).catch(e=>setError(apiErrorMessage(e)));
+      setChallenge((event as CustomEvent).detail);setValue('');setError('');setSent(false);setSentTo('');setMethod('');setGoogle(false);setApple(false);setAccountEmail('');setForGbp(gbpConnectPending);
+      apiRequest('GET','/api/auth/reauth').then(r=>r.json()).then(d=>{setMethod(d.method);setGoogle(d.google===true);setApple(d.apple===true&&!!appleBridge());setAccountEmail(typeof d.email==='string'?d.email:'');}).catch(e=>setError(apiErrorMessage(e)));
     };
     // All existing Google connect anchors share the same preflight and retry behavior.
     const connect=(event:MouseEvent)=>{
@@ -71,6 +72,11 @@ export function RecentAuthModal() {
       ?"To connect Google Business Profile, confirm it's you first. Google's sign-in opens next."
       :"A quick security check on your own account, so nobody else can act as you. Nothing is sent to anyone else, and your action continues as soon as you confirm."}</DialogDescription></DialogHeader>
     {method && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();if(needsCode)return;setBusy(true);setError('');try{await apiRequest('POST','/api/auth/reauth',{value});challenge?.resolve();setChallenge(null);}catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}}}>
+      {method==='email' && apple && <div className="space-y-2">
+        {/* Inside the iPhone app: the Apple ID linked to this account confirms it (server/apple-auth.ts, purpose reauth). */}
+        <Button type="button" className="w-full bg-black text-white hover:bg-black/90" disabled={busy} onClick={()=>{setBusy(true);setError('');requestAppleReauth().then(()=>{challenge?.resolve();setChallenge(null);}).catch(e=>setError(e.message)).finally(()=>setBusy(false));}} data-testid="button-reauth-apple"><AppleMark className="h-4 w-4"/>Continue with Apple</Button>
+        {!google && <p className="text-xs text-muted-foreground text-center">or use an emailed code</p>}
+      </div>}
       {method==='email' && google && <div className="space-y-2">
         <Button type="button" className="w-full" disabled={busy} onClick={continueWithGoogle} data-testid="button-reauth-google">Continue with Google</Button>
         <p className="text-xs text-muted-foreground text-center">or use an emailed code</p>

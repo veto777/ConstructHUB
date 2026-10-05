@@ -6,7 +6,8 @@ export { fromNativeApp } from "../app-shell";
  *
  * Two steps, as the privacy policy describes (account data kept until deletion is requested; payment records 7 years):
  *   1. Closing — now, POST /api/account/delete: billing is cancelled at Stripe, every session and API key stops
- *      working, connected Google / Ads / social / domain / LSA grants (their tokens) are deleted, personal fields are
+ *      working, a Sign in with Apple grant is revoked at Apple, connected Google / Ads / social / domain / LSA grants
+ *      (their tokens) are deleted, personal fields are
  *      cleared (the avatar and logo files stay until step 2 erases them with their rows) and the email is freed (the address can sign up again). Login is impossible from this moment.
  *   2. Erasing — within 30 days (purgeClosedAccounts): the account's own data and the CRM workspaces it owned alone.
  *      Payment and invoice records stay, without the person's name or email, for the legal retention period.
@@ -20,6 +21,7 @@ import { pool } from "../db";
 import { requireRecentAuth } from "../account-security";
 import { stripe, stripeConfigured } from "../billing/client";
 import { sendTransactionalEmail, emailLayout } from "./email";
+import { revokeAppleSignIn } from "../apple-auth";
 
 export const ERASE_AFTER_DAYS = 30;
 
@@ -39,7 +41,7 @@ const BILLABLE = ["active", "trialing", "past_due", "unpaid", "incomplete", "pau
 /** Tables that hold a connected service's grant or token for this user — deleted at closing, not 30 days later. */
 const GRANT_TABLES = [
   "gbp_grants", "ads_grants", "social_connections", "domain_connections", "edge_connections", "lsa_connections",
-  "app_auth_codes", "app_oauth_states", "app_push_tokens",
+  "app_auth_codes", "app_oauth_states", "app_push_tokens", "user_apple_ids",
   "mail_alert_grants", "agency_poll_grants", "account_api_keys", "account_trusted_devices", "account_recovery_codes",
 ] as const;
 
@@ -97,6 +99,9 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
       }
     }
   }
+
+  // Sign in with Apple: revoke the grant at Apple before its row goes (guideline 5.1.1(v)); best-effort.
+  await revokeAppleSignIn(userId).catch((e) => console.warn(`[account-delete] Apple revoke failed: ${e?.message ?? e}`));
 
   const grantTables: string[] = [];
   for (const t of GRANT_TABLES) if (await tableExists(t)) grantTables.push(t);

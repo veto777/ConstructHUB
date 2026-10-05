@@ -4,6 +4,12 @@ import express from "express";
 import passport from "passport";
 import { setupAuth } from "../auth";
 import { pool } from "../db";
+// Sign in with Apple: Apple's published keys come from the test (server/apple-auth.test.ts), never from Apple.
+if (process.env.APP_TEST_APPLE_JWKS) {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => String(input) === "https://appleid.apple.com/auth/keys"
+    ? Response.json({ keys: JSON.parse(process.env.APP_TEST_APPLE_JWKS!) }) : realFetch(input, init);
+}
 const app = express();
 app.set("trust proxy", 1);
 app.use(express.json());

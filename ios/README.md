@@ -53,11 +53,14 @@ window.webkit?.messageHandlers.ch.postMessage({
   type: 'share', url: 'https://constructhub.us/example', title: 'Project update'
 });
 window.webkit?.messageHandlers.ch.postMessage({ type: 'haptic' });
+window.webkit?.messageHandlers.ch.postMessage({ type: 'appleSignIn', purpose: 'login', next: '/crm' }); // or purpose: 'reauth'
 ```
 
-`enablePush` asks for notification authorization only after that message. The page should send it following an intentional user action and explain the benefit. `share` accepts an HTTP(S) URL and optional title. `haptic` produces a light impact. Unknown types, untrusted origins and subframes are ignored. Messages are fire-and-forget; no promise/response protocol is exposed.
+`enablePush` asks for notification authorization only after that message. The page should send it following an intentional user action and explain the benefit. `share` accepts an HTTP(S) URL and optional title. `haptic` produces a light impact. Unknown types, untrusted origins and subframes are ignored. Messages are fire-and-forget; no promise/response protocol is exposed, except that `appleSignIn` reports back with a `ch-apple-signin` window event (`{ purpose, ok, message }`).
 
-Push is **on** (`CH_PUSH_ENABLED=YES`, `CODE_SIGN_ENTITLEMENTS=Shared/Push.entitlements`). Push Notifications is enabled on both Apple app identifiers and the App Store profiles carry `aps-environment=production` (`npx tsx scripts/asc.ts ensure-push`, 2026-10-05). The entitlement reads `$(APS_ENVIRONMENT)`: `development` for Debug, `production` for Release. No silent/background push capability is needed for alert notifications.
+**Sign in with Apple** (guideline 4.8 — the apps offer Google sign-in, so Apple's must be there too): the sign-in page shows "Continue with Apple" / "Sign up with Apple" inside the app only (`client/src/components/apple-sign-in.tsx`). The shell opens Apple's native sheet with a fresh nonce (its SHA-256 goes to Apple), then the page posts `{identityToken, nonce, authorizationCode, givenName, familyName, purpose, next}` to `/api/auth/apple` (`server/apple-auth.ts`) so the session cookie belongs to the web view, and opens `next` or the 2FA step. `purpose: 'reauth'` is the identity check before a sensitive action (e.g. deleting the account) for accounts without a password. The capability is on for both bundle IDs and in the profiles (`scripts/asc.ts ensure-capabilities`); the entitlement is in `Shared/App.entitlements`. Deleting the account revokes the Apple grant.
+
+Push is **on** (`CH_PUSH_ENABLED=YES`, `CODE_SIGN_ENTITLEMENTS=Shared/App.entitlements`). Push Notifications is enabled on both Apple app identifiers and the App Store profiles carry `aps-environment=production` (`npx tsx scripts/asc.ts ensure-push`, 2026-10-05). The entitlement reads `$(APS_ENVIRONMENT)`: `development` for Debug, `production` for Release. No silent/background push capability is needed for alert notifications.
 
 The page sends `enablePush` from Settings → Notifications ("Notifications on this iPhone", `client/src/components/app-push-card.tsx`), shown only inside the app. On later launches the app registers again by itself when notifications are already allowed, so a changed device token reaches the server.
 
