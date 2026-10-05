@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
 import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   AGENCY_ONLY_MODULES, CRM_SEATS_LINE, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
   agencyBandsLine, formatUsd, joinNames, planPriceLine,
@@ -45,6 +46,7 @@ export default function TermsOfUsePage() {
 
           <section data-testid="section-subscription-plans">
             <h2 className="text-xl font-semibold mb-3">3. Subscription Plans and Pricing</h2>
+            {inNativeApp() ? <p>Paid plans aren't sold in the ConstructHUB apps. A paid plan on your account is governed by the plan, price and billing terms in effect when you subscribed, including automatic renewal and cancellation at the end of the billing period.</p> : <>
             <p className="mb-2">ConstructHUB offers the following subscription plans, billed monthly or annually (the annual price is 10 times the monthly price):</p>
             <ul className="list-disc pl-6 space-y-1 mb-3" data-testid="list-plans">
               {PLAN_KEYS.map((key) => (
@@ -55,10 +57,12 @@ export default function TermsOfUsePage() {
             <p className="mb-2">The ConstructHUB CRM is included in every plan; the plan sets the number of CRM seats ({CRM_SEATS_LINE}). What each plan includes, and its usage limits, are listed on the Pricing page.</p>
             <p className="mb-2">There is no free plan. A new subscription starts with a {TRIAL_LABEL}. When the trial ends, the subscription continues at the plan price unless you cancel before then.</p>
             <p>All subscription plans automatically renew at the end of each billing cycle unless canceled before the renewal date. You may cancel your subscription at any time through your account settings, and cancellation will take effect at the end of the current billing period. No partial refunds are issued for unused portions of the current billing cycle unless otherwise stated.</p>
+            </>}
           </section>
 
           <section data-testid="section-add-ons">
             <h2 className="text-xl font-semibold mb-3">4. Add-ons</h2>
+            {inNativeApp() ? <p>Add-ons aren't sold in the ConstructHUB apps. Add-ons on your account follow the same terms as your plan.</p> : <>
             <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price):</p>
             <ul className="list-disc pl-6 space-y-1">
               {Object.values(ADDONS).map((addon) => (
@@ -70,6 +74,7 @@ export default function TermsOfUsePage() {
               ))}
             </ul>
             <p className="mt-2">Add-ons are subject to the same auto-renewal, cancellation, and billing policies as subscription plans.</p>
+            </>}
           </section>
 
           <section data-testid="section-billing">
@@ -85,15 +90,19 @@ export default function TermsOfUsePage() {
 
           <section data-testid="section-done-for-you">
             <h2 className="text-xl font-semibold mb-3">6. Done-For-You Services</h2>
+            {inNativeApp() ? <p>Done-For-You services aren't sold in the ConstructHUB apps. Services you have agreed to are governed by the scope, price and contract terms you accepted.</p> : <>
             <p className="mb-2">ConstructHUB offers Done-For-You services, including but not limited to business formation and licensing, GMB &amp; website setup, SEO programs, the Complete Business Build, and custom work.</p>
             <p className="mb-2">Services priced at {SALES_THRESHOLD_LABEL} or more are not sold through online checkout. A sales rep (&ldquo;{SALES_REP_LABEL}&rdquo;) confirms the scope and the price with you before you commit or pay.</p>
             <p className="mb-2">SEO packages require a minimum 6-month contract commitment. Early termination of SEO contracts is subject to an early termination penalty equal to 50% of the remaining contract value. Done-For-You service fees are non-refundable once work has commenced.</p>
+            </>}
           </section>
 
           <section data-testid="section-master-class">
             <h2 className="text-xl font-semibold mb-3">7. Master Class</h2>
+            {inNativeApp() ? <p>Master Class content isn't sold in the ConstructHUB apps. Master Class materials you have access to are proprietary; you may not redistribute, share, copy, or resell them.</p> : <>
             <p className="mb-2">ConstructHUB offers educational Master Class content as individual modules and as a complete bundle. Master Class items priced at {SALES_THRESHOLD_LABEL} or more are quoted by a sales rep before purchase; items under {SALES_THRESHOLD_LABEL} show their price at checkout.</p>
             <p>Master Class purchases are non-refundable once access has been granted. All Master Class materials are proprietary and protected by intellectual property laws. You may not redistribute, share, copy, or resell any Master Class content.</p>
+            </>}
           </section>
 
           <section data-testid="section-trial-beta">
