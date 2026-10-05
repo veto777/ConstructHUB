@@ -735,7 +735,7 @@ function AppContent() {
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing"];
+const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing", "/crm-app"];
 
 function App() {
   return (
