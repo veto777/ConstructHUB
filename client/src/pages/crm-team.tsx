@@ -15,6 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { marketingUrl } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   Users, Building2, UserCircle, ShieldCheck, Mail, Loader2, Trash2,
   Copy, AlertTriangle, Plus, Check, ArrowRight, RefreshCw, KeyRound, History,
@@ -66,6 +67,13 @@ interface Seats {
 
 /** What the seats card says: the server's message, or one built from the counts for an older server. */
 function seatsSummary(seats: Seats): string {
+  // The iPhone apps sell nothing: counts only — never the server's plan-name /
+  // "Choose a plan" message (App Store 3.1.3(f); docs/app/APP-STORE-PLAN.md).
+  if (inNativeApp()) {
+    return seats.limit < 0
+      ? `${seats.used} seat${seats.used === 1 ? "" : "s"} in use (no limit).`
+      : `${seats.used} of ${seats.limit} seats in use.`;
+  }
   if (seats.message) return seats.message;
   const count = seats.limit < 0 ? "unlimited seats" : `${seats.limit} seat${seats.limit === 1 ? "" : "s"}`;
   return seats.plan === "none" ? `Without a plan the owner keeps ${count}.` : `Your ${seats.planName} plan includes ${count}.`;
@@ -794,14 +802,21 @@ export default function CrmTeamPage() {
                 <p className="text-xs text-muted-foreground">{ROLE_BLURB[inviteRole]}</p>
                 {!seats.canAddSeat && (
                   <p className="text-sm text-destructive" data-testid="text-seat-limit">
-                    {seats.plan === "none"
-                      ? "Inviting your team needs a plan."
-                      : `You've used every seat on the ${seats.planName} plan.`}{" "}
-                    {/* Plans live on the main site — the portal host has no /pricing route. */}
-                    <a href={marketingUrl("/pricing")} className="underline font-medium" data-testid="link-seat-upgrade">
-                      {seats.plan === "none" ? "Choose a plan" : "See plans and add-ons"}
-                    </a>
-                    .
+                    {inNativeApp() ? (
+                      // The apps sell nothing: no plan name, no link to plans (App Store 3.1.3(f)).
+                      "No seats are free right now."
+                    ) : (
+                      <>
+                        {seats.plan === "none"
+                          ? "Inviting your team needs a plan."
+                          : `You've used every seat on the ${seats.planName} plan.`}{" "}
+                        {/* Plans live on the main site — the portal host has no /pricing route. */}
+                        <a href={marketingUrl("/pricing")} className="underline font-medium" data-testid="link-seat-upgrade">
+                          {seats.plan === "none" ? "Choose a plan" : "See plans and add-ons"}
+                        </a>
+                        .
+                      </>
+                    )}
                   </p>
                 )}
                 {lastLink && (
