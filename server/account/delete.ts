@@ -39,6 +39,7 @@ const BILLABLE = ["active", "trialing", "past_due", "unpaid", "incomplete", "pau
 /** Tables that hold a connected service's grant or token for this user — deleted at closing, not 30 days later. */
 const GRANT_TABLES = [
   "gbp_grants", "ads_grants", "social_connections", "domain_connections", "edge_connections", "lsa_connections",
+  "app_auth_codes", "app_oauth_states",
   "mail_alert_grants", "agency_poll_grants", "account_api_keys", "account_trusted_devices", "account_recovery_codes",
 ] as const;
 

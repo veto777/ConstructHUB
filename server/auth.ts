@@ -1,3 +1,4 @@
+import { ensureAppConnectionsSchema, registerAppConnections } from "./app-connections";
 import { safeNextPath } from "./app-shell";
 import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost } from "./app-auth";
 import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
@@ -81,6 +82,7 @@ export function googleSignInConfigured(): boolean {
 export async function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
   await ensureAppAuthSchema();
+  await ensureAppConnectionsSchema();
 
   // SECURITY: never fall back to a hardcoded secret in production — a constant
   // baked into source lets anyone forge signed session cookies. Fail fast so a
@@ -125,6 +127,8 @@ export async function setupAuth(app: Express) {
     const [user] = await db.select().from(users).where(eq(users.id, 1));
     return user;
   }));
+
+  registerAppConnections(app);
 
   // Google sign-in needs both OAuth client values. Without them passport
   // cannot build the strategy (it throws, which used to stop the whole server

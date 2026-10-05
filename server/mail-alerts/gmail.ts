@@ -1,3 +1,4 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
 import type { Express, NextFunction, Request, Response } from "express";
 import { randomBytes } from "node:crypto";
 import { pool } from "../db";
@@ -72,8 +73,8 @@ export function registerGmailOAuth(
       redirect,
       expires: Date.now() + 600000,
     };
-    res.redirect(
-      `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID || "", redirect_uri: redirect, response_type: "code", scope: `openid email ${GMAIL_SCOPE}`, state, access_type: "offline", prompt: "consent select_account" })}`,
+    res.redirect(await appConnectUrl(req, "gmail",
+      `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID || "", redirect_uri: redirect, response_type: "code", scope: `openid email ${GMAIL_SCOPE}`, state, access_type: "offline", prompt: "consent select_account" })}`, "/mail-alerts?oauth=connected")
     );
   });
   app.get("/api/mail-alerts/oauth/callback", async (req, res) => {
@@ -89,7 +90,7 @@ export function registerGmailOAuth(
       pending.state !== req.query.state ||
       typeof req.query.code !== "string"
     )
-      return void res.redirect("/mail-alerts?oauth=failed");
+      return void await finishAppConnection(req,res,"/mail-alerts?oauth=failed");
     try {
       const r = await http("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -134,9 +135,9 @@ export function registerGmailOAuth(
         ],
       );
       await logActivity(req, u.id, "mail.connected", { email: who.email });
-      res.redirect("/mail-alerts?oauth=connected");
+      await finishAppConnection(req,res,"/mail-alerts?oauth=connected");
     } catch {
-      res.redirect("/mail-alerts?oauth=failed");
+      await finishAppConnection(req,res,"/mail-alerts?oauth=failed");
     }
   });
   app.post("/api/mail-alerts/oauth/disconnect", async (req, res) => {

@@ -1,3 +1,4 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
 /**
  * Calendar sync — two directions, one card on /crm/settings.
  *
@@ -24,7 +25,7 @@
  * The RFC 5545 document itself lives in ./ical (pure, unit-tested directly).
  */
 import type { Express } from "express";
-import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual, randomBytes } from "crypto";
 import { db } from "../db";
 import { crmAppointments, crmCustomers, crmOrgs, crmProjects } from "@shared/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -404,10 +405,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     }
 
     // CSRF: bind the OAuth round-trip to this session + org (+ member scope).
-    const state = createHash("sha256")
-      .update(`${ctx.org.id}:${Date.now()}:${Math.random()}`)
-      .digest("hex")
-      .slice(0, 48);
+    const state = randomBytes(32).toString("hex");
     if (req.session) {
       req.session.googleCalendarState = state;
       req.session.googleCalendarOrgId = ctx.org.id;
@@ -423,7 +421,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
       prompt: "consent", // a refresh token is only guaranteed with an explicit consent screen
       state,
     });
-    res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
+    res.json({ url: await appConnectUrl(req, "calendar", `https://accounts.google.com/o/oauth2/v2/auth?${params}`, scope === "me" ? "/crm/team?calendar=connected=1" : "/crm/settings?calendar=connected=1") });
   });
 
   app.get("/api/crm/calendar/google/callback", async (req: any, res) => {
@@ -431,7 +429,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     // it); an org-scope connect returns to Settings as before.
     const scope = req.session?.googleCalendarScope === "me" ? "me" : "org";
     const back = (q: string) =>
-      res.redirect(scope === "me" ? `/crm/team?calendar=${q}` : `/crm/settings?calendar=${q}`);
+      finishAppConnection(req, res, scope === "me" ? `/crm/team?calendar=${q}` : `/crm/settings?calendar=${q}`);
     const user = getDevUser(req, res);
     if (!user) return;
     if (!googleCalendarConfigured()) return back("error=not_configured");
@@ -452,6 +450,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (ctx.org.id !== orgId) return back("error=org_mismatch");
+    if (scope === "org" && !requirePermission(res, ctx, "manageSettings")) return;
     // The member slot being written must be the member who started the flow.
     if (scope === "me" && ctx.member.id !== memberId) return back("error=member_mismatch");
 

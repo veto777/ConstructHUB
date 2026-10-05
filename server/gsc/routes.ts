@@ -1,3 +1,4 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
 import type { Express } from "express";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -67,7 +68,7 @@ export function registerGscRoutes(
       prompt: "consent select_account",
       state,
     });
-    res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${q}` });
+    res.json({ url: await appConnectUrl(req, "gsc", `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "/search-console?connection=connected") });
   });
   // OAuth landing: saves the grant (edge_connections + queued 'discover') and redirects
   // to /search-console?connection=connected|failed. site-connections.tsx.
@@ -81,7 +82,7 @@ export function registerGscRoutes(
       pending.state !== req.query.state ||
       typeof req.query.code !== "string"
     )
-      return res.redirect("/search-console?connection=failed");
+      return await finishAppConnection(req,res,"/search-console?connection=failed");
     try {
       const response = await http("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -108,9 +109,9 @@ export function registerGscRoutes(
       const who = await identity.json();
       await saveGscGrant(user, who, tokens);
       await connectionNotice(req, user, "gsc", true, who.email);
-      res.redirect("/search-console?connection=connected");
+      await finishAppConnection(req,res,"/search-console?connection=connected");
     } catch {
-      res.redirect("/search-console?connection=failed");
+      await finishAppConnection(req,res,"/search-console?connection=failed");
     }
   });
   // Search analytics for one property: gsc_analytics grouped by date/day-week-month for

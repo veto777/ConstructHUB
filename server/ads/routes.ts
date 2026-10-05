@@ -1,3 +1,6 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
+import { fromNativeApp } from "../app-shell";
+import { oauthBaseUrl } from "../site-context";
 import type { Express, Request, Response } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -47,17 +50,17 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
   route('post','/connect',async(req,res,user)=>{
     if(!requireRecentAuth(req,res)) return;
     if(!configured()) throw new AdsError('Owner setup required: approved Ads project access (or legacy developer token), OAuth client ID and secret.',503);
-    const manager=customerId.parse(req.body?.managerId),state=randomBytes(32).toString('hex'),redirect=redirectUri();
+    const manager=customerId.parse(req.body?.managerId),state=randomBytes(32).toString('hex'),redirect=fromNativeApp(req) ? `${oauthBaseUrl(req)}/api/ads/callback` : redirectUri();
     req.session.adsOAuth={state,userId:user,manager,expires:Date.now()+600000,redirect};
     const q=new URLSearchParams({client_id:process.env.GOOGLE_ADS_CLIENT_ID!,redirect_uri:redirect,response_type:'code',scope:ADS_SCOPE,access_type:'offline',prompt:'consent',state});
-    res.json({url:`https://accounts.google.com/o/oauth2/v2/auth?${q}`});
+    res.json({url:await appConnectUrl(req, 'ads', `https://accounts.google.com/o/oauth2/v2/auth?${q}`, '/ads-manager?connect=ok')});
   });
   // OAuth landing: stores encrypted tokens in ads_grants, wipes+requeues the user's ads
   // jobs/plans/accounts/findings/invitations, redirects to /ads-manager?connect=ok|failed.
   route('get','/callback',async(req,res,user)=>{
     const s=req.session.adsOAuth;delete req.session.adsOAuth;
     await new Promise<void>((resolve,reject)=>req.session.save(e=>e?reject(e):resolve()));
-    if(!s || s.userId!==user || s.expires<Date.now() || s.state!==req.query.state || typeof req.query.code!=='string' || req.query.code.length>4096) return res.redirect('/ads-manager?connect=failed');
+    if(!s || s.userId!==user || s.expires<Date.now() || s.state!==req.query.state || typeof req.query.code!=='string' || req.query.code.length>4096) return await finishAppConnection(req,res,'/ads-manager?connect=failed');
     try {
       const t=await oauthTokens({code:req.query.code,redirect_uri:s.redirect,grant_type:'authorization_code'},options.http);
       if(typeof t.refresh_token!=='string'||!String(t.scope||'').split(' ').includes(ADS_SCOPE)) throw new AdsError('Ads permission and offline access are required.',401);
@@ -75,8 +78,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
       });
       await logActivity(req,user,'google.connected',{service:'ads',managerId:s.manager});
       await notifyUser(user,'google.connected',{title:'Google Ads MCC connected',body:`Manager ${s.manager}; queued verification and discovery.`,link:'/ads-manager'});
-      res.redirect('/ads-manager?connect=ok');
-    }catch{res.redirect('/ads-manager?connect=failed');}
+      await finishAppConnection(req,res,'/ads-manager?connect=ok');
+    }catch{await finishAppConnection(req,res,'/ads-manager?connect=failed');}
   });
   // Removes the saved MCC and all local ads data (ads_grants, accounts, findings,
   // invitations; cancels queued jobs, expires previews). "Disconnect MCC" — ads-manager.tsx.

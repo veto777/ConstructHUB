@@ -1,3 +1,4 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
 import { z } from 'zod';
 import { filters, listLocations, accessFor, locationAccess }  from '../agency/access';
 import { queueSync } from '../agency/jobs';
@@ -37,13 +38,13 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
     const redirect=`${oauthBaseUrl(req)}/api/gbp/callback`,state=randomBytes(32).toString('hex');
     req.session.gbpOAuth={state,userId,redirect,expires:Date.now()+10*60*1000};
     const q=new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID!,redirect_uri:redirect,response_type:'code',scope:`openid email profile ${GBP_SCOPE}`,access_type:'offline',prompt:'consent select_account',state});
-    const url=`https://accounts.google.com/o/oauth2/v2/auth?${q}`;
+    const url=await appConnectUrl(req, 'gbp', `https://accounts.google.com/o/oauth2/v2/auth?${q}`, '/locations?gbp=connected');
     if(req.query.format==='json') return res.json({url});
     res.redirect(url);
   });
   route('get','/api/gbp/callback',async(req,res,userId)=>{
     const pending=req.session.gbpOAuth; delete req.session.gbpOAuth;
-    if(!pending || pending.userId!==userId || pending.expires<Date.now() || pending.state!==req.query.state || typeof req.query.code!=='string') return res.redirect('/locations?gbp=consent-failed');
+    if(!pending || pending.userId!==userId || pending.expires<Date.now() || pending.state!==req.query.state || typeof req.query.code!=='string') return await finishAppConnection(req,res,'/locations?gbp=consent-failed');
     try {
       const response=await (options.http ?? fetch)('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:process.env.GOOGLE_CLIENT_ID!,client_secret:process.env.GOOGLE_CLIENT_SECRET!,code:req.query.code,redirect_uri:pending.redirect,grant_type:'authorization_code'}),signal:AbortSignal.timeout(20000)});
       const tokens=await response.json();if(!response.ok) throw new Error('Token exchange failed');
@@ -54,8 +55,8 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
       await connectionAlert(req,userId,'google.connected',who);
       // Fill the Locations pages without further clicks; failures show per location in sync status.
       void (options.afterConnect ?? (async(userId:number,subject:string)=>{await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) VALUES($1,$2,now(),true) ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[userId,subject]);}))(userId,who.sub).catch((e)=>{console.error('GBP discovery queue failed');void recordFailure('job','GBP discovery queue',e);});
-      res.redirect('/locations?gbp=connected');
-    }catch {res.redirect('/locations?gbp=consent-failed');}
+      await finishAppConnection(req,res,'/locations?gbp=connected');
+    }catch {await finishAppConnection(req,res,'/locations?gbp=consent-failed');}
   });
   // The Google-connection banner (Locations, Posts & photos, Google Reviews): which Google accounts are
   // connected, plus the per-linked-location sync rows behind "Sync details".
