@@ -1,3 +1,6 @@
+import { ensureAppAuthSchema, mintAppCode } from "../app-auth";
+import { ensureAppConnectionsSchema } from "../app-connections";
+import { ensureAppPushSchema } from "../app-push";
 /**
  * Self-serve account deletion, step 1 (closing) — server/account/delete.ts. Function-level on throwaway users only:
  * nothing here goes through the dev-bypass HTTP user.
@@ -20,6 +23,9 @@ async function user(): Promise<{ id: number; email: string }> {
 beforeAll(async () => {
   await ensureAccountSchema();
   await ensureAccountDeletionSchema();
+  await ensureAppAuthSchema();
+  await ensureAppConnectionsSchema();
+  await ensureAppPushSchema();
 });
 afterAll(async () => {
   await pool.query("DELETE FROM crm_members WHERE org_id = ANY($1::text[])", [orgs]);
@@ -37,10 +43,16 @@ describe("closing an account (App Store 5.1.1(v))", () => {
     await pool.query("INSERT INTO subscriptions(user_id, plan, status, stripe_subscription_id) VALUES($1, 'pro', 'active', $2)", [u.id, subId]);
     await pool.query(`INSERT INTO session(sid, sess, expire) VALUES($1, $2::json, now() + interval '1 day')`,
       [`del-${randomUUID()}`, JSON.stringify({ cookie: {}, passport: { user: u.id } })]);
+    await mintAppCode(u.id, "constructhub.us", "login", "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM", "/");
+    await pool.query("INSERT INTO app_oauth_states(state,user_id,purpose,host,next,payload,google_url) VALUES($1,$2,'gbp','constructhub.us','/','{}','https://accounts.google.com/')", [`app.${randomUUID()}`,u.id]);
+    await pool.query("INSERT INTO app_push_tokens(token,user_id,app,platform,session_id) VALUES($1,$2,'platform','ios','fixture')", [randomUUID().replaceAll('-',''),u.id]);
     const cancelled: string[] = [];
     const r = await closeAccount(u.id, { cancelSubscription: async (id) => { cancelled.push(id); } });
     expect(r).toMatchObject({ ok: true, cancelledSubscriptions: 1 });
     expect(cancelled).toEqual([subId]);
+    for (const table of ['app_auth_codes','app_oauth_states','app_push_tokens']) {
+      expect((await pool.query(`SELECT 1 FROM ${table} WHERE user_id=$1`,[u.id])).rowCount).toBe(0);
+    }
     const { rows: [row] } = await pool.query("SELECT * FROM users WHERE id = $1", [u.id]);
     expect(row.deletion_requested_at).not.toBeNull();
     expect(row.deleted_email).toBe(u.email);

@@ -1,3 +1,6 @@
+import { appConnectUrl, finishAppConnection } from "../app-connections";
+import { fromNativeApp } from "../app-shell";
+import { oauthBaseUrl } from "../site-context";
 /**
  * LSA HTTP API — every route is scoped to req.user.id for full tenant isolation.
  * The only unauthenticated route is the Telegram webhook, which is authorized by
@@ -91,10 +94,11 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     if (!isConfigured()) {
       return res.status(400).json({ message: "Google Ads isn't configured yet (missing app credentials)." });
     }
-    const nonce = randomBytes(16).toString("hex");
+    const nonce = randomBytes(32).toString("hex");
     (req.session as any).lsaOauthState = nonce;
-    const redirectUri = getRedirectUri();
-    res.redirect(buildAuthUrl(redirectUri, nonce));
+    const redirectUri = fromNativeApp(req) ? `${oauthBaseUrl(req)}/api/lsa/oauth/callback` : getRedirectUri();
+    if (fromNativeApp(req)) (req.session as any).lsaAppRedirect = redirectUri;
+    res.redirect(await appConnectUrl(req, "lsa", buildAuthUrl(redirectUri, nonce), "/lsa-leads?connect=ok"));
   });
 
   // OAuth landing: stores the refresh token on lsa_connections, kicks off first
@@ -106,13 +110,14 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     const expected = (req.session as any).lsaOauthState;
     delete (req.session as any).lsaOauthState;
     if (!code || !state || !expected || state !== expected) {
-      return res.redirect("/lsa-leads?connect=error");
+      return await finishAppConnection(req,res,"/lsa-leads?connect=error");
     }
     try {
-      const redirectUri = getRedirectUri();
+      const redirectUri = res.locals?.appConnection ? (req.session as any).lsaAppRedirect : getRedirectUri();
+      delete (req.session as any).lsaAppRedirect;
       const tokens = await exchangeCode(code, redirectUri);
       if (!tokens.refresh_token) {
-        return res.redirect("/lsa-leads?connect=norefresh");
+        return await finishAppConnection(req,res,"/lsa-leads?connect=norefresh");
       }
       const conn = await ensureConnection(user.id);
       clearAccessToken(conn.refreshToken);
@@ -131,10 +136,10 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
         }
       })();
 
-      res.redirect("/lsa-leads?connect=ok");
+      await finishAppConnection(req,res,"/lsa-leads?connect=ok");
     } catch (e: any) {
       console.error("LSA OAuth callback error:", e?.message || e);
-      res.redirect("/lsa-leads?connect=error");
+      await finishAppConnection(req,res,"/lsa-leads?connect=error");
     }
   });
 

@@ -1,3 +1,7 @@
+import { ensureAppPushSchema, registerAppPushRoutes } from "./app-push";
+import { ensureAppConnectionsSchema, registerAppConnections } from "./app-connections";
+import { safeNextPath } from "./app-shell";
+import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost, appChallenge } from "./app-auth";
 import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
 import { encryptToken, decryptToken } from "./gbp/token-crypto";
 import { logActivity } from "./account-events";
@@ -24,21 +28,7 @@ import { GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
 import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
 
-/**
- * Open-redirect guard for post-auth `next` destinations. Only a plain
- * same-origin path survives: exactly one leading `/` (never `//host`), no
- * backslash anywhere (browsers resolve `/\host` as `//host`), no control
- * chars or whitespace. Anything else returns null and the caller falls back
- * to the default destination.
- */
-export function safeNextPath(next: string | undefined | null): string | null {
-  if (!next || typeof next !== "string" || next.length > 2048) return null;
-  if (/[\x00-\x20\x7f\\]/.test(next)) return null;
-  if (next[0] !== "/" || next[1] === "/") return null;
-  const url = new URL(next, "http://local");
-  if (url.origin !== "http://local" || !url.pathname.startsWith("/")) return null;
-  return next;
-}
+export { safeNextPath } from "./app-shell";
 
 export function generateAccountId(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -57,6 +47,8 @@ declare module "express-session" {
     /** CRM beta invite token, carried through the Google OAuth round-trip. */
     betaToken?: string;
     authNext?: string;
+    nativeGoogleHost?: string;
+    nativeGoogleChallenge?: string;
     /** "Continue with Google" step-up: the signed-in user it may re-verify. */
     googleReauth?: { userId: number; expires: number };
   }
@@ -91,6 +83,9 @@ export function googleSignInConfigured(): boolean {
 
 export async function setupAuth(app: Express) {
   const PgStore = connectPgSimple(session);
+  await ensureAppAuthSchema();
+  await ensureAppConnectionsSchema();
+  await ensureAppPushSchema();
 
   // SECURITY: never fall back to a hardcoded secret in production — a constant
   // baked into source lets anyone forge signed session cookies. Fail fast so a
@@ -135,6 +130,9 @@ export async function setupAuth(app: Express) {
     const [user] = await db.select().from(users).where(eq(users.id, 1));
     return user;
   }));
+
+  registerAppConnections(app);
+  registerAppPushRoutes(app);
 
   // Google sign-in needs both OAuth client values. Without them passport
   // cannot build the strategy (it throws, which used to stop the whole server
@@ -251,6 +249,8 @@ export async function setupAuth(app: Express) {
   // The Google button on /auth: starts Google OAuth; the callback signs the user in (making a
   // Google-only account when needed) and lands them on ?next= (validated) or the home page.
   app.get("/api/auth/google", (req, res, next) => {
+    const challenge = appChallenge(req.query);
+    if (req.query.app === "1" && !challenge) return res.status(400).json({ message: "S256 PKCE challenge required" });
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
     if (!googleConfigured) {
@@ -262,6 +262,10 @@ export async function setupAuth(app: Express) {
       }
       return res.redirect("/auth?error=google-unavailable");
     }
+    if (req.query.app === "1") req.session.nativeGoogleHost = appAuthHost(req);
+    else delete req.session.nativeGoogleHost;
+    if (req.query.app === "1") req.session.nativeGoogleChallenge = challenge!;
+    else delete req.session.nativeGoogleChallenge;
     const gbp = false;
     // A CRM beta invite survives the OAuth round-trip in the session.
     if (typeof req.query.beta === "string" && req.query.beta) {
@@ -304,6 +308,10 @@ export async function setupAuth(app: Express) {
       // failureRedirect only covers access_denied, and any other Google error
       // (server_error, temporarily_unavailable, …) used to surface as raw JSON.
       passport.authenticate("google", { callbackURL } as any, async (err: any, user: any) => {
+        const nativeHost = req.session.nativeGoogleHost;
+        const nativeChallenge = req.session.nativeGoogleChallenge;
+        delete req.session.nativeGoogleHost;
+        delete req.session.nativeGoogleChallenge;
         delete req.session.googleReauth; // single use
         // The visitor gets a page either way; the server log keeps the cause
         // (this error used to reach the global handler, which logged it).
@@ -321,6 +329,14 @@ export async function setupAuth(app: Express) {
           return res.redirect(`${nextPath}${nextPath.includes("?") ? "&" : "?"}reauth=google-failed`);
         }
         if (err || !user) return res.redirect("/auth?error=google-failed");
+        if (nativeHost) {
+          if (nativeHost !== appAuthHost(req) || !nativeChallenge) return res.redirect("/auth?error=google-failed");
+          try {
+            const code = await mintAppCode(user.id, nativeHost, "login", nativeChallenge, req.session.authNext);
+            delete req.session.authNext;
+            return res.redirect(`constructhub://auth-done?code=${code}`);
+          } catch { return res.redirect("/auth?error=google-failed"); }
+        }
         // keepSessionInfo: the OAuth round-trip state (authNext) must survive
         // passport's session regeneration on login.
         req.logIn(user, { keepSessionInfo: true } as any, (loginErr) => {
@@ -329,7 +345,10 @@ export async function setupAuth(app: Express) {
         });
       })(req, res, next);
     },
-    async (req, res) => {
+    (req, res) => finishGoogleLogin(req, res)
+  );
+
+  async function finishGoogleLogin(req: import("express").Request, res: import("express").Response, native = false) {
       try {
         if (req.user) {
           const [fullUser] = await db.select().from(users).where(eq(users.id, req.user.id));
@@ -339,7 +358,7 @@ export async function setupAuth(app: Express) {
             // keepSessionInfo: passport's logout regenerates the session,
             // which would wipe the pending 2FA marker we just set.
             req.logout({ keepSessionInfo: true } as any, () => {
-              res.redirect("/auth?mode=2fa");
+              res.redirect("/auth?mode=2fa" + (native && safeNextPath(req.session.authNext) ? `&next=${encodeURIComponent(req.session.authNext!)}` : ""));
             });
             return;
           }
@@ -359,9 +378,31 @@ export async function setupAuth(app: Express) {
       // validate again before putting it in a Location header.
       const nextPath = safeNextPath(req.session.authNext);
       delete req.session.authNext;
-      res.redirect(nextPath ?? "/?auth=success");
+      res.redirect(nextPath ?? (native ? "/" : "/?auth=success"));
     }
-  );
+
+  app.get("/api/auth/app-exchange", rateLimit("app-auth-exchange", 30, 60), async (req, res, next) => {
+    res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
+    try {
+      const code = await consumeAppCode(req.query.code, appAuthHost(req), req.query.verifier);
+      if (!code) return res.status(400).json({ message: "Invalid or expired app code" });
+      if (code.purpose === "redirect") {
+        if (req.user?.id !== code.user_id) return res.status(403).json({ message: "Sign in to the account that started this connection" });
+        return res.redirect(safeNextPath(code.next) ?? "/");
+      }
+      const [user] = await db.select().from(users).where(eq(users.id, code.user_id));
+      if (!user) return res.status(400).json({ message: "Invalid or expired app code" });
+      // Clear any other account's session before applying this authenticated identity.
+      req.session.regenerate(err => {
+        if (err) return next(err);
+        req.session.authNext = safeNextPath(code.next) ?? "/";
+        req.logIn(user, { keepSessionInfo: true } as any, err => {
+          if (err) return next(err);
+          void finishGoogleLogin(req, res, true).catch(next);
+        });
+      });
+    } catch (err) { next(err); }
+  });
 
   // The auth page's "Get Started": creates the unverified account, emails a 24-hour
   // verification link, and applies a beta invite code when present.

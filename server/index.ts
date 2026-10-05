@@ -1,3 +1,4 @@
+import { registerAppPurchaseGuard } from "./app-purchases";
 import { credentialBody } from "./cloudflare/credential-body";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
@@ -6,6 +7,7 @@ import { setupAuth } from "./auth";
 import { createServer } from "http";
 
 const app = express();
+registerAppPurchaseGuard(app);
 app.set("trust proxy", 1);
 const httpServer = createServer(app);
 import { registerInboundMail } from "./mail-alerts/inbound";
