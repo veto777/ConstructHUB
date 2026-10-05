@@ -25,6 +25,8 @@ import {
 } from "lucide-react";
 import { PLANS, PLAN_KEYS, type PlanKey } from "@shared/plans";
 import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
+import { AppLocked } from "@/components/app-locked";
+import { inNativeApp } from "@/lib/app-shell";
 
 /**
  * The server decides who may use Competitor Intel (server/entitlements.ts):
@@ -159,6 +161,16 @@ export default function CompetitorsPage() {
   }
 
   if (planRequired) {
+    // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): the locked tool only says
+    // it isn't on this account — no plan names, no "See plans" button.
+    if (inNativeApp()) {
+      return (
+        <AppPage width="narrow">
+          <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
+          <AppLocked name="Competitor Intel" testId="text-plan-required" />
+        </AppPage>
+      );
+    }
     const requiredName = planRequired.requiredPlan ? PLANS[planRequired.requiredPlan].name : null;
     return (
       <AppPage width="narrow">
