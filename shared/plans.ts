@@ -277,14 +277,15 @@ export type CallAssistantTier = {
 };
 /**
  * Cheapest first. The order is the upgrade order.
- * Lite's $149/mo and 1,000 minutes are the owner's (2026-10-02); its $1,199/yr was confirmed by the owner on
- * 2026-10-04 ("thats fine").
+ * Lite's $149/mo is the owner's (2026-10-02); its $1,199/yr was confirmed by the owner on 2026-10-04 ("thats fine").
+ * Included minutes, owner 2026-10-04: "i need to change to 2000 for lite then 5000, 10,000 and 25,000"
+ * (was 1,000 / 2,000 / 5,000 / 12,000; prices unchanged).
  */
 export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
-  { tier: "lite", addon: "call_assistant_lite", name: "Lite", monthlyCents: 14900, annualCents: 119900, includedMinutes: 1000, includedNumbers: 1, overageCentsPerMinute: 10 },
-  { tier: "solo", addon: "call_assistant", name: "Solo", monthlyCents: 24900, annualCents: 199900, includedMinutes: 2000, includedNumbers: 1, overageCentsPerMinute: 10, introMonthlyCents: 9900, introMonths: 3 },
-  { tier: "crew", addon: "call_assistant_crew", name: "Crew", monthlyCents: 44900, annualCents: 359900, includedMinutes: 5000, includedNumbers: 5, overageCentsPerMinute: 5 },
-  { tier: "fleet", addon: "call_assistant_fleet", name: "Fleet", monthlyCents: 79900, annualCents: 639900, includedMinutes: 12000, includedNumbers: 20, overageCentsPerMinute: 5 },
+  { tier: "lite", addon: "call_assistant_lite", name: "Lite", monthlyCents: 14900, annualCents: 119900, includedMinutes: 2000, includedNumbers: 1, overageCentsPerMinute: 10 },
+  { tier: "solo", addon: "call_assistant", name: "Solo", monthlyCents: 24900, annualCents: 199900, includedMinutes: 5000, includedNumbers: 1, overageCentsPerMinute: 10, introMonthlyCents: 9900, introMonths: 3 },
+  { tier: "crew", addon: "call_assistant_crew", name: "Crew", monthlyCents: 44900, annualCents: 359900, includedMinutes: 10000, includedNumbers: 5, overageCentsPerMinute: 5 },
+  { tier: "fleet", addon: "call_assistant_fleet", name: "Fleet", monthlyCents: 79900, annualCents: 639900, includedMinutes: 25000, includedNumbers: 20, overageCentsPerMinute: 5 },
 ];
 export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TIERS.map((t) => t.addon);
 /** The product's name; each tier's add-on is "<this> — <tier name>". */

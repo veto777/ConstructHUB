@@ -56,9 +56,12 @@ export function registerAgencyAccess(app:Express) {
         const {rows:jobs}=await pool.query(`SELECT j.id,j.url,j.status,j.error,j.created_at,j.completed_at,j.report->'scores' scores,jsonb_array_length(j.state->'pages') pages,j.page_cap,j.profile->>'business_name' client,count(*) OVER()::int total FROM sitescan_jobs j LEFT JOIN business_locations l ON l.id=(j.profile->>'id')::int AND l.user_id=j.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND j.user_id=$1 AND j.profile IS NULL)) AND concat_ws(' ',j.url,l.business_name) ILIKE $8 AND ($10='' OR j.status=$10) AND ($11::int IS NULL OR l.id=$11) ORDER BY j.created_at DESC,j.id LIMIT $12 OFFSET $9`,params);
         // Only Business Profile-linked locations can be compared (the scan reads their synced profile).
         const {rows:locations}=await pool.query(`SELECT l.id,l.business_name,l.website,count(*) OVER()::int total FROM ${locationJoin} WHERE ${w.sql} AND l.gbp_location_name IS NOT NULL AND concat_ws(' ',l.business_name,l.website) ILIKE $8 ORDER BY l.id LIMIT $9 OFFSET $10`,[...w.values,like(s.locationQ),s.limit,s.locationOffset]);
+        // Count independently of the page: locations[0].total reads the window off the current page,
+        // so paging past the end reported "no locations" even when locations exist.
+        const {rows:[locationCount]}=await pool.query(`SELECT count(*)::int total FROM ${locationJoin} WHERE ${w.sql} AND l.gbp_location_name IS NOT NULL AND concat_ws(' ',l.business_name,l.website) ILIKE $8`,[...w.values,like(s.locationQ)]);
         // URL-only schedules (no location, or a deleted one) belong to the owner, like profile-less jobs above.
         const {rows:schedules}=await pool.query(`SELECT s.* FROM sitescan_schedules s LEFT JOIN business_locations l ON l.id=s.location_id AND l.user_id=s.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ((${w.sql}) OR ($2::boolean AND $4::int IS NULL AND s.user_id=$1 AND l.id IS NULL)) ORDER BY s.url LIMIT 50`,w.values);
-        return void res.json({jobs,locations:locations.map(({total,...l})=>l),locationTotal:locations[0]?.total??0,schedules,total:jobs[0]?.total??0});
+        return void res.json({jobs,locations:locations.map(({total,...l})=>l),locationTotal:locationCount?.total??0,schedules,total:jobs[0]?.total??0});
       }
       // The Locations Citations tab campaign cards: the owner's citation campaigns (newest first), scoped
       // to an agency member's assigned clients like every location list here.

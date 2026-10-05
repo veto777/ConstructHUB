@@ -118,9 +118,14 @@ export function registerAssetRoutes(
     );
     res.json({ items: rows });
   });
+  // Sites tab list: edge_assets of this user+provider (?q name, ?status, 25/page) with
+  // linked-location counts. Both provider pages — site-connections.tsx.
   route("get", `${base}/assets`, async (req, res, user) =>
     res.json(await listAssets(user, provider, req.query)),
   );
+  // Connections tab list: edge_connections (?q, 25/page) + worker/agency flags that drive
+  // the "background processing is disabled" and agency-membership notices.
+  // Both provider pages — site-connections.tsx.
   route("get", `${base}/connections`, async (req, res, user) => {
     const p = listInput.parse(req.query),
       v = [user, provider, `%${p.q}%`];
@@ -145,10 +150,14 @@ export function registerAssetRoutes(
       workerEnabled: process.env.EDGE_SEARCH_WORKER_ENABLED === "true",
     });
   });
+  // One site's detail row (owned edge_assets), opened by clicking its name in the Sites
+  // tab. Details panel — site-connections.tsx.
   route("get", `${base}/assets/:id`, async (req, res, user) => {
     const a = await ownedAsset(user, idInput.parse(req.params.id), provider);
     res.json(a);
   });
+  // Re-imports sites/properties from the chosen connections (queued 'discover' /
+  // 'memberships' jobs into edge_jobs). "Discover sites" — site-connections.tsx.
   route("post", `${base}/discover`, async (req, res, user) => {
     const p = z.object({ connectionIds: idsInput }).parse(req.body);
     await budget(user, "discover", p.connectionIds.length);
@@ -167,6 +176,9 @@ export function registerAssetRoutes(
       );
     res.status(202).json({ queued: rows.length });
   });
+  // Queues background analytics syncs for the selected sites or everything matching
+  // ?q/?status (GSC: ?start/?end within the last 16 months), deduped against running
+  // jobs in edge_jobs. "Sync selected / Sync all matching" — site-connections.tsx.
   route("post", `${base}/sync`, async (req, res, user) => {
     const p = z
       .object({
@@ -215,6 +227,8 @@ export function registerAssetRoutes(
     );
     res.status(202).json({ queued: result.rowCount });
   });
+  // Work queue tab: edge_jobs of this user+provider (?q kind/error, ?state, 25/page).
+  // Both provider pages — site-connections.tsx.
   route("get", `${base}/jobs`, async (req, res, user) => {
     const p = listInput.parse(req.query);
     const where = `j.user_id=$1 AND c.provider=$2 AND ($3='' OR j.state=$3) AND (j.kind ILIKE $4 OR COALESCE(j.error,'') ILIKE $4)`;
@@ -231,6 +245,9 @@ export function registerAssetRoutes(
     );
     res.json({ items: rows, total: n.total });
   });
+  // Removes saved connections: deletes edge_invites + edge_connections (revoking a
+  // ConstructHUB-created Cloudflare token when possible) with per-connection guidance.
+  // Disconnect buttons — site-connections.tsx (+ the plan_required card).
   route("post", `${base}/disconnect`, async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     const { ids } = z.object({ ids: idsInput }).parse(req.body);
@@ -282,6 +299,9 @@ export function registerAssetRoutes(
     }
     res.json({ results });
   });
+  // Sends client onboarding invitations: INSERT edge_invites rows (each client must be an
+  // owned location with a website; Cloudflare also needs the account ID + agency env) and
+  // queues an invite job per row. "Send onboarding emails" — site-connections.tsx.
   route("post", `${base}/invites`, async (req, res, user) => {
     const p = z
       .object({
@@ -346,6 +366,8 @@ export function registerAssetRoutes(
     });
     res.status(202).json({ queued: records.length });
   });
+  // Onboarding tab location picker: business_locations of this user (?q name, 25/page)
+  // for composing invitation lines. Both provider pages — site-connections.tsx.
   route("get", `${base}/locations`, async (req, res, user) => {
     const p = listInput.parse(req.query),
       v = [user, `%${p.q}%`];
@@ -361,6 +383,8 @@ export function registerAssetRoutes(
     );
     res.json({ items: rows, total: n.total });
   });
+  // Onboarding tab invitation list: edge_invites of this user+provider (?q email/domain,
+  // ?state pending/accepted, 25/page). Both provider pages — site-connections.tsx.
   route("get", `${base}/invites`, async (req, res, user) => {
     const p = listInput.parse(req.query),
       v = [user, provider, `%${p.q}%`, p.status];
@@ -390,6 +414,8 @@ export function registerCloudflareRoutes(
     if (process.env.NODE_ENV === "production" && !req.secure)
       throw new ProviderError("HTTPS is required for credentials", 400);
   };
+  // Raw analytics lists behind the details panel ("Flagged IPs / traffic / events / paths /
+  // bots / countries"): expands edge_assets.data->field (?q, 25/page). site-connections.tsx.
   route("get", "/api/cloudflare/assets/:id/cache", async (req, res, user) => {
     const a = await ownedAsset(
       user,
@@ -413,6 +439,9 @@ export function registerCloudflareRoutes(
     } = await pool.query(`SELECT count(*)::int total ${from}`, values);
     res.json({ items: rows.map((r) => r.value), total: n.total });
   });
+  // Global-Key connect step 1: verifies the email+key with Cloudflare and lists accounts/
+  // zones to pick from (50/page). The key is wiped from the request afterwards.
+  // "Verify and choose zones" — site-connections.tsx.
   route("post", "/api/cloudflare/key-discovery", async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     secure(req);
@@ -443,6 +472,9 @@ export function registerCloudflareRoutes(
       page: p.page,
     });
   });
+  // Global-Key connect step 2: mints a limited ConstructHUB token (Zone Read, Analytics
+  // Read, Zone WAF Edit) scoped to the picked zones and saves edge_connections.
+  // "Create limited key" — site-connections.tsx.
   route("post", "/api/cloudflare/exchange", async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     secure(req);
@@ -460,6 +492,8 @@ export function registerCloudflareRoutes(
     await connectionNotice(req, user, "cloudflare", true, p.email);
     res.json(result);
   });
+  // Fallback connect path: verifies a manually created scoped token and saves
+  // edge_connections (method 'paste'). "Connect scoped token" — site-connections.tsx.
   route("post", "/api/cloudflare/token", async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     secure(req);
@@ -480,6 +514,9 @@ export function registerCloudflareRoutes(
     await connectionNotice(req, user, "cloudflare", true, "Scoped token");
     res.json({ id });
   });
+  // Ops-only agency-membership connect: saves a preconfigured agency connection
+  // (env CLOUDFLARE_AGENCY_*) and queues a memberships job; 503 unless that env is set.
+  // "Enable agency membership connection" — site-connections.tsx.
   route("post", "/api/cloudflare/agency", async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     if (
@@ -516,6 +553,8 @@ export function registerCloudflareRoutes(
     );
     res.json({ id: c.id });
   });
+  // "Flagged IPs" list in the zone details panel: Click Guard blocked_ips + VPN Shield
+  // vpn_visits for the zone's domain. site-connections.tsx.
   route(
     "get",
     "/api/cloudflare/assets/:id/flagged-ips",
@@ -524,6 +563,9 @@ export function registerCloudflareRoutes(
         await flaggedIpsForZone(user, idInput.parse(req.params.id), req.query),
       ),
   );
+  // Builds the chosen rule pack for the selected zones and stores a state='preview'
+  // edge_actions row per zone for review before anything touches Cloudflare.
+  // "Preview rules" — site-connections.tsx.
   route("post", "/api/cloudflare/preview", async (req, res, user) => {
     const p = z
       .object({
@@ -557,6 +599,9 @@ export function registerCloudflareRoutes(
     }
     res.json({ items });
   });
+  // confirm: queues previewed edge changes for the worker (state 'queued' + 'apply' job;
+  // previews expire after 1h). undo: queues removal of ConstructHUB-managed rules for
+  // applied/uncertain actions ('reverting' + 'undo' job). Both buttons — site-connections.tsx.
   for (const op of ["confirm", "undo"] as const)
     route("post", `/api/cloudflare/${op}`, async (req, res, user) => {
       if (!requireRecentAuth(req, res)) return;
@@ -613,6 +658,8 @@ export function registerCloudflareRoutes(
         db.release();
       }
     });
+  // Edge audit tab: every previewed/applied edge change (edge_actions joined with
+  // edge_assets, ?q zone name, ?state, 25/page). Cloudflare page — site-connections.tsx.
   route("get", "/api/cloudflare/actions", async (req, res, user) => {
     const p = listInput.parse(req.query),
       v = [user, `%${p.q}%`, p.status],

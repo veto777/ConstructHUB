@@ -340,7 +340,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground" data-testid="text-limits-resets">
-                {resets ? `Monthly counts reset ${resets.toLocaleDateString(undefined, { month: "long", day: "numeric", timeZone: "UTC" })}.` : ""}
+                {/* The meters roll over at midnight UTC (billing runs on it); say when that is on the viewer's own clock
+                    (audit lane 1 G; owner 2026-10-04: as recommended). */}
+                {resets ? `Monthly counts reset ${resets.toLocaleString(undefined, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}.` : ""}
                 {isAgency ? " Agency allowances grow with the locations you're billed for." : ""}
                 {admin
                   ? " This is a platform admin account: every feature and add-on is on, and every plan limit is unlimited, whatever plan it holds. Per-day safety caps still apply (for example 5 Site Scans and 40 Gabe questions a day), and the Call Assistant keeps a ceiling on phone numbers." : ""}

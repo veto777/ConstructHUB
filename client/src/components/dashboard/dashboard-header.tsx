@@ -85,7 +85,7 @@ export function DashboardHeader({
   if (account.status === "active" && account.renewsAt) meta.push(`Renews ${shortDate(account.renewsAt, now)}`);
   // A Stripe plan set to cancel: renewsAt is null and endsAt says when it stops.
   else if (account.endsAt) meta.push(`Plan ends ${shortDate(account.endsAt, now)}`);
-  if (account.usage.some((u) => u.period === "monthly")) meta.push(`Usage resets ${shortDate(account.resetsAt, now, true)}`);
+  if (account.usage.some((u) => u.period === "monthly")) meta.push(`Usage resets ${new Date(account.resetsAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`); // midnight UTC, on the viewer's clock
   meta.push(`Updated ${relativeTime(generatedAt, updatedNow)}`);
 
   return (

@@ -147,6 +147,9 @@ export function registerSiteScanRoutes(
     if (!job) res.status(404).json({ message: "Report not found" });
     return job;
   };
+  // Scan history + GBP-location picker + schedules for site-scan.tsx. NOTE: for signed-in
+  // users this is shadowed by registerAgencyAccess (server/agency/middleware.ts), which
+  // answers GET /api/sitescan itself; this handler still serves tests/anonymous 401s.
   owner("get", "/api/sitescan", async (req, res, user) => {
     const v = pageInput
       .extend({
@@ -191,6 +194,8 @@ export function registerSiteScanRoutes(
       schedules: schedules.rows,
     });
   });
+  // Bulk scan queue: one sitescan_jobs row per selected GBP location (1,000/day agency
+  // budget; one monthly plan scan each). "Queue selected sites" — site-scan.tsx.
   owner("post", "/api/sitescan/bulk", async (req, res, user) => {
     // Validate first (400), then take one monthly Site Scan per selected location.
     const ids = new Set(bulkInput.parse(req.body).locationIds).size;
@@ -215,6 +220,8 @@ export function registerSiteScanRoutes(
     });
     res.status(202).json({ jobs });
   });
+  // White-label PDF branding load: the user's sitescan_branding row (name + logo).
+  // "White-label PDF branding" form — site-scan.tsx.
   owner("get", "/api/sitescan/branding", async (_req, res, user) => {
     const {
       rows: [brand],
@@ -224,6 +231,8 @@ export function registerSiteScanRoutes(
     );
     res.json(brand || { name: "", logo: null });
   });
+  // Saves white-label PDF branding (agency name, logo normalized to ≤600×300 PNG via
+  // sharp) into sitescan_branding. "Save PDF branding" — site-scan.tsx.
   owner("post", "/api/sitescan/branding", async (req, res, user) => {
     const b = z
       .object({
@@ -277,6 +286,9 @@ export function registerSiteScanRoutes(
     await pool.query("DELETE FROM sitescan_branding WHERE user_id=$1", [user]);
     res.json({ ok: true });
   });
+  // Marks fixes done/not-done in the user's own work tracking: merges keys into
+  // sitescan_jobs.fix_done jsonb (keys validated against the report's fixes).
+  // FixChecklist buttons — site-scan.tsx.
   owner("post", "/api/sitescan/jobs/:id/fixes", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -307,6 +319,8 @@ export function registerSiteScanRoutes(
     });
     res.json({ ok: true });
   });
+  // Re-runs a scan (5/day budget + one monthly plan scan), keeping page cap/PageSpeed
+  // settings and the linked GBP profile. "Rescan / retry PageSpeed" — site-scan.tsx.
   owner("post", "/api/sitescan/jobs/:id/retry", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -329,6 +343,8 @@ export function registerSiteScanRoutes(
     await logActivity(req, user, "sitescan.started", { id, retryOf: j.id });
     res.status(202).json({ id });
   });
+  // Emails the prioritized fix checklist to any address (10/day). "Send prioritized
+  // checklist" — site-scan.tsx Follow up section.
   owner("post", "/api/sitescan/jobs/:id/email", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -363,6 +379,9 @@ export function registerSiteScanRoutes(
     });
     res.json({ ok: true, sink: process.env.EMAIL_FORCE_SINK === "1" });
   });
+  // Starts a scan: validates the URL, reserves one monthly plan Site Scan + the 5/day
+  // budget, INSERT sitescan_jobs (with the linked GBP profile when a location is picked).
+  // "Start scan" — site-scan.tsx.
   owner("post", "/api/sitescan", async (req, res, user) => {
     const body = input.parse(req.body);
     const profile =
@@ -399,6 +418,9 @@ export function registerSiteScanRoutes(
     await logActivity(req, user, "sitescan.started", { id, url });
     res.status(202).json({ id });
   });
+  // One scan's full detail: sitescan_jobs row (owned) — report JSON filtered/paged by
+  // reportView (?q/?category/?verification/?offset), crawl progress, ai_draft, share state.
+  // Selected scan section — site-scan.tsx.
   owner("get", "/api/sitescan/jobs/:id", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (j)
@@ -414,6 +436,9 @@ export function registerSiteScanRoutes(
         shareEnabled: !!j.share_hash,
       });
   });
+  // AI fix plan: drafts a page-by-page plan via the OpenAI provider (3 drafts/day,
+  // 20 provider calls/day budgets) and saves it to sitescan_jobs.ai_draft.
+  // "Generate AI fix plan" — site-scan.tsx.
   owner("post", "/api/sitescan/jobs/:id/plan", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -478,6 +503,8 @@ export function registerSiteScanRoutes(
     await logActivity(req, user, "sitescan.plan_drafted", { id: j.id });
     res.json({ draft, label: "AI draft — review before publishing" });
   });
+  // Creates a 30-day read-only share link: stores sha256(token) + expiry on
+  // sitescan_jobs, returns /site-scan/report/<token>. Create/Replace share link — site-scan.tsx.
   owner("post", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -491,6 +518,8 @@ export function registerSiteScanRoutes(
     await logActivity(req, user, "sitescan.shared", { id: j.id });
     res.json({ path: "/site-scan/report/" + value });
   });
+  // Deletes a scan (report, fix progress, share link; the daily budget is not refunded).
+  // "Delete scan" — site-scan.tsx.
   owner("delete", "/api/sitescan/jobs/:id", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -503,6 +532,7 @@ export function registerSiteScanRoutes(
     await logActivity(req, user, "sitescan.deleted", { id: j.id, url: j.url });
     res.json({ ok: true });
   });
+  // Revokes the share link (clears share_hash/share_expires). "Revoke share link" — site-scan.tsx.
   owner("delete", "/api/sitescan/jobs/:id/share", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -512,6 +542,8 @@ export function registerSiteScanRoutes(
     );
     res.json({ ok: true });
   });
+  // Monthly rescan toggle: upserts/deletes a sitescan_schedules row (PK user_id+url,
+  // max 10). Enable/Disable monthly rescan — site-scan.tsx.
   owner("post", "/api/sitescan/schedule", async (req, res, user) => {
     const body = input.extend({ enabled: z.boolean() }).parse(req.body);
     let url: string;
@@ -564,6 +596,7 @@ export function registerSiteScanRoutes(
       );
     res.json({ ok: true });
   });
+  // Branded PDF export (pdfkit stream) using sitescan_branding. "Export PDF" — site-scan.tsx.
   owner("get", "/api/sitescan/jobs/:id/pdf", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;
@@ -660,6 +693,8 @@ export function registerSiteScanRoutes(
         }
       },
     );
+  // Public shared report: sitescan_jobs row matching sha256(token) with an unexpired share.
+  // Shared Site Scan page (/site-scan/report/:token) — site-scan.tsx.
   publicRoute("get", "/api/sitescan/shared/:token", async (req, res) => {
     const value = tokenSchema.parse(req.params.token);
     const {
@@ -674,6 +709,8 @@ export function registerSiteScanRoutes(
         .json({ message: "This report link expired or was revoked." });
     res.json({ report: reportView(j, req.query || {}), aiDraft: j.ai_draft });
   });
+  // Free-scan CAPTCHA site key (null when reCAPTCHA isn't configured). FreeSiteScanPage
+  // widget — site-scan.tsx (/free-site-scan).
   publicRoute("get", "/api/sitescan/public/config", async (_req, res) =>
     res.json({
       captchaSiteKey:
@@ -682,6 +719,9 @@ export function registerSiteScanRoutes(
         null,
     }),
   );
+  // Starts a free public scan (11 pages): rate-limited per IP/email/global, queues an
+  // anonymous sitescan_jobs row, INSERT sitescan_leads + sends the 7-day verification
+  // email. "Scan my website" — site-scan.tsx (/free-site-scan).
   publicRoute("post", "/api/sitescan/public/start", async (req, res) => {
     const body = z
       .object({
@@ -759,6 +799,8 @@ export function registerSiteScanRoutes(
         "Check your email to unlock the full report. Most quick scans take about 60 seconds; slow sites may take longer.",
     });
   });
+  // Free-scan progress polling by access token: job status/error plus a teaser summary
+  // (scores + first 5 findings) until the email is verified. /free-site-scan — site-scan.tsx.
   publicRoute("get", "/api/sitescan/public/status/:token", async (req, res) => {
     const value = tokenSchema.parse(req.params.token);
     const {
@@ -780,6 +822,8 @@ export function registerSiteScanRoutes(
         : null,
     });
   });
+  // Verifies a free-scan lead's email from the ?verify= link (unexpired sitescan_leads
+  // row) and returns the full report. /free-site-scan — site-scan.tsx.
   publicRoute("post", "/api/sitescan/public/verify", async (req, res) => {
     const value = tokenSchema.parse(req.body?.token);
     const {
@@ -800,6 +844,8 @@ export function registerSiteScanRoutes(
     );
     res.json(j);
   });
+  // Platform-admin list of free-scan leads (sitescan_leads joined with their jobs, latest
+  // 500). SiteScanLeads table on /crm/admin — site-scan.tsx.
   app.get("/api/admin/sitescan-leads", async (req, res) => {
     if (!(await requirePlatformAdmin(req, res, auth))) return;
     const { rows } = await pool.query(

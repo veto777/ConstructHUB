@@ -44,12 +44,15 @@ export function trialCodeDays(raw: unknown): number | null {
 }
 
 /** Where an account's current access comes from. */
-export type AccessSource = "stripe" | "grant" | "trial_code" | "none";
+/** "complimentary": a plan held without Stripe, a grant row or a trial code (seed, legacy or comp accounts) — it used
+ *  to read "Granted" although this page never granted it (audit lane 1 N; owner 2026-10-04: as recommended). */
+export type AccessSource = "stripe" | "grant" | "trial_code" | "complimentary" | "none";
 
 export const ACCESS_SOURCE_LABELS: Record<AccessSource, string> = {
   stripe: "Paid (Stripe)",
   grant: "Granted",
   trial_code: "Trial code",
+  complimentary: "Free account (no charge)",
   none: "No plan",
 };
 

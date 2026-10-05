@@ -9,7 +9,7 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
-import { ADDONS, PLANS } from "../shared/plans";
+import { ADDONS, CALL_ASSISTANT_TIER_ADDONS, PLANS } from "../shared/plans";
 import { gotoCrm } from "./helpers";
 
 const SHOTS = process.env.SETTINGS_SHOTS_DIR ?? "";
@@ -25,7 +25,7 @@ const shot = async (page: Page, name: string, fullPage = true) => {
 const SECTION_ANCHOR: Record<string, string> = {
   account: "card-profile", security: "card-two-factor", notifications: "section-notifications", billing: "card-current-plan",
   limits: "text-limits-plan", "api-keys": "card-api-keys", "api-usage": "card-api-usage", "audit-log": "text-audit-count",
-  integrations: "text-integration-service-gbp",
+  integrations: "text-integration-service-gbp", "phone-bar": "platform-tabs-picker",
 };
 
 const PRO_STRIPE = {
@@ -93,7 +93,7 @@ async function expectNoSideScroll(page: Page, anchorTestId: string) {
   expect(offenders).toEqual([]);
 }
 
-const ME = [["account", "My account"], ["security", "Password & security"], ["notifications", "Notifications"]] as const;
+const ME = [["account", "My account"], ["security", "Password & security"], ["notifications", "Notifications"], ["phone-bar", "Phone tab bar"]] as const;
 const WORKSPACE = [
   ["billing", "Billing"], ["limits", "Limits & usage"], ["api-keys", "API keys"], ["api-usage", "API usage"],
   ["audit-log", "Audit log"], ["integrations", "Integrations"],
@@ -175,7 +175,8 @@ test.describe("settings shell — desktop", () => {
     const calls = await mockAccount(page);
     await gotoCrm(page, "/settings?tab=limits");
     await expect(page.getByTestId("text-limits-plan")).toContainText("Pro plan limits");
-    await expect(page.getByTestId("text-limits-resets")).toContainText("November 1");
+    // Midnight UTC on Nov 1, on the viewer's own clock (owner 2026-10-04: as recommended).
+    await expect(page.getByTestId("text-limits-resets")).toContainText(/Monthly counts reset (October 31|November 1) at \d{1,2}:\d{2}/);
 
     const L = PLANS.pro.limits;
     const n = (v: number) => v.toLocaleString("en-US");
@@ -203,7 +204,8 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-apiUnitsPerMonth-included")).toContainText(`${n((PLANS.pro.limits as any).apiUnitsPerMonth)} / mo`);
 
     // Add-ons the Pro plan sells sit under the limit they raise, with the quantity Stripe reports.
-    for (const addon of Object.values(ADDONS).filter((a) => a.availableOn.includes("pro"))) {
+    // The Call Assistant tiers are one tier picker row (row-limit-call-assistant-tier), not an add-on row each.
+    for (const addon of Object.values(ADDONS).filter((a) => a.availableOn.includes("pro") && !CALL_ASSISTANT_TIER_ADDONS.includes(a.key))) {
       await expect(page.getByTestId(`row-limit-addon-${addon.key}`), addon.key).toBeVisible();
     }
     await expect(page.getByTestId("text-limit-addon-qty-protected_site")).toHaveText("1");

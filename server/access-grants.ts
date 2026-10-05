@@ -173,7 +173,7 @@ async function accessFor(rows: any[], now: Date): Promise<AccessGrantAccount[]> 
     else if (plan) {
       const grant = grants.find((g: any) => g.user_id === r.id && grantHoldsRow(g, sub));
       if (grant) { source = "grant"; grantId = grant.id; }
-      else source = sub!.status === "trialing" || trialCodeUsers.has(r.id) ? "trial_code" : "grant";
+      else source = sub!.status === "trialing" || trialCodeUsers.has(r.id) ? "trial_code" : "complimentary";
     }
     const access: AccountAccess = {
       plan,

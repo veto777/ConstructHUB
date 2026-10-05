@@ -124,10 +124,10 @@ describe("entitlements: the callAssistant add-on module", () => {
     const allowance = (addons: Record<string, number>, isPlatformAdmin = false) =>
       callAssistantAllowance({ addonModules: { callAssistant: true }, addons, isPlatformAdmin });
     // Each tier's own overage rate rides along (the meter prices each call at it).
-    expect(allowance({ call_assistant_lite: 1 })).toEqual({ numbers: 1, minutes: 1000, overageCentsPerMinute: 10 });
-    expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 2000, overageCentsPerMinute: 10 });
-    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 5, minutes: 5000, overageCentsPerMinute: 5 });
-    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 21, minutes: 12_000, overageCentsPerMinute: 5 });
+    expect(allowance({ call_assistant_lite: 1 })).toEqual({ numbers: 1, minutes: 2000, overageCentsPerMinute: 10 });
+    expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 5000, overageCentsPerMinute: 10 });
+    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 5, minutes: 10_000, overageCentsPerMinute: 5 });
+    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 21, minutes: 25_000, overageCentsPerMinute: 5 });
     expect(callAssistantAllowance({ addonModules: { callAssistant: false }, addons: { call_assistant: 2 }, isPlatformAdmin: false })).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
     expect(allowance({}, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 10 });
     expect(ADMIN_CALL_ASSISTANT_NUMBERS).toBe(5);

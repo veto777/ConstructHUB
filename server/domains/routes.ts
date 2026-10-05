@@ -77,6 +77,8 @@ export function registerDomainRoutes(
           });
       }
     });
+  // Registrar walkthroughs: static guides, the server's egress IP for registrar allowlists,
+  // and whether the background worker is enabled. Guide accordions + worker banner — domains.tsx.
   route("get", "/guides", async (_req, res) =>
     res.json({
       guides: registrarGuides,
@@ -84,23 +86,27 @@ export function registerDomainRoutes(
       workerEnabled: process.env.DOMAINS_WORKER_ENABLED === "true",
     }),
   );
+  // Domain inventory: managed_domains of this user (?q domain, ?registrar, ?locationId,
+  // 25/page) with joined client name and DNS/expiry state. Inventory table — domains.tsx.
   route("get", "", async (req, res, id) => {
     const p = pageInput.parse(req.query),
       values = [id, `%${p.q}%`, p.registrar, p.locationId || null];
     const filter =
-      "user_id=$1 AND domain ILIKE $2 AND ($3='' OR registrar=$3) AND ($4::int IS NULL OR location_id=$4)";
+      "m.user_id=$1 AND m.domain ILIKE $2 AND ($3='' OR m.registrar=$3) AND ($4::int IS NULL OR m.location_id=$4)";
     const { rows } = await pool.query(
-      `SELECT id,domain,registrar,location_id,state - 'records' AS state,checked_at FROM managed_domains WHERE ${filter} ORDER BY domain,id LIMIT $5 OFFSET $6`,
+      `SELECT m.id,m.domain,m.registrar,m.location_id,bl.business_name AS location_name,m.state - 'records' AS state,m.checked_at FROM managed_domains m LEFT JOIN business_locations bl ON bl.id=m.location_id AND bl.user_id=m.user_id WHERE ${filter} ORDER BY m.domain,m.id LIMIT $5 OFFSET $6`,
       [...values, p.limit, (p.page - 1) * p.limit],
     );
     const {
       rows: [n],
     } = await pool.query(
-      `SELECT count(*)::int total FROM managed_domains WHERE ${filter}`,
+      `SELECT count(*)::int total FROM managed_domains m WHERE ${filter}`,
       values,
     );
     res.json({ items: rows, total: n.total, page: p.page });
   });
+  // Client-location search for the mapping dropdown: business_locations of this user
+  // (?q name/website, 25/page). "Find client location" — domains.tsx.
   route("get", "/locations", async (req, res, id) => {
     const p = pageInput.parse(req.query);
     const { rows } = await pool.query(
@@ -147,6 +153,8 @@ export function registerDomainRoutes(
     }
     res.json({ results });
   });
+  // Saved registrar keys on the Domains page: domain_connections (id/provider/label,
+  // 25/page). Connection chips — domains.tsx.
   route("get", "/connections", async (req, res, id) => {
     const p = pageInput.parse(req.query);
     const { rows } = await pool.query(
@@ -155,6 +163,8 @@ export function registerDomainRoutes(
     );
     res.json({ items: rows });
   });
+  // Saves an encrypted registrar API key (domain_connections) and queues a discover job
+  // that imports the domain inventory. "Connect Porkbun/Name.com" — domains.tsx.
   route("post", "/connections", async (req, res, id) => {
     const b = z
       .object({
@@ -179,6 +189,8 @@ export function registerDomainRoutes(
     });
     res.status(201).json({ id: connectionId });
   });
+  // Re-imports the domain inventory from the chosen registrar keys (discover job per
+  // connection into domain_jobs). "Sync connections" — domains.tsx.
   route("post", "/sync", async (req, res, id) => {
     const b = z.object({ connectionIds: idsInput }).strict().parse(req.body);
     const { rows } = await pool.query(
@@ -192,6 +204,8 @@ export function registerDomainRoutes(
       jobs.push(await enqueue(id, "discover", {}, undefined, c.id));
     res.status(202).json({ jobs });
   });
+  // Adds manually tracked domains: INSERT managed_domains (registrar 'manual', on-conflict
+  // skip), then auto-links a location whose website matches. "Add domains" — domains.tsx.
   route("post", "/manual", async (req, res, id) => {
     const b = z
       .object({
@@ -209,6 +223,8 @@ export function registerDomainRoutes(
     await autoMapDomains(id);
     res.status(201).json({ added: rows.length });
   });
+  // Links/unlinks selected domains to a client location: UPDATE managed_domains.location_id
+  // (null unmaps; location must belong to the user). "Map selected to client" — domains.tsx.
   route("post", "/mapping", async (req, res, id) => {
     const b = z
       .object({
@@ -231,6 +247,8 @@ export function registerDomainRoutes(
     );
     res.json({ ok: true });
   });
+  // Asks the monitor to re-check the selected domains sooner (next_check=now).
+  // "Check selected domains" — domains.tsx.
   route("post", "/monitor", async (req, res, id) => {
     const b = z.object({ ids: idsInput }).strict().parse(req.body);
     await ownedDomains(id, b.ids);
@@ -240,6 +258,9 @@ export function registerDomainRoutes(
     );
     res.status(202).json({ queued: true });
   });
+  // Queues before/after preview jobs (domain_jobs, status 'previewing') for a nameserver
+  // or DNS-record change on the selected domains; rejects manual domains. The two
+  // "Preview…" buttons — domains.tsx.
   route("post", "/preview", async (req, res, id) => {
     const b = z
       .object({ ids: idsInput, change: changeInput })
@@ -247,6 +268,8 @@ export function registerDomainRoutes(
       .parse(req.body);
     res.status(202).json({ jobs: await preview(id, b.ids, b.change) });
   });
+  // Previews pointing the selected domains at the Cloudflare nameservers already assigned
+  // to them (via the linked Cloudflare account). "Preview assigned Cloudflare pair" — domains.tsx.
   route("post", "/cloudflare-preview", async (req, res, id) => {
     const b = z.object({ ids: idsInput }).strict().parse(req.body);
     const rows = await ownedDomains(id, b.ids);
@@ -268,6 +291,9 @@ export function registerDomainRoutes(
       jobs.push(...(await preview(id, [t.id], t.change)));
     res.status(202).json({ jobs });
   });
+  // Applies confirmed previews: requires recent sign-in, the email-interruption warning
+  // for email-affecting changes, and unexpired 'ready' jobs, then queues them for the
+  // worker. "Confirm selected previews" — domains.tsx.
   route("post", "/confirm", async (req, res, id) => {
     const b = z
       .object({
@@ -282,6 +308,8 @@ export function registerDomainRoutes(
     await logActivity(req, id, "domains.confirmed", { jobIds: b.jobIds });
     res.status(202).json({ queued: true });
   });
+  // Builds new previews that would undo the selected applied changes (restore their
+  // before-values). "Preview rollback of selected changes" — domains.tsx.
   route("post", "/rollback-preview", async (req, res, id) => {
     const b = z
       .object({ jobIds: z.array(z.string().uuid()).min(1).max(100) })
@@ -291,6 +319,8 @@ export function registerDomainRoutes(
     for (const j of b.jobIds) jobs.push(...(await rollbackPreview(id, j)));
     res.status(202).json({ jobs });
   });
+  // Previews and change history: domain_jobs of this user (?q domain, 25/page, newest
+  // first) with before/after state. "Previews and change history" section — domains.tsx.
   route("get", "/jobs", async (req, res, id) => {
     const p = pageInput.parse(req.query);
     const { rows } = await pool.query(

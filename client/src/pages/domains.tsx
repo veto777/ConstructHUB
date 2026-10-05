@@ -89,7 +89,7 @@ export default function DomainsPage() {
       setNotice(
         d.jobs
           ? "Preview jobs queued. Review their before/after values below before confirming."
-          : "Saved. Background work will appear below.",
+          : "Saved.",
       );
       await refresh();
       return true;
@@ -492,7 +492,7 @@ export default function DomainsPage() {
                           <span className="sm:hidden text-muted-foreground">
                             Client location:{" "}
                           </span>
-                          {d.location_id || "Unmapped"}
+                          {d.location_name || d.location_id || "Unmapped"}
                         </td>
                         <td
                           className={`${appTable.td} ${appTableCards.td} hidden sm:table-cell`}

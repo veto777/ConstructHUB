@@ -68,18 +68,24 @@ export function registerAgencyRoutes(app:Express) {
     const {rows:[workspace]}=await pool.query('SELECT * FROM agency_workspaces WHERE user_id=$1',[a.owner]);
     res.json({...a,workspace,workspaces:rows.filter((_,i)=>open[i]),entitled,...(entitled?{}:{requiredPlan:agencyPlan})});
   },false);
+  // Workspace switcher: stores the chosen workspace owner in the session (membership and
+  // its owner's plan verified). agency.tsx header select.
   route('post','/workspace',async(req,res,a)=>{
     const b=z.object({owner:positiveId}).strict().parse(req.body),t=await accessFor(a.actor,b.owner);
     // Returning to your own account is always allowed; opening someone else's workspace needs its owner's plan.
     if(t.owner!==t.actor&&!await workspaceEntitled(t.owner,t.actor))return void agencyPlanRequired(res);
     req.session.agencyOwner=b.owner;res.json({ok:true});
   },false);
+  // Settings tab (owner): upserts agency_workspaces (name, auto_accept_all — whether the
+  // worker accepts any unmatched Google invitation). agency.tsx.
   route('put','/settings',async(req,res,a)=>{
     if(a.role!=='owner')throw missing();
     const b=z.object({name:z.string().trim().min(1).max(200),autoAcceptAll:z.boolean().default(false)}).strict().parse(req.body);
     await pool.query('INSERT INTO agency_workspaces(user_id,name,auto_accept_all) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET name=$2,auto_accept_all=$3,updated_at=now()',[a.owner,b.name,b.autoAcceptAll]);
     await logActivity(req,a.owner,'agency.settings',{actorId:a.actor,autoAcceptAll:b.autoAcceptAll});res.json({ok:true});
   });
+  // Clients tab list: agency_clients of the workspace owner (?q name/email/folder/tags,
+  // member client scoping, 50/page). agency.tsx.
   route('get','/clients',async(req,res,a)=>{
     const f=filters.parse(req.query),q=`%${f.q.replace(/[\\%_]/g,'\\$&')}%`;
     const where=`c.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=c.user_id AND m.client_id=c.id AND m.member_id=$3)) AND concat_ws(' ',c.name,c.contact_email,c.folder,array_to_string(c.tags,' ')) ILIKE $4`;
@@ -87,19 +93,27 @@ export function registerAgencyRoutes(app:Express) {
     const [{rows},{rows:[n]}]=await Promise.all([pool.query(`SELECT c.* FROM agency_clients c WHERE ${where} ORDER BY c.id LIMIT 50 OFFSET $5`,[...p,f.offset]),pool.query(`SELECT count(*)::int total FROM agency_clients c WHERE ${where}`,p)]);
     res.json({items:rows,total:n.total,offset:f.offset,pageSize:50});
   });
+  // Client form create: INSERT agency_clients (admin + all-client access required).
+  // agency.tsx Clients tab.
   route('post','/clients',async(req,res,a)=>{
     requireAdmin(a);const b=clientInput.parse(req.body);
     if(!a.allClients)throw missing();
     const {rows:[c]}=await pool.query('INSERT INTO agency_clients(user_id,name,contact_email,notes,tags,folder) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[a.owner,b.name,b.contactEmail,b.notes,b.tags,b.folder]);res.status(201).json(c);
   });
+  // Client form update: UPDATE agency_clients (write role + client access required).
+  // agency.tsx Clients tab "Save client".
   route('put','/clients/:id',async(req,res,a)=>{
     requireWrite(a);const id=positiveId.parse(req.params.id);await clientAccess(a,id);const b=clientInput.parse(req.body);
     await pool.query('UPDATE agency_clients SET name=$3,contact_email=$4,notes=$5,tags=$6,folder=$7 WHERE user_id=$1 AND id=$2',[a.owner,id,b.name,b.contactEmail,b.notes,b.tags,b.folder]);res.json({ok:true});
   });
+  // Team tab list (admin+): agency_members joined with users, each with its
+  // agency_member_clients id array (50/page). agency.tsx.
   route('get','/team',async(req,res,a)=>{
     requireAdmin(a);const f=filters.parse(req.query);
     const {rows}=await pool.query(`SELECT m.member_id,m.role,m.all_clients,u.email,ARRAY(SELECT client_id FROM agency_member_clients mc WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id ORDER BY client_id) client_ids,count(*) OVER()::int total FROM agency_members m JOIN users u ON u.id=m.member_id WHERE m.user_id=$1 AND u.email ILIKE $2 ORDER BY m.member_id LIMIT 50 OFFSET $3`,[a.owner,`%${f.q}%`,f.offset]);res.json({items:rows,total:rows[0]?.total??0});
   });
+  // Adds/updates a team member: upserts agency_members + agency_member_clients under the
+  // owner's seat lock (403 when plan seats are full). Member form — agency.tsx Team tab.
   route('put','/team',async(req,res,a)=>{
     // Only the owner can grant access; scoped admins cannot escalate themselves or other members.
     if(a.role!=='owner')throw missing();
@@ -120,8 +134,15 @@ export function registerAgencyRoutes(app:Express) {
     if(full)return void res.status(403).json(seatLimitBody(full));
     await logActivity(req,a.owner,'agency.member_updated',{memberId:u.id,role:b.role});res.json({ok:true});
   });
+  // Removes a team member (owner only): DELETE agency_members. agency.tsx Team tab.
   route('delete','/team/:id',async(req,res,a)=>{if(a.role!=='owner')throw missing();await pool.query('DELETE FROM agency_members WHERE user_id=$1 AND member_id=$2',[a.owner,positiveId.parse(req.params.id)]);res.json({ok:true});});
+  // Workspace location list (?q/?status/?clientId filters, member visibility, 50/page):
+  // business_locations joined with agency_clients. agency.tsx Locations tab and the
+  // AgencyWorkspace strip — site-scan.tsx.
   route('get','/locations',async(req,res,a)=>res.json(await listLocations(a,filters.parse(req.query))));
+  // Status counts behind the location filters (total/synced/needs-reconnect/unlinked/guard/
+  // unanswered-reviews/failed-posts), same filters as /locations. Filter-count select —
+  // agency.tsx Locations tab, AgencyWorkspace strip — site-scan.tsx.
   route('get','/dashboard',async(req,res,a)=>res.json(await dashboard(a,filters.parse(req.query))));
   route('get','/locations/:id',async(req,res,a)=>res.json(await locationAccess(a,positiveId.parse(req.params.id))));
   route('post','/bulk',async(req,res,a)=>{
@@ -129,6 +150,9 @@ export function registerAgencyRoutes(app:Express) {
     if(b.action==='guard'&&!guardRecentAuthOk(req,a.actor))return res.status(403).json({reauth:true,message:'Verify your identity to change Profile Guard mode'});
     res.status(202).json(await queueBulk(a,b));
   });
+  // CSV export of the workspace's locations (same filters as /locations; optional ?ids
+  // re-checked per row), streamed 500 rows at a time. Export CSV buttons —
+  // agency-workspace.tsx (agency.tsx + site-scan.tsx).
   route('get','/export',async(req,res,a)=>{
     const f=filters.parse(req.query),w=locationFilter(a,f);let cursor=0;
     const ids=req.query.ids?z.array(positiveId).min(1).max(50).parse(String(req.query.ids).split(',')):null;
@@ -139,6 +163,8 @@ export function registerAgencyRoutes(app:Express) {
       for(const r of rows){if(!res.write(Object.values(r).map(csvCell).join(',')+'\r\n'))await new Promise<void>(resolve=>{const done=()=>{res.off('drain',done);res.off('close',done);resolve();};res.once('drain',done);res.once('close',done);});}cursor=rows.at(-1)!.id;}
     res.end();
   });
+  // Jobs tab: agency_jobs of the workspace (?q location text, 50/page, newest first).
+  // agency.tsx.
   route('get','/jobs',async(req,res,a)=>{
     const f=filters.parse(req.query),w=locationFilter(a,f);
     const {rows}=await pool.query(`SELECT j.id,j.batch_id,j.action,j.location_id,j.status,j.error,j.created_at,j.finished_at,l.business_name,count(*) OVER()::int total FROM agency_jobs j JOIN business_locations l ON l.id=j.location_id AND l.user_id=j.user_id LEFT JOIN agency_clients c ON c.id=l.agency_client_id AND c.user_id=l.user_id WHERE ${w.sql} ORDER BY j.created_at DESC,j.id LIMIT 50 OFFSET $8`,[...w.values,f.offset]);res.json({items:rows,total:rows[0]?.total??0});
@@ -166,6 +192,9 @@ export function registerAgencyRoutes(app:Express) {
     res.json(await changePost(a.owner,id,b.action,b.text));
   });
   route('get','/google',async(_req,res,a)=>{res.json(await grantStatus(a.owner));});
+  // Settings tab: queues a refresh of the connected accounts' GBP discovery by marking
+  // agency_poll_grants refresh_requested (rate-limited 1/10min). "Refresh Google listings
+  // in background" — agency.tsx.
   route('post','/google/refresh',async(_req,res,a)=>{
     requireAdmin(a);if(!a.allClients)throw missing();
     if(!await takeBudget(`agency-discover:${a.owner}`,2,1,600000))throw new GoogleError('quota','Discovery is already queued or was recently requested',429);
@@ -173,11 +202,19 @@ export function registerAgencyRoutes(app:Express) {
     await pool.query(`INSERT INTO agency_poll_grants(user_id,subject,next_at,refresh_requested) SELECT user_id,google_subject,now(),true FROM gbp_grants WHERE user_id=$1 AND NOT reconnect_required ON CONFLICT(user_id,subject) DO UPDATE SET next_at=now(),refresh_requested=true`,[a.owner]);
     res.status(202).json({queued:true});
   });
+  // Onboarding form submit: validates client + agency Google grant, INSERT agency_onboarding
+  // (30-day expiry, hashed/encrypted token) and queues the instructions email; the worker
+  // sends it and later auto-accepts the matching Google invitation. agency.tsx Onboarding tab.
   route('post','/onboarding',async(req,res,a)=>res.status(202).json(await createOnboarding(a,req.body)));
+  // Onboarding tab list: agency_onboarding joined with agency_clients (?q business name,
+  // member client scoping, 50/page), each row with its client instructions link.
+  // agency.tsx.
   route('get','/onboarding',async(req,res,a)=>{
-    const f=filters.parse(req.query);const {rows}=await pool.query(`SELECT r.* FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE r.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=r.user_id AND m.member_id=$3 AND m.client_id=r.client_id)) AND ($4::int IS NULL OR r.client_id=$4) AND r.business_name ILIKE $5 ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q}%`,f.offset]);
-    res.json({items:rows.map(({token_hash,token_enc,...r})=>({...r,link:onboardingLink({...r,token_enc})}))});
+    const f=filters.parse(req.query);const {rows}=await pool.query(`SELECT r.*,count(*) OVER()::int total FROM agency_onboarding r JOIN agency_clients c ON c.id=r.client_id AND c.user_id=r.user_id WHERE r.user_id=$1 AND ($2::boolean OR EXISTS(SELECT 1 FROM agency_member_clients m WHERE m.user_id=r.user_id AND m.member_id=$3 AND m.client_id=r.client_id)) AND ($4::int IS NULL OR r.client_id=$4) AND r.business_name ILIKE $5 ORDER BY r.created_at DESC LIMIT 50 OFFSET $6`,[a.owner,a.allClients,a.actor,f.clientId??null,`%${f.q}%`,f.offset]);
+    res.json({items:rows.map(({token_hash,token_enc,total,...r})=>({...r,link:onboardingLink({...r,token_enc})})),total:rows[0]?.total??0});
   });
+  // "Send reminder" on one onboarding request: rate-limited 1/day; nudges reminder_at so
+  // the worker resends on its next tick. agency.tsx Onboarding tab.
   route('post','/onboarding/:id/remind',async(req,res,a)=>{requireWrite(a);const id=z.string().uuid().parse(req.params.id);const {rows:[r]}=await pool.query('SELECT client_id FROM agency_onboarding WHERE user_id=$1 AND id=$2',[a.owner,id]);if(!r)throw missing();await clientAccess(a,r.client_id);
     if(!await takeBudget(`agency-reminder:${id}`,1,1,86400000))throw new GoogleError('quota','One manual reminder per day',429);
     await pool.query("UPDATE agency_onboarding SET reminder_at=now()-interval '4 days',reminders=LEAST(reminders,1) WHERE user_id=$1 AND id=$2 AND status IN ('sent','opened')",[a.owner,id]);res.json({queued:true});});

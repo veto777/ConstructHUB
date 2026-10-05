@@ -2,11 +2,15 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone, LayoutGrid, ArrowUpRight,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone, LayoutGrid, ArrowUpRight, Trash2, SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
+import { CRM_TAB_DEFAULT, CRM_TAB_OPTIONS, resolveTabs, type TabOption } from "@shared/tab-bar";
+import { CRM_TAB_ICONS, activeTabKey, useSaveTabPrefs, useTabPrefs } from "@/lib/tab-prefs";
+import { TabBarPicker } from "@/components/tab-bar-picker";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -115,13 +119,23 @@ function RibbonTab({
   );
 }
 
+/** The default four keep the testids the specs already use. */
+const RIBBON_TESTIDS: Record<string, string> = { home: "ribbon-tab-dashboard", schedule: "ribbon-tab-schedule", inbox: "ribbon-tab-inbox", clients: "ribbon-tab-customers" };
+
 export function CrmRibbon() {
   const [location] = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
 
-  const moreActive = MORE_LINKS.some((l) => l.active(location));
+  const prefs = useTabPrefs();
+  const saveTabs = useSaveTabPrefs();
+  const [customizing, setCustomizing] = useState(false);
+  // A tab the person can't open (Inbox without manageCustomers, Invoices without seePrices) is never shown.
+  const can = (o: TabOption) => !o.perm || me?.permissions?.[o.perm] !== false;
+  const tabs = resolveTabs(prefs.data?.crmTabs, CRM_TAB_OPTIONS, CRM_TAB_DEFAULT, can);
+  const activeKey = activeTabKey(tabs, location);
+  const moreActive = !activeKey && MORE_LINKS.some((l) => l.active(location));
 
   return (
     <>
@@ -130,17 +144,11 @@ export function CrmRibbon() {
         className="fixed inset-x-0 bottom-0 z-50 flex border-t border-border/60 bg-background/85 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <RibbonTab href="/" icon={LayoutDashboard} label="Dashboard" testid="ribbon-tab-dashboard"
-          active={location === "/" || location === "/crm" || location === "/crm/home"} />
-        <RibbonTab href="/crm/schedule" icon={CalendarDays} label="Schedule" testid="ribbon-tab-schedule"
-          active={location.startsWith("/crm/schedule")} />
-        {/* Gated like the inbox API (manageCustomers): no dead tab for field crews and subs (audit lane 5). */}
-        {me?.permissions?.manageCustomers !== false && (
-          <RibbonTab href="/crm/inbox" icon={Inbox} label="Inbox" testid="ribbon-tab-inbox"
-            active={location.startsWith("/crm/inbox")} />
-        )}
-        <RibbonTab href="/crm/clients" icon={Users} label="Clients" testid="ribbon-tab-customers"
-          active={location.startsWith("/crm/clients")} />
+        {/* The person's four tabs (Settings → Phone tab bar, or More → Customize the bar); More always stays last. */}
+        {tabs.map((t) => (
+          <RibbonTab key={t.key} href={t.href} icon={CRM_TAB_ICONS[t.key] ?? LayoutDashboard} label={t.label}
+            testid={RIBBON_TESTIDS[t.key] ?? `ribbon-tab-${t.key}`} active={activeKey === t.key} />
+        ))}
         <RibbonTab icon={MoreHorizontal} label="More" testid="ribbon-tab-more"
           active={moreActive} onClick={() => setMoreOpen(true)} />
       </nav>
@@ -191,6 +199,19 @@ export function CrmRibbon() {
                 <InfoTip k={l.infoKey} className="h-11 w-11 my-0 mx-0" />
               </div>
             ))}
+            <button type="button" onClick={() => { setMoreOpen(false); setCustomizing(true); }} data-testid="ribbon-more-customize"
+              className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-foreground hover:bg-accent transition-colors">
+              <SlidersHorizontal className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+              Customize the bar
+            </button>
+            {/* iPhone app only: self-serve account deletion (App Store 5.1.1(v); the website keeps the support request). */}
+            {inNativeApp() && (
+              <Link href="/account/delete" onClick={() => setMoreOpen(false)} data-testid="ribbon-more-delete-account"
+                className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-destructive hover:bg-accent transition-colors">
+                <Trash2 className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                Delete account
+              </Link>
+            )}
             {/* Back to the platform and every other ConstructHUB tool (another host: a full navigation). */}
             <a href={marketingUrl("/")} data-testid="ribbon-more-platform"
               className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-foreground hover:bg-accent transition-colors">
@@ -210,6 +231,19 @@ export function CrmRibbon() {
               {theme === "light" ? "Dark mode" : "Light mode"}
             </button>
           </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={customizing} onOpenChange={setCustomizing}>
+        <SheetContent side="bottom" data-testid="ribbon-customize-sheet"
+          className="max-h-[90dvh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-base">Customize the bar</SheetTitle>
+            <SheetDescription>Choose the four tabs at the bottom of the CRM on your phone and in the app.</SheetDescription>
+          </SheetHeader>
+          <TabBarPicker options={CRM_TAB_OPTIONS} defaults={CRM_TAB_DEFAULT} value={prefs.data?.crmTabs} icons={CRM_TAB_ICONS}
+            can={can} lastLabel="More" saving={saveTabs.isPending} testIdPrefix="crm-tabs"
+            onSave={(keys) => saveTabs.mutateAsync({ crmTabs: keys })} />
         </SheetContent>
       </Sheet>
     </>

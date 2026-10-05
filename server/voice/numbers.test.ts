@@ -449,20 +449,20 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   it("the Overview status and the usage route carry the numbers and this month's minutes", async () => {
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
-    expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 2000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
-    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([["lite", 1000, 1, 10], ["solo", 2000, 1, 10], ["crew", 5000, 5, 5], ["fleet", 12000, 20, 5]]);
-    expect(status.body.pricing).toMatchObject({ includedMinutes: 2000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
+    expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 5000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
+    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([["lite", 2000, 1, 10], ["solo", 5000, 1, 10], ["crew", 10000, 5, 5], ["fleet", 25000, 20, 5]]);
+    expect(status.body.pricing).toMatchObject({ includedMinutes: 5000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
     // The engine is probed, not assumed; its internal address never reaches the browser.
     expect(status.body.engine).toMatchObject({ reachable: false, models: false });
     expect(status.body.engine).not.toHaveProperty("url");
     expect(status.body.engine).not.toHaveProperty("publicBase");
     expect(status.body.numbers.map((n: any) => n.status)).toEqual(["active"]);
     const month = new Date().toISOString().slice(0, 7);
-    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 2000, remainingMinutes: 2000, overageMinutes: 0, overageCentsPerMinute: 10, spamCallsThisMonth: 0, freeSpamCallsLimit: 500 });
-    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes,spam_calls,blocked_calls,spam_free_calls,spam_free_minutes) values($1,$2,$3,4,2020,2000,20,2,1,2,3)", [pro.org, pro.id, month]);
+    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 5000, remainingMinutes: 5000, overageMinutes: 0, overageCentsPerMinute: 10, spamCallsThisMonth: 0, freeSpamCallsLimit: 500 });
+    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes,spam_calls,blocked_calls,spam_free_calls,spam_free_minutes) values($1,$2,$3,4,5020,5000,20,2,1,2,3)", [pro.org, pro.id, month]);
     const usage = await api("/api/crm/voice/usage", pro);
     expect(usage.status).toBe(200);
-    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 2020, includedMinutes: 2000, remainingMinutes: 0, overageMinutes: 20, overageCents: 200, allowance: { minutes: 2000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
+    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 5020, includedMinutes: 5000, remainingMinutes: 0, overageMinutes: 20, overageCents: 200, allowance: { minutes: 5000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
     expect(usage.body.history).toHaveLength(1);
     // A month that switched tiers: each rate bucket at its own rate (10 min at 10¢ + 10 min at 5¢), not 20 × the current rate.
     await db.query(`update voice_usage set overage_rate_minutes = '{"10": 10, "5": 10}'::jsonb where org_id = $1 and month = $2`, [pro.org, month]);

@@ -343,6 +343,16 @@ export async function registerRoutes(
   // and the integrations status. ensureAccountSchema() ran above.
   const { registerBillingRoutes } = await import("./account/billing-routes");
   registerBillingRoutes(app, getDevUser);
+  // The phone tab bars each person picks (Settings → Phone tab bar; CRM More → Customize the bar).
+  const { ensureUiPrefsSchema, registerUiPrefsRoutes } = await import("./account/ui-prefs");
+  await ensureUiPrefsSchema();
+  registerUiPrefsRoutes(app, getDevUser);
+  // Self-serve account deletion — iPhone apps only (App Store 5.1.1(v)); the website keeps the support request.
+  const { ensureAccountDeletionSchema, registerAccountDeletionRoutes } = await import("./account/delete");
+  await ensureAccountDeletionSchema();
+  registerAccountDeletionRoutes(app, getDevUser);
+  // Step 2: erase closed accounts after 30 days (production, ACCOUNT_ERASE_WORKER_ENABLED=true).
+  (await import("./account/erase")).startAccountEraseWorker();
   const { registerApiKeyRoutes } = await import("./account/api-key-routes");
   registerApiKeyRoutes(app, getDevUser, await import("./account/api-keys"));
   const { registerIntegrationsRoute } = await import("./account/integrations-route");
@@ -3291,8 +3301,8 @@ export async function registerRoutes(
     res.json(modules);
   });
 
-  // The Master Class page (/master-class): which course modules this account has bought,
-  // so purchased modules show as owned. Signed out → [].
+  // The signed-in user's Master Class purchases (course_purchases); the guide index uses
+  // any row to unlock the paid playbook. google-ads-guide.tsx.
   app.get("/api/course-purchases", async (req, res) => {
     // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
     const user = req.user ? getDevUser(req, res) : null;
@@ -3452,6 +3462,9 @@ export async function registerRoutes(
     /go-http-client/i, /apache-httpclient/i, /okhttp/i,
   ];
 
+  // Tracking-pixel collector: writes click_visits for the site behind :trackingId,
+  // attaches suspicion reasons (bot UA, >5 visits/IP/hour, >15/day, fingerprint reuse),
+  // auto-blocks the IP at >=10 visits/hour. Data source for Click Guard + IP Tracker.
   app.post("/api/click-guard/track", async (req, res) => {
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -3555,8 +3568,9 @@ export async function registerRoutes(
     res.status(204).end();
   });
 
-  // The account's Click Guard–tracked domains, scoped to the signed-in user — read by Settings →
-  // Limits & usage ("Protected websites" used count) and the IP Tracker / VPN Shield pages.
+  // Lists the signed-in user's tracked_domains — the one site list shared by Click Guard,
+  // IP Tracker and VPN Shield — each with all-time stats from click_visits + blocked_ips.
+  // Site/domain selectors and settings-tab domain cards — google-ads.tsx, ip-tracker.tsx, vpn-shield.tsx.
   app.get("/api/click-guard/domains", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3587,6 +3601,8 @@ export async function registerRoutes(
     }
   });
 
+  // Adds a tracked site: INSERT tracked_domains (user_id, uuid tracking_id) after the
+  // plan's protectedSites allowance check. "Add domain" / "Add site" — google-ads.tsx, ip-tracker.tsx.
   app.post("/api/click-guard/domains", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3620,6 +3636,8 @@ export async function registerRoutes(
     }
   });
 
+  // Removes a site and cascades: deletes its blocked_ips, click_visits and vpn_visits
+  // rows. Delete-domain / remove-site buttons — google-ads.tsx, ip-tracker.tsx.
   app.delete("/api/click-guard/domains/:id", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3637,6 +3655,10 @@ export async function registerRoutes(
     }
   });
 
+  // Windowed analytics over click_visits (?start&end, default 7d, capped at the newest
+  // 1000 rows): stat tiles, threat level, daily/hourly chart, device/browser/OS/country,
+  // multi-click and traffic-source breakdowns. Dashboard + Traffic tabs — google-ads.tsx;
+  // stat tiles/chart — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/analytics", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3653,7 +3675,9 @@ export async function registerRoutes(
       const endDate = endParam ? new Date(endParam) : new Date();
 
       const visits = await storage.getClickVisits(domain.id, startDate, endDate);
-      const blocked = await storage.getBlockedIps(domain.id);
+      // Same window as the visit stats: the dashboard "Blocked IPs" tile sits in the
+      // range-filtered stat grid, so an all-time count would never move with the range.
+      const blocked = await storage.getBlockedIps(domain.id, startDate, endDate);
 
       const uniqueIps = new Set(visits.map(v => v.ipAddress)).size;
       const suspiciousCount = visits.filter(v => v.isSuspicious).length;
@@ -3746,6 +3770,8 @@ export async function registerRoutes(
     }
   });
 
+  // Raw click_visits rows for ?start&end (optional ?ip substring filter) — the clicks
+  // report table, google-ads.tsx "Traffic signals" tab.
   app.get("/api/click-guard/domains/:id/visits", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3775,6 +3801,8 @@ export async function registerRoutes(
     }
   });
 
+  // Active blocked_ips rows for a site (all time). Blocked-IPs panel and the Google Ads
+  // script tab counts — google-ads.tsx.
   app.get("/api/click-guard/domains/:id/blocked", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3791,6 +3819,8 @@ export async function registerRoutes(
     }
   });
 
+  // Manually blocks an IP/CIDR/wildcard for a site: INSERT blocked_ips (source 'manual'),
+  // 409 if already blocked. Block buttons — google-ads.tsx.
   app.post("/api/click-guard/domains/:id/block", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3823,6 +3853,9 @@ export async function registerRoutes(
     }
   });
 
+  // Merges one detection/exclusion preference (click threshold, block days, manual
+  // exclude / whitelist IPs, toggles) into tracked_domains.settings jsonb after per-key
+  // zod validation. Detection-rules cards — google-ads.tsx "Domain settings" tab.
   app.patch("/api/click-guard/domains/:id/settings", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3848,6 +3881,9 @@ export async function registerRoutes(
     }
   });
 
+  // Serves the Google Ads exclusion list — active blocked IPs + manual excludes − whitelist,
+  // capped at the saved list length (50–500) — as ?format=json or plain text; requires the
+  // ?key= HMAC carried by the generated script. Probed by the "Exclusion list" tile — google-ads.tsx.
   app.get("/api/click-guard/exclusion-list/:trackingId", async (req, res) => {
     try {
       const { trackingId } = req.params;
@@ -3887,6 +3923,9 @@ export async function registerRoutes(
     }
   });
 
+  // Generates the hourly-run Google Ads Apps Script that adds the site's exclusion list as
+  // campaign IP exclusions (500/campaign cap), plus its keyed exclusion-list URL.
+  // "Google Ads script" tab — google-ads.tsx.
   app.get("/api/click-guard/domains/:id/google-ads-script", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -3980,6 +4019,7 @@ function main() {
     }
   });
 
+  // Deletes one blocked_ips row, scoped to the owned domain. Unblock button — google-ads.tsx.
   app.delete("/api/click-guard/domains/:id/block/:blockId", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4003,6 +4043,8 @@ function main() {
     }
   });
 
+  // Groups click_visits into one visitor per IP (visit/page counts, last-seen device and
+  // geo, suspicious = any flagged visit, online = seen within 20 min). Visitors tab — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/visitors", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4076,6 +4118,9 @@ function main() {
     }
   });
 
+  // One visitor's full detail: all-time click_visits for that IP, latest system specs and
+  // Cloudflare geo, suspicion reasons, and the 50 most recent visits. Expanded visitor
+  // card — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/visitors/:visitorIp", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4137,6 +4182,8 @@ function main() {
     }
   });
 
+  // click_visits grouped by landing_page (hits + distinct visitor IPs, all time).
+  // Pages tab — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/pages", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4176,6 +4223,8 @@ function main() {
     }
   });
 
+  // click_visits grouped by Cloudflare country/city ("Unknown" when the visit stored none).
+  // Geo tab — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/geo", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4231,6 +4280,8 @@ function main() {
     }
   });
 
+  // click_visits grouped by browser / OS / device type / screen resolution, all time.
+  // Platforms tab — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/platforms", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4270,6 +4321,8 @@ function main() {
     }
   });
 
+  // Distinct visitor IPs seen in the last 20 minutes (click_visits). Online banner/tile
+  // and the all-sites table Online column — ip-tracker.tsx.
   app.get("/api/click-guard/domains/:id/online", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4400,6 +4453,9 @@ function main() {
     res.status(204).end();
   });
 
+  // VPN Shield collector: matches the visitor IP against known VPN-provider/datacenter
+  // prefixes plus WebRTC-leak and extension signals; on detection writes vpn_visits with
+  // the site's configured action (block/log/redirect) and tells the script what to do.
   app.post("/api/vpn-shield/track", async (req, res) => {
     try {
       res.setHeader("Access-Control-Allow-Origin", "*");
@@ -4496,6 +4552,8 @@ function main() {
     }
   });
 
+  // Same tracked_domains list as Click Guard, plus per-site vpn_visits totals/distinct IPs.
+  // Site selector — vpn-shield.tsx.
   app.get("/api/vpn-shield/domains", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4521,6 +4579,8 @@ function main() {
     }
   });
 
+  // All-time vpn_visits stats for a site: total/today/yesterday/7d/30d detections, unique
+  // IPs, top VPN providers and countries. Overview tab tiles/lists — vpn-shield.tsx.
   app.get("/api/vpn-shield/domains/:id/stats", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4579,6 +4639,8 @@ function main() {
     }
   });
 
+  // Every vpn_visits row for a site (each detection, whatever action the mode took).
+  // Overview "Blocked" tile and Flagged visits tab — vpn-shield.tsx.
   app.get("/api/vpn-shield/domains/:id/blocked-visits", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4595,6 +4657,8 @@ function main() {
     }
   });
 
+  // Builds the VPN Shield <script> tag for a site (the Install script tab renders the
+  // equivalent tag client-side from /api/public-config) — vpn-shield.tsx.
   app.get("/api/vpn-shield/domains/:id/script", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -4618,6 +4682,9 @@ function main() {
     }
   });
 
+  // Public: serves the VPN Shield detection JS; it reports signals to
+  // POST /api/vpn-shield/track and shows the overlay / redirect when flagged.
+  // Install script tab — vpn-shield.tsx.
   app.get("/api/vpn-shield/script/:trackingId", (req, res) => {
     const { trackingId } = req.params;
     const apiUrl = canonicalAppOrigin();
@@ -4735,6 +4802,8 @@ function main() {
     res.send(script);
   });
 
+  // Saves VPN Shield preferences (block mode, redirect URL, whitelisted IPs, validated)
+  // into tracked_domains.settings jsonb. Settings tab — vpn-shield.tsx.
   app.post("/api/vpn-shield/domains/:id/settings", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -6172,6 +6241,8 @@ function main() {
     }
   }
 
+  // Admin LSA console (lsa-account-manager.tsx; global lsa_manager_* tables, adminGuard):
+  // manager-connection state from lsa_manager_connection.
   app.get("/api/admin/lsa/manager", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6190,6 +6261,8 @@ function main() {
     }
   });
 
+  // Verifies the MCC refresh token with Google, then upserts lsa_manager_connection
+  // (status 'active') + admin_audit_log. Connect-manager dialog — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/manager/connect", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6225,6 +6298,7 @@ function main() {
     }
   });
 
+  // Marks the manager connection disconnected (keeps the row). Disconnect button — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/manager/disconnect", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6235,6 +6309,8 @@ function main() {
     }
   });
 
+  // Pulls the MCC's child accounts from the Google Ads API and upserts each into
+  // lsa_manager_accounts (linkType 'central') + admin_audit_log. Sync accounts button — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/manager/sync-accounts", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6258,19 +6334,24 @@ function main() {
     }
   });
 
+  // Accounts registry page: lsa_manager_accounts (50/page, ?q) with live lead/charged/
+  // disputed counts from lsa_manager_leads. Accounts tab table — lsa-account-manager.tsx.
   app.get("/api/admin/lsa/accounts", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
       const limit = Math.min(Number(req.query.limit) || 50, 200);
       const offset = Number(req.query.offset) || 0;
-      const accounts = await storage.getLsaAccountsWithMetrics(limit, offset);
-      const total = await storage.countLsaAccounts();
+      const q = typeof req.query.q === "string" && req.query.q.trim() ? req.query.q.trim().slice(0, 100) : undefined;
+      const accounts = await storage.getLsaAccountsWithMetrics(limit, offset, q);
+      const total = await storage.countLsaAccounts(q);
       res.json({ accounts, total, limit, offset });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
   });
 
+  // Manually adds a client account to the registry (linkType 'self', reconciled to 'both'
+  // if already centrally linked). Add-account card — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/accounts", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6291,6 +6372,8 @@ function main() {
     }
   });
 
+  // Account detail: one lsa_manager_accounts row plus its stored leads
+  // (lsa_manager_leads, 50/page). View/Refresh account — lsa-account-manager.tsx.
   app.get("/api/admin/lsa/accounts/:id", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6303,6 +6386,8 @@ function main() {
     }
   });
 
+  // Imports the latest 200 LSA leads from Google into lsa_manager_leads (upsert on
+  // google_lead_id), refreshes the account's lead_count + admin_audit_log. Sync Leads — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/accounts/:id/sync-leads", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6323,6 +6408,8 @@ function main() {
     }
   });
 
+  // Live Google Ads query: the account's campaigns (name, status, daily budget, LSA flag).
+  // Campaigns sub-tab — lsa-account-manager.tsx.
   app.get("/api/admin/lsa/accounts/:id/campaigns", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6341,6 +6428,7 @@ function main() {
     name: z.string().min(1).max(255).optional(),
   });
 
+  // Renames a campaign at Google (campaigns:mutate) + admin_audit_log. Rename dialog — lsa-account-manager.tsx.
   app.patch("/api/admin/lsa/accounts/:id/campaigns/:campaignId/settings", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6381,6 +6469,8 @@ function main() {
     campaignResourceName: z.string().min(1),
   });
 
+  // Sets a campaign's daily budget at Google (amount_micros) + admin_audit_log.
+  // Budget dialog — lsa-account-manager.tsx.
   app.patch("/api/admin/lsa/accounts/:id/campaigns/:campaignId/budget", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6408,6 +6498,8 @@ function main() {
     }
   });
 
+  // Pauses/enables a campaign at Google + admin_audit_log; pausing also emails the
+  // paused-campaign alert. Pause/Enable buttons — lsa-account-manager.tsx.
   app.patch("/api/admin/lsa/accounts/:id/campaigns/:campaignId/status", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6452,6 +6544,7 @@ function main() {
     }
   });
 
+  // Manager-link invitations: lsa_manager_invitations (newest first). Invitations tab — lsa-account-manager.tsx.
   app.get("/api/admin/lsa/invitations", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6462,6 +6555,8 @@ function main() {
     }
   });
 
+  // Creates a PENDING customerClientLink at Google, then INSERT lsa_manager_invitations
+  // (status 'pending') + admin_audit_log. Send invitation — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/invitations", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6501,6 +6596,8 @@ function main() {
     notes: z.string().max(1000).optional(),
   });
 
+  // Marks an invitation accepted/cancelled/etc.; "accepted" also upserts the account into
+  // lsa_manager_accounts as centrally linked. Mark accepted / Cancel buttons — lsa-account-manager.tsx.
   app.patch("/api/admin/lsa/invitations/:id", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6555,6 +6652,8 @@ function main() {
     res.json({ reasons: DISPUTE_REASONS });
   });
 
+  // Admin-side lead dispute: sets disputed + reason on a charged, not-yet-disputed
+  // lsa_manager_leads row + admin_audit_log. Dispute dialog — lsa-account-manager.tsx.
   app.post("/api/admin/lsa/leads/:leadId/dispute", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
@@ -6588,6 +6687,8 @@ function main() {
     }
   });
 
+  // Every admin write on this console: admin_audit_log (100/page, newest first).
+  // Audit log tab — lsa-account-manager.tsx.
   app.get("/api/admin/lsa/audit-log", async (req, res) => {
     if (!adminGuard(req, res)) return;
     try {
