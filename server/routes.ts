@@ -343,6 +343,8 @@ export async function registerRoutes(
   // and the integrations status. ensureAccountSchema() ran above.
   const { registerBillingRoutes } = await import("./account/billing-routes");
   registerBillingRoutes(app, getDevUser);
+  // The iPhone apps' cloud build gets its signing key here, only with GitHub's proof it is our release workflow.
+  (await import("./ci-signing")).registerCiSigningRoutes(app);
   // The phone tab bars each person picks (Settings → Phone tab bar; CRM More → Customize the bar).
   const { ensureUiPrefsSchema, registerUiPrefsRoutes } = await import("./account/ui-prefs");
   await ensureUiPrefsSchema();
