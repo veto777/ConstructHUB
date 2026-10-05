@@ -5,6 +5,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Button } from "@/components/ui/button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { inNativeApp } from "@/lib/app-shell";
 import { formatPhone, type ForwardingCarrier, type VoiceNumber } from "./numbers-shared";
 
 /** The digits a star code wants: "+13605550100" → "3605550100". */
@@ -47,7 +48,10 @@ export function ForwardingInstructions({ numbers, carriers, advice, initialId }:
       </CardHeader>
       <CardContent className="space-y-4">
         {!current ? (
-          <p className="text-sm text-muted-foreground" data-testid="text-voice-forwarding-none">Buy a number first; the steps here fill in with it.</p>
+          // The iPhone apps sell nothing (App Store 3.1.3(f)): no "Buy a number" nudge there.
+          <p className="text-sm text-muted-foreground" data-testid="text-voice-forwarding-none">
+            {inNativeApp() ? "The steps here fill in once a number is on this account." : "Buy a number first; the steps here fill in with it."}
+          </p>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             {usable.length > 1 ? (
