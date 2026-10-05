@@ -1291,6 +1291,8 @@ export function SharedSiteScanPage() {
     retry: false,
   });
   return (
+    <>
+    <PublicPageHeader next="/free-site-scan" backWhenSignedIn />
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Shared Site Scan</h1>
       {error && <p role="alert">This report link is unavailable or revoked.</p>}
@@ -1304,6 +1306,7 @@ export function SharedSiteScanPage() {
       />
       <ScanReport report={data?.report} draft={data?.aiDraft} />
     </main>
+    </>
   );
 }
 export function FreeSiteScanPage() {
@@ -1358,7 +1361,7 @@ export function FreeSiteScanPage() {
   });
   return (
     <>
-    <PublicPageHeader next="/free-site-scan" />
+    <PublicPageHeader next="/free-site-scan" backWhenSignedIn />
     <main className="max-w-4xl mx-auto p-8 space-y-6">
       <a href="/" className="text-primary">
         ConstructHUB

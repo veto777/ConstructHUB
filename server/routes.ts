@@ -5484,21 +5484,8 @@ function main() {
     }
   });
 
-  app.get("/api/review/:token/pixel.png", async (req, res) => {
-    try {
-      const request = await storage.getReviewRequestByToken(String(req.params.token));
-      if (request && !request.emailOpened) {
-        await storage.updateReviewRequest(request.id, {
-          emailOpened: true,
-          emailOpenedAt: new Date(),
-        });
-      }
-    } catch (e) {}
-    const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==", "base64");
-    res.set({ "Content-Type": "image/png", "Content-Length": pixel.length.toString(), "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate", "Pragma": "no-cache", "Expires": "0" });
-    res.end(pixel);
-  });
-
+  // (The email-open tracking pixel was removed 2026-10-04: no email embeds it and it bypassed the owner-preview guard —
+  // audit lane 2.)
   app.get("/api/review/:token/click", async (req, res) => {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));

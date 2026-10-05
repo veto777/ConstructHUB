@@ -56,7 +56,12 @@ export function SimulatorPanel() {
   const start = useMutation({
     mutationFn: async () => {
       const body: Record<string, unknown> = { useDraft: source === "draft" };
-      if (callerNumber.trim()) body.callerNumber = toE164(callerNumber);
+      if (callerNumber.trim()) {
+        const e164 = toE164(callerNumber);
+        // Say what's wrong instead of the server's generic 400 (audit lane 1 D).
+        if (!/^\+\d{10,15}$/.test(e164)) throw new Error("400: " + JSON.stringify({ message: "Enter the caller's number like (360) 555-1234 or +13605551234 — or leave it blank." }));
+        body.callerNumber = e164;
+      }
       return (await apiRequest("POST", "/api/crm/voice/simulator/session", body)).json() as Promise<SimulatorSession>;
     },
     onSuccess: (s) => {

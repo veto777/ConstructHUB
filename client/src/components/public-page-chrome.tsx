@@ -33,8 +33,18 @@ const startAtTop = () => window.scrollTo(0, 0);
  * from every Add to Cart button however far down the page it sits. Render it
  * outside the page's own `overflow-y-auto` wrapper, or it cannot stick.
  */
-export function PublicPageHeader({ next, cart = false }: { next: string; cart?: boolean }) {
-  if (!useSignedOut()) return null;
+export function PublicPageHeader({ next, cart = false, backWhenSignedIn = false }: { next: string; cart?: boolean; backWhenSignedIn?: boolean }) {
+  const signedOut = useSignedOut();
+  const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  // The free Site Scan pages render outside the platform shell: a signed-in visitor gets a way back (audit lane 6).
+  if (!signedOut && backWhenSignedIn && user) {
+    return (
+      <header className="sticky top-0 z-40 flex h-12 items-center border-b bg-background px-4" data-testid="header-signed-in-back">
+        <a href="/" className="text-sm font-medium text-primary hover:underline" data-testid="link-back-to-app">← Back to ConstructHUB</a>
+      </header>
+    );
+  }
+  if (!signedOut) return null;
   // The same ribbon as the home page (components/site-nav.tsx): Features ▾, the
   // home page's sections, sign in / get started. Pinned to the top on every page.
   return (
