@@ -5,7 +5,7 @@
  * must have an entry here — server/crm/info-content.test.ts enforces it.
  */
 import { TEXTING_PLANS, planNamesWhere } from "@shared/plan-copy";
-import { inNativeApp } from "@/lib/app-shell";
+import { inNativeApp } from "./app-shell";
 
 /** Which plans text, read from the price book (shared/plans.ts). In the iPhone
  * apps there are no plans or add-ons — the note just says what texting is. */

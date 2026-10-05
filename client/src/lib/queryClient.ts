@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
-import { inNativeApp } from "@/lib/app-shell";
+import { inNativeApp } from "./app-shell";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

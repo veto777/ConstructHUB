@@ -13,7 +13,7 @@
  * so plan answers read as neutral sentences and carry no link.
  */
 import { ADDONS, PLANS, isAddonKey, isPlanKey } from "@shared/plans";
-import { inNativeApp } from "@/lib/app-shell";
+import { inNativeApp } from "./app-shell";
 
 export type PlanPrompt = { label: string; href: string };
 

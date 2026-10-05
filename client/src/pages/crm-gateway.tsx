@@ -23,7 +23,6 @@ import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chr
 import { CRM_SEATS_LINE } from "@shared/plan-copy";
 import { StandingGator } from "@/components/mascot";
 import { BTN_LG, BTN_OUTLINE, BTN_PRIMARY, Kicker, TEXT_LINK } from "@/components/feature-landing/primitives";
-import { inNativeApp } from "@/lib/app-shell";
 
 const CRM_ACCESS_MAILTO =
   "mailto:support@constructhub.us?subject=" + encodeURIComponent("ConstructHub CRM access request");
