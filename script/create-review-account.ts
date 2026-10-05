@@ -4,6 +4,7 @@
  * and refill the sample CRM workspace if it was emptied.
  *
  *   npx tsx script/create-review-account.ts --email support+appreview@constructhub.us --password-file /path/600-file
+ *   … --plain   just the account (no access, no workspace): the throwaway the review recording deletes on camera
  *
  * Run on vb11 with the live .env. What it does:
  *   1. the account: verified email, that password, no 2FA (a reviewer can't receive a code), name "App Review";
@@ -55,6 +56,7 @@ async function main() {
   const password = readFileSync(passwordFile, "utf8").trim();
   if (password.length < 12) throw new Error("the password must be at least 12 characters");
   const hash = await bcrypt.hash(password, 12);
+  const plain = process.argv.includes("--plain");
 
   // 1. The account.
   const { rows: [existing] } = await pool.query("SELECT id FROM users WHERE lower(email)=$1", [email]);
@@ -63,13 +65,18 @@ async function main() {
     userId = existing.id;
     await pool.query(
       `UPDATE users SET password_hash=$2, email_verified=true, totp_enabled=false, totp_secret=NULL,
-              display_name='App Review', company_name='Sample Roofing Co. (demo)' WHERE id=$1`, [userId, hash]);
+              display_name='App Review', company_name=$3 WHERE id=$1`, [userId, hash, plain ? null : "Sample Roofing Co. (demo)"]);
   } else {
     const { generateAccountId } = await import("../server/auth");
     const { rows: [row] } = await pool.query(
       `INSERT INTO users(email, password_hash, email_verified, display_name, company_name, account_id)
-       VALUES ($1, $2, true, 'App Review', 'Sample Roofing Co. (demo)', $3) RETURNING id`, [email, hash, generateAccountId()]);
+       VALUES ($1, $2, true, 'App Review', $3, $4) RETURNING id`, [email, hash, plain ? null : "Sample Roofing Co. (demo)", generateAccountId()]);
     userId = row.id;
+  }
+
+  if (process.argv.includes("--plain")) {
+    console.log(JSON.stringify({ userId, email, plain: true }));
+    return;
   }
 
   // 2. Access: the Growth plan for a year, the same way an admin grants it on /admin/access.

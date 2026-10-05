@@ -6,12 +6,15 @@
  *   npx tsx scripts/asc-listing.ts check    lengths and banned words only (no network)
  *   npx tsx scripts/asc-listing.ts apply    listing text, categories, age rating, price (free), availability,
  *                                           review contact + demo account + notes, TestFlight internal group
+ *   npx tsx scripts/asc-listing.ts screenshots [app|crm]   replace each (or one) app's 6.7" iPhone set with docs/app/screenshots/<app|crm>/*.jpg
+ *                                                (1290×2796 RGB, captured from the live apps' screens as the review account)
  *
  * Rules (docs/app/APP-STORE-PLAN.md): the apps sell nothing, so no price, plan, trial, upgrade or "buy" anywhere
  * in the listing; describe only what the apps really do; one demo account, described the same everywhere.
  * App Privacy ("nutrition labels") has no API — see docs/app/APP-PRIVACY.md for the answers to enter.
  */
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
+import { createHash } from "crypto";
 import { homedir } from "os";
 import { join } from "path";
 import { asc } from "./asc";
@@ -40,6 +43,7 @@ ANSWERS TO THE STANDARD INFORMATION QUESTIONS (2.1)
 7. Regulated industry: no — business productivity tools; no health, financial, gambling or other regulated services.`;
 
 type Listing = {
+  screenshots: "app" | "crm";
   appId: string; bundleId: string; name: string; subtitle: string; promotionalText: string; description: string;
   keywords: string; supportUrl: string; marketingUrl: string; privacyPolicyUrl: string; reviewNotes: string;
   messagingAndChat: boolean;
@@ -47,19 +51,19 @@ type Listing = {
 
 export const LISTINGS: Listing[] = [
   {
-    appId: "6819417454", bundleId: "us.constructhub.app", name: "ConstructHUB: Contractor Tools",
+    screenshots: "app", appId: "6819417454", bundleId: "us.constructhub.app", name: "ConstructHUB: Contractor Tools",
     subtitle: "Permits, reviews & local leads",
-    promotionalText: "See every call your AI Call Assistant answered, get alerts when your Google Business Profile changes, and find any permit office — from the job site.",
+    promotionalText: "Get alerts when your Google Business Profile changes, answer reviews, find any permit office and check your website — right from the job site.",
     description: `ConstructHUB is the growth toolkit for construction contractors. This app opens your ConstructHUB account on iPhone, so the tools you use on the web go with you to the job site.
 
 WHAT'S IN THE APP
-• AI Call Assistant: every call your AI receptionist answered, with the caller, a summary and the recording, and each real caller filed as a lead.
 • Google Business Profile: your locations, Profile Guard alerts when your listing is edited, your reviews with AI-drafted replies, and posts and photos.
 • Ranking grid: see where your business shows up on the map across your service area.
 • Permit office directory: find the permit office and online permit portal for a city or county.
 • Property records: find the county appraiser or assessor office for a property.
 • Site Scan: check your website for speed, search and on-page problems.
 • Social media posting and website traffic protection.
+• AI Call Assistant, for businesses that use it on their phone line: every call it answered, with the caller, a summary and the recording, and each real caller filed as a lead.
 
 MADE FOR YOUR PHONE
 • Notifications for new calls, leads, reviews and profile changes. Tap one to open the exact page.
@@ -75,7 +79,7 @@ Your ConstructHUB account works the same on the web and in the app. Running jobs
 ConstructHUB: Contractor Tools opens a contractor's ConstructHUB account (constructhub.us): the AI Call Assistant dashboard, Google Business Profile tools (Profile Guard, reviews, posts), the ranking grid, the permit office directory, property records and Site Scan. ConstructHUB CRM, submitted separately by the same team, is a different product (clients, estimates, jobs, invoices) — the two apps share only the sign-in.
 
 WHAT TO TRY
-Database Directory (permit offices by city or county), Property Records, Site Scan (enter any website address), Settings → Phone tab bar, Settings → Notifications → "Turn on" (push), Settings → My account → Delete account. Google Business Profile tools show their empty state: they need the business owner's own Google account, which a reviewer can't connect.
+Database Directory (permit offices by city or county), Property Records, Site Scan (enter any website address), Settings → Phone tab bar, Settings → Notifications → "Turn on" (push), Settings → My account → Delete account. Google Business Profile tools show their empty state: they need the business owner's own Google account, which a reviewer can't connect. The AI Call Assistant answers a business's own phone line; the demo account has no phone line connected, so that screen says it isn't on this account.
 
 NATIVE FEATURES (4.2)
 Push notifications (tap opens the exact page), Sign in with Apple, Google sign-in in the system sheet, iPhone share sheet for downloaded files, camera and photo attachments, an offline screen with retry, and a customizable bottom tab bar.
@@ -83,7 +87,7 @@ Push notifications (tap opens the exact page), Sign in with Apple, Google sign-i
 ${SHARED_REVIEW}`,
   },
   {
-    appId: "6819417824", bundleId: "us.constructhub.crm", name: "ConstructHUB CRM",
+    screenshots: "crm", appId: "6819417824", bundleId: "us.constructhub.crm", name: "ConstructHUB CRM",
     subtitle: "Estimates, jobs & invoices",
     promotionalText: "Send estimates your clients sign on their phone, track every job from lead to paid, and keep your crew on the same schedule.",
     description: `ConstructHUB CRM runs the office side of a contracting business from your iPhone: clients, estimates, jobs, invoices, scheduling and your team.
@@ -136,6 +140,18 @@ export function checkListing(l: Listing): string[] {
 
 async function one(path: string) { return (await asc("GET", path)).data; }
 
+/** Territories where the app is on sale right now (read back from Apple, not assumed). */
+export async function availableTerritories(appId: string): Promise<string[]> {
+  const a = await asc("GET", `/v1/apps/${appId}/appAvailabilityV2`);
+  const on: string[] = [];
+  for (let next: string | null = `/v2/appAvailabilities/${a.data.id}/territoryAvailabilities?limit=200&include=territory`; next;) {
+    const r = await asc("GET", next);
+    for (const t of r.data) if (t.attributes.available) on.push(t.relationships.territory.data.id);
+    next = r.links?.next ? String(r.links.next).replace("https://api.appstoreconnect.apple.com", "") : null;
+  }
+  return on;
+}
+
 async function applyListing(l: Listing) {
   const say = (s: string) => console.log(`${l.bundleId}: ${s}`);
   // App-level: content rights; App Info: categories, name/subtitle/privacy URL, age rating.
@@ -175,16 +191,26 @@ async function applyListing(l: Listing) {
     included: [{ type: "appPrices", id: "${free}", attributes: { startDate: null }, relationships: { appPricePoint: { data: { type: "appPricePoints", id: free.id } } } }] });
   say("price: free");
 
-  // Availability: the United States only (a US contractor product; also no EU trader-status requirement).
-  try {
+  // Availability: the United States only (a US contractor product; also no EU trader-status requirement). Apple's v2
+  // call lists every territory, each marked available or not. Read first, never infer from an error.
+  const current = await asc("GET", `/v1/apps/${l.appId}/appAvailabilityV2`).catch((e: any) => { if (e.status === 404) return null; throw e; });
+  if (!current) {
+    const territories: string[] = [];
+    for (let next: string | null = "/v1/territories?limit=200"; next;) {
+      const r = await asc("GET", next);
+      territories.push(...r.data.map((t: any) => t.id));
+      next = r.links?.next ? String(r.links.next).replace("https://api.appstoreconnect.apple.com", "") : null;
+    }
+    if (!territories.includes("USA")) throw new Error("territory list has no USA");
     await asc("POST", "/v2/appAvailabilities", { data: { type: "appAvailabilities", attributes: { availableInNewTerritories: false }, relationships: {
-        app: { data: { type: "apps", id: l.appId } }, territoryAvailabilities: { data: [{ type: "territoryAvailabilities", id: "${usa}" }] } } },
-      included: [{ type: "territoryAvailabilities", id: "${usa}", attributes: { available: true }, relationships: { territory: { data: { type: "territories", id: "USA" } } } }] });
-    say("availability: United States");
-  } catch (e: any) {
-    if (e.status !== 409) throw e;
-    say("availability already set (unchanged)");
+        app: { data: { type: "apps", id: l.appId } },
+        territoryAvailabilities: { data: territories.map((t) => ({ type: "territoryAvailabilities", id: `\${${t}}` })) } } },
+      included: territories.map((t) => ({ type: "territoryAvailabilities", id: `\${${t}}`, attributes: { available: t === "USA" },
+        relationships: { territory: { data: { type: "territories", id: t } } } })) });
   }
+  const live = await availableTerritories(l.appId);
+  if (live.length !== 1 || live[0] !== "USA") throw new Error(`availability is ${live.join(",") || "nowhere"} — expected USA only; fix it before submitting`);
+  say("availability: United States only (checked)");
 
   // Review details: contact, the one demo account, the notes.
   const demo = JSON.parse(readFileSync(join(homedir(), ".constructhub-keys", "review-demo.json"), "utf8"));
@@ -205,12 +231,47 @@ async function applyListing(l: Listing) {
   return { versionId: version.id, groupId: group.id };
 }
 
+/** Replace the version's 6.7" iPhone screenshot set with the files in docs/app/screenshots/<dir>, in name order. */
+async function uploadScreenshots(l: Listing) {
+  const dir = join(process.cwd(), "docs", "app", "screenshots", l.screenshots);
+  const files = readdirSync(dir).filter((f) => /\.(jpe?g|png)$/i.test(f)).sort();
+  if (!files.length || files.length > 10) throw new Error(`${dir}: need 1–10 screenshots, found ${files.length}`);
+  const [version] = await one(`/v1/apps/${l.appId}/appStoreVersions?filter[platform]=IOS&limit=1`);
+  const [vLoc] = await one(`/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`);
+  const sets = await one(`/v1/appStoreVersionLocalizations/${vLoc.id}/appScreenshotSets`);
+  for (const old of sets.filter((x: any) => x.attributes.screenshotDisplayType === "APP_IPHONE_67")) await asc("DELETE", `/v1/appScreenshotSets/${old.id}`);
+  const set = (await asc("POST", "/v1/appScreenshotSets", { data: { type: "appScreenshotSets", attributes: { screenshotDisplayType: "APP_IPHONE_67" },
+    relationships: { appStoreVersionLocalization: { data: { type: "appStoreVersionLocalizations", id: vLoc.id } } } } })).data;
+  for (const f of files) {
+    const bytes = readFileSync(join(dir, f));
+    const shot = (await asc("POST", "/v1/appScreenshots", { data: { type: "appScreenshots", attributes: { fileName: f, fileSize: bytes.length },
+      relationships: { appScreenshotSet: { data: { type: "appScreenshotSets", id: set.id } } } } })).data;
+    for (const op of shot.attributes.uploadOperations) {
+      const res = await fetch(op.url, { method: op.method, headers: Object.fromEntries(op.requestHeaders.map((h: any) => [h.name, h.value])),
+        body: bytes.subarray(op.offset, op.offset + op.length) });
+      if (!res.ok) throw new Error(`${f}: upload part ${res.status}`);
+    }
+    await asc("PATCH", `/v1/appScreenshots/${shot.id}`, { data: { type: "appScreenshots", id: shot.id,
+      attributes: { uploaded: true, sourceFileChecksum: createHash("md5").update(bytes).digest("hex") } } });
+  }
+  // Apple processes each image; wait until every one is COMPLETE (or report the failure).
+  for (let i = 0; i < 150; i++) {
+    const shots = await one(`/v1/appScreenshotSets/${set.id}/appScreenshots`);
+    const states = shots.map((x: any) => x.attributes.assetDeliveryState?.state);
+    if (states.some((st: string) => st === "FAILED")) throw new Error(`${l.bundleId}: screenshot processing failed: ${JSON.stringify(shots.map((x: any) => x.attributes.assetDeliveryState))}`);
+    if (states.length === files.length && states.every((st: string) => st === "COMPLETE")) { console.log(`${l.bundleId}: ${files.length} screenshots COMPLETE`); return; }
+    await new Promise((r) => setTimeout(r, 4000));
+  }
+  throw new Error(`${l.bundleId}: screenshots still processing after 10 minutes`);
+}
+
 async function main() {
   const cmd = process.argv[2];
   const problems = LISTINGS.flatMap(checkListing);
   if (problems.length) { console.error(problems.join("\n")); process.exit(1); }
   if (cmd === "check") { console.log("listing OK:", LISTINGS.map((l) => `${l.name} (${l.description.length}/4000, notes ${l.reviewNotes.length}/4000)`).join("; ")); return; }
   if (cmd === "apply") { for (const l of LISTINGS) await applyListing(l); return; }
-  console.log("usage: check | apply");
+  if (cmd === "screenshots") { for (const l of LISTINGS.filter((x) => !process.argv[3] || x.screenshots === process.argv[3])) await uploadScreenshots(l); return; }
+  console.log("usage: check | apply | screenshots");
 }
 if (process.argv[1]?.endsWith("asc-listing.ts")) main().catch((e) => { console.error(e.message); process.exit(1); });
