@@ -343,6 +343,12 @@ export async function registerRoutes(
   // and the integrations status. ensureAccountSchema() ran above.
   const { registerBillingRoutes } = await import("./account/billing-routes");
   registerBillingRoutes(app, getDevUser);
+  // Self-serve account deletion — iPhone apps only (App Store 5.1.1(v)); the website keeps the support request.
+  const { ensureAccountDeletionSchema, registerAccountDeletionRoutes } = await import("./account/delete");
+  await ensureAccountDeletionSchema();
+  registerAccountDeletionRoutes(app, getDevUser);
+  // Step 2: erase closed accounts after 30 days (production, ACCOUNT_ERASE_WORKER_ENABLED=true).
+  (await import("./account/erase")).startAccountEraseWorker();
   const { registerApiKeyRoutes } = await import("./account/api-key-routes");
   registerApiKeyRoutes(app, getDevUser, await import("./account/api-keys"));
   const { registerIntegrationsRoute } = await import("./account/integrations-route");

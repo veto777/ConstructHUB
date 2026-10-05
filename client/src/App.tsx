@@ -104,6 +104,7 @@ const CrmPipelinePage = lazy(() => import("@/pages/crm-pipeline"));
 const CrmPriceBookPage = lazy(() => import("@/pages/crm-pricebook"));
 const CrmProjectPage = lazy(() => import("@/pages/crm-project"));
 const CrmSettingsPage = lazy(() => import("@/pages/crm-settings"));
+const AccountDeletePage = lazy(() => import("@/pages/account-delete"));
 const CrmIntegrationsPage = lazy(() => import("@/pages/crm-integrations"));
 const CrmReportsPage = lazy(() => import("@/pages/crm-reports"));
 const CrmMigratePage = lazy(() => import("@/pages/crm-migrate"));
@@ -236,6 +237,7 @@ function DashboardRouter() {
       <Route path="/settings/api" component={SettingsApiRedirect} />
       <Route path="/developers" component={DevelopersPage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/account/delete" component={AccountDeletePage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
@@ -412,6 +414,7 @@ function PortalRouter() {
       <Route path="/crm/payments" component={CrmPaymentsPage} />
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/settings" component={CrmSettingsPage} />
+      <Route path="/account/delete" component={AccountDeletePage} />
       <Route path="/crm/integrations" component={CrmIntegrationsPage} />
       <Route path="/crm/reports" component={CrmReportsPage} />
       <Route path="/crm/migrate" component={CrmMigratePage} />

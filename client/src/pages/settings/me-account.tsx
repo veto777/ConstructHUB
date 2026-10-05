@@ -1,3 +1,5 @@
+import { Link as RouteLink } from "wouter";
+import { inNativeApp } from "@/lib/app-shell";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -655,12 +657,20 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
             <div className="min-w-0">
               <p className="text-sm font-medium">Delete account</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Ask our support team to permanently delete your account and its data.
+                {inNativeApp() ? "Permanently delete your account and its data." : "Ask our support team to permanently delete your account and its data."}
               </p>
             </div>
-            <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)} data-testid="button-delete-account">
-              <Trash2 className="h-4 w-4 mr-2" /> Request deletion
-            </Button>
+            {/* The iPhone apps delete the account themselves (App Store 5.1.1(v)); the website keeps the support
+                request (owner, 2026-10-04: "just dont delete in the original site/mobile"). */}
+            {inNativeApp() ? (
+              <Button asChild variant="destructive" size="sm" data-testid="button-delete-account">
+                <RouteLink href="/account/delete"><Trash2 className="h-4 w-4 mr-2" /> Delete account</RouteLink>
+              </Button>
+            ) : (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmDelete(true)} data-testid="button-delete-account">
+                <Trash2 className="h-4 w-4 mr-2" /> Request deletion
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

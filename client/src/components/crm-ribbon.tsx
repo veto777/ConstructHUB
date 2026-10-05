@@ -2,11 +2,12 @@ import { useState } from "react";
 import {
   LayoutDashboard, CalendarDays, Inbox, Users, MoreHorizontal,
   KanbanSquare, BookOpen, CreditCard, Building2, Settings, Sun, Moon,
-  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone, LayoutGrid, ArrowUpRight,
+  ShieldCheck, FileText, FilePlus2, ReceiptText, Blocks, Plus, ChevronRight, Phone, LayoutGrid, ArrowUpRight, Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -191,6 +192,14 @@ export function CrmRibbon() {
                 <InfoTip k={l.infoKey} className="h-11 w-11 my-0 mx-0" />
               </div>
             ))}
+            {/* iPhone app only: self-serve account deletion (App Store 5.1.1(v); the website keeps the support request). */}
+            {inNativeApp() && (
+              <Link href="/account/delete" onClick={() => setMoreOpen(false)} data-testid="ribbon-more-delete-account"
+                className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-destructive hover:bg-accent transition-colors">
+                <Trash2 className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                Delete account
+              </Link>
+            )}
             {/* Back to the platform and every other ConstructHUB tool (another host: a full navigation). */}
             <a href={marketingUrl("/")} data-testid="ribbon-more-platform"
               className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-foreground hover:bg-accent transition-colors">
