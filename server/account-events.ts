@@ -1,7 +1,7 @@
 /**
  * Growth-platform (non-CRM) user notifications and the account activity log.
  *
- *   notifyUser(userId, kind, msg)  — in-app row + optional email, per the user's per-kind preferences
+ *   notifyUser(userId, kind, msg)  — in-app row (+ iPhone push) + optional email, per the user's per-kind preferences
  *   logActivity(req|null, userId, kind, detail) — who / when / from where, for the Activity log
  *
  * Every emitted kind belongs to the shared registry; KIND_DEFAULTS supplies channels until
@@ -10,6 +10,7 @@
 import type { Express } from "express";
 import { pool } from "./db";
 import { sendWithFallback } from "./email";
+import { pushSoon } from "./apns";
 
 import { NOTIFICATION_KINDS, type NotificationDefaults, type NotificationKind } from "./notification-kinds";
 export const KIND_DEFAULTS: Record<NotificationKind, NotificationDefaults> = NOTIFICATION_KINDS;
@@ -53,6 +54,8 @@ export async function notifyUser(userId: number, kind: NotificationKind,
   if (ch.inApp) {
     await pool.query("INSERT INTO user_notifications(user_id,kind,title,body,link,severity) VALUES($1,$2,$3,$4,$5,$6)",
       [userId, kind, msg.title, msg.body ?? null, msg.link ?? null, msg.severity ?? "info"]);
+    // The bell's twin on the iPhone app (when the user turned notifications on there): same switch, same link.
+    pushSoon(userId, "platform", { title: msg.title, body: msg.body, link: msg.link });
   }
   if (ch.email) {
     const { rows: [u] } = await pool.query("SELECT email FROM users WHERE id=$1", [userId]);

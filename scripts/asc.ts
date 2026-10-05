@@ -8,6 +8,8 @@
  *   ensure-bundle-ids      register us.constructhub.app / us.constructhub.crm (idempotent)
  *   ensure-signing         ConstructHUB's own Apple Distribution certificate (key made here) + an App Store
  *                          profile per app → ~/.constructhub-keys/ios-signing (idempotent; reuses what exists)
+ *   ensure-push            push notifications on for both bundle IDs, then remake any App Store profile that lacks
+ *                          the aps-environment entitlement (copy the new .mobileprovision files to vb11 keys/ios after)
  *   get <path>             GET any /v1 path and print the JSON (e.g. "get /v1/apps?limit=5")
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync } from "fs";
@@ -42,6 +44,24 @@ export async function asc(method: string, path: string, body?: unknown): Promise
   return json;
 }
 
+const SIGNING_DIR = join(homedir(), ".constructhub-keys", "ios-signing");
+
+async function bundleId(identifier: string) {
+  const ids = await asc("GET", `/v1/bundleIds?filter[identifier]=${identifier}`);
+  return ids.data.find((x: any) => x.attributes.identifier === identifier);
+}
+
+/** A fresh App Store profile for one app, tied to ConstructHUB's distribution certificate; recorded in state. */
+async function makeProfile(b: { identifier: string; name: string }, state: any) {
+  const bundle = await bundleId(b.identifier);
+  const name = `${b.name} App Store`;
+  const r = await asc("POST", "/v1/profiles", { data: { type: "profiles", attributes: { name, profileType: "IOS_APP_STORE" },
+    relationships: { bundleId: { data: { type: "bundleIds", id: bundle.id } }, certificates: { data: [{ type: "certificates", id: state.certificateId }] } } } });
+  writeFileSync(join(SIGNING_DIR, `${b.identifier}.mobileprovision`), Buffer.from(r.data.attributes.profileContent, "base64"), { mode: 0o600 });
+  state.profiles[b.identifier] = { name, uuid: r.data.attributes.uuid, id: r.data.id };
+  console.log(`${b.identifier}: profile "${name}" created`);
+}
+
 async function main() {
   const [cmd, arg] = process.argv.slice(2);
   if (cmd === "whoami") {
@@ -58,7 +78,7 @@ async function main() {
       console.log(`${b.identifier}: registered #${r.data.id}`);
     }
   } else if (cmd === "ensure-signing") {
-    const dir = join(homedir(), ".constructhub-keys", "ios-signing");
+    const dir = SIGNING_DIR;
     mkdirSync(dir, { recursive: true, mode: 0o700 }); chmodSync(dir, 0o700);
     const state = existsSync(join(dir, "signing.json")) ? JSON.parse(readFileSync(join(dir, "signing.json"), "utf8")) : { profiles: {} };
     // 1. The certificate: a private key generated here; Apple signs the CSR.
@@ -81,20 +101,32 @@ async function main() {
     // 2. An App Store profile per app, tied to that certificate.
     for (const b of BUNDLES) {
       if (state.profiles[b.identifier]) { console.log(`${b.identifier}: profile exists`); continue; }
-      const ids = await asc("GET", `/v1/bundleIds?filter[identifier]=${b.identifier}`);
-      const bundle = ids.data.find((x: any) => x.attributes.identifier === b.identifier);
-      const name = `${b.name} App Store`;
-      const r = await asc("POST", "/v1/profiles", { data: { type: "profiles", attributes: { name, profileType: "IOS_APP_STORE" },
-        relationships: { bundleId: { data: { type: "bundleIds", id: bundle.id } }, certificates: { data: [{ type: "certificates", id: state.certificateId }] } } } });
-      writeFileSync(join(dir, `${b.identifier}.mobileprovision`), Buffer.from(r.data.attributes.profileContent, "base64"), { mode: 0o600 });
-      state.profiles[b.identifier] = { name, uuid: r.data.attributes.uuid, id: r.data.id };
-      console.log(`${b.identifier}: profile "${name}" created`);
+      await makeProfile(b, state);
     }
     writeFileSync(join(dir, "signing.json"), JSON.stringify(state, null, 1), { mode: 0o600 });
+  } else if (cmd === "ensure-push") {
+    const state = JSON.parse(readFileSync(join(SIGNING_DIR, "signing.json"), "utf8"));
+    for (const b of BUNDLES) {
+      const bundle = await bundleId(b.identifier);
+      const caps = await asc("GET", `/v1/bundleIds/${bundle.id}/bundleIdCapabilities`);
+      if (caps.data.some((c: any) => c.attributes.capabilityType === "PUSH_NOTIFICATIONS")) console.log(`${b.identifier}: push already on`);
+      else {
+        await asc("POST", "/v1/bundleIdCapabilities", { data: { type: "bundleIdCapabilities", attributes: { capabilityType: "PUSH_NOTIFICATIONS" },
+          relationships: { bundleId: { data: { type: "bundleIds", id: bundle.id } } } } });
+        console.log(`${b.identifier}: push turned on`);
+      }
+      // A profile made before the capability carries no aps-environment; Apple won't let a pushing build use it.
+      const file = join(SIGNING_DIR, `${b.identifier}.mobileprovision`);
+      if (existsSync(file) && readFileSync(file).includes("aps-environment")) { console.log(`${b.identifier}: profile has push`); continue; }
+      const old = state.profiles[b.identifier];
+      if (old?.id) await asc("DELETE", `/v1/profiles/${old.id}`).catch((e) => { if (e.status !== 404) throw e; });
+      await makeProfile(b, state);
+    }
+    writeFileSync(join(SIGNING_DIR, "signing.json"), JSON.stringify(state, null, 1), { mode: 0o600 });
   } else if (cmd === "get" && arg) {
     console.log(JSON.stringify(await asc("GET", arg), null, 1).slice(0, 4000));
   } else {
-    console.log("usage: whoami | ensure-bundle-ids | get <path>");
+    console.log("usage: whoami | ensure-bundle-ids | ensure-signing | ensure-push | get <path>");
   }
 }
 if (process.argv[1]?.endsWith("asc.ts")) main().catch((e) => { console.error(e.message); process.exit(1); });

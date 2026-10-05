@@ -7,7 +7,7 @@ Two free companion apps for existing ConstructHUB customers. The apps sell nothi
 | ConstructHUB | `us.constructhub.app` | `https://constructhub.us/` | `ConstructHUBApp/1.0` |
 | ConstructHUB CRM | `us.constructhub.crm` | `https://portal.constructhub.us/` | `ConstructHUBCRM/1.0` |
 
-Shared SwiftUI/UIKit implementation in `Shared/`; each target's Info.plist supplies `CHStartURL`, `CHUserAgentToken`, `CHAppKind` and `CHPushEnabled`. Version 1.0, build 1, iPhone only, minimum iOS 16, build with Xcode 26 / iOS 26 SDK. No third-party runtime dependencies. Swift 5 language mode intentionally avoids adopting Swift 6 strict concurrency while using Xcode 26's SDK signatures.
+Shared SwiftUI/UIKit implementation in `Shared/`; each target's Info.plist supplies `CHStartURL`, `CHUserAgentToken`, `CHAppKind` and `CHPushEnabled`. Icons: `scripts/generate-icons.py` (navy + orange CHUB for ConstructHUB; orange with "CRM" for the CRM). Version 1.0, build 1, iPhone only, minimum iOS 16, build with Xcode 26 / iOS 26 SDK. No third-party runtime dependencies. Swift 5 language mode intentionally avoids adopting Swift 6 strict concurrency while using Xcode 26's SDK signatures.
 
 ## Generate and build on a Mac
 
@@ -57,16 +57,13 @@ window.webkit?.messageHandlers.ch.postMessage({ type: 'haptic' });
 
 `enablePush` asks for notification authorization only after that message. The page should send it following an intentional user action and explain the benefit. `share` accepts an HTTP(S) URL and optional title. `haptic` produces a light impact. Unknown types, untrusted origins and subframes are ignored. Messages are fire-and-forget; no promise/response protocol is exposed.
 
-Push is **off by default** (`CH_PUSH_ENABLED=NO`, no signing entitlements attached). To switch it on after provisioning, set both target build settings:
+Push is **on** (`CH_PUSH_ENABLED=YES`, `CODE_SIGN_ENTITLEMENTS=Shared/Push.entitlements`). Push Notifications is enabled on both Apple app identifiers and the App Store profiles carry `aps-environment=production` (`npx tsx scripts/asc.ts ensure-push`, 2026-10-05). The entitlement reads `$(APS_ENVIRONMENT)`: `development` for Debug, `production` for Release. No silent/background push capability is needed for alert notifications.
 
-```text
-CH_PUSH_ENABLED = YES
-CODE_SIGN_ENTITLEMENTS = Shared/Push.entitlements
-```
+The page sends `enablePush` from Settings → Notifications ("Notifications on this iPhone", `client/src/components/app-push-card.tsx`), shown only inside the app. On later launches the app registers again by itself when notifications are already allowed, so a changed device token reaches the server.
 
-Enable Push Notifications for both Apple app identifiers/profiles. `Push.entitlements` currently specifies `aps-environment=development`; change to `production` with distribution provisioning before TestFlight/App Store. No silent/background push capability is needed for alert notifications.
+After APNs registration, the page runs a credentialed same-origin POST to `/api/app/push-token` with JSON `{token, app: "platform" | "crm", platform: "ios"}`. This uses the current allowed HTTPS page's session cookies without reading them in native code. Registration is idempotent and bound to the signed-in account and session (`server/app-push.ts`); a signed-out or expired session receives nothing. Unsuccessful sends retry on the next completed navigation or enable request. The token remains only in process memory. Tapped notifications containing an allowed HTTP(S) `userInfo.url` open that page, including cold launch; external URLs are ignored. Banners also show while the app is open.
 
-After APNs registration, the page runs a credentialed same-origin POST to `/api/app/push-token` with JSON `{token, app: "platform" | "crm", platform: "ios"}`. This uses the current allowed HTTPS page's session cookies without reading them in native code. The server should make registration idempotent and bind it to the signed-in account; unsuccessful sends retry on the next completed navigation or enable request. The token remains only in process memory. Tapped notifications containing an allowed HTTP(S) `userInfo.url` open that page, including cold launch; external URLs are ignored. Delivery and account-switch/logout token ownership remain server responsibilities. Foreground banners use the system default (no custom presentation override).
+Delivery: `server/apns.ts` (team APNs key, HTTP/2 to `api.push.apple.com`, topic = bundle ID). Every in-app alert pushes too: the site's bell (`notifyUser`) → ConstructHUB; CRM alerts (`notifyMembers`) → ConstructHUB CRM, except Call Assistant alerts, which open `/call-assistant` in ConstructHUB. Tokens Apple reports dead are deleted. Off unless `APNS_KEY_FILE`, `APNS_KEY_ID`, `APNS_TEAM_ID` are set on the server.
 
 ## CI and compilation evidence
 
@@ -80,6 +77,6 @@ The built-in `GITHUB_TOKEN` needs `contents: write`; branch protection must perm
 
 - Successful Xcode 26 CI builds; real-device TestFlight coverage for both apps on minimum and current iOS: session persistence, safe areas/keyboard/rotation, offline recovery, OAuth login and all account connections, cancellation, camera/photo/video attachments, authenticated PDF/audio/blob downloads, external and blank-target links, and warm/cold push taps.
 - ConstructHUB-specific signing, App Store Connect app records/API key, distribution profiles, final icons, screenshots, availability and privacy labels/review notes/demo accounts/recording.
-- Server OAuth start/exchange integration and push registration/delivery; enable push capability and test APNs on devices.
+- Test push delivery and taps on real devices (TestFlight).
 - Share extension (not implemented); optional Face ID reopen (not implemented).
 - Web-side App Store requirements from the plan: no sales UI or trackers, Sign in with Apple when Google is offered, AI consent and real account deletion. The native shell is not proof those web requirements are complete.

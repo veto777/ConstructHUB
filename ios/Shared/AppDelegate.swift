@@ -21,6 +21,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Already allowed on an earlier launch: register again so a changed device token reaches the server.
+        if AppConfiguration.current.pushEnabled {
+            UNUserNotificationCenter.current().getNotificationSettings { settings in
+                guard [.authorized, .provisional].contains(settings.authorizationStatus) else { return }
+                DispatchQueue.main.async { UIApplication.shared.registerForRemoteNotifications() }
+            }
+        }
         return true
     }
 
@@ -31,6 +38,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         AppEvents.shared.browser?.showMessage("Notifications unavailable", "Please try enabling notifications again later.")
+    }
+
+    // Show the banner even while the app is open (the in-app bell updates on its own).
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping @Sendable (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .list, .sound])
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,

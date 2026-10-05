@@ -2,7 +2,7 @@
  * In-app notifications — the bell at the top of the CRM, fed by the same
  * events that already email (and sometimes text) the owner. One row per
  * recipient member; the per-pref channel matrix in Settings decides which
- * channels fire (in-app / email / sms). Everything here is best-effort: a
+ * channels fire (in-app / email / sms). In-app also pushes to the member's iPhone app (server/apns.ts). Everything here is best-effort: a
  * notification insert must never break the action that caused it.
  */
 import type { Express } from "express";
@@ -15,6 +15,7 @@ import {
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { requireOrg } from "./tenancy";
 import { sendSms, normalizePhone, resolveSmsSender } from "./sms";
+import { appForLink, pushSoon } from "../apns";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -61,6 +62,11 @@ export async function notifyMembers(args: {
         body: args.body ? String(args.body).slice(0, 1000) : null,
         link: args.link ?? null,
       }))).catch((e: any) => console.error("[crm] notification insert failed:", e?.message || e));
+      // Same alert on each recipient's iPhone (if they turned notifications on): CRM pages → the CRM app,
+      // Call Assistant pages → the ConstructHUB app.
+      for (const m of recipients) {
+        if (m.userId) pushSoon(m.userId, appForLink(args.link), { title: `${org.name}: ${args.title}`, body: args.body, link: args.link });
+      }
     }
 
     if (!args.smsHandled && crmNotificationChannel(org.customFields, pref, "sms") && resolveSmsSender(org.customFields)) {

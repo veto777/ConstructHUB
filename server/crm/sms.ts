@@ -42,6 +42,7 @@ import { reserveQuotaFor, refundReservation, monthKey, type LimitReachedBody, ty
 import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
 import { smsSegments } from "./sms-segments";
+import { pushSoon } from "../apns";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -558,6 +559,9 @@ export async function maybeAlertReengagement(args: {
       title: `${cust.displayName} is reviewing ${estLabel}${total ? ` (${total})` : ""} again — good time to call`,
       link: `/crm/clients/${cust.id}`,
     }))).catch((e: any) => console.error("[crm] reengagement notification failed:", e?.message || e));
+    for (const m of targets) {
+      if (m.userId) pushSoon(m.userId, "crm", { title: `${cust.displayName} is reviewing ${estLabel} again — good time to call`, link: `/crm/clients/${cust.id}` });
+    }
   }
 
   // Mark AFTER the sends so a crashed alert can retry on the next open; the

@@ -19,6 +19,7 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { apiIssueMessage } from "@/lib/api-issue-message";
 import { marketingUrl } from "@/lib/site";
 import { inNativeApp } from "@/lib/app-shell";
+import { AppPushCard } from "@/components/app-push-card";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
@@ -1233,6 +1234,7 @@ export default function CrmSettingsPage() {
           />
         </CardHeader>
         <CardContent>
+          <div className="mb-4 empty:hidden"><AppPushCard /></div>
           {/* Sticky so the channel names stay on screen while scrolling the
               14 rows — on a phone the header otherwise scrolls away and
               leaves three unlabeled switches per row. */}
