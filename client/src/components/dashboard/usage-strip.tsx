@@ -20,25 +20,37 @@ export function UsageStrip({ usage }: { usage: DashboardUsage[] }) {
         // A standing count can sit above the plan's limit (sites added before a downgrade): say so, never "All in use".
         const countState = u.used > u.limit ? (inNativeApp() ? "Over the limit" : "Over your plan's limit") : "All in use";
         const state = raw === "bad" ? (u.period === "count" ? countState : "Limit reached") : raw === "warn" ? "Almost at the limit" : null;
+        // The iPhone apps sell nothing (App Store 3.1.3(f)): a meter that would open the
+        // hidden Billing / Limits / API settings sections is not a link in the app.
+        const meter = (
+          <>
+            <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2 2xl:flex-col 2xl:items-start 2xl:gap-0.5">
+              <span className="truncate text-xs text-muted-foreground group-hover:text-foreground">{u.label}</span>
+              <span className={`shrink-0 text-xs font-semibold tabular-nums ${toneText(tone)}`}>{amount}</span>
+            </span>
+            <Progress
+              value={unlimited ? 100 : pct}
+              className={`mt-1.5 h-1.5 ${unlimited ? "[&>div]:bg-muted-foreground/25" : toneBar(tone)}`}
+              aria-label={`${u.label}: ${amount}${u.period === "monthly" ? " this month" : ""}${state ? `, ${state.toLowerCase()}` : ""}`}
+            />
+            {state && <span className={`mt-1 block text-[11px] font-medium ${toneText(tone)}`}>{state}</span>}
+          </>
+        );
+        const billingHref = /\/settings\?tab=(billing|limits|api-)/.test(u.href);
         return (
           <li key={u.key} className="min-w-0" data-testid={`usage-${u.key}`} data-tone={tone}>
-            <DashLink
-              href={u.href}
-              surface={usageSurface(u)}
-              className={`group block rounded-md py-1 ${FOCUS_RING}`}
-              data-testid={`link-usage-${u.key}`}
-            >
-              <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-2 2xl:flex-col 2xl:items-start 2xl:gap-0.5">
-                <span className="truncate text-xs text-muted-foreground group-hover:text-foreground">{u.label}</span>
-                <span className={`shrink-0 text-xs font-semibold tabular-nums ${toneText(tone)}`}>{amount}</span>
-              </span>
-              <Progress
-                value={unlimited ? 100 : pct}
-                className={`mt-1.5 h-1.5 ${unlimited ? "[&>div]:bg-muted-foreground/25" : toneBar(tone)}`}
-                aria-label={`${u.label}: ${amount}${u.period === "monthly" ? " this month" : ""}${state ? `, ${state.toLowerCase()}` : ""}`}
-              />
-              {state && <span className={`mt-1 block text-[11px] font-medium ${toneText(tone)}`}>{state}</span>}
-            </DashLink>
+            {inNativeApp() && billingHref ? (
+              <div className="block rounded-md py-1" data-testid={`link-usage-${u.key}`}>{meter}</div>
+            ) : (
+              <DashLink
+                href={u.href}
+                surface={usageSurface(u)}
+                className={`group block rounded-md py-1 ${FOCUS_RING}`}
+                data-testid={`link-usage-${u.key}`}
+              >
+                {meter}
+              </DashLink>
+            )}
           </li>
         );
       })}
