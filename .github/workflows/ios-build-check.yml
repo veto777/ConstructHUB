@@ -1,0 +1,70 @@
+name: iOS build check
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest Xcode 26
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob, re, subprocess, sys
+          candidates = glob.glob('/Applications/Xcode_26*.app')
+          print('Installed Xcode 26 candidates:', candidates, flush=True)
+          if not candidates:
+              sys.exit('ERROR: No Xcode 26 installation found on this macos-15 runner.')
+          def version(path):
+              return tuple(map(int, re.findall(r'\d+', path)))
+          selected = max(candidates, key=version)
+          subprocess.run(['sudo', 'xcode-select', '-s', selected + '/Contents/Developer'], check=True)
+          subprocess.run(['xcodebuild', '-version'], check=True)
+          subprocess.run(['xcodebuild', '-showsdks'], check=True)
+          PY
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build both simulator schemes
+        id: builds
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ios-build-check"
+          failed=0
+          for scheme in 'ConstructHUB' 'ConstructHUB CRM'; do
+            key="${scheme// /-}"
+            if xcodebuild -project ios/ConstructHUB.xcodeproj -scheme "$scheme" \
+              -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+              CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/ios-build-check/$key.log" 2>&1; then
+              echo PASS > "$RUNNER_TEMP/ios-build-check/$key.status"
+            else
+              echo FAIL > "$RUNNER_TEMP/ios-build-check/$key.status"
+              failed=1
+            fi
+            tail -n 60 "$RUNNER_TEMP/ios-build-check/$key.log"
+          done
+          exit "$failed"
+      - name: Write and commit build result to ios-results
+        if: always()
+        shell: bash
+        env:
+          BUILD_STEP_OUTCOME: ${{ steps.builds.outcome }}
+        run: |
+          python3 ios/scripts/build-report.py
+          bash ios/scripts/publish-result.sh
+      - name: Upload build logs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-check-${{ github.sha }}
+          path: ${{ runner.temp }}/ios-build-check/
+          if-no-files-found: warn
