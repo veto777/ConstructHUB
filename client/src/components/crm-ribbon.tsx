@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
+import { AppPushCard } from "@/components/app-push-card";
 import { inNativeApp } from "@/lib/app-shell";
 import { CRM_TAB_DEFAULT, CRM_TAB_OPTIONS, resolveTabs, type TabOption } from "@shared/tab-bar";
 import { CRM_TAB_ICONS, activeTabKey, useSaveTabPrefs, useTabPrefs } from "@/lib/tab-prefs";
@@ -204,6 +205,8 @@ export function CrmRibbon() {
               <SlidersHorizontal className="h-5 w-5 shrink-0" strokeWidth={1.8} />
               Customize the bar
             </button>
+            {/* iPhone app only: phone notifications for every member (CRM Settings is owner/admin-only), then account deletion. */}
+            <AppPushCard />
             {/* iPhone app only: self-serve account deletion (App Store 5.1.1(v); the website keeps the support request). */}
             {inNativeApp() && (
               <Link href="/account/delete" onClick={() => setMoreOpen(false)} data-testid="ribbon-more-delete-account"

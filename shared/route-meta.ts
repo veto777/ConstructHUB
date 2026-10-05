@@ -80,6 +80,11 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
     description:
       "How ConstructHUB collects, uses, discloses and safeguards your information when you visit constructhub.us or use our services.",
   },
+  "/support": {
+    title: "Support | ConstructHUB",
+    description:
+      "How to contact ConstructHUB support, sign in, turn on iPhone notifications and delete your account in the ConstructHUB iPhone apps.",
+  },
   "/terms": {
     title: "Terms of Use | ConstructHUB",
     description:

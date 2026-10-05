@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
       pageTestId="page-privacy-policy"
       title="Privacy Policy"
       titleTestId="heading-privacy-policy"
-      date="Effective Date: September 30, 2026"
+      date="Effective Date: September 30, 2026 · Last updated: October 5, 2026"
       dateTestId="text-effective-date"
       footer={copyrightNotice()}
     >
@@ -60,6 +60,26 @@ export default function PrivacyPolicyPage() {
           <h3 className="text-lg font-medium mt-4 mb-2">1.3 Cookies and Tracking Technologies</h3>
           <p className="mb-3">
             We use cookies, local storage, and similar tracking technologies to maintain your session, remember your preferences, and analyze usage patterns. You may disable cookies through your browser settings, but some features of the platform may not function properly without them.
+          </p>
+        
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-iphone-apps">1.4 The ConstructHUB iPhone Apps</h3>
+          <p className="mb-3">
+            The ConstructHUB and ConstructHUB CRM apps for iPhone use the same account and the same data as the website. In addition:
+          </p>
+          <ul className="list-disc pl-6 space-y-1 mb-4">
+            <li><strong>Sign in with Apple</strong>: if you choose it, Apple gives us a stable account identifier, your name (the first time only) and an email address, which can be an Apple private relay address if you choose to hide your email.</li>
+            <li><strong>Notifications</strong>: if you turn them on, we store your iPhone's push token so Apple's push service can deliver your account's alerts. Signing out stops them.</li>
+            <li><strong>Camera and photos</strong>: used only when you choose to take or attach a photo or video, which is then uploaded to your account.</li>
+            <li>The apps show no ads, include no analytics or advertising SDKs, and do not track you across other companies' apps or websites.</li>
+            <li><strong>Deleting your account</strong>: in ConstructHUB, open Settings → My account → Delete account; in ConstructHUB CRM, open More → Delete account. Billing is cancelled, you are signed out everywhere, any Sign in with Apple grant is revoked, and your data is erased within 30 days (payment records are kept as described in Data Retention).</li>
+          </ul>
+
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-call-assistant-data">1.5 AI Features and the AI Call Assistant</h3>
+          <p className="mb-3">
+            ConstructHUB's AI features (the Hub assistant, AI review replies, content writing, Site Scan summaries) and the AI Call Assistant run on ConstructHUB's own servers. Your prompts, documents, call audio and transcripts are not sent to an outside AI company.
+          </p>
+          <p className="mb-3">
+            When the AI Call Assistant answers your business line, we process the caller's phone number, the call audio, a recording, the transcript and a summary to answer the call and file the caller as a lead in your CRM. Calls and texts are carried by our telephone provider, SignalWire. Recordings and transcripts are kept with your account until you delete them or your account is erased.
           </p>
         </section>
 
@@ -191,8 +211,14 @@ export default function PrivacyPolicyPage() {
               <strong>Google Business Profile API</strong> — Used, with your authorization, to access and manage your own Google Business Profile (listing details, reviews, performance insights, and media). Our use of this data adheres to the Google API Services User Data Policy, including the Limited Use requirements (see Section 4).
             </li>
             <li>
-              <strong>OpenAI</strong> — Used for AI-powered features including the site assistant, ads consultant, and content generation. Conversations and prompts may be sent to OpenAI for processing. See{" "}
-              <a href="https://openai.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenAI's Privacy Policy</a>.
+              <strong>AI processing</strong> — AI features and the AI Call Assistant run on ConstructHUB's own servers; prompts, documents, call audio and transcripts are not sent to an outside AI company.
+            </li>
+            <li>
+              <strong>Apple</strong> — Sign in with Apple (when you choose it) and the Apple Push Notification service (when you turn on notifications in an iPhone app). See{" "}
+              <a href="https://www.apple.com/legal/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Apple's Privacy Policy</a>.
+            </li>
+            <li>
+              <strong>SignalWire</strong> — Carries the phone calls and text messages of the AI Call Assistant and CRM texting.
             </li>
             <li>
               <strong>Cloudflare R2</strong> — Used for cloud storage of uploaded photos and processed images. Files are stored securely in Cloudflare's infrastructure.

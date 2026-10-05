@@ -56,6 +56,7 @@ export const MARKETING_ROUTES: readonly string[] = [
   "/lsa-guide",
   "/privacy",
   "/terms",
+  "/support",
 ];
 
 /** The short name a breadcrumb uses for the pages that are not features or services. */
@@ -70,6 +71,7 @@ const PAGE_NAMES: Record<string, string> = {
   "/google-ad-fraud": "Google Ad Fraud",
   "/lsa-guide": "LSA Guide",
   "/privacy": "Privacy Policy",
+  "/support": "Support",
   "/terms": "Terms of Use",
 };
 
@@ -96,6 +98,7 @@ export function routeSourceFile(path: string): string | null {
     "/lsa-guide": "client/src/pages/lsa-guide.tsx",
     "/privacy": "client/src/pages/privacy-policy.tsx",
     "/terms": "client/src/pages/terms-of-use.tsx",
+    "/support": "client/src/pages/support.tsx",
     "/auth": "client/src/pages/auth.tsx",
   };
   return pages[path] ?? null;

@@ -12,7 +12,7 @@ import { CrmLogo } from "@/components/crm-logo";
 
 const EFFECTIVE = "September 30, 2026";
 
-function LegalShell({ title, children, testid }: { title: string; children: React.ReactNode; testid: string }) {
+function LegalShell({ title, children, testid, updated }: { title: string; children: React.ReactNode; testid: string; updated?: string }) {
   useEffect(() => {
     document.title = `${title} | ConstructHUB CRM`;
   }, [title]);
@@ -23,7 +23,7 @@ function LegalShell({ title, children, testid }: { title: string; children: Reac
           <CrmLogo height={26} />
         </a>
         <h1 className="text-3xl font-bold mt-6 mb-2">{title}</h1>
-        <p className="text-sm text-muted-foreground mb-8">Effective Date: {EFFECTIVE}</p>
+        <p className="text-sm text-muted-foreground mb-8">Effective Date: {EFFECTIVE}{updated ? ` · Last updated: ${updated}` : ""}</p>
         {children}
         <div className="border-t mt-10 pt-6 text-sm text-muted-foreground space-y-1">
           <p>
@@ -187,10 +187,10 @@ export function CrmTermsPage() {
 
 export function CrmPrivacyPage() {
   return (
-    <LegalShell title="Privacy Policy — ConstructHUB CRM" testid="page-crm-privacy">
+    <LegalShell title="Privacy Policy — ConstructHUB CRM" testid="page-crm-privacy" updated="October 5, 2026">
       <P>
         This Privacy Policy covers the ConstructHUB CRM: the contractor workspace at
-        portal.constructhub.us and the client-facing pages it powers — the client portal
+        portal.constructhub.us and in the ConstructHUB CRM iPhone app, and the client-facing pages it powers — the client portal
         (client.constructhub.us) and estimate, invoice and contract links. It is written for both{" "}
         <strong>Contractors</strong> (account holders) and <strong>Clients</strong> (homeowners a
         contractor works with).
@@ -219,6 +219,22 @@ export function CrmPrivacyPage() {
         and approval.
       </P>
       <P>
+        <strong>In the iPhone app:</strong> the same account and data as the website. If you choose Sign
+        in with Apple, Apple gives us a stable account identifier, your name (the first time only) and an
+        email address (an Apple private relay address if you hide yours). If you turn on notifications, we
+        store your iPhone's push token so Apple's push service can deliver your account's alerts; signing
+        out stops them. The camera and photo library are used only when you choose to attach a photo or
+        video. The app shows no ads, has no analytics or advertising SDKs, and does not track you across
+        other companies' apps or websites. To delete your account in the app, open More → Delete account:
+        billing is cancelled, you are signed out everywhere, any Sign in with Apple grant is revoked, and
+        your data is erased within 30 days (payment records are kept as the law requires).
+      </P>
+      <P>
+        <strong>AI:</strong> AI features — including the AI Call Assistant, which answers a Contractor's
+        calls and files callers as leads in the CRM — run on ConstructHUB's own servers. Call audio,
+        recordings, transcripts and other data are not sent to an outside AI company.
+      </P>
+      <P>
         <strong>Payments:</strong> card numbers and bank account details are entered directly on
         Stripe's systems and never touch our servers. We keep only the payment's status and amount
         so your documents show what's paid.
@@ -239,8 +255,9 @@ export function CrmPrivacyPage() {
         service is for — and to no other contractor. A Contractor's business data (price books,
         margins, costs) is visible only to their own team, under the permission levels they set. We
         share data outside the service only with the infrastructure providers that run it — hosting,
-        Cloudflare (network security and delivery), Stripe (payments), email delivery, and SignalWire
-        (delivery of the text messages and automated calls described in §5) — each only receiving
+        Cloudflare (network security and delivery), Stripe (payments), email delivery, SignalWire
+        (delivery of the text messages and automated calls described in §5), and Apple (Sign in with
+        Apple and notifications, in the iPhone app) — each only receiving
         what their function requires; and when the law genuinely compels us. That's the whole list.
       </P>
 
@@ -305,7 +322,8 @@ export function CrmPrivacyPage() {
         We use it to understand how the product is used. Your answer is remembered
         in a <code>ch_consent</code> cookie for a year; if you choose <strong>Decline</strong>, no
         analytics cookie is set and nothing is recorded. No advertising cookies, no third-party
-        trackers, no analytics that follow you around the web.
+        trackers, no analytics that follow you around the web. The iPhone app shows no cookie banner
+        and sets no analytics cookie: only the session cookie that keeps you signed in.
       </P>
 
       <H>8. Retention and your rights</H>

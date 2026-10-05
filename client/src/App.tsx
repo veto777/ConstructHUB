@@ -105,6 +105,7 @@ const CrmPriceBookPage = lazy(() => import("@/pages/crm-pricebook"));
 const CrmProjectPage = lazy(() => import("@/pages/crm-project"));
 const CrmSettingsPage = lazy(() => import("@/pages/crm-settings"));
 const AccountDeletePage = lazy(() => import("@/pages/account-delete"));
+const SupportPage = lazy(() => import("@/pages/support"));
 const CrmIntegrationsPage = lazy(() => import("@/pages/crm-integrations"));
 const CrmReportsPage = lazy(() => import("@/pages/crm-reports"));
 const CrmMigratePage = lazy(() => import("@/pages/crm-migrate"));
@@ -234,6 +235,7 @@ function DashboardRouter() {
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
+      <Route path="/support" component={SupportPage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
       {/* Deep links into Account settings (the shell's Billing / API keys / API usage sections) and the public API reference. */}
       <Route path="/settings/billing" component={SettingsBillingRedirect} />
@@ -331,6 +333,7 @@ function PublicRouter() {
       <Route path="/crm-privacy" component={Ribboned.CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
       <Route path="/terms" component={TermsOfUsePage} />
+      <Route path="/support" component={SupportPage} />
       <Route path="/landing" component={LandingPage} />
       {/* Signed-in tools send a signed-out visitor to sign in and back; any
           other unknown URL is an honest 404, never the landing page. */}
@@ -362,7 +365,7 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/issues"];
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/issues"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
@@ -569,7 +572,7 @@ function AppContent() {
   // Signed out, the app is the sign-in screen (plus the legal pages and the links customers open from email);
   // signed in, the sales pages go back to Home.
   if (inNativeApp() && !portal) {
-    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
+    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/support", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
       .some((p) => location === p || location.startsWith(p.endsWith("/") ? p : `${p}`));
     if (!user && !open) return <Redirect to="/auth" />;
     if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
