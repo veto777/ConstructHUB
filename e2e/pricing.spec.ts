@@ -6,7 +6,7 @@
  * from shared/plans.ts, never a number typed into this file.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { PLANS, PLAN_KEYS, ADDONS, MODULE_NAMES, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
+import { PLANS, PLAN_KEYS, ADDONS, CALL_ASSISTANT_TIER_ADDONS, MODULE_NAMES, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
 import { gotoCrm, watchPage } from "./helpers";
 
 const usd = (cents: number) => {
@@ -112,7 +112,8 @@ test.describe("pricing page", () => {
     await gotoCrm(page, "/individual-pricing");
     await expect(page).toHaveURL(/\/pricing#add-ons$/);
     await expect(page.getByTestId("text-addons-heading")).toBeInViewport();
-    for (const addon of Object.values(ADDONS)) {
+    // The Call Assistant tiers have their own section (pricing.tsx); every other add-on is a row here.
+    for (const addon of Object.values(ADDONS).filter((a) => !CALL_ASSISTANT_TIER_ADDONS.includes(a.key))) {
       await expect(page.getByTestId(`row-addon-${addon.key}`)).toContainText(addon.name);
       await expect(page.getByTestId(`text-addon-price-${addon.key}`)).toContainText(`${usd(addon.monthlyCents)}/mo`);
     }
@@ -292,7 +293,8 @@ test.describe("settings billing", () => {
     await expect(page.getByTestId("text-current-plan")).toContainText("Pro plan");
     await expect(page.getByTestId("text-legacy-match")).toHaveCount(0);
     await expect(page.getByTestId("text-plan-interval")).toHaveText(`Billed monthly · ${usd(PLANS.pro.monthlyCents)}/mo`);
-    const expected = Object.values(ADDONS).filter((a) => a.availableOn.includes("pro" as PlanKey)).map((a) => a.key);
+    // The Call Assistant tiers are a tier picker of their own (plan-billing.tsx), not add-on rows.
+    const expected = Object.values(ADDONS).filter((a) => a.availableOn.includes("pro" as PlanKey) && !CALL_ASSISTANT_TIER_ADDONS.includes(a.key)).map((a) => a.key);
     for (const k of expected) await expect(page.getByTestId(`row-billing-addon-${k}`)).toBeVisible();
     await expect(page.getByTestId("text-addon-qty-protected_site")).toHaveText("1");
   });

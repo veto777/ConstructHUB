@@ -221,7 +221,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(call.flags.processedAt).toBeTruthy();
       expect(call.flags.processingAt).toBeUndefined();
       expect(call.flags.alertedKinds).toEqual(["urgent"]);
-      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: 2000, overage_minutes: 0, account_user_id: A.userId });
+      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: 5000, overage_minutes: 0, account_user_id: A.userId }); // Solo
     });
 
     it("two end reports racing for one call: exactly one does the work, minutes counted once", async () => {

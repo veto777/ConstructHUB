@@ -9,7 +9,7 @@
  */
 import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
-import { ADDONS, PLANS } from "../shared/plans";
+import { ADDONS, CALL_ASSISTANT_TIER_ADDONS, PLANS } from "../shared/plans";
 import { gotoCrm } from "./helpers";
 
 const SHOTS = process.env.SETTINGS_SHOTS_DIR ?? "";
@@ -203,7 +203,8 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-apiUnitsPerMonth-included")).toContainText(`${n((PLANS.pro.limits as any).apiUnitsPerMonth)} / mo`);
 
     // Add-ons the Pro plan sells sit under the limit they raise, with the quantity Stripe reports.
-    for (const addon of Object.values(ADDONS).filter((a) => a.availableOn.includes("pro"))) {
+    // The Call Assistant tiers are one tier picker row (row-limit-call-assistant-tier), not an add-on row each.
+    for (const addon of Object.values(ADDONS).filter((a) => a.availableOn.includes("pro") && !CALL_ASSISTANT_TIER_ADDONS.includes(a.key))) {
       await expect(page.getByTestId(`row-limit-addon-${addon.key}`), addon.key).toBeVisible();
     }
     await expect(page.getByTestId("text-limit-addon-qty-protected_site")).toHaveText("1");

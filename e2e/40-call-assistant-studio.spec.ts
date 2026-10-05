@@ -482,7 +482,7 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await expect(page.getByTestId("badge-overview-preview")).toHaveCount(0);
     await expect(page.getByText("Pricing is being finalized")).toHaveCount(0);
     // The tier, the tiers to move between, and this month's spam (owner, 2026-10-02).
-    await expect(page.getByTestId("text-overview-tier")).toHaveText("Solo — 2,000 minutes and 1 local number a month");
+    await expect(page.getByTestId("text-overview-tier")).toHaveText("Solo — 5,000 minutes and 1 local number a month");
     for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(t.name);
     await expect(page.getByTestId("row-overview-tier-solo")).toContainText("Current");
     await expect(page.getByTestId("row-overview-tier-fleet")).toContainText("Upgrade");

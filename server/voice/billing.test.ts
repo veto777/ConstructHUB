@@ -26,17 +26,21 @@ vi.mock("../admin", async (importOriginal) => {
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
 
+/** Each tier's included minutes, from the price book: the meter scenarios below are written relative to them. */
+const tierMinutes = (t: string) => CALL_ASSISTANT_TIERS.find((x) => x.tier === t)!.includedMinutes;
+const LITE = tierMinutes("lite"), SOLO = tierMinutes("solo"), CREW = tierMinutes("crew"), FLEET = tierMinutes("fleet");
+
 // ── Part 1: pure ────────────────────────────────────────────────────────────
 
 describe("Call Assistant price book: four tiers (owner, 2026-10-02)", () => {
   it("Lite / Solo / Crew / Fleet: prices, yearly prices, minutes, numbers, per-tier overage; 500 free spam calls on every tier", () => {
     expect(CALL_ASSISTANT_TIERS.map((t) => [t.tier, t.addon, t.monthlyCents, t.annualCents, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([
-      // Owner: "lets do 1000 min for $149 a month so 4 tiers instead of 3".
-      ["lite", "call_assistant_lite", 14_900, 119_900, 1_000, 1, 10],
-      ["solo", "call_assistant", 24_900, 199_900, 2_000, 1, 10],
+      // Owner 2026-10-04: "i need to change to 2000 for lite then 5000, 10,000 and 25,000" (prices unchanged).
+      ["lite", "call_assistant_lite", 14_900, 119_900, 2_000, 1, 10],
+      ["solo", "call_assistant", 24_900, 199_900, 5_000, 1, 10],
       // Owner: "for the crew and fleet the cost per minute is 5 not 10 cents for overages".
-      ["crew", "call_assistant_crew", 44_900, 359_900, 5_000, 5, 5],
-      ["fleet", "call_assistant_fleet", 79_900, 639_900, 12_000, 20, 5],
+      ["crew", "call_assistant_crew", 44_900, 359_900, 10_000, 5, 5],
+      ["fleet", "call_assistant_fleet", 79_900, 639_900, 25_000, 20, 5],
     ]);
     // Cheapest first: the order is the upgrade order.
     for (let i = 1; i < CALL_ASSISTANT_TIERS.length; i++) {
@@ -84,10 +88,10 @@ describe("Call Assistant price book: four tiers (owner, 2026-10-02)", () => {
     expect(callAssistantTierOf({ call_assistant: 1 })?.tier).toBe("solo");
     expect(callAssistantTierOf({ call_assistant_crew: 1, call_number: 2 })?.tier).toBe("crew");
     expect(callAssistantTierOf({ call_assistant_lite: 1 })?.tier).toBe("lite");
-    expect(callAssistantIncluded({ call_assistant_lite: 1 })).toMatchObject({ numbers: 1, minutes: 1_000, overageCentsPerMinute: 10 });
+    expect(callAssistantIncluded({ call_assistant_lite: 1 })).toMatchObject({ numbers: 1, minutes: 2_000, overageCentsPerMinute: 10 });
     expect(callAssistantIncluded({ call_assistant_crew: 1 })).toMatchObject({ overageCentsPerMinute: 5 });
     expect(callAssistantTierOf({ call_number: 2 })).toBeNull();
-    expect(callAssistantIncluded({ call_assistant_fleet: 1 })).toMatchObject({ numbers: 20, minutes: 12_000 });
+    expect(callAssistantIncluded({ call_assistant_fleet: 1 })).toMatchObject({ numbers: 20, minutes: 25_000 });
     expect(callAssistantIncluded({})).toMatchObject({ tier: null, numbers: 0, minutes: 0 });
     expect(callAssistantTier("crew").name).toBe("Crew");
   });
@@ -252,7 +256,7 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "spam", durationSeconds: 20, at: AT });
     const after = await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "blocked", durationSeconds: 300, at: AT });
     // The spam call's minute is free (the first of the month's 500); the blocked one costs nothing at all.
-    expect(after).toMatchObject({ month: MONTH, calls: 3, minutes: 2, spamCalls: 1, blockedCalls: 1, spamFreeCalls: 1, spamFreeMinutes: 1, includedMinutes: 2000, overageMinutes: 0 });
+    expect(after).toMatchObject({ month: MONTH, calls: 3, minutes: 2, spamCalls: 1, blockedCalls: 1, spamFreeCalls: 1, spamFreeMinutes: 1, includedMinutes: SOLO, overageMinutes: 0 });
     // Concurrent end-of-call reports never lose a count.
     await Promise.all(Array.from({ length: 10 }, () => usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: 2, at: AT })));
     expect(await usage.getVoiceUsageRow(o, MONTH)).toMatchObject({ calls: 13, minutes: 22 });
@@ -281,12 +285,12 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     // Over the included minutes: free spam minutes never become overage; past the allowance they do.
     const o2 = org();
     const rec2 = (outcome: string, billedMinutes: number) => usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome, billedMinutes, at: AT }, undefined, 2);
-    await rec2("lead_submitted", 2000);
+    await rec2("lead_submitted", SOLO);
     await rec2("spam", 30);
-    expect(await usage.getVoiceUsageRow(o2, MONTH)).toMatchObject({ minutes: 2000, overageMinutes: 0, spamFreeMinutes: 30 });
+    expect(await usage.getVoiceUsageRow(o2, MONTH)).toMatchObject({ minutes: SOLO, overageMinutes: 0, spamFreeMinutes: 30 });
     await rec2("spam", 30);
     const over = await rec2("spam", 7);
-    expect(over).toMatchObject({ minutes: 2007, overageMinutes: 7, spamFreeCalls: 2, spamFreeMinutes: 60 });
+    expect(over).toMatchObject({ minutes: SOLO + 7, overageMinutes: 7, spamFreeCalls: 2, spamFreeMinutes: 60 });
 
     // Concurrent spam calls at the boundary never hand out more free calls than the allowance.
     const o3 = org();
@@ -305,58 +309,58 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
   it("the included minutes follow the held tier", async () => {
     const crew = await user({ call_assistant_crew: 1 });
     const fleet = await user({ call_assistant_fleet: 1, call_number: 1 });
-    expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: crew, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 5000 });
-    expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 12_000 });
+    expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: crew, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: CREW });
+    expect(await usage.recordVoiceCallUsage({ orgId: org(), accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: FLEET });
   });
 
   it("overage accrues per call against the tier in force: a later upgrade never wipes it, a downgrade lowers the allowance from then on", async () => {
     const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
-    // (1) Solo, one 4,500-minute call → 2,500 over. A one-day upgrade to Crew afterwards keeps those 2,500.
+    // (1) Solo, one call 2,500 minutes past Solo's included → 2,500 over. A one-day upgrade to Crew afterwards keeps those 2,500.
     const solo = await user({ call_assistant: 1 });
     const o = org();
-    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 4500, at: AT })).toMatchObject({ includedMinutes: 2000, overageMinutes: 2500 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: SOLO + 2500, at: AT })).toMatchObject({ includedMinutes: SOLO, overageMinutes: 2500 });
     await setAddons(solo, { call_assistant_crew: 1 });
-    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ minutes: 4501, includedMinutes: 5000, overageMinutes: 2500 });
-    // Crew's 5,000 cover the month's minutes up to 5,000; the call that crosses it is over only by the part above.
-    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 600, at: AT })).toMatchObject({ minutes: 5101, overageMinutes: 2601 });
-    // Back to Solo: every billable minute from here is over (the month is already past 2,000).
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ minutes: SOLO + 2501, includedMinutes: CREW, overageMinutes: 2500 });
+    // Crew's included minutes cover the month up to them; the call that crosses them is over only by the part above (100).
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: CREW - (SOLO + 2501) + 100, at: AT })).toMatchObject({ minutes: CREW + 100, overageMinutes: 2600 });
+    // Back to Solo: every billable minute from here is over (the month is already past Solo's included).
     await setAddons(solo, { call_assistant: 1 });
-    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 3, at: AT })).toMatchObject({ includedMinutes: 2000, overageMinutes: 2604 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: solo, outcome: "info", billedMinutes: 3, at: AT })).toMatchObject({ includedMinutes: SOLO, overageMinutes: 2603 });
 
-    // (2) Fleet, one 1-minute call, then a downgrade to Solo, then 11,000 minutes → 9,001 over (Solo's 2,000 included).
+    // (2) Fleet, one 1-minute call, then a downgrade to Solo, then a call 9,000 past Solo's included → 9,001 over.
     const fleet = await user({ call_assistant_fleet: 1 });
     const o2 = org();
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: 12_000, overageMinutes: 0 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: 1, at: AT })).toMatchObject({ includedMinutes: FLEET, overageMinutes: 0 });
     await setAddons(fleet, { call_assistant: 1 });
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: 11_000, at: AT })).toMatchObject({ minutes: 11_001, includedMinutes: 2000, overageMinutes: 9001 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: fleet, outcome: "info", billedMinutes: SOLO + 9000, at: AT })).toMatchObject({ minutes: SOLO + 9001, includedMinutes: SOLO, overageMinutes: 9001 });
 
     // (3) A call that ends after the add-on is gone keeps the month's allowance (it was answered while paid for).
     const gone = await user({ call_assistant: 1 });
     const o3 = org();
     await usage.recordVoiceCallUsage({ orgId: o3, accountUserId: gone, outcome: "info", billedMinutes: 100, at: AT });
     await setAddons(gone, {});
-    expect(await usage.recordVoiceCallUsage({ orgId: o3, accountUserId: gone, outcome: "info", billedMinutes: 5, at: AT })).toMatchObject({ minutes: 105, includedMinutes: 2000, overageMinutes: 0 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o3, accountUserId: gone, outcome: "info", billedMinutes: 5, at: AT })).toMatchObject({ minutes: 105, includedMinutes: SOLO, overageMinutes: 0 });
 
     // Free spam minutes never accrue overage, even past the allowance.
     const o4 = org();
-    await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "info", billedMinutes: 2000, at: AT });
-    expect(await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "spam", billedMinutes: 9, at: AT })).toMatchObject({ minutes: 2000, overageMinutes: 0, spamFreeMinutes: 9 });
+    await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "info", billedMinutes: SOLO, at: AT });
+    expect(await usage.recordVoiceCallUsage({ orgId: o4, accountUserId: payer, outcome: "spam", billedMinutes: 9, at: AT })).toMatchObject({ minutes: SOLO, overageMinutes: 0, spamFreeMinutes: 9 });
   });
 
   it("per-tier overage: a month on Solo (10¢) then Crew (5¢) bills each call at the rate of the tier it was taken on", async () => {
     const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
     const acct = await user({ call_assistant: 1 });
     const o = org();
-    // Solo: 2,030 minutes → 30 over at 10¢.
-    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 2030, at: AT }))
-      .toMatchObject({ includedMinutes: 2000, overageMinutes: 30, overageRateMinutes: { "10": 30 }, overageCentsPerMinute: 10 });
-    // Upgrade to Crew: 5,000 included; the month's 2,030 + 3,090 = 5,120 → this call is 120 over, at Crew's 5¢. Solo's 30 stay at 10¢.
+    // Solo: 30 minutes past its included → 30 over at 10¢.
+    expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: SOLO + 30, at: AT }))
+      .toMatchObject({ includedMinutes: SOLO, overageMinutes: 30, overageRateMinutes: { "10": 30 }, overageCentsPerMinute: 10 });
+    // Upgrade to Crew: the month reaches Crew's included + 120 → this call is 120 over, at Crew's 5¢. Solo's 30 stay at 10¢.
     await setAddons(acct, { call_assistant_crew: 1 });
-    const row = await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 3090, at: AT });
-    expect(row).toMatchObject({ minutes: 5120, includedMinutes: 5000, overageMinutes: 150, overageRateMinutes: { "10": 30, "5": 120 }, overageCentsPerMinute: 5 });
+    const row = await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: CREW - SOLO + 90, at: AT });
+    expect(row).toMatchObject({ minutes: CREW + 120, includedMinutes: CREW, overageMinutes: 150, overageRateMinutes: { "10": 30, "5": 120 }, overageCentsPerMinute: 5 });
     // Spam is still free up to the allowance on Crew, at any rate.
     expect(await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "spam", billedMinutes: 4, at: AT }))
-      .toMatchObject({ minutes: 5120, overageMinutes: 150, spamFreeCalls: 1, spamFreeMinutes: 4 });
+      .toMatchObject({ minutes: CREW + 120, overageMinutes: 150, spamFreeCalls: 1, spamFreeMinutes: 4 });
     const s = usage.summarizeVoiceUsage(row, MONTH, 0);
     // NOT 150 × 10¢ (= $15) or 150 × 5¢ (= $7.50): 30 × 10¢ + 120 × 5¢ = $9.
     expect(s).toMatchObject({ overageMinutes: 150, overageCents: 900, overageByRate: [{ centsPerMinute: 10, minutes: 30 }, { centsPerMinute: 5, minutes: 120 }] });
@@ -385,32 +389,32 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     expect(await usage.reportVoiceOverage(o, MONTH, deps)).toMatchObject({ reported: 6, reportedCents: 30, lines: [{ centsPerMinute: 5, minutes: 6 }] });
     expect(calls.map((c) => [c.method, c.opts?.idempotencyKey])).toEqual([["invoiceItems.create", `chub-voice-overage-${o}-${MONTH}-r5-126`]]);
 
-    // Lite (10¢, 1,000 included) → Fleet (5¢): the same per-call rule.
+    // Lite (10¢) → Fleet (5¢): the same per-call rule.
     const lite = await user({ call_assistant_lite: 1 });
     const o2 = org();
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: lite, outcome: "info", billedMinutes: 1010, at: AT }))
-      .toMatchObject({ includedMinutes: 1000, overageMinutes: 10, overageRateMinutes: { "10": 10 } });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: lite, outcome: "info", billedMinutes: LITE + 10, at: AT }))
+      .toMatchObject({ includedMinutes: LITE, overageMinutes: 10, overageRateMinutes: { "10": 10 } });
     await setAddons(lite, { call_assistant_fleet: 1 });
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: lite, outcome: "info", billedMinutes: 10_990, at: AT }))
-      .toMatchObject({ includedMinutes: 12_000, overageMinutes: 10, overageRateMinutes: { "10": 10 } });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: lite, outcome: "info", billedMinutes: FLEET - (LITE + 10), at: AT }))
+      .toMatchObject({ includedMinutes: FLEET, overageMinutes: 10, overageRateMinutes: { "10": 10 } });
     // And a downgrade to Lite: everything from here is over at Lite's 10¢.
     await setAddons(lite, { call_assistant_lite: 1 });
     expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: lite, outcome: "info", billedMinutes: 7, at: AT }))
-      .toMatchObject({ includedMinutes: 1000, overageMinutes: 17, overageRateMinutes: { "10": 17 } });
+      .toMatchObject({ includedMinutes: LITE, overageMinutes: 17, overageRateMinutes: { "10": 17 } });
   });
 
   it("per-tier overage on an annual subscription: one item per rate, each invoiced and recorded before the next", async () => {
     const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
     const acct = await user({ call_assistant_lite: 1 });
     const o = org();
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 1004, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: LITE + 4, at: AT });
     await setAddons(acct, { call_assistant_fleet: 1 });
     await setAddons(acct, { call_assistant_crew: 1 });
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 4000, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: CREW - LITE, at: AT });
     usage.resetVoiceOveragePriceCache();
     const { stripe, calls } = fakeStripe("price_existing");
     const out = await usage.reportVoiceOverage(o, MONTH, { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_a", stripeSubscriptionId: "sub_a", status: "active", billingInterval: "year" }) });
-    // 1,004 + 4,000 = 5,004 on Crew → 4 over at 5¢; Lite's 4 at 10¢.
+    // The month ends 4 past Crew's included → 4 over at 5¢; Lite's 4 at 10¢.
     expect(out).toMatchObject({ reported: 8, reportedCents: 60, invoiceId: "in_fake_1", lines: [{ centsPerMinute: 10, invoiceId: "in_fake_1" }, { centsPerMinute: 5, invoiceId: "in_fake_2" }] });
     expect(calls.map((c) => c.method)).toEqual(["prices.list", "invoiceItems.create", "invoices.create", "prices.list", "invoiceItems.create", "invoices.create"]);
     expect(calls.filter((c) => c.method === "invoices.create").map((c) => c.opts?.idempotencyKey)).toEqual([
@@ -425,18 +429,18 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const setAddons = (uid: number, addons: Record<string, number>) => db.query("update subscriptions set addons = $2 where user_id = $1", [uid, JSON.stringify(addons)]);
     const acct = await user({ call_assistant: 1 });
     const o = org();
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 2030, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: SOLO + 30, at: AT });
     await setAddons(acct, { call_assistant_crew: 1 });
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: 3090, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: acct, outcome: "info", billedMinutes: CREW - SOLO + 90, at: AT });
     expect(await usage.getVoiceUsageRow(o, MONTH)).toMatchObject({ overageRateMinutes: { "10": 30, "5": 120 }, overageReportedMinutes: 0 });
 
     for (const interval of ["month", "year"] as const) {
       const oo = interval === "month" ? o : org();
       if (interval === "year") {
         await setAddons(acct, { call_assistant: 1 });
-        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: 2030, at: AT });
+        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: SOLO + 30, at: AT });
         await setAddons(acct, { call_assistant_crew: 1 });
-        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: 3090, at: AT });
+        await usage.recordVoiceCallUsage({ orgId: oo, accountUserId: acct, outcome: "info", billedMinutes: CREW - SOLO + 90, at: AT });
       }
       // A Stripe with NO idempotency memory (a key older than 24 hours) that rejects the 5¢ price twice.
       usage.resetVoiceOveragePriceCache();
@@ -466,7 +470,7 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
 
   it("annual: an invoice that fails leaves its bucket unrecorded, so the retry invoices it", async () => {
     const o = org();
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: 2005, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: SOLO + 5, at: AT });
     usage.resetVoiceOveragePriceCache();
     const { stripe, calls } = fakeStripe("price_existing");
     const invoice = stripe.invoices.create;
@@ -485,9 +489,9 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
 
   it("overage: monthly subscription → one invoice item on the subscription, only the new minutes, idempotent", async () => {
     const o = org();
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "lead_submitted", billedMinutes: 1998, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "lead_submitted", billedMinutes: SOLO - 2, at: AT });
     const row = await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "lead_submitted", billedMinutes: 5, at: AT });
-    expect(row).toMatchObject({ minutes: 2003, includedMinutes: 2000, overageMinutes: 3, overageReportedMinutes: 0 });
+    expect(row).toMatchObject({ minutes: SOLO + 3, includedMinutes: SOLO, overageMinutes: 3, overageReportedMinutes: 0 });
 
     usage.resetVoiceOveragePriceCache();
     const { stripe, calls } = fakeStripe();
@@ -516,7 +520,7 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
 
   it("overage: annual subscription → unattached item invoiced now; no Stripe / no live subscription → nothing billed, minutes kept", async () => {
     const o = org();
-    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: 2010, at: AT });
+    await usage.recordVoiceCallUsage({ orgId: o, accountUserId: payer, outcome: "info", billedMinutes: SOLO + 10, at: AT });
     usage.resetVoiceOveragePriceCache();
     const { stripe, calls } = fakeStripe("price_existing");
 
@@ -545,17 +549,17 @@ describe("voice_usage meter + overage billing (lane DB, fake Stripe)", () => {
     const out = await usage.reportVoiceOverage(o, MONTH, { stripe, configured: () => true, subscriptionFor: async () => ({ stripeCustomerId: "cus_x", stripeSubscriptionId: "sub_x", status: "active", billingInterval: "month" }) });
     expect(out).toEqual({ reported: 0, reason: "nothing_to_report" });
     expect(calls).toEqual([]);
-    // A customer on the same month is unchanged: past Solo's included 2,000, the rest is overage.
+    // A customer on the same month is unchanged: past Solo's included minutes, the rest is overage.
     const o2 = org();
-    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome: "info", billedMinutes: 2500, at: AT }))
-      .toMatchObject({ includedMinutes: 2000, overageMinutes: 500 });
+    expect(await usage.recordVoiceCallUsage({ orgId: o2, accountUserId: payer, outcome: "info", billedMinutes: SOLO + 500, at: AT }))
+      .toMatchObject({ includedMinutes: SOLO, overageMinutes: 500 });
   });
 
   it("the sweep bills every org with unreported overage in the month and reports what it skipped", async () => {
     // Its own month so the other tests' rows don't count.
     const month = "2001-02", at = new Date("2001-02-10T00:00:00Z");
     const billed = org(), skipped = org();
-    await usage.recordVoiceCallUsage({ orgId: billed, accountUserId: payer, outcome: "info", billedMinutes: 2002, at });
+    await usage.recordVoiceCallUsage({ orgId: billed, accountUserId: payer, outcome: "info", billedMinutes: SOLO + 2, at });
     await usage.recordVoiceCallUsage({ orgId: skipped, accountUserId: unpaid, outcome: "info", billedMinutes: 1, at });
     usage.resetVoiceOveragePriceCache();
     const { stripe } = fakeStripe("price_existing");

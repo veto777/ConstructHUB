@@ -45,8 +45,8 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
 
 ## 🧰 2026-10-02 evening — what is live now (all deployed to vb11; dump-first each time)
 - **Call Assistant is LAUNCHED (purchasable).** Four tiers in `shared/plans.ts` CALL_ASSISTANT_TIERS: Lite $149
-  (1,000 min, 1 number), Solo $249 ($99 × 3 monthly intro; 2,000 min, 1 number), Crew $449 (5,000 min, 5 numbers),
-  Fleet $799 (12,000 min, 20 numbers). Overage 10¢ Lite/Solo, 5¢ Crew/Fleet. 500 spam calls/month free on every tier.
+  (2,000 min, 1 number), Solo $249 ($99 × 3 monthly intro; 5,000 min, 1 number), Crew $449 (10,000 min, 5 numbers),
+  Fleet $799 (25,000 min, 20 numbers) — minutes raised by the owner 2026-10-04 (was 1,000/2,000/5,000/12,000). Overage 10¢ Lite/Solo, 5¢ Crew/Fleet. 500 spam calls/month free on every tier.
   The two "NOT deployed" entries below are merged, live and superseded by these numbers. Lite yearly $1,199 confirmed by the owner
   2026-10-04. Owner still to confirm: the Stripe failed-payments setting (see the launch gate below).
 - **Owner call rules (engine + compiler, `9931a36`):** a caller who asked for work is never hung up on: the spam flag

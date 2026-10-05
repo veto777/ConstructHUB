@@ -109,16 +109,16 @@ describe("AI Call Assistant launch price", () => {
   it("four tiers, every figure from the price book (owner, 2026-10-02)", () => {
     const tiers = callAssistantTiers();
     expect(tiers.map((t) => [t.name, t.monthly, t.annual, t.minutes, t.numbersLabel, t.intro, t.overage, t.overageShort, t.lowerOverage])).toEqual([
-      ["Lite", "$149", "$1,199", "1,000", "1 local number", null, "$0.10", "10¢", false],
-      ["Solo", "$249", "$1,999", "2,000", "1 local number", "$99", "$0.10", "10¢", false],
-      ["Crew", "$449", "$3,599", "5,000", "5 local numbers", null, "$0.05", "5¢", true],
-      ["Fleet", "$799", "$6,399", "12,000", "20 local numbers", null, "$0.05", "5¢", true],
+      ["Lite", "$149", "$1,199", "2,000", "1 local number", null, "$0.10", "10¢", false],
+      ["Solo", "$249", "$1,999", "5,000", "1 local number", "$99", "$0.10", "10¢", false],
+      ["Crew", "$449", "$3,599", "10,000", "5 local numbers", null, "$0.05", "5¢", true],
+      ["Fleet", "$799", "$6,399", "25,000", "20 local numbers", null, "$0.05", "5¢", true],
     ]);
-    // ~2 min a call: Lite ~500, Solo ~1,000, Crew ~2,500, Fleet ~6,000.
-    expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 500 calls a month", "about 1,000 calls a month", "about 2,500 calls a month", "about 6,000 calls a month"]);
-    expect(callAssistantTiersLine()).toBe("Lite $149/month or $1,199/year (1,000 minutes a month and 1 local number, then $0.10 a minute), Solo $249/month or $1,999/year (2,000 minutes a month and 1 local number, then $0.10 a minute), Crew $449/month or $3,599/year (5,000 minutes a month and 5 local numbers, then $0.05 a minute) and Fleet $799/month or $6,399/year (12,000 minutes a month and 20 local numbers, then $0.05 a minute)");
-    expect(callAssistantTiersShortLine()).toBe("Lite $149/month (1,000 minutes), Solo $249/month (2,000 minutes), Crew $449/month (5,000 minutes) and Fleet $799/month (12,000 minutes)");
-    expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Lite covers about 500 calls a month, Solo covers about 1,000 calls a month, Crew covers about 2,500 calls a month and Fleet covers about 6,000 calls a month\. On Crew and Fleet, minutes above the included ones also cost less: \$0\.05 a minute instead of \$0\.10\. These are estimates/);
+    // ~2 min a call: Lite ~1,000, Solo ~2,500, Crew ~5,000, Fleet ~12,500.
+    expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 1,000 calls a month", "about 2,500 calls a month", "about 5,000 calls a month", "about 12,500 calls a month"]);
+    expect(callAssistantTiersLine()).toBe("Lite $149/month or $1,199/year (2,000 minutes a month and 1 local number, then $0.10 a minute), Solo $249/month or $1,999/year (5,000 minutes a month and 1 local number, then $0.10 a minute), Crew $449/month or $3,599/year (10,000 minutes a month and 5 local numbers, then $0.05 a minute) and Fleet $799/month or $6,399/year (25,000 minutes a month and 20 local numbers, then $0.05 a minute)");
+    expect(callAssistantTiersShortLine()).toBe("Lite $149/month (2,000 minutes), Solo $249/month (5,000 minutes), Crew $449/month (10,000 minutes) and Fleet $799/month (25,000 minutes)");
+    expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Lite covers about 1,000 calls a month, Solo covers about 2,500 calls a month, Crew covers about 5,000 calls a month and Fleet covers about 12,500 calls a month\. On Crew and Fleet, minutes above the included ones also cost less: \$0\.05 a minute instead of \$0\.10\. These are estimates/);
     const p = callAssistantPricing();
     expect([p.from, p.fromTier, p.tierCountWord, p.overageLine, p.extraNumber, p.freeSpamCalls]).toEqual(["$149", "Lite", "four", "$0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet", "$5", "500"]);
     expect(callAssistantOverageLine()).toBe(p.overageLine);
@@ -146,8 +146,8 @@ describe("AI Call Assistant launch price", () => {
     }
     for (const rate of CALL_ASSISTANT_OVERAGE_RATES) expect(priceBookCents().has(rate)).toBe(true);
     // Gabe may name a tier and quote its price and overage.
-    expect(filterReply("The Crew tier is $449/month with 5,000 minutes; Fleet is $799/month.").ok).toBe(true);
-    expect(filterReply("The Lite tier is $149/month with 1,000 minutes, then $0.10 a minute; on Crew extra minutes are $0.05.").ok).toBe(true);
+    expect(filterReply("The Crew tier is $449/month with 10,000 minutes; Fleet is $799/month.").ok).toBe(true);
+    expect(filterReply("The Lite tier is $149/month with 2,000 minutes, then $0.10 a minute; on Crew extra minutes are $0.05.").ok).toBe(true);
     expect(filterReply("The Lite tier is $129/month.").ok).toBe(false);
     expect(filterReply("The Fleet tier costs $6,399/year on yearly billing.").ok).toBe(true);
     expect(filterReply("The Crew tier is $399/month.").ok).toBe(false);
