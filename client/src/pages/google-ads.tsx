@@ -538,9 +538,9 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
       ) : (
         <>
           <StatGrid cols={3} className="max-w-4xl mx-auto">
-            <Stat label="IPs ready to sync" value={activeBlockedCount} testId="card-blocked-count" />
+            <Stat label="IPs ready to sync" value={exclusionCheck?.count ?? activeBlockedCount} testId="card-blocked-count" />
             <Stat label="Exclusion list" testId="card-api-status" value={<span data-testid="text-api-status">{scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}</span>} hint={exclusionCheck ? `Serving ${exclusionCheck.count} IPs` : "Exclusion list URL"} />
-            <Stat label="Campaign IP limit" value={`${Math.min(activeBlockedCount, 500)}/500`} testId="card-google-limit" />
+            <Stat label="Campaign IP limit" value={`${Math.min(exclusionCheck?.count ?? activeBlockedCount, 500)}/500`} testId="card-google-limit" />
           </StatGrid>
 
           <Section flush className="max-w-4xl mx-auto border-border" testId="card-step1-tracking">
@@ -1845,7 +1845,7 @@ function SettingsView({ domain, domains, deleteDomainMutation, selectedDomainId,
                   </label>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground" data-testid="text-country-list-unavailable">
-                  No country list: the tracker does not record visitor countries yet, so there is nothing to allow or block.
+                  Country blocking isn't implemented yet: the tracker does record visitor countries (see the Countries panel), but no rule allows or blocks by them.
                 </p>
               </div>
             </div>

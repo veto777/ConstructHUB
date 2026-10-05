@@ -43,6 +43,8 @@ export function registerGscRoutes(
 ) {
   registerAssetRoutes(app, auth, "gsc", http);
   const route = routeFor(app, auth);
+  // Starts Google OAuth for Search Console (Search-Console-only scope) and returns the
+  // consent URL. "Connect Google Search Console" — site-connections.tsx.
   route("get", "/api/gsc/connect", async (req, res, user) => {
     if (!requireRecentAuth(req, res)) return;
     await budget(user, "connect");
@@ -67,6 +69,8 @@ export function registerGscRoutes(
     });
     res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${q}` });
   });
+  // OAuth landing: saves the grant (edge_connections + queued 'discover') and redirects
+  // to /search-console?connection=connected|failed. site-connections.tsx.
   route("get", "/api/gsc/callback", async (req, res, user) => {
     const pending = req.session.gscOAuth;
     delete req.session.gscOAuth;
@@ -109,6 +113,9 @@ export function registerGscRoutes(
       res.redirect("/search-console?connection=failed");
     }
   });
+  // Search analytics for one property: gsc_analytics grouped by date/day-week-month for
+  // the chosen dimension and date range (impression-weighted CTR/position; ?q filters
+  // keys). "Search analytics" DataList — site-connections.tsx MetricRows.
   route("get", "/api/gsc/assets/:id/analytics", async (req, res, user) => {
     const a = await ownedAsset(user, idInput.parse(req.params.id), "gsc");
     const p = listInput
@@ -149,6 +156,9 @@ export function registerGscRoutes(
         "Google returns top rows, excludes some anonymized queries, and reports with a delay. CTR and position are weighted by impressions. Pending or failed jobs may leave incomplete results.",
     });
   });
+  // Bulk URL work: queues 'inspect' or 'sitemap' jobs per assetId+url line (URL must be
+  // inside the property; sitemap needs confirm + Full access). "Queue inspections" /
+  // "Review and submit sitemaps" — site-connections.tsx.
   route("post", "/api/gsc/urls", async (req, res, user) => {
     const p = z
       .object({
@@ -183,6 +193,9 @@ export function registerGscRoutes(
       });
     res.status(202).json({ queued: assets.length });
   });
+  // Inspection results for one property: gsc_inspections (?q url, ?status verdict) plus
+  // per-verdict coverage counts. "Inspections" DataList + coverage summary —
+  // site-connections.tsx.
   route("get", "/api/gsc/assets/:id/inspections", async (req, res, user) => {
     const a = await ownedAsset(user, idInput.parse(req.params.id), "gsc"),
       p = listInput.parse(req.query),
@@ -211,6 +224,8 @@ export function registerGscRoutes(
         "Coverage of inspected URLs only, not Google’s full Page Indexing report. Inspection does not request indexing.",
     });
   });
+  // Sitemaps known to Search Console for a property (from edge_assets.data->'sitemaps',
+  // ?q path, 25/page). "Sitemaps" DataList — site-connections.tsx.
   route("get", "/api/gsc/assets/:id/sitemaps", async (req, res, user) => {
     const a = await ownedAsset(user, idInput.parse(req.params.id), "gsc"),
       p = listInput.parse(req.query);
@@ -230,6 +245,9 @@ export function registerGscRoutes(
       syncedAt: a.synced_at,
     });
   });
+  // Per-URL index-inspection status for one of the user's site scans: the scan's crawled
+  // pages joined with the latest gsc_inspections per URL. ScanIndexingSummary card —
+  // site-scan.tsx (component lives in site-connections.tsx).
   route("get", "/api/gsc/scans/:id/indexing", async (req, res, user) => {
     const id = z.string().uuid().parse(req.params.id),
       p = listInput.parse(req.query);
@@ -256,6 +274,9 @@ export function registerGscRoutes(
     } = await pool.query(`SELECT count(*)::int total ${from}`, v);
     res.json({ items: rows, total: n.total });
   });
+  // Property totals for one location (last 30 days of gsc_analytics clicks, one property
+  // per location). LocationSearchSummary card — locations.tsx insights tab
+  // (component lives in site-connections.tsx).
   route("get", "/api/gsc/locations/:id/summary", async (req, res, user) => {
     const location = idInput.parse(req.params.id);
     if (

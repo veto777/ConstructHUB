@@ -83,6 +83,7 @@ function dailyCostQuery(startDate: string, endDate: string): string {
 
 /* --------------------------------- discovery --------------------------------- */
 
+/** Walks every Google Ads account the connection can reach and upserts them into lsa_accounts. */
 export async function discoverAccounts(conn: LsaConnection): Promise<{ discovered: number; warning: string | null }> {
   if (!conn.refreshToken) return { discovered: 0, warning: "Not connected." };
   let warning: string | null = null;
@@ -224,6 +225,7 @@ export interface AccountSyncResult {
   error?: string;
 }
 
+/** Incremental lead sync for one account: upserts lsa_leads from the creation-time cursor, refreshes the denormalized lsa_accounts counters, and DMs new-lead Telegram alerts. */
 export async function syncAccount(conn: LsaConnection, account: LsaAccount): Promise<AccountSyncResult> {
   const cid = account.customerId;
   const loginCid = account.loginCustomerId || cid;

@@ -53,6 +53,8 @@ const syncingUsers = new Set<number>();
 
 export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   // ── Status ────────────────────────────────────────────────────────────────
+  // Connection state for the LSA self-serve page: lsa_connections row (sync times,
+  // Telegram link) + whether server OAuth/Telegram are configured. lsa-leads.tsx.
   app.get("/api/lsa/status", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -81,6 +83,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ── OAuth ─────────────────────────────────────────────────────────────────
+  // Starts the Google OAuth round trip (nonce in session); callback lands back on
+  // /lsa-leads?connect=…. "Connect Google Ads" — lsa-leads.tsx.
   app.get("/api/lsa/oauth/start", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -93,6 +97,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     res.redirect(buildAuthUrl(redirectUri, nonce));
   });
 
+  // OAuth landing: stores the refresh token on lsa_connections, kicks off first
+  // discovery+sync, redirects to /lsa-leads?connect=ok|error|norefresh. lsa-leads.tsx.
   app.get("/api/lsa/oauth/callback", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -132,6 +138,7 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     }
   });
 
+  // Clears the stored Google refresh token (lsa_connections). Disconnect — lsa-leads.tsx.
   app.post("/api/lsa/disconnect", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -147,6 +154,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ── Manual sync ─────────────────────────────────────────────────────────────
+  // Full manual sync: discovers accounts, then syncs leads for each enabled lsa_accounts
+  // row of this user (updates lsa_connections last_sync_*). "Sync now" — lsa-leads.tsx.
   app.post("/api/lsa/sync", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -178,6 +187,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ── Accounts ────────────────────────────────────────────────────────────────
+  // Account list for the signed-in user: lsa_accounts (?q matches name/customer ID,
+  // LSA-enrolled first, 25/page). Search + account cards — lsa-leads.tsx.
   app.get("/api/lsa/accounts", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -222,6 +233,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ── Leads ─────────────────────────────────────────────────────────────────
+  // Lead list for one account: lsa_leads scoped by user_id + customer_id, ?filter=
+  // all|charged|disputed, 50/page newest first. Filter bar + lead cards — lsa-leads.tsx.
   app.get("/api/lsa/leads", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -265,6 +278,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     items: z.array(z.object({ leadId: z.string().min(1), reason: reasonSchema })).min(1),
   });
 
+  // Queues selected charged leads as DISSATISFIED feedback to Google (spaced sends).
+  // "Report now" / per-lead "Report" — lsa-leads.tsx.
   app.post("/api/lsa/disputes", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -278,6 +293,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     }
   });
 
+  // Scatters selected disputes at random business-hour moments in the chosen window
+  // (dispute_status 'scheduled'; promoted by a 60s timer). "Schedule N" — lsa-leads.tsx.
   app.post("/api/lsa/disputes/schedule", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -308,6 +325,8 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   // ── Telegram linking ─────────────────────────────────────────────────────────
+  // Creates a one-time Telegram deep link (stores telegram_link_token on lsa_connections;
+  // the webhook fills telegram_chat_id after the user presses Start). "Link Telegram" — lsa-leads.tsx.
   app.post("/api/lsa/telegram/link", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -327,6 +346,7 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
     });
   });
 
+  // Clears the linked Telegram chat (lsa_connections). "Unlink" — lsa-leads.tsx.
   app.post("/api/lsa/telegram/unlink", async (req, res) => {
     const user = getDevUser(req, res);
     if (!user) return;

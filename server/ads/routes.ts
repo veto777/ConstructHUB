@@ -32,6 +32,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     try{const user=auth(req,res);if(!user)return;await fn(req,res,user.id);}catch(e){res.status(e instanceof AdsError?e.status:e instanceof z.ZodError?400:500).json({message:e instanceof AdsError?e.message:e instanceof z.ZodError?'Invalid input. Check IDs, selection and protection settings.':'Ads operation failed.'});}
   });
   const reserve=async(user:number,n:number)=>{if(!await takeBudget(`ads-queue:${user}`,5000,n,3600000)) throw new AdsError('Hourly Ads queue budget reached.',429);};
+  // Connection state for the Ads & LSA manager page: the user's ads_grants row (MCC id,
+  // verified/reconnect flags) + server setup/worker flags. Header card — ads-manager.tsx.
   route('get','/status',async(_req,res,user)=>{
     const {rows:[g]}=await pool.query('SELECT manager_id,verified,reconnect_required,updated_at FROM ads_grants WHERE user_id=$1',[user]);
     res.json({configured:configured(),connected:!!g&&!g.reconnect_required,grant:g||null,workerEnabled:process.env.GOOGLE_ADS_WORKER_ENABLED==='true',defaultManagerId:process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID?.replaceAll('-','')||'',starterNegatives:STARTER_NEGATIVES,playbook:optimizationSteps});
@@ -41,6 +43,7 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const {rows:[g]}=await pool.query('SELECT manager_id FROM ads_grants WHERE user_id=$1',[user]);
     res.json({saved:!!g,managerId:g?.manager_id??null});
   });
+  // Starts Google OAuth for connecting an MCC: returns the consent URL. "Connect MCC" — ads-manager.tsx.
   route('post','/connect',async(req,res,user)=>{
     if(!requireRecentAuth(req,res)) return;
     if(!configured()) throw new AdsError('Owner setup required: approved Ads project access (or legacy developer token), OAuth client ID and secret.',503);
@@ -49,6 +52,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const q=new URLSearchParams({client_id:process.env.GOOGLE_ADS_CLIENT_ID!,redirect_uri:redirect,response_type:'code',scope:ADS_SCOPE,access_type:'offline',prompt:'consent',state});
     res.json({url:`https://accounts.google.com/o/oauth2/v2/auth?${q}`});
   });
+  // OAuth landing: stores encrypted tokens in ads_grants, wipes+requeues the user's ads
+  // jobs/plans/accounts/findings/invitations, redirects to /ads-manager?connect=ok|failed.
   route('get','/callback',async(req,res,user)=>{
     const s=req.session.adsOAuth;delete req.session.adsOAuth;
     await new Promise<void>((resolve,reject)=>req.session.save(e=>e?reject(e):resolve()));
@@ -73,6 +78,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
       res.redirect('/ads-manager?connect=ok');
     }catch{res.redirect('/ads-manager?connect=failed');}
   });
+  // Removes the saved MCC and all local ads data (ads_grants, accounts, findings,
+  // invitations; cancels queued jobs, expires previews). "Disconnect MCC" — ads-manager.tsx.
   route('post','/disconnect',async(req,res,user)=>{
     if(!requireRecentAuth(req,res)) return;
     z.object({confirm:z.literal(true)}).strict().parse(req.body);
@@ -89,10 +96,14 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     await notifyUser(user,'google.disconnected',{title:'Google Ads MCC disconnected',body:'Local credentials removed and queued work cancelled. Remove ConstructHUB access in your Google Account to revoke the Google grant.',link:'/ads-manager'});
     res.json({message:'Disconnected locally. Remove ConstructHUB access in your Google Account to revoke the Google grant.'});
   });
+  // Queues a background job: 'discover' pulls client accounts from the MCC, 'poll'
+  // refreshes pending invitations. Discover/Poll invitations buttons — ads-manager.tsx.
   route('post','/sync',async(req,res,user)=>{
     const p=z.object({kind:z.enum(['discover','poll'])}).strict().parse(req.body),g=await grant(user,false);await reserve(user,1);
     res.status(202).json(await enqueue(user,g.connection_id,p.kind,{}));
   });
+  // Client accounts tab: ads_accounts (?q name/customer_id, ?status, ?lsa, 25/page) with
+  // manager/LSA flags, currency/timezone, mapped Click Guard domain_id, last audit time.
   route('get','/accounts',async(req,res,user)=>{
     const p=pageInput.parse(req.query);
     const where=`user_id=$1 AND ($2='' OR name ILIKE '%'||$2||'%' OR customer_id ILIKE '%'||$2||'%') AND ($3='' OR status=$3) AND ($4='' OR ($4='true' AND lsa=true) OR ($4='false' AND lsa=false) OR ($4='unknown' AND lsa IS NULL))`;
@@ -101,12 +112,16 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const {rows}=await pool.query(`SELECT customer_id,name,manager,status,lsa,currency,timezone,synced_at,error,domain_id FROM ads_accounts WHERE ${where} ORDER BY customer_id LIMIT $5 OFFSET $6`,[...args,p.limit,(p.page-1)*p.limit]);
     res.json({items:rows,total:n.total,page:p.page});
   });
+  // Searches the account's own tracked_domains (id + name) for the domain-mapping picker —
+  // ads-manager.tsx "Advanced · Bulk protections and domain mapping".
   route('get','/domains',async(req,res,user)=>{
     const p=pageInput.parse(req.query),args=[user,p.q];
     const where=`user_id=$1 AND domain ILIKE '%'||$2||'%'`;
     const {rows:[n]}=await pool.query(`SELECT count(*)::int total FROM tracked_domains WHERE ${where}`,args);
     res.json({items:(await pool.query(`SELECT id,domain FROM tracked_domains WHERE ${where} ORDER BY id LIMIT $3 OFFSET $4`,[...args,p.limit,(p.page-1)*p.limit])).rows,total:n.total});
   });
+  // Saves client→Click Guard domain links: UPDATE ads_accounts.domain_id (blank unmaps;
+  // domain must belong to the user). "Save domain mappings" — ads-manager.tsx.
   route('post','/domain-mappings',async(req,res,user)=>{
     const p=z.object({mappings:z.array(z.object({customerId,domainId:z.number().int().positive().nullable()}).strict()).min(1).max(1000)}).strict().parse(req.body);
     await withAgencyLock(user,async c=>{
@@ -116,8 +131,10 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
         await c.query('UPDATE ads_accounts SET domain_id=$3 WHERE user_id=$1 AND customer_id=$2',[user,m.customerId,m.domainId]);
       } await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}
     });
-    await logActivity(req,user,'ads.domain_mapped',{count:p.mappings.length});res.json({mapped:p.mappings.length});
+    await logActivity(req,user,'ads.domain_mapped',{count:p.mappings.length});res.json({mapped:p.mappings.length,message:`Saved ${p.mappings.length} domain mapping(s).`});
   });
+  // One client's campaigns from the last audit snapshot (ads_accounts.snapshot->'campaign',
+  // ?q/?status, 25/page). Campaigns dialog — ads-manager.tsx.
   route('get','/accounts/:cid/campaigns',async(req,res,user)=>{
     const cid=customerId.parse(req.params.cid),p=pageInput.parse(req.query);await account(user,cid);
     const from=`ads_accounts a CROSS JOIN LATERAL jsonb_array_elements(a.snapshot->'campaign') r WHERE a.user_id=$1 AND a.customer_id=$2 AND (r->>'name') ILIKE '%'||$3||'%' AND ($4='' OR r->>'advertisingChannelType'=$4)`;
@@ -125,6 +142,9 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const {rows:[n]}=await pool.query(`SELECT count(*)::int total FROM ${from}`,args);
     res.json({items:(await pool.query(`SELECT r AS campaign FROM ${from} ORDER BY r->>'id' LIMIT $5 OFFSET $6`,[...args,p.limit,(p.page-1)*p.limit])).rows.map(r=>r.campaign),total:n.total});
   });
+  // Bulk queue for selected/filtered clients: 'audit' jobs rewrite ads_findings; 'preview'
+  // jobs build reversible protection plans into ads_plans. Queue health audit /
+  // Queue protection previews — ads-manager.tsx.
   route('post','/bulk',async(req,res,user)=>{
     const p=z.object({selection,kind:z.enum(['audit','preview']),action:protectionInput.optional(),requestId:z.string().uuid()}).strict().parse(req.body);
     if(p.kind==='preview'&&!p.action) throw new AdsError('Choose a protection.',400);
@@ -133,6 +153,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     await withAgencyLock(user,async c=>{await c.query('BEGIN');try{for(const cid of ids) await enqueue(user,g.connection_id,p.kind,{action:p.action},cid,batch,`${batch}:${cid}`,c);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     await logActivity(req,user,'ads.bulk_queued',{kind:p.kind,batchId:batch,count:ids.length});res.status(202).json({batchId:batch,queued:ids.length});
   });
+  // Creates ads_invitations rows (deduped per requestId) and queues invite + invitation-
+  // email jobs per client. "Confirm invitations and emails" — ads-manager.tsx.
   route('post','/invitations',async(req,res,user)=>{
     const p=z.object({confirm:z.literal(true),clients:z.array(z.object({customerId,email:z.string().email().max(254)}).strict()).min(1).max(1000),requestId:z.string().uuid()}).strict().parse(req.body);
     const g=await grant(user);await reserve(user,p.clients.length);
@@ -147,6 +169,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     }await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     await logActivity(req,user,'ads.invitations_confirmed',{count:p.clients.length,batchId:p.requestId});res.status(202).json({queued:p.clients.length,batchId:p.requestId});
   });
+  // Queues cancel-invite jobs for the selected pending ads_invitations. "Cancel selected
+  // pending invitations" — ads-manager.tsx.
   route('post','/invitations/cancel',async(req,res,user)=>{
     const p=z.object({ids:z.array(z.string().uuid()).min(1).max(1000),confirm:z.literal(true)}).strict().parse(req.body),g=await grant(user);await reserve(user,p.ids.length);
     await withAgencyLock(user,async c=>{await c.query('BEGIN');try{for(const id of new Set(p.ids)) {
@@ -156,6 +180,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     }await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     res.status(202).json({queued:p.ids.length});
   });
+  // Tab lists (25/page, ?q/?status, newest first): invitations, background jobs, and
+  // protection previews — the ads-manager.tsx tabs of the same names.
   for(const [path,table,columns,search] of [
     ['/invitations','ads_invitations','id,customer_id,email,status,email_status,created_at','customer_id'],
     ['/jobs','ads_jobs','id,batch_id,customer_id,kind,status,attempts,error,created_at','COALESCE(customer_id,kind)'],
@@ -167,6 +193,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const {rows:[n]}=await pool.query(`SELECT count(*)::int total FROM ${table} WHERE ${where}`,args);
     res.json({items:(await pool.query(`SELECT ${columns} FROM ${table} WHERE ${where} ORDER BY created_at DESC,id LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,(p.page-1)*p.limit])).rows,total:n.total});
   });
+  // One preview's change document from ads_plans: summary/warnings plus the operation
+  // list (?q filters, 25/page) for the read-only review dialog — ads-manager.tsx.
   route('get','/plans/:id',async(req,res,user)=>{
     const id=z.string().uuid().parse(req.params.id),p=pageInput.parse(req.query);
     const {rows:[plan]}=await pool.query('SELECT id,customer_id,kind,status,expires_at,error,document FROM ads_plans WHERE user_id=$1 AND id=$2',[user,id]);
@@ -175,6 +203,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const operations=d.operations.filter((operation:any)=>(!p.q||JSON.stringify(operation).toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||Object.values(operation).some((v:any)=>Object.hasOwn(v,p.status))));
     res.json({...plan,summary:d.summary,warnings:d.warnings,operations:operations.slice((p.page-1)*p.limit,p.page*p.limit).map((operation:any)=>{const type=Object.keys(operation)[0].replace(/Operation$/,'');const op:any=Object.values(operation)[0];return {operation,before:op.remove||op.update?d.before[type]?.find((r:any)=>r.resourceName===(op.remove||op.update.resourceName))||null:null};}),total:operations.length});
   });
+  // Owner-approved apply: marks unexpired 'preview' plans queued and enqueues an apply job
+  // per plan (the worker writes to Google). "Confirm selected previews" — ads-manager.tsx.
   route('post','/plans/confirm',async(req,res,user)=>{
     const p=z.object({ids:z.array(z.string().uuid()).min(1).max(1000),confirm:z.literal(true)}).strict().parse(req.body),g=await grant(user);await reserve(user,p.ids.length);
     await withAgencyLock(user,async c=>{await c.query('BEGIN');try {for(const id of new Set(p.ids)) {
@@ -184,6 +214,8 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     }await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     await logActivity(req,user,'ads.previews_confirmed',{planIds:p.ids});res.status(202).json({queued:p.ids.length});
   });
+  // Builds reversal previews for applied plans (status 'applied', no existing undo) as new
+  // ads_plans rows. "Preview reversal of selected applied changes" — ads-manager.tsx.
   route('post','/plans/undo-preview',async(req,res,user)=>{
     const p=z.object({ids:z.array(z.string().uuid()).min(1).max(1000)}).strict().parse(req.body),g=await grant(user);await reserve(user,p.ids.length);
     const batch=randomUUID();
@@ -194,6 +226,7 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     }await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     res.status(202).json({queued:p.ids.length,batchId:batch});
   });
+  // Health audit tab: ads_findings (?q on title, ?customerId, ?severity, 25/page).
   route('get','/findings',async(req,res,user)=>{
     const p=pageInput.parse(req.query),cid=req.query.customerId?customerId.parse(req.query.customerId):'';
     const where=`user_id=$1 AND ($2='' OR customer_id=$2) AND ($3='' OR title ILIKE '%'||$3||'%') AND ($4='' OR severity=$4)`;

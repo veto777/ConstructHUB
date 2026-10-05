@@ -429,7 +429,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
           </li>
           <li>
             <p className="font-medium" data-testid="text-detection-timezone">Timezone / geo mismatch</p>
-            <p className="text-muted-foreground">Uses browser-reported timezone differences as a heuristic; travel and device settings can also cause mismatches.</p>
+            <p className="text-muted-foreground">Not used as a signal: timezone differences also match ordinary visitors (travel, device settings), so detection deliberately ignores them.</p>
           </li>
           <li>
             <p className="font-medium" data-testid="text-detection-datacenter">Datacenter IP range detection</p>
