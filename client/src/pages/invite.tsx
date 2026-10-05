@@ -14,6 +14,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
+import { inNativeApp } from "@/lib/app-shell";
 
 export default function InvitePage() {
   const [, params] = useRoute("/invite/:code");
@@ -43,6 +44,16 @@ export default function InvitePage() {
   );
 
   if (isLoading) return card(<p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your invite…</p>);
+
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): an invite grants a trial plan — that
+  // changes billing state, so it isn't activated inside the app. No trial copy, no activation.
+  if (inNativeApp()) {
+    return card(<>
+      <h1 className="text-2xl font-semibold" data-testid="text-invite-title">This invite can't be activated in the app</h1>
+      <p className="text-sm text-muted-foreground">Open your invite link in a browser to use it.</p>
+      {/^[A-Z0-9-]{4,40}$/.test(code) && <p className="text-xs text-muted-foreground">Invite code: <span className="font-mono">{code}</span></p>}
+    </>);
+  }
 
   if (!/^[A-Z0-9-]{4,40}$/.test(code)) {
     return (
