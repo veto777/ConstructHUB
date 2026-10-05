@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
+import { inNativeApp } from "@/lib/app-shell";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -1240,16 +1241,23 @@ export default function PhotosPage() {
       />
 
       {processingBlock && (
+        /* The iPhone apps sell nothing (App Store 3.1.3(f)): no "See plans" action and no plan copy. */
         <Notice tone="info" testId="notice-photos-access" action={
+          !inNativeApp() ? (
           <Button asChild size="sm" variant="outline">
             {processingBlock === "sign-in"
               ? <Link href={`/auth?next=${encodeURIComponent("/photos")}`} data-testid="link-photos-sign-in">Sign in</Link>
               : <Link href="/pricing" data-testid="link-photos-plans">See plans</Link>}
           </Button>
+          ) : (processingBlock === "sign-in" ? (
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/auth?next=${encodeURIComponent("/photos")}`} data-testid="link-photos-sign-in">Sign in</Link>
+          </Button>
+          ) : undefined)
         }>
           {processingBlock === "sign-in"
-            ? "Sign in to process photos. The Photo Optimizer is included with every ConstructHUB plan."
-            : `Processing photos is included with every plan, starting with ${PLANS[PLAN_KEYS[0]].name}. Choose a plan to process this batch.`}
+            ? (inNativeApp() ? "Sign in to process photos." : "Sign in to process photos. The Photo Optimizer is included with every ConstructHUB plan.")
+            : (inNativeApp() ? "Processing photos isn't on this account." : `Processing photos is included with every plan, starting with ${PLANS[PLAN_KEYS[0]].name}. Choose a plan to process this batch.`)}
         </Notice>
       )}
 
