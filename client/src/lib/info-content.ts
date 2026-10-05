@@ -5,12 +5,15 @@
  * must have an entry here — server/crm/info-content.test.ts enforces it.
  */
 import { TEXTING_PLANS, planNamesWhere } from "@shared/plan-copy";
+import { inNativeApp } from "@/lib/app-shell";
 
-/** Which plans text, read from the price book (shared/plans.ts). */
-const TEXTING_NOTE =
-  `Texting comes with the ${TEXTING_PLANS} plans: team text alerts on every one of them, and client texts from ` +
-  `your own SignalWire number or a texting-number add-on (${planNamesWhere((plan) => plan.limits.clientTexting === "included")} ` +
-  `includes one number).`;
+/** Which plans text, read from the price book (shared/plans.ts). In the iPhone
+ * apps there are no plans or add-ons — the note just says what texting is. */
+const TEXTING_NOTE = inNativeApp()
+  ? "Texting sends bid reminders to clients and texts you the moment a bid is signed, money lands, or a client re-opens their estimate."
+  : `Texting comes with the ${TEXTING_PLANS} plans: team text alerts on every one of them, and client texts from ` +
+    `your own SignalWire number or a texting-number add-on (${planNamesWhere((plan) => plan.limits.clientTexting === "included")} ` +
+    `includes one number).`;
 
 export interface InfoEntry {
   title: string;
