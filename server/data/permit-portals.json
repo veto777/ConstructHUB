@@ -3899,7 +3899,7 @@
     "lastVerifiedAt": "2026-10-05T00:53:40.539Z"
   },
   {
-    "jurisdiction": "Do̱a Ana County, NM",
+    "jurisdiction": "Doña Ana County, NM",
     "url": "https://www.donaana.gov/departments/community_services/building_services/index.php",
     "platform": "Building Services permit page",
     "sourceUrl": "https://www.donaana.gov/",
@@ -12417,15 +12417,6 @@
     "candidateUrl": "https://aca-prod.accela.com/scmn/default.aspx",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T01:00:47.354Z"
-  },
-  {
-    "jurisdiction": "Saint George, UT",
-    "url": "https://stg.cityinspect.com/login",
-    "platform": "CityInspect building permit portal",
-    "sourceUrl": "https://sgcityutah.gov/departments/community_development/building_department.php",
-    "candidateUrl": "https://stg.cityinspect.com/login",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:55:14.803Z"
   },
   {
     "jurisdiction": "Saint Louis Park, MN",

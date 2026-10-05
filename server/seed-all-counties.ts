@@ -1939,7 +1939,7 @@ const ALL_US_COUNTIES: { name: string; state: string; stateCode: string }[] = [
   { name: "Colfax", state: "New Mexico", stateCode: "NM" },
   { name: "Curry", state: "New Mexico", stateCode: "NM" },
   { name: "De Baca", state: "New Mexico", stateCode: "NM" },
-  { name: "Do̱a Ana", state: "New Mexico", stateCode: "NM" },
+  { name: "Doña Ana", state: "New Mexico", stateCode: "NM" },
   { name: "Eddy", state: "New Mexico", stateCode: "NM" },
   { name: "Grant", state: "New Mexico", stateCode: "NM" },
   { name: "Guadalupe", state: "New Mexico", stateCode: "NM" },

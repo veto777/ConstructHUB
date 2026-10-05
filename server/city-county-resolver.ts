@@ -14,9 +14,10 @@ export interface CountyIndex {
   loose: Map<string, number[]>;
 }
 
-/** "Saint Louis" / "St. Louis", "De Kalb" / "DeKalb", "Yukon Koyukuk" / "Yukon-Koyukuk" → one key. */
+/** "Saint Louis" / "St. Louis", "De Kalb" / "DeKalb", "Yukon Koyukuk" / "Yukon-Koyukuk", "Doña Ana" / "Dona Ana" → one key. */
 export function looseCountyKey(name: string): string {
   return name
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // "Doña Ana" / "Dona Ana" → one key
     .toLowerCase()
     .trim()
     .replace(/^sainte\s+/, "ste ")
