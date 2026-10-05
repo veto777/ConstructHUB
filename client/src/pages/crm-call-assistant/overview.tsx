@@ -27,7 +27,8 @@ type CallRow = { id: string | number; startedAt?: string; from?: string; fromNum
  * hides the list). OWNER: studio-frontend lane.
  */
 export function OverviewPanel({ status, loading, onPickResult }: { status: VoiceStatus | null; loading: boolean; onPickResult?: (pick: ResultsPick) => void }) {
-  const calls = useQuery<{ calls: CallRow[] } | CallRow[]>({ queryKey: ["/api/crm/voice/calls?limit=5"], enabled: !!status?.enabled || !!status?.paused, retry: false });
+  // Every call, spam included: the empty state can't say "No calls yet" while the spam tile counts some (audit lane 1 A).
+  const calls = useQuery<{ calls: CallRow[] } | CallRow[]>({ queryKey: ["/api/crm/voice/calls?limit=5&spam=all"], enabled: !!status?.enabled || !!status?.paused, retry: false });
   const recent: CallRow[] = Array.isArray(calls.data) ? calls.data : calls.data?.calls ?? [];
 
   if (loading || !status) {
@@ -71,7 +72,10 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   const tiers = callAssistantTiers();
   const heldTier = status.tier ? tiers.find((t) => t.tier === status.tier!.key) ?? null : null;
   const heldIndex = heldTier ? tiers.indexOf(heldTier) : -1;
-  const spamThisMonth = status.usage?.spamCallsThisMonth ?? 0;
+  // Own assistant live AND an outside receptionist pushing calls: spam adds both (disjoint engines); the minutes tile
+  // stays the billed meter and names her minutes in its hint (audit lane 1 B — the 7e2512b shape, mixed case).
+  const extAlso = ext && ownLive ? ext.thisMonth ?? null : null;
+  const spamThisMonth = (status.usage?.spamCallsThisMonth ?? 0) + (extAlso?.spam ?? 0);
   const freeSpamUsed = status.usage?.freeSpamCalls ?? 0;
   const freeSpamLimit = status.usage?.freeSpamCallsLimit ?? status.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS;
   return (
@@ -107,7 +111,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
         ) : (
           <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
-            hint={unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`} />
+            hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
         )}
         {extMonth ? (
           <Stat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"

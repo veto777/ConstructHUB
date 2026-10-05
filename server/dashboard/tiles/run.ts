@@ -19,7 +19,7 @@ import { int, metric, ok, watch, type TileOutcome, type TileSources } from "./ty
 
 const DAY = 86_400_000;
 /** Open prospect projects the leads tile reads (the CRM's own Needs-attention card reads 200). */
-const LEAD_ROWS = 1000;
+const LEAD_ROWS = 5000; // audit lane 1 F: 1,000 hid ~600 of a real account's 1,257 open leads
 
 /** No CRM org yet: the gateway sets one up (the dashboard never creates it). */
 const NO_ORG: TileOutcome = {

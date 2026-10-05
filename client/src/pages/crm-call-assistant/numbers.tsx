@@ -27,6 +27,11 @@ import { NUMBERS_KEY, NumberStatusPill, formatDate, formatPhone, type NumbersRes
  * instructions per carrier / CallRail. OWNER: numbers+billing lane (LANES.md).
  * API: /api/crm/voice/numbers* (server/voice/numbers.ts).
  */
+/** A purchase stuck "Setting up" for over 10 minutes (a crashed buy): the server dismisses it like a failed one
+ *  (server/voice/numbers.ts STALE_PENDING_MS) — audit lane 1 E. The server re-checks; a fresher one answers "busy". */
+const stalePending = (n: { status: string; createdAt: string | null }) =>
+  n.status === "pending" && !!n.createdAt && Date.now() - Date.parse(n.createdAt) > 10 * 60_000;
+
 export function NumbersPanel({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
   const q = useQuery<NumbersResponse>({ queryKey: [NUMBERS_KEY] });
@@ -169,12 +174,12 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
                     {n.status === "active" && (
                       <Button size="sm" variant="outline" onClick={() => setEditing(n)} data-testid={`button-voice-number-edit-${n.id}`}><Pencil className="h-4 w-4 mr-1.5" aria-hidden="true" />Edit</Button>
                     )}
-                    {(n.status === "active" || n.status === "failed") && (
+                    {(n.status === "active" || n.status === "failed" || stalePending(n)) && (
                       <Button size="sm" variant="ghost" className="text-destructive"
                         disabled={n.status === "active" && !n.releasable}
                         title={n.status === "active" && !n.releasable ? `The carrier keeps a number for ${d.minDays} days; release from ${formatDate(n.releaseEligibleAt)}.` : undefined}
                         onClick={() => setReleasing(n)} data-testid={`button-voice-number-release-${n.id}`}>
-                        {n.status === "failed" ? "Dismiss" : "Release"}
+                        {n.status === "active" ? "Release" : "Dismiss"}
                       </Button>
                     )}
                   </div>
@@ -201,9 +206,9 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
       <AlertDialog open={!!releasing} onOpenChange={(open) => { if (!open && !release.isPending) setReleasing(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{releasing?.status === "failed" ? "Remove this unfinished purchase?" : `Release ${formatPhone(releasing?.phoneNumber)}?`}</AlertDialogTitle>
+            <AlertDialogTitle>{releasing?.status !== "active" ? "Remove this unfinished purchase?" : `Release ${formatPhone(releasing?.phoneNumber)}?`}</AlertDialogTitle>
             <AlertDialogDescription>
-              {releasing?.status === "failed"
+              {releasing?.status !== "active"
                 ? "The carrier never confirmed this purchase. Removing it here doesn't call the carrier."
                 : "Calls to it stop reaching the assistant right away, and the number goes back to the carrier — you may not get it back. Move any forwarding off it first."}
             </AlertDialogDescription>
@@ -217,7 +222,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
               data-testid="button-voice-number-release-confirm"
             >
               {release.isPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" aria-hidden="true" /> : null}
-              {releasing?.status === "failed" ? "Remove" : "Release number"}
+              {releasing?.status !== "active" ? "Remove" : "Release number"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -313,6 +313,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       const spamList = await crm(a, "GET", "/calls?spam=1");
       expect(new Set(spamList.body.calls.map((x: any) => x.outcome))).toEqual(new Set(["spam", "blocked"]));
       expect(spamList.body.total).toBe(3);
+      // spam=all (the overview's Recent calls): every call, spam included.
+      const everything = await crm(a, "GET", "/calls?spam=all");
+      expect(everything.body.total).toBe(all.body.total + spamList.body.total);
       const byName = await crm(a, "GET", "/calls?q=Dana");
       expect(byName.body.calls.map((x: any) => x.id)).toEqual([shared.leadCallId]);
       const leadsOnly = await crm(a, "GET", "/calls?outcome=lead_submitted&limit=1&page=1");

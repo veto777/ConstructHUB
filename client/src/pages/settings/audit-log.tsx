@@ -84,7 +84,7 @@ export function AuditLogSection(_props: SettingsSectionProps) {
   });
 
   const exportCsv = () => {
-    const header = ["Time", "Event", "Kind", "Area", "IP", "Device", "Email"];
+    const header = ["Time (UTC)", "Event", "Kind", "Area", "IP", "Device", "Email"];
     const lines = shown.map((r) => [
       new Date(r.created_at).toISOString(), activityLabel(r.kind, r.detail), r.kind, areaLabel(areaOf(r.kind)),
       r.ip ?? "", r.user_agent ?? "", (r.detail as any)?.email ?? "",

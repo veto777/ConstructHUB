@@ -30,7 +30,7 @@ export const SPAM_OUTCOMES = ["spam", "blocked"] as const;
 
 const listQuery = z.object({
   outcome: z.enum(CALL_OUTCOMES).optional(),
-  spam: z.enum(["1", "0", "true", "false"]).optional(),
+  spam: z.enum(["1", "0", "true", "false", "all"]).optional(),
   numberId: z.string().max(64).optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}/).optional(),
@@ -71,13 +71,19 @@ export function summaryTimezone(raw: unknown): string {
 /** Spam an outside receptionist screened out this calendar month (org time zone); never on the minute meter.
  *  engine 'external' = server/voice/ingest.ts INGEST_ENGINE (not imported: ingest.ts imports this file). */
 export async function outsideSpamThisMonth(orgId: string, timezone: unknown): Promise<number> {
+  return (await outsideSpamSplitThisMonth(orgId, timezone)).spam;
+}
+
+/** The same month's outside-receptionist spam split: all spam (spam + blocked) and the blocked-before-answer part. */
+export async function outsideSpamSplitThisMonth(orgId: string, timezone: unknown): Promise<{ spam: number; blocked: number }> {
   const tz = summaryTimezone(timezone);
   const r = await db.execute(sql`
-    SELECT count(*)::int AS n FROM voice_calls
+    SELECT count(*)::int AS n, count(*) FILTER (WHERE outcome = 'blocked')::int AS blocked FROM voice_calls
      WHERE org_id = ${orgId} AND engine = 'external'
        AND outcome IN (${sql.join(SPAM_OUTCOMES.map((o) => sql`${o}`), sql`, `)})
        AND started_at >= (date_trunc('month', now() AT TIME ZONE ${tz}) AT TIME ZONE ${tz}) AT TIME ZONE 'UTC'`);
-  return Number((r as any).rows?.[0]?.n ?? 0);
+  const row = (r as any).rows?.[0];
+  return { spam: Number(row?.n ?? 0), blocked: Number(row?.blocked ?? 0) };
 }
 
 export type CallResultsRange = "7d" | "30d" | "month" | "all";
@@ -140,6 +146,8 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const spamView = q.spam === "1" || q.spam === "true";
     const where: SQL[] = [eq(voiceCalls.orgId, v.ctx.org.id)];
     if (q.outcome) where.push(eq(voiceCalls.outcome, q.outcome));
+    // spam=all: every call, spam included (the overview's Recent calls — audit lane 1 A).
+    else if (q.spam === "all") { /* no outcome filter */ }
     else if (spamView) where.push(inArray(voiceCalls.outcome, [...SPAM_OUTCOMES]));
     else where.push(or(sql`${voiceCalls.outcome} is null`, notInArray(voiceCalls.outcome, [...SPAM_OUTCOMES]))!);
     if (q.numberId) where.push(eq(voiceCalls.numberId, q.numberId));
@@ -258,7 +266,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const month = voiceMonthKey();
     const [ledger, usage, outside] = await Promise.all([
       listSpamLedger(v.ctx.org.id), getVoiceUsageRow(v.ctx.org.id, month),
-      outsideSpamThisMonth(v.ctx.org.id, (v.ctx.org as any).timezone),
+      outsideSpamSplitThisMonth(v.ctx.org.id, (v.ctx.org as any).timezone),
     ]);
     const entries = ledger.map(presentSpamRow);
     const u = summarizeVoiceUsage(usage, month, v.allowance.minutes, v.allowance.overageCentsPerMinute);
@@ -268,7 +276,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
       thisMonth: {
         // The meter only counts calls ConstructHUB's engine answered; an outside receptionist's (Alpine's Janice)
         // screened calls are added from her pushed calls (owner 2026-10-04: "why are the stats not updated").
-        month, spamCalls: u.spamCallsThisMonth + outside, screened: u.spamCalls + outside, rejected: u.blockedCalls,
+        month, spamCalls: u.spamCallsThisMonth + outside.spam, screened: u.spamCalls + outside.spam, rejected: u.blockedCalls + outside.blocked,
         freeSpamCalls: u.freeSpamCalls, freeSpamMinutes: u.freeSpamMinutes, freeSpamCallsLimit: u.freeSpamCallsLimit,
       },
     });
