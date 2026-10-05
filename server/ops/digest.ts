@@ -1,6 +1,6 @@
 /**
- * After a tower run reported on any issue: one short digest to the platform
- * admins (server/admin.ts ADMIN_EMAILS) through the transactional outbox
+ * After a tower run reported on any issue: a bell notification for the platform admins (internal only — no email
+ * since 2026-10-05 unless ISSUE_DESK_EMAIL=true; it used to email them (server/admin.ts ADMIN_EMAILS) through the transactional outbox
  * (deliverTransactionalEmail — a send the provider refuses is retried by the
  * outbox drainer), plus a bell notification ("Claude inspected 3 issues — 1
  * fix ready") linking to /admin/issues. Deduped per run and admin, so a
@@ -79,11 +79,15 @@ export async function sendRunDigest(
     } catch (e) {
       console.warn(`[issues] digest bell for admin ${admin.id} failed: ${(e as Error)?.message ?? e}`);
     }
-    try {
-      const sent = await deliver(admin.id, DIGEST_EMAIL_KIND, dedupe, { subject: msg.subject, html: msg.html, text: msg.text });
-      if (sent === "sent" || sent === "queued") emailed++;
-    } catch (e) {
-      console.warn(`[issues] digest email for admin ${admin.id} failed: ${(e as Error)?.message ?? e}`);
+    // Internal only (owner, 2026-10-05: "stop emailing me with these frivulous issues! Make this internal only"):
+    // the bell and /admin/issues carry the digest; no email unless ISSUE_DESK_EMAIL=true turns it back on.
+    if (process.env.ISSUE_DESK_EMAIL === "true") {
+      try {
+        const sent = await deliver(admin.id, DIGEST_EMAIL_KIND, dedupe, { subject: msg.subject, html: msg.html, text: msg.text });
+        if (sent === "sent" || sent === "queued") emailed++;
+      } catch (e) {
+        console.warn(`[issues] digest email for admin ${admin.id} failed: ${(e as Error)?.message ?? e}`);
+      }
     }
   }
   return { title, emailed, notified, admins: admins.length };
