@@ -78,3 +78,23 @@ What went wrong there, and what we do instead:
    services and stay (3.1.3(e)).
 2. **Apple team: Construct Hub LLC** (the team Remindr ships under), with a **new App Store Connect API key just for
    ConstructHUB**. Remindr's key, signing branch and scripts are never reused.
+
+## E. Status (2026-10-04, late)
+Done:
+- Native shells for both apps (`ios/`, branch `app/ios`, Codex) — **both compile on Xcode 26.3 / iOS 26 SDK** in CI
+  (`.github/workflows/ios-build-check.yml`; results on the `ios-results` branch, readable without a GitHub token).
+- App mode on the web: phone tab bar (pickable — Settings → Phone tab bar), safe areas, no cookie banner/tracking/cart,
+  self-serve account deletion inside the apps only (website keeps the support request), and the central
+  "sells nothing" gates (no sales pages, locked tools say only "isn't on this account", no billing/plan screens).
+In progress:
+- Kimi page-by-page leak sweeps of both apps in app mode (branches `appsweep/plat`, `appsweep/crm`).
+- Codex: Google sign-in / Google connections through the auth sheet with one-time codes, push-token storage, and a
+  server guard refusing every purchase endpoint from the app (branch `app/auth`).
+Before submission:
+- **AI disclosure:** production AI is TruthCoder (`AI_MODEL=truthcode-api`, vision `qwen3-vl` on vb11) — the owner's
+  own models, not a third-party AI company. Confirm the ConstructHUB path never forwards to an outside model; then the
+  review notes + privacy policy say "AI features run on our own servers", and no third-party-AI consent screen is
+  needed. If anything does forward, add the consent screen.
+- Apple: the ConstructHUB App Store Connect API key on Construct Hub LLC (owner, App Store Connect website), app
+  records for `us.constructhub.app` / `us.constructhub.crm`, signing, TestFlight, push (APNs key), demo accounts,
+  review notes with all seven 2.1 answers, a real-iPhone recording, screenshots, availability + pricing (free).
