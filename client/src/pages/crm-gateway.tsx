@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   KanbanSquare, ArrowRight, Loader2, Check, Users, FileText, MessageSquare,
   CreditCard, Camera, Building2, ExternalLink, LogIn, Mail,
@@ -58,9 +59,12 @@ export default function CrmGatewayPage() {
       } />
       <Section title={isLoading ? "Checking your access…" : isMember ? "Your CRM is active" : "Get your CRM workspace"} testId="card-crm-gateway-action">
         <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : "Workspaces are set up on request. Email us to get started."}</p>
-        <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-included">Your CRM is included with every ConstructHUB plan. {CRM_SEATS_LINE}.</p>
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-included">
+          {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan names or seat-per-plan lines. */}
+          {inNativeApp() ? "Your CRM is included with your ConstructHUB account." : <>Your CRM is included with every ConstructHUB plan. {CRM_SEATS_LINE}.</>}
+        </p>
         {!isLoading && !isMember && <div className="mt-4 flex flex-wrap gap-2">
-          <Button asChild variant="outline"><Link href="/pricing" data-testid="button-crm-plans">See plans</Link></Button>
+          {!inNativeApp() && <Button asChild variant="outline"><Link href="/pricing" data-testid="button-crm-plans">See plans</Link></Button>}
           <Button asChild variant="ghost"><a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer" data-testid="button-crm-preview">Visit CRM <ExternalLink className="ml-2 h-4 w-4" /></a></Button>
         </div>}
       </Section>
