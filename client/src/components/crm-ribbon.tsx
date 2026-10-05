@@ -134,8 +134,11 @@ export function CrmRibbon() {
           active={location === "/" || location === "/crm" || location === "/crm/home"} />
         <RibbonTab href="/crm/schedule" icon={CalendarDays} label="Schedule" testid="ribbon-tab-schedule"
           active={location.startsWith("/crm/schedule")} />
-        <RibbonTab href="/crm/inbox" icon={Inbox} label="Inbox" testid="ribbon-tab-inbox"
-          active={location.startsWith("/crm/inbox")} />
+        {/* Gated like the inbox API (manageCustomers): no dead tab for field crews and subs (audit lane 5). */}
+        {me?.permissions?.manageCustomers !== false && (
+          <RibbonTab href="/crm/inbox" icon={Inbox} label="Inbox" testid="ribbon-tab-inbox"
+            active={location.startsWith("/crm/inbox")} />
+        )}
         <RibbonTab href="/crm/clients" icon={Users} label="Clients" testid="ribbon-tab-customers"
           active={location.startsWith("/crm/clients")} />
         <RibbonTab icon={MoreHorizontal} label="More" testid="ribbon-tab-more"

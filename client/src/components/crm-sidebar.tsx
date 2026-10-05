@@ -45,7 +45,9 @@ const NAV: {
     active: (l: string) => l === "/" || l === "/crm" || l === "/crm/home" },
   { title: "Clients", url: "/crm/clients", icon: Users, testid: "link-portal-nav-clients",
     active: (l: string) => l.startsWith("/crm/clients") },
+  // Gated like the inbox API (server/crm/inbox.ts: manageCustomers) — field crews and subs got a dead link (audit lane 5).
   { title: "Messages", url: "/crm/inbox", icon: Inbox, testid: "link-portal-nav-messages",
+    perm: "manageCustomers",
     active: (l: string) => l.startsWith("/crm/inbox") },
   // No Call Assistant here: it lives on the platform (constructhub.us/call-assistant), and the CRM is a
   // standalone service (owner, 2026-10-02).
