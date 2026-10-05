@@ -36,7 +36,7 @@ enum URLPolicy {
     static func isGoogleStart(_ url: URL) -> Bool {
         guard isAllowed(url) else { return false }
         let path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return ["api/auth/google", "api/gbp/connect", "api/ads/connect", "api/gsc/connect"].contains(path)
+        return ["api/auth/google", "api/app/oauth/open"].contains(path)
     }
 
     static func origin(of url: URL) -> URL? {

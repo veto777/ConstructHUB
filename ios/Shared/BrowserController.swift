@@ -1,5 +1,7 @@
 import AuthenticationServices
 import Combine
+import CryptoKit
+import Security
 import Network
 import UIKit
 import UserNotifications
@@ -16,6 +18,7 @@ final class BrowserController: UIViewController, ObservableObject {
     private var hasLoaded = false
     private var retryURL: URL
     private var authenticationSession: ASWebAuthenticationSession?
+    private var authenticationPending = false
     private var authenticationWindow: UIWindow?
     private var downloadFiles: [ObjectIdentifier: URL] = [:]
     private var pushRequestPending = false
@@ -121,29 +124,70 @@ final class BrowserController: UIViewController, ObservableObject {
     }
 
     private func beginAuthentication(_ intercepted: URL) {
-        guard authenticationSession == nil, let window = viewIfLoaded?.window else { return }
+        guard authenticationSession == nil, !authenticationPending, let window = viewIfLoaded?.window else { return }
         let currentOrigin = URLPolicy.origin(of: webView.url ?? config.startURL) ?? config.startURL
         var start = intercepted
         var exchangeOrigin = currentOrigin
         if URLPolicy.isAllowed(intercepted) {
             exchangeOrigin = URLPolicy.origin(of: intercepted) ?? currentOrigin
         } else if URLPolicy.isGoogle(intercepted) {
-            // Preserve connection state/scope on direct Google URLs returned by a connect API.
-            // App-aware connect APIs must already have marked that state for the scheme callback.
-            let redirect = URLComponents(url: intercepted, resolvingAgainstBaseURL: false)?
-                .queryItems?.first(where: { $0.name == "redirect_uri" })?.value
-            if let redirect = redirect, let callback = URL(string: redirect),
-               let origin = URLPolicy.origin(of: callback) {
-                exchangeOrigin = origin
-                if callback.path == "/api/auth/google/callback" {
-                    start = origin.appendingPathComponent("api/auth/google")
-                }
-            } else {
-                start = currentOrigin.appendingPathComponent("api/auth/google")
+            // Direct provider connection URLs cannot be bound after consent starts.
+            guard let redirect = URLComponents(url: intercepted, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "redirect_uri" })?.value,
+                  let callback = URL(string: redirect), callback.path == "/api/auth/google/callback",
+                  let origin = URLPolicy.origin(of: callback) else {
+                showMessage("Connection unavailable", "Please start the connection again from the app.")
+                return
             }
+            exchangeOrigin = origin
+            start = origin.appendingPathComponent("api/auth/google")
         } else { return }
-        guard let authURL = URLPolicy.addingAppFlag(to: start) else { return }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else {
+            showMessage("Sign-in unavailable", "Please try again.")
+            return
+        }
+        let verifier = Self.base64url(Data(bytes))
+        let challenge = Self.base64url(Data(SHA256.hash(data: Data(verifier.utf8))))
+        guard let flagged = URLPolicy.addingAppFlag(to: start),
+              var parts = URLComponents(url: flagged, resolvingAgainstBaseURL: false) else { return }
+        parts.queryItems = (parts.queryItems ?? []).filter {
+            !["challenge", "challenge_method", "format"].contains($0.name)
+        } + [URLQueryItem(name: "challenge", value: challenge),
+             URLQueryItem(name: "challenge_method", value: "S256")]
+        guard let authURL = parts.url else { return }
         let origin = exchangeOrigin
+        if start.path == "/api/app/oauth/open" {
+            // Bind in the signed-in WK cookie jar; the auth sheet has a separate jar.
+            parts.queryItems?.append(URLQueryItem(name: "format", value: "json"))
+            guard let bindURL = parts.url else { return }
+            authenticationPending = true
+            webView.callAsyncJavaScript("""
+                const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+                if (!response.ok) throw new Error('Connection unavailable');
+                return (await response.json()).url;
+                """, arguments: ["url": bindURL.absoluteString], in: nil, in: .page) { [weak self] result in
+                    guard let self = self else { return }
+                    self.authenticationPending = false
+                    guard case .success(let value) = result, let value = value as? String,
+                          let googleURL = URL(string: value), googleURL.scheme == "https",
+                          URLPolicy.isGoogle(googleURL) else {
+                        self.showMessage("Connection unavailable", "Please start the connection again.")
+                        return
+                    }
+                    self.startAuthentication(googleURL, origin: origin, window: window, verifier: verifier)
+                }
+            return
+        }
+        startAuthentication(authURL, origin: origin, window: window, verifier: verifier)
+    }
+
+    private static func base64url(_ data: Data) -> String {
+        data.base64EncodedString().replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "")
+    }
+
+    private func startAuthentication(_ authURL: URL, origin: URL, window: UIWindow, verifier: String) {
         let session = ASWebAuthenticationSession(url: authURL, callbackURLScheme: "constructhub") { [weak self] callback, error in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -165,9 +209,10 @@ final class BrowserController: UIViewController, ObservableObject {
                     return
                 }
                 var exchange = URLComponents(url: origin.appendingPathComponent("api/auth/app-exchange"), resolvingAgainstBaseURL: false)!
-                exchange.queryItems = [URLQueryItem(name: "code", value: code)]
+                exchange.queryItems = [URLQueryItem(name: "code", value: code),
+                                       URLQueryItem(name: "verifier", value: verifier)]
                 if let url = exchange.url {
-                    // Never persist or retry the one-time code.
+                    // Never persist, log, or retry the code or session-only verifier.
                     self.loadFailed = false
                     self.updateOffline()
                     self.webView.load(URLRequest(url: url))
