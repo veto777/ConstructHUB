@@ -2,11 +2,22 @@ import { Notice } from "@/components/app-ui";
 import { PauseCircle } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { inNativeApp } from "@/lib/app-shell";
 import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 
 /** "Paused — update your payment method": the one banner for a bought add-on whose payment failed. */
 export function CallAssistantPausedBanner({ status }: { status: VoiceStatus }) {
+  // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no "update your payment
+  // method" button and no billing instructions there. The fact of the pause is all the app says.
+  if (inNativeApp()) {
+    return (
+      <Notice tone="warning" testId="banner-call-assistant-paused"
+        title={<span data-testid="text-call-assistant-paused">Paused</span>}>
+        <p className="mt-2 text-sm text-muted-foreground">The assistant isn't answering calls right now. You can still read your settings and call log.</p>
+      </Notice>
+    );
+  }
   return (
     <Notice tone="warning" testId="banner-call-assistant-paused"
       title={<span data-testid="text-call-assistant-paused">Paused — update your payment method</span>}>

@@ -15,6 +15,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
+import { inNativeApp } from "@/lib/app-shell";
 import { ADDONS } from "@shared/plans";
 import { CALL_ASSISTANT_NUMBER_RULES, formatUsd } from "@shared/plan-copy";
 import { BuyNumberWizard } from "./numbers-buy";
@@ -77,13 +78,16 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
           <p className="text-sm font-medium" data-testid="text-voice-numbers-allowance">
             {d.allowance.used} of {d.allowance.numbers} number{d.allowance.numbers === 1 ? "" : "s"} in use
           </p>
+          {/* Extra-number pricing and "move to a bigger tier" are sales — not in the app (3.1.3(f)). */}
+          {!inNativeApp() && (
           <p className="text-xs text-muted-foreground">
             {d.allowance.includedNumbers} included with your tier; more are {formatUsd(d.allowance.extraNumberMonthlyCents)}/mo each ({ADDONS.call_number.name}), or move to a bigger tier.
           </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {d.mock && <Badge variant="outline" data-testid="badge-voice-numbers-mock-list">Mock carrier — not real numbers</Badge>}
-          {manage && d.configured && !full && !showWizard && (
+          {manage && d.configured && !full && !showWizard && !inNativeApp() && (
             <Button size="sm" onClick={() => setBuying(true)} data-testid="button-voice-number-add"><Plus className="h-4 w-4 mr-1.5" aria-hidden="true" />Add a number</Button>
           )}
         </div>
@@ -95,7 +99,8 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
           <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
             <li data-testid="text-voice-numbers-rule-own">{CALL_ASSISTANT_NUMBER_RULES.ownNumbers}</li>
             <li data-testid="text-voice-numbers-rule-cancel">{CALL_ASSISTANT_NUMBER_RULES.cancel}</li>
-            <li data-testid="text-voice-numbers-rule-payment">{CALL_ASSISTANT_NUMBER_RULES.payment}</li>
+            {/* The failed-payment rule points at Settings → Billing — not in the app (it sells nothing). */}
+            {!inNativeApp() && <li data-testid="text-voice-numbers-rule-payment">{CALL_ASSISTANT_NUMBER_RULES.payment}</li>}
           </ul></details>
         </CardContent>
       </Section>
@@ -104,12 +109,20 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
         <Section flush className="border-amber-500/40" testId="card-voice-numbers-unconfigured">
           <CardContent className="flex items-start gap-3 p-4 text-sm">
             <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
-            <span>Numbers can't be bought on this server yet: the phone carrier isn't connected. Nothing will be charged.</span>
+            <span>{inNativeApp() ? "Numbers aren't available on this server yet." : "Numbers can't be bought on this server yet: the phone carrier isn't connected. Nothing will be charged."}</span>
           </CardContent>
         </Section>
       )}
 
       {manage && full && d.configured && (
+        inNativeApp() ? (
+          <Section flush testId="card-voice-numbers-full">
+            <CardContent className="p-4 text-sm space-y-2">
+              <p>Every number included on this account is in use.</p>
+              <p className="text-muted-foreground">Release one you no longer need to add another.</p>
+            </CardContent>
+          </Section>
+        ) : (
         <Section flush testId="card-voice-numbers-full">
           <CardContent className="p-4 text-sm space-y-2">
             <p>Every number your tier includes is in use.</p>
@@ -122,13 +135,19 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
             )}
           </CardContent>
         </Section>
+        )
       )}
 
       {!manage && shown.length === 0 && (
-        <EmptyState icon={Hash} title="No numbers yet" description="Only members who manage settings can buy or release numbers." />
+        <EmptyState icon={Hash} title="No numbers yet" description={inNativeApp() ? "Only members who manage settings can add or release numbers." : "Only members who manage settings can buy or release numbers."} />
       )}
 
-      {showWizard && (
+      {manage && shown.length === 0 && inNativeApp() && (
+        <EmptyState icon={Hash} title="No numbers yet" description="A manager sets numbers up on the full website; they show here once added." />
+      )}
+
+      {/* The iPhone apps sell nothing: the buy-a-number wizard (and its monthly price) stays off the app. */}
+      {showWizard && !inNativeApp() && (
         <BuyNumberWizard
           minDays={d.minDays}
           mock={d.mock}
@@ -158,7 +177,7 @@ export function NumbersPanel({ canManage }: { canManage: boolean }) {
                     {n.status === "active" && n.releaseEligibleAt
                       ? n.releasable ? " · can be released any time" : ` · can be released from ${formatDate(n.releaseEligibleAt)}`
                       : ""}
-                    {` · ${n.monthlyCents > 0 ? `${formatUsd(n.monthlyCents)}/mo extra number` : "included"}`}
+                    {` · ${n.monthlyCents > 0 ? (inNativeApp() ? "extra number" : `${formatUsd(n.monthlyCents)}/mo extra number`) : "included"}`}
                   </p>
                   {n.status === "releasing" && n.releaseReason && (
                     <p className="text-xs text-amber-700 dark:text-amber-400" data-testid={`text-voice-number-releasing-${n.id}`}>
