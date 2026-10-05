@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { Activity, Bell, CreditCard, Gauge, KeyRound, Lock, Plug, ScrollText, Smartphone, User } from "lucide-react";
 import type { SettingsGroupId, SettingsSectionDef, SettingsSectionId, SettingsSectionProps } from "./types";
+import { inNativeApp } from "@/lib/app-shell";
 import { MyAccountSection } from "./me-account";
 import { PasswordSecuritySection } from "./me-security";
 import { NotificationsSection } from "./me-notifications";
@@ -19,6 +20,10 @@ import { IntegrationsSection } from "./integrations";
  */
 
 export const DEFAULT_SECTION: SettingsSectionId = "account";
+
+/** Not in the iPhone apps, which sell nothing (App Store 3.1.3(f)): Billing, plan limits and the plan-metered API. */
+export const APP_HIDDEN_SECTIONS: ReadonlySet<SettingsSectionId> = new Set<SettingsSectionId>(["billing", "limits", "api-keys", "api-usage"]);
+export const sectionVisible = (id: SettingsSectionId): boolean => !(inNativeApp() && APP_HIDDEN_SECTIONS.has(id));
 
 export const SETTINGS_GROUPS: readonly { id: SettingsGroupId; label: string }[] = [
   { id: "me", label: "Me" },
@@ -105,5 +110,5 @@ export function resolveSettingsTab(tab: string | null | undefined): { section: S
   const key = (tab ?? "").trim().toLowerCase();
   if (!key) return { section: DEFAULT_SECTION, view: null };
   const hit = TAB_ALIASES[key];
-  return hit ? { section: hit.section, view: hit.view ?? null } : { section: DEFAULT_SECTION, view: null };
+  return hit && sectionVisible(hit.section) ? { section: hit.section, view: hit.view ?? null } : { section: DEFAULT_SECTION, view: null };
 }

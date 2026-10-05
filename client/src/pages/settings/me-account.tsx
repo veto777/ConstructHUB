@@ -646,7 +646,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
       </Card>
 
       {/* Open for platform admins: inviting people is something the owner does from here (Dennis, 2026-10-02). */}
-      <details className="border-t pt-4" open={user?.isPlatformAdmin === true || undefined}><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>
+      {!inNativeApp() && <details className="border-t pt-4" open={user?.isPlatformAdmin === true || undefined}><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>}
 
       <Card className="border-destructive/20" data-testid="card-danger-zone">
         <CardHeader>

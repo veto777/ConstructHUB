@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "./sections";
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, sectionVisible } from "./sections";
 import type { SettingsSectionId } from "./types";
 
 /**
@@ -16,7 +16,7 @@ export function SettingsNav({ active, onSelect }: { active: SettingsSectionId; o
   const current = SETTINGS_SECTIONS.find((s) => s.id === active) ?? SETTINGS_SECTIONS[0];
   const [open, setOpen] = useState(false);
 
-  const groups = SETTINGS_GROUPS.map((g) => ({ ...g, sections: SETTINGS_SECTIONS.filter((s) => s.group === g.id) }));
+  const groups = SETTINGS_GROUPS.map((g) => ({ ...g, sections: SETTINGS_SECTIONS.filter((s) => s.group === g.id && sectionVisible(s.id)) })).filter((g) => g.sections.length);
 
   return (
     <>

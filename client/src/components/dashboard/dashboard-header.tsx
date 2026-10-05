@@ -1,4 +1,5 @@
 import { PageHeader, Section } from "@/components/app-ui";
+import { inNativeApp } from "@/lib/app-shell";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
@@ -93,7 +94,8 @@ export function DashboardHeader({
       title={<span data-testid="text-dashboard-greeting">{account.firstName ? greeting : "Welcome back"}</span>}
       description={
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-1">
-          <PlanChip account={account} />
+          {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name, trial or billing link there. */}
+          {!inNativeApp() && <PlanChip account={account} />}
           <span className="text-xs text-muted-foreground" data-testid="text-dashboard-meta">{meta.join(" · ")}</span>
           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={onRefresh} disabled={refreshing}
             title={refreshing ? "Refreshing…" : "Refresh"} aria-label={refreshing ? "Refreshing" : "Refresh"} data-testid="button-dashboard-refresh">
@@ -108,7 +110,7 @@ export function DashboardHeader({
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline">More</Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="max-w-[calc(100vw-2rem)] [&_[role=menuitem]]:min-h-10">
-            {account.status !== "none" && <DropdownMenuItem asChild><Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">Manage plan</Link></DropdownMenuItem>}
+            {account.status !== "none" && !inNativeApp() && <DropdownMenuItem asChild><Link href="/settings?tab=billing" data-testid="link-dashboard-manage-plan">Manage plan</Link></DropdownMenuItem>}
             {account.isPlatformAdmin && <DropdownMenuItem asChild><Link href={ADMIN_FEATURE_PAGES_PATH} data-testid="link-dashboard-feature-pages">Feature pages</Link></DropdownMenuItem>}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -122,7 +124,7 @@ export function UsageCard({ account }: { account: DashboardAccount }) {
   if (!account.usage.length) return null;
   return (
     <Card className="px-4 py-3 sm:px-5 sm:py-4" role="region" aria-labelledby="dashboard-usage-title" data-testid="card-dashboard-usage">
-      <h2 id="dashboard-usage-title" className="mb-3 text-sm font-semibold">Plan usage</h2>
+      <h2 id="dashboard-usage-title" className="mb-3 text-sm font-semibold">{inNativeApp() ? "This month's usage" : "Plan usage"}</h2>
       <UsageStrip usage={account.usage} />
     </Card>
   );

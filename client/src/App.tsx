@@ -8,7 +8,7 @@ import { RecentAuthModal } from "@/components/recent-auth";
 import SocialMediaPage from "@/pages/social-media";
 import GuidesPage from "@/pages/guides";
 import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
-import { Switch, Route, useLocation, Link } from "wouter";
+import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
@@ -562,6 +562,16 @@ function AppContent() {
 
   const showAdsChat = location.startsWith("/google-ads") || location.startsWith("/google-ad-fraud");
 
+  // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no marketing or sales page inside them.
+  // Signed out, the app is the sign-in screen (plus the legal pages and the links customers open from email);
+  // signed in, the sales pages go back to Home.
+  if (inNativeApp() && !portal) {
+    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
+      .some((p) => location === p || location.startsWith(p.endsWith("/") ? p : `${p}`));
+    if (!user && !open) return <Redirect to="/auth" />;
+    if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
+  }
+
   if (!user) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the
     // marketing site — the two are deliberately separate products.
@@ -723,6 +733,9 @@ function AppContent() {
     </SidebarProvider>
   );
 }
+
+/** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
+const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing"];
 
 function App() {
   return (

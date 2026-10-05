@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
@@ -159,11 +160,11 @@ function PlanBadge({ plan, label }: { plan: string; label: string }) {
   return (
     <span
       className="ml-auto shrink-0 inline-flex items-center p-0.5 text-sidebar-foreground/60"
-      title={`Included with the ${plan} plan`}
+      title={inNativeApp() ? "Not on this account" : `Included with the ${plan} plan`}
       data-testid={`badge-plan-${label.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <Lock className="h-3 w-3" aria-hidden="true" />
-      <span className="sr-only">{plan} plan</span>
+      <span className="sr-only">{inNativeApp() ? "Not on this account" : `${plan} plan`}</span>
     </span>
   );
 }
@@ -522,7 +523,8 @@ export function AppSidebar() {
                   </div>
                 </SidebarMenuItem>
               ))}
-              <CollapsibleNavGroup group={pricingGroup} />
+              {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plans, add-ons or services there. */}
+              {!inNativeApp() && <CollapsibleNavGroup group={pricingGroup} />}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

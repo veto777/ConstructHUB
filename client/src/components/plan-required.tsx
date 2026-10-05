@@ -6,6 +6,8 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { CREDENTIAL_SOURCES, disconnectMessage, fetchOptionalList, type SavedCredential } from "@/lib/saved-credentials";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { Button } from "@/components/ui/button";
+import { AppLocked } from "@/components/app-locked";
+import { inNativeApp } from "@/lib/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -144,6 +146,8 @@ export function PlanRequired({ module, error, className }: { module: ModuleKey; 
     : body?.message || `${MODULE_NAMES[module]} is included with the ${plan.name} plan.`;
   const locations = plan.limits.locations;
   const headingId = `plan-required-${module}`;
+  // The iPhone apps sell nothing: no plan, price or upgrade — just that it isn't on this account.
+  if (inNativeApp()) return <AppLocked name={MODULE_NAMES[module]} testId={`plan-required-${module}`} />;
   return (
     <Card role="region" aria-labelledby={headingId} className={className} data-testid={`plan-required-${module}`}>
       <CardHeader className="space-y-2">

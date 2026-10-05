@@ -7,10 +7,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { inNativeApp } from "@/lib/app-shell";
 
 export function PaymentNeededBanner() {
   const { data } = useQuery<{ paymentNeeded?: boolean; subscriptionStatus?: string | null }>({ queryKey: ["/api/entitlements"], staleTime: 60_000 });
-  if (!data?.paymentNeeded) return null;
+  // Not in the iPhone apps: they sell nothing and never send anyone to pay (App Store 3.1.3(f)).
+  if (!data?.paymentNeeded || inNativeApp()) return null;
   return (
     <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-950 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100" data-testid="banner-payment-needed">
       <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />

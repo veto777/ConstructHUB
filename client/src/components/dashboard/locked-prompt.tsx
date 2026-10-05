@@ -3,6 +3,8 @@ import { MODULE_NAMES, PLANS, type ModuleKey, type PlanKey } from "@shared/plans
 import type { DashboardSurface } from "@shared/dashboard";
 import { featureIntroPath } from "@shared/feature-pages";
 import { DashLink, FOCUS_RING } from "./dash-link";
+import { AppLocked } from "@/components/app-locked";
+import { inNativeApp } from "@/lib/app-shell";
 
 /**
  * The plan_required prompt at tile size: the same words as the sidebar's
@@ -22,6 +24,7 @@ export function LockedPrompt({
   surface?: DashboardSurface;
   compact?: boolean;
 }) {
+  if (inNativeApp()) return <AppLocked name={module ? MODULE_NAMES[module] : "This"} testId={`locked-${tileKey}`} compact />;
   const planName = requiredPlan ? PLANS[requiredPlan].name : null;
   const intro = featureIntroPath(tileKey);
   const tooltip = module ? `${MODULE_NAMES[module]} is included with the ${planName ?? "a paid"} plan` : undefined;
