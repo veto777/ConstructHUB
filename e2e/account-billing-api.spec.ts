@@ -208,6 +208,14 @@ test.describe("settings billing", () => {
     await expect(page.locator('[data-testid="text-subscription-total"]')).toHaveCount(0);
   });
 
+  test("Subscriptions: a paused subscription reads 'Paused' on both plan cards", async ({ page }) => {
+    // Stripe-side pause (pause_collection): both the statement and the plan card badge must label it.
+    await mockAccount(page, { sub: { ...PRO_SUB, status: "paused" } });
+    await gotoCrm(page, BILLING_URL);
+    await expect(page.getByTestId("badge-subscription-status")).toHaveText("Paused");
+    await expect(page.getByTestId("badge-plan-status")).toHaveText("Paused");
+  });
+
   test("Subscriptions without a plan: no price, a way to choose one, no portal button", async ({ page }) => {
     await mockAccount(page, { sub: NO_SUB });
     await gotoCrm(page, BILLING_URL);

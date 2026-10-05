@@ -377,6 +377,48 @@ test.describe("Call Assistant — Agent Studio", () => {
     expect(mock.puts).toHaveLength(1);
   });
 
+  test("wizard: Skip to the editor opens the draft the wizard just saved (no stale cache)", async ({ page }) => {
+    const mock = await mockVoice(page);
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-wizard")).toBeVisible();
+    await page.getByTestId("input-company-name").fill("Acme Siding");
+    await page.getByTestId("button-wizard-next").click(); // saves the draft
+    expect(mock.puts).toHaveLength(1);
+    await page.getByTestId("button-wizard-skip").click();
+    await expect(page.getByTestId("studio-editor")).toBeVisible();
+    // The editor must show what the wizard saved — not the cached pre-wizard copy.
+    await expect(page.getByTestId("input-company-name")).toHaveValue("Acme Siding");
+  });
+
+  test("editor: the setup wizard is disabled while there are unsaved edits", async ({ page }) => {
+    await mockVoice(page, { published: true });
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-editor")).toBeVisible();
+    await page.getByTestId("studio-nav-persona").click();
+    await page.getByTestId("textarea-greeting").fill("A greeting I have not saved");
+    await expect(page.getByTestId("text-studio-dirty")).toHaveText("Unsaved changes");
+    // Entering the wizard now would seed it from the SAVED draft and drop this edit silently.
+    await expect(page.getByTestId("button-studio-wizard")).toBeDisabled();
+    await page.getByTestId("button-studio-save").click();
+    await expect(page.getByTestId("text-studio-dirty")).toHaveText("All changes saved");
+    await expect(page.getByTestId("button-studio-wizard")).toBeEnabled();
+  });
+
+  test("wizard review: with no rules and the owner fallback off, it says who really hears about escalations", async ({ page }) => {
+    await mockVoice(page);
+    await gotoCrm(page, "/call-assistant?tab=studio");
+    await expect(page.getByTestId("studio-wizard")).toBeVisible();
+    // Reach the Delivery step: one service is enough to pass the Services validation.
+    await page.getByTestId("wizard-step-services").click();
+    await page.getByTestId("button-add-service").click();
+    await page.getByTestId("input-service-name-0").fill("Siding replacement");
+    await page.getByTestId("wizard-step-delivery").click();
+    await page.getByTestId("switch-fallback-owner").click(); // off
+    await page.getByTestId("wizard-step-review").click();
+    // urgent/human always page the owners (server/voice/escalations.ts); every other kind is unassigned.
+    await expect(page.getByTestId("review-row-escalations-9")).toContainText("owners only for emergencies and 'I want a person'");
+  });
+
   test("editor: a value the server would refuse (max turns 999) blocks Publish; the field clamps on blur", async ({ page }) => {
     await mockVoice(page, { published: true });
     await gotoCrm(page, "/call-assistant?tab=studio");

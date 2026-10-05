@@ -106,12 +106,15 @@ export async function securityChanged(req: Request, userId: number, kind: Notifi
   await notifyUser(userId,kind,{ title, link:'/settings?tab=security', actionUrl:'/settings?tab=security' });
 }
 export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res: any)=>any) {
+  // RecentAuthModal's prefill: which verification methods this account can use
+  // (password / authenticator / emailed code, optional Google) so the dialog can offer them.
   app.get('/api/auth/reauth', async (req,res) => {
     const u=auth(req,res); if(!u) return;
     const {rows:[user]}=await pool.query('SELECT password_hash,totp_enabled,google_id,email FROM users WHERE id=$1',[u.id]);
     // google: an email-code account can also confirm through its linked Google sign-in.
     res.json({ method:user.totp_enabled?'totp':user.password_hash?'password':'email', google:!!user.google_id, email:maskEmail(user.email) });
   });
+  // RecentAuthModal "Email a verification code": sends the 6-digit code; it lives in the session for 10 minutes, 5 attempts.
   app.post('/api/auth/reauth/email', rateLimit('security-email',3,10,15*60_000), async(req,res)=>{
     const u=auth(req,res); if(!u) return;
     const {rows:[user]}=await pool.query('SELECT email,password_hash,totp_enabled FROM users WHERE id=$1',[u.id]);
@@ -121,6 +124,8 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     await sendWithFallback({to:user.email,subject:'ConstructHUB verification code',text:`Your verification code is ${code}. It expires in 10 minutes.`,html:`<p>Your verification code is <strong>${code}</strong>. It expires in 10 minutes.</p>`});
     res.json({ok:true,sentTo:maskEmail(user.email)});
   });
+  // RecentAuthModal "Verify and continue": checks password / TOTP / emailed code; on success marks the
+  // session recently-authenticated so the guarded action proceeds.
   app.post('/api/auth/reauth', rateLimit('security-verify',10,30,15*60_000), async(req,res)=>{
     const u=auth(req,res); if(!u) return;
     const value=req.body?.value;
@@ -137,11 +142,15 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     delete req.session.reauthEmail; markRecentAuth(req,u.id);
     await logActivity(req,u.id,'security.reauthenticated'); res.json({ok:true});
   });
+  // Me → Password & security "Remembered devices": the account's unexpired trusted-device rows
+  // (30-day sign-in skips), newest first.
   app.get('/api/auth/devices',async(req,res)=>{
     const u=auth(req,res);if(!u)return;
     const {rows}=await pool.query('SELECT id,device,created_at,expires_at FROM account_trusted_devices WHERE user_id=$1 AND expires_at>now() ORDER BY created_at DESC',[u.id]);
     res.json({devices:rows});
   });
+  // "Revoke device" on a remembered-device row: deletes that account_trusted_devices row (own
+  // account only) and logs security.device_revoked.
   app.delete('/api/auth/devices/:id',async(req,res)=>{
     const u=auth(req,res);if(!u)return;
     if(!/^[a-f0-9]{32}$/.test(String(req.params.id))) return res.status(400).json({message:'Invalid device'});
@@ -149,6 +158,8 @@ export function registerAccountSecurityRoutes(app: Express, auth: (req: any,res:
     if (!removed.rowCount) return res.status(404).json({message:'Remembered device not found'});
     await logActivity(req,u.id,'security.device_revoked',{deviceId:req.params.id});res.json({ok:true});
   });
+  // "Generate new recovery codes" while 2FA is on: replaces all 10 codes in one transaction
+  // (recent identity check required) and logs security.recovery_codes_changed.
   app.post('/api/auth/2fa/recovery-codes',rateLimit('security-recovery',5,15),async(req,res)=>{
     const u=auth(req,res);if(!u || !requireRecentAuth(req,res))return;
     const {rows:[user]}=await pool.query('SELECT totp_enabled FROM users WHERE id=$1',[u.id]);

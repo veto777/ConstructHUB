@@ -116,7 +116,7 @@ async function seed(pool: pg.Pool, tag: string, users: number[]): Promise<Seeded
 
   // ── CRM orgs ────────────────────────────────────────────────────────────
   async function org(ownerId: number, name: string) {
-    const [g] = await q(`INSERT INTO crm_orgs(name, owner_user_id, phone, address_line1, city, state) VALUES($1,$2,'555-0100','1 Main St','Tampa','FL') RETURNING id`, [name, ownerId]);
+    const [g] = await q(`INSERT INTO crm_orgs(name, owner_user_id, phone, address_line1, city, state, timezone) VALUES($1,$2,'555-0100','1 Main St','Tampa','FL','America/Los_Angeles') RETURNING id`, [name, ownerId]);
     const [m] = await q(`INSERT INTO crm_members(org_id, user_id, email, role, status, display_name, phone, created_at)
                          VALUES($1,$2,$3,'owner','active','Owner','555-0101', now() - interval '30 days') RETURNING id`, [g.id, ownerId, `owner-${tag}-${ownerId}@example.invalid`]);
     return { id: g.id as string, ownerMember: m.id as string };
@@ -134,10 +134,13 @@ async function seed(pool: pg.Pool, tag: string, users: number[]): Promise<Seeded
   await project(ao.id, ac, "approved", 500_000);
   await estimate(ao.id, ac, "sent", 120_000);
   await estimate(ao.id, ac, "approved", 250_000);
+  // The "today"/"next 7 days" tiles count the ORG's local day (the schedule
+  // page's clock): the visits sit at Los Angeles local midnight, not UTC's.
+  const laDay = "date_trunc('day', now() AT TIME ZONE 'America/Los_Angeles') AT TIME ZONE 'America/Los_Angeles'";
   await q(`INSERT INTO crm_appointments(org_id, title, status, starts_at, created_by_member_id) VALUES
-           ($1,'Today visit','scheduled', date_trunc('day', now() AT TIME ZONE 'UTC') + interval '1 minute', $2),
-           ($1,'Later visit','scheduled', date_trunc('day', now() AT TIME ZONE 'UTC') + interval '3 days', $2),
-           ($1,'Cancelled visit','canceled', date_trunc('day', now() AT TIME ZONE 'UTC') + interval '2 minutes', $2)`, [ao.id, ao.ownerMember]);
+           ($1,'Today visit','scheduled', ${laDay} + interval '1 minute', $2),
+           ($1,'Later visit','scheduled', ${laDay} + interval '3 days', $2),
+           ($1,'Cancelled visit','canceled', ${laDay} + interval '2 minutes', $2)`, [ao.id, ao.ownerMember]);
   await q("INSERT INTO crm_team_activity(org_id, member_id, type, title, link, created_at) VALUES($1,$2,'note','sent estimate 1001','/crm/clients/x', now() - interval '30 minutes')", [ao.id, ao.ownerMember]);
 
   const oo = await org(other, `Dash ${tag} Other Co`);

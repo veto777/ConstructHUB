@@ -150,6 +150,10 @@ export async function upsertIngestedCall(orgId: string, c: IngestCall): Promise<
 }
 
 export function registerVoiceIngestRoutes(app: Express): void {
+  /** One outside receptionist's finished call (or {calls:[…]} backfill, ≤100), upserted by call_sid into
+   *  voice_calls with engine='external' — a RECORD ONLY: never metered, never a lead/escalation. Its rows power
+   *  Call Assistant → Calls (log/spam/detail via flags.ingest) and the Overview's "live · Janice" status
+   *  (externalReceptionist below). Tailnet + bearer auth; 409 when the sid belongs to another engine/org. */
   app.post(`${VOICE_INGEST_PATH}/calls`, requireVoiceIngest, async (req: Request, res: Response) => {
     const orgId = (res.locals as any).ingestOrgId as string;
     const body = req.body;
@@ -184,6 +188,9 @@ export function registerVoiceIngestRoutes(app: Express): void {
     res.json({ stored, failed: results.length - stored, results });
   });
 
+  /** Stores the call's WAV (≤40 MB, RIFF-validated) in R2 and links it via voice_calls.recording_key — the
+   *  Recording player in the call detail sheet (Call Assistant → Calls) streams it back through
+   *  GET /api/crm/voice/calls/:id/recording. Call must have been pushed first (404 otherwise). */
   app.put(`${VOICE_INGEST_PATH}/calls/:callSid/recording`, requireVoiceIngest,
     express.raw({ type: ["audio/wav", "audio/x-wav", "application/octet-stream"], limit: RECORDING_MAX_BYTES }),
     async (req: Request, res: Response) => {
@@ -238,9 +245,13 @@ export async function externalReceptionist(orgId: string, timezone?: unknown): P
   const row = (r as any).rows?.[0];
   if (!row?.last_call || !Number(row.recent)) return null;
   const p = String(row.persona || "janice");
+  // db.execute hands back the raw UTC wall string ("2026-10-04 23:20:00"); `new Date` on it reads the
+  // SERVER'S local zone (a 4h shift on an EDT box — the overview's "last call" date was a day late for
+  // late-evening calls). Read it as UTC, the CRM's convention for timestamp-without-tz columns.
+  const lastCall = row.last_call instanceof Date ? row.last_call : new Date(`${String(row.last_call).replace(" ", "T")}Z`);
   return {
     name: p.charAt(0).toUpperCase() + p.slice(1),
-    lastCallAt: new Date(row.last_call).toISOString(),
+    lastCallAt: lastCall.toISOString(),
     callsLast30Days: Number(row.recent),
     lines: ((row.lines ?? []) as string[]).sort(),
     thisMonth: { calls: Number(row.month_calls ?? 0), minutes: Number(row.month_minutes ?? 0), spam: Number(row.month_spam ?? 0) },

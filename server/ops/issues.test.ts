@@ -336,6 +336,22 @@ describe("admin API (/api/admin/issues — platform admins only)", () => {
     expect(re.body.history.map((h: any) => h.event)).toEqual(["reported", "fixed", "ignored", "reinspect"]);
     expect((await getIssue(id, pool))?.status).toBe("new");
   });
+
+  it("status tab counts follow the source filter — the tabs never out-count the list below them", async () => {
+    const byStatus = async (where: string) =>
+      Object.fromEntries((await pool.query(`SELECT status, count(*)::int n FROM ops_issues WHERE ${where} GROUP BY status`)).rows.map((r) => [r.status, r.n]));
+    const all = await http("GET", "/api/admin/issues", { user: 1 });
+    const healthList = await http("GET", "/api/admin/issues?source=health", { user: 1 });
+    // Regression (audit, 2026-10-04): counts ignored every filter, so with a
+    // source chosen the "All" tab still claimed the whole desk while the list
+    // below it showed only that source's rows.
+    expect(healthList.body.counts).toEqual(await byStatus("source = 'health'"));
+    expect(Object.values(healthList.body.counts).reduce((a: number, b: number) => a + b, 0)).toBe(healthList.body.total);
+    expect(all.body.counts).toEqual(await byStatus("true"));
+    // A status filter narrows the list, but no tab's count changes because one is chosen.
+    const newOnly = await http("GET", "/api/admin/issues?status=new", { user: 1 });
+    expect(newOnly.body.counts).toEqual(all.body.counts);
+  });
 });
 
 describe("browser error reports (POST /api/ops/client-error)", () => {

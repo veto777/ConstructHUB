@@ -154,6 +154,9 @@ describe("the outside receptionist on the status (owner 2026-10-04: \"we are usi
     const ext = await externalReceptionist(ORG);
     expect(ext).toMatchObject({ name: "Janice", lines: ["FL"] });
     expect(ext!.callsLast30Days).toBeGreaterThan(0);
+    // lastCallAt is the pushed call's instant, read as UTC: `new Date` on the raw "YYYY-MM-DD HH:MM:SS"
+    // string shifted it by the server's local zone (the overview's "last call" date was hours late).
+    expect(ext!.lastCallAt).toBe("2026-10-02T19:58:00.000Z");
     // This month's tiles come from her calls (never the minute meter): the same counts as the Results panel.
     expect(ext!.thisMonth.calls).toBeGreaterThan(0);
     expect(ext!.thisMonth.minutes).toBeGreaterThanOrEqual(0);

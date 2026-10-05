@@ -220,8 +220,9 @@ export function registerStripeRoutes(app: Express) {
     res.json(priceBook());
   });
 
-  // The Pricing page (/pricing): this account's plan, interval, add-ons and renewal date —
-  // what the plan cards compare against. Signed out → a plain "none" summary.
+  // The cart sheet's "Proceed to checkout" (client/src/components/cart-sheet.tsx): re-resolves every
+  // price server-side (catalog/DB, never the client's), refuses duplicates, bundle overlap, sales-only (>= $1,000)
+  // and contract-gated items, then opens a Stripe Checkout session for the resolved total.
   app.get("/api/stripe/subscription", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -514,9 +515,9 @@ export function registerStripeRoutes(app: Express) {
     }
   });
 
-  // The cart drawer's checkout (CartSheet): resolves every item's price server-side from the
-  // catalog/DB, rejects duplicates, bundle-overlap and sales-only items, then opens a Stripe
-  // checkout for the resolved total.
+  // The cart sheet's "Proceed to checkout" (client/src/components/cart-sheet.tsx): re-resolves every
+  // price server-side (catalog/DB, never the client's), refuses sales-only (>= $1,000) and
+  // contract-gated items, then opens a Stripe Checkout session.
   app.post("/api/stripe/create-cart-checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;

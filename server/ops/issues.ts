@@ -286,11 +286,15 @@ export async function listIssues(query: IssueListQuery = {}, q?: Queryable): Pro
   const w = where.length ? `WHERE ${where.join(" AND ")}` : "";
   const limit = Math.min(Math.max(Math.trunc(query.limit ?? 50), 1), 200);
   const offset = Math.max(Math.trunc(query.offset ?? 0), 0);
+  // The status tabs' counts follow the source filter (a tab must not claim
+  // more issues than the list below it), but never the status filter — each
+  // tab counts its own status, so the counts don't move when one tab is chosen.
+  const sourceOnly = query.source ? "WHERE source = $1" : "";
   const [{ rows }, { rows: [t] }, { rows: c }] = await Promise.all([
     db.query(`SELECT id, source, severity, title, count, first_seen, last_seen, status, report, branch, inspected_at, claimed_at
                 FROM ops_issues ${w} ORDER BY last_seen DESC, id DESC LIMIT ${limit} OFFSET ${offset}`, params),
     db.query(`SELECT count(*)::int n FROM ops_issues ${w}`, params),
-    db.query(`SELECT status, count(*)::int n FROM ops_issues GROUP BY status`),
+    db.query(`SELECT status, count(*)::int n FROM ops_issues ${sourceOnly} GROUP BY status`, query.source ? [query.source] : []),
   ]);
   const counts: Record<string, number> = {};
   for (const r of c) counts[r.status] = r.n;
