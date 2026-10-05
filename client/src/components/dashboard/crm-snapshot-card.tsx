@@ -41,7 +41,7 @@ export function CrmSnapshotCard({ tile, leads, schedule }: { tile: DashboardTile
   const failed = [leads, schedule].filter((t) => t?.status === "error").map((t) => (t!.key === "crmLeads" ? "Leads and follow-ups" : "The schedule"));
   const workNote = failed.length ? `${failed.join(" and ")} didn't load. Open the CRM for live numbers.` : null;
   const cta = isEmpty
-    ? { label: "Set up the CRM", href: "/crm-app", surface: "app" as const }
+    ? (inNativeApp() ? { label: "Set up the CRM", href: "/crm", surface: "portal" as const } : { label: "Set up the CRM", href: "/crm-app", surface: "app" as const })
     : { label: "Open the CRM", href: tile.cta?.href ?? tile.href, surface: tile.cta?.surface ?? tile.surface };
 
   return (

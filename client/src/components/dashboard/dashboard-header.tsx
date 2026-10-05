@@ -1,5 +1,6 @@
 import { PageHeader, Section } from "@/components/app-ui";
 import { inNativeApp } from "@/lib/app-shell";
+import { portalUrl } from "@/lib/site";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
@@ -108,7 +109,8 @@ export function DashboardHeader({
       }
       meta={fixture ? <Badge variant="secondary" data-testid="badge-dashboard-fixture">Sample data</Badge> : undefined}
       actions={<>
-        <Button asChild><Link href="/crm-app">Open CRM</Link></Button>
+        {/* In the iPhone apps /crm-app (the CRM's sales gateway) is not shown, so go straight to the CRM. */}
+        <Button asChild>{inNativeApp() ? <a href={portalUrl("/crm")}>Open CRM</a> : <Link href="/crm-app">Open CRM</Link>}</Button>
         {onCustomize && <Button variant="outline" onClick={onCustomize} aria-haspopup="dialog" data-testid="button-dashboard-customize">Customize</Button>}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="outline">More</Button></DropdownMenuTrigger>

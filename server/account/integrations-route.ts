@@ -20,6 +20,7 @@
  */
 import type { Express, NextFunction, Request, Response } from "express";
 import { pool } from "../db";
+import { fromNativeApp } from "../app-shell";
 import { getEntitlements } from "../entitlements";
 import { PLANS, planForModule, type ModuleKey, type PlanModules } from "@shared/plans";
 
@@ -141,7 +142,12 @@ export function registerIntegrationsRoute(app: Express, auth: (req: any, res: an
   app.get("/api/account/integrations", (req: Request, res: Response, next: NextFunction) => {
     const u = auth(req, res); if (!u) return;
     integrationItems(u.id)
-      .then((items) => { res.setHeader("Cache-Control", "no-store"); res.json({ items }); })
+      .then((items) => {
+        res.setHeader("Cache-Control", "no-store");
+        // The iPhone apps sell nothing (App Store 3.1.3(f)): no plan names there — the same words as AppLocked.
+        const app = fromNativeApp(req);
+        res.json({ items: app ? items.map((i) => (i.detail && /^Included with the .+ plan\.$/.test(i.detail) ? { ...i, detail: "Not on this account." } : i)) : items });
+      })
       .catch(next);
   });
 }

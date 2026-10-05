@@ -126,8 +126,15 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
  * (`keepGroups` off): a single grid in the user's order, locked tiles in one
  * row under it.
  */
+/** Not in the iPhone apps (they sell nothing; the app routes these sales pages to Home, so the tile would look broken). */
+const APP_HIDDEN_TILES = new Set(["masterClass", "reinstatement"]);
+const APP_HIDDEN_LINKS = new Set(["/google-ads-guide"]);
+
 export function TileGrid({ tiles, keepGroups = true, onCustomize }: { tiles: DashboardTile[]; keepGroups?: boolean; onCustomize?: () => void }) {
-  const gridTiles = tiles.filter((t) => !CRM_CARD_TILES.has(t.key));
+  const shown = inNativeApp()
+    ? tiles.filter((t) => !APP_HIDDEN_TILES.has(t.key)).map((t) => (t.links ? { ...t, links: t.links.filter((l) => !APP_HIDDEN_LINKS.has(l.href)) } : t))
+    : tiles;
+  const gridTiles = shown.filter((t) => !CRM_CARD_TILES.has(t.key));
   if (!gridTiles.length) {
     return (
       <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed px-4 py-5 sm:flex-row sm:items-center sm:justify-between" data-testid="text-dashboard-tiles-empty">
