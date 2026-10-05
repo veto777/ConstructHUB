@@ -34,6 +34,11 @@ export function classifyGovernmentPage(r: any, kind: string) {
   const content = (main.length ? main.text() : $('body').text()).replace(/\s+/g, ' ').trim();
   const topic = kind === 'appraiser' ? /assess(?:or|ing|ment)|apprais|property (search|records|assessment|valuation|lister|owner services)|parcel|real estate|tax (search|records)|revenue commission(?:er)?|myproperty|tax administration|board of taxation|commissioner of revenue|real property tax/i : /permits?|building inspection|development services|planning and building/i;
 
+  // A permit link that lands on another government service (tax/revenue, budget transparency, procurement, utility
+  // billing, film/tourism, stormwater-only) is the wrong page, whatever the page says (2026-10-04 portal batch).
+  if (kind !== 'appraiser' && final && /taxandrevenue|\/transparency|procurement\.|utility-?billing|paymentus|invoicecloud|\/tourism\/|film-office|stormwater/i.test(final.hostname + final.pathname + final.hash)) {
+    return { status: 'dead', reason: 'not a building-permit service (tax, budget, procurement, utility, tourism or stormwater)', ...evidence };
+  }
   if (!topic.test(content + title)) {
     if (final && final.pathname === '/' && /community news|county news|town news|upcoming events|welcome to (?:the )?(?:city|town|county)/i.test(content)) return { status: 'dead', reason: 'generic homepage; department URL required', ...evidence };
     return { status: 'unverified', reason: 'no on-topic page content (manual/browser review required)', ...evidence };

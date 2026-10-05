@@ -441,7 +441,8 @@ test.describe("pricing page: refusals with a next step", () => {
     await gotoCrm(page, "/pricing");
     await page.getByTestId("button-subscribe-growth").click();
     await page.getByTestId("button-confirm-change-plan").click();
-    await expect(page.getByText(message)).toBeVisible();
+    // .first(): Radix also announces the toast in a hidden live region for a moment (same text twice).
+    await expect(page.getByText(message).first()).toBeVisible();
     await page.getByTestId("button-toast-manage-billing").click();
     await expect.poll(() => portal).toBe(1);
   });

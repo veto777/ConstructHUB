@@ -113,7 +113,11 @@ const CANDIDATES: Candidate[] = [
 // (Workflow candidates are already WebFetch-confirmed by agents; this is the
 // deterministic second gate. A path like "/" with no hint is rejected.)
 const PERMIT_HINT = /permit|accela|energov|etrakit|epermit|eplan|dobnow|bisweb|\bdbi\b|\bpli\b|posse|inspection|building|develop|\bdpp\b|dcra|\bdsi\b|\bdns\b|\bpdd\b|ladbs|onestop|compass|tdc-online|buildingrecords|eclipse|selfservice|dppweb|citizenaccess|\baca[-.]|cityworks|mygov|viewpoint|smartgov|opengov|civicplus|projectdox|avolve|camino|clariti|epath|citizenserve|onlinepermit|land-?management|lms|\bpds\b|codeenforcement/i;
-const CONCURRENCY = 4;
+// PERMIT_BUILD_CONCURRENCY raises the parallel checks for a big batch (default 4).
+const CONCURRENCY = Math.max(1, Math.min(48, Number(process.env.PERMIT_BUILD_CONCURRENCY) || 4));
+// PERMIT_BUILD_ONLY_NEW=1: keep the shipped entries as they are and check only the new candidates (a large discovery
+// batch right after a full re-check); the default re-checks everything.
+const ONLY_NEW = process.env.PERMIT_BUILD_ONLY_NEW === "1";
 import { classifySourceListedLink } from "../server/government-link-policy";
 import { fetchGovernmentPage, classifyGovernmentPage } from "../server/government-url-check";
 
@@ -132,6 +136,7 @@ async function main() {
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     while (idx < merged.length) {
       const index = idx++; const c = merged[index];
+      if (ONLY_NEW && index < existing.length) { results[index] = c; continue; }
       const candidateUrl = c.url || c.candidateUrl;
       if (!candidateUrl) { results[index] = c; continue; }
       let sourceVerified = existing.some(e => e.jurisdiction === c.jurisdiction);
