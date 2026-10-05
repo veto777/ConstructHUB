@@ -148,6 +148,8 @@ export interface HoverConn {
   connectedByMemberId?: string | null;
   webhook?: HoverWebhookState | null;
   lastSyncAt?: string | null;
+  /** Last auto-sync attempt, success or not — a failing org waits a full cadence too. */
+  lastSyncAttemptAt?: string | null;
   lastError?: string | null;
   lastSyncReport?: HoverSyncReport | null;
   /** Auto-sync cadence in hours (default 6). */
@@ -1108,17 +1110,41 @@ export async function walkHoverJobsPages(
   return { jobs, truncated, firstPageError: null };
 }
 
+/** Why page 1 failed, for the settings card: the HTTP status, or the thrown
+ *  error (a dead refresh token surfaces here as "HOVER token refresh failed: 401")
+ *  rather than a bare "network". */
+export function hoverListFailureReason(status: number, thrown: string | null): string {
+  if (status) return String(status);
+  return thrown || "network";
+}
+
+/** Auto-sync is due once a full cadence has passed since the last success AND
+ *  the last attempt — a failing connection is retried at the cadence, not on
+ *  every 10-minute tick. */
+export function hoverSyncDue(
+  hover: { syncEveryHours?: unknown; lastSyncAt?: string | null; lastSyncAttemptAt?: string | null },
+  now: Date,
+): boolean {
+  const hours = Number(hover.syncEveryHours) || 6;
+  const at = (s: string | null | undefined) => (s ? new Date(s).getTime() || 0 : 0);
+  const last = Math.max(at(hover.lastSyncAt), at(hover.lastSyncAttemptAt));
+  return now.getTime() - last >= hours * 3600_000;
+}
+
 /** One full sync pass: list completed HOVER jobs, ingest each (idempotent —
  *  existing jobs just top up photos). Used by the Sync button AND the
  *  scheduler. */
 export async function runHoverSync(orgId: string): Promise<HoverSyncRunReport> {
+  let firstThrown: string | null = null;
   const walk = await walkHoverJobsPages((page) =>
     hoverApi(orgId, "GET", `/v2/jobs?page=${page}`).catch((e: any) => {
+      firstThrown ??= String(e?.message || e).slice(0, 160);
       return { status: 0, json: { error: String(e?.message || e) } } as any;
     }));
   if (walk.firstPageError !== null) {
-    await writeHoverConn(orgId, { lastError: `jobs list failed (${walk.firstPageError || "network"})` }).catch(() => {});
-    throw new Error("Could not list HOVER jobs.");
+    const reason = hoverListFailureReason(walk.firstPageError, firstThrown);
+    await writeHoverConn(orgId, { lastError: `jobs list failed (${reason})` }).catch(() => {});
+    throw new Error(`Could not list HOVER jobs: ${reason}`);
   }
   const { jobs } = walk;
   const report: HoverSyncRunReport = {
@@ -1164,12 +1190,11 @@ export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
     .where(sql`${crmOrgs.customFields} -> 'hover' ->> 'refreshTokenEnc' IS NOT NULL`);
   for (const org of orgs) {
     const hover = ((org.customFields as any) ?? {}).hover ?? {};
-    const hours = Number(hover.syncEveryHours) || 6;
-    const last = hover.lastSyncAt ? new Date(hover.lastSyncAt).getTime() : 0;
-    if (now.getTime() - last < hours * 3600_000) continue;
+    if (!hoverSyncDue(hover, now)) continue;
     if (hoverSyncRunning.has(org.id)) continue;
     hoverSyncRunning.add(org.id);
     try {
+      await writeHoverConn(org.id, { lastSyncAttemptAt: now.toISOString() }).catch(() => {});
       const r = await runHoverSync(org.id);
       console.log(`[hover] auto-sync org ${org.id}: scanned ${r.scanned}, dup ${r.duplicates}, errors ${r.errors.length}`);
     } catch (e: any) {
