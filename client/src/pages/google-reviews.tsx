@@ -5,6 +5,7 @@ import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
+import { inNativeApp } from "@/lib/app-shell";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -929,9 +930,12 @@ export default function GoogleReviewsPage() {
                   ))}
                   {atTemplateLimit && (
                     <p className="pt-2 text-center text-xs text-muted-foreground" data-testid="text-template-limit">
-                      {templateLimit === 0
-                        ? <>Saving profiles is included with every plan. <a href="/pricing" className="underline">See plans</a>.</>
-                        : <>Profile limit reached ({templateLimit}). <a href="/pricing" className="underline">See plans</a> for more.</>}
+                      {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no "included with every plan" / "See plans". */}
+                      {inNativeApp()
+                        ? (templateLimit === 0 ? "Saving profiles isn't on this account." : `Profile limit reached (${templateLimit}).`)
+                        : templateLimit === 0
+                          ? <>Saving profiles is included with every plan. <a href="/pricing" className="underline">See plans</a>.</>
+                          : <>Profile limit reached ({templateLimit}). <a href="/pricing" className="underline">See plans</a> for more.</>}
                     </p>
                   )}
                 </div>
