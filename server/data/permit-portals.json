@@ -2032,11 +2032,11 @@
   },
   {
     "jurisdiction": "Atherton, CA",
-    "url": "https://athertonca.opengov.com/",
-    "platform": "OpenGov",
+    "url": null,
+    "platform": null,
     "sourceUrl": "https://athertonca.gov/",
     "candidateUrl": "https://athertonca.opengov.com/",
-    "linkStatus": "unconfirmed",
+    "linkStatus": "dead",
     "lastVerifiedAt": "2026-10-05T02:58:31.877Z"
   },
   {
@@ -5172,11 +5172,11 @@
   },
   {
     "jurisdiction": "Boone County, MO",
-    "url": "https://report.boonemo.gov/mrcjava/servlet/RM00_MP.I00020s",
-    "platform": "Boone County Resource Management building permit search",
+    "url": null,
+    "platform": null,
     "sourceUrl": "https://www.boonemo.gov/",
     "candidateUrl": "https://report.boonemo.gov/mrcjava/servlet/RM00_MP.I00020s",
-    "linkStatus": "unconfirmed",
+    "linkStatus": "dead",
     "lastVerifiedAt": "2026-10-05T01:01:50.694Z"
   },
   {
@@ -32784,11 +32784,11 @@
   },
   {
     "jurisdiction": "Marble Falls, TX",
-    "url": "https://marblefallstx.opengov.com/",
-    "platform": "OpenGov",
+    "url": null,
+    "platform": null,
     "sourceUrl": "https://marblefallstx.gov/",
     "candidateUrl": "https://marblefallstx.opengov.com/",
-    "linkStatus": "unconfirmed",
+    "linkStatus": "dead",
     "lastVerifiedAt": "2026-10-05T02:58:48.838Z"
   },
   {
