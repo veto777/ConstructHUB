@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { inNativeApp } from "@/lib/app-shell";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -440,14 +441,19 @@ export default function LsaGuidePage() {
               <BadgeCheck className="h-8 w-8 text-[#34A853] mx-auto mb-3 animate-float" />
               <h3 className="text-lg font-bold text-foreground mb-2">Ready to Dominate Local Search?</h3>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-4">
-                LSA is just one piece of the puzzle. Learn the complete system for building a profitable contractor business with our Master Class, or set up Click Guard to protect your Google Ads campaigns from click fraud.
+                {inNativeApp()
+                  ? "LSA is just one piece of the puzzle. Set up Click Guard to protect your Google Ads campaigns from click fraud."
+                  : "LSA is just one piece of the puzzle. Learn the complete system for building a profitable contractor business with our Master Class, or set up Click Guard to protect your Google Ads campaigns from click fraud."}
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
+                {/* Not in the iPhone apps: the Master Class is a paid course (the apps sell nothing). */}
+                {!inNativeApp() && (
                 <Link href="/master-class">
                   <Button size="lg" className="bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white" data-testid="button-masterclass">
                     <GraduationCap className="h-4 w-4 mr-2" /> Explore Master Class
                   </Button>
                 </Link>
+                )}
                 <Link href="/google-ads">
                   <Button size="lg" variant="outline" data-testid="button-click-guard">
                     <Shield className="h-4 w-4 mr-2" /> Set Up Click Guard

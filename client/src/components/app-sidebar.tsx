@@ -199,6 +199,14 @@ function FeatureBadge({ type, label }: { type: BadgeType; label: string }) {
   return <span className="sr-only" data-testid={`badge-${type}-${label.toLowerCase().replace(/\s+/g, "-")}`}>{type === "new" ? "New" : type === "hot" ? "Popular" : "Recommended"}</span>;
 }
 
+/**
+ * Not in the iPhone apps (they sell nothing — App Store 3.1.3(f)): the paid Master Class, the reinstatement
+ * service and the Google Ads guide (its sections are Master Class content behind a purchase). The app routes
+ * them to Home (App.tsx APP_SALES_PATHS), so a menu entry would only look broken.
+ */
+const APP_HIDDEN_URLS = new Set(["/master-class", "/reinstatement", "/google-ads-guide"]);
+const shownHere = (item: { url: string }) => !inNativeApp() || !APP_HIDDEN_URLS.has(item.url);
+
 const permitsGroup: NavGroup = {
   label: "Permits & Databases",
   icon: HardHat,
@@ -305,7 +313,7 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
           <span className="font-medium">{group.label}</span>
           <ChevronRight className={`ml-auto h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
         </SidebarMenuButton>
-        {group.landingUrl && (
+        {group.landingUrl && !inNativeApp() && (
           <Link href={group.landingUrl} className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mr-1" data-testid={`link-nav-${group.label.toLowerCase().replace(/\s+/g, "-")}-landing`}>
             <ExternalLink className="h-3 w-3 text-muted-foreground" />
           </Link>
@@ -313,7 +321,7 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
       </div>
       {open && (
         <SidebarMenuSub>
-          {group.children.map(item => (
+          {group.children.filter(shownHere).map(item => (
             <SidebarMenuSubItem key={item.title}>
               <SidebarMenuSubButton
                 asChild
@@ -493,7 +501,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Tools</div>
             <SidebarMenu>
-              {standaloneItems.map(item => (
+              {standaloneItems.filter(shownHere).map(item => (
                 <SidebarMenuItem key={item.url}>
                   <div className="flex items-center">
                     <SidebarMenuButton
@@ -515,7 +523,7 @@ export function AppSidebar() {
                           : item.badge && <FeatureBadge type={item.badge} label={item.title} />}
                       </Link>
                     </SidebarMenuButton>
-                    {item.landingUrl && (
+                    {item.landingUrl && !inNativeApp() && (
                       <Link href={item.landingUrl} className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mr-1" data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}-landing`}>
                         <ExternalLink className="h-3 w-3 text-muted-foreground" />
                       </Link>
