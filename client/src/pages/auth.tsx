@@ -15,6 +15,7 @@ import { CrmLogo } from "@/components/crm-logo";
 import { CRM_NAME, isPortal } from "@/lib/site";
 import { BRAND_NAME } from "@/lib/marketing";
 import { StandingGator } from "@/components/mascot";
+import { inNativeApp } from "@/lib/app-shell";
 import { BTN_OUTLINE, BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 
 type AuthMode = "2fa" | "login" | "signup" | "forgot-password" | "reset-password";
@@ -275,24 +276,28 @@ export default function AuthPage() {
   }
 
   const bubble = BUBBLE[mode];
+  const app = inNativeApp();
 
   return (
     <>
-    {/* The site's ribbon, as on every public page (owner, 2026-10-02). */}
-    <PublicPageHeader next={nextParam ?? "/"} />
-    <div className="mkt-editorial mkt-shadcn min-h-screen bg-mkt-paper text-mkt-ink lg:grid lg:grid-cols-12" data-testid="page-auth" data-auth-mode={mode}>
+    {/* The site's ribbon, as on every public page (owner, 2026-10-02) — but not in the iPhone apps, where the
+        sign-in screen is the whole app: one logo (below), and the page itself clears the status bar. */}
+    {!app && <PublicPageHeader next={nextParam ?? "/"} />}
+    <div className={`${app ? "app-status-pad " : ""}mkt-editorial mkt-shadcn min-h-screen bg-mkt-paper text-mkt-ink lg:grid lg:grid-cols-12`} data-testid="page-auth" data-auth-mode={mode}>
       {/* The form: cream paper with the drafting grid fading out below the masthead. */}
       <div className="relative lg:col-span-7 xl:col-span-6 flex flex-col min-h-screen">
         <div className="absolute inset-x-0 top-0 h-[28rem] mkt-grid-paper [mask-image:linear-gradient(to_bottom,black_0%,transparent_100%)]" aria-hidden />
         <div className="relative flex-1 flex flex-col items-center px-4 sm:px-6 py-8 sm:py-12 lg:justify-center">
           <div className="w-full max-w-[28rem] space-y-6">
             <div className="text-center lg:text-left space-y-3">
-              <div className="flex justify-center lg:justify-start">
+              {/* One logo per screen: on phone browsers the ribbon above already shows it; the apps have no ribbon. */}
+              <div className={`${app ? "flex pt-2" : "hidden lg:flex"} justify-center lg:justify-start`}>
                 {isPortal()
-                  ? <CrmLogo height={40} />
-                  : <Link href="/" aria-label={`${BRAND_NAME} home`} data-testid="link-auth-logo-home"><CHLogo height={46} /></Link>}
+                  ? <CrmLogo height={app ? 52 : 40} />
+                  : <Link href="/" aria-label={`${BRAND_NAME} home`} data-testid="link-auth-logo-home"><CHLogo height={app ? 60 : 46} /></Link>}
               </div>
-              <h1 className="font-display font-semibold text-[1.9rem] leading-none tracking-[-0.02em] text-mkt-ink" data-testid="text-auth-title">
+              {/* In the apps the logo already reads ConstructHUB (CRM): the title stays for screen readers only. */}
+              <h1 className={`${app ? "sr-only " : ""}font-display font-semibold text-[1.9rem] leading-none tracking-[-0.02em] text-mkt-ink`} data-testid="text-auth-title">
                 {isPortal()
                   ? <>ConstructHub <em className="text-mkt-orange-ink">CRM</em></>
                   : <>Construct<em className="text-mkt-orange-ink">HUB</em></>}
@@ -302,10 +307,11 @@ export default function AuthPage() {
               </Kicker>
             </div>
 
-            {/* Phones and tablets: the gator sits small above the card, his line beside him. */}
-            <div className="lg:hidden flex items-end justify-center gap-3 px-2" aria-hidden>
-              <p className="mkt-bubble px-4 py-2.5 text-[16px] leading-snug max-w-[15rem] -rotate-1 mb-6" data-testid="text-auth-bubble-small">{bubble}</p>
-              <StandingGator height={104} className="shrink-0" />
+            {/* Phones and tablets: the gator stands beside the card's top, facing his line; the bubble's tail
+                points back at him (.mkt-bubble-left), the two centered as one group. */}
+            <div className="lg:hidden flex items-start justify-center gap-2 px-2" aria-hidden>
+              <StandingGator height={96} className="shrink-0" />
+              <p className="mkt-bubble mkt-bubble-left mt-3 px-4 py-2.5 text-[17px] leading-snug max-w-[13rem]" data-testid="text-auth-bubble-small">{bubble}</p>
             </div>
 
             <Card className="relative p-6 sm:p-8 space-y-5 rounded-2xl border-mkt-rule bg-mkt-card shadow-none -mt-2 lg:mt-0">
@@ -667,7 +673,8 @@ export default function AuthPage() {
               </p>
             )}
 
-            {!isPortal() && (
+            {/* Not in the apps: "home" there is this screen (the marketing site is not part of the apps). */}
+            {!isPortal() && !app && (
               <p className="text-center text-[13px]">
                 <Link href="/" className="inline-flex items-center gap-1.5 font-semibold text-mkt-muted hover:text-mkt-ink transition-colors" data-testid="link-auth-home">
                   <ArrowLeft className="h-3.5 w-3.5" /> Back to {BRAND_NAME} home

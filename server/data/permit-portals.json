@@ -17365,15 +17365,6 @@
     "lastVerifiedAt": "2026-10-05T02:57:28.349Z"
   },
   {
-    "jurisdiction": "FDL, WI",
-    "url": "https://www.fdl.wi.gov/inspection-services/permits-fees/",
-    "platform": "City building permits page",
-    "sourceUrl": "https://www.fdl.wi.gov/",
-    "candidateUrl": "https://www.fdl.wi.gov/inspection-services/permits-fees/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:55:43.202Z"
-  },
-  {
     "jurisdiction": "Federal Heights, CO",
     "url": "https://www.fedheights.org/building",
     "platform": "City building permit page",

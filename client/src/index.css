@@ -1339,6 +1339,16 @@
   border-bottom: 2px solid var(--mkt-ink);
   transform: rotate(45deg);
 }
+/* A bubble spoken by someone on its LEFT (the sign-in gator on phones): tail on the left edge, near the top. */
+.mkt-bubble-left { border-radius: 18px; }
+.mkt-bubble-left::after {
+  right: auto;
+  bottom: auto;
+  left: -9px;
+  top: 16px;
+  border-right: 0;
+  border-left: 2px solid var(--mkt-ink);
+}
 
 /*
  * ── shadcn controls inside the editorial theme ──────────────────────────────
