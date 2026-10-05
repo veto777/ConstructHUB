@@ -245,9 +245,13 @@ export async function syncLocation(userId: number, id: number, client?: GoogleCl
           profile_snapshot=CASE WHEN kind='profile' THEN $4::jsonb ELSE profile_snapshot END
           WHERE location_id=$1 AND kind=$2`,[id,kind,warnings?.length ? warnings.join('; ') : null,profileSnapshot]);
       } catch(e) {
-        const error = publicError(e);
+        const error: ReturnType<typeof publicError> & {unverified?: true} = publicError(e);
         // Google only shares performance for listings whose owner it has verified (voice of merchant).
-        if (kind === 'performance' && verified === false && error.kind === 'permission') error.message = 'Google only shares performance stats for verified listings. Verify this listing in Google Business Profile, then sync again.';
+        // That is the listing's state, not a failed sync: retrying cannot change it (see syncIncomplete).
+        if (kind === 'performance' && verified === false && error.kind === 'permission') {
+          error.message = 'Google only shares performance stats for verified listings. Verify this listing in Google Business Profile, then sync again.';
+          error.unverified = true;
+        }
         result[kind] = error;
         await c.query('UPDATE gbp_sync_status SET last_error=$3 WHERE location_id=$1 AND kind=$2',[id,kind,error.message]);
         if(e instanceof GoogleError && e.kind==='auth') await invalidate(userId, subject);

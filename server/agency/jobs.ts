@@ -76,13 +76,18 @@ export async function linkCached(user:number,id:number) {
   await pool.query('UPDATE business_locations SET gbp_account_name=$3,gbp_location_name=$4,gbp_google_subject=$5,gbp_unlinked_by_user=false WHERE user_id=$1 AND id=$2',[user,id,d.account,d.location,d.subject]);
   await queueSync(user,id);
 }
+/** A sync failed when any part errored, except performance on a listing Google hasn't verified: that is the
+ *  listing's state (shown on the location), and retrying it only re-ran the sync five times and paged the desk. */
+export function syncIncomplete(result:Record<string,unknown>) {
+  return Object.values(result).some((r:any)=>r?.kind&&!r.unverified);
+}
 export async function performJob(j:any) {
   const a=await accessFor(j.actor_id,j.user_id);
   await locationAccess(a,j.location_id,true); // Revocations/assignment changes take effect while queued.
   switch(j.action) {
     case 'sync': {
       const result=await syncLocation(j.user_id,j.location_id);
-      if(Object.values(result).some((r:any)=>r?.kind)) throw new GoogleError('transient','Sync incomplete; see the location sync errors',503);
+      if(syncIncomplete(result)) throw new GoogleError('transient','Sync incomplete; see the location sync errors',503);
       return result;
     }
     case 'unlink': return unlinkLocation(j.user_id,j.location_id);
