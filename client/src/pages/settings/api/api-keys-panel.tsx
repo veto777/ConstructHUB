@@ -271,7 +271,7 @@ function QuotaCard({ used, limit, ratePerMinute }: { used: number; limit: number
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
           <span className="font-medium">API units this month</span>
           <span className={`tabular-nums ${exhausted ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-api-quota">
-            {limit < 0 ? `${formatCount(used)} used · fair use` : `${formatCount(used)} of ${formatCount(limit)} used`}
+            {limit < 0 ? `${formatCount(used)} used · unlimited` : `${formatCount(used)} of ${formatCount(limit)} used`}
           </span>
         </div>
         {limit > 0 && (

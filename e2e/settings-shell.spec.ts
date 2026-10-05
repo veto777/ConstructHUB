@@ -175,7 +175,8 @@ test.describe("settings shell — desktop", () => {
     const calls = await mockAccount(page);
     await gotoCrm(page, "/settings?tab=limits");
     await expect(page.getByTestId("text-limits-plan")).toContainText("Pro plan limits");
-    await expect(page.getByTestId("text-limits-resets")).toContainText("November 1");
+    // Midnight UTC on Nov 1, on the viewer's own clock (owner 2026-10-04: as recommended).
+    await expect(page.getByTestId("text-limits-resets")).toContainText(/Monthly counts reset (October 31|November 1) at \d{1,2}:\d{2}/);
 
     const L = PLANS.pro.limits;
     const n = (v: number) => v.toLocaleString("en-US");

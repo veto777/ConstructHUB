@@ -1009,7 +1009,7 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
                           {status === "revoked" ? (
                             <Badge variant="outline" className="text-red-500 border-red-500/30" data-testid={`badge-status-${c.id}`}>Revoked</Badge>
                           ) : status === "redeemed" ? (
-                            <Badge variant="outline" className="text-emerald-600 border-emerald-500/30" data-testid={`badge-status-${c.id}`}>Active</Badge>
+                            <Badge variant="outline" data-testid={`badge-status-${c.id}`}>Redeemed</Badge>
                           ) : status === "expired" ? (
                             <Badge variant="outline" className="text-red-500 border-red-500/30" data-testid={`badge-status-${c.id}`}>Expired</Badge>
                           ) : (
