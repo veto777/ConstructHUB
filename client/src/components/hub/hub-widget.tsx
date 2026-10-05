@@ -6,6 +6,7 @@ import HubMascot, { type HubMascotState } from "./hub-mascot";
 import { HubMarkdown } from "./hub-markdown";
 import { pageKeyForPath } from "@shared/hub-links";
 import { isClientPortal, isPortal } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 import { cn } from "@/lib/utils";
 
 /**
@@ -48,6 +49,9 @@ const BUSY_TEXT = "My radio's crackling, so that took too long. Please try again
 const WELCOME_FLAG = "hub.welcomeSeen";
 const HISTORY_MAX_MESSAGES = 10;
 const HISTORY_MAX_CHARS = 3800;
+/** In the iPhone apps Gabe offers no price / plan / checkout / sales-rep quick questions (keep in step
+ * with APP_SALES_PRESETS in server/hub/app-guard.ts; the server answers them with the fixed line regardless). */
+const APP_HIDDEN_CHIP_IDS = new Set(["pricing", "which-plan", "trial", "get-started", "agency", "done-for-you", "master-class", "call-assistant", "call-number"]);
 
 // Homeowner-facing token pages, the auth flow and the admin console never show Gabe.
 const TOKEN_PAGES = ["/e/", "/i/", "/co/", "/lead-form/", "/portal/", "/review/", "/contract/sign/", "/site-scan/report/"];
@@ -292,10 +296,14 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
 
   const chips = useMemo(() => {
     if (!meta) return [];
-    const byId = new Map(meta.presets.map((p) => [p.id, p]));
+    // The iPhone apps sell nothing (App Store 3.1.3(f)): chips about prices, plans, checkout or a
+    // sales rep stay hidden (the server answers them with the fixed line anyway — this spares the tap).
+    const appHide = inNativeApp() ? APP_HIDDEN_CHIP_IDS : null;
+    const list = appHide ? meta.presets.filter((p) => !appHide.has(p.id)) : meta.presets;
+    const byId = new Map(list.map((p) => [p.id, p]));
     const firstIds = welcome ? meta.welcome : meta.primary;
     const first = firstIds.map((id) => byId.get(id)).filter(Boolean) as HubMeta["presets"];
-    const rest = meta.presets.filter((p) => !firstIds.includes(p.id));
+    const rest = list.filter((p) => !firstIds.includes(p.id));
     return showMore ? [...first, ...rest] : first;
   }, [meta, welcome, showMore]);
 

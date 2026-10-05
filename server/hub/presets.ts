@@ -69,6 +69,34 @@ export function templateAnswer(presetId: PresetId): string {
 
 const COMING_SOON = /\bcoming soon\b|\bnot (yet )?for sale\b/i;
 
+/**
+ * App-mode preset answers (the iPhone apps sell nothing — App Store 3.1.3(f)):
+ * the informational presets get templates with every plan name, price and
+ * pricing link removed; the sales presets are answered by the fixed
+ * "Plans and pricing aren't available in the app." line (routes.ts) and never
+ * reach this function.
+ */
+export function appTemplateAnswer(presetId: PresetId): string {
+  switch (presetId) {
+    case "features":
+      return "ConstructHUB is one platform for construction contractors and the agencies that market them. One account covers:\n- **Growth tools**: permit offices and permit search, property records, Google Business Profile tools, Site Scan, Social Media and ad-traffic protection.\n- **The ConstructHub CRM**: clients, estimates with e-signature, invoices, online payments into your own Stripe account, pipeline, schedule and team roles.\n- **A client portal** for every client you add to the CRM.\n- **Education**: free guides and the Master Class.\nAsk me about any of these and I'll walk you through it.";
+    case "crm":
+      return "The **ConstructHub CRM** is part of your ConstructHUB account. It covers clients, estimates with e-signature, invoices, online payments straight into your own Stripe account, a price book, a pipeline, projects, a schedule, team roles and client messaging. Every client you add gets a private portal to read estimates, sign, pay and message you. See [ConstructHub CRM](/crm-app).";
+    case "permits":
+      return "The [Database Directory](/databases) lists county and city permit offices in all 50 states and DC. An official portal link is shown only when one is on record and has been checked; otherwise you get a **Find permit portal** search instead of a guessed link. **Search Permits** searches permit records live on the government portals that support it, by address, keyword, name, company name, license number or permit number. **Property Records** finds the official county appraiser or assessor office. The Directory and Property Records are free to browse, and live permit search is part of your ConstructHUB account.";
+    case "google-profile":
+      return "Link your listing under **Locations** to sync its reviews, photos, services and Google performance numbers. **Profile Guard** watches the listing for changes to the fields you choose and alerts you, or puts your approved values back in Lockdown mode. **Google Reviews** sends review requests and lets you reply to reviews, with AI-drafted replies you approve. **Posts & Photos** schedules updates and photos to the listing, and the **GMB Ranking Grid** shows where you rank in Google Maps for a keyword. Nobody can block edits at Google, and no ranking is guaranteed.";
+    case "reviews":
+      return "**Review Requests** emails your clients a request from your company with a button to leave a Google review, with optional follow-up reminders and tracking of opens and clicks. Ask every client, not only happy ones, and never offer anything in return for a review. **Google Profile Reviews** shows your synced Google reviews so you can publish replies to Google. **AI review replies** draft replies for you to approve before anything is published.";
+    case "click-fraud":
+      return "**Click Guard** puts a small tracking script on the pages your ads send people to, flags unusual traffic such as bot-like browsers and repeated visits from one IP, and adds repeat offenders to **Blocked IPs**. A script you paste into your own Google Ads account then adds those IPs as exclusions on your active campaigns. It comes with **IP Tracker** and **VPN Shield**. These signals don't prove fraud, and no savings are guaranteed.";
+    case "site-scan":
+      return "The **free 60-second website scan** needs no account: enter a website and email to see scores and up to five findings, then verify your email to unlock the quick-scan report of up to 11 pages. The full **Site Scan** checks technical and content issues, Google PageSpeed performance, how your site matches your Google Business Profile and AI search readiness, then lists what to fix in priority order. [Try the free scan](/free-site-scan).";
+    default:
+      return "";
+  }
+}
+
 /** A model answer is cached only if it states these facts exactly (on top of passing the output filter). */
 export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
   switch (presetId) {
