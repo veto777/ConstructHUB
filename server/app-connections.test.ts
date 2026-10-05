@@ -47,7 +47,7 @@ async function exchange(r: Response, auth = cookie) {
 beforeAll(async () => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a6") throw Error("Requires assigned development database");
   child = spawn(process.execPath,["--import","tsx","server/test-fixtures/app-auth-server.ts"], {
-    env:{...process.env,NODE_ENV:"test",SESSION_SECRET:secret,APP_TEST_CONNECTIONS:"true",GOOGLE_CLIENT_ID:"fixture",GOOGLE_CLIENT_SECRET:"fixture",GOOGLE_ADS_CLIENT_ID:"fixture",GOOGLE_ADS_CLIENT_SECRET:"fixture",GOOGLE_ADS_DEVELOPER_TOKEN:"fixture",GMAIL_OAUTH_ENABLED:"true",DEV_AUTH_BYPASS_USER1:"false",CRM_DEMO_AUTOLOGIN:"false",EMAIL_FORCE_SINK:"true"},
+    env:{...process.env,NODE_ENV:"test",SESSION_SECRET:secret,APP_TEST_CONNECTIONS:"true",GOOGLE_CLIENT_ID:"fixture",GOOGLE_CLIENT_SECRET:"fixture",GOOGLE_ADS_CLIENT_ID:"fixture",GOOGLE_ADS_CLIENT_SECRET:"fixture",GOOGLE_ADS_DEVELOPER_TOKEN:"fixture",GMAIL_OAUTH_ENABLED:"true",DEV_AUTH_BYPASS_USER1:"false",CRM_DEMO_AUTOLOGIN:"false",EMAIL_FORCE_SINK:"1"},
     stdio:["ignore","pipe","pipe","ipc"],
   });
   let logs=""; child.stdout?.on("data",b=>{logs+=b;}); child.stderr?.on("data",b=>{logs+=b;});
@@ -65,7 +65,7 @@ afterAll(async()=>{
   await pool.query("DELETE FROM crm_orgs WHERE owner_user_id=ANY($1::int[])",[ids]);
   for(const table of ["subscriptions","account_activity","ads_jobs","ads_grants","lsa_connections"]) await pool.query(`DELETE FROM ${table} WHERE user_id=ANY($1::int[])`,[ids]);
   const hash=createHash('sha256').update(ip).digest('hex');
-  await pool.query("DELETE FROM growth_budgets WHERE key LIKE $1 OR key LIKE ANY($2::text[])",[`%:ip:${hash}`,ids.flatMap(id=>[`%:user:${id}`,`edge:${id}:%`])]);
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE $1 OR key LIKE ANY($2::text[])",[`%:ip:${hash}`,ids.flatMap(id=>[`%:user:${id}`,`edge:%:${id}`])]);
   await pool.query("DELETE FROM users WHERE id=ANY($1::int[])",[ids]);
   await pool.end();
 });
@@ -73,14 +73,15 @@ for(const purpose of Object.keys(starts) as (keyof typeof starts)[]) {
   it(`${purpose}: links across cookie jars, returns to the web view, and consumes state once`,async()=>{
     const url=await start(purpose);
     expect(url.hostname).toBe("accounts.google.com");
-    const result=await finish(purpose,url);
+    const result=await finish(purpose,url, 'fixture-ok', purpose === 'ads' ? otherCookie : '');
     const back=await exchange(result);
     expect(back.status).toBe(302);
     expect(back.headers.get("location")).toMatch(/^\/(locations|ads-manager|search-console|mail-alerts|lsa-leads|crm\/team)\?/);
     expect(back.headers.get("location")).not.toMatch(/failed|error|norefresh/);
     expect((await finish(purpose,url)).status).toBe(400);
     const sheetCookie=result.headers.get("set-cookie")?.split(";")[0]||"";
-    expect(await (await api("/api/auth/me",sheetCookie)).json()).toBeNull();
+    if (purpose === "ads") expect((await (await api("/api/auth/me", otherCookie)).json()).id).toBe(other);
+    else expect(await (await api("/api/auth/me",sheetCookie)).json()).toBeNull();
     if(purpose==='calendar') expect((await pool.query("SELECT custom_fields FROM crm_orgs WHERE owner_user_id=$1",[owner])).rows[0].custom_fields).toBeTruthy();
     else {
       const table={gbp:'gbp_grants',ads:'ads_grants',gsc:'edge_connections',gmail:'mail_alert_grants',lsa:'lsa_connections'}[purpose];
@@ -89,6 +90,24 @@ for(const purpose of Object.keys(starts) as (keyof typeof starts)[]) {
     }
   });
 }
+for(const purpose of Object.keys(starts) as (keyof typeof starts)[]) {
+  it(`${purpose}: preserves the website consent URL and session callback`, async () => {
+    const url = await start(purpose, false);
+    expect(url.hostname).toBe("accounts.google.com");
+    expect(url.searchParams.get("state")).not.toMatch(/^app\./);
+    const result = await finish(purpose, url, "fixture-ok", cookie);
+    expect(result.status).toBe(302);
+    expect(result.headers.get("location")).toMatch(/^\//);
+    expect(result.headers.get("location")).not.toMatch(/failed|error|norefresh/);
+  });
+}
+it("permits only one concurrent callback and checks the GET handoff owner", async () => {
+  const url = await start("gsc");
+  const state = url.searchParams.get("state")!;
+  expect((await api(`/api/app/oauth/open?state=${state}`, otherCookie)).status).toBe(400);
+  const responses = await Promise.all([finish("gsc", url), finish("gsc", url)]);
+  expect(responses.map(r => r.status).sort()).toEqual([302,400]);
+});
 it("rejects expired, wrong-host, wrong-purpose and replayed app states without consuming a valid different-host/purpose state",async()=>{
   const url=await start('gsc');const state=url.searchParams.get('state')!;
   expect((await api(`/api/gbp/callback?state=${state}&code=x`)).status).toBe(400);

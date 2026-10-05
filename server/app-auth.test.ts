@@ -26,7 +26,7 @@ async function google(user: number, next = "/locations", app = true) {
 beforeAll(async () => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a6") throw Error("Requires assigned development database");
   child = spawn(process.execPath, ["--import", "tsx", "server/test-fixtures/app-auth-server.ts"], {
-    env: { ...process.env, NODE_ENV: "test", SESSION_SECRET: secret, GOOGLE_CLIENT_ID: "fixture", GOOGLE_CLIENT_SECRET: "fixture", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", EMAIL_FORCE_SINK: "true" },
+    env: { ...process.env, NODE_ENV: "test", SESSION_SECRET: secret, GOOGLE_CLIENT_ID: "fixture", GOOGLE_CLIENT_SECRET: "fixture", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", EMAIL_FORCE_SINK: "1" },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let logs = "";
@@ -42,7 +42,7 @@ beforeAll(async () => {
   }
 }, 40000);
 afterAll(async () => {
-  child?.kill("SIGTERM");
+  if (child && child.exitCode === null) await new Promise<void>(resolve => { child.once("exit", () => resolve()); child.kill("SIGTERM"); });
   for (const cookie of cookies) {
     const sid = decodeURIComponent(cookie.split("=")[1]).slice(2).split(".")[0];
     await pool.query("DELETE FROM session WHERE sid=$1", [sid]);

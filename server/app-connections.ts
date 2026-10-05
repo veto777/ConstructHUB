@@ -51,7 +51,7 @@ export async function appConnectUrl(req: Request, purpose: Purpose, googleUrl: s
 }
 
 export async function finishAppConnection(req: Request, res: Response, next: string) {
-  const connection = res.locals.appConnection as { user_id: number; host: string; next: string } | undefined;
+  const connection = res.locals?.appConnection as { user_id: number; host: string; next: string } | undefined;
   if (!connection) return res.redirect(next);
   const code = await mintAppCode(connection.user_id, connection.host, "redirect", safeNextPath(next) ?? connection.next);
   res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });

@@ -113,7 +113,7 @@ export function registerLsaRoutes(app: Express, getDevUser: GetUser): void {
       return await finishAppConnection(req,res,"/lsa-leads?connect=error");
     }
     try {
-      const redirectUri = res.locals.appConnection ? (req.session as any).lsaAppRedirect : getRedirectUri();
+      const redirectUri = res.locals?.appConnection ? (req.session as any).lsaAppRedirect : getRedirectUri();
       delete (req.session as any).lsaAppRedirect;
       const tokens = await exchangeCode(code, redirectUri);
       if (!tokens.refresh_token) {

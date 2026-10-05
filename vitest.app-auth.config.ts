@@ -1,4 +1,5 @@
-import { defineConfig, mergeConfig } from "vitest/config";
+import { defineConfig } from "vitest/config";
 import base from "./vitest.config";
-// These tests own their fixtures and budgets; do not clear other suites' auth counters.
-export default mergeConfig(base, defineConfig({ test: { globalSetup: [] } }));
+// Assign directly: mergeConfig concatenates arrays and would retain the global
+// auth-counter reset. These tests may only change their own fixtures/budgets.
+export default defineConfig({ ...base, test: { ...base.test, globalSetup: [] } });

@@ -12,7 +12,7 @@ async function api(method:string,body:unknown,cookie="") {
 }
 beforeAll(async()=>{
   if(new URL(process.env.DATABASE_URL!).pathname!=="/constructhub_dev_a6")throw Error("Requires assigned development database");
-  child=spawn(process.execPath,["--import","tsx","server/test-fixtures/app-auth-server.ts"],{env:{...process.env,NODE_ENV:"test",SESSION_SECRET:secret,GOOGLE_CLIENT_ID:"fixture",GOOGLE_CLIENT_SECRET:"fixture",DEV_AUTH_BYPASS_USER1:"false",CRM_DEMO_AUTOLOGIN:"false",EMAIL_FORCE_SINK:"true"},stdio:["ignore","pipe","pipe","ipc"]});
+  child=spawn(process.execPath,["--import","tsx","server/test-fixtures/app-auth-server.ts"],{env:{...process.env,NODE_ENV:"test",SESSION_SECRET:secret,GOOGLE_CLIENT_ID:"fixture",GOOGLE_CLIENT_SECRET:"fixture",DEV_AUTH_BYPASS_USER1:"false",CRM_DEMO_AUTOLOGIN:"false",EMAIL_FORCE_SINK:"1"},stdio:["ignore","pipe","pipe","ipc"]});
   let logs="";child.stderr?.on('data',b=>{logs+=b;});
   base=await new Promise<string>((resolve,reject)=>{const t=setTimeout(()=>reject(Error(logs)),30000);child.once('message',(m:any)=>{clearTimeout(t);resolve(`http://127.0.0.1:${m.port}`);});child.once('exit',()=>{clearTimeout(t);reject(Error(logs));});});
   for(let i=0;i<2;i++) {
@@ -49,6 +49,13 @@ it("upserts token ownership, isolates apps, and allows only the owner to delete"
   expect(await pushTokensFor(ids[1],'crm')).toEqual([token]);
   expect((await api('DELETE',{token},cookies[1])).status).toBe(204);
   expect(await pushTokensFor(ids[1],'crm')).toEqual([]);
+});
+it("stops delivery after the real logout endpoint ends the registering session",async()=>{
+  expect((await api('POST',{token,app:'platform',platform:'ios'},cookies[0])).status).toBe(204);
+  expect(await pushTokensFor(ids[0],'platform')).toEqual([token]);
+  const logout=await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:cookies[0]}});
+  expect(logout.status).toBe(200);
+  expect(await pushTokensFor(ids[0],'platform')).toEqual([]);
 });
 it("filters revoked/expired sessions and cascades account deletion",async()=>{
   expect((await api('POST',{token,app:'crm',platform:'ios'},cookies[1])).status).toBe(204);
