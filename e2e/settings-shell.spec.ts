@@ -25,7 +25,7 @@ const shot = async (page: Page, name: string, fullPage = true) => {
 const SECTION_ANCHOR: Record<string, string> = {
   account: "card-profile", security: "card-two-factor", notifications: "section-notifications", billing: "card-current-plan",
   limits: "text-limits-plan", "api-keys": "card-api-keys", "api-usage": "card-api-usage", "audit-log": "text-audit-count",
-  integrations: "text-integration-service-gbp",
+  integrations: "text-integration-service-gbp", "phone-bar": "platform-tabs-picker",
 };
 
 const PRO_STRIPE = {
@@ -93,7 +93,7 @@ async function expectNoSideScroll(page: Page, anchorTestId: string) {
   expect(offenders).toEqual([]);
 }
 
-const ME = [["account", "My account"], ["security", "Password & security"], ["notifications", "Notifications"]] as const;
+const ME = [["account", "My account"], ["security", "Password & security"], ["notifications", "Notifications"], ["phone-bar", "Phone tab bar"]] as const;
 const WORKSPACE = [
   ["billing", "Billing"], ["limits", "Limits & usage"], ["api-keys", "API keys"], ["api-usage", "API usage"],
   ["audit-log", "Audit log"], ["integrations", "Integrations"],

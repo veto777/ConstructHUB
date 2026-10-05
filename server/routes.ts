@@ -343,6 +343,10 @@ export async function registerRoutes(
   // and the integrations status. ensureAccountSchema() ran above.
   const { registerBillingRoutes } = await import("./account/billing-routes");
   registerBillingRoutes(app, getDevUser);
+  // The phone tab bars each person picks (Settings → Phone tab bar; CRM More → Customize the bar).
+  const { ensureUiPrefsSchema, registerUiPrefsRoutes } = await import("./account/ui-prefs");
+  await ensureUiPrefsSchema();
+  registerUiPrefsRoutes(app, getDevUser);
   // Self-serve account deletion — iPhone apps only (App Store 5.1.1(v)); the website keeps the support request.
   const { ensureAccountDeletionSchema, registerAccountDeletionRoutes } = await import("./account/delete");
   await ensureAccountDeletionSchema();

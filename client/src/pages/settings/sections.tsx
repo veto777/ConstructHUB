@@ -1,9 +1,10 @@
 import type { ComponentType } from "react";
-import { Activity, Bell, CreditCard, Gauge, KeyRound, Lock, Plug, ScrollText, User } from "lucide-react";
+import { Activity, Bell, CreditCard, Gauge, KeyRound, Lock, Plug, ScrollText, Smartphone, User } from "lucide-react";
 import type { SettingsGroupId, SettingsSectionDef, SettingsSectionId, SettingsSectionProps } from "./types";
 import { MyAccountSection } from "./me-account";
 import { PasswordSecuritySection } from "./me-security";
 import { NotificationsSection } from "./me-notifications";
+import { PhoneTabBarSection } from "./me-tab-bar";
 import { LimitsUsageSection } from "./limits-usage";
 import { BillingSection, ApiKeysSection, ApiUsageSection } from "./account-panels";
 import { AuditLogSection } from "./audit-log";
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: "account", group: "me", label: "My account", description: "Your name, photo, company details and account information.", icon: User, infoKey: "account-profile" },
   { id: "security", group: "me", label: "Password & security", description: "Password, two-factor sign-in, remembered devices and recent security activity.", icon: Lock, infoKey: "account-security" },
   { id: "notifications", group: "me", label: "Notifications", description: "Which alerts reach you in the app and by email.", icon: Bell, infoKey: "account-notifications" },
+  { id: "phone-bar", group: "me", label: "Phone tab bar", description: "Pick the four tabs at the bottom of the screen on your phone and in the app.", icon: Smartphone, infoKey: "account-phone-bar" },
   { id: "billing", group: "workspace", label: "Billing", description: "Your subscription, add-ons, invoices and payment methods.", icon: CreditCard, infoKey: "account-billing" },
   { id: "limits", group: "workspace", label: "Limits & usage", description: "Everything your plan includes and how much of it you've used this month.", icon: Gauge, infoKey: "account-limits" },
   { id: "api-keys", group: "workspace", label: "API keys", description: "Keys for reading and writing your own data from your own tools.", icon: KeyRound, infoKey: "account-api-keys" },
@@ -40,6 +42,7 @@ const DEFAULT_COMPONENTS: Record<SettingsSectionId, ComponentType<SettingsSectio
   "account": MyAccountSection,
   "security": PasswordSecuritySection,
   "notifications": NotificationsSection,
+  "phone-bar": PhoneTabBarSection,
   "billing": BillingSection,
   "limits": LimitsUsageSection,
   "api-keys": ApiKeysSection,
@@ -94,6 +97,8 @@ const TAB_ALIASES: Record<string, { section: SettingsSectionId; view?: string }>
   activity: { section: "audit-log" },
   "audit-log": { section: "audit-log" },
   integrations: { section: "integrations" },
+  "phone-bar": { section: "phone-bar" },
+  "tab-bar": { section: "phone-bar" },
 };
 
 export function resolveSettingsTab(tab: string | null | undefined): { section: SettingsSectionId; view: string | null } {

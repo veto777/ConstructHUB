@@ -12,6 +12,7 @@ export type SettingsSectionId =
   | "account"
   | "security"
   | "notifications"
+  | "phone-bar"
   | "billing"
   | "limits"
   | "api-keys"

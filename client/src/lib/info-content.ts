@@ -655,6 +655,15 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     ],
   },
 
+  "account-phone-bar": {
+    title: "Phone tab bar",
+    body: [
+      "The bar at the bottom of the screen on your phone and in the ConstructHUB apps. Pick the four tabs you open most; Menu (tools) or More (CRM) always stays last, so every page is one tap away.",
+      "Your choice is saved on your account, so your phone's browser and the app show the same bar. Reset to default any time.",
+      "Example: you live in the CRM's estimates. Put Clients, Estimates, New estimate and Schedule on the CRM bar.",
+    ],
+  },
+
   "account-billing": {
     title: "Billing",
     body: [
