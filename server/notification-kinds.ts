@@ -22,5 +22,7 @@ export const NOTIFICATION_KINDS = {
   "gbp.post_failed": { label: "A Google post or photo failed", inApp: true, email: false },
   "sitescan.completed": { label: "Site Scan completed", inApp: true, email: false },
   "sitescan.regressed": { label: "Site Scan score dropped or new critical issue", inApp: true, email: false },
+  // Platform admins only (server/ops/app-review-watch.ts): bell + iPhone push; email stays off unless switched on.
+  "ops.app_review": { label: "iPhone app review status changed (admins)", inApp: true, email: false },
 } satisfies Record<string, NotificationDefaults>;
 export type NotificationKind = keyof typeof NOTIFICATION_KINDS;

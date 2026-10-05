@@ -355,6 +355,8 @@ export async function registerRoutes(
   registerAccountDeletionRoutes(app, getDevUser);
   // Step 2: erase closed accounts after 30 days (production, ACCOUNT_ERASE_WORKER_ENABLED=true).
   (await import("./account/erase")).startAccountEraseWorker();
+  // App Review status of the iPhone apps → admins' bell + push (only where the App Store Connect key is installed).
+  (await import("./ops/app-review-watch")).startAppReviewWatch();
   const { registerApiKeyRoutes } = await import("./account/api-key-routes");
   registerApiKeyRoutes(app, getDevUser, await import("./account/api-keys"));
   const { registerIntegrationsRoute } = await import("./account/integrations-route");
