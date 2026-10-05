@@ -32,6 +32,8 @@ const CRM_ROUTES = ["/", "/crm/clients", "/crm/estimates", "/crm/estimates/new",
   "/crm/schedule", "/crm/inbox", "/crm/pricebook", "/crm/reports", "/crm/team", "/crm/settings", "/crm/integrations",
   "/crm/migrate", "/account/delete"];
 
+/** A link is fetched once per run, not once per page that shows it (kinder to a live site). */
+const linkStatus = new Map();
 const SALES = /\$\s?\d[\d,]*(\.\d\d)?\s*(\/\s?(mo|month|yr|year)|per\s+(month|year|minute))|\b(upgrade|free trial|start (your|my) trial|subscribe|checkout|add to cart|choose a (plan|tier)|see plans|compare tiers|talk to (a )?sales)\b|\b(Starter|Pro|Growth|Agency|Lite|Solo|Crew|Fleet)\s+(plan|tier)\b/i;
 const EXPECTED_STATUS = new Set([401, 402, 403]);
 
@@ -64,8 +66,12 @@ async function crawl(browser, { name, base, routes, ctxOpts, appMode }) {
       }
       const uniq = [...new Set(info.links.map((h) => h.split("#")[0]).filter(Boolean))].slice(0, 60);
       for (const h of uniq) {
-        const res = await ctx.request.get(base + h, { maxRedirects: 5 }).catch(() => null);
-        if (res && res.status() === 404) r.brokenLinks.push(h);
+        const key = base + h;
+        if (!linkStatus.has(key)) {
+          const res = await ctx.request.get(key, { maxRedirects: 5 }).catch(() => null);
+          linkStatus.set(key, res ? res.status() : 0);
+        }
+        if (linkStatus.get(key) === 404) r.brokenLinks.push(h);
       }
     } catch (e) { r.errors.push(`navigation: ${String(e.message || e).slice(0, 200)}`); }
     await page.close();
@@ -91,8 +97,10 @@ async function crawl(browser, { name, base, routes, ctxOpts, appMode }) {
     { name: "crm-phone", base: PORTAL, routes: CRM_ROUTES, ctxOpts: phone },
     { name: "crm-app", base: PORTAL, routes: CRM_ROUTES, ctxOpts: app("ConstructHUBCRM"), appMode: true },
   ];
+  // ONLY=public|platform|crm runs one surface (e.g. ONLY=public ANON=https://constructhub.us for the live site).
+  const only = process.env.ONLY;
   const all = [];
-  for (const run of runs) all.push(...await crawl(browser, run));
+  for (const run of runs.filter((r) => !only || r.name.startsWith(only))) all.push(...await crawl(browser, run));
   await browser.close();
   fs.writeFileSync(OUT, JSON.stringify(all, null, 1));
   const bad = all.filter((r) => r.errors.length || r.failed.length || r.overflow > 2 || r.brokenLinks.length || r.sales.length);
