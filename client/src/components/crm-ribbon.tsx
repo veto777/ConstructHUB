@@ -212,13 +212,17 @@ export function CrmRibbon() {
                 Delete account
               </Link>
             )}
-            {/* Back to the platform and every other ConstructHUB tool (another host: a full navigation). */}
+            {/* Back to the platform and every other ConstructHUB tool (another host: a full navigation).
+                Not in the iPhone apps: that host is where plans and prices live, and the apps sell nothing
+                (App Store 3.1.3(f)). */}
+            {!inNativeApp() && (
             <a href={marketingUrl("/")} data-testid="ribbon-more-platform"
               className="flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[15px] font-medium text-foreground hover:bg-accent transition-colors">
               <LayoutGrid className="h-5 w-5 shrink-0" strokeWidth={1.8} />
               All ConstructHUB tools
               <ArrowUpRight className="ml-auto h-4 w-4 opacity-60" aria-hidden="true" />
             </a>
+            )}
             <button
               type="button"
               onClick={toggleTheme}
