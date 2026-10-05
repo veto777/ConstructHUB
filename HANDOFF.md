@@ -19,6 +19,31 @@ own Cloudflare tunnel. Imported from a Replit dump, reviewed, refactored, and ha
 government data rebuilt with real, verified sources; deployed with a fresh Postgres and fresh secrets
 where possible. See "Live deployment" below for the runbook; owner-pending items at the end.
 
+## 📱 2026-10-04/05 — audit, iPhone apps, permit portals ×10 (all deployed; dump-first each time)
+- **Element audit (Kimi, 6 lanes):** every number/button/tab/link mapped in `docs/ui-map/*.md` (~4,000 elements, each
+  traced to its route/table/window); ~56 bugs fixed. Server routes carry what-it-does comments.
+- **iPhone apps (owner: two apps, "ConstructHUB" + "ConstructHUB CRM"; they SELL NOTHING — 3.1.3(f); Construct Hub LLC
+  team, new ConstructHUB ASC key):** plan + Remindr lessons in `docs/app/APP-STORE-PLAN.md`. Native shells in `ios/`
+  (xcodegen, two targets; CI `.github/workflows/ios-build-check.yml` compiles both on Xcode 26 — results on branch
+  `ios-results`). Web app mode = `client/src/lib/app-shell.ts` (UA `ConstructHUBApp/`/`ConstructHUBCRM/`): no sales
+  anywhere (central gates + two Kimi sweeps), account deletion in-app only (`server/account/delete.ts` + `erase.ts`;
+  erase worker behind ACCOUNT_ERASE_WORKER_ENABLED — turn on when the apps ship), Google sign-in/connections through the
+  auth sheet with PKCE (`server/app-auth.ts`, `app-connections.ts`), push tokens (`app-push.ts`), purchase guard
+  (`app-purchases.ts`). Pickable phone tab bar (Settings → Phone tab bar; `user_ui_prefs`).
+  Left for submission: the ConstructHUB App Store Connect API key (owner login), app records, signing, TestFlight,
+  APNs key, demo accounts, review notes, screenshots. AI = TruthCoder (own models) — confirm no outside forwarding.
+- **Call Assistant minutes** (owner): Lite 2,000 · Solo 5,000 · Crew 10,000 · Fleet 25,000 (prices unchanged).
+- **Permit portals 659 → 6,400** (verified 641 → 4,187). Pipeline: research lanes (Claude A/C/D, Kimi, Codex) write
+  gated candidates → `server/data/_permit-candidates.json` → `PERMIT_BUILD_CONCURRENCY=24 PERMIT_BUILD_ONLY_NEW=1 npx tsx
+  scripts/build-permit-portals.ts` → spot-check wrong-service links → commit `permit-portals.json` → deploy (boot seeding
+  applies it). Dry-run a candidate file: `scripts/check-portal-candidates.ts`. .gov crawler:
+  `scripts/discover-permit-portals.ts` (CISA dotgov registry). The checker now rejects tax/budget/procurement/utility
+  pages.
+- **Directory:** 2,877 missing incorporated cities added from Census 2023 estimates (`scripts/add-missing-cities.ts`,
+  only rows that don't exist); Eighty Eight KY / Doña Ana / duplicate St. George & Duluth fixed
+  (`scripts/fix-directory-names.ts`). The boot seeder only fills an EMPTY directory — use the scripts on prod.
+- **Final crawl:** `script/crawl-all.cjs` (desktop/phone/app × tools/public/CRM, 270 visits) — clean.
+
 ## 🔁 2026-10-04 — Alpine's CRM re-synced from Housecall Pro
 - A fresh read-only export (`analysis/hcp-export-2026-10-04/`, gitignored) was imported into the Alpine Exteriors org
   with `scripts/import-hcp.ts`, after a database backup. Zero errors. It created 33 customers, 48 estimates,
