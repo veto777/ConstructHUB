@@ -98,7 +98,8 @@ jobs:
             echo "== $scheme: archive" | tee "$log"
             if xcodebuild -project ios/ConstructHUB.xcodeproj -scheme "$scheme" -configuration Release \
                  -destination 'generic/platform=iOS' -archivePath "$archive" \
-                 DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+                 DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Distribution" \
+                 CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
                  "${AUTH[@]}" archive >> "$log" 2>&1 \
                && echo "== $scheme: export + upload" >> "$log" \
                && xcodebuild -exportArchive -archivePath "$archive" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
