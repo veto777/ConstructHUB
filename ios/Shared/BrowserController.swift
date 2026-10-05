@@ -90,7 +90,7 @@ final class BrowserController: UIViewController, ObservableObject {
     }
 
     @objc private func refreshPage() {
-        if webView.url != nil { webView.reload() } else { retry() }
+        if let url = webView.url, url.path != "/api/auth/app-exchange" { webView.reload() } else { retry() }
     }
 
     func showMessage(_ title: String, _ message: String) {
@@ -152,7 +152,7 @@ final class BrowserController: UIViewController, ObservableObject {
                 if let error = error {
                     let nsError = error as NSError
                     if nsError.domain != ASWebAuthenticationSessionErrorDomain ||
-                        nsError.code != ASWebAuthenticationSessionError.canceledLogin.rawValue {
+                        nsError.code != ASWebAuthenticationSessionError.Code.canceledLogin.rawValue {
                         self.showMessage("Sign-in unavailable", "Please try connecting your Google account again.")
                     }
                     return
@@ -227,7 +227,7 @@ final class BrowserController: UIViewController, ObservableObject {
 
 extension BrowserController: WKNavigationDelegate, WKUIDelegate {
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         if URLPolicy.isGoogle(url) || URLPolicy.isGoogleStart(url) {
             decisionHandler(.cancel)
@@ -253,7 +253,7 @@ extension BrowserController: WKNavigationDelegate, WKUIDelegate {
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
-                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+                 decisionHandler: @escaping @MainActor @Sendable (WKNavigationResponsePolicy) -> Void) {
         let response = navigationResponse.response
         let http = response as? HTTPURLResponse
         let mime = response.mimeType?.lowercased() ?? ""
@@ -341,7 +341,7 @@ extension BrowserController: WKScriptMessageHandler {
 
 extension BrowserController: WKDownloadDelegate {
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse, suggestedFilename: String,
-                  completionHandler: @escaping (URL?) -> Void) {
+                  completionHandler: @escaping @MainActor @Sendable (URL?) -> Void) {
         do {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

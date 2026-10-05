@@ -49,6 +49,13 @@
 	<string>Record audio when capturing a video to attach to your projects.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach job photos to projects, estimates, and customer messages.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

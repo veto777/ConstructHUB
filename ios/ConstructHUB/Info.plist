@@ -49,6 +49,13 @@
 	<string>Record audio when capturing a video for your business updates.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach photos to your business profile and project updates.</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

@@ -9,7 +9,7 @@ struct ConstructHUBApp: App {
         WindowGroup {
             ZStack {
                 BrowserView(controller: browser)
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container)
                     .opacity(browser.showOffline ? 0 : 1)
                     .accessibilityHidden(browser.showOffline)
                 if browser.showOffline {
