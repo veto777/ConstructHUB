@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { featureIntroPath } from "@shared/feature-pages";
 import { ADDONS, MODULE_NAMES, PLANS, type AddonKey } from "@shared/plans";
 import { joinNames } from "@shared/plan-copy";
+import { inNativeApp } from "@/lib/app-shell";
 import { DashboardTileCard } from "./dashboard-tile";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { TILE_ICONS } from "./tile-icons";
@@ -22,6 +23,36 @@ export const CRM_CARD_TILES: ReadonlySet<DashboardTileKey> = DASHBOARD_CRM_CARD_
  */
 function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all"; tiles: DashboardTile[]; spaced: boolean }) {
   const labelId = `dashboard-locked-${group}`;
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name, "See plans" or
+  // add-on hint — the tools' names and a lock, like AppLocked.
+  if (inNativeApp()) {
+    return (
+      <div
+        className={`${spaced ? "mt-4 " : ""}flex flex-col gap-3 rounded-lg border border-dashed bg-muted/30 px-3 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4`}
+        data-testid={`locked-row-${group}`}
+      >
+        <p id={labelId} className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
+          <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Not on this account
+        </p>
+        <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-labelledby={labelId}>
+          {tiles.map((t) => {
+            const Icon = TILE_ICONS[t.key] ?? LayoutGrid;
+            return (
+              <li
+                key={t.key}
+                className="inline-flex items-center gap-2 rounded-full border bg-card py-1 pl-2 pr-3 text-sm text-muted-foreground"
+                data-testid={`tile-${t.key}`}
+                data-status="locked"
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="font-medium">{t.title}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
   // An add-on the account hasn't bought (the AI Call Assistant) is bought on top of a plan, not "on a higher plan".
   const anyAddon = tiles.some((t) => t.addon);
   const addonsOnly = tiles.every((t) => t.addon);

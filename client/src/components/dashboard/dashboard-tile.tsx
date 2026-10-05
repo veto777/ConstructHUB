@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { inNativeApp } from "@/lib/app-shell";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { LockedPrompt } from "./locked-prompt";
 import { TILE_ICONS } from "./tile-icons";
@@ -74,7 +75,8 @@ function StatusPill({ tile }: { tile: DashboardTile }) {
       return (
         <Badge variant="outline" className="gap-1 font-medium text-muted-foreground" data-testid={`status-${tile.key}`}>
           <Lock className="h-3 w-3" aria-hidden="true" />
-          {tile.requiredPlan ? PLANS[tile.requiredPlan].name : "Paid plan"}
+          {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name on the lock. */}
+          {inNativeApp() ? "Not on this account" : tile.requiredPlan ? PLANS[tile.requiredPlan].name : "Paid plan"}
         </Badge>
       );
     case "coming_soon":

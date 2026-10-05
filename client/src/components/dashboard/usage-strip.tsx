@@ -1,5 +1,6 @@
 import type { DashboardUsage } from "@shared/dashboard";
 import { Progress } from "@/components/ui/progress";
+import { inNativeApp } from "@/lib/app-shell";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { formatCount, meterTone, toneBar, toneText, usageSurface } from "./format";
 
@@ -7,7 +8,8 @@ import { formatCount, meterTone, toneBar, toneText, usageSurface } from "./forma
 export function UsageStrip({ usage }: { usage: DashboardUsage[] }) {
   if (!usage.length) return null;
   return (
-    <ul className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8" aria-label="Plan usage">
+    // The iPhone apps sell nothing (App Store 3.1.3(f)): the meters keep their counts, never the plan word.
+    <ul className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8" aria-label={inNativeApp() ? "Usage" : "Plan usage"}>
       {usage.map((u) => {
         const unlimited = u.limit < 0;
         // A full standing count (seats, locations) is "all in use", not an overrun: amber, never red.
@@ -16,7 +18,7 @@ export function UsageStrip({ usage }: { usage: DashboardUsage[] }) {
         const pct = unlimited ? 0 : Math.min(100, (u.used / Math.max(1, u.limit)) * 100);
         const amount = unlimited ? `${formatCount(u.used)} · Unlimited` : `${formatCount(u.used)} / ${formatCount(u.limit)}`;
         // A standing count can sit above the plan's limit (sites added before a downgrade): say so, never "All in use".
-        const countState = u.used > u.limit ? "Over your plan's limit" : "All in use";
+        const countState = u.used > u.limit ? (inNativeApp() ? "Over the limit" : "Over your plan's limit") : "All in use";
         const state = raw === "bad" ? (u.period === "count" ? countState : "Limit reached") : raw === "warn" ? "Almost at the limit" : null;
         return (
           <li key={u.key} className="min-w-0" data-testid={`usage-${u.key}`} data-tone={tone}>

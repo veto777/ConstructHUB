@@ -3,6 +3,7 @@ import type { DashboardTile } from "@shared/dashboard";
 import { CRM_NAME } from "@/lib/site";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { inNativeApp } from "@/lib/app-shell";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { LockedPrompt } from "./locked-prompt";
 import { MetricHero } from "./dashboard-tile";
@@ -53,7 +54,8 @@ export function CrmSnapshotCard({ tile, leads, schedule }: { tile: DashboardTile
           <div className="min-w-0">
             <h2 id="dashboard-crm-title" className="text-base font-semibold leading-tight">{CRM_NAME}</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
-              {isEmpty ? "Your CRM is included with your plan." : tile.description}
+              {/* The iPhone apps sell nothing (App Store 3.1.3(f)): the CRM comes with the account, not "your plan". */}
+              {isEmpty ? (inNativeApp() ? "Your CRM is included with your account." : "Your CRM is included with your plan.") : tile.description}
             </p>
           </div>
         </div>
