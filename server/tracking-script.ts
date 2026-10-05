@@ -3,6 +3,9 @@ import type { Express } from "express";
 
 export function registerTrackingRoutes(app: Express) {
   app.get("/api/public-config", (_req, res) => res.json({ appOrigin: canonicalAppOrigin() }));
+  // Public: serves the Click Guard tracking JS that site owners paste into their pages;
+  // the script reports visitor data to POST /api/click-guard/track. Snippet src on the
+  // Tools tab (client/src/pages/google-ads.tsx) and the Install card (ip-tracker.tsx).
   app.get("/api/click-guard/script/:trackingId", (req, res) => {
     const { trackingId } = req.params;
     const apiUrl = canonicalAppOrigin();
