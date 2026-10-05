@@ -22,6 +22,7 @@ import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chr
 import { CRM_SEATS_LINE } from "@shared/plan-copy";
 import { StandingGator } from "@/components/mascot";
 import { BTN_LG, BTN_OUTLINE, BTN_PRIMARY, Kicker, TEXT_LINK } from "@/components/feature-landing/primitives";
+import { inNativeApp } from "@/lib/app-shell";
 
 const CRM_ACCESS_MAILTO =
   "mailto:support@constructhub.us?subject=" + encodeURIComponent("ConstructHub CRM access request");
@@ -49,6 +50,33 @@ export default function CrmGatewayPage() {
   const isMember = !signedOut && !!data?.org?.id;
   const orgName = data?.org?.name as string | undefined;
   const openCrm = () => { window.location.href = portalUrl("/crm"); };
+
+  // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)):
+  // no "included with every plan", seats-per-plan line, or See-plans buttons.
+  // What stays: opening the CRM you already have, signing in, or asking for a
+  // workspace — none of that is a sale.
+  if (inNativeApp()) return (
+    <AppPage testId="page-crm-gateway">
+      <PageHeader title="ConstructHub CRM" description="Clients, jobs and payments — all in one place." actions={isLoading || signedOut ? undefined : isMember ?
+        <Button onClick={openCrm} data-testid="button-open-crm">Open your CRM <ArrowRight className="ml-2 h-4 w-4" /></Button> :
+        <Button asChild><a href={CRM_ACCESS_MAILTO} data-testid="button-crm-get-access">Request access</a></Button>
+      } />
+      <Section title={isLoading ? "Checking your access…" : isMember ? "Your CRM is active" : signedOut ? "Sign in to open your CRM" : "Get your CRM workspace"} testId="card-crm-gateway-action">
+        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : signedOut ? "Sign in with your ConstructHUB account and we'll check whether your company has a CRM workspace." : "Workspaces are set up on request. Email us to get started."}</p>
+        {!isLoading && (signedOut || !isMember) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {signedOut && <Button asChild><Link href={`/auth?next=${encodeURIComponent("/crm-app")}`} data-testid="button-crm-signin">Sign in <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
+            {!signedOut && !isMember && <Button asChild variant="outline"><a href={CRM_ACCESS_MAILTO} data-testid="button-crm-get-access">Request access</a></Button>}
+          </div>
+        )}
+      </Section>
+      <details className="rounded-xl border bg-card p-4 sm:p-5">
+        <summary className="cursor-pointer text-sm font-medium">Explore CRM features</summary>
+        <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-bubble">Clients, jobs and payments — all in one place.</p>
+        <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{FEATURES.map(f => <li key={f.label}><h2 className="text-sm font-semibold">{f.label}</h2><p className="mt-1 text-sm text-muted-foreground">{f.desc}</p></li>)}</ul>
+      </details>
+    </AppPage>
+  );
 
   if (user && !signedOut) return (
     <AppPage testId="page-crm-gateway">
