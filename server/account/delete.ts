@@ -1,3 +1,5 @@
+import { fromNativeApp } from "../app-shell";
+export { fromNativeApp } from "../app-shell";
 /**
  * Self-serve account deletion (App Store guideline 5.1.1(v); docs/app/APP-STORE-PLAN.md). Before this, Settings →
  * Delete account only prefilled an email to support — Apple rejects that outside highly regulated industries.
@@ -135,10 +137,6 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
 
   return { ok: true, eraseAfter: eraseAfter.toISOString(), cancelledSubscriptions: subs.length };
 }
-
-/** The iPhone apps add ConstructHUBApp/<v> or ConstructHUBCRM/<v> to their user agent (client/src/lib/app-shell.ts). */
-export const fromNativeApp = (req: { headers?: Record<string, unknown> }): boolean =>
-  /\bConstructHUB(App|CRM)\/\d/.test(String(req.headers?.["user-agent"] ?? ""));
 
 export function registerAccountDeletionRoutes(app: Express, getDevUser: (req: any, res: any) => any): void {
   /** Settings → Delete account: what would block it (a CRM workspace other people use) and what will happen. */
