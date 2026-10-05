@@ -1469,7 +1469,13 @@ export default function CrmSettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="platform">Shared ConstructHUB number (nothing to set up)</SelectItem>
-                  <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                  {/* Buying a ConstructHUB-billed number is a sale — not offered in the iPhone apps
+                      (App Store 3.1.3(f)). An account that already has one keeps it, labelled neutrally. */}
+                  {!inNativeApp() ? (
+                    <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                  ) : senderForm.mode === "dedicated" ? (
+                    <SelectItem value="dedicated">My own number (set up on the website)</SelectItem>
+                  ) : null}
                   <SelectItem value="byo">My own SignalWire account (billed to me)</SelectItem>
                 </SelectContent>
               </Select>
@@ -1481,7 +1487,7 @@ export default function CrmSettingsPage() {
                     value={senderForm.fromNumber}
                     onChange={(e) => setSenderForm((f) => ({ ...f, fromNumber: e.target.value }))}
                     data-testid="input-sms-from" />
-                  {senderForm.mode === "dedicated" && (
+                  {senderForm.mode === "dedicated" && !inNativeApp() && (
                     <p className="text-xs text-muted-foreground">
                       Ask us to provision this number for you — it stays on ConstructHUB's carrier account.
                     </p>
