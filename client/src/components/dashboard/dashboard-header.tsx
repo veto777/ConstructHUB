@@ -83,9 +83,12 @@ export function DashboardHeader({
   const updatedNow = new Date(Math.max(now.getTime(), Date.parse(generatedAt) || 0));
   const greeting = `${greetingFor(now)}${account.firstName ? `, ${account.firstName}` : ""}`;
   const meta: string[] = [];
-  if (account.status === "active" && account.renewsAt) meta.push(`Renews ${shortDate(account.renewsAt, now)}`);
-  // A Stripe plan set to cancel: renewsAt is null and endsAt says when it stops.
-  else if (account.endsAt) meta.push(`Plan ends ${shortDate(account.endsAt, now)}`);
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): no renewal / plan-end dates there.
+  if (!inNativeApp()) {
+    if (account.status === "active" && account.renewsAt) meta.push(`Renews ${shortDate(account.renewsAt, now)}`);
+    // A Stripe plan set to cancel: renewsAt is null and endsAt says when it stops.
+    else if (account.endsAt) meta.push(`Plan ends ${shortDate(account.endsAt, now)}`);
+  }
   if (account.usage.some((u) => u.period === "monthly")) meta.push(`Usage resets ${new Date(account.resetsAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`); // midnight UTC, on the viewer's clock
   meta.push(`Updated ${relativeTime(generatedAt, updatedNow)}`);
 

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { Link } from 'wouter';
+import { inNativeApp } from '@/lib/app-shell';
 import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
 export function useAgencyFilter() {
   const [client,setClient]=useUrlParam('clientId'),[q,setQ]=useUrlParam('q'),[status,setStatus]=useUrlParam('status'),[offset,setOffset]=useUrlParam('offset');
@@ -56,15 +57,20 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
       ? <p className="text-sm text-muted-foreground">No locations match these filters.</p>
       : <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4" data-testid="own-locations-empty">
           <p className="text-sm text-muted-foreground">{noPlan
-            ? `No locations yet. Connect Google and we'll find your Business Profile; importing it and opening its profile page needs a plan, from ${formatUsd(STARTING_MONTHLY_CENTS)}/month.`
+            ? inNativeApp()
+              ? "No locations yet. Connect Google and we'll find your Business Profile."
+              : `No locations yet. Connect Google and we'll find your Business Profile; importing it and opening its profile page needs a plan, from ${formatUsd(STARTING_MONTHLY_CENTS)}/month.`
             : 'No locations yet. Bring in the Business Profile from your connected Google account, or add one by searching Google.'}</p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline"><a href="/locations?import=gbp" data-testid="button-import-own-profile">{noPlan ? 'See your Google profiles' : 'Import your Business Profile'}</a></Button>
-            {noPlan && <Button asChild variant="outline"><a href="/pricing" data-testid="button-own-locations-see-plans">See plans</a></Button>}
+            {noPlan && !inNativeApp() && <Button asChild variant="outline"><a href="/pricing" data-testid="button-own-locations-see-plans">See plans</a></Button>}
           </div>
         </div>)}
     <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
-    <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace} on the <Link href="/pricing" className="text-primary underline">{agencyPlan} plan</Link>.</p>
+    {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name or pricing link there. */}
+    {inNativeApp()
+      ? <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace}.</p>
+      : <p className="text-sm text-muted-foreground">Client workspaces, bulk actions across locations and CSV export are part of the {MODULE_NAMES.agencyWorkspace} on the <Link href="/pricing" className="text-primary underline">{agencyPlan} plan</Link>.</p>}
   </Section>;
 }
 function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;compact?:boolean}) {

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { apiErrorMessage } from "@/lib/queryClient";
+import { inNativeApp } from "@/lib/app-shell";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { KeyRound, ShieldAlert } from "lucide-react";
 import { API_NO_AI_NOTICE } from "@/pages/settings/api/api-keys-panel";
@@ -185,16 +186,19 @@ export default function DevelopersPage() {
         <Card className={CARD} data-testid="card-developers-limits">
           <CardHeader>
             <CardTitle className={CARD_TITLE}>Limits and units</CardTitle>
-            <CardDescription>Fair, predictable and the same for everyone on a plan.</CardDescription>
+            {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no "on a plan" wording there. */}
+            <CardDescription>{inNativeApp() ? "Fair, predictable and the same for every account." : "Fair, predictable and the same for everyone on a plan."}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Rate limit:</strong> 60 requests per minute per key. Over it, <code>429</code> with a <code>Retry-After</code> header.</li>
               <li><strong>Units:</strong> a read costs 1 unit plus 1 per 100 rows returned; a write costs 5 units.</li>
-              <li><strong>Monthly quota:</strong> your plan's units, and optionally a lower cap per key. When it's used up: <code>429 quota_exceeded</code>. A plan without API access: <code>402 plan_required</code>.</li>
+              <li><strong>Monthly quota:</strong> {inNativeApp() ? <>your account's units, and optionally a lower cap per key. When it's used up: <code>429 quota_exceeded</code>. An account without API access: <code>402 plan_required</code>.</> : <>your plan's units, and optionally a lower cap per key. When it's used up: <code>429 quota_exceeded</code>. A plan without API access: <code>402 plan_required</code>.</>}</li>
               <li><strong>Headers on every response:</strong> <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>X-Units-Remaining</code>.</li>
             </ul>
-            {units ? (
+            {/* The iPhone apps sell nothing (App Store 3.1.3(f)): the per-plan units table names the
+                plan tiers — hidden there; the app shows only the account's own usage in Settings. */}
+            {units && !inNativeApp() && (
               <table className="w-full text-sm" data-testid="table-developers-plan-units">
                 <thead><tr className="text-left text-muted-foreground"><th className="py-1 font-medium">Plan</th><th className="py-1 font-medium text-right">Units / month</th></tr></thead>
                 <tbody>
@@ -206,8 +210,11 @@ export default function DevelopersPage() {
                   ))}
                 </tbody>
               </table>
-            ) : (
-              <p className="text-xs text-muted-foreground" data-testid="text-developers-plan-units">Your plan's monthly units are shown in Settings → API keys.</p>
+            )}
+            {(!units || inNativeApp()) && (
+              <p className="text-xs text-muted-foreground" data-testid="text-developers-plan-units">
+                {inNativeApp() ? "Your monthly units are listed with your API keys." : "Your plan's monthly units are shown in Settings → API keys."}
+              </p>
             )}
           </CardContent>
         </Card>

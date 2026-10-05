@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Bell, KanbanSquare, TriangleAlert } from "lucide-react";
 import type { DashboardRecentItem } from "@shared/dashboard";
 import { Card } from "@/components/ui/card";
+import { inNativeApp } from "@/lib/app-shell";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { relativeTime } from "./format";
 
@@ -56,17 +57,22 @@ export function RecentActivity({ items }: { items: DashboardRecentItem[] }) {
         </p>
       ) : (
         <ul className="mt-2 divide-y" data-testid="list-dashboard-recent">
-          {items.slice(0, 12).map((item) => (
-            <li key={item.id} data-testid={`recent-${item.id}`}>
-              {item.href ? (
-                <DashLink href={item.href} surface={item.surface} className={`-mx-2 flex items-start gap-3 rounded-md px-2 py-3 hover:bg-accent ${FOCUS_RING}`}>
-                  <ItemBody item={item} />
-                </DashLink>
-              ) : (
-                <div className="flex items-start gap-3 py-3"><ItemBody item={item} /></div>
-              )}
-            </li>
-          ))}
+          {items.slice(0, 12).map((item) => {
+            // The iPhone apps sell nothing (App Store 3.1.3(f)): activity that links to the
+            // hidden Billing / Limits / API sections is plain text there — the words stay.
+            const hidden = inNativeApp() && /\/settings\?tab=(billing|limits|api-)/.test(item.href ?? "");
+            return (
+              <li key={item.id} data-testid={`recent-${item.id}`}>
+                {item.href && !hidden ? (
+                  <DashLink href={item.href} surface={item.surface} className={`-mx-2 flex items-start gap-3 rounded-md px-2 py-3 hover:bg-accent ${FOCUS_RING}`}>
+                    <ItemBody item={item} />
+                  </DashLink>
+                ) : (
+                  <div className="flex items-start gap-3 py-3"><ItemBody item={item} /></div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </Card>

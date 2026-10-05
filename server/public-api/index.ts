@@ -28,6 +28,38 @@ import { quota } from "./quota";
 import { rateLimitByKey } from "./rate-limit";
 import { listResources, registerResource, resourceRouter } from "./registry";
 import { registerAllResources } from "./resources/register";
+import { hubAppRequest } from "../hub/app-guard";
+
+/**
+ * App-mode copies of the reference's plan wording (the iPhone apps sell nothing —
+ * App Store 3.1.3(f)). Matched verbatim so a wording change fails loudly in the
+ * crawl rather than silently leaking "plan" into the app.
+ */
+const APP_OPENAPI_REWRITES: [RegExp, string][] = [
+  [/Your plan, limits and API usage\./g, "Your account, limits and API usage."],
+  [/Your account, plan, limits and API usage/g, "Your account, limits and API usage"],
+  [/uses one of the plan's monthly Site Scans/g, "uses one of your monthly Site Scans"],
+  [/The plan's allowances with add-ons applied \(-1 = unlimited\)\./g, "The account's allowances (-1 = unlimited)."],
+];
+
+/** Deep copy with the plan rewrites applied and `plan` schema objects dropped. */
+function appNeutralOpenApi(value: any): any {
+  if (typeof value === "string") {
+    let out = value;
+    for (const [re, to] of APP_OPENAPI_REWRITES) out = out.replace(re, to);
+    return out;
+  }
+  if (Array.isArray(value)) return value.map(appNeutralOpenApi);
+  if (value && typeof value === "object") {
+    const out: Record<string, any> = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (key === "plan" && child && typeof child === "object" && "properties" in (child as any)) continue;
+      out[key] = appNeutralOpenApi(child);
+    }
+    return out;
+  }
+  return value;
+}
 
 export { PUBLIC_API_BASE, rejectApiKeysOutsidePublicApi, isPublicApiPath } from "./guard";
 export { registerResource, listResources, CRM_RESERVED, type OpenApiFragment, type PublicResource } from "./registry";
@@ -48,7 +80,14 @@ export function ensureResourcesRegistered(): string[] {
 export function createPublicApiRouter(): Router {
   const router = Router();
 
-  router.get("/openapi.json", (_req, res) => {
+  router.get("/openapi.json", (req, res) => {
+    // The iPhone apps sell nothing (App Store 3.1.3(f)): from an app shell the reference
+    // docs carry no plan copy — neutral summaries, and the `plan` object stays out of the
+    // schemas (the website gets the document unchanged). Never cached: keyed per user agent.
+    if (hubAppRequest(req.get("user-agent"))) {
+      res.setHeader("Cache-Control", "no-store");
+      return void res.json(appNeutralOpenApi(buildOpenApiDocument()));
+    }
     res.setHeader("Cache-Control", "public, max-age=300");
     res.json(buildOpenApiDocument());
   });

@@ -10,6 +10,7 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 import { planPromptFor, type PlanPrompt } from "@/lib/plan-errors"
+import { inNativeApp } from "@/lib/app-shell"
 import { isPortal, marketingUrl } from "@/lib/site"
 
 /** "See Pro" / "Add extra seat" / "Manage billing" next to a toast that shows a plan answer. */
@@ -32,7 +33,8 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
-        const prompt = action ? null : planPromptFor(description)
+        // The iPhone apps sell nothing (App Store 3.1.3(f)): no "See Pro" / "Add seat" / "Manage billing" toast links.
+        const prompt = action || inNativeApp() ? null : planPromptFor(description)
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-1">

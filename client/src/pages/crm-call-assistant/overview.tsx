@@ -8,6 +8,7 @@ import { CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
+import { inNativeApp } from "@/lib/app-shell";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
@@ -111,7 +112,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
         ) : (
           <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
-            hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over (${overageCost})` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
+            hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over${inNativeApp() ? "" : ` (${overageCost})`}` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
         )}
         {extMonth ? (
           <Stat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
@@ -129,6 +130,9 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         else window.location.assign(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`);
       }} />
 
+      {/* The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no tier names, prices,
+          "Change tier" / "Choose a tier" or the compare list — changing tiers is billing, not in the app. */}
+      {!inNativeApp() && (
       <Section flush testId="card-overview-tier">
         <CardContent className="p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -164,6 +168,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           </details>
         </CardContent>
       </Section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section flush>
@@ -173,6 +178,8 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
             {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
+            {/* Billing copy — the per-minute price and the launch price stay out of the app (it sells nothing). */}
+            {!inNativeApp() && (
             <details className="text-sm"><summary className="cursor-pointer py-2">Billing details</summary>
             <p className="text-xs text-muted-foreground">
               {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
@@ -182,10 +189,11 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <span className="font-medium">{status.addon.name}:</span> Solo {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
             </p>
             </details>
+            )}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="secondary">{status.addon.name}</Badge>
               {status.addon.preview && <Badge variant="outline" data-testid="badge-overview-preview">Coming soon</Badge>}
-              {status.plan && <Badge variant="outline" className="capitalize">{status.plan} plan</Badge>}
+              {status.plan && !inNativeApp() && <Badge variant="outline" className="capitalize">{status.plan} plan</Badge>}
               <StatusPill tone={engine.tone} data-testid="pill-overview-engine" title={engine.hint}>{engine.text}</StatusPill>
             </div>
           </CardContent>
@@ -198,7 +206,11 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <Button asChild variant="ghost" size="sm"><Link href="/call-assistant?tab=numbers" data-testid="link-overview-numbers">Manage <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
             </div>
             {numbers.length === 0 ? (
-              <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">No number yet. Buy a local number in the Numbers tab, then forward your existing line to it.</p>
+              <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">
+                {inNativeApp()
+                  ? "No number yet. Get a local number in the Numbers tab, then forward your existing line to it."
+                  : "No number yet. Buy a local number in the Numbers tab, then forward your existing line to it."}
+              </p>
             ) : (
               <ul className="divide-y text-sm" data-testid="list-overview-numbers">
                 {numbers.map((n, i) => (

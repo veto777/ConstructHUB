@@ -15,13 +15,14 @@ import { z } from "zod";
 import { PAGE_KEYS, type PageKey } from "@shared/hub-links";
 import { HUB_PRESETS, PRESET_IDS, PRIMARY_PRESETS, WELCOME_PRESETS, type PresetId } from "@shared/hub-presets";
 import { prefilter } from "./prefilter";
+import { appAnswerBlocked, appPrefilterOverride, appSalesQuestion, APP_SALES_PRESETS, hubAppRequest } from "./app-guard";
 import { buildMessages, buildPresetMessages, buildRequest, knowledgeHash, type VisitorTurn } from "./prompt";
 import { filterOutput } from "./output-filter";
 import { REPLIES, replyText } from "./replies";
 import { checkConversation, signTurn, type InTurn } from "./turns";
 import { Breaker, HUB_LIMITS, Semaphore, globalDailyCap, keys, maxConcurrency, type Budget } from "./limits";
 import { latencyBucket, logError, logLine, type HubOutcome, type HubTier, type StatsSink } from "./stats";
-import { requiredFactsOk, templateAnswer, presetList, type PresetStore } from "./presets";
+import { requiredFactsOk, templateAnswer, appTemplateAnswer, presetList, type PresetStore } from "./presets";
 import type { HubAi, HubCompletion } from "./ai";
 
 export type HubDeps = {
@@ -183,6 +184,21 @@ export function createHub(deps: HubDeps) {
 
   router.get("/api/hub/presets", (req, res) => {
     const builder = deps.isBuilder(req);
+    // The iPhone apps sell nothing (App Store 3.1.3(f)): the chip list there drops the
+    // questions whose answer is plans/pricing/buying ("How much does it cost?", "talk to
+    // sales"…). Tapping one still gets the fixed line (POST /preset), so old app builds
+    // that cached the list stay safe.
+    if (hubAppRequest(req.get("user-agent"))) {
+      const presets = presetList().filter((p) => !APP_SALES_PRESETS.has(p.id));
+      return void res.json({
+        presets,
+        primary: PRIMARY_PRESETS.filter((id) => !APP_SALES_PRESETS.has(id)),
+        welcome: WELCOME_PRESETS.filter((id) => !APP_SALES_PRESETS.has(id)),
+        tier: builder ? "builder" : "browse",
+        chat: builder && deps.providerOk(),
+        maxChars: MAX_USER_CHARS,
+      });
+    }
     res.json({
       presets: presetList(),
       primary: PRIMARY_PRESETS,
@@ -205,6 +221,17 @@ export function createHub(deps: HubDeps) {
         note(tier, "limit", "preset_ip", started);
         res.setHeader("Retry-After", String(Math.ceil(HUB_LIMITS.presetPerIp.windowMs / 1000)));
         return void res.status(429).json({ reply: REPLIES.R_SLOWDOWN, code: "slowdown" });
+      }
+      // The iPhone apps sell nothing (App Store 3.1.3(f)): a sales preset gets the one fixed
+      // answer — never the template, never a cached model answer (those quote the price book).
+      if (hubAppRequest(req.get("user-agent"))) {
+        if (APP_SALES_PRESETS.has(presetId)) {
+          note(tier, "preset_template", "app_pricing", started);
+          return void res.json({ presetId, question: HUB_PRESETS[presetId].label, reply: REPLIES.R_APP_PRICING, kind: "template" });
+        }
+        const answer = { kind: "template" as const, text: appTemplateAnswer(presetId) };
+        note(tier, "preset_template", "-", started);
+        return void res.json({ presetId, question: HUB_PRESETS[presetId].label, reply: answer.text, kind: answer.kind });
       }
       const answer = await presetAnswer(presetId);
       note(tier, answer.kind === "answer" ? "preset_hit" : "preset_template", "-", started);
@@ -229,12 +256,13 @@ export function createHub(deps: HubDeps) {
       if (tier !== "builder") return void res.status(403).json({ presetsOnly: true, reply: REPLIES.R_SIGNIN, code: "verify_email" });
       const userId = Number((req.user as { id: number }).id);
       const { messages, pageKey } = parsed.data;
+      const inApp = hubAppRequest(req.get("user-agent"));
 
       // 4. turn signatures
       const convo = checkConversation(userId, parsed.data.conversationId, messages as InTurn[]);
       if (!convo.ok) { note(tier, "tampered", "sig", started); return void res.status(400).json({ code: "tampered", message: "This chat can't continue. Start a new one." }); }
       if (convo.capped) { note(tier, "limit", "convo_cap", started); return void res.json({ reply: REPLIES.R_CONVO_CAP, code: "convo_cap", reset: true }); }
-      if (!deps.providerOk()) { note(tier, "offline", "provider", started); return void res.status(503).json({ reply: REPLIES.R_OFFLINE, code: "offline" }); }
+      if (!deps.providerOk()) { note(tier, "offline", "provider", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
 
       // 5. per-minute (before the pre-filter, so probing is throttled too)
       if (!(await deps.budget.take(keys.minute(userId), HUB_LIMITS.chatPerMinute.limit, HUB_LIMITS.chatPerMinute.windowMs))) {
@@ -254,12 +282,22 @@ export function createHub(deps: HubDeps) {
         res.json({ reply, kind, conversationId: convo.conversationId, index, sig: signTurn(userId, convo.conversationId, index, reply, newMessage) });
       };
 
+      // 6.5 — the iPhone apps sell nothing (App Store 3.1.3(f)): a price / plan / buying question
+      // gets one fixed answer, deterministically — the model (its knowledge pack holds the price
+      // book) and the pre-filter's own replies never see it.
+      if (inApp && appSalesQuestion(newMessage)) {
+        await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
+        note(tier, "prefilter", "app_pricing", started);
+        return void signed(REPLIES.R_APP_PRICING, "refusal");
+      }
+
       // 7. pre-filter (fixed reply, no model call)
       const pre = prefilter(newMessage);
       if (pre.code !== "pass") {
+        const override = inApp ? appPrefilterOverride(pre.reply, pre.link?.path) : null;
         await deps.budget.take(keys.refusals(userId), HUB_LIMITS.refusalsPerDay.limit, HUB_LIMITS.refusalsPerDay.windowMs);
-        note(tier, "prefilter", pre.code, started);
-        return void signed(replyText(pre.reply, pre.link), "refusal");
+        note(tier, "prefilter", override ? "app_pricing" : pre.code, started);
+        return void signed(override ? REPLIES.R_APP_PRICING : replyText(pre.reply, pre.link), "refusal");
       }
 
       // 8. breaker
@@ -303,7 +341,12 @@ export function createHub(deps: HubDeps) {
         assistant: messages.filter((m) => m.role === "assistant").map((m) => m.content),
       };
       const filtered = filterOutput(result.completion, { publicOnly: false, echo });
-      if (!filtered.ok) { note(tier, "output_block", filtered.code, started); return void signed(REPLIES.R_FALLBACK, "fallback"); }
+      if (!filtered.ok) { note(tier, "output_block", filtered.code, started); return void signed(inApp ? REPLIES.R_APP_FALLBACK : REPLIES.R_FALLBACK, "fallback"); }
+      // The iPhone apps sell nothing: no model answer in the app may state a price or point at Pricing.
+      if (inApp && appAnswerBlocked(filtered.text)) {
+        note(tier, "output_block", "app_pricing", started);
+        return void signed(REPLIES.R_APP_PRICING, "refusal");
+      }
       note(tier, "chat_ok", latencyBucket(result.ms), started);
       signed(filtered.text, "answer");
     } catch (err) {

@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { inNativeApp } from "@/lib/app-shell";
 import { useToast } from "@/hooks/use-toast";
 import { useSaveLayout } from "./use-dashboard-prefs";
 
@@ -212,7 +213,8 @@ export function CustomizeDashboard({ open, onOpenChange, data, flagOff }: {
                 <span className="min-w-0 truncate font-medium">{row.title}</span>
                 {row.lockedPlan && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" data-testid={`badge-customize-locked-${key}`}>
-                    <Lock className="h-3 w-3" aria-hidden="true" /> {row.addon ? "Add-on" : `${row.lockedPlan} plan`}
+                    {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name or "Add-on" hint. */}
+                    <Lock className="h-3 w-3" aria-hidden="true" /> {inNativeApp() ? "Not on this account" : row.addon ? "Add-on" : `${row.lockedPlan} plan`}
                   </span>
                 )}
                 {row.comingSoon && <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Coming soon</span>}

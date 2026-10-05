@@ -1,5 +1,6 @@
 import { AppPage, PageHeader, AppTabsList, appTableCards } from "@/components/app-ui";
 import { AgencyWorkspace, Pager, fullAddress, useAgencyFilter } from "@/components/agency-workspace";
+import { inNativeApp } from "@/lib/app-shell";
 import { STARTING_MONTHLY_CENTS, formatUsd } from "@shared/plan-copy";
 import { LocationSearchSummary } from "./site-connections";
 import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
@@ -335,6 +336,12 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
               ))}
             </div>
             {needsPlan ? (
+              inNativeApp() ? (
+                /* The iPhone apps sell nothing (App Store 3.1.3(f)): no "from $X/month", no plans link. */
+                <div className="rounded-md border border-dashed bg-muted/40 p-3" data-testid="gbp-import-needs-plan">
+                  <p className="text-sm text-muted-foreground">Importing your Google profiles into ConstructHUB isn't on this account.</p>
+                </div>
+              ) : (
               <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2" data-testid="gbp-import-needs-plan">
                 <p className="text-sm">
                   <strong>Your Google profile{gbpLocations.length !== 1 ? "s were" : " was"} found.</strong> Importing {gbpLocations.length !== 1 ? "them" : "it"} into
@@ -343,6 +350,7 @@ function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated:
                 </p>
                 <Button asChild className="w-full gap-2" data-testid="button-gbp-see-plans"><a href="/pricing">See plans to import</a></Button>
               </div>
+              )
             ) : (
               <Button onClick={importGbpLocations} disabled={selectedGbp.size === 0} className="w-full gap-2" data-testid="button-import-gbp">
                 <Plus className="w-4 h-4" />

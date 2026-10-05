@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { planRequiredFrom } from "@/components/plan-required";
+import { AppLocked } from "@/components/app-locked";
+import { inNativeApp } from "@/lib/app-shell";
 import { ADDONS, PLANS, CALL_ASSISTANT_NAME } from "@shared/plans";
 import { callAssistantIntroShort, callAssistantSpamAllowanceLine, callAssistantTiers, joinNames } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
@@ -80,6 +82,9 @@ function tabFromSearch(): CallAssistantTab {
 
 /** The standard plan prompt for the add-on module: honest copy from the price book, one way to Billing. */
 export function CallAssistantPlanRequired({ error, status }: { error?: unknown; status?: VoiceStatus | null }) {
+  // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): a locked tool only says it
+  // isn't on this account — no tier prices, no "Add it in Billing", no plan names.
+  if (inNativeApp()) return <AppLocked name={CALL_ASSISTANT_NAME} testId="plan-required-callAssistant" />;
   const body = planRequiredFrom(error);
   const addon = ADDONS.call_assistant;
   const plans = joinNames(addon.availableOn.map((k) => PLANS[k].name));

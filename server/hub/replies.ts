@@ -24,6 +24,12 @@ export const REPLIES = {
   R_OFFLINE: "Gabe is off site right now. The quick questions below still work, or see [Pricing](/pricing).",
   R_CONVO_CAP: "This chat's getting long. Start a fresh one and I'll pick right back up.",
   R_SIGNIN: "Sign up or log in to ask your own questions. Until then, tap a quick question.",
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): one fixed answer for every price / plan /
+  // buying question inside the app — never a quote, never a link to Pricing or a sales rep.
+  R_APP_PRICING: "Plans and pricing aren't available in the app.",
+  // App variants of the two replies that otherwise end in "see [Pricing](/pricing)".
+  R_APP_FALLBACK: "Let me not get that one wrong. I can help with ConstructHUB features and how to set them up. Try one of the questions below.",
+  R_APP_OFFLINE: "Gabe is off site right now. The quick questions below still work.",
 } as const;
 
 export type ReplyCode = keyof typeof REPLIES | "R_OWN_DATA";

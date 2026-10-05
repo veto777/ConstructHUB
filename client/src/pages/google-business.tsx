@@ -2,6 +2,7 @@ import { AppPage, PageHeader, Section } from "@/components/app-ui";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { PublicPageHeader } from "@/components/public-page-chrome";
+import { inNativeApp } from "@/lib/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -116,7 +117,8 @@ export default function GoogleBusinessPage() {
       <div className="grid gap-4 sm:grid-cols-2">{keyPoints.map((point,i)=><div key={point.title} data-testid={`card-insight-${i}`}><h3 className="text-sm font-medium">{point.title}</h3><p className="text-sm text-muted-foreground">{point.desc}</p></div>)}</div>
       <div data-testid="card-comparison" className="text-sm text-muted-foreground">Keep your details current, check for changes and show customers your recent work.</div>
       <p className="font-medium" data-testid="text-final-cta">Keep your profile up to date</p>
-      <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/gmb-monitor" data-testid="link-final-start">Open monitor</Link></Button><Button asChild variant="outline"><Link href="/pricing" data-testid="link-final-pricing">View plans</Link></Button></div>
+      {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no "View plans" link there. */}
+      <div className="flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/gmb-monitor" data-testid="link-final-start">Open monitor</Link></Button>{!inNativeApp() && <Button asChild variant="outline"><Link href="/pricing" data-testid="link-final-pricing">View plans</Link></Button>}</div>
     </details>
   </AppPage>;
 
