@@ -235,7 +235,7 @@ describe("internal API (bearer ISSUE_DESK_SECRET)", () => {
     expect((await http("GET", "/api/ops-internal/issues?status=new", { bearer: SECRET, headers: { "cf-connecting-ip": "203.0.113.9" } })).status).toBe(404);
   });
 
-  it("claims, takes reports, and sends one digest per run (bell + outbox email to each platform admin)", async () => {
+  it("claims, takes reports, and sends one digest per run (a bell for each platform admin; no email — internal only)", async () => {
     await pool.query(`UPDATE ops_issues SET status = 'ignored' WHERE status IN ('new','inspecting')`);
     await seed(3, "http");
     const peek = await http("GET", "/api/ops-internal/issues?status=new&claim=0", { bearer: SECRET });
@@ -266,14 +266,14 @@ describe("internal API (bearer ISSUE_DESK_SECRET)", () => {
     expect(done.body).toMatchObject({ reported: 3, title: "Claude inspected 3 issues — 1 fix ready" });
     expect(done.body.admins).toBeGreaterThanOrEqual(1);
     expect(done.body.notified).toBe(done.body.admins);
-    const sent = delivered.slice(before);
-    expect(sent.length).toBe(done.body.admins);
-    expect(sent.every((d) => d.kind === "ops.issue_desk_digest" && d.dedupeKey.startsWith(`issue-desk:${RUN}:`) && d.subject === "ConstructHUB: Claude inspected 3 issues — 1 fix ready")).toBe(true);
+    // Internal only (owner, 2026-10-05: "stop emailing me with these frivulous issues!"): no digest email.
+    expect(delivered.slice(before)).toHaveLength(0);
+    expect(done.body.emailed).toBe(0);
     const bell = (await admin.query(`SELECT * FROM user_notifications WHERE kind = 'ops.issue_desk' AND body LIKE $1`, [`%Run ${RUN}`])).rows;
     expect(bell).toHaveLength(done.body.admins);
     expect(bell[0]).toMatchObject({ title: "Claude inspected 3 issues — 1 fix ready", link: "/admin/issues", severity: "warning" });
     expect(bell.some((n) => n.user_id === 1)).toBe(true);
-    // A retried "run complete": no second bell (the outbox dedupes the email by the same key).
+    // A retried "run complete": no second bell.
     const again = await http("POST", `/api/ops-internal/runs/${RUN}/complete`, { bearer: SECRET, body: { ids } });
     expect(again.body.notified).toBe(0);
     expect((await admin.query(`SELECT count(*)::int n FROM user_notifications WHERE kind = 'ops.issue_desk' AND body LIKE $1`, [`%Run ${RUN}`])).rows[0].n).toBe(done.body.admins);
