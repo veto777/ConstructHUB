@@ -28,6 +28,7 @@ import { Link, useLocation } from "wouter";
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
 import { ArrowRight, ChevronDown, LayoutDashboard, Menu } from "lucide-react";
 import { CHLogo } from "@/components/ch-logo";
+import { inNativeApp } from "@/lib/app-shell";
 import { CartSheet } from "@/components/cart-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { FEATURE_ICON_COMPONENTS } from "@/components/feature-landing/icons";
@@ -319,6 +320,16 @@ function SiteMobileMenu({ signedIn, signInHref }: { signedIn: boolean; signInHre
  * owns the wrapper (the home page hides it on scroll; other pages pin it).
  */
 export function SiteNavBar({ signedIn, next = "/", cart = true }: { signedIn: boolean; next?: string; cart?: boolean }) {
+  // Inside the iPhone apps the bar is the logo alone: no features, plans, pricing, cart, services or sign-up
+  // pitch (the apps sell nothing — App Store 3.1.3(f), docs/app/APP-STORE-PLAN.md). Signed out, the app only
+  // shows the sign-in screen and the legal/support pages, and the logo leads back to sign-in.
+  if (inNativeApp()) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-center" data-testid="site-nav-app">
+        <Link href="/auth" aria-label="Sign in to ConstructHUB" data-testid="link-app-home"><CHLogo height={38} /></Link>
+      </div>
+    );
+  }
   const signInHref = next && next !== "/" ? `/auth?next=${encodeURIComponent(next)}` : "/auth";
   const link = "whitespace-nowrap rounded-md px-2 py-1.5 text-white/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange transition-colors";
   return (

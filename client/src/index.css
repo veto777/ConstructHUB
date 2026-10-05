@@ -1462,3 +1462,19 @@
   overflow-wrap: anywhere;
 }
 .mkt-legal a:hover { text-decoration-color: var(--mkt-orange); }
+
+/*
+ * iPhone apps (html.in-app, client/src/lib/app-shell.ts): the web view runs under the status bar
+ * (viewport-fit=cover), so a page's top bar must clear it. The signed-in shells pad their own headers;
+ * pages outside them (sign-in, invite, legal, support) use .app-status-pad. The strip behind the clock
+ * and battery follows the iPhone's light/dark setting — the same setting that colors those icons — so they
+ * stay readable above the navy public header: a light strip under dark icons, navy under light ones.
+ */
+:root { --app-status-strip: #f4efe6; }
+@media (prefers-color-scheme: dark) { :root { --app-status-strip: #0d1b3d; } }
+html.in-app .app-status-pad {
+  padding-top: env(safe-area-inset-top);
+  background-image: linear-gradient(var(--app-status-strip), var(--app-status-strip));
+  background-size: 100% env(safe-area-inset-top);
+  background-repeat: no-repeat;
+}

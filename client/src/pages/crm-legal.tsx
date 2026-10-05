@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CrmLogo } from "@/components/crm-logo";
 
 /**
@@ -16,8 +16,13 @@ function LegalShell({ title, children, testid, updated }: { title: string; child
   useEffect(() => {
     document.title = `${title} | ConstructHUB CRM`;
   }, [title]);
+  const root = useRef<HTMLDivElement>(null);
+  const [atTop, setAtTop] = useState(false);
+  useLayoutEffect(() => { setAtTop((root.current?.getBoundingClientRect().top ?? 1) < 1); }, []);
   return (
-    <div className="min-h-screen bg-background text-foreground" data-testid={testid}>
+    // In the iPhone apps it clears the status bar itself only when nothing is above it (on the CRM host it is
+    // the whole page; on the main site the public header or the signed-in shell already pads).
+    <div ref={root} className={`${atTop ? "app-status-pad " : ""}min-h-screen bg-background text-foreground`} data-testid={testid}>
       <div className="max-w-3xl mx-auto px-4 py-10">
         <a href="/" aria-label="Home" data-testid="link-legal-home">
           <CrmLogo height={26} />

@@ -11,6 +11,7 @@
  * `mkt-editorial` scope in client/src/index.css — Plus Jakarta Sans here,
  * Inter everywhere else in the app).
  */
+import { inNativeApp } from "@/lib/app-shell";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { SiteNavBar } from "@/components/site-nav";
@@ -39,7 +40,7 @@ export function PublicPageHeader({ next, cart = false, backWhenSignedIn = false 
   // The free Site Scan pages render outside the platform shell: a signed-in visitor gets a way back (audit lane 6).
   if (!signedOut && backWhenSignedIn && user) {
     return (
-      <header className="sticky top-0 z-40 flex h-12 items-center border-b bg-background px-4" data-testid="header-signed-in-back">
+      <header className="app-status-pad box-content sticky top-0 z-40 flex h-12 items-center border-b bg-background px-4" data-testid="header-signed-in-back">
         <a href="/" className="text-sm font-medium text-primary hover:underline" data-testid="link-back-to-app">← Back to ConstructHUB</a>
       </header>
     );
@@ -48,7 +49,8 @@ export function PublicPageHeader({ next, cart = false, backWhenSignedIn = false 
   // The same ribbon as the home page (components/site-nav.tsx): Features ▾, the
   // home page's sections, sign in / get started. Pinned to the top on every page.
   return (
-    <header className="mkt-editorial sticky top-0 z-40 bg-mkt-navy border-b-[3px] border-mkt-orange" data-testid="header-public-page">
+    // .app-status-pad: inside the iPhone apps the header clears the status bar (client/src/index.css).
+    <header className="app-status-pad mkt-editorial sticky top-0 z-40 bg-mkt-navy border-b-[3px] border-mkt-orange" data-testid="header-public-page">
       <SiteNavBar signedIn={false} next={next} cart={cart} />
     </header>
   );
@@ -80,6 +82,23 @@ export function FooterGuides({ className = "" }: { className?: string }) {
 
 export function PublicPageFooter() {
   if (!useSignedOut()) return null;
+  // Inside the iPhone apps: support and the legal pages only — no sales pages (the apps sell nothing, 3.1.3(f)).
+  if (inNativeApp()) {
+    return (
+      <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule pt-8 pb-[calc(2rem+env(safe-area-inset-bottom))] px-4 text-center text-[13px]" data-testid="footer-public-page-app">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+          <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors">support@constructhub.us</a>
+          <span aria-hidden className="opacity-40">·</span>
+          <a href="/support" className="hover:text-mkt-navy-ink transition-colors">Support</a>
+          <span aria-hidden className="opacity-40">·</span>
+          <a href="/terms" className="hover:text-mkt-navy-ink transition-colors">Terms</a>
+          <span aria-hidden className="opacity-40">·</span>
+          <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
+        </div>
+        <p className="mt-2">{copyrightNotice()}</p>
+      </footer>
+    );
+  }
   return (
     <footer className="mkt-editorial bg-mkt-navy text-mkt-navy-muted border-t border-mkt-navy-rule pt-8 pb-24 sm:pb-8 px-4 text-center text-[13px]" data-testid="footer-public-page">
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
