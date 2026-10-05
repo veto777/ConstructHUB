@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { apiErrorMessage } from "@/lib/queryClient";
+import { inNativeApp } from "@/lib/app-shell";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { KeyRound, ShieldAlert } from "lucide-react";
 import { API_NO_AI_NOTICE } from "@/pages/settings/api/api-keys-panel";
@@ -194,7 +195,9 @@ export default function DevelopersPage() {
               <li><strong>Monthly quota:</strong> your plan's units, and optionally a lower cap per key. When it's used up: <code>429 quota_exceeded</code>. A plan without API access: <code>402 plan_required</code>.</li>
               <li><strong>Headers on every response:</strong> <code>X-RateLimit-Limit</code>, <code>X-RateLimit-Remaining</code>, <code>X-Units-Remaining</code>.</li>
             </ul>
-            {units ? (
+            {/* The iPhone apps sell nothing (App Store 3.1.3(f)): the per-plan units table names the
+                plan tiers — hidden there; the app shows only the account's own usage in Settings. */}
+            {units && !inNativeApp() && (
               <table className="w-full text-sm" data-testid="table-developers-plan-units">
                 <thead><tr className="text-left text-muted-foreground"><th className="py-1 font-medium">Plan</th><th className="py-1 font-medium text-right">Units / month</th></tr></thead>
                 <tbody>
@@ -206,7 +209,8 @@ export default function DevelopersPage() {
                   ))}
                 </tbody>
               </table>
-            ) : (
+            )}
+            {(!units || inNativeApp()) && (
               <p className="text-xs text-muted-foreground" data-testid="text-developers-plan-units">Your plan's monthly units are shown in Settings → API keys.</p>
             )}
           </CardContent>
