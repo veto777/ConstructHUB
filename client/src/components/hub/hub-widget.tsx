@@ -62,6 +62,11 @@ const MARKETING = ["/", "/landing", "/pricing", "/reinstatement", "/google-ad-fr
 // Not /features: like /call-assistant, the feature pages keep the hero and CTAs clear of the launcher on phones.
 
 export function hubVisible(location: string, surface: HubSurface): boolean {
+  // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)):
+  // Gabe's quick questions and answers are built from the plan/price knowledge
+  // pack, so in app mode he stays off the air entirely rather than risk a
+  // plan name, price or /pricing link reaching a reviewer.
+  if (inNativeApp()) return false;
   if (isClientPortal()) return false;
   if (TOKEN_PAGES.some((p) => location.startsWith(p))) return false;
   if (NEVER.some((p) => location === p || location.startsWith(`${p}/`))) return false;

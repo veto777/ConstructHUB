@@ -157,7 +157,10 @@ function SettingsApiRedirect() {
 /** On the CRM host: the Call Assistant moved to the platform; keep the query (tab, call, view). */
 function CallAssistantMovedRedirect() {
   useEffect(() => {
-    window.location.replace(marketingUrl(`/call-assistant${window.location.search}`));
+    // The iPhone apps sell nothing: don't bounce the app onto the marketing
+    // host (the Call Assistant page sells plans) — old links land on Home.
+    if (inNativeApp()) window.location.replace("/crm");
+    else window.location.replace(marketingUrl(`/call-assistant${window.location.search}`));
   }, []);
   return null;
 }
@@ -735,7 +738,7 @@ function AppContent() {
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing"];
+const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing", "/crm-app"];
 
 function App() {
   return (

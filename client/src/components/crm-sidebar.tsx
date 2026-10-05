@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
 import { StandingGator } from "@/components/mascot";
@@ -195,7 +196,10 @@ export function CrmSidebar() {
         </SidebarGroup>
 
         {/* The way back to the platform and every other tool (owner, 2026-10-04: "where is the link to get to the
-            ConstructHUB original that has all the other features?"). A full navigation: it's another host. */}
+            ConstructHUB original that has all the other features?"). A full navigation: it's another host.
+            Not in the iPhone apps: that host is where plans and prices live, and the apps sell nothing
+            (App Store 3.1.3(f)). */}
+        {!inNativeApp() && (
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-4">
             ConstructHUB
@@ -214,6 +218,7 @@ export function CrmSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-3">

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { apiIssueMessage } from "@/lib/api-issue-message";
 import { marketingUrl } from "@/lib/site";
+import { inNativeApp } from "@/lib/app-shell";
 import {
   Settings, Building2, FileText, Bell, CreditCard, Blocks,
   Users, BookOpen, Tag, Loader2, Copy, Trash2, ArrowRight, Landmark, MapPin, UploadCloud, Plus,
@@ -1392,7 +1393,18 @@ export default function CrmSettingsPage() {
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1">
               {smsStatus?.planAllowsSms === false ? (
-                <>
+                inNativeApp() ? (
+                  // The iPhone apps sell nothing: no plan names, no "Upgrade", no
+                  // link to Pricing (App Store 3.1.3(f); docs/app/APP-STORE-PLAN.md).
+                  <>
+                    <div className="font-medium" data-testid="text-sms-plan">Texting isn't on this account.</div>
+                    <div className="text-xs text-muted-foreground">
+                      Text bid reminders to clients, and get a text when a bid is signed, money lands, or a client
+                      re-opens their estimate. Emails keep working.
+                    </div>
+                  </>
+                ) : (
+                  <>
                   <div className="font-medium" data-testid="text-sms-plan">Texting is included with the {TEXTING_PLANS} plans</div>
                   <div className="text-xs text-muted-foreground">
                     {/* The heading names the plans from the same price book the server's gate reads (server/crm/sms.ts). */}
@@ -1402,7 +1414,8 @@ export default function CrmSettingsPage() {
                   {/* The portal host has no /pricing route (it would fall
                       through to CRM home) — plans live on the main site. */}
                   <a href={marketingUrl("/pricing")} className="text-xs text-primary underline" data-testid="link-sms-upgrade">See plans</a>
-                </>
+                  </>
+                )
               ) : smsStatus?.configured ? (
                 <>
                   <div className="font-medium" data-testid="text-sms-configured">
@@ -1435,7 +1448,9 @@ export default function CrmSettingsPage() {
             </div>
             {smsStatus && (
               <StatusPill tone={smsStatus.configured ? "success" : "neutral"} data-testid="pill-sms-status">
-                {smsStatus.planAllowsSms === false ? "Upgrade to enable" : smsStatus.configured ? "Configured" : "Not configured"}
+                {smsStatus.planAllowsSms === false
+                  ? inNativeApp() ? "Not on this account" : "Upgrade to enable"
+                  : smsStatus.configured ? "Configured" : "Not configured"}
               </StatusPill>
             )}
           </div>
@@ -1454,7 +1469,13 @@ export default function CrmSettingsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="platform">Shared ConstructHUB number (nothing to set up)</SelectItem>
-                  <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                  {/* Buying a ConstructHUB-billed number is a sale — not offered in the iPhone apps
+                      (App Store 3.1.3(f)). An account that already has one keeps it, labelled neutrally. */}
+                  {!inNativeApp() ? (
+                    <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                  ) : senderForm.mode === "dedicated" ? (
+                    <SelectItem value="dedicated">My own number (set up on the website)</SelectItem>
+                  ) : null}
                   <SelectItem value="byo">My own SignalWire account (billed to me)</SelectItem>
                 </SelectContent>
               </Select>
@@ -1466,7 +1487,7 @@ export default function CrmSettingsPage() {
                     value={senderForm.fromNumber}
                     onChange={(e) => setSenderForm((f) => ({ ...f, fromNumber: e.target.value }))}
                     data-testid="input-sms-from" />
-                  {senderForm.mode === "dedicated" && (
+                  {senderForm.mode === "dedicated" && !inNativeApp() && (
                     <p className="text-xs text-muted-foreground">
                       Ask us to provision this number for you — it stays on ConstructHUB's carrier account.
                     </p>

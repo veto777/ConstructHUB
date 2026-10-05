@@ -9,8 +9,11 @@
  * message. So every page that toasts apiErrorMessage(err) gets "See Pro" or
  * "Add competitor scan pack" next to the server's sentence without building the
  * link itself. Pure (no React) so the server test suite can check it.
+ * In the iPhone apps none of this fires: the apps sell nothing (owner, 2026-10-04),
+ * so plan answers read as neutral sentences and carry no link.
  */
 import { ADDONS, PLANS, isAddonKey, isPlanKey } from "@shared/plans";
+import { inNativeApp } from "@/lib/app-shell";
 
 export type PlanPrompt = { label: string; href: string };
 
@@ -41,6 +44,9 @@ const REMEMBER_MAX = 50;
 
 /** Record the way forward for a parsed error body whose `message` a toast is about to show. */
 export function rememberPlanPrompt(body: unknown): void {
+  // The iPhone apps sell nothing (owner, 2026-10-04): no "See Pro" / "Add extra
+  // seat" / "Manage billing" toast actions inside them.
+  if (inNativeApp()) return;
   const prompt = planPromptFromBody(body);
   const message = (body as { message?: unknown } | null)?.message;
   if (!prompt || typeof message !== "string" || !message) return;

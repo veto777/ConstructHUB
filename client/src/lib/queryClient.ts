@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { rememberPlanPrompt } from "@/lib/plan-errors";
+import { inNativeApp } from "@/lib/app-shell";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -48,6 +49,13 @@ export function apiErrorMessage(err: any, fallback = "Something went wrong — p
   try {
     const parsed = JSON.parse(body);
     if (parsed && typeof parsed.message === "string") {
+      // Inside the iPhone apps a plan answer reads neutrally — the apps sell
+      // nothing (owner, 2026-10-04): no plan names, prices, upgrade wording.
+      if (inNativeApp()) {
+        if (parsed.code === "plan_required") return "That isn't on this account.";
+        if (parsed.code === "limit_reached") return "That limit is reached on this account.";
+        if (parsed.code === "payment_failed") return "That payment didn't go through.";
+      }
       rememberPlanPrompt(parsed);
       return parsed.message;
     }
