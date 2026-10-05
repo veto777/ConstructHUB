@@ -7,6 +7,9 @@ let child: ChildProcess, base: string, owner: number, other: number, cookie: str
 const sids = new Set<string>(), ids: number[] = [];
 const ip = `198.19.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*254)+1}`;
 const secret = "app-connections-fixture";
+const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+const pkce = `&challenge=${challenge}&challenge_method=S256`;
 const ua = "Mozilla/5.0 ConstructHUBApp/1.0";
 async function session(user: number, recent = true) {
   const sid = randomUUID(); sids.add(sid);
@@ -29,7 +32,7 @@ async function start(purpose: keyof typeof starts, native = true, auth = cookie)
   let url = r.status===302 ? r.headers.get("location")! : (await r.json()).url;
   if (native) {
     expect(url).toMatch(/^\/api\/app\/oauth\/open\?state=/);
-    const open = await api(url, auth, true);
+    const open = await api(url + pkce, auth, true);
     expect(open.status).toBe(302);
     url = open.headers.get("location")!;
   }
@@ -38,11 +41,11 @@ async function start(purpose: keyof typeof starts, native = true, auth = cookie)
 async function finish(purpose: keyof typeof starts, url: URL, code="fixture-ok", auth="") {
   return api(`${APP_CONNECTIONS[purpose].callback}?state=${encodeURIComponent(url.searchParams.get("state")!)}&code=${code}`, auth);
 }
-async function exchange(r: Response, auth = cookie) {
+async function exchange(r: Response, auth = cookie, supplied: string | null = verifier) {
   expect(r.status, await r.clone().text()).toBe(302);
   const callback = new URL(r.headers.get("location")!);
   expect(callback.protocol).toBe("constructhub:");
-  return api(`/api/auth/app-exchange?code=${callback.searchParams.get("code")}`, auth, true);
+  return api(`/api/auth/app-exchange?code=${callback.searchParams.get("code")}${supplied === null ? "" : `&verifier=${supplied}`}`, auth, true);
 }
 beforeAll(async () => {
   if (new URL(process.env.DATABASE_URL!).pathname !== "/constructhub_dev_a6") throw Error("Requires assigned development database");
@@ -104,7 +107,7 @@ for(const purpose of Object.keys(starts) as (keyof typeof starts)[]) {
 it("permits only one concurrent callback and checks the GET handoff owner", async () => {
   const url = await start("gsc");
   const state = url.searchParams.get("state")!;
-  expect((await api(`/api/app/oauth/open?state=${state}`, otherCookie)).status).toBe(400);
+  expect((await api(`/api/app/oauth/open?state=${state}${pkce}`, otherCookie)).status).toBe(400);
   const responses = await Promise.all([finish("gsc", url), finish("gsc", url)]);
   expect(responses.map(r => r.status).sort()).toEqual([302,400]);
 });
@@ -133,3 +136,32 @@ it("retains website session binding and recent-auth/plan guards",async()=>{
   await pool.query("UPDATE subscriptions SET status='canceled' WHERE user_id=$1",[other]);
   expect((await api(starts.gsc,otherCookie,true)).status).toBe(402);
 });
+
+for (const purpose of Object.keys(starts) as (keyof typeof starts)[]) {
+  it(`${purpose}: refuses consent and callbacks before a valid S256 handoff`, async () => {
+    await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1::text[])", [[
+      ...["app-oauth-open", "app-auth-exchange"].flatMap(name => [
+        `${name}:ip:${createHash('sha256').update(ip).digest('hex')}`, `${name}:user:${owner}`])
+    ]]);
+    const r = await api(starts[purpose], cookie, true, purpose === "ads" ? {managerId:"1234567890"} : undefined);
+    const url = r.status === 302 ? r.headers.get("location")! : (await r.json()).url;
+    const state = new URL(url, base).searchParams.get("state");
+    for (const suffix of ["", `&challenge=${challenge}&challenge_method=plain`, "&challenge=short&challenge_method=S256"]) {
+      expect((await api(url + suffix, cookie, true)).status).toBe(400);
+    }
+    expect((await api(`${APP_CONNECTIONS[purpose].callback}?state=${state}&code=fixture-ok`)).status).toBe(400);
+    expect((await api(url + pkce, otherCookie, true)).status).toBe(400);
+    const open = await api(url + pkce + "&format=json", cookie, true);
+    expect(open.status).toBe(200);
+    const google = new URL((await open.json()).url);
+    expect((await api(url + `&challenge=${"x".repeat(43)}&challenge_method=S256`, cookie, true)).status).toBe(400);
+    expect((await exchange(await finish(purpose, google))).status).toBe(302);
+  });
+  it(`${purpose}: burns redirect codes on wrong or missing verifiers`, async () => {
+    for (const supplied of [null, "x".repeat(43)]) {
+      const result = await finish(purpose, await start(purpose), "provider-failure");
+      expect((await exchange(result, cookie, supplied)).status).toBe(400);
+      expect((await exchange(result)).status).toBe(400);
+    }
+  });
+}

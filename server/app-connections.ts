@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { users } from "@shared/schema";
 import { db, pool } from "./db";
 import { fromNativeApp, safeNextPath } from "./app-shell";
-import { appAuthHost, mintAppCode } from "./app-auth";
+import { appAuthHost, mintAppCode, appChallenge } from "./app-auth";
 import { rateLimit } from "./growth-limits";
 
 /** Only these callback paths may use a state-bound, request-local identity. */
@@ -22,7 +22,7 @@ export async function ensureAppConnectionsSchema() {
     purpose text NOT NULL, host text NOT NULL, next text NOT NULL,
     payload jsonb NOT NULL, google_url text NOT NULL,
     expires_at timestamptz NOT NULL DEFAULT now() + interval '10 minutes'
-  ); CREATE INDEX IF NOT EXISTS app_oauth_states_expiry ON app_oauth_states(expires_at);`);
+  ); ALTER TABLE app_oauth_states ADD COLUMN IF NOT EXISTS challenge text; CREATE INDEX IF NOT EXISTS app_oauth_states_expiry ON app_oauth_states(expires_at);`);
 }
 
 /** Called AFTER each start's auth, recent-auth, entitlement and input checks. */
@@ -46,14 +46,15 @@ export async function appConnectUrl(req: Request, purpose: Purpose, googleUrl: s
     [state, req.user.id, purpose, appAuthHost(req), safeNextPath(next) ?? "/", payload, url.toString()]);
   for (const key of APP_CONNECTIONS[purpose].fields) delete (req.session as any)[key];
   // A real GET navigation in WKWebView, including for POST-based Ads starts.
-  // The shell then intercepts the redirect to Google and opens the auth sheet.
+  // The shell intercepts this handoff and binds PKCE before opening the auth sheet.
+  // This preparation alone cannot authorize a callback or mint an exchange code.
   return `/api/app/oauth/open?state=${encodeURIComponent(state)}`;
 }
 
 export async function finishAppConnection(req: Request, res: Response, next: string) {
-  const connection = res.locals?.appConnection as { user_id: number; host: string; next: string } | undefined;
+  const connection = res.locals?.appConnection as { user_id: number; host: string; next: string; challenge: string } | undefined;
   if (!connection) return res.redirect(next);
-  const code = await mintAppCode(connection.user_id, connection.host, "redirect", safeNextPath(next) ?? connection.next);
+  const code = await mintAppCode(connection.user_id, connection.host, "redirect", connection.challenge, safeNextPath(next) ?? connection.next);
   res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
   return res.redirect(`constructhub://auth-done?code=${code}`);
 }
@@ -61,11 +62,14 @@ export async function finishAppConnection(req: Request, res: Response, next: str
 export function registerAppConnections(app: Express) {
   app.get("/api/app/oauth/open", rateLimit("app-oauth-open", 30, 60), async (req, res) => {
     res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
+    const challenge = appChallenge(req.query);
+    if (!challenge) return res.status(400).json({ message: "S256 PKCE challenge required" });
     if (!req.user) return res.status(401).json({ message: "Not authenticated" });
     if (typeof req.query.state !== "string" || req.query.state.length > 256) return res.sendStatus(400);
-    const { rows: [row] } = await pool.query("SELECT google_url FROM app_oauth_states WHERE state=$1 AND user_id=$2 AND host=$3 AND expires_at>now()",
-      [req.query.state, req.user.id, appAuthHost(req)]);
+    const { rows: [row] } = await pool.query("UPDATE app_oauth_states SET challenge=$4 WHERE state=$1 AND user_id=$2 AND host=$3 AND expires_at>now() AND challenge IS NULL RETURNING google_url",
+      [req.query.state, req.user.id, appAuthHost(req), challenge]);
     if (!row) return res.status(400).json({ message: "Connection expired. Please start again." });
+    if (req.query.format === "json") return res.json({ url: row.google_url });
     res.redirect(row.google_url);
   });
   // Runs before the normal module/agency/org gates, which still authorize this
@@ -74,7 +78,7 @@ export function registerAppConnections(app: Express) {
     const entry = Object.entries(APP_CONNECTIONS).find(([, value]) => value.callback === req.path);
     if (req.method !== "GET" || !entry || typeof req.query.state !== "string" || req.query.state.length > 256) return next();
     try {
-      const { rows: [row] } = await pool.query("DELETE FROM app_oauth_states WHERE state=$1 AND purpose=$2 AND host=$3 AND expires_at>now() RETURNING *",
+      const { rows: [row] } = await pool.query("DELETE FROM app_oauth_states WHERE state=$1 AND purpose=$2 AND host=$3 AND expires_at>now() AND challenge IS NOT NULL RETURNING *",
         [req.query.state, entry[0], appAuthHost(req)]);
       if (!row) {
         if (req.query.state.startsWith("app.")) return res.status(400).json({ message: "Invalid or expired app connection" });

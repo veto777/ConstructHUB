@@ -1,7 +1,7 @@
 import { ensureAppPushSchema, registerAppPushRoutes } from "./app-push";
 import { ensureAppConnectionsSchema, registerAppConnections } from "./app-connections";
 import { safeNextPath } from "./app-shell";
-import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost } from "./app-auth";
+import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost, appChallenge } from "./app-auth";
 import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
 import { encryptToken, decryptToken } from "./gbp/token-crypto";
 import { logActivity } from "./account-events";
@@ -48,6 +48,7 @@ declare module "express-session" {
     betaToken?: string;
     authNext?: string;
     nativeGoogleHost?: string;
+    nativeGoogleChallenge?: string;
     /** "Continue with Google" step-up: the signed-in user it may re-verify. */
     googleReauth?: { userId: number; expires: number };
   }
@@ -248,6 +249,8 @@ export async function setupAuth(app: Express) {
   // The Google button on /auth: starts Google OAuth; the callback signs the user in (making a
   // Google-only account when needed) and lands them on ?next= (validated) or the home page.
   app.get("/api/auth/google", (req, res, next) => {
+    const challenge = appChallenge(req.query);
+    if (req.query.app === "1" && !challenge) return res.status(400).json({ message: "S256 PKCE challenge required" });
     const callbackURL = `${oauthBaseUrl(req)}/api/auth/google/callback`;
     if (req.query.gbp === "1") return res.redirect("/api/gbp/connect");
     if (!googleConfigured) {
@@ -261,6 +264,8 @@ export async function setupAuth(app: Express) {
     }
     if (req.query.app === "1") req.session.nativeGoogleHost = appAuthHost(req);
     else delete req.session.nativeGoogleHost;
+    if (req.query.app === "1") req.session.nativeGoogleChallenge = challenge!;
+    else delete req.session.nativeGoogleChallenge;
     const gbp = false;
     // A CRM beta invite survives the OAuth round-trip in the session.
     if (typeof req.query.beta === "string" && req.query.beta) {
@@ -303,6 +308,10 @@ export async function setupAuth(app: Express) {
       // failureRedirect only covers access_denied, and any other Google error
       // (server_error, temporarily_unavailable, …) used to surface as raw JSON.
       passport.authenticate("google", { callbackURL } as any, async (err: any, user: any) => {
+        const nativeHost = req.session.nativeGoogleHost;
+        const nativeChallenge = req.session.nativeGoogleChallenge;
+        delete req.session.nativeGoogleHost;
+        delete req.session.nativeGoogleChallenge;
         delete req.session.googleReauth; // single use
         // The visitor gets a page either way; the server log keeps the cause
         // (this error used to reach the global handler, which logged it).
@@ -319,13 +328,11 @@ export async function setupAuth(app: Express) {
           }
           return res.redirect(`${nextPath}${nextPath.includes("?") ? "&" : "?"}reauth=google-failed`);
         }
-        const nativeHost = req.session.nativeGoogleHost;
-        delete req.session.nativeGoogleHost;
         if (err || !user) return res.redirect("/auth?error=google-failed");
         if (nativeHost) {
-          if (nativeHost !== appAuthHost(req)) return res.redirect("/auth?error=google-failed");
+          if (nativeHost !== appAuthHost(req) || !nativeChallenge) return res.redirect("/auth?error=google-failed");
           try {
-            const code = await mintAppCode(user.id, nativeHost, "login", req.session.authNext);
+            const code = await mintAppCode(user.id, nativeHost, "login", nativeChallenge, req.session.authNext);
             delete req.session.authNext;
             return res.redirect(`constructhub://auth-done?code=${code}`);
           } catch { return res.redirect("/auth?error=google-failed"); }
@@ -377,7 +384,7 @@ export async function setupAuth(app: Express) {
   app.get("/api/auth/app-exchange", rateLimit("app-auth-exchange", 30, 60), async (req, res, next) => {
     res.set({ "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
     try {
-      const code = await consumeAppCode(req.query.code, appAuthHost(req));
+      const code = await consumeAppCode(req.query.code, appAuthHost(req), req.query.verifier);
       if (!code) return res.status(400).json({ message: "Invalid or expired app code" });
       if (code.purpose === "redirect") {
         if (req.user?.id !== code.user_id) return res.status(403).json({ message: "Sign in to the account that started this connection" });

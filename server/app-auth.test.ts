@@ -8,6 +8,9 @@ import { TOTP } from "otpauth";
 let child: ChildProcess, base: string;
 const ids: number[] = [], cookies = new Set<string>();
 const ip = `198.19.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*254)+1}`;
+// RFC 7636 Appendix B test vector.
+const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 const secret = "app-auth-owned-fixture";
 process.env.SESSION_SECRET = secret;
 const totp = new TOTP({ issuer: "ConstructHUB", secret: "JBSWY3DPEHPK3PXP", algorithm: "SHA1", digits: 6, period: 30 });
@@ -19,7 +22,7 @@ async function api(path: string, cookie = "", init: RequestInit = {}) {
 }
 const cookieOf = (r: Response) => r.headers.get("set-cookie")?.split(";")[0] || "";
 async function google(user: number, next = "/locations", app = true) {
-  const r = await api(`/api/auth/google?${app ? "app=1&" : ""}next=${encodeURIComponent(next)}`);
+  const r = await api(`/api/auth/google?${app ? `app=1&challenge=${challenge}&challenge_method=S256&` : ""}next=${encodeURIComponent(next)}`);
   const state = new URL(r.headers.get("location")!).searchParams.get("state");
   return api(`/api/auth/google/callback?code=fixture-${ids[user]}&state=${state}`, cookieOf(r));
 }
@@ -66,31 +69,48 @@ it("moves Google identity from the sheet to a separate web-view cookie jar exact
   const code = callback.searchParams.get("code")!;
   expect(code).toMatch(/^[a-f0-9]{64}$/);
   const { rows: [stored] } = await pool.query("SELECT * FROM app_auth_codes WHERE user_id=$1", [ids[0]]);
+  expect(stored.challenge).toBe(challenge);
   expect(stored.code_hash).toBe(createHash("sha256").update(code).digest("hex"));
-  const exchange = await api(`/api/auth/app-exchange?code=${code}`);
+  const exchange = await api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`);
   expect(exchange.headers.get("location")).toBe("/locations");
   expect((await (await api("/api/auth/me", cookieOf(exchange))).json()).id).toBe(ids[0]);
-  expect((await api(`/api/auth/app-exchange?code=${code}`)).status).toBe(400);
+  expect((await api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`)).status).toBe(400);
 });
 it("rejects wrong hosts, expired codes, unsafe next, and concurrent replay", async () => {
-  const wrong = await mintAppCode(ids[0], "portal.constructhub.us", "login", "/");
-  expect((await api(`/api/auth/app-exchange?code=${wrong}`)).status).toBe(400);
-  const expired = await mintAppCode(ids[0], "127.0.0.1", "login", "/");
+  const wrong = await mintAppCode(ids[0], "portal.constructhub.us", "login", challenge, "/");
+  expect((await api(`/api/auth/app-exchange?code=${wrong}&verifier=${verifier}`)).status).toBe(400);
+  const expired = await mintAppCode(ids[0], "127.0.0.1", "login", challenge, "/");
   await pool.query("UPDATE app_auth_codes SET expires_at=now()-interval '1 second' WHERE code_hash=$1", [createHash("sha256").update(expired).digest("hex")]);
-  expect((await api(`/api/auth/app-exchange?code=${expired}`)).status).toBe(400);
-  const code = await mintAppCode(ids[0], "127.0.0.1", "login", "//evil.invalid/");
-  const results = await Promise.all([api(`/api/auth/app-exchange?code=${code}`), api(`/api/auth/app-exchange?code=${code}`)]);
+  expect((await api(`/api/auth/app-exchange?code=${expired}&verifier=${verifier}`)).status).toBe(400);
+  const code = await mintAppCode(ids[0], "127.0.0.1", "login", challenge, "//evil.invalid/");
+  const results = await Promise.all([api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`), api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`)]);
   expect(results.map(r=>r.status).sort()).toEqual([302,400]);
   expect(results.find(r=>r.status===302)?.headers.get("location")).toBe("/");
 });
 it("requires the existing second factor before the web view becomes signed in", async () => {
   const sheet = await google(1, "/crm/team");
   const code = new URL(sheet.headers.get("location")!).searchParams.get("code");
-  const exchange = await api(`/api/auth/app-exchange?code=${code}`);
+  const exchange = await api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`);
   expect(exchange.headers.get("location")).toBe("/auth?mode=2fa&next=%2Fcrm%2Fteam");
   const cookie = cookieOf(exchange);
   expect(await (await api("/api/auth/me", cookie)).json()).toBeNull();
   const verified = await api("/api/auth/2fa/login", cookie, { method:"POST", headers: {"content-type":"application/json"}, body: JSON.stringify({code:totp.generate()}) });
   expect(verified.status).toBe(200);
   expect((await (await api("/api/auth/me", cookieOf(verified))).json()).id).toBe(ids[1]);
+});
+
+it("requires a well-formed S256 challenge at app sign-in start", async () => {
+  for (const query of ["", `&challenge=${challenge}`, `&challenge=${challenge}&challenge_method=plain`,
+    "&challenge=short&challenge_method=S256", `&challenge=${"!".repeat(43)}&challenge_method=S256`,
+    `&challenge=${challenge}&challenge=${challenge}&challenge_method=S256`]) {
+    expect((await api(`/api/auth/google?app=1${query}`)).status).toBe(400);
+  }
+});
+it("burns the code on a wrong, missing or malformed verifier", async () => {
+  for (const supplied of ["", "&verifier=short", `&verifier=${"x".repeat(43)}`, `&verifier=${verifier}&verifier=${verifier}`]) {
+    const sheet = await google(0);
+    const code = new URL(sheet.headers.get("location")!).searchParams.get("code");
+    expect((await api(`/api/auth/app-exchange?code=${code}${supplied}`)).status).toBe(400);
+    expect((await api(`/api/auth/app-exchange?code=${code}&verifier=${verifier}`)).status).toBe(400);
+  }
 });
