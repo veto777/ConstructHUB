@@ -720,7 +720,14 @@ export async function registerRoutes(
 
   // The Search page's "Permit details" (/search): returns cached details for a result, or
   // scrapes the portal for that permit and caches them on the result row.
+  // Each uncached lookup opens a browser context on the portal for up to 60 s, so lookups are capped per account
+  // and per server; a cached result never counts.
+  const detailLookups = new Map<number, number>();
+  let detailLookupsRunning = 0;
+  const DETAIL_LOOKUPS_PER_USER = 2, DETAIL_LOOKUPS_PER_SERVER = 6;
   app.post("/api/permit-details/:resultId", async (req, res) => {
+    const userId: number = req.user!.id;
+    let counted = false;
     try {
       const resultId = parseInt(req.params.resultId);
       const result = await storage.getSearchResultById(resultId);
@@ -737,6 +744,15 @@ export async function registerRoutes(
       if (!db || !db.platform || !db.searchUrl) {
         return res.status(400).json({ message: "Database not configured for detail scraping" });
       }
+      if (!governmentLinksAvailable(db) || !canScrapeGovernmentPortal(db)) {
+        return res.status(400).json({ message: "This portal's details can't be fetched automatically. Open the portal to see them." });
+      }
+      if ((detailLookups.get(userId) ?? 0) >= DETAIL_LOOKUPS_PER_USER || detailLookupsRunning >= DETAIL_LOOKUPS_PER_SERVER) {
+        return res.status(429).json({ message: "Other permit details are still loading. Try again in a moment." });
+      }
+      detailLookups.set(userId, (detailLookups.get(userId) ?? 0) + 1);
+      detailLookupsRunning++;
+      counted = true;
 
       const details = await scrapePermitDetail(
         db.platform,
@@ -756,6 +772,12 @@ export async function registerRoutes(
       res.json({ details: details || {}, cached: false });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    } finally {
+      if (counted) {
+        detailLookupsRunning--;
+        const left = (detailLookups.get(userId) ?? 1) - 1;
+        if (left > 0) detailLookups.set(userId, left); else detailLookups.delete(userId);
+      }
     }
   });
 

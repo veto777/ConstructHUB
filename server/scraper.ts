@@ -2303,7 +2303,17 @@ export function parseEnerGovDetail(data: any, contacts: any, permitNumber: strin
     ApplyDate: 'Applied', IssueDate: 'Issued', ExpireDate: 'Expires', FinalizeDate: 'Finaled',
     MainAddress: 'Address', MainParcelNumber: 'Parcel',
   };
-  for (const [field, label] of Object.entries(fields)) addDetail(details, label, record[field]);
+  // EnerGov sends UTC instants: a date is the jurisdiction's local midnight ("2003-03-24T06:00:00Z"), a finalize is
+  // a real time. Shown as the calendar date the way Accela and Click2Gov print it. Every US zone is 4-10 h behind
+  // UTC, so shifting by 4 h keeps local midnights (04-10Z) on their day and moves 00-04Z back to the local evening.
+  const usDate = (v: unknown) => {
+    if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(v)) return v;
+    const t = Date.parse(v);
+    if (Number.isNaN(t)) return v;
+    const [y, m, d] = new Date(t - 4 * 3_600_000).toISOString().slice(0, 10).split('-');
+    return `${m}/${d}/${y}`;
+  };
+  for (const [field, label] of Object.entries(fields)) addDetail(details, label, /Date$/.test(field) ? usDate(record[field]) : record[field]);
   if (record.ShowValue === true) addDetail(details, 'Job value', record.Value);
   if (contacts?.Success === true && Array.isArray(contacts.Result)) {
     for (const contact of contacts.Result) {

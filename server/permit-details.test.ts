@@ -63,7 +63,7 @@ describe('Accela public CapDetail fixtures', () => {
 describe('EnerGov anonymous detail and contacts JSON fixtures', () => {
   it('reads detail fields and public contractor while omitting masked names and ambiguous Title', () => {
     const details = energov(5001);
-    expect(details).toMatchObject({ Permit: 'RERF-001928-2012', Contractor: 'Allstate Roofing Specialist Inc dba Allstate Roofing', 'Job value': '14700', Parcel: '43042311', Finaled: '2013-02-12T19:04:58.35Z' });
+    expect(details).toMatchObject({ Permit: 'RERF-001928-2012', Contractor: 'Allstate Roofing Specialist Inc dba Allstate Roofing', 'Job value': '14700', Parcel: '43042311', Finaled: '02/12/2013' });
     expect(details).not.toHaveProperty('Applicant');
     expect(details).not.toHaveProperty('Owner');
     expect(details).not.toHaveProperty('Contractor license');
