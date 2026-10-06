@@ -54,6 +54,15 @@
     "lastVerifiedAt": "2026-10-05T22:06:53.769Z"
   },
   {
+    "jurisdiction": "Aberdeen, NC",
+    "url": "https://us.cloudpermit.com/townofaberdeen/",
+    "platform": "Cloudpermit",
+    "sourceUrl": "https://www.townofaberdeen.net/pview.aspx?id=2091&catid=29",
+    "candidateUrl": "https://us.cloudpermit.com/townofaberdeen/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:29.453Z"
+  },
+  {
     "jurisdiction": "Aberdeen, SD",
     "url": "https://www.aberdeen.sd.us/94/Building-Inspection",
     "platform": "City website",
@@ -410,6 +419,15 @@
     "candidateUrl": "https://aglc.addison-il.org/CityViewPortal/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:59:43.359Z"
+  },
+  {
+    "jurisdiction": "Addison, ME",
+    "url": "https://addisonmaine.org/permits-and-applications",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://addisonmaine.org/",
+    "candidateUrl": "https://addisonmaine.org/permits-and-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:27.738Z"
   },
   {
     "jurisdiction": "Addison, MI",
@@ -2171,6 +2189,15 @@
     "lastVerifiedAt": "2026-10-05T22:06:58.423Z"
   },
   {
+    "jurisdiction": "Andale, KS",
+    "url": "https://www.cityofandale.com/faq-old/44-questions/5-i-want-to-build-a-shed-or-some-other-type-of-building-what-do-i-need-to-do",
+    "platform": "City building permit information",
+    "sourceUrl": "https://www.cityofandale.com/faq",
+    "candidateUrl": "https://www.cityofandale.com/faq-old/44-questions/5-i-want-to-build-a-shed-or-some-other-type-of-building-what-do-i-need-to-do",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:30.251Z"
+  },
+  {
     "jurisdiction": "Andalusia, AL",
     "url": "https://andalusiaal.gov/planning/planning-development.html",
     "platform": "City permit page (no online system)",
@@ -3131,6 +3158,15 @@
     "candidateUrl": "https://www.cityofarnoldpa.org/home/code-enforcement",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T22:06:58.009Z"
+  },
+  {
+    "jurisdiction": "Arnoldsville, GA",
+    "url": "https://www.cityofarnoldsville.org/zoning",
+    "platform": "City building permit forms page",
+    "sourceUrl": "https://www.cityofarnoldsville.org/",
+    "candidateUrl": "https://www.cityofarnoldsville.org/zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:27.781Z"
   },
   {
     "jurisdiction": "Aroma Park, IL",
@@ -4374,7 +4410,7 @@
     "sourceUrl": "https://cityofaurorasd.com/",
     "candidateUrl": "https://cityofaurorasd.com/forms",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:19:50.010Z"
+    "lastVerifiedAt": "2026-10-06T02:58:34.602Z"
   },
   {
     "jurisdiction": "Aurora, TX",
@@ -4822,7 +4858,7 @@
     "sourceUrl": "https://www.bainbridgecity.com/",
     "candidateUrl": "https://www.bainbridgecity.com/page/building-permits-applications",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:19:43.424Z"
+    "lastVerifiedAt": "2026-10-06T02:58:28.201Z"
   },
   {
     "jurisdiction": "Bainville, MT",
@@ -4977,6 +5013,15 @@
     "lastVerifiedAt": "2026-10-05T04:29:25.668Z"
   },
   {
+    "jurisdiction": "Baldwin, WI",
+    "url": "https://www.villageofbaldwin.com/building/page/building-inspection",
+    "platform": "Village building inspection page",
+    "sourceUrl": "https://www.villageofbaldwin.com/",
+    "candidateUrl": "https://www.villageofbaldwin.com/node/1531",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.506Z"
+  },
+  {
     "jurisdiction": "Baldwinsville, NY",
     "url": "https://www.baldwinsville.gov/code-enforcement/",
     "platform": "city-site",
@@ -5064,6 +5109,15 @@
     "candidateUrl": "https://aca-prod.accela.com/BALTIMORE/Default.aspx",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T01:01:52.077Z"
+  },
+  {
+    "jurisdiction": "Baltimore, OH",
+    "url": "https://app.communitycore.com/app/public-portal/e1a73111-c328-4d4c-b90e-0303a886f466",
+    "platform": "CommunityCore",
+    "sourceUrl": "https://www.baltimoreohio.org/building",
+    "candidateUrl": "https://app.communitycore.com/app/public-portal/e1a73111-c328-4d4c-b90e-0303a886f466",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:28.711Z"
   },
   {
     "jurisdiction": "Bamberg County, SC",
@@ -5894,6 +5948,15 @@
     "lastVerifiedAt": "2026-10-05T22:07:04.443Z"
   },
   {
+    "jurisdiction": "Bay City, MI",
+    "url": "https://www.baycitymi.gov/158/Building-Department",
+    "platform": "City Building Department page",
+    "sourceUrl": "https://www.baycitymi.gov/sitemap",
+    "candidateUrl": "https://www.baycitymi.gov/158/Building-Department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:33.240Z"
+  },
+  {
     "jurisdiction": "Bay City, TX",
     "url": "https://www.baycitytx.gov/248/Planning-Development-Services-Division",
     "platform": "City permits page (no online system)",
@@ -5928,6 +5991,15 @@
     "candidateUrl": "https://bayharborislands-fl-bhiapplicationportal.app.transform.civicplus.com/",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T04:29:33.519Z"
+  },
+  {
+    "jurisdiction": "Bay Head, NJ",
+    "url": "https://www.bayheadnj.org/construction-and-building",
+    "platform": "Borough construction and building page",
+    "sourceUrl": "https://www.bayheadnj.org/construction-and-building",
+    "candidateUrl": "https://www.bayheadnj.org/construction-and-building",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:31.179Z"
   },
   {
     "jurisdiction": "Bay Minette, AL",
@@ -6197,6 +6269,15 @@
     "candidateUrl": "https://beaufortcountysc-energovpub.tylerhost.net/Apps/SelfService",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:52:29.642Z"
+  },
+  {
+    "jurisdiction": "Beaufort, NC",
+    "url": "https://www.beaufortnc.org/planninginspections/page/permitting-applications-inspections",
+    "platform": "Town planning & inspections permitting page",
+    "sourceUrl": "https://www.beaufortnc.org/",
+    "candidateUrl": "https://www.beaufortnc.org/planninginspections/page/permitting-applications-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:29.716Z"
   },
   {
     "jurisdiction": "Beaufort, SC",
@@ -6493,6 +6574,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:59.465Z"
   },
   {
+    "jurisdiction": "Beech Bottom, WV",
+    "url": "https://beechbottomwv.org/?pg=forms_payments",
+    "platform": "Village building permit forms page",
+    "sourceUrl": "https://beechbottomwv.org/",
+    "candidateUrl": "https://beechbottomwv.org/?pg=forms_payments",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:28.519Z"
+  },
+  {
     "jurisdiction": "Beech Grove, IN",
     "url": "https://www.beechgrove.com/building-commissioner",
     "platform": "Building Commissioner page",
@@ -6592,6 +6682,24 @@
     "lastVerifiedAt": "2026-10-05T02:57:50.500Z"
   },
   {
+    "jurisdiction": "Belgium, WI",
+    "url": "https://app.heygov.com/belgiumwi.gov/forms/building/send",
+    "platform": "HeyGov",
+    "sourceUrl": "https://www.belgiumwi.gov/resources/building-permits",
+    "candidateUrl": "https://app.heygov.com/belgiumwi.gov/forms/building/send",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:28.011Z"
+  },
+  {
+    "jurisdiction": "Belgrade, ME",
+    "url": "https://www.belgrademaine.gov/codeenforcement",
+    "platform": "Town code enforcement / building permits page",
+    "sourceUrl": "https://www.belgrademaine.gov/",
+    "candidateUrl": "https://www.belgrademaine.gov/codeenforcement",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.516Z"
+  },
+  {
     "jurisdiction": "Belgrade, MN",
     "url": "https://belgradecitymn.gov/index.asp?SEC=74137A28-EDBF-4E17-8062-C9A9B48603D2",
     "platform": "City permits, licenses & forms page",
@@ -6689,6 +6797,15 @@
     "candidateUrl": "https://public.mygov.us/belle_fourche_sd",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:35.516Z"
+  },
+  {
+    "jurisdiction": "Belle Glade, FL",
+    "url": "http://app.govwell.com/belle-glade-fl",
+    "platform": "GovWell",
+    "sourceUrl": "https://www.belleglade.gov/",
+    "candidateUrl": "http://app.govwell.com/belle-glade-fl",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:29.611Z"
   },
   {
     "jurisdiction": "Belle Isle, FL",
@@ -6833,6 +6950,15 @@
     "candidateUrl": "https://bellevilleonthelake.com/departments/building-zoning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:16.762Z"
+  },
+  {
+    "jurisdiction": "Belleville, WI",
+    "url": "https://www.bellevillewi.gov/community-economic-development/page/building-inspection",
+    "platform": "Village building inspection page",
+    "sourceUrl": "https://www.bellevillewi.gov/",
+    "candidateUrl": "https://www.bellevillewi.gov/node/5406",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:32.134Z"
   },
   {
     "jurisdiction": "Bellevue, IA",
@@ -7103,6 +7229,15 @@
     "lastVerifiedAt": "2026-10-05T02:58:34.086Z"
   },
   {
+    "jurisdiction": "Belvidere, NJ",
+    "url": "https://www.belviderenj.net/building",
+    "platform": "Town building/construction office page",
+    "sourceUrl": "https://www.belviderenj.net/",
+    "candidateUrl": "https://www.belviderenj.net/building",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:30.619Z"
+  },
+  {
     "jurisdiction": "Belview, MN",
     "url": null,
     "platform": null,
@@ -7326,6 +7461,15 @@
     "candidateUrl": "https://bentcounty.colorado.gov/government/land-use-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:37.556Z"
+  },
+  {
+    "jurisdiction": "Bentley, KS",
+    "url": "https://www.bentleyks.gov/pview.aspx?id=55009&catid=25",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.bentleyks.gov/",
+    "candidateUrl": "https://www.bentleyks.gov/pview.aspx?id=55009&catid=25",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.800Z"
   },
   {
     "jurisdiction": "Bentleyville, OH",
@@ -7585,6 +7729,15 @@
     "candidateUrl": "https://www.berkeley.il.us/permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:01.943Z"
+  },
+  {
+    "jurisdiction": "Berkley, MA",
+    "url": "https://townofberkleyma.gov/building-inspector/",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://townofberkleyma.gov/",
+    "candidateUrl": "https://townofberkleyma.gov/building-inspector/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.531Z"
   },
   {
     "jurisdiction": "Berkley, MI",
@@ -8276,6 +8429,15 @@
     "candidateUrl": "https://sites.google.com/cityofbiglaketx.org/cityofbiglaketx/permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:28.119Z"
+  },
+  {
+    "jurisdiction": "Big Piney, WY",
+    "url": "https://www.bigpineywyoming.us/forms",
+    "platform": "Town building permit forms page",
+    "sourceUrl": "https://www.bigpineywyoming.us/",
+    "candidateUrl": "https://www.bigpineywyoming.us/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.493Z"
   },
   {
     "jurisdiction": "Big Rapids, MI",
@@ -9934,6 +10096,15 @@
     "lastVerifiedAt": "2026-10-05T02:57:56.676Z"
   },
   {
+    "jurisdiction": "Bowdoinham, ME",
+    "url": "https://www.bowdoinham.com/code-enforcement",
+    "platform": "Town code enforcement (building permit) page",
+    "sourceUrl": "https://www.bowdoinham.com/",
+    "candidateUrl": "https://www.bowdoinham.com/code-enforcement",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.101Z"
+  },
+  {
     "jurisdiction": "Bowdon, GA",
     "url": "https://www.bowdon.net/city-clerk/",
     "platform": "City-built",
@@ -11091,6 +11262,15 @@
     "lastVerifiedAt": "2026-10-05T23:15:33.153Z"
   },
   {
+    "jurisdiction": "Brimfield, MA",
+    "url": "https://brimfield.patriotpermitpro.com/",
+    "platform": "Patriot PermitPro",
+    "sourceUrl": "https://www.brimfieldma.org/",
+    "candidateUrl": "https://brimfield.patriotpermitpro.com/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:30.676Z"
+  },
+  {
     "jurisdiction": "Briny Breezes, FL",
     "url": "https://www.brinybreezes.us/forms-1/",
     "platform": "Town building permit application and process page",
@@ -11483,6 +11663,16 @@
     "lastVerifiedAt": "2026-10-05T23:15:32.181Z"
   },
   {
+    "jurisdiction": "Brookline Village, MA",
+    "url": null,
+    "platform": null,
+    "sourceUrl": null,
+    "candidateUrl": "https://aca-prod.accela.com/Brookline/Default.aspx",
+    "linkStatus": "none",
+    "lastVerifiedAt": null,
+    "note": "removed in review 2026-10-06: a village inside the Town of Brookline; its portal is listed under Brookline, MA"
+  },
+  {
     "jurisdiction": "Brookline, MA",
     "url": "https://aca-prod.accela.com/Brookline/Default.aspx",
     "platform": "Accela Citizen Access",
@@ -11775,6 +11965,15 @@
     "candidateUrl": "https://www.browndeerwi.org/309/Building-Inspection",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T04:29:28.408Z"
+  },
+  {
+    "jurisdiction": "Brownfield, ME",
+    "url": "https://www.brownfieldmaine.gov/code-enforcement-office",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.brownfieldmaine.gov/",
+    "candidateUrl": "https://www.brownfieldmaine.gov/code-enforcement-office",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:32.109Z"
   },
   {
     "jurisdiction": "Brownfield, TX",
@@ -12305,6 +12504,15 @@
     "lastVerifiedAt": "2026-10-05T23:15:32.784Z"
   },
   {
+    "jurisdiction": "Buffalo, WY",
+    "url": "https://www.cityofbuffalowy.com/pview.aspx?id=24236&catid=510",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.cityofbuffalowy.com/",
+    "candidateUrl": "https://www.cityofbuffalowy.com/pview.aspx?id=24236&catid=510",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:32.206Z"
+  },
+  {
     "jurisdiction": "Buford, GA",
     "url": "https://www.cityofbuford.com/inspection-department",
     "platform": "Inspection department page",
@@ -12753,6 +12961,15 @@
     "lastVerifiedAt": "2026-10-06T02:19:52.671Z"
   },
   {
+    "jurisdiction": "Burnham, ME",
+    "url": "https://burnham-maine.us/services",
+    "platform": "Town services page (building permit fees)",
+    "sourceUrl": "https://burnham-maine.us/",
+    "candidateUrl": "https://burnham-maine.us/services",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:30.491Z"
+  },
+  {
     "jurisdiction": "Burns Flat, OK",
     "url": "https://www.burnsflatok.com/_files/ugd/41f9d3_4f2ebb88f1d34c359ed6563174327ad4.pdf",
     "platform": "Town building permit application (PDF)",
@@ -12795,6 +13012,15 @@
     "candidateUrl": "https://www.burr-ridge.gov/community/permits_and_licenses.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:18.305Z"
+  },
+  {
+    "jurisdiction": "Burrton, KS",
+    "url": "https://www.burrtonkansas.com/formsandpermits",
+    "platform": "City building permit page (Forms and Permits)",
+    "sourceUrl": "https://www.burrtonkansas.com/",
+    "candidateUrl": "https://www.burrtonkansas.com/formsandpermits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:30.731Z"
   },
   {
     "jurisdiction": "Burt County, NE",
@@ -12966,6 +13192,15 @@
     "candidateUrl": "https://byhalia-ms.com/zoning-and-building-dept",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:18.620Z"
+  },
+  {
+    "jurisdiction": "Byng, OK",
+    "url": "https://byngok.com/code-enforcement",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://byngok.com/",
+    "candidateUrl": "https://byngok.com/code-enforcement",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:30.898Z"
   },
   {
     "jurisdiction": "Byram, MS",
@@ -13504,6 +13739,15 @@
     "candidateUrl": "https://www.villageofcalumetpark.org/building-department-2",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:34.878Z"
+  },
+  {
+    "jurisdiction": "Calumet, OK",
+    "url": "https://townofcalumetok.com/departments.html",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://townofcalumetok.com",
+    "candidateUrl": "https://townofcalumetok.com/departments.html",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:30.880Z"
   },
   {
     "jurisdiction": "Calvert County, MD",
@@ -14224,6 +14468,15 @@
     "lastVerifiedAt": "2026-10-06T01:05:00.245Z"
   },
   {
+    "jurisdiction": "Canton, ME",
+    "url": "https://www.cantonme.com/code-enforcement",
+    "platform": "Town code enforcement page",
+    "sourceUrl": "https://www.cantonme.com/",
+    "candidateUrl": "https://www.cantonme.com/code-enforcement",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:34.006Z"
+  },
+  {
     "jurisdiction": "Canton, MI",
     "url": "https://bsaonline.com/CD_MdbPermitApplication/PermitApplication?permitApplicationSessionGuid=44f4fa70-1f17-438b-8b23-3720ed78c107&uid=684",
     "platform": "BS&A Online",
@@ -14293,7 +14546,7 @@
     "sourceUrl": "https://www.cantonsd.org/",
     "candidateUrl": "https://www.cantonsd.org/page/permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:19:54.411Z"
+    "lastVerifiedAt": "2026-10-06T02:58:31.465Z"
   },
   {
     "jurisdiction": "Canton, TX",
@@ -14960,6 +15213,15 @@
     "lastVerifiedAt": "2026-10-05T22:07:21.317Z"
   },
   {
+    "jurisdiction": "Carrollton, GA",
+    "url": "https://carrolltonga.com/licenses-permits/#building-permits",
+    "platform": "City building permits page",
+    "sourceUrl": "https://carrolltonga.com/",
+    "candidateUrl": "https://carrolltonga.com/licenses-permits/#building-permits",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:32.961Z"
+  },
+  {
     "jurisdiction": "Carrollton, IL",
     "url": "https://www.carrolltonil.net/forms.html",
     "platform": "City building permits page",
@@ -15246,6 +15508,15 @@
     "lastVerifiedAt": "2026-10-05T23:15:39.108Z"
   },
   {
+    "jurisdiction": "Caseville, MI",
+    "url": "https://casevillecity.com/documents/building-permit-application-form-3/",
+    "platform": "City building permit application page",
+    "sourceUrl": "https://casevillecity.com/documents-category/forms/",
+    "candidateUrl": "https://casevillecity.com/documents/building-permit-application-form-3/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.909Z"
+  },
+  {
     "jurisdiction": "Casey, IA",
     "url": "https://www.cityofcaseyia.com/forms",
     "platform": "City building permits page",
@@ -15530,6 +15801,15 @@
     "candidateUrl": "https://castrovilletx.portal.iworq.net/portalhome/castrovilletx",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:58:35.064Z"
+  },
+  {
+    "jurisdiction": "Caswell Beach, NC",
+    "url": "https://www.caswellbeach.org/building-inspections",
+    "platform": "Town building inspections page",
+    "sourceUrl": "https://www.caswellbeach.org/",
+    "candidateUrl": "https://www.caswellbeach.org/building-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:33.927Z"
   },
   {
     "jurisdiction": "Caswell County, NC",
@@ -17388,6 +17668,15 @@
     "lastVerifiedAt": "2026-10-05T00:50:17.185Z"
   },
   {
+    "jurisdiction": "Chesterfield, MA",
+    "url": "https://www.townofchesterfieldma.com/building-department-office-hours-mondays-500-pm-630-pm",
+    "platform": "Town building department page",
+    "sourceUrl": "https://www.townofchesterfieldma.com/",
+    "candidateUrl": "https://www.townofchesterfieldma.com/chesterfield-building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:34.993Z"
+  },
+  {
     "jurisdiction": "Chesterfield, MO",
     "url": "https://www.chesterfield.mo.us/building-permits",
     "platform": "Building Inspections & Permits page",
@@ -17691,6 +17980,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:26.056Z"
   },
   {
+    "jurisdiction": "Chilmark, MA",
+    "url": "https://chilmarkma.portal.opengov.com/",
+    "platform": "OpenGov permitting portal",
+    "sourceUrl": "https://www.chilmarkma.gov/building-inspection-zoning-enforcement",
+    "candidateUrl": "https://chilmarkma.portal.opengov.com/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:36.018Z"
+  },
+  {
     "jurisdiction": "Chilton, WI",
     "url": "https://chiltonwi.gov/building-permits",
     "platform": "City building permits page",
@@ -17851,6 +18149,15 @@
     "candidateUrl": "https://choudrant.org/building-permits-and-inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:29.045Z"
+  },
+  {
+    "jurisdiction": "Chouteau County, MT",
+    "url": "https://www.chouteaucountymt.gov/planning-development",
+    "platform": "County planning & development permits page",
+    "sourceUrl": "https://www.chouteaucountymt.gov/",
+    "candidateUrl": "https://www.chouteaucountymt.gov/planning-development",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:31.892Z"
   },
   {
     "jurisdiction": "Chouteau, OK",
@@ -18789,7 +19096,7 @@
     "sourceUrl": "https://www.clarksvillear.gov/page/building-inspector/",
     "candidateUrl": "https://coc.tekconnectgov.com/",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:02.894Z"
+    "lastVerifiedAt": "2026-10-06T02:58:32.476Z"
   },
   {
     "jurisdiction": "Clarksville, IN",
@@ -19002,7 +19309,7 @@
     "sourceUrl": "https://www.cityofclaytonga.gov/",
     "candidateUrl": "https://www.cityofclaytonga.gov/browse/672583",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:02.693Z"
+    "lastVerifiedAt": "2026-10-06T02:58:32.019Z"
   },
   {
     "jurisdiction": "Clayton, IL",
@@ -19140,6 +19447,15 @@
     "lastVerifiedAt": "2026-10-05T22:07:30.088Z"
   },
   {
+    "jurisdiction": "Clear Lake, WI",
+    "url": "https://www.clearlake-wi.gov/administration/page/building-permit-information",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.clearlake-wi.gov/",
+    "candidateUrl": "https://www.clearlake-wi.gov/administration/page/building-permit-information",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:34.242Z"
+  },
+  {
     "jurisdiction": "Clearfield, PA",
     "url": "https://clearfieldboro.com/forms/",
     "platform": "municipal website (forms incl. zoning/UCC permit application)",
@@ -19165,6 +19481,15 @@
     "candidateUrl": "https://clearlakeca.portal.opengov.com/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-06T01:05:27.816Z"
+  },
+  {
+    "jurisdiction": "Clearmont, WY",
+    "url": "https://www.townofclearmont.com/_files/ugd/6972bf_978a241de41141d7a2e7ab032f667871.pdf",
+    "platform": "Town building/permit application (PDF)",
+    "sourceUrl": "https://www.townofclearmont.com/city-government",
+    "candidateUrl": "https://www.townofclearmont.com/_files/ugd/6972bf_978a241de41141d7a2e7ab032f667871.pdf",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:32.417Z"
   },
   {
     "jurisdiction": "Clearwater County, ID",
@@ -19714,6 +20039,15 @@
     "lastVerifiedAt": "2026-10-05T23:35:47.321Z"
   },
   {
+    "jurisdiction": "Clintonville, WI",
+    "url": "https://www.clintonvillewi.gov/economic-development/page/building-permits-and-inspections",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.clintonvillewi.gov/",
+    "candidateUrl": "https://www.clintonvillewi.gov/economic-development/page/building-permits-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.077Z"
+  },
+  {
     "jurisdiction": "Clive, IA",
     "url": "https://www4.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=434&original_iid=0&original_contactID=0",
     "platform": "CitizenServe",
@@ -19875,6 +20209,15 @@
     "lastVerifiedAt": "2026-10-06T02:20:03.638Z"
   },
   {
+    "jurisdiction": "Coal Hill, AR",
+    "url": "https://cityofcoalhillar.municipalimpact.com/building-permits-and-inspections",
+    "platform": "City building permits page",
+    "sourceUrl": "https://cityofcoalhillar.municipalimpact.com/locations-and-directions",
+    "candidateUrl": "https://cityofcoalhillar.municipalimpact.com/building-permits-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:32.607Z"
+  },
+  {
     "jurisdiction": "Coal Township, PA",
     "url": "https://coaltwpnorthumberland.com/code-office/",
     "platform": "Township code office page",
@@ -19944,6 +20287,15 @@
     "candidateUrl": "https://villageofcobb.com/village-zoning-building-inspector",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:43.092Z"
+  },
+  {
+    "jurisdiction": "Coburg, OR",
+    "url": "https://www.coburgoregon.gov/planning/page/building-permits",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.coburgoregon.gov/",
+    "candidateUrl": "https://www.coburgoregon.gov/planning/page/building-permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:36.706Z"
   },
   {
     "jurisdiction": "Cochecton, NY",
@@ -20385,6 +20737,15 @@
     "lastVerifiedAt": "2026-10-05T23:15:45.210Z"
   },
   {
+    "jurisdiction": "College Park, GA",
+    "url": "https://www.sagesgov.com/collegepark-ga",
+    "platform": "SagesGov permitting portal",
+    "sourceUrl": "https://www.collegeparkga.gov/293/Services",
+    "candidateUrl": "https://www.sagesgov.com/collegepark-ga",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.766Z"
+  },
+  {
     "jurisdiction": "College Park, MD",
     "url": "https://aca-prod.accela.com/collegepark/Default.aspx",
     "platform": "Accela",
@@ -20814,6 +21175,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:38.834Z"
   },
   {
+    "jurisdiction": "Columbia Falls, ME",
+    "url": "https://columbiafallsmaine.org/forms",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://columbiafallsmaine.org/",
+    "candidateUrl": "https://columbiafallsmaine.org/forms",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:32.442Z"
+  },
+  {
     "jurisdiction": "Columbia Falls, MT",
     "url": "https://www.cityofcolumbiafalls.org/1204/Building-Inspection-Code-Enforcement",
     "platform": "Building department page",
@@ -21141,6 +21511,15 @@
     "candidateUrl": "https://bsaonline.com/CD_PermitAjaxApplication/ApplyForPermit?applicationGuid=43368795-1312-4ab6-9ede-78b99a73ebf9&propertyGuid=0&projectGuid=0&uid=1630",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:58:40.407Z"
+  },
+  {
+    "jurisdiction": "Commerce, CA",
+    "url": "https://www.commerceca.gov/city-hall/economic-development-and-planning/building-safety",
+    "platform": "City Building & Safety page",
+    "sourceUrl": "https://www.commerceca.gov/",
+    "candidateUrl": "https://www.commerceca.gov/city-hall/economic-development-and-planning/building-safety",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:32.668Z"
   },
   {
     "jurisdiction": "Commerce, GA",
@@ -21596,12 +21975,12 @@
   },
   {
     "jurisdiction": "Coon Rapids, IA",
-    "url": null,
-    "platform": null,
+    "url": "https://coonrapidsia.municipalone.com/pview.aspx?id=35801&catid=465",
+    "platform": "City building permits page",
     "sourceUrl": "https://coonrapidsia.municipalone.com/pview.aspx?id=35858&catid=601",
     "candidateUrl": "https://coonrapidsia.municipalone.com/pview.aspx?id=35801&catid=465",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:29.848Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.994Z"
   },
   {
     "jurisdiction": "Coon Rapids, MN",
@@ -21842,6 +22221,15 @@
     "candidateUrl": "https://corinna.govoffice.com/index.asp?SEC=C1EF22A3-4EE4-4425-A63E-D031C2B098B5",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:46.040Z"
+  },
+  {
+    "jurisdiction": "Corinth, ME",
+    "url": "https://www.townofcorinth.com/code-enforcement/page/applications",
+    "platform": "Town code enforcement applications page",
+    "sourceUrl": "https://www.townofcorinth.com/code-enforcement",
+    "candidateUrl": "https://www.townofcorinth.com/code-enforcement/page/applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.556Z"
   },
   {
     "jurisdiction": "Corinth, MS",
@@ -22085,6 +22473,15 @@
     "candidateUrl": "https://www.cortlandoh.gov/departments/zoning-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:28.917Z"
+  },
+  {
+    "jurisdiction": "Corunna, MI",
+    "url": "https://www.corunna-mi.gov/building",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.corunna-mi.gov/",
+    "candidateUrl": "https://www.corunna-mi.gov/building",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.386Z"
   },
   {
     "jurisdiction": "Corvallis, OR",
@@ -23193,6 +23590,15 @@
     "lastVerifiedAt": "2026-10-05T00:59:40.651Z"
   },
   {
+    "jurisdiction": "Crystal River, FL",
+    "url": "https://bsaonline.com/Home/MunicipalityHome?uid=2285",
+    "platform": "BS&A Online",
+    "sourceUrl": "https://www.crystalriverfl.org/planning/page/building-department",
+    "candidateUrl": "https://bsaonline.com/Home/MunicipalityHome?uid=2285",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.601Z"
+  },
+  {
     "jurisdiction": "Crystal, MN",
     "url": "https://epermits.logis.org/home.aspx?city=cy",
     "platform": "LOGIS ePermits",
@@ -23540,6 +23946,15 @@
     "candidateUrl": "https://cutandshoot.org/building-permits-and-inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:49.004Z"
+  },
+  {
+    "jurisdiction": "Cut Bank, MT",
+    "url": "https://www.cityofcutbank.org/building-department",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.cityofcutbank.org/",
+    "candidateUrl": "https://www.cityofcutbank.org/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.614Z"
   },
   {
     "jurisdiction": "Cutler Bay, FL",
@@ -24894,6 +25309,15 @@
     "candidateUrl": "https://adlc.us/153/Building-Inspector",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:40.170Z"
+  },
+  {
+    "jurisdiction": "Deer Lodge, MT",
+    "url": "https://deerlodgemt2.portal.iworq.net/portalhome/deerlodgemt2",
+    "platform": "iWorQ",
+    "sourceUrl": "https://www.cityofdeerlodgemt.gov/building-inspector",
+    "candidateUrl": "https://deerlodgemt2.portal.iworq.net/portalhome/deerlodgemt2",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.259Z"
   },
   {
     "jurisdiction": "Deer Park, IL",
@@ -26318,6 +26742,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:26.969Z"
   },
   {
+    "jurisdiction": "Donalsonville, GA",
+    "url": "https://www.donalsonvillega.org/docs-form/license-and-permit-forms",
+    "platform": "City license & permit forms page (building permit application)",
+    "sourceUrl": "https://www.donalsonvillega.org/documents-forms",
+    "candidateUrl": "https://www.donalsonvillega.org/docs-form/license-and-permit-forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.786Z"
+  },
+  {
     "jurisdiction": "Donegal, PA",
     "url": "https://www.donegaltownshippa.com/forms",
     "platform": "Municipal building permits page",
@@ -26818,6 +27251,15 @@
     "candidateUrl": "https://dracutma.viewpointcloud.com/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-06T01:06:03.269Z"
+  },
+  {
+    "jurisdiction": "Drakes Branch, VA",
+    "url": "https://drakesbranch.gov/permits/",
+    "platform": "Town permits page",
+    "sourceUrl": "https://drakesbranch.gov/",
+    "candidateUrl": "https://drakesbranch.gov/permits/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.580Z"
   },
   {
     "jurisdiction": "Draper, UT",
@@ -28840,6 +29282,15 @@
     "lastVerifiedAt": "2026-10-05T23:15:56.314Z"
   },
   {
+    "jurisdiction": "Eden, NC",
+    "url": "https://www.edennc.us/departments/planning-community-development",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.edennc.us/",
+    "candidateUrl": "https://www.edennc.us/departments/planning-community-development",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:34.298Z"
+  },
+  {
     "jurisdiction": "Eden, NY",
     "url": "https://edenny.gov/building-permit-center/",
     "platform": "City website",
@@ -29132,6 +29583,15 @@
     "candidateUrl": "https://www.effinghamil.com/building-and-construction-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:03.355Z"
+  },
+  {
+    "jurisdiction": "Effingham, KS",
+    "url": "https://www.cityofeffinghamks.gov/document-library",
+    "platform": "City building permit forms page",
+    "sourceUrl": "https://www.cityofeffinghamks.gov/",
+    "candidateUrl": "https://www.cityofeffinghamks.gov/document-library",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:36.278Z"
   },
   {
     "jurisdiction": "Effingham, NH",
@@ -29651,13 +30111,22 @@
     "lastVerifiedAt": "2026-10-05T22:07:51.155Z"
   },
   {
+    "jurisdiction": "Elk Mountain, WY",
+    "url": "https://www.townofelkmountain.com/zoning-building-inspections",
+    "platform": "Town zoning & building code page",
+    "sourceUrl": "https://www.townofelkmountain.com/",
+    "candidateUrl": "https://www.townofelkmountain.com/zoning-building-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:34.658Z"
+  },
+  {
     "jurisdiction": "Elk Point, SD",
     "url": null,
     "platform": null,
     "sourceUrl": "https://www.elkpoint.org/documents/city/forms/727876",
     "candidateUrl": "https://www.elkpoint.org/documents/city/forms/planning-and-zoning/22158474",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:17.602Z"
+    "lastVerifiedAt": "2026-10-06T02:58:35.237Z"
   },
   {
     "jurisdiction": "Elk Ridge, UT",
@@ -29748,6 +30217,15 @@
     "candidateUrl": "https://www.cityofelkharttx.gov/building-permits-and-inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:57.806Z"
+  },
+  {
+    "jurisdiction": "Elkhorn, WI",
+    "url": "https://www.cityofelkhorn.gov/building/page/building-department",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.cityofelkhorn.gov/building",
+    "candidateUrl": "https://www.cityofelkhorn.gov/building/page/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:36.668Z"
   },
   {
     "jurisdiction": "Elkin, NC",
@@ -30011,6 +30489,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:45.368Z"
   },
   {
+    "jurisdiction": "Elm Springs, AR",
+    "url": "https://elmsprings.net/planning-building.html",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://elmsprings.net/",
+    "candidateUrl": "https://elmsprings.net/planning-building.html",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.270Z"
+  },
+  {
     "jurisdiction": "Elma, NY",
     "url": "https://www.elmanewyork.gov/building-department",
     "platform": "city-site",
@@ -30018,6 +30505,15 @@
     "candidateUrl": "https://elmanewyork.com/building-department",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T03:53:14.146Z"
+  },
+  {
+    "jurisdiction": "Elma, WA",
+    "url": "https://elmawa.portal.iworq.net/portalhome/elmawa",
+    "platform": "iWorQ permit portal",
+    "sourceUrl": "https://www.cityofelma.com/",
+    "candidateUrl": "https://elmawa.portal.iworq.net/portalhome/elmawa",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:38.418Z"
   },
   {
     "jurisdiction": "Elmendorf, TX",
@@ -31060,6 +31556,15 @@
     "lastVerifiedAt": "2026-10-05T06:06:25.682Z"
   },
   {
+    "jurisdiction": "Eureka Springs, AR",
+    "url": "https://www.eurekaspringsar.gov/building-and-safety",
+    "platform": "City Building and Safety page",
+    "sourceUrl": "https://www.eurekaspringsar.gov/",
+    "candidateUrl": "https://www.eurekaspringsar.gov/Building-and-Safety",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.869Z"
+  },
+  {
     "jurisdiction": "Eureka, CA",
     "url": "https://eurekaca.portal.opengov.com/",
     "platform": "OpenGov permit portal",
@@ -31655,6 +32160,15 @@
     "lastVerifiedAt": "2026-10-05T22:07:56.573Z"
   },
   {
+    "jurisdiction": "Fairhaven, MA",
+    "url": "https://permiteyes.us/fairhaven/loginuser.php",
+    "platform": "PermitEyes",
+    "sourceUrl": "https://fairhaven-ma.gov/building-department/",
+    "candidateUrl": "https://permiteyes.us/fairhaven/loginuser.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:36.472Z"
+  },
+  {
     "jurisdiction": "Fairhope, AL",
     "url": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=374&original_iid=0&original_contactID=0",
     "platform": "CitizenServe",
@@ -31761,6 +32275,15 @@
     "candidateUrl": "https://www.fairviewkansas.com/_files/ugd/accda5_fb114e63922044769f945ce15e5081eb.pdf",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-06T02:20:21.121Z"
+  },
+  {
+    "jurisdiction": "Fairview, MT",
+    "url": "https://fairviewmt.com/building-permits-and-inspections",
+    "platform": "Town building permits and inspections page",
+    "sourceUrl": "https://fairviewmt.com/",
+    "candidateUrl": "https://fairviewmt.com/building-permits-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.905Z"
   },
   {
     "jurisdiction": "Fairview, NJ",
@@ -32468,6 +32991,15 @@
     "candidateUrl": "https://www.townoffederalsburg.org/departments/code_enforcement.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:49.608Z"
+  },
+  {
+    "jurisdiction": "Fellsmere, FL",
+    "url": "https://www.cityoffellsmere.org/comm-dev/page/building-division",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.cityoffellsmere.org/comm-dev",
+    "candidateUrl": "https://www.cityoffellsmere.org/comm-dev/page/building-division",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.286Z"
   },
   {
     "jurisdiction": "Felton, DE",
@@ -33713,6 +34245,15 @@
     "candidateUrl": "https://www.mgoconnect.org/cp/project-type-details/3?IsApplicationRestricted=false&SectionID=1",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:52:40.438Z"
+  },
+  {
+    "jurisdiction": "Fort Benton, MT",
+    "url": "https://www.cityoffortbenton.org/documents",
+    "platform": "City residential building permit applications page",
+    "sourceUrl": "https://www.cityoffortbenton.org/city-codes-copy",
+    "candidateUrl": "https://www.cityoffortbenton.org/documents",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.914Z"
   },
   {
     "jurisdiction": "Fort Bragg, CA",
@@ -35965,6 +36506,15 @@
     "lastVerifiedAt": "2026-10-05T02:53:49.894Z"
   },
   {
+    "jurisdiction": "Garfield County, WA",
+    "url": "https://www.garfieldcountywa.gov/forms",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.garfieldcountywa.gov/",
+    "candidateUrl": "https://www.garfieldcountywa.gov/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.477Z"
+  },
+  {
     "jurisdiction": "Garfield Heights, OH",
     "url": "https://www.garfieldhts.org/167/Permits",
     "platform": "City building permits page",
@@ -37182,6 +37732,15 @@
     "lastVerifiedAt": "2026-10-05T22:08:08.273Z"
   },
   {
+    "jurisdiction": "Glen Ridge, FL",
+    "url": "https://www.townofglenridgefl.com/building/page/building-permit-information",
+    "platform": "Town building permit forms page",
+    "sourceUrl": "https://www.townofglenridgefl.com/building",
+    "candidateUrl": "https://www.townofglenridgefl.com/building/page/building-permit-information",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:37.477Z"
+  },
+  {
     "jurisdiction": "Glen Ridge, NJ",
     "url": "https://sdl.town/GlenRidge",
     "platform": "SDL Portal (Building Department Portal)",
@@ -37323,6 +37882,15 @@
     "candidateUrl": "https://www.glendaleohio.org/departments/building_zoning_department/index.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:08:08.411Z"
+  },
+  {
+    "jurisdiction": "Glendale, UT",
+    "url": "https://www.glendaletownutah.gov/planning-zoning/page/building-permit",
+    "platform": "Town building permit application page",
+    "sourceUrl": "https://www.glendaletownutah.gov/",
+    "candidateUrl": "https://www.glendaletownutah.gov/node/146",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:39.856Z"
   },
   {
     "jurisdiction": "Glendale, WI",
@@ -39061,6 +39629,15 @@
     "lastVerifiedAt": "2026-10-05T22:08:13.801Z"
   },
   {
+    "jurisdiction": "Green Lake County, WI",
+    "url": "https://www.greenlakecountywi.gov/departments/land-use-planning-zoning/",
+    "platform": "County land use planning & zoning permits page",
+    "sourceUrl": "https://www.greenlakecountywi.gov/departments/",
+    "candidateUrl": "https://www.greenlakecountywi.gov/departments/land-use-planning-zoning/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.661Z"
+  },
+  {
     "jurisdiction": "Green Lake, WI",
     "url": "https://cityofgreenlake.com/building-inspector-zoning-administrator/",
     "platform": "City building inspector/zoning administrator page",
@@ -39878,6 +40455,15 @@
     "lastVerifiedAt": "2026-10-05T23:16:30.205Z"
   },
   {
+    "jurisdiction": "Greybull, WY",
+    "url": "https://townofgreybull.com/services/",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://townofgreybull.com/",
+    "candidateUrl": "https://townofgreybull.com/services/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:35.897Z"
+  },
+  {
     "jurisdiction": "Gridley, CA",
     "url": "https://www.gridleyca.gov/183/Building-Inspection-Services",
     "platform": "Building inspection services page",
@@ -40055,7 +40641,7 @@
     "sourceUrl": "https://www.grotonsd.gov/",
     "candidateUrl": "https://www.grotonsd.gov/page/building-permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:26.395Z"
+    "lastVerifiedAt": "2026-10-06T02:58:36.849Z"
   },
   {
     "jurisdiction": "Grove City, MN",
@@ -41959,6 +42545,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:29.096Z"
   },
   {
+    "jurisdiction": "Harrison, WI",
+    "url": "https://www.harrison.wi.gov/building-inspector/page/building-permits",
+    "platform": "Village building permits page",
+    "sourceUrl": "https://www.harrison.wi.gov/",
+    "candidateUrl": "https://www.harrison.wi.gov/node/261",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:40.905Z"
+  },
+  {
     "jurisdiction": "Harrisonburg, VA",
     "url": "https://permits.harrisonburgva.gov/",
     "platform": "LAMA Permit Web Portal",
@@ -42189,6 +42784,15 @@
     "candidateUrl": "https://www.hartvilleoh.com/wba/content/departments/building-department/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:08:25.278Z"
+  },
+  {
+    "jurisdiction": "Hartwell, GA",
+    "url": "https://www.hartwellga.gov/fire-department",
+    "platform": "City building inspections department page",
+    "sourceUrl": "https://www.hartwellga.gov/",
+    "candidateUrl": "https://www.hartwellga.gov/fire-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.969Z"
   },
   {
     "jurisdiction": "Harvard, IL",
@@ -44803,6 +45407,15 @@
     "lastVerifiedAt": "2026-10-05T23:16:46.804Z"
   },
   {
+    "jurisdiction": "Holland, MA",
+    "url": "https://www.town.holland.ma.us/building-department",
+    "platform": "Town building department page",
+    "sourceUrl": "https://www.town.holland.ma.us/",
+    "candidateUrl": "https://www.town.holland.ma.us/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:39.083Z"
+  },
+  {
     "jurisdiction": "Holland, MI",
     "url": "https://bsaonline.com/Home/MunicipalityHome?uid=116",
     "platform": "BS&A Online",
@@ -44909,6 +45522,15 @@
     "candidateUrl": "https://www.mapsonline.net/simplicity/building_permits.php?use_react=yes&client=hollistonma",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:57:37.064Z"
+  },
+  {
+    "jurisdiction": "Holly Hill, FL",
+    "url": "https://cityofhollyhillfl-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov Citizen Self Service",
+    "sourceUrl": "https://www.hollyhillfl.org/cd/page/building-division",
+    "candidateUrl": "https://cityofhollyhillfl-energovweb.tylerhost.net/apps/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:37.783Z"
   },
   {
     "jurisdiction": "Holly Ridge, NC",
@@ -45621,12 +46243,12 @@
   },
   {
     "jurisdiction": "Horsham, PA",
-    "url": null,
-    "platform": null,
+    "url": "https://www.horsham.org/10499/code-enforcement",
+    "platform": "Municipal building permits page",
     "sourceUrl": "https://www.horsham.org/",
     "candidateUrl": "https://www.horsham.org/10499/code-enforcement",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:00.137Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:39.635Z"
   },
   {
     "jurisdiction": "Horton, KS",
@@ -46400,6 +47022,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:38.956Z"
   },
   {
+    "jurisdiction": "Huntington, MA",
+    "url": "https://www.huntingtonma.us/building",
+    "platform": "Town Building Department page",
+    "sourceUrl": "https://www.huntingtonma.us/",
+    "candidateUrl": "https://www.huntingtonma.us/building",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:39.917Z"
+  },
+  {
     "jurisdiction": "Huntington, NY",
     "url": "https://townofhuntingtonny.viewpointcloud.com/categories/1071",
     "platform": "OpenGov ViewPoint",
@@ -46667,6 +47298,15 @@
     "lastVerifiedAt": "2026-10-05T02:57:44.335Z"
   },
   {
+    "jurisdiction": "Hyde County, NC",
+    "url": "https://cms2.revize.com/revize/hydecounty/departments/building_inspections.php",
+    "platform": "County building inspections page",
+    "sourceUrl": "https://www.hydecountync.gov/",
+    "candidateUrl": "https://cms2.revize.com/revize/hydecounty/departments/building_inspections.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:39.124Z"
+  },
+  {
     "jurisdiction": "Hyde Park, NY",
     "url": "https://www.hydeparkny.gov/357/Forms-Applications",
     "platform": "City website",
@@ -46917,6 +47557,15 @@
     "lastVerifiedAt": "2026-10-05T22:08:43.160Z"
   },
   {
+    "jurisdiction": "Indialantic, FL",
+    "url": "https://bsaonline.com/Home/MunicipalityHome?uid=2821",
+    "platform": "BS&A Online",
+    "sourceUrl": "https://www.indialantic.com/building-department",
+    "candidateUrl": "https://bsaonline.com/?uid=2821%20",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.641Z"
+  },
+  {
     "jurisdiction": "Indian Creek, FL",
     "url": "https://indiancreekvillagefl.gov/government/building-department/",
     "platform": "Village building department page (CommunityConnect)",
@@ -47058,6 +47707,15 @@
     "candidateUrl": "https://www.indianolams.gov/inspection-departmentplanning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:31.488Z"
+  },
+  {
+    "jurisdiction": "Indiantown, FL",
+    "url": "https://villageofindiantownfl-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov Civic Access",
+    "sourceUrl": "https://www.indiantownfl.gov/building",
+    "candidateUrl": "https://villageofindiantownfl-energovweb.tylerhost.net/apps/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:38.974Z"
   },
   {
     "jurisdiction": "Indio, CA",
@@ -47255,6 +47913,15 @@
     "candidateUrl": "https://www.cityofiona.org/city-clerktreasurers-office/building-permits-applications/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:39.023Z"
+  },
+  {
+    "jurisdiction": "Ione, CA",
+    "url": "https://www.ione.ca.gov/building/page/building-permit-submittal-process",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.ione.ca.gov/building",
+    "candidateUrl": "https://www.ione.ca.gov/building/page/building-permit-submittal-process",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:39.721Z"
   },
   {
     "jurisdiction": "Ionia, MI",
@@ -49780,6 +50447,15 @@
     "lastVerifiedAt": "2026-10-05T23:17:00.117Z"
   },
   {
+    "jurisdiction": "Keiser, AR",
+    "url": "https://www.cityofkeiserar.gov/city-documents",
+    "platform": "City building permit fees and documents page",
+    "sourceUrl": "https://www.cityofkeiserar.gov/",
+    "candidateUrl": "https://www.cityofkeiserar.gov/city-documents",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:38.238Z"
+  },
+  {
     "jurisdiction": "Keith County, NE",
     "url": "https://keithcountyne.gov/residents/planning_and_zoning_department.php",
     "platform": "county site",
@@ -50961,6 +51637,15 @@
     "lastVerifiedAt": "2026-10-05T22:08:53.609Z"
   },
   {
+    "jurisdiction": "Kiowa, KS",
+    "url": "https://www.kiowaks.org/documentlist.aspx?categoryid=10414",
+    "platform": "City building permit applications page",
+    "sourceUrl": "https://www.kiowaks.org/",
+    "candidateUrl": "https://www.kiowaks.org/pview.aspx?id=21200&catid=579",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:42.260Z"
+  },
+  {
     "jurisdiction": "Kiowa, OK",
     "url": "https://kiowaoklahoma.com/Permits.htm",
     "platform": "Town permits & forms page (building permit application)",
@@ -51946,6 +52631,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:33.484Z"
   },
   {
+    "jurisdiction": "Lafayette County, WI",
+    "url": "https://www.lafayettecountywi.org/lcpz/page/planning-and-zoning",
+    "platform": "County planning and zoning permits page",
+    "sourceUrl": "https://www.lafayettecountywi.org/lcpz/page/land-conservation-and-planning-zoning-department",
+    "candidateUrl": "https://www.lafayettecountywi.org/lcpz/page/planning-and-zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:42.237Z"
+  },
+  {
     "jurisdiction": "Lafayette Parish, LA",
     "url": "https://www.mgoconnect.org/cp?JID=250&PID=3&CPSectionID=1",
     "platform": "MGO Connect",
@@ -52213,6 +52907,15 @@
     "candidateUrl": "https://www.lakecitysc.gov/164/Building-Codes-Enforcement",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:54.735Z"
+  },
+  {
+    "jurisdiction": "Lake Clarke Shores, FL",
+    "url": "https://www.townoflcs.gov/cds/page/building-permits",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://www.townoflcs.gov/",
+    "candidateUrl": "https://www.townoflcs.gov/node/43941",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:50.001Z"
   },
   {
     "jurisdiction": "Lake Como, NJ",
@@ -52585,7 +53288,7 @@
     "sourceUrl": "https://lakeprestonsd.com/",
     "candidateUrl": "https://lakeprestonsd.com/permits-licenses",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:47.975Z"
+    "lastVerifiedAt": "2026-10-06T02:58:47.009Z"
   },
   {
     "jurisdiction": "Lake Quivira, KS",
@@ -53203,6 +53906,15 @@
     "candidateUrl": "https://www.landercountynv.org/departments/building_department/index.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:43.212Z"
+  },
+  {
+    "jurisdiction": "Lander, WY",
+    "url": "https://www.landerwy.gov/building/page/building-permits",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.landerwy.gov/building",
+    "candidateUrl": "https://www.landerwy.gov/building/page/building-permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:41.480Z"
   },
   {
     "jurisdiction": "Landfall, MN",
@@ -53866,7 +54578,7 @@
     "sourceUrl": "https://www.lavoniaga.gov/",
     "candidateUrl": "https://www.lavoniaga.gov/page/building-permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:43.707Z"
+    "lastVerifiedAt": "2026-10-06T02:58:39.325Z"
   },
   {
     "jurisdiction": "Lawndale, CA",
@@ -54168,6 +54880,15 @@
     "candidateUrl": "https://www.leavenworthks.gov/publicworks/page/inspections-and-permits-division",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:20.357Z"
+  },
+  {
+    "jurisdiction": "Leavenworth, WA",
+    "url": "https://cityofleavenworth.com/city-services/gis-permit-portal/",
+    "platform": "City permit portal access page",
+    "sourceUrl": "https://cityofleavenworth.com/",
+    "candidateUrl": "https://cityofleavenworth.com/city-services/gis-permit-portal/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:41.634Z"
   },
   {
     "jurisdiction": "Leawood, KS",
@@ -54500,6 +55221,15 @@
     "candidateUrl": "https://leesvillela.gov/378/Permits-Applications",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:27.420Z"
+  },
+  {
+    "jurisdiction": "Leetonia, OH",
+    "url": "https://www.leetoniaohio.gov/building-department",
+    "platform": "Village building department page",
+    "sourceUrl": "https://www.leetoniaohio.gov/",
+    "candidateUrl": "https://www.leetoniaohio.gov/building-department",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:40.923Z"
   },
   {
     "jurisdiction": "Leetsdale, PA",
@@ -55623,6 +56353,15 @@
     "lastVerifiedAt": "2026-10-05T02:53:56.160Z"
   },
   {
+    "jurisdiction": "Lincoln County, WI",
+    "url": "https://www.co.lincoln.wi.us/land-services/page/land-use-permits",
+    "platform": "County land use permits page",
+    "sourceUrl": "https://co.lincoln.wi.us/",
+    "candidateUrl": "https://www.co.lincoln.wi.us/node/23951",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:48.980Z"
+  },
+  {
     "jurisdiction": "Lincoln County, WY",
     "url": "https://lincolncountywy.portal.iworq.net/portalhome/lincolncountywy",
     "platform": "iWorQ",
@@ -55666,6 +56405,15 @@
     "candidateUrl": "https://lincolncity_permit.portal.iworq.net/portalhome/lincolncity_permit",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:55:54.534Z"
+  },
+  {
+    "jurisdiction": "Lincoln, AR",
+    "url": "https://www.lincolnarkansas.com/city-hall/page/building-inspector",
+    "platform": "City building inspector page",
+    "sourceUrl": "https://www.lincolnarkansas.com/city-hall",
+    "candidateUrl": "https://www.lincolnarkansas.com/city-hall/page/building-inspector",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:41.558Z"
   },
   {
     "jurisdiction": "Lincoln, CA",
@@ -56878,6 +57626,15 @@
     "lastVerifiedAt": "2026-10-05T01:02:23.570Z"
   },
   {
+    "jurisdiction": "Long Beach, WA",
+    "url": "https://www.longbeachwa.gov/community-development/page/building-details-information",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.longbeachwa.gov/community-development",
+    "candidateUrl": "https://www.longbeachwa.gov/community-development/page/building-details-information",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:41.797Z"
+  },
+  {
     "jurisdiction": "Long Branch, NJ",
     "url": "https://www.longbranch.org/178/Building-Development",
     "platform": "Building & Development (city page)",
@@ -57341,6 +58098,15 @@
     "lastVerifiedAt": "2026-10-05T00:56:08.593Z"
   },
   {
+    "jurisdiction": "Lovell, ME",
+    "url": "https://www.lovellmaine.org/code-enforcement/code-enforcement",
+    "platform": "Town code enforcement and building permits page",
+    "sourceUrl": "https://www.lovellmaine.org/",
+    "candidateUrl": "https://www.lovellmaine.org/code-enforcement-0",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:42.323Z"
+  },
+  {
     "jurisdiction": "Lovell, WY",
     "url": "https://townoflovell.com/building/",
     "platform": "City building permits page",
@@ -57601,6 +58367,15 @@
     "lastVerifiedAt": "2026-10-05T23:17:12.019Z"
   },
   {
+    "jurisdiction": "Ludlow, MA",
+    "url": "https://permiteyes.us/ludlow/loginuser.php",
+    "platform": "PermitEyes",
+    "sourceUrl": "https://ludlow.ma.us/building/",
+    "candidateUrl": "https://permiteyes.us/ludlow/loginuser.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:41.614Z"
+  },
+  {
     "jurisdiction": "Lufkin, TX",
     "url": "https://mylufkintx.com/",
     "platform": "CitySourced (MyLufkinTX)",
@@ -57626,6 +58401,15 @@
     "candidateUrl": "https://www.cityofluling.net/296/Permits-Applications-Inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:14.990Z"
+  },
+  {
+    "jurisdiction": "Lumberport, WV",
+    "url": "https://wvlumberport.com/forms",
+    "platform": "Town forms page (construction application/building permit)",
+    "sourceUrl": "https://wvlumberport.com/",
+    "candidateUrl": "https://wvlumberport.com/forms",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:39.926Z"
   },
   {
     "jurisdiction": "Lumberton, NC",
@@ -58095,6 +58879,15 @@
     "lastVerifiedAt": "2026-10-05T00:51:40.760Z"
   },
   {
+    "jurisdiction": "Mabton, WA",
+    "url": "https://www.cityofmabton.com/media/166",
+    "platform": "City building permit application",
+    "sourceUrl": "https://www.cityofmabton.com/document-library?search=&category%5B181%5D=181",
+    "candidateUrl": "https://www.cityofmabton.com/media/166",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:41.423Z"
+  },
+  {
     "jurisdiction": "Macclenny, FL",
     "url": "https://sites.google.com/a/cityofmacclenny.com/building-zoning/",
     "platform": "City building & zoning page (Google Sites)",
@@ -58138,6 +58931,15 @@
     "candidateUrl": "https://www.citizenserve.com/Portal/PortalController?Action=showPermit&ctzPagePrefix=Portal_&installationID=340&original_iid=0&original_contactID=0",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:54:06.523Z"
+  },
+  {
+    "jurisdiction": "Machias, ME",
+    "url": "https://machiasme.gov/departments-staff/town-clerk/licenses-and-permits/",
+    "platform": "Town licenses & permits page (building permits at Town Office)",
+    "sourceUrl": "https://machiasme.gov/",
+    "candidateUrl": "https://machiasme.gov/departments-staff/town-clerk/licenses-and-permits/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:43.249Z"
   },
   {
     "jurisdiction": "Machias, NY",
@@ -58201,6 +59003,15 @@
     "candidateUrl": "https://maconcountyil.portal.iworq.net/portalhome/maconcountyil",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:54:07.563Z"
+  },
+  {
+    "jurisdiction": "Macon County, NC",
+    "url": "https://app.govwell.com/macon-county-nc",
+    "platform": "GovWell permit portal",
+    "sourceUrl": "https://gis.maconnc.org/www.maconnc.org/planning-development-home.html",
+    "candidateUrl": "https://app.govwell.com/macon-county-nc",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:52.144Z"
   },
   {
     "jurisdiction": "Macon County, TN",
@@ -58714,6 +59525,15 @@
     "lastVerifiedAt": "2026-10-05T02:57:48.350Z"
   },
   {
+    "jurisdiction": "Magnolia, NJ",
+    "url": "https://www.magnolia-nj.org/construction",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.magnolia-nj.org/",
+    "candidateUrl": "https://www.magnolia-nj.org/construction",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:45.086Z"
+  },
+  {
     "jurisdiction": "Magnolia, TX",
     "url": "https://www.cityofmagnolia.com/planning-permits-inspections",
     "platform": "City building permits page",
@@ -59105,6 +59925,15 @@
     "candidateUrl": "https://www.cityofmandeville.com/planning/page/building-permit-information",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:25.064Z"
+  },
+  {
+    "jurisdiction": "Mangonia Park, FL",
+    "url": "https://www.tompfl.com/ds/page/building-permits-applications",
+    "platform": "Town building permits & applications page",
+    "sourceUrl": "https://www.tompfl.com/ds/page/building-planning-zoning",
+    "candidateUrl": "https://www.tompfl.com/ds/page/building-permits-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:43.376Z"
   },
   {
     "jurisdiction": "Manhattan Beach, CA",
@@ -59653,6 +60482,15 @@
     "lastVerifiedAt": "2026-10-05T23:17:16.045Z"
   },
   {
+    "jurisdiction": "Marblehead, MA",
+    "url": "https://marbleheadma.portal.opengov.com/",
+    "platform": "OpenGov permitting portal",
+    "sourceUrl": "https://marbleheadma.gov/building-inspection/",
+    "candidateUrl": "https://marbleheadma.portal.opengov.com/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:45.373Z"
+  },
+  {
     "jurisdiction": "Marceline, MO",
     "url": "https://marcelinemo.us/residents/Building%20Permits.html",
     "platform": "City building permits page",
@@ -59820,6 +60658,15 @@
     "candidateUrl": "https://www.townofmarilla.gov/departments/building-department",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T03:53:18.841Z"
+  },
+  {
+    "jurisdiction": "Marin County, CA",
+    "url": "https://cdaportal2.marincounty.org/MarinBuildingPermits/",
+    "platform": "County online building permits",
+    "sourceUrl": "https://www.marincounty.gov/departments/cda/building-and-safety/how-apply-building-permit",
+    "candidateUrl": "https://cdaportal2.marincounty.org/MarinBuildingPermits/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:46.635Z"
   },
   {
     "jurisdiction": "Marina, CA",
@@ -60168,6 +61015,15 @@
     "candidateUrl": "https://www.marlownh.gov/building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-06T02:20:52.580Z"
+  },
+  {
+    "jurisdiction": "Marlow, OK",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://www.cityofmarlow.com/",
+    "candidateUrl": "https://www.cityofmarlow.com/o/marlowcity/page/report-an-issue",
+    "linkStatus": "none",
+    "lastVerifiedAt": "2026-10-06T02:58:42.192Z"
   },
   {
     "jurisdiction": "Marmaduke, AR",
@@ -61912,6 +62768,15 @@
     "lastVerifiedAt": "2026-10-05T22:09:15.728Z"
   },
   {
+    "jurisdiction": "Meeker, OK",
+    "url": "https://townofmeekerok.com/town%2Fcourt-clerk",
+    "platform": "Town Clerk page (building permit fees and process)",
+    "sourceUrl": "https://townofmeekerok.com/",
+    "candidateUrl": "https://townofmeekerok.com/town%2Fcourt-clerk",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:41.827Z"
+  },
+  {
     "jurisdiction": "Meeteetse, WY",
     "url": "https://www.townofmeeteetse.org/documents",
     "platform": "City building permits page",
@@ -62251,6 +63116,15 @@
     "lastVerifiedAt": "2026-10-06T01:09:04.283Z"
   },
   {
+    "jurisdiction": "Mequon, WI",
+    "url": "https://www.cityofmequonwi.gov/commdev/page/building-permit-information-commercial-industrial-agricultural-multi-family",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.cityofmequonwi.gov/",
+    "candidateUrl": "https://www.cityofmequonwi.gov/node/6751",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:50.651Z"
+  },
+  {
     "jurisdiction": "Merced County, CA",
     "url": "https://permits.countyofmerced.com/Permitting-Licensing-Divisions/Building-Safety-Division",
     "platform": "Merced County Online Permitting System (Building & Safety Division)",
@@ -62456,6 +63330,15 @@
     "lastVerifiedAt": "2026-10-05T02:54:17.623Z"
   },
   {
+    "jurisdiction": "Merrimac, MA",
+    "url": "https://townofmerrimac.com/inspectional-services/",
+    "platform": "Town inspectional services page",
+    "sourceUrl": "https://townofmerrimac.com/",
+    "candidateUrl": "https://townofmerrimac.com/inspectional-services/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:48.455Z"
+  },
+  {
     "jurisdiction": "Merrimac, WI",
     "url": "https://merrimacwi.gov/permits",
     "platform": "Village permits, licenses & forms page (building permit)",
@@ -62594,7 +63477,7 @@
     "sourceUrl": "https://www.metter-candler.com/",
     "candidateUrl": "https://www.metter-candler.com/page/building-zoning",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:20:53.300Z"
+    "lastVerifiedAt": "2026-10-06T02:58:42.658Z"
   },
   {
     "jurisdiction": "Metuchen, NJ",
@@ -62710,6 +63593,15 @@
     "candidateUrl": "https://villageofmiamishoresfl-energovweb.tylerhost.net/apps/selfservice#/applicationAssistant?sectionName=All&moduleId=2&categoryName=All&showTemplates=false",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T23:17:28.533Z"
+  },
+  {
+    "jurisdiction": "Miami Springs, FL",
+    "url": "https://mias-trk.aspgov.com/eTRAKiT/",
+    "platform": "eTRAKiT",
+    "sourceUrl": "https://www.miamisprings-fl.gov/building/page/apply-online",
+    "candidateUrl": "https://mias-trk.aspgov.com/eTRAKiT/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:44.756Z"
   },
   {
     "jurisdiction": "Miami-Dade County, FL",
@@ -62863,6 +63755,15 @@
     "candidateUrl": "https://middleportny.gov/zoning-code-enforcement/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:22.641Z"
+  },
+  {
+    "jurisdiction": "Middleport, OH",
+    "url": "https://www.middleportohio.com/docs-form/middleport-building-permit",
+    "platform": "Village building permit form page",
+    "sourceUrl": "https://www.middleportohio.com/documents-forms",
+    "candidateUrl": "https://www.middleportohio.com/docs-form/middleport-building-permit",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:44.209Z"
   },
   {
     "jurisdiction": "Middlesex County, VA",
@@ -63698,6 +64599,15 @@
     "lastVerifiedAt": "2026-10-05T02:57:49.927Z"
   },
   {
+    "jurisdiction": "Millville, MA",
+    "url": "https://permiteyes.us/millville/loginuser.php",
+    "platform": "PermitEyes",
+    "sourceUrl": "https://www.millvillema.org/building-inspections/news/apply-building-permits-online-0",
+    "candidateUrl": "https://permiteyes.us/millville/loginuser.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:43.817Z"
+  },
+  {
     "jurisdiction": "Millville, NJ",
     "url": "https://www.millvillenj.gov/566/Permits",
     "platform": "Building department permit page (no online portal)",
@@ -63707,6 +64617,15 @@
     "lastVerifiedAt": "2026-10-05T01:02:16.063Z"
   },
   {
+    "jurisdiction": "Millwood, WA",
+    "url": "https://www.millwoodwa.us/planning-building",
+    "platform": "City planning & building page",
+    "sourceUrl": "https://www.millwoodwa.us/",
+    "candidateUrl": "https://www.millwoodwa.us/planning-building",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:45.271Z"
+  },
+  {
     "jurisdiction": "Milnor, ND",
     "url": "https://www.milnornd.com/forms",
     "platform": "City building permits page",
@@ -63714,6 +64633,15 @@
     "candidateUrl": "https://www.milnornd.com/forms",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:28.258Z"
+  },
+  {
+    "jurisdiction": "Milo, ME",
+    "url": "https://www.milomaine.org/code-enforcement-officer",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://www.milomaine.org/",
+    "candidateUrl": "https://www.milomaine.org/code-enforcement-officer",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:45.291Z"
   },
   {
     "jurisdiction": "Milpitas, CA",
@@ -64036,6 +64964,15 @@
     "candidateUrl": "https://www.minneapolismn.gov/business-services/licenses-permits-inspections/construction-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:52.751Z"
+  },
+  {
+    "jurisdiction": "Minneola, FL",
+    "url": "https://app.communitycore.com/app/public-portal/0f0dbbfa-460b-4494-b2db-08ad7caeb902",
+    "platform": "CommunityCore",
+    "sourceUrl": "https://www.minneola.us/building-department",
+    "candidateUrl": "https://app.communitycore.com/app/public-portal/0f0dbbfa-460b-4494-b2db-08ad7caeb902",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:45.413Z"
   },
   {
     "jurisdiction": "Minneota, MN",
@@ -64537,6 +65474,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:02.371Z"
   },
   {
+    "jurisdiction": "Monkton, VT",
+    "url": "https://monktonvt.com/town-info/forms/",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://monktonvt.com/",
+    "candidateUrl": "https://monktonvt.com/town-info/forms/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:45.814Z"
+  },
+  {
     "jurisdiction": "Monmouth Beach, NJ",
     "url": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach",
     "platform": "SDL Portal",
@@ -65004,6 +65950,15 @@
     "lastVerifiedAt": "2026-10-05T00:54:46.737Z"
   },
   {
+    "jurisdiction": "Monterey, MA",
+    "url": "https://www.montereyma.gov/building-department",
+    "platform": "Town building department page",
+    "sourceUrl": "https://www.montereyma.gov/",
+    "candidateUrl": "https://www.montereyma.gov/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:49.333Z"
+  },
+  {
     "jurisdiction": "Monterey, TN",
     "url": "https://www.townofmontereytn.com/buildings-and-codes",
     "platform": "Town buildings and codes page",
@@ -65342,6 +66297,15 @@
     "candidateUrl": "https://montrealwis.com/departments/building-department/",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T23:17:29.517Z"
+  },
+  {
+    "jurisdiction": "Montreat, NC",
+    "url": "https://townofmontreat.org/zoning-and-inspections/",
+    "platform": "Town buildings and inspections page",
+    "sourceUrl": "https://townofmontreat.org/services/",
+    "candidateUrl": "https://townofmontreat.org/zoning-and-inspections/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:44.440Z"
   },
   {
     "jurisdiction": "Montrose County, CO",
@@ -65774,6 +66738,15 @@
     "candidateUrl": "https://www.morganspoint-tx.com/departments/building-permitting/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:29.997Z"
+  },
+  {
+    "jurisdiction": "Morganton, NC",
+    "url": "https://morganton.portal.iworq.net/portalhome/morganton",
+    "platform": "iWorQ permit portal",
+    "sourceUrl": "https://www.morgantonnc.gov/development-design-services/page/building-permit-applications",
+    "candidateUrl": "https://morganton.portal.iworq.net/portalhome/morganton",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:46.132Z"
   },
   {
     "jurisdiction": "Morgantown, IN",
@@ -66889,6 +67862,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:44.032Z"
   },
   {
+    "jurisdiction": "Mulberry, FL",
+    "url": "https://aca-prod.accela.com/MULBERRY/Default.aspx",
+    "platform": "Accela Citizen Access",
+    "sourceUrl": "https://www.cityofmulberryfl.org/building-department",
+    "candidateUrl": "https://aca-prod.accela.com/MULBERRY/Default.aspx",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:47.861Z"
+  },
+  {
     "jurisdiction": "Mullins, SC",
     "url": "https://www.mullinssc.us/department-building-safety",
     "platform": "City building department page",
@@ -67263,6 +68245,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:42.666Z"
   },
   {
+    "jurisdiction": "Nahant, MA",
+    "url": "https://nahant.org/inspections/permits/",
+    "platform": "Town building permit page",
+    "sourceUrl": "https://nahant.org/",
+    "candidateUrl": "https://nahant.org/inspections/permits/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:48.008Z"
+  },
+  {
     "jurisdiction": "Nahunta, GA",
     "url": "https://cityofnahunta.org/building-permits-and-inspections",
     "platform": "City building permits & inspections page",
@@ -67348,6 +68339,15 @@
     "candidateUrl": "https://napervilleil-energovweb.tylerhost.net/apps/SelfService#/home",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:50:49.104Z"
+  },
+  {
+    "jurisdiction": "Naples, FL",
+    "url": "https://cityview2.iharriscomputer.com/cityofnaplesflorida",
+    "platform": "CityView",
+    "sourceUrl": "https://www.naplesgov.com/building",
+    "candidateUrl": "https://cityview2.iharriscomputer.com/cityofnaplesflorida",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:49.019Z"
   },
   {
     "jurisdiction": "Naples, ME",
@@ -67878,6 +68878,15 @@
     "candidateUrl": "https://nephi.utah.gov/509/Building-Inspector",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:49.835Z"
+  },
+  {
+    "jurisdiction": "Neptune Beach, FL",
+    "url": "https://www.nbfl.gov/permits/pages/permit-applications",
+    "platform": "City permit applications page",
+    "sourceUrl": "https://www.nbfl.gov/",
+    "candidateUrl": "https://www.nbfl.gov/permits/pages/permit-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:51.923Z"
   },
   {
     "jurisdiction": "Neptune, NJ",
@@ -68497,6 +69506,15 @@
     "candidateUrl": "https://www.newhavenny.gov/building-inspector.html",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:31.235Z"
+  },
+  {
+    "jurisdiction": "New Haven, WV",
+    "url": "https://www.townofnewhavenwv.com/docs-form/building-permit",
+    "platform": "Town building permit form page",
+    "sourceUrl": "https://www.townofnewhavenwv.com/documents-forms",
+    "candidateUrl": "https://www.townofnewhavenwv.com/docs-form/building-permit",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:47.305Z"
   },
   {
     "jurisdiction": "New Hempstead, NY",
@@ -69233,6 +70251,15 @@
     "lastVerifiedAt": "2026-10-06T02:21:02.166Z"
   },
   {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "platform": "OpenGov",
+    "sourceUrl": "https://www.cityofnewburyport.com/zoning-board-of-appeals/faq/can-i-see-all-of-the-permits-that-have-been-issued-to-a-property",
+    "candidateUrl": "https://newburyportma.portal.opengov.com/search",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:51.221Z"
+  },
+  {
     "jurisdiction": "Newcastle, ME",
     "url": "https://www.newcastlemaine.us/departments/code_enforcement_lpi_planning/index.php",
     "platform": "Town code enforcement/LPI & planning page",
@@ -69455,6 +70482,15 @@
     "candidateUrl": "https://newportmn.gov/how_do_i/apply_for_obtain/permits_forms___applications.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:48.237Z"
+  },
+  {
+    "jurisdiction": "Newport, NC",
+    "url": "https://newportnc.portal.iworq.net/portalhome/newportnc",
+    "platform": "iWorQ permit portal",
+    "sourceUrl": "https://www.newportnc.gov/",
+    "candidateUrl": "https://newportnc.portal.iworq.net/portalhome/newportnc",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:50.291Z"
   },
   {
     "jurisdiction": "Newport, NH",
@@ -70082,6 +71118,15 @@
     "candidateUrl": "https://devnorman.normanok.gov/Portal/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:46.393Z"
+  },
+  {
+    "jurisdiction": "Normandy Park, WA",
+    "url": "https://ci-normandypark-wa.smartgovcommunity.com/Public/Home",
+    "platform": "SmartGov",
+    "sourceUrl": "https://normandyparkwa.gov/community-development/permits/",
+    "candidateUrl": "https://ci-normandypark-wa.smartgovcommunity.com/Public/Home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:48.111Z"
   },
   {
     "jurisdiction": "Normandy, MO",
@@ -70946,6 +71991,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:29.627Z"
   },
   {
+    "jurisdiction": "Northborough, MA",
+    "url": "https://northboroughma.portal.opengov.com/",
+    "platform": "OpenGov permit center",
+    "sourceUrl": "https://www.northboroughma.gov/",
+    "candidateUrl": "https://northboroughma.portal.opengov.com/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:51.352Z"
+  },
+  {
     "jurisdiction": "Northbridge, MA",
     "url": "https://www.northbridgemass.org/298/Permit-Fees-Applications-Forms",
     "platform": "Building dept page",
@@ -71118,12 +72172,12 @@
   },
   {
     "jurisdiction": "Northwood, IA",
-    "url": null,
-    "platform": null,
+    "url": "https://www.northwoodia.org/documentlist.aspx?categoryid=10424",
+    "platform": "City building permits page",
     "sourceUrl": "https://northwoodia.org",
     "candidateUrl": "https://www.northwoodia.org/documents.aspx?categoryid=10424",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:26.309Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:50.067Z"
   },
   {
     "jurisdiction": "Northwood, ND",
@@ -71888,6 +72942,15 @@
     "lastVerifiedAt": "2026-10-05T23:17:43.921Z"
   },
   {
+    "jurisdiction": "Oakville, WA",
+    "url": "https://www.oakvillecityhall.com/building-department",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.oakvillecityhall.com/",
+    "candidateUrl": "https://www.oakvillecityhall.com/building-department",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:49.555Z"
+  },
+  {
     "jurisdiction": "Oakwood, GA",
     "url": "https://www.cityofoakwood.net/community_development/permits.php",
     "platform": "Permits page (Hall County Accela linked)",
@@ -71985,6 +73048,24 @@
     "candidateUrl": "https://www.ocnj.us/construction-code",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:44.420Z"
+  },
+  {
+    "jurisdiction": "Ocean Gate, NJ",
+    "url": "https://oceangatenjgov.com/construction%2Fcode%2Fzoning-1",
+    "platform": "Borough construction/code/zoning page",
+    "sourceUrl": "https://oceangatenjgov.com/",
+    "candidateUrl": "https://oceangatenjgov.com/construction%2Fcode%2Fzoning-1",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:48.166Z"
+  },
+  {
+    "jurisdiction": "Ocean Isle Beach, NC",
+    "url": "https://oceanislebeachnc2.portal.iworq.net/portalhome/oceanislebeachnc2",
+    "platform": "iWorQ",
+    "sourceUrl": "https://www.oibgov.com/20736/planningbuilding-inspections",
+    "candidateUrl": "https://oceanislebeachnc2.portal.iworq.net/portalhome/oceanislebeachnc2",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:50.100Z"
   },
   {
     "jurisdiction": "Ocean Ridge, FL",
@@ -72726,6 +73807,15 @@
     "candidateUrl": "https://www.omakcity.com/1402/Building-and-Planning",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:54:00.090Z"
+  },
+  {
+    "jurisdiction": "Omro, WI",
+    "url": "https://www.omro-wi.com/building-inspection",
+    "platform": "City building permits & inspections page",
+    "sourceUrl": "https://www.omro-wi.com/",
+    "candidateUrl": "https://www.omro-wi.com/building-inspection",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:51.792Z"
   },
   {
     "jurisdiction": "Onalaska, TX",
@@ -74290,6 +75380,15 @@
     "candidateUrl": "https://pagosasprings.portal.iworq.net/portalhome/pagosasprings",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:35.815Z"
+  },
+  {
+    "jurisdiction": "Pahokee, FL",
+    "url": "https://www.cityofpahokee.com/building-planning-zoning",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.cityofpahokee.com/",
+    "candidateUrl": "https://www.cityofpahokee.com/building-planning-zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.200Z"
   },
   {
     "jurisdiction": "Painesville, OH",
@@ -76367,6 +77466,15 @@
     "lastVerifiedAt": "2026-10-05T02:54:18.179Z"
   },
   {
+    "jurisdiction": "Perry, FL",
+    "url": "https://www.cityofperry.net/planning-zoning",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.cityofperry.net/",
+    "candidateUrl": "https://www.cityofperry.net/Planning-Zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:51.661Z"
+  },
+  {
     "jurisdiction": "Perry, GA",
     "url": "https://www.perry-ga.gov/business-services/community-development/building-permits",
     "platform": "Building permits page",
@@ -76589,6 +77697,15 @@
     "candidateUrl": "https://petersburgva.portal.iworq.net/portalhome/petersburgva",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:52:53.198Z"
+  },
+  {
+    "jurisdiction": "Petersham, MA",
+    "url": "https://townofpetersham.gov/building/",
+    "platform": "Town building department page",
+    "sourceUrl": "https://townofpetersham.gov/",
+    "candidateUrl": "https://townofpetersham.gov/building/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.010Z"
   },
   {
     "jurisdiction": "Peterstown, WV",
@@ -77085,6 +78202,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:52.733Z"
   },
   {
+    "jurisdiction": "Pillager, MN",
+    "url": "https://cityofpillager.com/forms-and-applications",
+    "platform": "City forms page (building permit application)",
+    "sourceUrl": "https://cityofpillager.com/",
+    "candidateUrl": "https://cityofpillager.com/forms-and-applications",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:49.276Z"
+  },
+  {
     "jurisdiction": "Pilot Grove, MO",
     "url": "https://cityofpilotgrovemo.gov/building-permits-and-inspections",
     "platform": "City building permits & inspections page",
@@ -77171,6 +78297,15 @@
     "candidateUrl": "https://www.cityofpinebluff-ar.gov/inspection-and-zoning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:46.264Z"
+  },
+  {
+    "jurisdiction": "Pine Bluffs, WY",
+    "url": "https://www.pinebluffswy.gov/planning-zoning/page/permits-licenses-forms",
+    "platform": "Town building permit forms page",
+    "sourceUrl": "https://www.pinebluffswy.gov/planning-zoning",
+    "candidateUrl": "https://www.pinebluffswy.gov/planning-zoning/page/permits-licenses-forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.579Z"
   },
   {
     "jurisdiction": "Pine County, MN",
@@ -77270,6 +78405,15 @@
     "candidateUrl": "https://www.pinecrest-fl.gov/Government/Building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:58.238Z"
+  },
+  {
+    "jurisdiction": "Pinedale, WY",
+    "url": "https://www.townofpinedale.us/construction",
+    "platform": "Town construction / building permits page",
+    "sourceUrl": "https://www.townofpinedale.us/permits-licences",
+    "candidateUrl": "https://www.townofpinedale.us/construction",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:49.721Z"
   },
   {
     "jurisdiction": "Pinehurst, NC",
@@ -77726,6 +78870,15 @@
     "lastVerifiedAt": "2026-10-05T01:00:26.702Z"
   },
   {
+    "jurisdiction": "Plainfield, MA",
+    "url": "https://www.plainfield-ma.us/building-commissioner/page/permits-licenses",
+    "platform": "Town building permit forms page",
+    "sourceUrl": "https://www.plainfield-ma.us/building-commissioner",
+    "candidateUrl": "https://www.plainfield-ma.us/building-commissioner/page/permits-licenses",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.031Z"
+  },
+  {
     "jurisdiction": "Plainfield, NH",
     "url": "https://www.plainfieldnh.gov/pview.aspx?id=56118&catid=890",
     "platform": "Building & inspections page",
@@ -78004,12 +79157,12 @@
   },
   {
     "jurisdiction": "Plattsburg, MO",
-    "url": null,
-    "platform": null,
+    "url": "https://www.plattsburg-mo.gov/pview.aspx?id=20701&catid=563",
+    "platform": "City planning zoning & building department page",
     "sourceUrl": "https://www.plattsburg-mo.gov/",
     "candidateUrl": "https://www.plattsburg-mo.gov/pview.aspx?id=20701&catid=563",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:31.444Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.176Z"
   },
   {
     "jurisdiction": "Plattsburgh, NY",
@@ -78076,12 +79229,12 @@
   },
   {
     "jurisdiction": "Pleasant Hill, MO",
-    "url": null,
-    "platform": null,
+    "url": "https://pleasanthillmo.municipalone.com/pview.aspx?id=20453&catid=525",
+    "platform": "City permits & inspections page",
     "sourceUrl": "https://pleasanthillmo.municipalone.com/",
     "candidateUrl": "https://pleasanthillmo.municipalone.com/pview.aspx?id=20492&catid=0",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:32.254Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.607Z"
   },
   {
     "jurisdiction": "Pleasant Hills, PA",
@@ -78324,6 +79477,15 @@
     "candidateUrl": "https://www.plymouthmn.gov/departments/administrative-services-/city-clerk/permits-licensing",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:48.615Z"
+  },
+  {
+    "jurisdiction": "Plymouth, NC",
+    "url": "https://www.visitplymouthnc.com/pzb",
+    "platform": "Town planning, zoning & building inspections page",
+    "sourceUrl": "https://www.visitplymouthnc.com/",
+    "candidateUrl": "https://www.visitplymouthnc.com/pzb",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.531Z"
   },
   {
     "jurisdiction": "Plymouth, NH",
@@ -78603,6 +79765,15 @@
     "lastVerifiedAt": "2026-10-05T23:36:56.385Z"
   },
   {
+    "jurisdiction": "Polson, MT",
+    "url": "https://app.govwell.com/polson",
+    "platform": "GovWell",
+    "sourceUrl": "https://www.cityofpolson.com/building",
+    "candidateUrl": "https://app.govwell.com/polson",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:52.022Z"
+  },
+  {
     "jurisdiction": "Pomeroy, IA",
     "url": "https://pomeroyiowa.com/permits-and-forms/",
     "platform": "City building permits page",
@@ -78610,6 +79781,15 @@
     "candidateUrl": "https://pomeroyiowa.com/permits-and-forms/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:59.379Z"
+  },
+  {
+    "jurisdiction": "Pomeroy, WA",
+    "url": "https://www.cityofpomeroy1.com/building-permit-fee-schedule",
+    "platform": "City building permit application information page",
+    "sourceUrl": "https://www.cityofpomeroy1.com/",
+    "candidateUrl": "https://www.cityofpomeroy1.com/building-permit-fee-schedule",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:50.523Z"
   },
   {
     "jurisdiction": "Pomona, CA",
@@ -79194,6 +80374,15 @@
     "lastVerifiedAt": "2026-10-05T22:09:50.263Z"
   },
   {
+    "jurisdiction": "Porter, ME",
+    "url": "https://portermaine.org/code-enforcement",
+    "platform": "Town Code Enforcement (building permits) page",
+    "sourceUrl": "https://portermaine.org/",
+    "candidateUrl": "https://portermaine.org/code-enforcement",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:50.790Z"
+  },
+  {
     "jurisdiction": "Porter, OK",
     "url": "https://townofporterok.org/building-permits-and-inspections",
     "platform": "Town building permits & inspections page",
@@ -79613,6 +80802,15 @@
     "candidateUrl": "https://www.powderspringsga.gov/645/Community-Development",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:19.272Z"
+  },
+  {
+    "jurisdiction": "Powell County, MT",
+    "url": "https://www.powellcountymt.gov/planning-department/page/permits-applications",
+    "platform": "County planning permits & applications page",
+    "sourceUrl": "https://www.powellcountymt.gov/",
+    "candidateUrl": "https://www.powellcountymt.gov/planning-department/page/permits-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.332Z"
   },
   {
     "jurisdiction": "Powell, OH",
@@ -80520,6 +81718,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:21.391Z"
   },
   {
+    "jurisdiction": "Quantico, VA",
+    "url": "https://www.townofquantico.org/bc-pc",
+    "platform": "Town permits page (Planning Commission)",
+    "sourceUrl": "https://www.townofquantico.org/",
+    "candidateUrl": "https://www.townofquantico.org/bc-pc",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.053Z"
+  },
+  {
     "jurisdiction": "Quarryville, PA",
     "url": "https://quarryvilleborough.com/government/zoning-and-building/",
     "platform": "Borough zoning and building page",
@@ -80562,6 +81769,15 @@
     "candidateUrl": "https://aca-prod.accela.com/QC/Cap/CapHome.aspx?module=Permits&TabName=Home",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:50:57.356Z"
+  },
+  {
+    "jurisdiction": "Quincy, FL",
+    "url": "https://www.myquincy.net/building-planning/page/applications-forms",
+    "platform": "City building permit forms page",
+    "sourceUrl": "https://www.myquincy.net/building-planning",
+    "candidateUrl": "https://www.myquincy.net/building-planning/page/applications-forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.668Z"
   },
   {
     "jurisdiction": "Quincy, IL",
@@ -81281,6 +82497,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:27.324Z"
   },
   {
+    "jurisdiction": "Raynham, MA",
+    "url": "https://app.govwell.com/raynham-ma",
+    "platform": "GovWell online permitting",
+    "sourceUrl": "https://www.town.raynham.ma.us/building-department/news/online-permitting-now-available",
+    "candidateUrl": "https://app.govwell.com/raynham-ma",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:53.197Z"
+  },
+  {
     "jurisdiction": "Raytown, MO",
     "url": "https://raytownmo-energovpub.tylerhost.net/apps/selfservice#/home",
     "platform": "EnerGov",
@@ -81288,6 +82513,15 @@
     "candidateUrl": "https://raytownmo-energovpub.tylerhost.net/apps/selfservice#/home",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T04:29:23.271Z"
+  },
+  {
+    "jurisdiction": "Readfield, ME",
+    "url": "https://www.readfieldmaine.gov/ordinances-policies-permits/pages/other-permit-applications",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.readfieldmaine.gov/",
+    "candidateUrl": "https://www.readfieldmaine.gov/code-enforcement/pages/permit-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.891Z"
   },
   {
     "jurisdiction": "Reading, MA",
@@ -81442,6 +82676,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:22.796Z"
   },
   {
+    "jurisdiction": "Red Lodge, MT",
+    "url": "https://www.cityofredlodge.net/com-dev/page/building-division",
+    "platform": "City Building Division page",
+    "sourceUrl": "https://www.cityofredlodge.net/",
+    "candidateUrl": "https://www.cityofredlodge.net/node/2200",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:55.134Z"
+  },
+  {
     "jurisdiction": "Red Oak, IA",
     "url": "https://city.redoakiowa.com/services/building_permits.php",
     "platform": "City building permits page",
@@ -81476,6 +82719,15 @@
     "candidateUrl": "https://www.rrppj.org/Permits/Default.aspx",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T04:29:41.802Z"
+  },
+  {
+    "jurisdiction": "Red River, NM",
+    "url": "https://www.redrivernm.gov/forms",
+    "platform": "Town building permit forms and instructions",
+    "sourceUrl": "https://www.redrivernm.gov/planning-zoning",
+    "candidateUrl": "https://www.redrivernm.gov/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.479Z"
   },
   {
     "jurisdiction": "Red Willow County, NE",
@@ -81736,6 +82988,15 @@
     "lastVerifiedAt": "2026-10-05T22:09:54.891Z"
   },
   {
+    "jurisdiction": "Reidsville, NC",
+    "url": "https://reidsville.portal.iworq.net/portalhome/reidsville",
+    "platform": "iWorQ building permit portal",
+    "sourceUrl": "https://www.reidsvillenc.gov/",
+    "candidateUrl": "https://reidsville.portal.iworq.net/portalhome/reidsville",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:53.852Z"
+  },
+  {
     "jurisdiction": "Reidville, SC",
     "url": "https://www.reidvillesc.gov/permits---inspections",
     "platform": "Town building permits page",
@@ -81779,6 +83040,15 @@
     "candidateUrl": "https://reminderville.com/departments/building-department/applications-and-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:56.467Z"
+  },
+  {
+    "jurisdiction": "Remington, IN",
+    "url": "https://www.remingtonindiana.org/resources",
+    "platform": "Town resources page with building permit application",
+    "sourceUrl": "https://www.remingtonindiana.org/",
+    "candidateUrl": "https://www.remingtonindiana.org/resources",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.400Z"
   },
   {
     "jurisdiction": "Remsen, IA",
@@ -82521,6 +83791,15 @@
     "lastVerifiedAt": "2026-10-05T02:57:46.658Z"
   },
   {
+    "jurisdiction": "Ridgeway, WI",
+    "url": "https://www.ridgewaywi.gov/villageoffice/page/building-permits-and-inspections",
+    "platform": "Village building permits and inspections page",
+    "sourceUrl": "https://www.ridgewaywi.gov/forms",
+    "candidateUrl": "https://www.ridgewaywi.gov/villageoffice/page/building-permits-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:55.050Z"
+  },
+  {
     "jurisdiction": "Ridgewood, NJ",
     "url": "https://www.sdlportal.com/login?redirect=https%3A%2F%2Fwww.sdlportal.com%2Ftowns%2Fnj%2Fbergen%2Fridgewoodvillage%3Futm_campaign%3Dwebsite%26utm_source%3Dsendgrid.com%26utm_medium%3Demail",
     "platform": "SDL Portal (Permit and Inspection Portal)",
@@ -82675,6 +83954,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:33.715Z"
   },
   {
+    "jurisdiction": "Ringwood, OK",
+    "url": "https://townofringwood.municipalimpact.com/building-permits-and-inspections",
+    "platform": "Town building permits & inspections page",
+    "sourceUrl": "http://ringwoodok.gov/",
+    "candidateUrl": "https://townofringwood.municipalimpact.com/building-permits-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.044Z"
+  },
+  {
     "jurisdiction": "Rio Arriba County, NM",
     "url": "https://www.rio-arriba.org/Departments/Departments-Divisions/Planning-and-Zoning",
     "platform": "county permit page",
@@ -82745,6 +84033,15 @@
     "candidateUrl": "https://rior-egov.aspgov.com/Click2GovBP/index.html",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:55:11.104Z"
+  },
+  {
+    "jurisdiction": "Rio Vista, CA",
+    "url": "https://h8.maintstar.co/riovista/Portal/#/",
+    "platform": "MaintStar permit portal",
+    "sourceUrl": "https://www.riovistacity.com/building",
+    "candidateUrl": "https://h8.maintstar.co/riovista/Portal/#/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:53.764Z"
   },
   {
     "jurisdiction": "Rio, WI",
@@ -82889,6 +84186,15 @@
     "candidateUrl": "https://www.rivergroveil.gov/245/Applications-Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:10.677Z"
+  },
+  {
+    "jurisdiction": "River Hills, WI",
+    "url": "https://www.riverhillswi.com/building-inspection",
+    "platform": "Village building inspection page",
+    "sourceUrl": "https://www.riverhillswi.com/",
+    "candidateUrl": "https://www.riverhillswi.com/building-inspection",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.858Z"
   },
   {
     "jurisdiction": "River Oaks, TX",
@@ -83050,6 +84356,15 @@
     "candidateUrl": "https://cityofriversidetx.com/permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:11.633Z"
+  },
+  {
+    "jurisdiction": "Riverside, WY",
+    "url": "https://www.riversidewyo.com/permits-applications",
+    "platform": "Town building permit applications page",
+    "sourceUrl": "https://www.riversidewyo.com/",
+    "candidateUrl": "https://www.riversidewyo.com/permits-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:52.842Z"
   },
   {
     "jurisdiction": "Riverton, IL",
@@ -83626,6 +84941,15 @@
     "lastVerifiedAt": "2026-10-05T22:09:57.666Z"
   },
   {
+    "jurisdiction": "Rockingham County, NC",
+    "url": "https://permits.rockinghamcountync.gov/etrakit/",
+    "platform": "eTRAKiT",
+    "sourceUrl": "https://www.rockinghamcountync.gov/",
+    "candidateUrl": "https://permits.rockinghamcountync.gov/etrakit/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:55.420Z"
+  },
+  {
     "jurisdiction": "Rockingham County, VA",
     "url": "https://www.rockinghamcountyva.gov/889/Residential-Building-Permits",
     "platform": "Building department permit page",
@@ -84141,6 +85465,15 @@
     "candidateUrl": "https://romeovilleil.portal.opengov.com/categories/1084",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-06T01:10:51.550Z"
+  },
+  {
+    "jurisdiction": "Romney, WV",
+    "url": "https://www.townofromney.com/forms-applications",
+    "platform": "Town building permit forms page",
+    "sourceUrl": "https://www.townofromney.com/",
+    "candidateUrl": "https://www.townofromney.com/forms-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:54.851Z"
   },
   {
     "jurisdiction": "Romulus, MI",
@@ -85612,6 +86945,15 @@
     "lastVerifiedAt": "2026-10-05T23:18:19.000Z"
   },
   {
+    "jurisdiction": "Saint Francis, KS",
+    "url": "https://stfranciskansas.com/obtain-a-building-permit/",
+    "platform": "City building permit page",
+    "sourceUrl": "https://stfranciskansas.com/",
+    "candidateUrl": "https://stfranciskansas.com/obtain-a-building-permit/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.231Z"
+  },
+  {
     "jurisdiction": "Saint Francis, MN",
     "url": "https://stfrancismn.gov/1321/Building-Permit-Application-Online",
     "platform": "City website",
@@ -85648,6 +86990,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:05.708Z"
   },
   {
+    "jurisdiction": "Saint Germain, WI",
+    "url": "https://www.townofstgermain.org/zoning-committee",
+    "platform": "Town zoning & building permits page (UDC inspection agency)",
+    "sourceUrl": "https://www.townofstgermain.org/",
+    "candidateUrl": "https://www.townofstgermain.org/Zoning-Committee",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:55.952Z"
+  },
+  {
     "jurisdiction": "Saint Hedwig, TX",
     "url": "https://sainthedwigcity.com/departments/building_and_development.php",
     "platform": "City building & development page",
@@ -85682,6 +87033,15 @@
     "candidateUrl": "https://sthenryoh.gov/wp-content/uploads/2021/08/BUILDING-PERMIT.pdf",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T22:10:04.101Z"
+  },
+  {
+    "jurisdiction": "Saint Ignace, MI",
+    "url": "https://www.cityofstignace.com/building-department",
+    "platform": "City Building Department page",
+    "sourceUrl": "https://www.cityofstignace.com/",
+    "candidateUrl": "https://www.cityofstignace.com/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:56.649Z"
   },
   {
     "jurisdiction": "Saint Jacob, IL",
@@ -85727,6 +87087,15 @@
     "candidateUrl": "https://www.stjohnkansas.com/business/permits-licenses",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:19.072Z"
+  },
+  {
+    "jurisdiction": "Saint John, WA",
+    "url": "https://www.stjohnwa.com/from-city-hall",
+    "platform": "Town building permits information",
+    "sourceUrl": "https://www.stjohnwa.com/",
+    "candidateUrl": "https://www.stjohnwa.com/from-city-hall",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:53.488Z"
   },
   {
     "jurisdiction": "Saint Johns, MI",
@@ -86801,6 +88170,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:18.986Z"
   },
   {
+    "jurisdiction": "Sandisfield, MA",
+    "url": "https://www.sandisfieldma.gov/building-department",
+    "platform": "Town Building Department page",
+    "sourceUrl": "https://www.sandisfieldma.gov/",
+    "candidateUrl": "https://www.sandisfieldma.gov/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:56.801Z"
+  },
+  {
     "jurisdiction": "Sandoval County, NM",
     "url": "https://www.sandovalcountynm.gov/departments/planning-zoning/",
     "platform": "Local permit-info page (state NM CID issues building permits)",
@@ -87750,6 +89128,15 @@
     "lastVerifiedAt": "2026-10-05T02:54:13.074Z"
   },
   {
+    "jurisdiction": "Schofield, WI",
+    "url": "https://www.schofieldwi.gov/building-inspection",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.schofieldwi.gov/",
+    "candidateUrl": "https://www.schofieldwi.gov/Building-Inspection",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:56.502Z"
+  },
+  {
     "jurisdiction": "Schoharie, NY",
     "url": "https://www.schohariecounty-ny.gov/towns/town_of_schoharie/services/code_enforcement_building_inspector.php",
     "platform": "Town building inspector page",
@@ -87865,6 +89252,15 @@
     "candidateUrl": "https://www.scotlandct.org/entities/building-and-land-use-department",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:10:06.777Z"
+  },
+  {
+    "jurisdiction": "Scott City, KS",
+    "url": "https://scottcityks.portal.iworq.net/portalhome/scottcityks",
+    "platform": "iWorQ permit portal",
+    "sourceUrl": "https://www.scottcityks.org/government/building-department/permits",
+    "candidateUrl": "https://scottcityks.portal.iworq.net/portalhome/scottcityks",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:54.297Z"
   },
   {
     "jurisdiction": "Scott County, IA",
@@ -88195,6 +89591,15 @@
     "candidateUrl": "https://services.seattle.gov/Portal/Customization/SEATTLE/welcome.aspx",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:51:08.400Z"
+  },
+  {
+    "jurisdiction": "Sebago, ME",
+    "url": "https://www.townofsebago.org/code-enforcement-planning/pages/permit-applications",
+    "platform": "Town building permit applications page",
+    "sourceUrl": "https://www.townofsebago.org/",
+    "candidateUrl": "https://www.townofsebago.org/code-enforcement-planning/pages/permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:57.338Z"
   },
   {
     "jurisdiction": "Sebastian, FL",
@@ -89050,6 +90455,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:56.876Z"
   },
   {
+    "jurisdiction": "Sheffield, MA",
+    "url": "https://www.sheffieldma.gov/inspectional-services",
+    "platform": "Town Inspectional Services (building) page",
+    "sourceUrl": "https://www.sheffieldma.gov/",
+    "candidateUrl": "https://www.sheffieldma.gov/inspectional-services",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:56.976Z"
+  },
+  {
     "jurisdiction": "Sheffield, OH",
     "url": "https://sheffieldvillage.com/building/",
     "platform": "Village building department page",
@@ -89218,6 +90632,15 @@
     "candidateUrl": "https://app.zipflow.com/jurisdiction_5629/inquiry",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:53:38.718Z"
+  },
+  {
+    "jurisdiction": "Shellman, GA",
+    "url": "https://cityofshellman.com/forms/",
+    "platform": "City building permit forms page",
+    "sourceUrl": "https://cityofshellman.com/",
+    "candidateUrl": "https://cityofshellman.com/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:58.347Z"
   },
   {
     "jurisdiction": "Shellsburg, IA",
@@ -89486,7 +90909,7 @@
     "sourceUrl": "https://www.sherwoodar.gov/",
     "candidateUrl": "https://cityofsherwood.portal.iworq.net/portalhome/cityofsherwood",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:22.197Z"
+    "lastVerifiedAt": "2026-10-06T02:58:55.036Z"
   },
   {
     "jurisdiction": "Sherwood, MI",
@@ -89622,6 +91045,15 @@
     "candidateUrl": "https://www.shoreacrestx.us/building/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:24.344Z"
+  },
+  {
+    "jurisdiction": "Shoreham, MI",
+    "url": "https://www.shorehamvillagemi.org/pview.aspx?id=2015&catid=26",
+    "platform": "Village building & enforcement page",
+    "sourceUrl": "https://www.shorehamvillagemi.org/",
+    "candidateUrl": "https://www.shorehamvillagemi.org/pview.aspx?id=2015&catid=26",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:59:21.484Z"
   },
   {
     "jurisdiction": "Shoreham, NY",
@@ -90238,7 +91670,7 @@
     "sourceUrl": "https://www.sisseton.com/",
     "candidateUrl": "https://www.sisseton.com/page/ordinances-licenses-permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:22.715Z"
+    "lastVerifiedAt": "2026-10-06T02:58:55.616Z"
   },
   {
     "jurisdiction": "Sister Bay, WI",
@@ -92059,6 +93491,15 @@
     "lastVerifiedAt": "2026-10-05T02:58:26.225Z"
   },
   {
+    "jurisdiction": "Sparta, WI",
+    "url": "https://www.spartawisconsin.org/building-and-zoning/page/permits-and-information",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.spartawisconsin.org/building-and-zoning",
+    "candidateUrl": "https://www.spartawisconsin.org/building-and-zoning/page/permits-and-information",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:57.424Z"
+  },
+  {
     "jurisdiction": "Spartanburg County, SC",
     "url": "https://spartanburgcountysc-energovweb.tylerhost.net/apps/civic-access-public/home",
     "platform": "Tyler Civic Access (EnerGov)",
@@ -92173,6 +93614,15 @@
     "candidateUrl": "https://townofspencerny.gov/code-enforcement",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:10:15.473Z"
+  },
+  {
+    "jurisdiction": "Spencer, OK",
+    "url": "https://www.cityofspencerok.gov/code-enforcement",
+    "platform": "City code enforcement / building permits page",
+    "sourceUrl": "https://www.cityofspencerok.gov/",
+    "candidateUrl": "https://www.cityofspencerok.gov/code-enforcement",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:59.015Z"
   },
   {
     "jurisdiction": "Spencer, SD",
@@ -92426,6 +93876,15 @@
     "lastVerifiedAt": "2026-10-05T23:18:31.998Z"
   },
   {
+    "jurisdiction": "Spring Lake, NJ",
+    "url": "https://springlakeboro.org/departments/construction",
+    "platform": "Borough construction office page",
+    "sourceUrl": "https://springlakeboro.org/",
+    "candidateUrl": "https://springlakeboro.org/departments/construction",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:57.855Z"
+  },
+  {
     "jurisdiction": "Spring Park, MN",
     "url": "https://springparkmn.gov/index.asp?SEC=8A58AD3A-7385-4752-96EB-9B27698E2FB3",
     "platform": "City building permit application forms page",
@@ -92486,7 +93945,7 @@
     "sourceUrl": "https://www.springdalear.gov/page/building-department",
     "candidateUrl": "https://www.springdalear.gov/o/springdale/page/building-department-permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:24.542Z"
+    "lastVerifiedAt": "2026-10-06T02:58:55.775Z"
   },
   {
     "jurisdiction": "Springdale, OH",
@@ -93882,6 +95341,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:20.391Z"
   },
   {
+    "jurisdiction": "Stockbridge, MA",
+    "url": "https://www.stockbridge-ma.gov/building-inspector",
+    "platform": "Town building inspector page (PermitEyes)",
+    "sourceUrl": "https://www.stockbridge-ma.gov/",
+    "candidateUrl": "https://www.stockbridge-ma.gov/building-inspector",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:57.461Z"
+  },
+  {
     "jurisdiction": "Stockbridge, MI",
     "url": "https://villageofstockbridgemi.gov/building-department/",
     "platform": "Village building department page",
@@ -94193,7 +95661,7 @@
     "sourceUrl": "https://www.townofstratford.com/",
     "candidateUrl": "https://stratfordct.viewpointcloud.com/",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:29.231Z"
+    "lastVerifiedAt": "2026-10-06T02:58:59.486Z"
   },
   {
     "jurisdiction": "Stratford, IA",
@@ -94374,6 +95842,15 @@
     "candidateUrl": "https://www.sturgis-sd.gov/building-inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:37.753Z"
+  },
+  {
+    "jurisdiction": "Sturtevant, WI",
+    "url": "https://www.sturtevant-wi.gov/building",
+    "platform": "Village building inspection & permits page",
+    "sourceUrl": "https://www.sturtevant-wi.gov/",
+    "candidateUrl": "https://www.sturtevant-wi.gov/building",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:58.927Z"
   },
   {
     "jurisdiction": "Stutsman County, ND",
@@ -94920,6 +96397,16 @@
     "candidateUrl": "https://www.sunburyohio.org/177/Zoning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:34.049Z"
+  },
+  {
+    "jurisdiction": "Sundance, WY",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://www.cityofsundancewy.com/",
+    "candidateUrl": "https://www.cityofsundancewy.com/resources/page/fees-permits-licenses-city-maps",
+    "linkStatus": "none",
+    "lastVerifiedAt": null,
+    "note": "removed in review 2026-10-06: a fee schedule only (no application, form or permit office)"
   },
   {
     "jurisdiction": "Sunderland, MA",
@@ -96411,6 +97898,15 @@
     "lastVerifiedAt": "2026-10-05T02:58:26.743Z"
   },
   {
+    "jurisdiction": "Tenino, WA",
+    "url": "https://www.cityoftenino.us/building-department",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.cityoftenino.us/",
+    "candidateUrl": "https://www.cityoftenino.us/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:00.464Z"
+  },
+  {
     "jurisdiction": "Tennille, GA",
     "url": "https://tennille-ga.gov/forms/",
     "platform": "City forms page (building & permits)",
@@ -96607,6 +98103,15 @@
     "lastVerifiedAt": "2026-10-05T02:53:47.217Z"
   },
   {
+    "jurisdiction": "The Highlands, KS",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://www.thehighlandsgov.net/",
+    "candidateUrl": "https://www.thehighlandsgov.net/11/building-and-construction-permits",
+    "linkStatus": "none",
+    "lastVerifiedAt": "2026-10-06T02:59:21.207Z"
+  },
+  {
     "jurisdiction": "Theresa, NY",
     "url": "https://www.townoftheresany.gov/building--zoning.html",
     "platform": "Town building/zoning page",
@@ -96731,6 +98236,15 @@
     "candidateUrl": "https://thomasville.org/departments/building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:19.236Z"
+  },
+  {
+    "jurisdiction": "Thomasville, NC",
+    "url": "https://thmv.csqrcloud.com/community-etrakit/",
+    "platform": "CentralSquare eTRAKiT",
+    "sourceUrl": "https://www.thomasville-nc.gov/",
+    "candidateUrl": "https://thmv.csqrcloud.com/community-etrakit",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:06.242Z"
   },
   {
     "jurisdiction": "Thompson, CT",
@@ -96936,6 +98450,15 @@
     "candidateUrl": "https://ticonderoga.portal.iworq.net/portalhome/ticonderoga",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:58:55.666Z"
+  },
+  {
+    "jurisdiction": "Tieton, WA",
+    "url": "https://www.cityoftieton.gov/forms",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.cityoftieton.gov/",
+    "candidateUrl": "https://www.cityoftieton.gov/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.020Z"
   },
   {
     "jurisdiction": "Tiffin, IA",
@@ -97359,6 +98882,15 @@
     "lastVerifiedAt": "2026-10-05T01:02:01.401Z"
   },
   {
+    "jurisdiction": "Tonasket, WA",
+    "url": "https://www.tonasketwa.gov/building",
+    "platform": "City building department page",
+    "sourceUrl": "https://www.tonasketwa.gov/",
+    "candidateUrl": "https://www.tonasketwa.gov/building",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:59.679Z"
+  },
+  {
     "jurisdiction": "Tonawanda, NY",
     "url": "https://www.tonawandacity.com/local_businesses/bldg_permits_and_inspections.php",
     "platform": "City website",
@@ -97571,6 +99103,15 @@
     "candidateUrl": "https://villageoftowanda.org/government",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:43.566Z"
+  },
+  {
+    "jurisdiction": "Towanda, KS",
+    "url": "https://www.cityoftowanda.com/planning-zoning",
+    "platform": "City planning & zoning page (building permits via P&Z administrator)",
+    "sourceUrl": "https://www.cityoftowanda.com/departments",
+    "candidateUrl": "https://www.cityoftowanda.com/planning-zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:58:57.303Z"
   },
   {
     "jurisdiction": "Towanda, PA",
@@ -98978,6 +100519,15 @@
     "lastVerifiedAt": "2026-10-05T02:56:59.785Z"
   },
   {
+    "jurisdiction": "Union County, FL",
+    "url": "https://unioncounty-fl.gov/building-department/",
+    "platform": "County building department page (Cloudpermit)",
+    "sourceUrl": "https://unioncounty-fl.gov/",
+    "candidateUrl": "https://unioncounty-fl.gov/building-department/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:01.868Z"
+  },
+  {
     "jurisdiction": "Union County, GA",
     "url": "https://www.unioncountyga.gov/264/Building-Permits",
     "platform": "Building permits page",
@@ -99716,6 +101266,15 @@
     "lastVerifiedAt": "2026-10-05T23:18:47.169Z"
   },
   {
+    "jurisdiction": "Valparaiso, FL",
+    "url": "https://www.valp.org/building",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.valp.org/",
+    "candidateUrl": "https://www.valp.org/building",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:01.959Z"
+  },
+  {
     "jurisdiction": "Valparaiso, IN",
     "url": "https://ci.valparaiso.in.us/85/Permits",
     "platform": "Permits page",
@@ -100128,6 +101687,15 @@
     "candidateUrl": "https://www.vppjla.com/?page_id=51",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:30.645Z"
+  },
+  {
+    "jurisdiction": "Vernon, CA",
+    "url": "https://vernonca-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov Civic Access",
+    "sourceUrl": "https://www.cityofvernonca.gov/",
+    "candidateUrl": "https://vernonca-energovweb.tylerhost.net/apps/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:58.058Z"
   },
   {
     "jurisdiction": "Vernon, MI",
@@ -101142,7 +102710,7 @@
     "sourceUrl": "https://www.wallsd.us/",
     "candidateUrl": "https://www.wallsd.us/page/forms-permits",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:32.809Z"
+    "lastVerifiedAt": "2026-10-06T02:58:58.016Z"
   },
   {
     "jurisdiction": "Walla Walla County, WA",
@@ -101423,6 +102991,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:36.493Z"
   },
   {
+    "jurisdiction": "Walton, KS",
+    "url": "https://nebula.wsimg.com/535385d47eb6624a127d7825f3edfe1f?AccessKeyId=1B5F8B7B19097B1D1819&disposition=0&alloworigin=1",
+    "platform": "City building permit application (PDF)",
+    "sourceUrl": "https://waltonkansas.com/",
+    "candidateUrl": "https://nebula.wsimg.com/535385d47eb6624a127d7825f3edfe1f?AccessKeyId=1B5F8B7B19097B1D1819&disposition=0&alloworigin=1",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:58:58.682Z"
+  },
+  {
     "jurisdiction": "Walworth County, SD",
     "url": "https://walworthco.org/planning-zoning/",
     "platform": "Building department permit page",
@@ -101475,6 +103052,15 @@
     "candidateUrl": "https://wampumboro.com/government/forms/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:51.759Z"
+  },
+  {
+    "jurisdiction": "Wamsutter, WY",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://www.wamsutter-wy.org/",
+    "candidateUrl": "https://www.wamsutter-wy.org/pview.aspx?id=966&catid=973",
+    "linkStatus": "none",
+    "lastVerifiedAt": "2026-10-06T02:59:24.566Z"
   },
   {
     "jurisdiction": "Wanamingo, MN",
@@ -101618,7 +103204,7 @@
     "sourceUrl": "https://www.wrga.gov/",
     "candidateUrl": "https://www.wrga.gov/page/permit-applications",
     "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:21:35.045Z"
+    "lastVerifiedAt": "2026-10-06T02:58:58.644Z"
   },
   {
     "jurisdiction": "Warner, NH",
@@ -102077,6 +103663,15 @@
     "candidateUrl": "https://www.washburnnd.com/building-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:52.535Z"
+  },
+  {
+    "jurisdiction": "Washburn, WI",
+    "url": "https://www.cityofwashburnwi.gov/zoning-administration-code-enforcement/page/permits-licenses",
+    "platform": "City permits page (construction permit)",
+    "sourceUrl": "https://www.cityofwashburnwi.gov/",
+    "candidateUrl": "https://www.cityofwashburnwi.gov/zoning-administration-code-enforcement/page/permits-licenses",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:03.329Z"
   },
   {
     "jurisdiction": "Washington County, CO",
@@ -102759,6 +104354,15 @@
     "lastVerifiedAt": "2026-10-05T02:55:33.242Z"
   },
   {
+    "jurisdiction": "Waterville, WA",
+    "url": "https://www.watervillewa.com/building",
+    "platform": "Town building permits & inspection page",
+    "sourceUrl": "https://www.watervillewa.com/",
+    "candidateUrl": "https://www.watervillewa.com/node/86",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.374Z"
+  },
+  {
     "jurisdiction": "Watervliet, MI",
     "url": "https://www.watervliet.org/building",
     "platform": "municipal permit page",
@@ -103001,6 +104605,24 @@
     "lastVerifiedAt": "2026-10-05T00:58:14.301Z"
   },
   {
+    "jurisdiction": "Wauseon, OH",
+    "url": "https://www.cityofwauseon.com/building-zoning-housing",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.cityofwauseon.com/",
+    "candidateUrl": "https://www.cityofwauseon.com/building-zoning-housing",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.175Z"
+  },
+  {
+    "jurisdiction": "Waushara County, WI",
+    "url": "https://www.wausharacountywi.gov/13661/building-code-and-inspections",
+    "platform": "County building code and inspections page",
+    "sourceUrl": "https://www.wausharacountywi.gov/",
+    "candidateUrl": "https://www.wausharacountywi.gov/13661/building-code-and-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:04.557Z"
+  },
+  {
     "jurisdiction": "Wautoma, WI",
     "url": "https://cityofwautoma.com/ordinance-zoning-info/",
     "platform": "City ordinance/zoning page (building permit info & fees)",
@@ -103043,6 +104665,15 @@
     "candidateUrl": "https://www.waverlyil.com/zoning-and-building-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:53.189Z"
+  },
+  {
+    "jurisdiction": "Waverly, KS",
+    "url": "https://welcometowaverly.com/permits/",
+    "platform": "City building permits page",
+    "sourceUrl": "https://welcometowaverly.com/permits/",
+    "candidateUrl": "https://welcometowaverly.com/permits/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.927Z"
   },
   {
     "jurisdiction": "Waverly, MN",
@@ -103324,12 +104955,12 @@
   },
   {
     "jurisdiction": "Waynoka, OK",
-    "url": null,
-    "platform": null,
+    "url": "https://waynokaok.org/index.php/city-waynoka/forms",
+    "platform": "City forms page (building permit form)",
     "sourceUrl": "https://waynokaok.org/",
     "candidateUrl": "https://waynokaok.org/index.php/city-waynoka/forms",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-05T23:36:59.383Z"
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:00.655Z"
   },
   {
     "jurisdiction": "Wayzata, MN",
@@ -103628,6 +105259,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:43.443Z"
   },
   {
+    "jurisdiction": "Welaka, FL",
+    "url": "https://www.welaka-fl.gov/building-department/pages/building-permits",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://www.welaka-fl.gov/",
+    "candidateUrl": "https://www.welaka-fl.gov/building-department/pages/building-permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.886Z"
+  },
+  {
     "jurisdiction": "Weld County, CO",
     "url": "https://aca-prod.accela.com/WELD/Default.aspx",
     "platform": null,
@@ -103643,6 +105283,15 @@
     "candidateUrl": "https://www.weld-maine.org/permits-services/permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:54.950Z"
+  },
+  {
+    "jurisdiction": "Weldon, NC",
+    "url": "https://historicweldonnc.com/departments/planning-development.html",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://historicweldonnc.com/departments/planning-development.html",
+    "candidateUrl": "https://historicweldonnc.com/departments/planning-development.html",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:01.452Z"
   },
   {
     "jurisdiction": "Wellesley, MA",
@@ -103673,12 +105322,12 @@
   },
   {
     "jurisdiction": "Wellington, KS",
-    "url": null,
-    "platform": null,
+    "url": "https://wellingtonks.portal.iworq.net/portalhome/wellingtonks",
+    "platform": "iWorQ",
     "sourceUrl": "https://www.cityofwellington.net/pview.aspx?id=20960&catid=561",
     "candidateUrl": "https://wellingtonks.portal.iworq.net/portalhome/wellingtonks",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-06T02:22:01.978Z"
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:59:04.180Z"
   },
   {
     "jurisdiction": "Wellington, OH",
@@ -104714,6 +106363,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:43.873Z"
   },
   {
+    "jurisdiction": "West Yellowstone, MT",
+    "url": "https://www.westyellowstone.gov/public-services/",
+    "platform": "Town building permits page",
+    "sourceUrl": "https://www.westyellowstone.gov/deparments/",
+    "candidateUrl": "https://www.westyellowstone.gov/public-services/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:04.112Z"
+  },
+  {
     "jurisdiction": "West York, PA",
     "url": "https://www.westyorkpa.gov/do-i-need-a-building-permit-to-improve-my-property-or-build-a-fence/",
     "platform": "Borough building permit FAQ page",
@@ -105135,6 +106793,15 @@
     "lastVerifiedAt": "2026-10-05T04:29:26.565Z"
   },
   {
+    "jurisdiction": "Weston, WV",
+    "url": "https://www.cityofwestonwv.gov/forms-and-applications/",
+    "platform": "City building permit forms page",
+    "sourceUrl": "https://www.cityofwestonwv.gov/",
+    "candidateUrl": "https://www.cityofwestonwv.gov/forms-and-applications/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:04.138Z"
+  },
+  {
     "jurisdiction": "Westover Hills, TX",
     "url": "https://www.westoverhills.us/files/",
     "platform": "City building permits page",
@@ -105429,6 +107096,15 @@
     "candidateUrl": "https://wheelercounty.ne.gov/planning-and-zoning/forms-permits-and-regulations/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:10:46.465Z"
+  },
+  {
+    "jurisdiction": "Wheeler County, OR",
+    "url": "https://www.wheelercountyoregon.com/planning-dept",
+    "platform": "County planning and development permits page",
+    "sourceUrl": "https://www.wheelercountyoregon.com/",
+    "candidateUrl": "http://www.wheelercountyoregon.com/planning-dept",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.285Z"
   },
   {
     "jurisdiction": "Wheeling, IL",
@@ -105815,6 +107491,15 @@
     "candidateUrl": "https://www.whitingmaine.com/property-assessment/planning-board/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:19:01.731Z"
+  },
+  {
+    "jurisdiction": "Whiting, VT",
+    "url": "https://www.whitingvt.com/zoning",
+    "platform": "Town zoning & land-use/building permit page",
+    "sourceUrl": "https://www.whitingvt.com/",
+    "candidateUrl": "https://www.whitingvt.com/zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.351Z"
   },
   {
     "jurisdiction": "Whiting, WI",
@@ -106256,6 +107941,15 @@
     "lastVerifiedAt": "2026-10-05T22:10:47.181Z"
   },
   {
+    "jurisdiction": "Williamsburg, KS",
+    "url": "https://www.williamsburgks.us/copy-of-utilities",
+    "platform": "City licenses & permits page (building permit application)",
+    "sourceUrl": "https://www.williamsburgks.us/",
+    "candidateUrl": "https://www.williamsburgks.us/copy-of-utilities",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.521Z"
+  },
+  {
     "jurisdiction": "Williamsburg, VA",
     "url": "https://www.williamsburgva.gov/192/ePermits---Online-Permitting",
     "platform": "City ePermits online permitting page",
@@ -106417,6 +108111,15 @@
     "lastVerifiedAt": "2026-10-06T02:21:42.977Z"
   },
   {
+    "jurisdiction": "Williston, FL",
+    "url": "https://www.willistonfl.org/community-development-department/page/permitting",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.willistonfl.org/forms",
+    "candidateUrl": "https://www.willistonfl.org/community-development-department/page/permitting",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:05.402Z"
+  },
+  {
     "jurisdiction": "Williston, ND",
     "url": "https://www.cityofwilliston.com/departments/building_safety/building_permit_applications.php",
     "platform": "city website",
@@ -106569,6 +108272,15 @@
     "lastVerifiedAt": "2026-10-05T02:54:12.924Z"
   },
   {
+    "jurisdiction": "Wilmington, MA",
+    "url": "https://www.wilmingtonma.gov/building-inspector",
+    "platform": "Town Building Inspector page",
+    "sourceUrl": "https://www.wilmingtonma.gov/",
+    "candidateUrl": "https://www.wilmingtonma.gov/building-inspector",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:06.084Z"
+  },
+  {
     "jurisdiction": "Wilmington, NC",
     "url": "https://newhanovercountync-energovpub.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov (New Hanover County COAST; county issues building permits within the city)",
@@ -106647,6 +108359,15 @@
     "candidateUrl": "https://www.wilsoncreekwa.com/living/building-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:10:46.944Z"
+  },
+  {
+    "jurisdiction": "Wilson, KS",
+    "url": "https://www.wilsonkansas.com/documentlist.aspx?categoryid=11993",
+    "platform": "Local building permits page",
+    "sourceUrl": "https://www.wilsonkansas.com/documents.aspx?categoryid=0",
+    "candidateUrl": "https://www.wilsonkansas.com/documentlist.aspx?categoryid=11993",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:05.023Z"
   },
   {
     "jurisdiction": "Wilson, NC",
@@ -106955,6 +108676,15 @@
     "lastVerifiedAt": "2026-10-06T01:13:42.704Z"
   },
   {
+    "jurisdiction": "Windsor, MA",
+    "url": "https://www.windsormass.com/boards-departments/inspections",
+    "platform": "Town building inspector page",
+    "sourceUrl": "https://www.windsormass.com/",
+    "candidateUrl": "https://www.windsormass.com/boards-departments/inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-06T02:59:02.753Z"
+  },
+  {
     "jurisdiction": "Windsor, ME",
     "url": "https://windsor.maine.gov/town-ordinances-applications-permits-and-policies/",
     "platform": "Town website",
@@ -107250,6 +108980,15 @@
     "candidateUrl": "https://bsaonline.com/Contractors/?uid=3123",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:11.466Z"
+  },
+  {
+    "jurisdiction": "Winter Harbor, ME",
+    "url": "https://winterharborme.org/town-infrastructure-page",
+    "platform": "Town page with Code Enforcement Officer (building permits) section",
+    "sourceUrl": "https://winterharborme.org/forms-%26-permits",
+    "candidateUrl": "https://winterharborme.org/town-infrastructure-page",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-06T02:59:02.838Z"
   },
   {
     "jurisdiction": "Winter Haven, FL",
