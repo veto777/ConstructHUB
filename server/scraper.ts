@@ -3,7 +3,11 @@ import { canScrapeGovernmentPortal } from "@shared/government-links";
 import { chromium, type Browser, type Page, type BrowserContext } from "playwright-core";
 import * as cheerio from "cheerio";
 import { storage } from "./storage";
-import { log } from "./index";
+// Keep the adapter importable by workers and tests without booting the HTTP
+// server (and its database seeding/scheduled jobs) through a circular import.
+function log(message: string, source = "scraper") {
+  console.log(`${new Date().toLocaleTimeString("en-US")} [${source}] ${message}`);
+}
 import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
 
 // CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
@@ -774,490 +778,191 @@ function extractEnerGovAddress(item: any): string | null {
   return typeof raw === "string" ? raw : null;
 }
 
-function deriveEnerGovBaseUrl(searchUrl: string): string {
-  try {
-    const u = new URL(searchUrl);
-    return `${u.protocol}//${u.host}`;
-  } catch {
-    return "https://whatcomcountywa-energovweb.tylerhost.net";
-  }
+export function enerGovApplicationUrl(searchUrl: string): string {
+  const url = new URL(searchUrl);
+  const match = url.pathname.match(/^(.*\/selfservice)(?:\/|$)/i);
+  if (!match) throw new Error('Configured portal is not an EnerGov Self Service application');
+  return `${url.origin}${match[1]}`;
 }
 
-async function scrapeEnerGovViaAPI(
-  searchTerm: string,
-  searchType: string,
-  databaseId: number,
-  databaseName: string,
-  queryId: number,
-  jobId: string,
-  progress: ScrapeProgress,
-  portalSearchUrl?: string
-): Promise<ScrapeResult[]> {
-  const results: ScrapeResult[] = [];
-  const baseUrl = portalSearchUrl ? deriveEnerGovBaseUrl(portalSearchUrl) : "https://whatcomcountywa-energovweb.tylerhost.net";
+export function enerGovSearchRequest(template: any, searchTerm: string, searchType: string): any {
+  const payload = structuredClone(template);
+  if (!payload.PermitCriteria) throw new Error('EnerGov UI did not provide permit criteria');
+  const advanced = ['address', 'permit', 'parcel'].includes(searchType);
+  payload.SearchModule = advanced ? 2 : 1;
+  payload.FilterModule = advanced ? 1 : 2;
+  payload.Keyword = advanced ? '' : searchTerm;
+  payload.PermitCriteria.Address = searchType === 'address' ? searchTerm : null;
+  payload.PermitCriteria.PermitNumber = searchType === 'permit' ? searchTerm : null;
+  payload.PermitCriteria.ParcelNumber = searchType === 'parcel' ? searchTerm : null;
+  payload.PermitCriteria.PageNumber = advanced ? 1 : 0;
+  payload.PermitCriteria.PageSize = advanced ? 50 : 0;
+  payload.PageNumber = advanced ? 0 : 1;
+  payload.PageSize = advanced ? 0 : 50;
+  return payload;
+}
 
-  try {
-    const searchPayloads: any[] = [];
+export function enerGovReplayHeaders(headers: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(headers).filter(([key]) => {
+    return !key.startsWith(':') && !['content-length', 'host', 'connection', 'cookie'].includes(key.toLowerCase());
+  }));
+}
 
-    if (searchType === "company_name" || searchType === "name") {
-      searchPayloads.push({
-        Rone: JSON.stringify({
-          SearchModule: 2,
-          SearchMainType: 0,
-          PlanningSearchType: 0,
-          SearchText: searchTerm,
-          StatusCode: "",
-          ApplyDateFrom: "",
-          ApplyDateTo: "",
-          PermitSearchType: 0,
-          Page: 1,
-          PageSize: 50,
-          SortBy: "relevance",
-          SortOrder: "desc"
-        })
-      });
-      searchPayloads.push({
-        Rone: JSON.stringify({
-          Tefft: searchTerm,
-          SearchModule: 2,
-          SearchText: searchTerm,
-          Page: 1,
-          PageSize: 50
-        })
-      });
-    } else {
-      searchPayloads.push({
-        Rone: JSON.stringify({
-          SearchModule: 2,
-          SearchMainType: 0,
-          SearchText: searchTerm,
-          Page: 1,
-          PageSize: 50,
-          SortBy: "relevance",
-          SortOrder: "desc"
-        })
-      });
-    }
-
-    const apiUrl = `${baseUrl}/apps/selfservice/api/energov/search/search`;
-    const searchCriteria = {
-      Keyword: searchTerm,
-      ExactMatch: false,
-      SearchModule: 2,
-      FilterModule: 0,
-      SearchMainAddress: false,
-      PermitCriteria: {
-        PermitNumber: null,
-        PermitTypeId: null,
-        PermitWorkclassId: null,
-        PermitStatusId: null,
-        ProjectName: null,
-        ApplyDateFrom: null,
-        ApplyDateTo: null,
-        ExpireDateFrom: null,
-        ExpireDateTo: null,
-        FinalDateFrom: null,
-        FinalDateTo: null,
-        IssueDateFrom: null,
-        IssueDateTo: null,
-        Address: null,
-        Description: searchTerm,
-        SearchMainAddress: false,
-        ContactId: null,
-        ParcelNumber: null,
-        TypeId: null,
-        WorkClassIds: null,
-        ExcludeCases: null,
-        PageNumber: 0,
-        PageSize: 50,
-        SortBy: "relevance",
-        SortOrder: "desc",
-      },
-    };
-
-    progress.message = `Trying API search for "${searchTerm}"...`;
-    scrapeJobs.set(jobId, { ...progress });
-
-    try {
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Origin": baseUrl,
-          "Referer": `${baseUrl}/apps/selfservice`,
-        },
-        body: JSON.stringify(searchCriteria),
-        signal: AbortSignal.timeout(20000),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const items = data?.Result?.EntityResults;
-        if (Array.isArray(items) && items.length > 0) {
-          for (const item of items) {
-            const pNum = item.CaseNumber || item.PermitNumber || null;
-            if (!pNum) continue;
-            results.push(makeResult({
-              permitNumber: String(pNum),
-              permitType: item.CaseType || item.PermitType || item.CaseWorkclass || null,
-              status: item.CaseStatus || item.Status || null,
-              address: extractEnerGovAddress(item),
-              applicantName: item.ApplicantName || item.ContactName || item.ProjectName || null,
-              contractorName: item.ContractorName || item.Contractor || item.CompanyName || null,
-              description: item.Description || item.WorkDescription || item.ProjectName || null,
-              issuedDate: item.ApplyDate || item.IssuedDate || item.IssueDate || null,
-              expirationDate: item.ExpireDate || item.ExpirationDate || null,
-              finalizedDate: item.FinalDate || item.FinalizedDate || null,
-              district: item.District || null,
-              parcelNumber: item.MainParcel || item.ParcelNumber || (item.Parcels?.[0]?.ParcelNumber) || null,
-              caseId: item.CaseId || item.GlobalEntityID || item.EntityId || null,
-            }));
-          }
-          log(`EnerGov API found ${results.length} results via direct API call`, "scraper");
-
-          await fetchEnerGovContacts(results, baseUrl, progress, jobId);
-          return results;
-        }
-      }
-    } catch (apiErr: any) {
-      log(`EnerGov direct API attempt failed: ${apiErr.message}`, "scraper");
-    }
-  } catch (err: any) {
-    log(`EnerGov API search failed: ${err.message}`, "scraper");
+export function enerGovPageRequest(template: any, pageNumber: number): any {
+  const payload = structuredClone(template);
+  // Basic search pages at the root; advanced permit search pages inside PermitCriteria.
+  const criteria = payload.SearchModule === 2 ? payload.PermitCriteria : payload;
+  if (!criteria || (payload.SearchModule !== 2 && payload.FilterModule !== 2)) {
+    throw new Error('EnerGov request is not scoped to permits');
   }
+  criteria.PageNumber = pageNumber;
+  return payload;
+}
 
-  return results;
+export function parseEnerGovResponse(data: any): { results: ScrapeResult[]; totalPages: number } {
+  if (data?.Success === false || !Array.isArray(data?.Result?.EntityResults)) {
+    throw new Error(`EnerGov search failed: ${data?.ErrorMessage || data?.ValidationErrorMessage || 'invalid search response'}`);
+  }
+  const result = data.Result;
+  const results = result.EntityResults.map((item: any) => {
+    if (item.ModuleName != null && Number(item.ModuleName) !== 2) {
+      throw new Error('EnerGov returned non-permit records for a permit search');
+    }
+    if (!item.CaseNumber && !item.PermitNumber) throw new Error('EnerGov record has no permit number');
+    return makeResult({
+      permitNumber: String(item.CaseNumber || item.PermitNumber),
+      permitType: item.CaseType || item.PermitType || item.CaseWorkclass,
+      status: item.CaseStatus || item.Status,
+      address: extractEnerGovAddress(item),
+      applicantName: item.ApplicantName || item.ContactName,
+      contractorName: item.ContractorName || item.CompanyName,
+      description: item.Description || item.WorkDescription || item.ProjectName,
+      issuedDate: item.IssueDate || item.IssuedDate,
+      expirationDate: item.ExpireDate || item.ExpirationDate,
+      finalizedDate: item.FinalDate,
+      parcelNumber: item.MainParcel || item.ParcelNumber,
+      caseId: item.CaseId || item.EntityId,
+    });
+  });
+  const totalPages = Number(result.TotalPages);
+  if (!Number.isInteger(totalPages) || totalPages < 0) throw new Error('EnerGov response has invalid pagination');
+  return { results, totalPages };
+}
+
+export function assertEnerGovTenant(searchUrl: string, tenants: any[], headers: Record<string, string>): void {
+  if (!tenants.length) return; // Older installations do not expose GetTenants.
+  const normalized = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
+  const selected = tenants.find(t => String(t.TenantID) === normalized.tenantid && t.TenantName === normalized.tenantname);
+  if (!selected) throw new Error('EnerGov tenant headers do not match the portal tenant list');
+  const app = enerGovApplicationUrl(searchUrl);
+  const suffix = decodeURIComponent(new URL(searchUrl).pathname.slice(new URL(app).pathname.length)).replace(/^\/|\/$/g, '');
+  if (suffix && ![selected.TenantUrl, selected.TenantName].some(v => String(v).toLowerCase() === suffix.toLowerCase())) {
+    throw new Error('EnerGov selected a different tenant from the configured portal');
+  }
+  if (tenants.length > 1 && !suffix) throw new Error('EnerGov portal has multiple tenants; a jurisdiction-specific tenant URL is required');
 }
 
 export async function scrapeEnerGov(
-  searchTerm: string,
-  searchType: string,
-  databaseId: number,
-  databaseName: string,
-  queryId: number,
-  jobId: string,
-  portalSearchUrl?: string
+  searchTerm: string, searchType: string, databaseId: number, databaseName: string,
+  queryId: number, jobId: string, portalSearchUrl?: string
 ): Promise<ScrapeResult[]> {
   const progress = initProgress(databaseId, databaseName, searchTerm, jobId);
   const allResults: ScrapeResult[] = [];
-  let totalNewResults = 0;
-  const baseUrl = portalSearchUrl ? deriveEnerGovBaseUrl(portalSearchUrl) : "https://whatcomcountywa-energovweb.tylerhost.net";
   let page: Page | null = null;
   let context: BrowserContext | null = null;
-
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
   try {
-    if (searchType === "company_name" || searchType === "name" || searchType === "keyword") {
-      progress.message = `Trying API search for "${searchTerm}"...`;
-      scrapeJobs.set(jobId, { ...progress });
-      const apiResults = await scrapeEnerGovViaAPI(searchTerm, searchType, databaseId, databaseName, queryId, jobId, progress, portalSearchUrl);
-      if (apiResults.length > 0) {
-        allResults.push(...apiResults);
-        progress.resultsFound = allResults.length;
-        progress.message = `Found ${allResults.length} results via API`;
-        scrapeJobs.set(jobId, { ...progress });
-        const newFromBatch = await saveResultsBatch(apiResults, databaseId, queryId);
-        totalNewResults += newFromBatch;
-        await finalizeScrape(allResults.length, totalNewResults, databaseId, databaseName, jobId, progress);
-        return allResults;
-      }
-      log(`EnerGov API returned no results for "${searchTerm}", falling back to browser scrape`, "scraper");
-    }
-
+    if (!portalSearchUrl) throw new Error('EnerGov requires a jurisdiction-specific portal URL');
+    if (!searchTerm.trim()) throw new Error('Search value is empty');
+    const applicationUrl = enerGovApplicationUrl(portalSearchUrl);
     ({ page, context } = await createIsolatedPage());
-
-    const capturedResponses: any[] = [];
-    page.on("response", async (response) => {
-      const url = response.url();
-      if (url.includes("/api/") && (url.includes("search") || url.includes("Search") || url.includes("permit") || url.includes("Permit") || url.includes("case") || url.includes("Case"))) {
-        try {
-          const contentType = response.headers()["content-type"] || "";
-          if (contentType.includes("json")) {
-            const json = await response.json().catch(() => null);
-            if (json) {
-              capturedResponses.push({ url, data: json });
-              log(`EnerGov captured API response from ${url}: ${JSON.stringify(json).substring(0, 500)}`, "scraper");
-            }
-          }
-        } catch {}
+    const activeContext = context;
+    deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 120_000);
+    page.setDefaultTimeout(20_000);
+    const tenantResponses: Promise<any[]>[] = [];
+    page.on('response', response => {
+      if (/\/api\/Home\/GetTenants(?:\?|$)/i.test(response.url()) && response.ok()) {
+        tenantResponses.push(response.json().then(data => Array.isArray(data.Result) ? data.Result : []).catch(() => []));
       }
     });
-
-    let searchUrl: string;
-    if (searchType === "keyword") {
-      searchUrl = `${baseUrl}/apps/selfservice#/search?m=1&fm=1&ps=50&pn=1&em=true&st=${encodeURIComponent(searchTerm)}`;
-    } else if (portalSearchUrl) {
-      searchUrl = portalSearchUrl;
-    } else {
-      searchUrl = `${baseUrl}/apps/selfservice#/search`;
+    const url = new URL(portalSearchUrl);
+    url.hash = '/search';
+    const landing = await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    if (landing && !landing.ok()) throw new Error(`EnerGov portal returned HTTP ${landing.status()}`);
+    await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+    await page.locator('#SearchModule option').filter({ hasText: /^Permit$/ }).waitFor({ state: 'attached' });
+    // Secondary data initializes the form asynchronously after the first options appear.
+    await page.waitForTimeout(1000);
+    await page.locator('#SearchModule').selectOption({ label: 'Permit' });
+    await page.locator('#button-Advanced').waitFor({ state: 'visible' });
+    if (!['address', 'permit', 'parcel', 'keyword', 'name', 'company', 'company_name'].includes(searchType)) {
+      throw new Error(`EnerGov does not support ${searchType} search`);
     }
-    log(`Scraper: Navigating to ${searchUrl}`, "scraper");
-    await page.goto(searchUrl, { waitUntil: "networkidle", timeout: 60000 });
-    await page.waitForTimeout(3000);
-
-    if (searchType !== "keyword") {
-      const searchInput = page.locator("input[type='search'], input[placeholder*='Search'], input[placeholder*='search'], input.form-control, input[ng-model*='search'], input[aria-label*='Search']").first();
-      await searchInput.waitFor({ state: "visible", timeout: 20000 });
-      await searchInput.fill(searchTerm);
+    // Bootstrap from a real permit keyword request. Its complete template and
+    // tenant headers also serve the advanced address/permit/parcel endpoint.
+    // Public name/company searches use this same keyword index.
+    await page.locator('#SearchKeyword').fill(searchTerm);
+    await page.locator('#button-Search').focus();
+    await page.waitForTimeout(750);
+    const responsePromise = page.waitForResponse(r => {
+      if (!/\/api\/energov\/search\/search(?:\?|$)/i.test(r.url()) || r.request().method() !== 'POST') return false;
+      // Selecting the module can itself start a search. Ignore those late
+      // responses and capture only the request submitted with this term.
+      return r.request().postDataJSON()?.Keyword === searchTerm;
+    }, { timeout: 30_000 });
+    const [response] = await Promise.all([responsePromise, page.locator('#button-Search').click()]);
+    if (!response.ok()) throw new Error(`EnerGov search returned HTTP ${response.status()}`);
+    const apiUrl = response.url();
+    if (new URL(apiUrl).origin !== new URL(applicationUrl).origin ||
+        !new URL(apiUrl).pathname.toLowerCase().startsWith(new URL(applicationUrl).pathname.toLowerCase() + '/api/')) {
+      throw new Error('EnerGov search redirected outside the configured application');
     }
-
-    progress.message = `Searching for "${searchTerm}"...`;
-    scrapeJobs.set(jobId, { ...progress });
-
-    if (searchType !== "keyword") {
-      await page.keyboard.press("Enter");
-      await page.waitForTimeout(2000);
-
-      const searchButton = page.locator("button:has-text('Search'), button:has-text('SEARCH'), a:has-text('Search')").first();
-      const btnVisible = await searchButton.isVisible().catch(() => false);
-      if (btnVisible) {
-        await searchButton.click();
-      }
-    }
-
-    await page.waitForTimeout(10000);
-
-    const searchResponses = capturedResponses.filter(r =>
-      r.url.includes("/search/search") || r.url.includes("/Search/Search")
-    );
-
-    for (const resp of searchResponses) {
-      const data = resp.data;
-      const entityResults = data?.Result?.EntityResults;
-      if (!Array.isArray(entityResults) || entityResults.length === 0) continue;
-
-      for (const item of entityResults) {
-        const pNum = item.CaseNumber || item.PermitNumber || item.Number || null;
-        if (!pNum) continue;
-        allResults.push(makeResult({
-          permitNumber: String(pNum),
-          permitType: item.CaseType || item.PermitType || item.CaseWorkclass || null,
-          status: item.CaseStatus || item.Status || null,
-          address: extractEnerGovAddress(item),
-          applicantName: item.ApplicantName || item.Applicant || item.ContactName || item.ProjectName || null,
-          contractorName: item.ContractorName || item.Contractor || item.CompanyName || null,
-          description: item.Description || item.WorkDescription || item.CaseDescription || item.ProjectName || null,
-          issuedDate: item.ApplyDate || item.IssuedDate || item.IssueDate || null,
-          expirationDate: item.ExpireDate || item.ExpirationDate || null,
-          finalizedDate: item.FinalDate || item.FinalizedDate || null,
-          district: item.District || null,
-          parcelNumber: item.MainParcel || item.ParcelNumber || (item.Parcels?.[0]?.ParcelNumber) || null,
-          caseId: item.CaseId || item.GlobalEntityID || item.EntityId || null,
-        }));
-      }
-      if (allResults.length > 0) {
-        log(`EnerGov API intercept parsed ${allResults.length} results from ${resp.url}`, "scraper");
-      }
-    }
-
-    if (allResults.length === 0) {
-      log(`EnerGov API intercept found 0 results, trying HTML parse...`, "scraper");
-      const html = await page.content();
-      const htmlResults = parseEnerGovResults(html);
-      allResults.push(...htmlResults);
-    }
-
-    if (allResults.length === 0) {
-      log(`EnerGov: trying visible text extraction for "${searchTerm}"...`, "scraper");
-      const visibleResults = await page.evaluate(() => {
-        const results: any[] = [];
-        const rows = document.querySelectorAll("tr, [class*='result'], [class*='row'], md-list-item, .case-item");
-        rows.forEach(row => {
-          const text = row.textContent?.trim() || "";
-          if (text.length < 10) return;
-          const permitMatch = text.match(/([A-Z]{2,}\d*[-\s]\d{2,}[-\s]?\d*)/);
-          if (permitMatch) {
-            const links = row.querySelectorAll("a");
-            const linkTexts: string[] = [];
-            links.forEach(l => linkTexts.push(l.textContent?.trim() || ""));
-            results.push({
-              text,
-              permit: permitMatch[1],
-              links: linkTexts,
-            });
-          }
-        });
-        return results;
+    const headers = enerGovReplayHeaders(await response.request().allHeaders());
+    const tenants = (await Promise.all(tenantResponses)).find(t => t.length) || [];
+    assertEnerGovTenant(portalSearchUrl, tenants, headers);
+    // Reuse the complete live UI payload, including version-specific criteria.
+    // Guessing a reduced payload causes HTTP 500 on current Self Service releases.
+    // Build the observed advanced request explicitly; the bootstrap keyword
+    // response is not the user's address search and must never be saved.
+    const template = enerGovSearchRequest(response.request().postDataJSON(), searchTerm, searchType);
+    const first = await context.request.post(apiUrl, { headers, data: template, timeout: 20_000 });
+    if (!first.ok()) throw new Error(`EnerGov search returned HTTP ${first.status()}`);
+    let data = await first.json();
+    const seen = new Set<string>();
+    for (let pg = 1; pg <= 100; pg++) {
+      const parsed = parseEnerGovResponse(data);
+      const fresh = parsed.results.filter(r => !seen.has(r.caseId || r.permitNumber!));
+      if (parsed.results.length && !fresh.length) throw new Error('EnerGov pagination repeated a page');
+      for (const r of fresh) { seen.add(r.caseId || r.permitNumber!); allResults.push(r); }
+      progress.currentPage = pg;
+      progress.totalPages = parsed.totalPages;
+      progress.resultsFound = allResults.length;
+      progress.message = `Found ${allResults.length} permits; reading page ${pg} of ${parsed.totalPages}`;
+      scrapeJobs.set(jobId, { ...progress });
+      if (pg >= parsed.totalPages) break;
+      if (!parsed.results.length) throw new Error('EnerGov pagination ended before the advertised last page');
+      if (pg === 100) throw new Error('EnerGov search exceeds 100 pages; narrow the search');
+      // BrowserContext.request carries the same cookies as the portal session.
+      const next = await context.request.post(apiUrl, {
+        headers, data: enerGovPageRequest(template, pg + 1), timeout: 20_000,
       });
-
-      for (const vr of visibleResults) {
-        const addressMatch = vr.text.match(/\d+\s+[A-Z][A-Za-z\s]+(?:ST|AVE|RD|DR|LN|WAY|BLVD|CT|PL|CIR)\b/i);
-        allResults.push(makeResult({
-          permitNumber: vr.permit,
-          address: addressMatch ? addressMatch[0] : null,
-        }));
-      }
+      if (!next.ok()) throw new Error(`EnerGov page ${pg + 1} returned HTTP ${next.status()}`);
+      data = await next.json();
     }
-
-    if (allResults.length > 0) {
-      await fetchEnerGovContacts(allResults, baseUrl, progress, jobId);
-    }
-
-    progress.resultsFound = allResults.length;
-    progress.message = `Found ${allResults.length} results`;
-    scrapeJobs.set(jobId, { ...progress });
-    log(`EnerGov total results for "${searchTerm}": ${allResults.length} (captured ${capturedResponses.length} API responses)`, "scraper");
-
-    const newFromBatch = await saveResultsBatch(allResults, databaseId, queryId);
-    totalNewResults += newFromBatch;
-    await finalizeScrape(allResults.length, totalNewResults, databaseId, databaseName, jobId, progress);
-    await closeIsolatedPage(page, context);
+    const newCount = await saveResultsBatch(allResults, databaseId, queryId);
+    await finalizeScrape(allResults.length, newCount, databaseId, databaseName, jobId, progress);
   } catch (error: any) {
-    try { if (page && context) await closeIsolatedPage(page, context); } catch {}
-    progress.status = "error";
-    progress.message = `Error: ${error.message}`;
+    if (allResults.length) await saveResultsBatch(allResults, databaseId, queryId);
+    progress.status = 'error';
+    progress.message = expired ? 'EnerGov search exceeded 120 seconds; narrow the search' : `Error: ${error.message}`;
     scrapeJobs.set(jobId, { ...progress });
-    log(`Scraper error on ${databaseName}: ${error.message}`, "scraper");
+    log(`EnerGov scraper error on ${databaseName}: ${progress.message}`, 'scraper');
+  } finally {
+    clearTimeout(deadline);
+    if (page && context) await closeIsolatedPage(page, context);
   }
-
   return allResults;
-}
-
-async function fetchEnerGovContacts(
-  results: ScrapeResult[],
-  baseUrl: string,
-  progress: ScrapeProgress,
-  jobId: string
-): Promise<void> {
-  const resultsWithCaseId = results.filter(r => r.caseId);
-  if (resultsWithCaseId.length === 0) return;
-
-  const limit = Math.min(resultsWithCaseId.length, 25);
-  progress.message = `Fetching contact details for ${limit} permits...`;
-  scrapeJobs.set(jobId, { ...progress });
-
-  for (let i = 0; i < limit; i++) {
-    const result = resultsWithCaseId[i];
-    try {
-      const detailUrl = `${baseUrl}/apps/selfservice/api/energov/permit/details/${result.caseId}`;
-      const resp = await fetch(detailUrl, {
-        headers: {
-          "Accept": "application/json",
-          "Origin": baseUrl,
-          "Referer": `${baseUrl}/apps/selfservice`,
-        },
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      const permit = data?.Result || data?.result || data;
-
-      if (permit.MainParcel && !result.parcelNumber) {
-        result.parcelNumber = permit.MainParcel;
-      }
-      if (permit.ExpireDate && !result.expirationDate) {
-        result.expirationDate = permit.ExpireDate;
-      }
-      if (permit.FinalDate && !result.finalizedDate) {
-        result.finalizedDate = permit.FinalDate;
-      }
-      if (permit.District && !result.district) {
-        result.district = permit.District;
-      }
-      if (permit.IssueDate && !result.issuedDate) {
-        result.issuedDate = permit.IssueDate;
-      }
-      if (permit.Description && !result.description) {
-        result.description = permit.Description;
-      }
-
-      const contacts: ScrapeContact[] = [];
-      const contactList = permit.Contacts || permit.contacts || [];
-      if (Array.isArray(contactList)) {
-        for (const c of contactList) {
-          contacts.push({
-            type: c.ContactType || c.Type || c.RoleDescription || "Unknown",
-            company: c.CompanyName || c.Company || c.OrganizationName || null,
-            firstName: c.FirstName || c.firstName || null,
-            lastName: c.LastName || c.lastName || null,
-            title: c.Title || c.title || null,
-            phone: c.Phone || c.PhoneNumber || c.phone || null,
-            email: c.Email || c.EmailAddress || c.email || null,
-          });
-        }
-      }
-
-      if (contacts.length > 0) {
-        result.contacts = contacts;
-        const contractor = contacts.find(c =>
-          c.type.toLowerCase().includes("contractor")
-        );
-        if (contractor) {
-          const parts = [contractor.company, [contractor.firstName, contractor.lastName].filter(Boolean).join(" ")].filter(Boolean);
-          result.contractorName = parts.join(" - ") || result.contractorName;
-        }
-        const owner = contacts.find(c =>
-          c.type.toLowerCase().includes("owner") || c.type.toLowerCase().includes("applicant")
-        );
-        if (owner && !result.applicantName) {
-          result.applicantName = [owner.firstName, owner.lastName].filter(Boolean).join(" ") || null;
-        }
-      }
-
-      log(`EnerGov detail fetched for ${result.permitNumber}: ${contacts.length} contacts`, "scraper");
-    } catch (err: any) {
-      log(`EnerGov detail fetch failed for ${result.permitNumber}: ${err.message}`, "scraper");
-    }
-  }
-}
-
-function parseEnerGovResults(html: string): ScrapeResult[] {
-  const $ = cheerio.load(html);
-  const results: ScrapeResult[] = [];
-
-  $("table tbody tr, .search-result, .result-item, .case-row, div[class*='result']").each((_i, el) => {
-    const $el = $(el);
-    const text = $el.text().trim();
-    if (!text || text.length < 5) return;
-
-    const cells = $el.find("td");
-    if (cells.length >= 2) {
-      const cellTexts: string[] = [];
-      cells.each((_j, cell) => { cellTexts.push($(cell).text().trim()); });
-
-      const permitNumber = cellTexts[0] || null;
-      if (!permitNumber || permitNumber.toLowerCase().includes("no results")) return;
-
-      results.push(makeResult({
-        permitNumber,
-        permitType: cellTexts.length > 1 ? cellTexts[1] : null,
-        status: cellTexts.length > 2 ? cellTexts[2] : null,
-        address: cellTexts.length > 3 ? cellTexts[3] : null,
-        applicantName: cellTexts.length > 4 ? cellTexts[4] : null,
-        description: cellTexts.length > 5 ? cellTexts[5] : null,
-        issuedDate: cellTexts.length > 6 ? cellTexts[6] : null,
-      }));
-      return;
-    }
-
-    const links = $el.find("a");
-    let permitNumber: string | null = null;
-    links.each((_j, link) => {
-      const linkText = $(link).text().trim();
-      if (linkText && /^[A-Z]{2,}[-\s]?\d+/i.test(linkText)) {
-        permitNumber = linkText;
-      }
-    });
-
-    if (!permitNumber) {
-      const match = text.match(/([A-Z]{2,}\d*[-\s]\d{2,}[-\s]?\d*)/);
-      if (match) permitNumber = match[1];
-    }
-
-    if (permitNumber) {
-      const addressMatch = text.match(/\d+\s+[A-Z][A-Za-z\s]+(?:ST|AVE|RD|DR|LN|WAY|BLVD|CT|PL|CIR)\b/i);
-      const dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
-
-      results.push(makeResult({
-        permitNumber,
-        address: addressMatch ? addressMatch[0] : null,
-        issuedDate: dateMatch ? dateMatch[1] : null,
-      }));
-    }
-  });
-
-  return results;
 }
 
 export async function scrapeETRAKiT(
@@ -1453,252 +1158,190 @@ function parseETRAKiTResults(html: string): ScrapeResult[] {
   return results;
 }
 
+// Module names are jurisdiction-specific (Building, Permits, DevServices, ...).
+// Only follow links within the configured agency, even on shared Accela hosts.
+export function accelaSearchUrl(searchUrl: string, html: string): string {
+  const source = new URL(searchUrl);
+  const agency = source.pathname.split('/').filter(Boolean)[0];
+  if (!agency) throw new Error('Accela portal has no agency path');
+  if (/\/Cap\/CapHome\.aspx$/i.test(source.pathname)) return source.href;
+  const $ = cheerio.load(html);
+  const candidates: { url: string; label: string }[] = [];
+  $('a[href]').each((_i, element) => {
+    const href = $(element).attr('href')!;
+    try {
+      const target = new URL(href, source);
+      if (target.origin === source.origin && target.pathname.split('/')[1]?.toLowerCase() === agency.toLowerCase()
+          && /\/Cap\/CapHome\.aspx$/i.test(target.pathname)) {
+        target.searchParams.delete('IsToShowInspection');
+        target.searchParams.delete('globalsearch');
+        candidates.push({ url: target.href, label: $(element).text().trim() });
+      }
+    } catch {}
+  });
+  const permitLink = candidates.find(c => /building|^permits$|development services/i.test(c.label));
+  if (permitLink) return permitLink.url;
+  return new URL(`/${agency}/Cap/CapHome.aspx?module=Building&TabName=Home`, source).href;
+}
+
+export function parseAccelaResults(html: string): ScrapeResult[] {
+  const $ = cheerio.load(html);
+  const results: ScrapeResult[] = [];
+  // A single match redirects to CapDetail instead of rendering a results grid.
+  const detailNumber = $('#ctl00_PlaceHolderMain_lblPermitNumber').text().trim();
+  if (detailNumber) {
+    return [makeResult({
+      permitNumber: detailNumber,
+      permitType: $('#ctl00_PlaceHolderMain_lblPermitType').text().trim() || null,
+      status: $('#ctl00_PlaceHolderMain_lblRecordStatus').text().trim() || null,
+      address: $("[id$='_workLocation_updatePanel']").text().replace(/\s+/g, ' ').trim().replace(/\s*\*$/, '').trim() || null,
+    })];
+  }
+  $("table[id*='gdvPermitList'], table[id*='GridView'], table[id*='dgPermit']").each((_i, table) => {
+    const rows = $(table).children('tbody').children('tr').add($(table).children('tr'));
+    const header = rows.filter((_j, row) => $(row).children('th').length > 0).first();
+    const headers = header.children('th').map((_j, th) => $(th).text().trim().toLowerCase()).get();
+    rows.each((_j, row) => {
+      const cells = $(row).children('td');
+      if (!headers.length || cells.length !== headers.length) return;
+      const value = (pattern: RegExp) => {
+        const i = headers.findIndex(h => pattern.test(h));
+        return i >= 0 ? cells.eq(i).text().replace(/\s+/g, ' ').trim() || null : null;
+      };
+      const permitNumber = value(/^(record|permit|application) (number|#)$/);
+      if (!permitNumber || !/\d/.test(permitNumber)) return;
+      results.push(makeResult({
+        permitNumber,
+        permitType: value(/^(record|permit|application) type$/),
+        status: value(/^status$/),
+        address: value(/address|location/) || $(row).find("[id$='_lblPermitAddress']").text().replace(/\s+/g, ' ').trim() || value(/^general description$/),
+        description: value(/^(permit |work )?description$/) || value(/^project name$/),
+        // Application/updated dates must not be mislabeled as issuance dates.
+        issuedDate: value(/^issue(d)? date$/),
+        expirationDate: value(/^expiration date$/),
+        applicantName: value(/applicant|owner/),
+        contractorName: value(/contractor|business name/),
+      }));
+    });
+  });
+  return [...new Map(results.map(r => [r.permitNumber, r])).values()];
+}
+
 export async function scrapeAccela(
-  searchUrl: string,
-  searchTerm: string,
-  searchType: string,
-  databaseId: number,
-  databaseName: string,
-  queryId: number,
-  jobId: string
+  searchUrl: string, searchTerm: string, searchType: string,
+  databaseId: number, databaseName: string, queryId: number, jobId: string
 ): Promise<ScrapeResult[]> {
   const progress = initProgress(databaseId, databaseName, searchTerm, jobId);
   const allResults: ScrapeResult[] = [];
-  let totalNewResults = 0;
   let page: Page | null = null;
   let context: BrowserContext | null = null;
-
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
   try {
     ({ page, context } = await createIsolatedPage());
-
-    log(`Accela: Navigating to ${searchUrl}`, "scraper");
-    await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(5000);
-
-    if (searchType === "address") {
-      const parts = searchTerm.match(/^(\d+)\s+(.+)/);
+    const activeContext = context;
+    deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 120_000);
+    page.setDefaultTimeout(15_000);
+    const landing = await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    if (landing && !landing.ok()) throw new Error(`Accela portal returned HTTP ${landing.status()}`);
+    const target = accelaSearchUrl(searchUrl, await page.content());
+    if (page.url() !== target) {
+      const response = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      if (response && !response.ok()) throw new Error(`Accela search returned HTTP ${response.status()}`);
+    }
+    // A redirect must never silently switch to another agency on a shared host.
+    const configured = new URL(searchUrl);
+    const actual = new URL(page.url());
+    if (actual.origin !== configured.origin || actual.pathname.split('/')[1]?.toLowerCase() !== configured.pathname.split('/')[1]?.toLowerCase()) {
+      throw new Error('Accela redirected outside the configured agency');
+    }
+    const form = page.locator("a[id*='btnNewSearch']").first();
+    await form.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    if (!(await form.isVisible())) throw new Error('Accela permit search unavailable (login required or invalid module)');
+    let selector: string;
+    let value = searchTerm.trim();
+    if (!value) throw new Error('Search value is empty');
+    if (searchType === 'address') {
+      const parts = value.match(/^(\d+)\s+(.+)$/);
       if (parts) {
-        const streetNum = parts[1];
-        const streetName = parts[2];
-        const numInput = page.locator("input[id*='txtHouseNumberFrom'], input[id*='HouseNumberFrom'], input[id*='txtStreetNo']").first();
-        const nameInput = page.locator("input[id*='txtStreetName'], input[id*='StreetName']").first();
-        if (await numInput.isVisible().catch(() => false)) {
-          await numInput.fill(streetNum);
-        }
-        if (await nameInput.isVisible().catch(() => false)) {
-          await nameInput.fill(streetName);
-        }
-      } else {
-        const nameInput = page.locator("input[id*='txtStreetName'], input[id*='StreetName']").first();
-        if (await nameInput.isVisible().catch(() => false)) {
-          await nameInput.fill(searchTerm);
-        }
+        await page.locator("input[id*='txtGSNumber_ChildControl0'], input[id*='txtHouseNumberFrom']").first().fill(parts[1]);
+        value = parts[2];
       }
-    } else if (searchType === "permit" || searchType === "keyword") {
-      const permitInput = page.locator("input[id*='txtPermitNumber'], input[id*='PermitNumber'], input[id*='txtSearchCondition']").first();
-      if (await permitInput.isVisible().catch(() => false)) {
-        await permitInput.fill(`%${searchTerm}%`);
-      } else {
-        const projInput = page.locator("input[id*='txtProjectName'], input[id*='ProjectName']").first();
-        if (await projInput.isVisible().catch(() => false)) {
-          await projInput.fill(searchTerm);
-        }
-      }
-    } else if (searchType === "name" || searchType === "company" || searchType === "company_name") {
-      const busiNameInput = page.locator("input[id*='txtGSBusiName']").first();
-      if (await busiNameInput.isVisible().catch(() => false)) {
-        await busiNameInput.fill(searchTerm);
-        log(`Accela: Filled Business Name with "${searchTerm}"`, "scraper");
-      } else {
-        const lastNameInput = page.locator("input[id*='txtGSLastName'], input[id*='LastName']").first();
-        if (await lastNameInput.isVisible().catch(() => false)) {
-          await lastNameInput.fill(searchTerm);
-          log(`Accela: Filled Last Name with "${searchTerm}"`, "scraper");
-        } else {
-          const keywordInput = page.locator("#txtSearchCondition").first();
-          if (await keywordInput.isVisible().catch(() => false)) {
-            await keywordInput.fill(searchTerm);
-            log(`Accela: Filled keyword search with "${searchTerm}"`, "scraper");
-          } else {
-            const projInput = page.locator("input[id*='txtGSProjectName'], input[id*='ProjectName']").first();
-            if (await projInput.isVisible().catch(() => false)) {
-              await projInput.fill(searchTerm);
-              log(`Accela: Filled Project Name with "${searchTerm}"`, "scraper");
-            } else {
-              log(`Accela: No name/company field found for "${searchTerm}"`, "scraper");
-            }
-          }
-        }
-      }
-    }
-
-    progress.message = `Searching Accela for "${searchTerm}"...`;
-    scrapeJobs.set(jobId, { ...progress });
-
-    const searchBtn = page.locator("a[id*='btnNewSearch'][class*=''], a[id*='btnNewSearch']").first();
-    const btnVisible = await searchBtn.isVisible().catch(() => false);
-    if (btnVisible) {
-      await searchBtn.click();
+      selector = "input[id*='txtGSStreetName'], input[id*='txtStreetName']";
+    } else if (searchType === 'permit') {
+      selector = "input[id*='txtGSPermitNumber'], input[id*='txtPermitNumber']";
+    } else if (searchType === 'keyword') {
+      selector = "input[id*='txtGSProjectName']";
+    } else if (searchType === 'name') {
+      selector = "input[id*='txtGSLastName']";
+    } else if (searchType === 'company' || searchType === 'company_name') {
+      selector = "input[id*='txtGSBusiName']";
     } else {
-      const altBtn = page.locator("input[id*='btnSearch'], button[id*='btnSearch']").first();
-      if (await altBtn.isVisible().catch(() => false)) {
-        await altBtn.click();
-      } else {
-        await page.keyboard.press("Enter");
-      }
+      throw new Error(`Accela does not support ${searchType} search`);
     }
-    await page.waitForTimeout(8000);
-
-    const parseAccelaResults = async (): Promise<void> => {
-      const html = await page!.content();
-      const $ = cheerio.load(html);
-
-      const headers: string[] = [];
-      $("table[id*='GridView'] tr:first-child th, table[id*='dgPermit'] tr:first-child th, div[id*='resultList'] table tr:first-child th").each((_i, th) => {
-        headers.push($(th).text().trim().toLowerCase());
+    const input = page.locator(selector).first();
+    if (!(await input.isVisible())) throw new Error(`Accela does not expose a public ${searchType} search field`);
+    await input.fill(value);
+    // Submit through WebForms so viewstate, cookies and event validation remain intact.
+    const submit = async (button: ReturnType<Page['locator']>) => {
+      const responsePromise = page!.waitForResponse(r => r.request().method() === 'POST' && /CapHome\.aspx/i.test(r.url()), { timeout: 30_000 });
+      const [response] = await Promise.all([responsePromise, button.click()]);
+      if (!response.ok()) throw new Error(`Accela search returned HTTP ${response.status()}`);
+      await response.finished();
+      await page!.waitForLoadState('domcontentloaded');
+      await page!.waitForFunction(() => {
+        const manager = (window as any).Sys?.WebForms?.PageRequestManager?.getInstance();
+        return !manager?.get_isInAsyncPostBack();
       });
-
-      $("table[id*='GridView'] tr, table[id*='dgPermit'] tr, div[id*='resultList'] table tr").each((_i, row) => {
-        const $row = $(row);
-        if ($row.find("th").length > 0) return;
-        const cells: string[] = [];
-        $row.find("td").each((_j, cell) => {
-          const linkText = $(cell).find("a").first().text().trim();
-          cells.push(linkText || $(cell).text().trim());
-        });
-        if (cells.length < 3) return;
-
-        const permitNumber = cells.find(c => /^[A-Z0-9]{2,}[-\s]?\d+/i.test(c)) || cells[1] || null;
-        if (!permitNumber || permitNumber.toLowerCase().includes("no record")) return;
-
-        const dateCell = cells.find(c => /\d{1,2}\/\d{1,2}\/\d{4}/.test(c));
-        const statusCell = cells.find(c => /issued|active|pending|approved|closed|expired|finaled|void|denied/i.test(c));
-
-        let address: string | null = null;
-        let permitType: string | null = null;
-        let description: string | null = null;
-        let applicantName: string | null = null;
-
-        if (headers.length > 0 && headers.length === cells.length) {
-          for (let hi = 0; hi < headers.length; hi++) {
-            const h = headers[hi];
-            const v = cells[hi];
-            if (!v || v === permitNumber || v === dateCell || v === statusCell) continue;
-            if (h.includes("address") || h.includes("location") || h.includes("project address")) {
-              address = v;
-            } else if (h.includes("type") || h.includes("record type") || h.includes("permit type")) {
-              permitType = v;
-            } else if (h.includes("description") || h.includes("work") || h.includes("project name")) {
-              description = v;
-            } else if (h.includes("applicant") || h.includes("owner") || h.includes("contact") || h.includes("name") || h.includes("contractor") || h.includes("licensee") || h.includes("business")) {
-              applicantName = v;
-            }
-          }
-        }
-
-        if (!address && !applicantName) {
-          for (const c of cells) {
-            if (c === permitNumber || c === dateCell || c === statusCell) continue;
-            if (!address && /\d+\s+[A-Z]/i.test(c) && c.length > 5 && c.length < 80) {
-              address = c;
-            } else if (!permitType && /residential|commercial|building|electrical|plumbing|mechanical|roofing|pool|fence|solar|demo/i.test(c)) {
-              permitType = c;
-            } else if (c.length > 10 && !description) {
-              description = c;
-            }
-          }
-        }
-
-        if (!applicantName && (searchType === "name" || searchType === "company" || searchType === "company_name")) {
-          applicantName = searchTerm;
-        }
-
-        allResults.push(makeResult({
-          permitNumber,
-          permitType,
-          status: statusCell || null,
-          address,
-          applicantName,
-          description,
-          issuedDate: dateCell || null,
-        }));
-      });
-
-      if (allResults.length === 0) {
-        const rows = page!.locator("table tr").filter({ hasText: /[A-Z]{2,}\d*[-\s]\d/ });
-        const count = await rows.count();
-        for (let i = 0; i < Math.min(count, 100); i++) {
-          const row = rows.nth(i);
-          const text = await row.textContent().catch(() => "");
-          if (!text || text.length < 10) continue;
-          const match = text.match(/([A-Z0-9]{2,}[-\s]?\d{2,}[-\s]?\d*)/);
-          if (match) {
-            const addrMatch = text.match(/\d+\s+[A-Z][A-Za-z\s]+(?:ST|AVE|RD|DR|LN|WAY|BLVD|CT|PL|CIR)\b/i);
-            allResults.push(makeResult({
-              permitNumber: match[1],
-              address: addrMatch ? addrMatch[0] : null,
-            }));
-          }
-        }
-      }
     };
-
-    await parseAccelaResults();
-
-    if (allResults.length === 0 && (searchType === "name" || searchType === "company" || searchType === "company_name")) {
-      const retryStrategies = [
-        { field: "input[id*='txtGSLastName']", label: "Last Name" },
-        { field: "input[id*='txtGSProjectName']", label: "Project Name" },
-        { field: "#txtSearchCondition", label: "Keyword Search" },
-      ];
-
-      for (const strategy of retryStrategies) {
-        if (allResults.length > 0) break;
-        
-        await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-        await page.waitForTimeout(4000);
-
-        const input = page.locator(strategy.field).first();
-        if (!(await input.isVisible().catch(() => false))) continue;
-        
-        const currentValue = await input.inputValue().catch(() => "");
-        if (currentValue === searchTerm) continue;
-
-        await input.fill(searchTerm);
-        log(`Accela: Retrying with ${strategy.label} field`, "scraper");
-
-        if (strategy.field === "#txtSearchCondition") {
-          await page.keyboard.press("Enter");
-        } else {
-          const retryBtn = page.locator("a[id*='btnNewSearch']").first();
-          if (await retryBtn.isVisible().catch(() => false)) {
-            await retryBtn.click();
-          } else {
-            await page.keyboard.press("Enter");
-          }
+    await submit(form);
+    // A one-record WebForms response can trigger a second navigation to CapDetail.
+    // Wait for the actual result instead of reading the transient CapHome document.
+    await page.waitForFunction(() => {
+      return !!document.querySelector("#ctl00_PlaceHolderMain_lblPermitNumber, table[id*='gdvPermitList'] [id*='lblPermitNumber']") ||
+        /no records found|no records match|no results found|search returned no results/i.test(document.body?.innerText || '');
+    }, undefined, { timeout: 15_000 });
+    const seen = new Set<string>();
+    for (let pg = 1; pg <= 100; pg++) {
+      const html = await page.content();
+      const batch = parseAccelaResults(html);
+      const fresh = batch.filter(r => !seen.has(r.permitNumber!));
+      if (batch.length && !fresh.length) throw new Error('Accela pagination repeated a page');
+      for (const r of fresh) { seen.add(r.permitNumber!); allResults.push(r); }
+      progress.resultsFound = allResults.length;
+      progress.currentPage = pg;
+      progress.totalPages = pg;
+      progress.message = `Found ${allResults.length} records; reading page ${pg}`;
+      scrapeJobs.set(jobId, { ...progress });
+      if (!batch.length) {
+        const text = cheerio.load(html)('body').text();
+        if (!/no records found|no record(s)? (were )?found|no results found|no records match|search returned no results/i.test(text)) {
+          throw new Error('Accela did not return a results grid or an explicit no-results response');
         }
-        await page.waitForTimeout(8000);
-        await parseAccelaResults();
+        break;
+      }
+      const next = page.locator("table[id*='gdvPermitList'] a, table[id*='GridView'] a").filter({ hasText: /^Next\s*>?$/ }).first();
+      if (!(await next.isVisible()) || !(await next.getAttribute('href')) || await next.getAttribute('disabled') !== null) break;
+      if (pg === 100) throw new Error('Accela search exceeds 100 pages; narrow the search');
+      const previous = batch.map(r => r.permitNumber).join('|');
+      await submit(next);
+      if (parseAccelaResults(await page.content()).map(r => r.permitNumber).join('|') === previous) {
+        throw new Error('Accela pagination did not advance');
       }
     }
-
-    progress.resultsFound = allResults.length;
-    progress.message = `Found ${allResults.length} results`;
-    scrapeJobs.set(jobId, { ...progress });
-    log(`Accela total results for "${searchTerm}" on ${databaseName}: ${allResults.length}`, "scraper");
-
-    const newFromBatch = await saveResultsBatch(allResults, databaseId, queryId);
-    totalNewResults += newFromBatch;
-    await finalizeScrape(allResults.length, totalNewResults, databaseId, databaseName, jobId, progress);
-    await closeIsolatedPage(page, context);
+    const newCount = await saveResultsBatch(allResults, databaseId, queryId);
+    await finalizeScrape(allResults.length, newCount, databaseId, databaseName, jobId, progress);
   } catch (error: any) {
-    try { if (page && context) await closeIsolatedPage(page, context); } catch {}
-    progress.status = "error";
-    progress.message = `Error: ${error.message}`;
+    // Preserve retrieved pages, but expose the incomplete search to callers.
+    if (allResults.length) await saveResultsBatch(allResults, databaseId, queryId);
+    progress.status = 'error';
+    progress.message = expired ? 'Accela search exceeded 120 seconds; narrow the search' : `Error: ${error.message}`;
     scrapeJobs.set(jobId, { ...progress });
-    log(`Accela scraper error on ${databaseName}: ${error.message}`, "scraper");
+    log(`Accela scraper error on ${databaseName}: ${progress.message}`, 'scraper');
+  } finally {
+    clearTimeout(deadline);
+    if (page && context) await closeIsolatedPage(page, context);
   }
-
   return allResults;
 }
 
@@ -1790,12 +1433,22 @@ export async function scrapeClick2Gov(
   let page: Page | null = null;
   let context: BrowserContext | null = null;
 
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  let expired = false;
   try {
     ({ page, context } = await createIsolatedPage());
+    const activeContext = context;
+    deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 90_000);
+    page.setDefaultTimeout(10_000);
 
     log(`Click2Gov: Navigating to ${searchUrl}`, "scraper");
-    await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForTimeout(4000);
+    await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    if (!(await page.locator("#searchMethod").isVisible())) {
+      const selectPermit = page.getByRole('link', { name: 'Select Permit', exact: true });
+      if (!(await selectPermit.isVisible())) throw new Error('Click2Gov public permit search is unavailable');
+      await selectPermit.click();
+    }
+    await page.locator('#searchMethod').waitFor({ state: 'visible', timeout: 10_000 });
 
     const searchMethodSelect = page.locator("#searchMethod, select[name='searchMethod']").first();
     const hasMethodDropdown = await searchMethodSelect.isVisible().catch(() => false);
@@ -1903,68 +1556,25 @@ export async function scrapeClick2Gov(
     }
     await page.waitForTimeout(3000);
 
+    // Locator.textContent() on a missing DataTables widget used to wait 30s
+    // on every poll. Wait once for an actual outcome, including plain HTML results.
+    await page.waitForFunction(() => {
+      const text = document.body?.innerText || '';
+      return !!document.querySelector('table tbody tr td a') ||
+        /no matching records|no records (to display|found)|search returned no results|no data available in table|error occurred/i.test(text) ||
+        !!document.querySelector('.dataTables_info');
+    }, undefined, { timeout: 15_000 }).catch(() => {
+      throw new Error('Click2Gov did not return permit results within 15 seconds');
+    });
+    const bodyText = await page.locator('body').innerText();
+    if (/error occurred/i.test(bodyText)) throw new Error('Click2Gov reported a portal error');
     let totalEntries = 0;
-    let waitAttempts = 0;
-    const maxWaitAttempts = 8;
-    while (waitAttempts < maxWaitAttempts) {
-      const infoText = await page.locator(".dataTables_info").first().textContent().catch(() => null);
-      if (infoText) {
-        const m = infoText.match(/of\s+(\d[\d,]*)\s+entries/i);
-        if (m) {
-          totalEntries = parseInt(m[1].replace(/,/g, ""));
-          if (totalEntries > 0) {
-            log(`Click2Gov: dataTables_info="${infoText}" -> ${totalEntries} entries`, "scraper");
-            break;
-          }
-        }
-      }
-
-      const tableRows = await page.locator("table tbody tr").count().catch(() => 0);
-      if (tableRows > 1) {
-        log(`Click2Gov: Found ${tableRows} table rows (no dataTables_info yet)`, "scraper");
-        break;
-      }
-
-      const errorAlert = await page.locator(".alert-danger, .error-message, text=/error occurred/i").first().isVisible().catch(() => false);
-      if (errorAlert) {
-        log(`Click2Gov: Error alert detected, stopping`, "scraper");
-        break;
-      }
-
-      waitAttempts++;
-      log(`Click2Gov: Waiting for results to load (attempt ${waitAttempts}/${maxWaitAttempts})...`, "scraper");
-      await page.waitForTimeout(3000);
-    }
-
-    const showingText = await page.locator(".dataTables_info, text=/Showing \\d+ to \\d+ of/").first().textContent().catch(() => null);
-    if (showingText) {
-      const match = showingText.match(/of\s+(\d[\d,]*)/);
-      if (match) {
-        totalEntries = parseInt(match[1].replace(/,/g, ""));
-        log(`Click2Gov: Found "${showingText}" -> ${totalEntries} total entries`, "scraper");
-      }
-    }
-
-    if (totalEntries === 0) {
-      const noMatchPatterns = [
-        "text=/No matching records found/i",
-        "text=/No records to display/i",
-        "text=/Your search returned no results/i",
-      ];
-      let isNoResults = false;
-      for (const pattern of noMatchPatterns) {
-        if (await page.locator(pattern).first().isVisible().catch(() => false)) {
-          isNoResults = true;
-          break;
-        }
-      }
-      const tableRows = await page.locator("table tbody tr td").count().catch(() => 0);
-      if (isNoResults || tableRows === 0) {
-        log(`Click2Gov: No results found for "${searchTerm}" (isNoResults=${isNoResults}, tableRows=${tableRows})`, "scraper");
-        await finalizeScrape(0, 0, databaseId, databaseName, jobId, progress);
-        await closeIsolatedPage(page, context);
-        return allResults;
-      }
+    const showingText = await page.locator('.dataTables_info').allTextContents();
+    const match = showingText.join(' ').match(/of\s+(\d[\d,]*)/i);
+    if (match) totalEntries = Number(match[1].replace(/,/g, ''));
+    if (/no matching records|no records (to display|found)|search returned no results|no data available in table/i.test(bodyText)) {
+      await finalizeScrape(0, 0, databaseId, databaseName, jobId, progress);
+      return allResults;
     }
 
     const lengthSelect = page.locator("select[name*='_length'], select[name$='_length'], .dataTables_length select").first();
@@ -2027,17 +1637,18 @@ export async function scrapeClick2Gov(
         }
         parsed.push(result);
       }
-      return parsed;
+      return [...new Map(parsed.map(r => [r.permitNumber, r])).values()];
     }
 
     const pageResults = await readVisibleTableRows();
+    if (!pageResults.length) throw new Error('Click2Gov results table could not be parsed');
     allResults.push(...pageResults);
     log(`Click2Gov page 1: parsed ${pageResults.length} results`, "scraper");
 
     const newFromFirstPage = await saveResultsBatch(pageResults, databaseId, queryId);
     totalNewResults += newFromFirstPage;
 
-    const updatedShowingText = await page.locator(".dataTables_info, text=/Showing \\d+ to \\d+ of \\d+/").first().textContent().catch(() => null);
+    const updatedShowingText = (await page.locator(".dataTables_info").allTextContents()).join(" ");
     if (updatedShowingText) {
       const m = updatedShowingText.match(/of (\d+)/);
       if (m) {
@@ -2046,7 +1657,7 @@ export async function scrapeClick2Gov(
       }
     }
 
-    const hasNextBtn = await page.locator(".dataTables_paginate a.next:not(.disabled), .dataTables_paginate a:has-text('Next'):not(.disabled), a.paginate_button.next:not(.disabled), .pagination a:has-text('Next')").first().isVisible().catch(() => false);
+    const hasNextBtn = await page.locator(".dataTables_paginate li.next:not(.disabled) a, .dataTables_paginate > a.next:not(.disabled), a.paginate_button.next:not(.disabled)").first().isVisible().catch(() => false);
     const hasPaginationLinks = totalEntries > allResults.length || hasNextBtn;
 
     if (hasPaginationLinks && pageResults.length > 0) {
@@ -2060,9 +1671,9 @@ export async function scrapeClick2Gov(
       let consecutiveEmpty = 0;
       for (let pg = 2; pg <= totalPages; pg++) {
         try {
-          const prevShowingText = await page.locator(".dataTables_info").first().textContent().catch(() => "");
+          const prevShowingText = (await page.locator(".dataTables_info").allTextContents()).join(" ");
 
-          const nextBtn = page.locator(".dataTables_paginate a.next:not(.disabled), .dataTables_paginate a:has-text('Next'):not(.disabled), a.paginate_button.next:not(.disabled)").first();
+          const nextBtn = page.locator(".dataTables_paginate li.next:not(.disabled) a, .dataTables_paginate > a.next:not(.disabled), a.paginate_button.next:not(.disabled)").first();
           const pageLink = page.locator(`.dataTables_paginate a.paginate_button:has-text("${pg}"), .dataTables_paginate span a:has-text("${pg}")`).first();
 
           if (await pageLink.isVisible().catch(() => false)) {
@@ -2117,7 +1728,7 @@ export async function scrapeClick2Gov(
           log(`Click2Gov page ${pg}: parsed ${pgResults.length} rows, ${newResults.length} new (${allResults.length} total)`, "scraper");
         } catch (pgErr: any) {
           log(`Click2Gov pagination error on page ${pg}: ${pgErr.message}`, "scraper");
-          break;
+          throw pgErr;
         }
       }
     }
@@ -2128,13 +1739,14 @@ export async function scrapeClick2Gov(
     log(`Click2Gov total results for "${searchTerm}" on ${databaseName}: ${allResults.length}`, "scraper");
 
     await finalizeScrape(allResults.length, totalNewResults, databaseId, databaseName, jobId, progress);
-    await closeIsolatedPage(page, context);
   } catch (error: any) {
-    try { if (page && context) await closeIsolatedPage(page, context); } catch {}
     progress.status = "error";
-    progress.message = `Error: ${error.message}`;
+    progress.message = expired ? "Click2Gov search exceeded 90 seconds; narrow the search" : `Error: ${error.message}`;
     scrapeJobs.set(jobId, { ...progress });
     log(`Click2Gov scraper error on ${databaseName}: ${error.message}`, "scraper");
+  } finally {
+    clearTimeout(deadline);
+    if (page && context) await closeIsolatedPage(page, context);
   }
 
   return allResults;
