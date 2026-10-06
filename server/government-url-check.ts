@@ -1,7 +1,60 @@
 import * as cheerio from 'cheerio';
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+/**
+ * Real-browser fallback for batch checks (GOV_FETCH_BROWSER=1; scripts only — no request path uses this file).
+ * Many small-government sites answer a plain fetch with a bot wall (403, Cloudflare "Just a moment", SiteGround's
+ * 202 captcha) yet open fine in a browser. When the plain fetch is blocked, the same URL is opened in headless
+ * Chromium (playwright-core, the browser the prerender uses). Dead answers (DNS gone, 404/410) never fall back.
+ * One shared browser per process; it closes itself after 20 s idle so scripts still exit.
+ */
+let browserPromise: Promise<any> | null = null;
+let idleTimer: NodeJS.Timeout | null = null;
+async function browser() {
+  browserPromise ??= import("playwright-core").then(({ chromium }) => chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined }));
+  return browserPromise;
+}
+function scheduleClose() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => { const b = browserPromise; browserPromise = null; b?.then((x) => x.close()).catch(() => {}); }, 20_000);
+  idleTimer.unref();
+}
+const BLOCKED_TEXT = /just a moment|access denied|verify you are human|attention required|request rejected|checking your browser|captcha/i;
+export function looksBlocked(r: any): boolean {
+  if (!r) return true;
+  if (r.error) return !governmentFailureIsDead(r.error);
+  if ([202, 401, 403, 406, 429, 503].includes(r.httpStatus)) return true;
+  return r.httpStatus >= 200 && r.httpStatus < 300 && String(r.html).length < 20_000 && BLOCKED_TEXT.test(String(r.html).slice(0, 5000));
+}
+export async function fetchWithBrowser(url: string): Promise<any> {
+  const b = await browser();
+  const ctx = await b.newContext({ userAgent: UA, locale: "en-US", viewport: { width: 1280, height: 900 } });
+  try {
+    const page = await ctx.newPage();
+    const res = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    // Bot walls usually clear themselves within a few seconds in a real browser.
+    for (let i = 0; i < 8 && BLOCKED_TEXT.test(await page.title().catch(() => "")); i++) await page.waitForTimeout(2000);
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+    const html = (await page.content()).slice(0, 2_000_000);
+    const blockedStill = BLOCKED_TEXT.test((await page.title().catch(() => "")) + html.slice(0, 3000)) && html.length < 20_000;
+    return { finalUrl: page.url(), httpStatus: blockedStill ? (res?.status() ?? 403) : 200, html, attempts: 1, via: "browser" };
+  } catch (e: any) {
+    return { finalUrl: null, httpStatus: null, html: "", attempts: 1, error: String(e?.message ?? e).match(/net::(ERR_[A-Z_]+)/)?.[1] ?? "browser timeout", via: "browser" };
+  } finally {
+    await ctx.close().catch(() => {});
+    scheduleClose();
+  }
+}
+
 export async function fetchGovernmentPage(url: string): Promise<any> {
+  const plain = await fetchPlain(url);
+  if (process.env.GOV_FETCH_BROWSER !== "1" || !looksBlocked(plain)) return plain;
+  const viaBrowser = await fetchWithBrowser(url);
+  // 202 is SiteGround's captcha answer, not a page: only a real 2xx page counts as rescued.
+  return viaBrowser.httpStatus >= 200 && viaBrowser.httpStatus < 300 && viaBrowser.httpStatus !== 202 ? viaBrowser : plain;
+}
+
+async function fetchPlain(url: string): Promise<any> {
   let last: any;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
