@@ -30,7 +30,20 @@ export async function syncPermitPortals(portals: PermitPortal[]) {
   for (const p of portals) {
     // permit_databases.jurisdiction is "City, ST" for cities and "Name County, ST"
     // for counties — the string alone identifies the row, so match on it directly.
-    const matches = await tx.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, p.jurisdiction));
+    let matches = await tx.select().from(permitDatabases).where(eq(permitDatabases.jurisdiction, p.jurisdiction));
+    if (!matches.length && p.url && !/ County, [A-Z]{2}$/.test(p.jurisdiction)) {
+      // The directory's city rows carry postal spellings ("Mckinney, TX", "Coeur D Alene, ID", "Saint Charles, MO");
+      // the portal file the proper ones. Exactly one city row with the same letters is the same place: apply the
+      // portal and give the row its proper name.
+      const loose = (j: string) => j.toLowerCase().replace(/\bsaint\b/g, "st").replace(/[^a-z0-9]/g, "");
+      const state = p.jurisdiction.slice(-2);
+      const same = (await tx.select().from(permitDatabases).where(and(eq(permitDatabases.jurisdictionType, "city"),
+        sql`right(${permitDatabases.jurisdiction}, 2) = ${state}`, sql`lower(regexp_replace(regexp_replace(${permitDatabases.jurisdiction}, '\\mSaint\\M', 'St', 'gi'), '[^A-Za-z0-9]', '', 'g')) = ${loose(p.jurisdiction)}`)));
+      if (same.length === 1) {
+        await tx.update(permitDatabases).set({ jurisdiction: p.jurisdiction, name: p.jurisdiction }).where(eq(permitDatabases.id, same[0].id));
+        matches = [{ ...same[0], jurisdiction: p.jurisdiction }];
+      }
+    }
     const values = {
       portalUrl: p.url,
       searchUrl: p.url,

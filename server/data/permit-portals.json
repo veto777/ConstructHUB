@@ -14271,15 +14271,6 @@
     "lastVerifiedAt": "2026-10-05T00:50:15.975Z"
   },
   {
-    "jurisdiction": "Carson County, NV",
-    "url": "https://energovweb.carsoncity.gov/EnerGovProd/SelfService#/home",
-    "platform": "Tyler EnerGov Self Service",
-    "sourceUrl": "https://www.carsoncity.gov/government/departments-a-f/community-development/building-division",
-    "candidateUrl": "https://energovweb.carsoncity.gov/EnerGovProd/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:53:18.881Z"
-  },
-  {
     "jurisdiction": "Carson, CA",
     "url": "https://cityofcarsonca-energovweb.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov Self Service",
@@ -19024,15 +19015,6 @@
     "lastVerifiedAt": "2026-10-06T01:05:41.130Z"
   },
   {
-    "jurisdiction": "Coeur D Alene, ID",
-    "url": "https://building.cdaid.org/",
-    "platform": "City-built online permits",
-    "sourceUrl": "https://www.cdaid.org/government/departments/building-services/online-permits-access/",
-    "candidateUrl": "https://building.cdaid.org/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:53:37.419Z"
-  },
-  {
     "jurisdiction": "Coeur d'Alene, ID",
     "url": "https://building.cdaid.org/Permit/Search.aspx",
     "platform": "eTRAKiT",
@@ -23453,11 +23435,12 @@
   },
   {
     "jurisdiction": "DeSoto, TX",
-    "url": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
-    "platform": "Tyler EnerGov SelfService",
-    "candidateUrl": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:22.824Z"
+    "url": "https://www.desototexas.gov/474/Permit-Application-Submission",
+    "platform": "City permits page",
+    "sourceUrl": "https://www.desototexas.gov/462/Building-Inspections",
+    "candidateUrl": "https://www.desototexas.gov/474/Permit-Application-Submission",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:11.220Z"
   },
   {
     "jurisdiction": "DeWitt County, TX",
@@ -24457,15 +24440,6 @@
     "candidateUrl": "https://www.desloge-mo.gov/building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T04:29:34.154Z"
-  },
-  {
-    "jurisdiction": "Desoto, TX",
-    "url": "https://www.desototexas.gov/474/Permit-Application-Submission",
-    "platform": "City permits page",
-    "sourceUrl": "https://www.desototexas.gov/462/Building-Inspections",
-    "candidateUrl": "https://www.desototexas.gov/474/Permit-Application-Submission",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:11.220Z"
   },
   {
     "jurisdiction": "Destin, FL",
@@ -51813,11 +51787,12 @@
   },
   {
     "jurisdiction": "Lee's Summit, MO",
-    "url": "https://devservices.cityofls.net/Permit/Locator",
-    "platform": null,
-    "candidateUrl": "https://devservices.cityofls.net/Permit/Locator",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:39.624Z"
+    "url": "https://cityview2.iharriscomputer.com/leessummitmoportal/",
+    "platform": "CityView Online Portal",
+    "sourceUrl": "https://cityofls.net/development-services/construction/permits",
+    "candidateUrl": "https://cityview2.iharriscomputer.com/leessummitmoportal/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T01:00:44.939Z"
   },
   {
     "jurisdiction": "Lee, IL",
@@ -51890,15 +51865,6 @@
     "candidateUrl": "https://bsaonline.com/?uid=828",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:34.949Z"
-  },
-  {
-    "jurisdiction": "Lees Summit, MO",
-    "url": "https://cityview2.iharriscomputer.com/leessummitmoportal/",
-    "platform": "CityView Online Portal",
-    "sourceUrl": "https://cityofls.net/development-services/construction/permits",
-    "candidateUrl": "https://cityview2.iharriscomputer.com/leessummitmoportal/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T01:00:44.939Z"
   },
   {
     "jurisdiction": "Leesburg, FL",
@@ -58609,15 +58575,6 @@
     "lastVerifiedAt": "2026-10-06T01:09:05.364Z"
   },
   {
-    "jurisdiction": "Mcallen, TX",
-    "url": "https://onlinepermits.mcallen.net/Portal/Default.aspx",
-    "platform": "City portal",
-    "sourceUrl": "https://www.mcallen.net/departments/permits",
-    "candidateUrl": "https://onlinepermits.mcallen.net/portal/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:52:43.674Z"
-  },
-  {
     "jurisdiction": "Mccall, ID",
     "url": "https://app.govwell.com/mccall-id",
     "platform": "GovWell",
@@ -58690,15 +58647,6 @@
     "lastVerifiedAt": "2026-10-05T03:53:20.288Z"
   },
   {
-    "jurisdiction": "Mckinney, TX",
-    "url": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
-    "platform": "Tyler EnerGov Self Service",
-    "sourceUrl": "https://www.mckinneytexas.org/165/Permits",
-    "candidateUrl": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:52:44.170Z"
-  },
-  {
     "jurisdiction": "Mcloud, OK",
     "url": null,
     "platform": null,
@@ -58724,15 +58672,6 @@
     "candidateUrl": "https://www.mcminnvilletn.gov/departments/community_development/index.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:15.352Z"
-  },
-  {
-    "jurisdiction": "Mcpherson, KS",
-    "url": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
-    "platform": "CivicPlus FormCenter (online building permit application)",
-    "sourceUrl": "https://www.mcpcity.com/309/Building-Permits",
-    "candidateUrl": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:38.938Z"
   },
   {
     "jurisdiction": "Mcville, ND",
@@ -68127,21 +68066,13 @@
     "lastVerifiedAt": "2026-10-05T00:59:50.139Z"
   },
   {
-    "jurisdiction": "O Fallon, MO",
+    "jurisdiction": "O'Fallon, MO",
     "url": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=192",
     "platform": "Citizenserve",
     "sourceUrl": "https://www.ofallonmo.gov/departments/building_and_permits.php",
     "candidateUrl": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=192",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T01:00:46.103Z"
-  },
-  {
-    "jurisdiction": "O'Fallon, MO",
-    "url": "https://www6.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=192",
-    "platform": null,
-    "candidateUrl": "https://www6.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=192",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:50:51.882Z"
   },
   {
     "jurisdiction": "Oak Bluffs, MA",
@@ -81596,15 +81527,6 @@
     "lastVerifiedAt": "2026-10-05T22:10:05.109Z"
   },
   {
-    "jurisdiction": "Saint Charles, MO",
-    "url": "https://cityofstcharlesmo-energovweb.tylerhost.net/apps/selfservice#/home",
-    "platform": "Tyler EnerGov Self Service",
-    "sourceUrl": "https://www.stcharlescitymo.gov/943/Permits-Development-Submittals",
-    "candidateUrl": "https://cityofstcharlesmo-energovweb.tylerhost.net/apps/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T01:00:46.088Z"
-  },
-  {
     "jurisdiction": "Saint Clair Shores, MI",
     "url": "https://bsaonline.com/CD_MdbPermitApplication/PermitApplication?permitApplicationSessionGuid=4eba43fb-4b31-428e-ad12-7cadf6bda3c2&uid=261",
     "platform": "BS&A Online",
@@ -81875,15 +81797,6 @@
     "lastVerifiedAt": "2026-10-05T02:55:04.333Z"
   },
   {
-    "jurisdiction": "Saint Louis Park, MN",
-    "url": "https://epermits.logis.org/home.aspx?city=sl",
-    "platform": "LOGIS ePermits",
-    "sourceUrl": "https://www.stlouisparkmn.gov/Services/Permits",
-    "candidateUrl": "https://epermits.logis.org/home.aspx?city=sl",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T01:00:49.657Z"
-  },
-  {
     "jurisdiction": "Saint Louis, MI",
     "url": "https://www.stlouismi.com/government/community-services/",
     "platform": "City community services (building permits) page",
@@ -81891,15 +81804,6 @@
     "candidateUrl": "https://www.stlouismi.com/government/community-services/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:41.033Z"
-  },
-  {
-    "jurisdiction": "Saint Louis, MO",
-    "url": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/building-permits/building-permit.cfm",
-    "platform": "Apply for a Building Permit page",
-    "sourceUrl": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/index.cfm",
-    "candidateUrl": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/building-permits/building-permit.cfm",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:55:05.824Z"
   },
   {
     "jurisdiction": "Saint Maries, ID",
@@ -88711,17 +88615,19 @@
     "jurisdiction": "St. Louis Park, MN",
     "url": "https://epermits.logis.org/home.aspx?city=sl",
     "platform": "LOGIS ePermits",
+    "sourceUrl": "https://www.stlouisparkmn.gov/Services/Permits",
     "candidateUrl": "https://epermits.logis.org/home.aspx?city=sl",
     "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:51:12.882Z"
+    "lastVerifiedAt": "2026-10-05T01:00:49.657Z"
   },
   {
     "jurisdiction": "St. Louis, MO",
-    "url": "https://www.stlcitypermits.com/",
-    "platform": null,
-    "candidateUrl": "https://www.stlcitypermits.com/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:51:13.023Z"
+    "url": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/building-permits/building-permit.cfm",
+    "platform": "Apply for a Building Permit page",
+    "sourceUrl": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/index.cfm",
+    "candidateUrl": "https://www.stlouis-mo.gov/government/departments/public-safety/building/permits/building-permits/building-permit.cfm",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:55:05.824Z"
   },
   {
     "jurisdiction": "St. Lucie County, FL",
