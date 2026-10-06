@@ -3,12 +3,16 @@ import { counties, permitDatabases } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { seedExpandedStates } from "./seed-all-states";
 import { seedAllCounties } from "./seed-all-counties";
+import { pool } from "./db";
 import { seedAllCities, repairSeededPermitRows } from "./seed-all-cities";
 import { seedAllAppraisers } from "./seed-all-appraisers";
 import { seedPermitPortals } from "./seed-permit-portals";
 import { seedReferenceData } from "./seed-reference-data";
 
 export async function seedDatabase() {
+  // Columns the Drizzle schema selects must exist before any query touches permit_databases.
+  const { ROUTING_DDL } = await import("./seed-permit-routing");
+  await pool.query(ROUTING_DDL);
   await seedReferenceData();
 
   const existing = await db.select().from(counties);
@@ -37,6 +41,13 @@ export async function seedDatabase() {
     }
     await seedAllAppraisers();
     await seedPermitPortals();
+    try {
+      const { seedPermitRouting } = await import("./seed-permit-routing");
+      const r = await seedPermitRouting();
+      if (r.set || r.cleared) console.log("County permit links applied:", JSON.stringify(r));
+    } catch (err: any) {
+      console.error("County permit links failed (will retry on next boot):", err?.message || err);
+    }
     return;
   }
   if (existing.length > 0 && existing.length < 3000) {

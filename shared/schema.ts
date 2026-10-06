@@ -58,6 +58,11 @@ export const permitDatabases = pgTable("permit_databases", {
   // Actual last check (including inconclusive checks), never the seeding time.
   lastVerifiedAt: timestamp("last_verified_at"),
   notes: text("notes"),
+  // A town with no permit office of its own: the county row (jurisdiction) that issues its building permits, the
+  // official page that says so and a quote from it (server/seed-permit-routing.ts).
+  issuedBy: text("issued_by"),
+  issuedBySource: text("issued_by_source"),
+  issuedByQuote: text("issued_by_quote"),
 });
 
 export const searchQueries = pgTable("search_queries", {

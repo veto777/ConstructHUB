@@ -463,7 +463,21 @@ export async function registerRoutes(
           limit: Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? ""), 10) || 25)),
         };
         const result = await storage.getDatabasesFiltered(params);
-        res.json({ ...result, databases: result.databases.map(governmentPermitForDisplay) });
+        // Towns whose county issues their building permits (seed-permit-routing.ts): attach that county's portal,
+        // through the same display rules as any portal (an unavailable link is never shown).
+        const issuerKeys = Array.from(new Set(result.databases.map((d) => d.issuedBy).filter((k): k is string => !!k)));
+        const issuers = issuerKeys.length
+          ? await db.select().from(permitDatabases).where(and(inArray(permitDatabases.jurisdiction, issuerKeys), eq(permitDatabases.jurisdictionType, "county")))
+          : [];
+        const issuerBy = new Map(issuers.map((r) => [r.jurisdiction, governmentPermitForDisplay(r)]));
+        res.json({ ...result, databases: result.databases.map((d) => {
+          const shown = governmentPermitForDisplay(d);
+          const issuer = d.issuedBy ? issuerBy.get(d.issuedBy) : undefined;
+          const issuedByPortal = issuer && governmentLinksAvailable(issuer) && (issuer.portalUrl || issuer.searchUrl)
+            ? { jurisdiction: issuer.jurisdiction, portalUrl: issuer.portalUrl, searchUrl: issuer.searchUrl, linkStatus: issuer.linkStatus }
+            : null;
+          return { ...shown, issuedByPortal };
+        }) });
       } else if (req.query.searchable === "true" || req.query.scrapable === "true") {
         // Only portals with a verified live link AND a live-search adapter — the
         // ones a search or a refresh schedule can actually run against (the

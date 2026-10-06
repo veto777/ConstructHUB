@@ -23,6 +23,9 @@ import { OPS_ISSUES_DDL } from "../server/ops/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
+  `ALTER TABLE permit_databases ADD COLUMN IF NOT EXISTS issued_by text`,
+  `ALTER TABLE permit_databases ADD COLUMN IF NOT EXISTS issued_by_source text`,
+  `ALTER TABLE permit_databases ADD COLUMN IF NOT EXISTS issued_by_quote text`,
   `ALTER TABLE property_appraisers ALTER COLUMN portal_url DROP NOT NULL`,
   `ALTER TABLE property_appraisers ALTER COLUMN search_url DROP NOT NULL`,
   `ALTER TABLE property_appraisers ALTER COLUMN platform  DROP NOT NULL`,

@@ -50,6 +50,8 @@ export interface PermitDirectoryCounts {
   withPortal: number;
   verifiedPortals: number;
   searchable: number;
+  /** Towns with no portal of their own whose county issues their permits (linked to the county's portal). */
+  viaCounty: number;
 }
 
 // Admin LSA registry search: matches the manager-accounts search box on the
@@ -313,7 +315,13 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(permitDatabases.isActive, true), isNotNull(permitDatabases.platform), sql`${link} is not null`));
     const searchable = candidates.filter(row => governmentLinksAvailable(row) && canScrapeGovernmentPortal(row)).length;
 
-    return { total, county, city, withPortal, verifiedPortals, searchable };
+    const via = await db.execute(sql`select count(*)::int as n from ${permitDatabases} t
+      join ${permitDatabases} c on c.jurisdiction = t.issued_by and c.jurisdiction_type = 'county'
+      where t.issued_by is not null and coalesce(nullif(t.portal_url, ''), nullif(t.search_url, '')) is null
+        and c.is_active and c.link_status in ('live', 'verified', 'unconfirmed')
+        and coalesce(nullif(c.portal_url, ''), nullif(c.search_url, '')) is not null`);
+    const viaCounty = Number((via.rows[0] as any)?.n ?? 0);
+    return { total, county, city, withPortal, verifiedPortals, searchable, viaCounty };
   }
 
   async createDatabase(data: InsertPermitDatabase): Promise<PermitDatabase> {

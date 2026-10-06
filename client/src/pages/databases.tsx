@@ -55,6 +55,7 @@ interface DbCounts {
   city: number;
   /** Rows with a usable official portal link — shown only when the server reports it. */
   withPortal?: number;
+  viaCounty?: number;
 }
 
 /** Old seeders wrote this line into every placeholder row; it is a template, not a source. */
@@ -195,7 +196,7 @@ export default function DatabasesPage() {
             value={counts.total.toLocaleString()}
             testId="text-database-count"
             hint={typeof counts.withPortal === "number" ? (
-              <span data-testid="text-portal-count">{counts.withPortal.toLocaleString()} with a permit portal on record</span>
+              <span data-testid="text-portal-count">{counts.withPortal.toLocaleString()} with a permit portal on record{counts.viaCounty ? <>, {counts.viaCounty.toLocaleString()} through their county</> : null}</span>
             ) : undefined}
           />
           <Stat label="Counties" value={counts.county.toLocaleString()} />
@@ -391,6 +392,8 @@ function PaginationControls({
   );
 }
 
+type IssuedByPortal = { jurisdiction: string; portalUrl: string | null; searchUrl: string | null; linkStatus: string | null };
+
 function DatabaseCard({ database, countyName }: { database: PermitDatabase; countyName?: string }) {
   // "Acadia Parish", "Kusilvak Census Area", "City of Alexandria" — not every county-equivalent is a "County".
   const stateCode = /, ([A-Z]{2})$/.exec(database.jurisdiction)?.[1] ?? "";
@@ -398,6 +401,9 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
   // "Active", searchable fields and notes describe a portal; a jurisdiction with no
   // usable portal on record gets none of them (never a templated placeholder).
   const hasPortal = governmentLinksAvailable(database) && !!(database.portalUrl || database.searchUrl);
+  // No permit office of its own, and an official page shows the county issues its permits (seed-permit-routing.ts).
+  const viaCounty = !hasPortal ? (database as PermitDatabase & { issuedByPortal?: IssuedByPortal | null }).issuedByPortal ?? null : null;
+  const viaCountyName = viaCounty?.jurisdiction.replace(/, [A-Z]{2}$/, "");
   const notes = database.notes && !SEEDED_PLACEHOLDER_NOTE.test(database.notes) ? database.notes : null;
   // Seeded placeholders were titled "City of X" / "X County Building Department" — an
   // office nobody verified. Without a portal, name the place itself.
@@ -419,6 +425,11 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
                 <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" data-testid={`status-portal-${database.id}`}>
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
                   Active
+                </span>
+              ) : viaCounty ? (
+                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" data-testid={`status-portal-${database.id}`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+                  Through {viaCountyName}
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" data-testid={`status-portal-${database.id}`}>
@@ -477,9 +488,36 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
               Search
             </a>
           )}
+          {/* The county issues this town's building permits: its portal, and the official page that says so. */}
+          {viaCounty && (
+            <>
+              <a
+                href={(viaCounty.portalUrl || viaCounty.searchUrl)!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 font-medium text-foreground hover:underline transition-colors"
+                data-testid={`link-county-portal-${database.id}`}
+              >
+                <ExternalLink className="h-3 w-3" />
+                {viaCountyName} permit portal
+              </a>
+              {database.issuedBySource && (
+                <a
+                  href={database.issuedBySource}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  title={database.issuedByQuote ? `“${database.issuedByQuote}”` : undefined}
+                  data-testid={`link-county-source-${database.id}`}
+                >
+                  Source: permits issued by {viaCountyName}
+                </a>
+              )}
+            </>
+          )}
           {/* No official portal on record: offer an honest web search rather than a
               fabricated link. Clearly labeled and styled as a "find", not a portal. */}
-          {(!governmentLinksAvailable(database) || (!database.portalUrl && !database.searchUrl)) && (
+          {!viaCounty && (!governmentLinksAvailable(database) || (!database.portalUrl && !database.searchUrl)) && (
             <a
               href={`https://www.google.com/search?q=${encodeURIComponent(`${database.jurisdiction} building permit search portal`)}`}
               target="_blank"
