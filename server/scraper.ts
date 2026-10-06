@@ -778,6 +778,16 @@ function extractEnerGovAddress(item: any): string | null {
   return typeof raw === "string" ? raw : null;
 }
 
+// Shared portal hosts (aca-prod.accela.com, tylerhost.net) answer the odd request with a momentary 502/503/504.
+// One retry keeps a daily schedule from missing its day over a blip; a portal that stays down still fails.
+async function gotoRetryingGatewayErrors(page: Page, url: string) {
+  const open = () => page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+  const first = await open();
+  if (!first || ![502, 503, 504].includes(first.status())) return first;
+  await page.waitForTimeout(5_000);
+  return open();
+}
+
 export function enerGovApplicationUrl(searchUrl: string): string {
   const url = new URL(searchUrl);
   const match = url.pathname.match(/^(.*\/selfservice)(?:\/|$)/i);
@@ -888,7 +898,7 @@ export async function scrapeEnerGov(
     });
     const url = new URL(portalSearchUrl);
     url.hash = '/search';
-    const landing = await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    const landing = await gotoRetryingGatewayErrors(page, url.href);
     if (landing && !landing.ok()) throw new Error(`EnerGov portal returned HTTP ${landing.status()}`);
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
     await page.locator('#SearchModule option').filter({ hasText: /^Permit$/ }).waitFor({ state: 'attached' });
@@ -1242,7 +1252,7 @@ export async function scrapeAccela(
     const activeContext = context;
     deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 120_000);
     page.setDefaultTimeout(15_000);
-    const landing = await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    const landing = await gotoRetryingGatewayErrors(page, searchUrl);
     if (landing && !landing.ok()) throw new Error(`Accela portal returned HTTP ${landing.status()}`);
     const target = accelaSearchUrl(searchUrl, await page.content());
     if (page.url() !== target) {
