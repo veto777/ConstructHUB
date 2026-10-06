@@ -118,6 +118,9 @@ const CONCURRENCY = Math.max(1, Math.min(48, Number(process.env.PERMIT_BUILD_CON
 // PERMIT_BUILD_ONLY_NEW=1: keep the shipped entries as they are and check only the new candidates (a large discovery
 // batch right after a full re-check); the default re-checks everything.
 const ONLY_NEW = process.env.PERMIT_BUILD_ONLY_NEW === "1";
+// PERMIT_BUILD_UPGRADE_UNCONFIRMED=1 (with ONLY_NEW): also re-check shipped "unconfirmed" entries — best run with
+// GOV_FETCH_BROWSER=1 — and keep the result only when it is now "verified"; anything else leaves the entry as it was.
+const UPGRADE_UNCONFIRMED = process.env.PERMIT_BUILD_UPGRADE_UNCONFIRMED === "1";
 import { classifySourceListedLink } from "../server/government-link-policy";
 import { fetchGovernmentPage, classifyGovernmentPage } from "../server/government-url-check";
 
@@ -136,7 +139,8 @@ async function main() {
   await Promise.all(Array.from({ length: CONCURRENCY }, async () => {
     while (idx < merged.length) {
       const index = idx++; const c = merged[index];
-      if (ONLY_NEW && index < existing.length) { results[index] = c; continue; }
+      const upgrading = UPGRADE_UNCONFIRMED && index < existing.length && c.url && c.linkStatus === "unconfirmed";
+      if (ONLY_NEW && index < existing.length && !upgrading) { results[index] = c; continue; }
       const candidateUrl = c.url || c.candidateUrl;
       if (!candidateUrl) { results[index] = c; continue; }
       let sourceVerified = existing.some(e => e.jurisdiction === c.jurisdiction);
@@ -158,6 +162,7 @@ async function main() {
         { ...check, httpStatus: response.httpStatus, finalUrl: response.finalUrl, jurisdictionMatched: identity },
         { state: c.jurisdiction.slice(-2), jurisdiction: name, sourceListed: true }) : "none";
       const available = status === "verified" || status === "unconfirmed";
+      if (upgrading && status !== "verified") { results[index] = c; continue; }   // never downgrade in an upgrade pass
       results[index] = { ...c, url: available ? (status === "verified" ? response.finalUrl : candidateUrl) : null,
         candidateUrl, platform: available ? c.platform : null, linkStatus: status, lastVerifiedAt: new Date().toISOString() };
     }

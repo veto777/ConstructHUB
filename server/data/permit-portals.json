@@ -125,7 +125,7 @@
     "lastVerifiedAt": "2026-10-05T02:58:10.308Z"
   },
   {
-    "jurisdiction": "Acadia County, LA",
+    "jurisdiction": "Acadia Parish, LA",
     "url": "https://acadiaparish.portal.iworq.net/portalhome/acadiaparish",
     "platform": "iWorQ",
     "sourceUrl": "https://appj.org/building-permits/",
@@ -1026,7 +1026,7 @@
     "lastVerifiedAt": "2026-10-05T02:57:05.862Z"
   },
   {
-    "jurisdiction": "Aleutians East County, AK",
+    "jurisdiction": "Aleutians East Borough, AK",
     "url": "https://www.aleutianseast.org/services/permitting/",
     "platform": "Building department permit page",
     "sourceUrl": "https://www.aleutianseast.org/",
@@ -1069,15 +1069,6 @@
     "candidateUrl": "https://townofalexanderny.gov/code-enforcement.html",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:06:55.059Z"
-  },
-  {
-    "jurisdiction": "Alexandria County, VA",
-    "url": "https://apex.alexandriava.gov/EnerGov_Prod/SelfService#/home",
-    "platform": "EnerGov CSS (APEX) (independent city)",
-    "sourceUrl": "https://www.alexandriava.gov/Permits",
-    "candidateUrl": "https://apex.alexandriava.gov/EnerGov_Prod/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.909Z"
   },
   {
     "jurisdiction": "Alexandria, IN",
@@ -1329,7 +1320,7 @@
     "lastVerifiedAt": "2026-10-05T04:29:38.050Z"
   },
   {
-    "jurisdiction": "Allen County, LA",
+    "jurisdiction": "Allen Parish, LA",
     "url": "https://www.allenparishpolicejury.com/residents/index.php",
     "platform": "Parish permits & buildings page",
     "sourceUrl": "https://www.allenparishpolicejury.com/",
@@ -2035,7 +2026,7 @@
     "lastVerifiedAt": "2026-10-05T03:53:41.623Z"
   },
   {
-    "jurisdiction": "Anchorage, AK",
+    "jurisdiction": "Anchorage Municipality, AK",
     "url": "https://www.muni.org/Departments/OCPD/development-services/permits-inspections/Pages/Permits.aspx",
     "platform": "Municipality building permits page",
     "sourceUrl": "https://www.muni.org/Departments/OCPD/development-services/permits-inspections/Pages/default.aspx",
@@ -3086,7 +3077,7 @@
     "lastVerifiedAt": "2026-10-05T04:29:33.304Z"
   },
   {
-    "jurisdiction": "Ascension County, LA",
+    "jurisdiction": "Ascension Parish, LA",
     "url": "https://mgoconnect.org/cp?JID=26&PID=3&AddToExisting=false&CPSectionID=1",
     "platform": "MGO Connect",
     "sourceUrl": "https://www.ascensionparish.net/departments/building/permitting",
@@ -3418,7 +3409,7 @@
     "lastVerifiedAt": "2026-10-05T23:15:20.439Z"
   },
   {
-    "jurisdiction": "Assumption County, LA",
+    "jurisdiction": "Assumption Parish, LA",
     "url": "https://www.assumptionla.com/161/Parish-Permit-Office",
     "platform": "Parish permit office page (no online portal)",
     "sourceUrl": "https://www.assumptionla.com/151/Departments",
@@ -4455,7 +4446,7 @@
     "lastVerifiedAt": "2026-10-05T22:07:00.408Z"
   },
   {
-    "jurisdiction": "Avoyelles County, LA",
+    "jurisdiction": "Avoyelles Parish, LA",
     "url": "https://www.avoypj.org/about-6-2",
     "platform": "Parish permits page (no online portal)",
     "sourceUrl": "https://www.avoypj.org/",
@@ -7568,7 +7559,7 @@
     "lastVerifiedAt": "2026-10-05T00:52:25.654Z"
   },
   {
-    "jurisdiction": "Bethel County, AK",
+    "jurisdiction": "Bethel Census Area, AK",
     "url": "https://bethelrequests.portal.iworq.net/portalhome/bethelrequests",
     "platform": "iWorQ",
     "sourceUrl": "https://www.cityofbethel.org/",
@@ -9259,7 +9250,7 @@
     "lastVerifiedAt": "2026-10-05T00:50:13.699Z"
   },
   {
-    "jurisdiction": "Bossier County, LA",
+    "jurisdiction": "Bossier Parish, LA",
     "url": "https://www.bossierparishla.gov/residents/parish-building-permits",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.bossierparishla.gov/",
@@ -10575,22 +10566,13 @@
     "lastVerifiedAt": "2026-10-05T02:53:30.340Z"
   },
   {
-    "jurisdiction": "Bristol Bay County, AK",
+    "jurisdiction": "Bristol Bay Borough, AK",
     "url": "https://www.bristolbayboroughak.us/departments/planning___zoning/planning___zoning_forms.php",
     "platform": "Borough development permits page",
     "sourceUrl": "https://www.bristolbayboroughak.us/",
     "candidateUrl": "https://www.bristolbayboroughak.us/departments/planning___zoning/planning___zoning_forms.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:16.363Z"
-  },
-  {
-    "jurisdiction": "Bristol County, VA",
-    "url": "https://www.bristolva.gov/97/Permits",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://www.bristolva.gov/27/Departments",
-    "candidateUrl": "https://www.bristolva.gov/97/Permits",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:48.006Z"
   },
   {
     "jurisdiction": "Bristol, CT",
@@ -11619,15 +11601,6 @@
     "lastVerifiedAt": "2026-10-05T23:15:32.678Z"
   },
   {
-    "jurisdiction": "Buena Vista County, VA",
-    "url": "https://buenavistava.portal.iworq.net/portalhome/buenavistava",
-    "platform": "iWorQ (independent city)",
-    "sourceUrl": "https://buenavistava.gov/government/departments/community-development/building-inspections/",
-    "candidateUrl": "https://buenavistava.portal.iworq.net/portalhome/buenavistava",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.008Z"
-  },
-  {
     "jurisdiction": "Buena Vista, GA",
     "url": "https://www.cityofbuenavista.org/licenses-and-permits/building-permit/",
     "platform": "City building permit page",
@@ -12604,7 +12577,7 @@
     "lastVerifiedAt": "2026-10-05T00:53:16.701Z"
   },
   {
-    "jurisdiction": "Calcasieu County, LA",
+    "jurisdiction": "Calcasieu Parish, LA",
     "url": "https://www.calcasieu.gov/services/planning-development/building-permits",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.calcasieu.gov/services/planning-development",
@@ -13133,21 +13106,21 @@
     "lastVerifiedAt": "2026-10-05T02:54:58.229Z"
   },
   {
-    "jurisdiction": "Cameron County, LA",
-    "url": "https://cameronpj.org/departments-and-services/permitting/",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://cameronpj.org/",
-    "candidateUrl": "https://cameronpj.org/departments-and-services/permitting/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T04:29:38.814Z"
-  },
-  {
     "jurisdiction": "Cameron County, TX",
     "url": "https://cameroncountytx-energovpub.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov SelfService",
     "candidateUrl": "https://cameroncountytx-energovpub.tylerhost.net/apps/selfservice#/home",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:50:15.674Z"
+  },
+  {
+    "jurisdiction": "Cameron Parish, LA",
+    "url": "https://cameronpj.org/departments-and-services/permitting/",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://cameronpj.org/",
+    "candidateUrl": "https://cameronpj.org/departments-and-services/permitting/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T04:29:38.814Z"
   },
   {
     "jurisdiction": "Cameron, MO",
@@ -15766,21 +15739,21 @@
     "lastVerifiedAt": "2026-10-05T22:07:25.197Z"
   },
   {
-    "jurisdiction": "Charles County, MD",
-    "url": "https://land.charlescountymd.gov/EnerGov_Prod/SelfService#/home",
-    "platform": "Tyler EnerGov Citizen Self Service",
-    "candidateUrl": "https://land.charlescountymd.gov/EnerGov_Prod/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:16.835Z"
-  },
-  {
-    "jurisdiction": "Charles County, VA",
+    "jurisdiction": "Charles City County, VA",
     "url": "https://www.charlescityva.us/400/Building-Official",
     "platform": "Charles City County building official page",
     "sourceUrl": "https://www.charlescityva.us/149/Departments",
     "candidateUrl": "https://www.charlescityva.us/400/Building-Official",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:41.078Z"
+  },
+  {
+    "jurisdiction": "Charles County, MD",
+    "url": "https://land.charlescountymd.gov/EnerGov_Prod/SelfService#/home",
+    "platform": "Tyler EnerGov Citizen Self Service",
+    "candidateUrl": "https://land.charlescountymd.gov/EnerGov_Prod/SelfService#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:50:16.835Z"
   },
   {
     "jurisdiction": "Charles Mix County, SD",
@@ -15922,15 +15895,6 @@
     "candidateUrl": "https://www.charlottemi.gov/315/Building-Planning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:27.589Z"
-  },
-  {
-    "jurisdiction": "Charlottesville County, VA",
-    "url": "https://permits.charlottesville.gov/portal",
-    "platform": "Permit portal (independent city)",
-    "sourceUrl": "https://www.charlottesville.gov/1906/Permit-Portal-Assistance",
-    "candidateUrl": "https://permits.charlottesville.gov/portal",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:26.420Z"
   },
   {
     "jurisdiction": "Charlottesville, VA",
@@ -16404,15 +16368,6 @@
     "candidateUrl": "https://www.chesapeakebeachmd.gov/434/Permits-Inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:45.747Z"
-  },
-  {
-    "jurisdiction": "Chesapeake County, VA",
-    "url": "https://aca-prod.accela.com/CHESAPEAKE/Default.aspx",
-    "platform": "Accela (eBUILD) (independent city)",
-    "sourceUrl": "https://www.cityofchesapeake.net/216/Development-Permits",
-    "candidateUrl": "https://aca-prod.accela.com/CHESAPEAKE/Default.aspx",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:26.094Z"
   },
   {
     "jurisdiction": "Chesapeake, VA",
@@ -17199,6 +17154,78 @@
     "lastVerifiedAt": "2026-10-05T00:50:18.150Z"
   },
   {
+    "jurisdiction": "City Of Industry, CA",
+    "url": "https://industryca.portal.opengov.com/",
+    "platform": "OpenGov",
+    "sourceUrl": "https://www.cityofindustry.org/",
+    "candidateUrl": "https://industryca.portal.opengov.com/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:53:29.113Z"
+  },
+  {
+    "jurisdiction": "City of Alexandria, VA",
+    "url": "https://apex.alexandriava.gov/EnerGov_Prod/SelfService#/home",
+    "platform": "EnerGov CSS (APEX) (independent city)",
+    "sourceUrl": "https://www.alexandriava.gov/Permits",
+    "candidateUrl": "https://apex.alexandriava.gov/EnerGov_Prod/SelfService#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.909Z"
+  },
+  {
+    "jurisdiction": "City of Bristol, VA",
+    "url": "https://www.bristolva.gov/97/Permits",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://www.bristolva.gov/27/Departments",
+    "candidateUrl": "https://www.bristolva.gov/97/Permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:48.006Z"
+  },
+  {
+    "jurisdiction": "City of Buena Vista, VA",
+    "url": "https://buenavistava.portal.iworq.net/portalhome/buenavistava",
+    "platform": "iWorQ (independent city)",
+    "sourceUrl": "https://buenavistava.gov/government/departments/community-development/building-inspections/",
+    "candidateUrl": "https://buenavistava.portal.iworq.net/portalhome/buenavistava",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.008Z"
+  },
+  {
+    "jurisdiction": "City of Charlottesville, VA",
+    "url": "https://permits.charlottesville.gov/portal",
+    "platform": "Permit portal (independent city)",
+    "sourceUrl": "https://www.charlottesville.gov/1906/Permit-Portal-Assistance",
+    "candidateUrl": "https://permits.charlottesville.gov/portal",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:26.420Z"
+  },
+  {
+    "jurisdiction": "City of Chesapeake, VA",
+    "url": "https://aca-prod.accela.com/CHESAPEAKE/Default.aspx",
+    "platform": "Accela (eBUILD) (independent city)",
+    "sourceUrl": "https://www.cityofchesapeake.net/216/Development-Permits",
+    "candidateUrl": "https://aca-prod.accela.com/CHESAPEAKE/Default.aspx",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:26.094Z"
+  },
+  {
+    "jurisdiction": "City of Colonial Heights, VA",
+    "url": "https://www.colonialheightsva.gov/509/Building-Inspections",
+    "platform": "City building inspections page",
+    "sourceUrl": "https://www.colonialheightsva.gov/27/Our-Government",
+    "candidateUrl": "https://www.colonialheightsva.gov/509/Building-Inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:15:52.747Z"
+  },
+  {
+    "jurisdiction": "City of Covington, VA",
+    "url": "https://covington.va.us/covington-departments-and-services/development-services.html",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://covington.va.us/",
+    "candidateUrl": "https://covington.va.us/covington-departments-and-services/development-services.html",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:46.776Z"
+  },
+  {
     "jurisdiction": "City of Creede, CO",
     "url": "https://cityofcreede.gov/documents",
     "platform": "City building permit forms page",
@@ -17208,13 +17235,229 @@
     "lastVerifiedAt": "2026-10-05T22:07:29.675Z"
   },
   {
-    "jurisdiction": "City Of Industry, CA",
-    "url": "https://industryca.portal.opengov.com/",
-    "platform": "OpenGov",
-    "sourceUrl": "https://www.cityofindustry.org/",
-    "candidateUrl": "https://industryca.portal.opengov.com/",
+    "jurisdiction": "City of Danville, VA",
+    "url": "https://onlinepermits.danvilleva.gov/portalprod",
+    "platform": "Online permit portal (independent city)",
+    "sourceUrl": "https://www.danvilleva.gov/2350/Online-Permit-Portal",
+    "candidateUrl": "https://onlinepermits.danvilleva.gov/portalprod",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:27.824Z"
+  },
+  {
+    "jurisdiction": "City of Emporia, VA",
+    "url": "https://www.ci.emporia.va.us/165/Building-Permit-Applications",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://www.ci.emporia.va.us/101/Departments",
+    "candidateUrl": "https://www.ci.emporia.va.us/165/Building-Permit-Applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:47.711Z"
+  },
+  {
+    "jurisdiction": "City of Falls Church, VA",
+    "url": "https://fallschurchva.gov/1914/When-a-Building-Permit-is-Required",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://fallschurchva.gov/154/Departments",
+    "candidateUrl": "https://fallschurchva.gov/1914/When-a-Building-Permit-is-Required",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:47.213Z"
+  },
+  {
+    "jurisdiction": "City of Fredericksburg, VA",
+    "url": "https://selfservice.fredericksburgva.gov/energov_prod/selfservice#/home",
+    "platform": "Tyler EnerGov Self Service (independent city)",
+    "sourceUrl": "https://www.fredericksburgva.gov/814/Building-Services",
+    "candidateUrl": "https://selfservice.fredericksburgva.gov/energov_prod/selfservice#/home",
     "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:53:29.113Z"
+    "lastVerifiedAt": "2026-10-05T02:57:24.830Z"
+  },
+  {
+    "jurisdiction": "City of Galax, VA",
+    "url": "https://galax.portal.iworq.net/portalhome/galax",
+    "platform": "iWorQ",
+    "sourceUrl": "https://galaxva.com/permits-and-applications/",
+    "candidateUrl": "https://galax.portal.iworq.net/portalhome/galax",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:47.414Z"
+  },
+  {
+    "jurisdiction": "City of Hampton, VA",
+    "url": "https://hamptonva.my.site.com/",
+    "platform": "Salesforce Permits & Inspections Portal (independent city)",
+    "sourceUrl": "https://www.hampton.gov/2673/Online-Permits-Inspections-Center",
+    "candidateUrl": "https://hamptonva.my.site.com/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.787Z"
+  },
+  {
+    "jurisdiction": "City of Harrisonburg, VA",
+    "url": "https://permits.harrisonburgva.gov/",
+    "platform": "LAMA (independent city)",
+    "sourceUrl": "https://www.harrisonburgva.gov/building-permit",
+    "candidateUrl": "https://permits.harrisonburgva.gov/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:25.954Z"
+  },
+  {
+    "jurisdiction": "City of Hopewell, VA",
+    "url": "https://hopewellva.gov/706/Building-Code-Property-Maintenance",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://hopewellva.gov/176/Development",
+    "candidateUrl": "https://hopewellva.gov/706/Building-Code-Property-Maintenance",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:45.740Z"
+  },
+  {
+    "jurisdiction": "City of Lexington, VA",
+    "url": "https://www.lexingtonva.gov/government/departments/planning-and-development/building-permits-inspections",
+    "platform": "City building permits & inspections page",
+    "sourceUrl": "https://www.lexingtonva.gov/",
+    "candidateUrl": "https://www.lexingtonva.gov/government/departments/planning-and-development/building-permits-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:17:09.161Z"
+  },
+  {
+    "jurisdiction": "City of Lynchburg, VA",
+    "url": "https://etrakit.lynchburgva.gov/",
+    "platform": "eTRAKiT (independent city)",
+    "sourceUrl": "https://www.lynchburgva.gov/261/Obtain-a-Building-Permit",
+    "candidateUrl": "https://etrakit.lynchburgva.gov/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:27.295Z"
+  },
+  {
+    "jurisdiction": "City of Manassas Park, VA",
+    "url": "https://ci-manassaspark-va.smartgovcommunity.com/ApplicationPublic/ApplicationHome",
+    "platform": "SmartGov",
+    "sourceUrl": "https://www.manassasparkva.gov/departments/development_zoning_and_code_enforcement_services/building_permits_and_inspections/index.php",
+    "candidateUrl": "https://ci-manassaspark-va.smartgovcommunity.com/ApplicationPublic/ApplicationHome",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:24.642Z"
+  },
+  {
+    "jurisdiction": "City of Manassas, VA",
+    "url": "https://energovcss24.manassasva.gov/energov_prod/selfservice#/home",
+    "platform": "EnerGov CSS (independent city)",
+    "sourceUrl": "https://www.manassasva.gov/",
+    "candidateUrl": "https://energovcss24.manassasva.gov/energov_prod/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:26.186Z"
+  },
+  {
+    "jurisdiction": "City of Martinsville, VA",
+    "url": "https://www.martinsville-va.gov/378/Inspections",
+    "platform": "City building inspections page",
+    "sourceUrl": "https://www.martinsville-va.gov/369/Community-Development",
+    "candidateUrl": "https://www.martinsville-va.gov/378/Inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:17:18.950Z"
+  },
+  {
+    "jurisdiction": "City of Newport News, VA",
+    "url": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService#/home",
+    "platform": "EnerGov CSS (independent city)",
+    "sourceUrl": "https://www.nnva.gov/2195/Building-Permit",
+    "candidateUrl": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:27.647Z"
+  },
+  {
+    "jurisdiction": "City of Norfolk, VA",
+    "url": "https://norfolkva.my.site.com/",
+    "platform": "Salesforce E-Permitting Portal (independent city)",
+    "sourceUrl": "https://www.norfolk.gov/2799/Permits-and-Inspections",
+    "candidateUrl": "https://norfolkva.my.site.com/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:26.101Z"
+  },
+  {
+    "jurisdiction": "City of Norton, VA",
+    "url": "https://nortonva.gov/71/Building-Inspection-Zoning",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://nortonva.gov/8/Departments",
+    "candidateUrl": "https://nortonva.gov/71/Building-Inspection-Zoning",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:46.503Z"
+  },
+  {
+    "jurisdiction": "City of Petersburg, VA",
+    "url": "https://petersburgva.portal.iworq.net/portalhome/petersburgva",
+    "platform": "iWorQ (independent city)",
+    "sourceUrl": "https://www.petersburgva.gov/369/Permits",
+    "candidateUrl": "https://petersburgva.portal.iworq.net/portalhome/petersburgva",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.475Z"
+  },
+  {
+    "jurisdiction": "City of Poquoson, VA",
+    "url": "https://poquoson.portal.iworq.net/portalhome/poquoson",
+    "platform": "iWorQ",
+    "sourceUrl": "https://www.poquoson-va.gov/193/Permit-Office",
+    "candidateUrl": "https://poquoson.portal.iworq.net/portalhome/poquoson",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:25.151Z"
+  },
+  {
+    "jurisdiction": "City of Portsmouth, VA",
+    "url": "https://www.portsmouthva.gov/about-building-permits-inspections",
+    "platform": "City building permits & inspections page",
+    "sourceUrl": "https://www.portsmouthva.gov/permits-inspections",
+    "candidateUrl": "https://www.portsmouthva.gov/about-building-permits-inspections",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:18:01.077Z"
+  },
+  {
+    "jurisdiction": "City of Radford, VA",
+    "url": "https://www.radfordva.gov/177/Building-Official",
+    "platform": "City building official page",
+    "sourceUrl": "https://www.radfordva.gov/538/Development-Services",
+    "candidateUrl": "https://www.radfordva.gov/177/Building-Official",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:18:06.737Z"
+  },
+  {
+    "jurisdiction": "City of Salem, VA",
+    "url": "https://cityworks.salemva.gov/PermitPortal",
+    "platform": "Cityworks PLL Permit Portal (independent city)",
+    "sourceUrl": "https://www.salemva.gov/159/Community-Development",
+    "candidateUrl": "https://cityworks.salemva.gov/PermitPortal",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.224Z"
+  },
+  {
+    "jurisdiction": "City of Staunton, VA",
+    "url": "https://cityofstauntonva-energovweb.tylerhost.net/apps/selfservice",
+    "platform": "Tyler EnerGov Self Service (independent city)",
+    "sourceUrl": "https://www.ci.staunton.va.us/departments/community-development/apply-online",
+    "candidateUrl": "https://cityofstauntonva-energovweb.tylerhost.net/apps/selfservice",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.122Z"
+  },
+  {
+    "jurisdiction": "City of Suffolk, VA",
+    "url": "https://app03.cityworksonline.com/CLIENT_SuffolkVA-Public/login",
+    "platform": "Cityworks PLL (independent city)",
+    "sourceUrl": "https://www.suffolkva.us/1730/Permits",
+    "candidateUrl": "https://app03.cityworksonline.com/CLIENT_SuffolkVA-Public/login",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:28.060Z"
+  },
+  {
+    "jurisdiction": "City of Williamsburg, VA",
+    "url": "https://williamsburgva.gov/209/Building-Design-Permit-Information",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://williamsburgva.gov/473/Planning-and-Codes-Compliance",
+    "candidateUrl": "https://williamsburgva.gov/209/Building-Design-Permit-Information",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:47.479Z"
+  },
+  {
+    "jurisdiction": "City of Winchester, VA",
+    "url": "https://winchesterva.portal.opengov.com/",
+    "platform": "OpenGov Permitting (independent city)",
+    "sourceUrl": "https://www.winchesterva.gov/Services-Payments/Permits-Licensing-Applications",
+    "candidateUrl": "https://winchesterva.portal.opengov.com/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:25.440Z"
   },
   {
     "jurisdiction": "Clackamas County, OR",
@@ -17234,15 +17477,6 @@
     "lastVerifiedAt": "2026-10-05T23:15:40.859Z"
   },
   {
-    "jurisdiction": "Claiborne County, LA",
-    "url": "https://www.claiborneparish.org/permits.php",
-    "platform": "Parish permit page",
-    "sourceUrl": "https://www.claiborneparish.org/",
-    "candidateUrl": "https://www.claiborneparish.org/permits.php",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:26.474Z"
-  },
-  {
     "jurisdiction": "Claiborne County, MS",
     "url": "https://www.ccmsgov.us/forms/",
     "platform": "County forms page with building permit application (no online system)",
@@ -17259,6 +17493,15 @@
     "candidateUrl": "https://claibornecountytn.gov/building-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T03:53:45.546Z"
+  },
+  {
+    "jurisdiction": "Claiborne Parish, LA",
+    "url": "https://www.claiborneparish.org/permits.php",
+    "platform": "Parish permit page",
+    "sourceUrl": "https://www.claiborneparish.org/",
+    "candidateUrl": "https://www.claiborneparish.org/permits.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:26.474Z"
   },
   {
     "jurisdiction": "Clallam County, WA",
@@ -19354,15 +19597,6 @@
     "lastVerifiedAt": "2026-10-05T23:15:45.847Z"
   },
   {
-    "jurisdiction": "Colonial Heights County, VA",
-    "url": "https://www.colonialheightsva.gov/509/Building-Inspections",
-    "platform": "City building inspections page",
-    "sourceUrl": "https://www.colonialheightsva.gov/27/Our-Government",
-    "candidateUrl": "https://www.colonialheightsva.gov/509/Building-Inspections",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:15:52.747Z"
-  },
-  {
     "jurisdiction": "Colonial Heights, VA",
     "url": "https://www.colonialheightsva.gov/509/Building-Inspections",
     "platform": "City building inspections page",
@@ -19931,7 +20165,7 @@
     "lastVerifiedAt": "2026-10-05T03:53:20.101Z"
   },
   {
-    "jurisdiction": "Concordia County, LA",
+    "jurisdiction": "Concordia Parish, LA",
     "url": "https://www.conppj.org/permits.html",
     "platform": "Parish permits page (no online portal; inspections by IBTS)",
     "sourceUrl": "https://www.conppj.org/",
@@ -21018,15 +21252,6 @@
     "candidateUrl": "https://covinaca.gov/city-departments/community-development/building-safety/building-safety-apply-for-a-permit/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:53:32.861Z"
-  },
-  {
-    "jurisdiction": "Covington County, VA",
-    "url": "https://covington.va.us/covington-departments-and-services/development-services.html",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://covington.va.us/",
-    "candidateUrl": "https://covington.va.us/covington-departments-and-services/development-services.html",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:46.776Z"
   },
   {
     "jurisdiction": "Covington, GA",
@@ -22573,15 +22798,6 @@
     "lastVerifiedAt": "2026-10-05T01:02:37.922Z"
   },
   {
-    "jurisdiction": "Danville County, VA",
-    "url": "https://onlinepermits.danvilleva.gov/portalprod",
-    "platform": "Online permit portal (independent city)",
-    "sourceUrl": "https://www.danvilleva.gov/2350/Online-Permit-Portal",
-    "candidateUrl": "https://onlinepermits.danvilleva.gov/portalprod",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:27.824Z"
-  },
-  {
     "jurisdiction": "Danville, CA",
     "url": "https://danvilleca-energovpub.tylerhost.net/Apps/SelfService#/home",
     "platform": "Tyler EnerGov Self Service (Citizen Self Service)",
@@ -23147,7 +23363,7 @@
     "lastVerifiedAt": "2026-10-05T22:07:40.723Z"
   },
   {
-    "jurisdiction": "De Soto County, LA",
+    "jurisdiction": "De Soto Parish, LA",
     "url": "https://www.desotoppj.com/how_do_i/permits/index.php",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.desotoppj.com/",
@@ -23190,6 +23406,67 @@
     "candidateUrl": "https://dewittcountyil.gov/departments/planning_and_zoning/index.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:49.917Z"
+  },
+  {
+    "jurisdiction": "DeKalb County, GA",
+    "url": "https://epermits.dekalbcountyga.gov/",
+    "platform": null,
+    "candidateUrl": "https://epermits.dekalbcountyga.gov/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:50:21.968Z"
+  },
+  {
+    "jurisdiction": "DeKalb County, IN",
+    "url": "https://www.co.dekalb.in.us/department/division.php?structureid=143",
+    "platform": "Building Department page",
+    "sourceUrl": "https://www.co.dekalb.in.us/department/index.php?structureid=137",
+    "candidateUrl": "https://www.co.dekalb.in.us/department/division.php?structureid=143",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:54:16.044Z"
+  },
+  {
+    "jurisdiction": "DeKalb County, TN",
+    "url": "https://www.dekalbtennessee.com/building-department.html",
+    "platform": "Building Department page (no online portal; PDF application)",
+    "sourceUrl": "https://www.dekalbtennessee.com/",
+    "candidateUrl": "https://www.dekalbtennessee.com/building-department.html",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:01.168Z"
+  },
+  {
+    "jurisdiction": "DeSoto County, FL",
+    "url": "https://desotocountyfl-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "platform": "Tyler EnerGov",
+    "sourceUrl": "https://www.desotobocc.com/171/Development",
+    "candidateUrl": "https://desotocountyfl-energovpub.tylerhost.net/Apps/SelfService#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:56:04.489Z"
+  },
+  {
+    "jurisdiction": "DeSoto County, MS",
+    "url": "https://energovweb.desotocountyms.gov/energov_prod/selfservice#/home",
+    "platform": "EnerGov Self Service",
+    "sourceUrl": "https://www.desotocountyms.gov/536/Permits",
+    "candidateUrl": "https://energovweb.desotocountyms.gov/energov_prod/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:56:30.064Z"
+  },
+  {
+    "jurisdiction": "DeSoto, TX",
+    "url": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
+    "platform": "Tyler EnerGov SelfService",
+    "candidateUrl": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:50:22.824Z"
+  },
+  {
+    "jurisdiction": "DeWitt County, TX",
+    "url": "https://www.co.dewitt.tx.us/page/Permits",
+    "platform": "County permits page",
+    "sourceUrl": "https://www.co.dewitt.tx.us/",
+    "candidateUrl": "https://www.co.dewitt.tx.us/page/Permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:57:21.109Z"
   },
   {
     "jurisdiction": "Deadwood, SD",
@@ -23549,32 +23826,6 @@
     "candidateUrl": "https://www.defuniaksprings.net/108/Building-Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:02.868Z"
-  },
-  {
-    "jurisdiction": "DeKalb County, GA",
-    "url": "https://epermits.dekalbcountyga.gov/",
-    "platform": null,
-    "candidateUrl": "https://epermits.dekalbcountyga.gov/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:21.968Z"
-  },
-  {
-    "jurisdiction": "DeKalb County, IN",
-    "url": "https://www.co.dekalb.in.us/department/division.php?structureid=143",
-    "platform": "Building Department page",
-    "sourceUrl": "https://www.co.dekalb.in.us/department/index.php?structureid=137",
-    "candidateUrl": "https://www.co.dekalb.in.us/department/division.php?structureid=143",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:54:16.044Z"
-  },
-  {
-    "jurisdiction": "DeKalb County, TN",
-    "url": "https://www.dekalbtennessee.com/building-department.html",
-    "platform": "Building Department page (no online portal; PDF application)",
-    "sourceUrl": "https://www.dekalbtennessee.com/",
-    "candidateUrl": "https://www.dekalbtennessee.com/building-department.html",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:01.168Z"
   },
   {
     "jurisdiction": "Dekalb, IL",
@@ -24031,7 +24282,7 @@
     "lastVerifiedAt": "2026-10-05T00:50:22.828Z"
   },
   {
-    "jurisdiction": "Denver, CO",
+    "jurisdiction": "Denver County, CO",
     "url": "https://aca-prod.accela.com/DENVER/Default.aspx",
     "platform": "Accela",
     "candidateUrl": "https://aca-prod.accela.com/DENVER/Default.aspx",
@@ -24208,24 +24459,6 @@
     "lastVerifiedAt": "2026-10-05T04:29:34.154Z"
   },
   {
-    "jurisdiction": "DeSoto County, FL",
-    "url": "https://desotocountyfl-energovpub.tylerhost.net/Apps/SelfService#/home",
-    "platform": "Tyler EnerGov",
-    "sourceUrl": "https://www.desotobocc.com/171/Development",
-    "candidateUrl": "https://desotocountyfl-energovpub.tylerhost.net/Apps/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:56:04.489Z"
-  },
-  {
-    "jurisdiction": "DeSoto County, MS",
-    "url": "https://energovweb.desotocountyms.gov/energov_prod/selfservice#/home",
-    "platform": "EnerGov Self Service",
-    "sourceUrl": "https://www.desotocountyms.gov/536/Permits",
-    "candidateUrl": "https://energovweb.desotocountyms.gov/energov_prod/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:56:30.064Z"
-  },
-  {
     "jurisdiction": "Desoto, TX",
     "url": "https://www.desototexas.gov/474/Permit-Application-Submission",
     "platform": "City permits page",
@@ -24233,14 +24466,6 @@
     "candidateUrl": "https://www.desototexas.gov/474/Permit-Application-Submission",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:11.220Z"
-  },
-  {
-    "jurisdiction": "DeSoto, TX",
-    "url": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
-    "platform": "Tyler EnerGov SelfService",
-    "candidateUrl": "https://cityofdesototx-energovweb.tylerhost.net/apps/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:22.824Z"
   },
   {
     "jurisdiction": "Destin, FL",
@@ -24321,15 +24546,6 @@
     "candidateUrl": "https://www.townofdeweybeach.gov/departments/building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:50.112Z"
-  },
-  {
-    "jurisdiction": "DeWitt County, TX",
-    "url": "https://www.co.dewitt.tx.us/page/Permits",
-    "platform": "County permits page",
-    "sourceUrl": "https://www.co.dewitt.tx.us/",
-    "candidateUrl": "https://www.co.dewitt.tx.us/page/Permits",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:21.109Z"
   },
   {
     "jurisdiction": "Dewitt, MI",
@@ -24620,7 +24836,7 @@
     "lastVerifiedAt": "2026-10-05T02:57:45.664Z"
   },
   {
-    "jurisdiction": "District of Columbia County, DC",
+    "jurisdiction": "District of Columbia, DC",
     "url": "https://citizenaccess.dc.gov/",
     "platform": "DOB Citizen Access Portal",
     "sourceUrl": "https://dob.dc.gov/page/permitting-district-columbia",
@@ -24762,15 +24978,6 @@
     "candidateUrl": "https://vodolton.org/housing-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:03.434Z"
-  },
-  {
-    "jurisdiction": "Do\u00f1a Ana County, NM",
-    "url": "https://www.donaana.gov/departments/community_services/building_services/index.php",
-    "platform": "Building Services permit page",
-    "sourceUrl": "https://www.donaana.gov/",
-    "candidateUrl": "https://www.donaana.gov/departments/community_services/building_services/index.php",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:53:39.899Z"
   },
   {
     "jurisdiction": "Donald, OR",
@@ -25230,6 +25437,15 @@
     "lastVerifiedAt": "2026-10-05T03:53:21.214Z"
   },
   {
+    "jurisdiction": "Do\u00f1a Ana County, NM",
+    "url": "https://www.donaana.gov/departments/community_services/building_services/index.php",
+    "platform": "Building Services permit page",
+    "sourceUrl": "https://www.donaana.gov/",
+    "candidateUrl": "https://www.donaana.gov/departments/community_services/building_services/index.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T00:53:39.899Z"
+  },
+  {
     "jurisdiction": "Dracut, MA",
     "url": "https://dracutma.viewpointcloud.com/",
     "platform": "OpenGov (ViewPoint Cloud)",
@@ -25355,6 +25571,14 @@
     "candidateUrl": "https://www.drydenvillageny.gov/codeenforcement",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:07:44.157Z"
+  },
+  {
+    "jurisdiction": "DuPage County, IL",
+    "url": "https://aca-prod.accela.com/DUPAGE/Default.aspx",
+    "platform": null,
+    "candidateUrl": "https://aca-prod.accela.com/DUPAGE/Default.aspx",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:50:23.555Z"
   },
   {
     "jurisdiction": "Duarte, CA",
@@ -25804,14 +26028,6 @@
     "lastVerifiedAt": "2026-10-05T02:58:40.642Z"
   },
   {
-    "jurisdiction": "DuPage County, IL",
-    "url": "https://aca-prod.accela.com/DUPAGE/Default.aspx",
-    "platform": null,
-    "candidateUrl": "https://aca-prod.accela.com/DUPAGE/Default.aspx",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:23.555Z"
-  },
-  {
     "jurisdiction": "Duplin County, NC",
     "url": "https://www.duplinnc.gov/182/Building-Inspections",
     "platform": "Building dept permit page (no online portal link found)",
@@ -25902,6 +26118,15 @@
     "lastVerifiedAt": "2026-10-05T00:52:27.609Z"
   },
   {
+    "jurisdiction": "Durham County, NC",
+    "url": "https://ldo4.durhamnc.gov/durhamweb/",
+    "platform": "Land Development Office (LDO) portal",
+    "sourceUrl": "https://www.durhamnc.gov/293/City-County-Building-Safety",
+    "candidateUrl": "https://ldo4.durhamnc.gov/durhamweb/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:38.705Z"
+  },
+  {
     "jurisdiction": "Durham, CT",
     "url": "https://permitlinkusa-online.com/csp/durhamct/DocumentLink.PublicWelcome.cls",
     "platform": "PermitLink",
@@ -25918,15 +26143,6 @@
     "candidateUrl": "https://durhammaine.gov/pages/code-enforcement",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:15:54.681Z"
-  },
-  {
-    "jurisdiction": "Durham, NC",
-    "url": "https://ldo4.durhamnc.gov/durhamweb/",
-    "platform": "Land Development Office (LDO) portal",
-    "sourceUrl": "https://www.durhamnc.gov/293/City-County-Building-Safety",
-    "candidateUrl": "https://ldo4.durhamnc.gov/durhamweb/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:38.705Z"
   },
   {
     "jurisdiction": "Durham, NH",
@@ -26425,7 +26641,7 @@
     "lastVerifiedAt": "2026-10-05T03:53:27.975Z"
   },
   {
-    "jurisdiction": "East Feliciana County, LA",
+    "jurisdiction": "East Feliciana Parish, LA",
     "url": "https://efparish.org/inspections-and-permits/",
     "platform": "Parish building inspections and permits page",
     "sourceUrl": "https://efparish.org/",
@@ -28663,15 +28879,6 @@
     "lastVerifiedAt": "2026-10-05T23:15:59.630Z"
   },
   {
-    "jurisdiction": "Emporia County, VA",
-    "url": "https://www.ci.emporia.va.us/165/Building-Permit-Applications",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://www.ci.emporia.va.us/101/Departments",
-    "candidateUrl": "https://www.ci.emporia.va.us/165/Building-Permit-Applications",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:47.711Z"
-  },
-  {
     "jurisdiction": "Emporia, KS",
     "url": "http://emporiaks.gov/emporiacivicgovportal",
     "platform": "CivicGov",
@@ -29362,7 +29569,7 @@
     "lastVerifiedAt": "2026-10-05T02:58:55.994Z"
   },
   {
-    "jurisdiction": "Evangeline County, LA",
+    "jurisdiction": "Evangeline Parish, LA",
     "url": "https://evangelineparishpolicejury.com/departments/",
     "platform": "Parish departments page (permit office)",
     "sourceUrl": "https://evangelineparishpolicejury.com/",
@@ -30054,15 +30261,6 @@
     "candidateUrl": "https://www.fallonnevada.gov/residents/homeowner-building-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:43.131Z"
-  },
-  {
-    "jurisdiction": "Falls Church County, VA",
-    "url": "https://fallschurchva.gov/1914/When-a-Building-Permit-is-Required",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://fallschurchva.gov/154/Departments",
-    "candidateUrl": "https://fallschurchva.gov/1914/When-a-Building-Permit-is-Required",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:47.213Z"
   },
   {
     "jurisdiction": "Falls Church, VA",
@@ -31516,15 +31714,6 @@
     "lastVerifiedAt": "2026-10-05T22:07:58.554Z"
   },
   {
-    "jurisdiction": "Fond du Lac County, WI",
-    "url": "https://www.fdlco.wi.gov/departments/departments-f-m/land-information/code-enforcement",
-    "platform": "County code enforcement (zoning/sanitary permits) page",
-    "sourceUrl": "https://www.fdlco.wi.gov/departments",
-    "candidateUrl": "https://www.fdlco.wi.gov/departments/departments-f-m/land-information/code-enforcement",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:07:58.528Z"
-  },
-  {
     "jurisdiction": "Fond Du Lac, WI",
     "url": "https://www.fdl.wi.gov/inspection-services/permits-fees/",
     "platform": "City building permits page",
@@ -31532,6 +31721,15 @@
     "candidateUrl": "https://www.fdl.wi.gov/inspection-services/permits-fees/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:43.182Z"
+  },
+  {
+    "jurisdiction": "Fond du Lac County, WI",
+    "url": "https://www.fdlco.wi.gov/departments/departments-f-m/land-information/code-enforcement",
+    "platform": "County code enforcement (zoning/sanitary permits) page",
+    "sourceUrl": "https://www.fdlco.wi.gov/departments",
+    "candidateUrl": "https://www.fdlco.wi.gov/departments/departments-f-m/land-information/code-enforcement",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:07:58.528Z"
   },
   {
     "jurisdiction": "Fontana, CA",
@@ -32909,15 +33107,6 @@
     "lastVerifiedAt": "2026-10-05T06:06:27.814Z"
   },
   {
-    "jurisdiction": "Fredericksburg County, VA",
-    "url": "https://selfservice.fredericksburgva.gov/energov_prod/selfservice#/home",
-    "platform": "Tyler EnerGov Self Service (independent city)",
-    "sourceUrl": "https://www.fredericksburgva.gov/814/Building-Services",
-    "candidateUrl": "https://selfservice.fredericksburgva.gov/energov_prod/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:24.830Z"
-  },
-  {
     "jurisdiction": "Fredericksburg, IA",
     "url": "https://www.fredericksburgiowa.com/permits.html",
     "platform": "City building permits page",
@@ -33746,15 +33935,6 @@
     "candidateUrl": "https://ppl.gaithersburgmd.gov/energovappsprod/selfservice/#/home",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:50:28.517Z"
-  },
-  {
-    "jurisdiction": "Galax County, VA",
-    "url": "https://galax.portal.iworq.net/portalhome/galax",
-    "platform": "iWorQ",
-    "sourceUrl": "https://galaxva.com/permits-and-applications/",
-    "candidateUrl": "https://galax.portal.iworq.net/portalhome/galax",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:47.414Z"
   },
   {
     "jurisdiction": "Galax, VA",
@@ -36628,15 +36808,6 @@
     "lastVerifiedAt": "2026-10-05T02:56:22.138Z"
   },
   {
-    "jurisdiction": "Grant County, LA",
-    "url": null,
-    "platform": null,
-    "sourceUrl": "https://gppj.org/",
-    "candidateUrl": "https://gppj.org/building-permits",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-05T23:35:48.814Z"
-  },
-  {
     "jurisdiction": "Grant County, MN",
     "url": "https://www.grantcountymn.gov/353/Permitting",
     "platform": "County permitting (planning/zoning) page",
@@ -36698,6 +36869,15 @@
     "candidateUrl": "https://gcinternetwebsite.co.grant.wi.gov/conservation-sanitation-and-zoning/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:42.051Z"
+  },
+  {
+    "jurisdiction": "Grant Parish, LA",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://gppj.org/",
+    "candidateUrl": "https://gppj.org/building-permits",
+    "linkStatus": "none",
+    "lastVerifiedAt": "2026-10-05T23:35:48.814Z"
   },
   {
     "jurisdiction": "Grant Park, IL",
@@ -39046,15 +39226,6 @@
     "lastVerifiedAt": "2026-10-05T02:56:57.015Z"
   },
   {
-    "jurisdiction": "Hampton County, VA",
-    "url": "https://hamptonva.my.site.com/",
-    "platform": "Salesforce Permits & Inspections Portal (independent city)",
-    "sourceUrl": "https://www.hampton.gov/2673/Online-Permits-Inspections-Center",
-    "candidateUrl": "https://hamptonva.my.site.com/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.787Z"
-  },
-  {
     "jurisdiction": "Hampton Falls, NH",
     "url": "https://www.hamptonfalls.org/207/Building-Inspection",
     "platform": "Municipal building permits page",
@@ -39827,15 +39998,6 @@
     "candidateUrl": "https://www.harrisonohio.gov/158/Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:29.096Z"
-  },
-  {
-    "jurisdiction": "Harrisonburg County, VA",
-    "url": "https://permits.harrisonburgva.gov/",
-    "platform": "LAMA (independent city)",
-    "sourceUrl": "https://www.harrisonburgva.gov/building-permit",
-    "candidateUrl": "https://permits.harrisonburgva.gov/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:25.954Z"
   },
   {
     "jurisdiction": "Harrisonburg, VA",
@@ -42977,7 +43139,7 @@
     "lastVerifiedAt": "2026-10-05T23:16:48.678Z"
   },
   {
-    "jurisdiction": "Honolulu, HI",
+    "jurisdiction": "Honolulu County, HI",
     "url": "https://dppweb.honolulu.gov/DPPWeb/",
     "platform": "Honolulu DPP",
     "candidateUrl": "https://dppweb.honolulu.gov/DPPWeb/",
@@ -43145,15 +43307,6 @@
     "candidateUrl": "https://permiteyes.us/hopedale/loginuser.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:37.025Z"
-  },
-  {
-    "jurisdiction": "Hopewell County, VA",
-    "url": "https://hopewellva.gov/706/Building-Code-Property-Maintenance",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://hopewellva.gov/176/Development",
-    "candidateUrl": "https://hopewellva.gov/706/Building-Code-Property-Maintenance",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:45.740Z"
   },
   {
     "jurisdiction": "Hopewell, NJ",
@@ -44346,7 +44499,7 @@
     "lastVerifiedAt": "2026-10-05T02:53:49.352Z"
   },
   {
-    "jurisdiction": "Iberia County, LA",
+    "jurisdiction": "Iberia Parish, LA",
     "url": "https://iberiaparishgovernment.com/permits/",
     "platform": "Parish permit page",
     "sourceUrl": "https://iberiaparishgovernment.com/",
@@ -44355,7 +44508,7 @@
     "lastVerifiedAt": "2026-10-05T02:56:24.499Z"
   },
   {
-    "jurisdiction": "Iberville County, LA",
+    "jurisdiction": "Iberville Parish, LA",
     "url": "https://ibervilleparish.com/permits-inspections/",
     "platform": "Parish permit page (links MGO Connect)",
     "sourceUrl": "https://ibervilleparish.com/",
@@ -45436,15 +45589,6 @@
     "lastVerifiedAt": "2026-10-05T02:54:25.311Z"
   },
   {
-    "jurisdiction": "Jackson County, LA",
-    "url": "https://www.jacksonparishpolicejury.org/departmentsdivisions/page/uniform-building-code",
-    "platform": "Parish building code page",
-    "sourceUrl": "https://www.jacksonparishpolicejury.org/",
-    "candidateUrl": "https://www.jacksonparishpolicejury.org/departmentsdivisions/page/uniform-building-code",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:26.533Z"
-  },
-  {
     "jurisdiction": "Jackson County, MN",
     "url": "https://jacksoncountymn.gov/index.asp?SEC=7E9AA9C0-BEAF-44A1-967B-90CF9C0BB258",
     "platform": "County website",
@@ -45497,6 +45641,15 @@
     "candidateUrl": "https://www.co.jackson.wi.us/index.asp?SEC=AF11C402-8B3D-4D21-8385-B1AB2AE4C8B1",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:49.896Z"
+  },
+  {
+    "jurisdiction": "Jackson Parish, LA",
+    "url": "https://www.jacksonparishpolicejury.org/departmentsdivisions/page/uniform-building-code",
+    "platform": "Parish building code page",
+    "sourceUrl": "https://www.jacksonparishpolicejury.org/",
+    "candidateUrl": "https://www.jacksonparishpolicejury.org/departmentsdivisions/page/uniform-building-code",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:26.533Z"
   },
   {
     "jurisdiction": "Jackson, CA",
@@ -45704,7 +45857,7 @@
     "lastVerifiedAt": "2026-10-05T23:16:58.195Z"
   },
   {
-    "jurisdiction": "James County, VA",
+    "jurisdiction": "James City County, VA",
     "url": "https://jamescitycountyva-energovweb.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov Self Service",
     "sourceUrl": "https://www.jamescitycountyva.gov/3578/JCC-PermitLink",
@@ -46135,7 +46288,7 @@
     "lastVerifiedAt": "2026-10-05T02:57:29.445Z"
   },
   {
-    "jurisdiction": "Jefferson Davis County, LA",
+    "jurisdiction": "Jefferson Davis Parish, LA",
     "url": "https://www.jdppj.net/permits/",
     "platform": "Parish permits page (no online portal)",
     "sourceUrl": "https://www.jdppj.net/",
@@ -46842,7 +46995,7 @@
     "lastVerifiedAt": "2026-10-05T02:53:45.517Z"
   },
   {
-    "jurisdiction": "Juneau City and County, AK",
+    "jurisdiction": "Juneau City and Borough, AK",
     "url": "https://cityandboroughofjuneauak-energovweb.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov Self Service",
     "sourceUrl": "https://juneau.org/community-development/do-i-need-a-permit",
@@ -47878,7 +48031,7 @@
     "lastVerifiedAt": "2026-10-05T02:56:58.725Z"
   },
   {
-    "jurisdiction": "Ketchikan Gateway County, AK",
+    "jurisdiction": "Ketchikan Gateway Borough, AK",
     "url": "https://www.borough.ketchikan.ak.us/1164/Permits-and-Applications",
     "platform": "Borough development permits page",
     "sourceUrl": "https://www.borough.ketchikan.ak.us/142/Planning-Community-Development",
@@ -48192,15 +48345,6 @@
     "lastVerifiedAt": "2026-10-05T02:55:05.615Z"
   },
   {
-    "jurisdiction": "King and Queen County, VA",
-    "url": "https://kingandqueen.portal.iworq.net/portalhome/kingandqueen",
-    "platform": "iWorQ",
-    "sourceUrl": "https://kingandqueenco.net/building-inspection/",
-    "candidateUrl": "https://kingandqueen.portal.iworq.net/portalhome/kingandqueen",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:24.740Z"
-  },
-  {
     "jurisdiction": "King City, CA",
     "url": "https://www.kingcity.com/174/Building-Safety-Department",
     "platform": "Building & Safety page (Citizenserve linked)",
@@ -48234,6 +48378,15 @@
     "candidateUrl": "https://co-kingwilliam-va.smartgovcommunity.com/Public/Home",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:25.413Z"
+  },
+  {
+    "jurisdiction": "King and Queen County, VA",
+    "url": "https://kingandqueen.portal.iworq.net/portalhome/kingandqueen",
+    "platform": "iWorQ",
+    "sourceUrl": "https://kingandqueenco.net/building-inspection/",
+    "candidateUrl": "https://kingandqueen.portal.iworq.net/portalhome/kingandqueen",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:24.740Z"
   },
   {
     "jurisdiction": "King, NC",
@@ -48718,7 +48871,7 @@
     "lastVerifiedAt": "2026-10-05T00:50:36.516Z"
   },
   {
-    "jurisdiction": "Kodiak Island County, AK",
+    "jurisdiction": "Kodiak Island Borough, AK",
     "url": "https://www.kodiakak.us/87/Building-Something",
     "platform": "Borough development permits page",
     "sourceUrl": "https://www.kodiakak.us/58/Departments",
@@ -49212,6 +49365,33 @@
     "lastVerifiedAt": "2026-10-05T01:00:39.327Z"
   },
   {
+    "jurisdiction": "LaGrange County, IN",
+    "url": "https://www.lagrangecounty.org/department/index.php?structureid=45",
+    "platform": "Building Department page",
+    "sourceUrl": "https://www.lagrangecounty.org/departments/",
+    "candidateUrl": "https://www.lagrangecounty.org/department/index.php?structureid=45",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:54:17.066Z"
+  },
+  {
+    "jurisdiction": "LaPorte County, IN",
+    "url": "https://laporteco.in.gov/boards-commissions/planning-commission/building-inspections/",
+    "platform": "Building Department page",
+    "sourceUrl": "https://laporteco.in.gov/residents/permits-and-licensing/",
+    "candidateUrl": "https://laporteco.in.gov/boards-commissions/planning-commission/building-inspections/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:54:16.733Z"
+  },
+  {
+    "jurisdiction": "LaSalle County, IL",
+    "url": "https://lasallecountyil.gov/437/Permits-Applications",
+    "platform": "Building permits page",
+    "sourceUrl": "https://lasallecountyil.gov/31/Departments",
+    "candidateUrl": "https://lasallecountyil.gov/437/Permits-Applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:54:06.833Z"
+  },
+  {
     "jurisdiction": "Labelle, FL",
     "url": "https://www.citylabelle.com/community_development/building_forms___permit_applications.php",
     "platform": "Building forms & permit applications page",
@@ -49364,15 +49544,6 @@
     "lastVerifiedAt": "2026-10-05T02:56:06.131Z"
   },
   {
-    "jurisdiction": "Lafayette County, LA",
-    "url": "https://www.mgoconnect.org/cp?JID=250&PID=3&CPSectionID=1",
-    "platform": "MGO Connect",
-    "sourceUrl": "https://www.lafayettela.gov/business-development/building-and-renovating/building-permits/",
-    "candidateUrl": "https://www.mgoconnect.org/cp?JID=250&PID=3&CPSectionID=1",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:52:12.321Z"
-  },
-  {
     "jurisdiction": "Lafayette County, MO",
     "url": "https://lafayettecountymo.gov/services/planning___economic_development/applications.php",
     "platform": "Planning & Economic Development applications/permits page",
@@ -49389,6 +49560,15 @@
     "candidateUrl": "http://app.govwell.com/lafayetteco",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:56:33.484Z"
+  },
+  {
+    "jurisdiction": "Lafayette Parish, LA",
+    "url": "https://www.mgoconnect.org/cp?JID=250&PID=3&CPSectionID=1",
+    "platform": "MGO Connect",
+    "sourceUrl": "https://www.lafayettela.gov/business-development/building-and-renovating/building-permits/",
+    "candidateUrl": "https://www.mgoconnect.org/cp?JID=250&PID=3&CPSectionID=1",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:52:12.321Z"
   },
   {
     "jurisdiction": "Lafayette, CA",
@@ -49471,7 +49651,7 @@
     "lastVerifiedAt": "2026-10-05T22:08:55.901Z"
   },
   {
-    "jurisdiction": "Lafourche County, LA",
+    "jurisdiction": "Lafourche Parish, LA",
     "url": "https://www.lafourchegov.org/permits/",
     "platform": "Parish permit page (links MyGov)",
     "sourceUrl": "https://www.lafourchegov.org/",
@@ -49487,15 +49667,6 @@
     "candidateUrl": "https://tx-lagovista.civicplus.com/165/Permitting",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:04.633Z"
-  },
-  {
-    "jurisdiction": "LaGrange County, IN",
-    "url": "https://www.lagrangecounty.org/department/index.php?structureid=45",
-    "platform": "Building Department page",
-    "sourceUrl": "https://www.lagrangecounty.org/departments/",
-    "candidateUrl": "https://www.lagrangecounty.org/department/index.php?structureid=45",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:54:17.066Z"
   },
   {
     "jurisdiction": "Lagrange, GA",
@@ -49577,15 +49748,6 @@
     "candidateUrl": "https://aca-prod.accela.com/COLA/Default.aspx",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:05.959Z"
-  },
-  {
-    "jurisdiction": "Lake and Peninsula County, AK",
-    "url": "https://www.lakeandpen.com/development-permits",
-    "platform": "Borough development permits page",
-    "sourceUrl": "https://www.lakeandpen.com/community-development",
-    "candidateUrl": "https://www.lakeandpen.com/development-permits",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:08:56.398Z"
   },
   {
     "jurisdiction": "Lake Angelus, MI",
@@ -49908,15 +50070,6 @@
     "lastVerifiedAt": "2026-10-05T23:17:04.705Z"
   },
   {
-    "jurisdiction": "Lake of the Woods County, MN",
-    "url": "https://lotwcounty.gov/land-water/",
-    "platform": "County Land & Water dept (building/land use permits)",
-    "sourceUrl": "https://lotwcounty.gov/",
-    "candidateUrl": "https://lotwcounty.gov/land-water/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:08:55.345Z"
-  },
-  {
     "jurisdiction": "Lake Oswego, OR",
     "url": "https://aca-oregon.accela.com/oregon/Default.aspx",
     "platform": null,
@@ -50140,6 +50293,24 @@
     "candidateUrl": "https://www.lakezurich.org/429/Permits-Inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:06.502Z"
+  },
+  {
+    "jurisdiction": "Lake and Peninsula Borough, AK",
+    "url": "https://www.lakeandpen.com/development-permits",
+    "platform": "Borough development permits page",
+    "sourceUrl": "https://www.lakeandpen.com/community-development",
+    "candidateUrl": "https://www.lakeandpen.com/development-permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:08:56.398Z"
+  },
+  {
+    "jurisdiction": "Lake of the Woods County, MN",
+    "url": "https://lotwcounty.gov/land-water/",
+    "platform": "County Land & Water dept (building/land use permits)",
+    "sourceUrl": "https://lotwcounty.gov/",
+    "candidateUrl": "https://lotwcounty.gov/land-water/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:08:55.345Z"
   },
   {
     "jurisdiction": "Lakefield, MN",
@@ -50784,15 +50955,6 @@
     "lastVerifiedAt": "2026-10-05T22:08:57.398Z"
   },
   {
-    "jurisdiction": "LaPorte County, IN",
-    "url": "https://laporteco.in.gov/boards-commissions/planning-commission/building-inspections/",
-    "platform": "Building Department page",
-    "sourceUrl": "https://laporteco.in.gov/residents/permits-and-licensing/",
-    "candidateUrl": "https://laporteco.in.gov/boards-commissions/planning-commission/building-inspections/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:54:16.733Z"
-  },
-  {
     "jurisdiction": "Laramie, WY",
     "url": "https://cityoflaramiewy-energovweb.tylerhost.net/apps/selfservice#/home",
     "platform": "Tyler EnerGov Self Service",
@@ -50917,15 +51079,6 @@
     "lastVerifiedAt": "2026-10-05T00:54:28.425Z"
   },
   {
-    "jurisdiction": "LaSalle County, IL",
-    "url": "https://lasallecountyil.gov/437/Permits-Applications",
-    "platform": "Building permits page",
-    "sourceUrl": "https://lasallecountyil.gov/31/Departments",
-    "candidateUrl": "https://lasallecountyil.gov/437/Permits-Applications",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:54:06.833Z"
-  },
-  {
     "jurisdiction": "Lassen County, CA",
     "url": "https://co-lassen-ca.smartgovcommunity.com/Public/Home",
     "platform": "SmartGov",
@@ -51025,15 +51178,6 @@
     "lastVerifiedAt": "2026-10-05T04:29:21.743Z"
   },
   {
-    "jurisdiction": "Lauderdale-by-the-Sea, FL",
-    "url": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=117&original_iid=0&original_contactID=0",
-    "platform": "CitizenServe",
-    "sourceUrl": "https://www.lauderdalebythesea-fl.gov/152/Building-Division",
-    "candidateUrl": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=117&original_iid=0&original_contactID=0",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:17:07.339Z"
-  },
-  {
     "jurisdiction": "Lauderdale, MN",
     "url": "https://www.lauderdalemn.org/1238/Building-Permits",
     "platform": "City building permits page",
@@ -51041,6 +51185,15 @@
     "candidateUrl": "https://www.lauderdalemn.org/1238/Building-Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:08:59.030Z"
+  },
+  {
+    "jurisdiction": "Lauderdale-by-the-Sea, FL",
+    "url": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=117&original_iid=0&original_contactID=0",
+    "platform": "CitizenServe",
+    "sourceUrl": "https://www.lauderdalebythesea-fl.gov/152/Building-Division",
+    "candidateUrl": "https://www2.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=117&original_iid=0&original_contactID=0",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:17:07.339Z"
   },
   {
     "jurisdiction": "Lauderhill, FL",
@@ -51659,6 +51812,14 @@
     "lastVerifiedAt": "2026-10-05T23:17:07.106Z"
   },
   {
+    "jurisdiction": "Lee's Summit, MO",
+    "url": "https://devservices.cityofls.net/Permit/Locator",
+    "platform": null,
+    "candidateUrl": "https://devservices.cityofls.net/Permit/Locator",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:50:39.624Z"
+  },
+  {
     "jurisdiction": "Lee, IL",
     "url": "https://www.villageoflee.com/how-do-i.html",
     "platform": "Village building permits instructions",
@@ -51684,14 +51845,6 @@
     "candidateUrl": "https://townofleemaine.com/code-enforcement/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:07.295Z"
-  },
-  {
-    "jurisdiction": "Lee's Summit, MO",
-    "url": "https://devservices.cityofls.net/Permit/Locator",
-    "platform": null,
-    "candidateUrl": "https://devservices.cityofls.net/Permit/Locator",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:50:39.624Z"
   },
   {
     "jurisdiction": "Leeds, AL",
@@ -52392,15 +52545,6 @@
     "lastVerifiedAt": "2026-10-05T00:52:30.783Z"
   },
   {
-    "jurisdiction": "Lexington County, VA",
-    "url": "https://www.lexingtonva.gov/government/departments/planning-and-development/building-permits-inspections",
-    "platform": "City building permits & inspections page",
-    "sourceUrl": "https://www.lexingtonva.gov/",
-    "candidateUrl": "https://www.lexingtonva.gov/government/departments/planning-and-development/building-permits-inspections",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:17:09.161Z"
-  },
-  {
     "jurisdiction": "Lexington, GA",
     "url": "https://lexingtonga.org/forms/",
     "platform": "City forms page (building permits & applications)",
@@ -52779,15 +52923,6 @@
     "lastVerifiedAt": "2026-10-05T04:29:39.669Z"
   },
   {
-    "jurisdiction": "Lincoln County, LA",
-    "url": "https://www.lincolnparish.gov/gis/page/lincoln-parish-building-permit-fees",
-    "platform": "Parish building permit page (no online portal)",
-    "sourceUrl": "https://www.lincolnparish.gov/",
-    "candidateUrl": "https://www.lincolnparish.gov/gis/page/lincoln-parish-building-permit-fees",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:27.651Z"
-  },
-  {
     "jurisdiction": "Lincoln County, MN",
     "url": "https://lincolncountymn.gov/departments_agencies/environmental/index.php",
     "platform": "County environmental office (planning & zoning permits)",
@@ -52894,6 +53029,15 @@
     "candidateUrl": "https://lincolncountywy.portal.iworq.net/portalhome/lincolncountywy",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:00.545Z"
+  },
+  {
+    "jurisdiction": "Lincoln Parish, LA",
+    "url": "https://www.lincolnparish.gov/gis/page/lincoln-parish-building-permit-fees",
+    "platform": "Parish building permit page (no online portal)",
+    "sourceUrl": "https://www.lincolnparish.gov/",
+    "candidateUrl": "https://www.lincolnparish.gov/gis/page/lincoln-parish-building-permit-fees",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:27.651Z"
   },
   {
     "jurisdiction": "Lincoln Park, MI",
@@ -53585,15 +53729,6 @@
     "lastVerifiedAt": "2026-10-05T02:54:06.478Z"
   },
   {
-    "jurisdiction": "Livingston County, LA",
-    "url": "https://www.livingstonparishla.gov/buildingsandpermit",
-    "platform": "Parish permit page",
-    "sourceUrl": "https://www.livingstonparishla.gov/",
-    "candidateUrl": "https://www.livingstonparishla.gov/buildingsAndPermit",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:26.079Z"
-  },
-  {
     "jurisdiction": "Livingston County, MO",
     "url": "https://www.livingstoncountymo.gov/zoning",
     "platform": "County zoning office (building permits, unincorporated)",
@@ -53601,6 +53736,15 @@
     "candidateUrl": "https://www.livingstoncountymo.gov/zoning",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:11.573Z"
+  },
+  {
+    "jurisdiction": "Livingston Parish, LA",
+    "url": "https://www.livingstonparishla.gov/buildingsandpermit",
+    "platform": "Parish permit page",
+    "sourceUrl": "https://www.livingstonparishla.gov/",
+    "candidateUrl": "https://www.livingstonparishla.gov/buildingsAndPermit",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:26.079Z"
   },
   {
     "jurisdiction": "Livingston, AL",
@@ -54973,15 +55117,6 @@
     "lastVerifiedAt": "2026-10-05T03:53:13.810Z"
   },
   {
-    "jurisdiction": "Lynchburg County, VA",
-    "url": "https://etrakit.lynchburgva.gov/",
-    "platform": "eTRAKiT (independent city)",
-    "sourceUrl": "https://www.lynchburgva.gov/261/Obtain-a-Building-Permit",
-    "candidateUrl": "https://etrakit.lynchburgva.gov/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:27.295Z"
-  },
-  {
     "jurisdiction": "Lynchburg, Moore County, TN",
     "url": "https://metromoorecounty.org/building_permits_-_planning.php",
     "platform": "Metro Building Permits - Planning page",
@@ -55539,15 +55674,6 @@
     "lastVerifiedAt": "2026-10-05T01:00:29.401Z"
   },
   {
-    "jurisdiction": "Madison County, LA",
-    "url": "https://www.madisonparish.org/services/forms/",
-    "platform": "Parish forms page (building permit application)",
-    "sourceUrl": "https://www.madisonparish.org/",
-    "candidateUrl": "https://www.madisonparish.org/services/forms",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:09:11.200Z"
-  },
-  {
     "jurisdiction": "Madison County, MS",
     "url": "https://www.madison-co.com/county-departments/planning-and-zoning",
     "platform": "County planning & zoning page (no online system)",
@@ -55636,6 +55762,15 @@
     "candidateUrl": "https://www.ci.madison-lake.mn.us/building-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:08.196Z"
+  },
+  {
+    "jurisdiction": "Madison Parish, LA",
+    "url": "https://www.madisonparish.org/services/forms/",
+    "platform": "Parish forms page (building permit application)",
+    "sourceUrl": "https://www.madisonparish.org/",
+    "candidateUrl": "https://www.madisonparish.org/services/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:09:11.200Z"
   },
   {
     "jurisdiction": "Madison, AL",
@@ -56083,24 +56218,6 @@
     "candidateUrl": "https://main.govpilot.com/web/public/092cfbd5-1b2_Report-a-Concern-manasquan?uid=7244&ust=NJ&pu=1&id=0",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:58:47.469Z"
-  },
-  {
-    "jurisdiction": "Manassas County, VA",
-    "url": "https://energovcss24.manassasva.gov/energov_prod/selfservice#/home",
-    "platform": "EnerGov CSS (independent city)",
-    "sourceUrl": "https://www.manassasva.gov/",
-    "candidateUrl": "https://energovcss24.manassasva.gov/energov_prod/selfservice#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:26.186Z"
-  },
-  {
-    "jurisdiction": "Manassas Park County, VA",
-    "url": "https://ci-manassaspark-va.smartgovcommunity.com/ApplicationPublic/ApplicationHome",
-    "platform": "SmartGov",
-    "sourceUrl": "https://www.manassasparkva.gov/departments/development_zoning_and_code_enforcement_services/building_permits_and_inspections/index.php",
-    "candidateUrl": "https://ci-manassaspark-va.smartgovcommunity.com/ApplicationPublic/ApplicationHome",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:24.642Z"
   },
   {
     "jurisdiction": "Manassas Park, VA",
@@ -57559,15 +57676,6 @@
     "lastVerifiedAt": "2026-10-05T02:56:41.012Z"
   },
   {
-    "jurisdiction": "Martin, TN",
-    "url": "https://core.tn.gov/",
-    "platform": "State-issued residential permit (TN SFMO CORE; SFMO list status SRBP)",
-    "sourceUrl": "https://www.tn.gov/commerce/fire/permit/residential.html",
-    "candidateUrl": "https://core.tn.gov/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:02.012Z"
-  },
-  {
     "jurisdiction": "Martin's Additions, MD",
     "url": "https://martinsadditions.org/how_do_i/apply_for/permit_application.php",
     "platform": "Village building permit applications",
@@ -57575,6 +57683,15 @@
     "candidateUrl": "https://martinsadditions.org/how_do_i/apply_for/permit_application.php",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:13.324Z"
+  },
+  {
+    "jurisdiction": "Martin, TN",
+    "url": "https://core.tn.gov/",
+    "platform": "State-issued residential permit (TN SFMO CORE; SFMO list status SRBP)",
+    "sourceUrl": "https://www.tn.gov/commerce/fire/permit/residential.html",
+    "candidateUrl": "https://core.tn.gov/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:57:02.012Z"
   },
   {
     "jurisdiction": "Martindale, TX",
@@ -57602,15 +57719,6 @@
     "candidateUrl": "https://www.cityofmartinsburg.org/government/city-departments/planning-department/building-permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:25.949Z"
-  },
-  {
-    "jurisdiction": "Martinsville County, VA",
-    "url": "https://www.martinsville-va.gov/378/Inspections",
-    "platform": "City building inspections page",
-    "sourceUrl": "https://www.martinsville-va.gov/369/Community-Development",
-    "candidateUrl": "https://www.martinsville-va.gov/378/Inspections",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:17:18.950Z"
   },
   {
     "jurisdiction": "Martinsville, IL",
@@ -58278,66 +58386,12 @@
     "lastVerifiedAt": "2026-10-05T02:57:02.014Z"
   },
   {
-    "jurisdiction": "Mcalester, OK",
-    "url": "https://mcalesterok.viewpointcloud.com/",
-    "platform": "OpenGov ViewPoint Cloud",
-    "sourceUrl": "https://www.cityofmcalester.com/residents/city_services___departments/building_inspection.php",
-    "candidateUrl": "https://mcalesterok.viewpointcloud.com/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:52:27.755Z"
-  },
-  {
-    "jurisdiction": "Mcallen, TX",
-    "url": "https://onlinepermits.mcallen.net/Portal/Default.aspx",
-    "platform": "City portal",
-    "sourceUrl": "https://www.mcallen.net/departments/permits",
-    "candidateUrl": "https://onlinepermits.mcallen.net/portal/",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:52:43.674Z"
-  },
-  {
     "jurisdiction": "McAllen, TX",
     "url": "https://onlinepermits.mcallen.net/portal/Cap/CapHome.aspx?module=Building",
     "platform": "Accela",
     "candidateUrl": "https://onlinepermits.mcallen.net/portal/Cap/CapHome.aspx?module=Building",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T00:50:44.342Z"
-  },
-  {
-    "jurisdiction": "Mccall, ID",
-    "url": "https://app.govwell.com/mccall-id",
-    "platform": "GovWell",
-    "sourceUrl": "https://www.mccall.id.us/158/Community-Economic-Development",
-    "candidateUrl": "https://app.govwell.com/mccall-id",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:53:37.686Z"
-  },
-  {
-    "jurisdiction": "Mccammon, ID",
-    "url": "https://www.mccammoncity.com/forms",
-    "platform": "City building permits page",
-    "sourceUrl": "https://www.mccammoncity.com/",
-    "candidateUrl": "https://www.mccammoncity.com/forms",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:09:14.328Z"
-  },
-  {
-    "jurisdiction": "Mccleary, WA",
-    "url": "https://www.cityofmccleary.com/community/page/building-department",
-    "platform": "City building permits page",
-    "sourceUrl": "https://www.cityofmccleary.com/",
-    "candidateUrl": "https://www.cityofmccleary.com/community/page/building-department",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:09:14.656Z"
-  },
-  {
-    "jurisdiction": "Mccomb, MS",
-    "url": "https://www.mccomb-ms.gov/departments/zoning,_inspections___permits/index.php",
-    "platform": "City zoning, inspections & permits page (no online system)",
-    "sourceUrl": "https://www.mccomb-ms.gov/",
-    "candidateUrl": "https://www.mccomb-ms.gov/departments/zoning,_inspections___permits/index.php",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:30.083Z"
   },
   {
     "jurisdiction": "McCone County, MT",
@@ -58385,15 +58439,6 @@
     "lastVerifiedAt": "2026-10-05T23:17:19.860Z"
   },
   {
-    "jurisdiction": "Mcdonough, GA",
-    "url": "https://www.mcdonoughga.org/198/Building-Inspection-Division",
-    "platform": "City building inspection division page",
-    "sourceUrl": "https://www.mcdonoughga.org/196/Community-Economic-Development",
-    "candidateUrl": "https://www.mcdonoughga.org/198/Building-Inspection-Division",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:09:15.451Z"
-  },
-  {
     "jurisdiction": "McDowell County, NC",
     "url": "https://co-mcdowell-nc.smartgovcommunity.com/Public/Home",
     "platform": "SmartGov",
@@ -58439,15 +58484,6 @@
     "lastVerifiedAt": "2026-10-05T23:17:19.010Z"
   },
   {
-    "jurisdiction": "Mchenry, IL",
-    "url": "https://bsaonline.com/Home/MunicipalityHome?uid=3274",
-    "platform": "BS&A Online",
-    "sourceUrl": "https://www.cityofmchenry.org/our_residents/building_permits.php",
-    "candidateUrl": "https://bsaonline.com/Home/Index?uid=3274",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:59:50.710Z"
-  },
-  {
     "jurisdiction": "McIntosh County, GA",
     "url": "https://app.govwell.com/mcintosh-ga",
     "platform": "GovWell",
@@ -58466,24 +58502,6 @@
     "lastVerifiedAt": "2026-10-05T03:53:49.554Z"
   },
   {
-    "jurisdiction": "Mcintosh, MN",
-    "url": "https://www.ci.mcintosh.mn.us/?page_id=109",
-    "platform": "City licenses & permits page",
-    "sourceUrl": "https://www.ci.mcintosh.mn.us/",
-    "candidateUrl": "https://www.ci.mcintosh.mn.us/?page_id=109",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:17:20.497Z"
-  },
-  {
-    "jurisdiction": "Mckeesport, PA",
-    "url": "https://www.mckeesport-pa.gov/150/Building-Inspector",
-    "platform": "city-site",
-    "sourceUrl": "https://www.mckeesport-pa.gov/",
-    "candidateUrl": "https://www.mckeesport-pa.gov/150/Building-Inspector",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:20.288Z"
-  },
-  {
     "jurisdiction": "McKenzie County, ND",
     "url": "https://mckenziecountynd.gov/departments/building-department/",
     "platform": "county website",
@@ -58491,15 +58509,6 @@
     "candidateUrl": "https://mckenziecountynd.gov/departments/building-department/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:55:07.045Z"
-  },
-  {
-    "jurisdiction": "Mckinney, TX",
-    "url": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
-    "platform": "Tyler EnerGov Self Service",
-    "sourceUrl": "https://www.mckinneytexas.org/165/Permits",
-    "candidateUrl": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:52:44.170Z"
   },
   {
     "jurisdiction": "McKinney, TX",
@@ -58546,33 +58555,6 @@
     "lastVerifiedAt": "2026-10-05T02:54:53.428Z"
   },
   {
-    "jurisdiction": "Mcloud, OK",
-    "url": null,
-    "platform": null,
-    "sourceUrl": "https://mcloudok.us/",
-    "candidateUrl": "https://mcloudok.us/city-codes-and-permits",
-    "linkStatus": "none",
-    "lastVerifiedAt": "2026-10-05T23:35:50.876Z"
-  },
-  {
-    "jurisdiction": "Mcminnville, OR",
-    "url": "https://aca-oregon.accela.com/oregon/Default.aspx",
-    "platform": "Oregon ePermitting (Accela)",
-    "sourceUrl": "https://www.mcminnvilleoregon.gov/building/page/epermitting",
-    "candidateUrl": "https://aca-oregon.accela.com/oregon/Default.aspx",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T00:54:41.299Z"
-  },
-  {
-    "jurisdiction": "Mcminnville, TN",
-    "url": "https://www.mcminnvilletn.gov/departments/community_development/index.php",
-    "platform": "City Community Development (permits & inspections) page",
-    "sourceUrl": "https://www.mcminnvilletn.gov/",
-    "candidateUrl": "https://www.mcminnvilletn.gov/departments/community_development/index.php",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:09:15.352Z"
-  },
-  {
     "jurisdiction": "McMullen County, TX",
     "url": "https://mcmullencounty.org/permits/",
     "platform": "How do I request or apply for permits?",
@@ -58609,15 +58591,6 @@
     "lastVerifiedAt": "2026-10-05T02:55:39.518Z"
   },
   {
-    "jurisdiction": "Mcpherson, KS",
-    "url": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
-    "platform": "CivicPlus FormCenter (online building permit application)",
-    "sourceUrl": "https://www.mcpcity.com/309/Building-Permits",
-    "candidateUrl": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:38.938Z"
-  },
-  {
     "jurisdiction": "McPherson, KS",
     "url": "https://www.mcpcity.com/309/Building-Permits",
     "platform": "city website",
@@ -58625,6 +58598,141 @@
     "candidateUrl": "https://www.mcpcity.com/309/Building-Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:23.972Z"
+  },
+  {
+    "jurisdiction": "Mcalester, OK",
+    "url": "https://mcalesterok.viewpointcloud.com/",
+    "platform": "OpenGov ViewPoint Cloud",
+    "sourceUrl": "https://www.cityofmcalester.com/residents/city_services___departments/building_inspection.php",
+    "candidateUrl": "https://mcalesterok.viewpointcloud.com/",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:52:27.755Z"
+  },
+  {
+    "jurisdiction": "Mcallen, TX",
+    "url": "https://onlinepermits.mcallen.net/Portal/Default.aspx",
+    "platform": "City portal",
+    "sourceUrl": "https://www.mcallen.net/departments/permits",
+    "candidateUrl": "https://onlinepermits.mcallen.net/portal/",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T00:52:43.674Z"
+  },
+  {
+    "jurisdiction": "Mccall, ID",
+    "url": "https://app.govwell.com/mccall-id",
+    "platform": "GovWell",
+    "sourceUrl": "https://www.mccall.id.us/158/Community-Economic-Development",
+    "candidateUrl": "https://app.govwell.com/mccall-id",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:53:37.686Z"
+  },
+  {
+    "jurisdiction": "Mccammon, ID",
+    "url": "https://www.mccammoncity.com/forms",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.mccammoncity.com/",
+    "candidateUrl": "https://www.mccammoncity.com/forms",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:09:14.328Z"
+  },
+  {
+    "jurisdiction": "Mccleary, WA",
+    "url": "https://www.cityofmccleary.com/community/page/building-department",
+    "platform": "City building permits page",
+    "sourceUrl": "https://www.cityofmccleary.com/",
+    "candidateUrl": "https://www.cityofmccleary.com/community/page/building-department",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:09:14.656Z"
+  },
+  {
+    "jurisdiction": "Mccomb, MS",
+    "url": "https://www.mccomb-ms.gov/departments/zoning,_inspections___permits/index.php",
+    "platform": "City zoning, inspections & permits page (no online system)",
+    "sourceUrl": "https://www.mccomb-ms.gov/",
+    "candidateUrl": "https://www.mccomb-ms.gov/departments/zoning,_inspections___permits/index.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:30.083Z"
+  },
+  {
+    "jurisdiction": "Mcdonough, GA",
+    "url": "https://www.mcdonoughga.org/198/Building-Inspection-Division",
+    "platform": "City building inspection division page",
+    "sourceUrl": "https://www.mcdonoughga.org/196/Community-Economic-Development",
+    "candidateUrl": "https://www.mcdonoughga.org/198/Building-Inspection-Division",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:09:15.451Z"
+  },
+  {
+    "jurisdiction": "Mchenry, IL",
+    "url": "https://bsaonline.com/Home/MunicipalityHome?uid=3274",
+    "platform": "BS&A Online",
+    "sourceUrl": "https://www.cityofmchenry.org/our_residents/building_permits.php",
+    "candidateUrl": "https://bsaonline.com/Home/Index?uid=3274",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T00:59:50.710Z"
+  },
+  {
+    "jurisdiction": "Mcintosh, MN",
+    "url": "https://www.ci.mcintosh.mn.us/?page_id=109",
+    "platform": "City licenses & permits page",
+    "sourceUrl": "https://www.ci.mcintosh.mn.us/",
+    "candidateUrl": "https://www.ci.mcintosh.mn.us/?page_id=109",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:17:20.497Z"
+  },
+  {
+    "jurisdiction": "Mckeesport, PA",
+    "url": "https://www.mckeesport-pa.gov/150/Building-Inspector",
+    "platform": "city-site",
+    "sourceUrl": "https://www.mckeesport-pa.gov/",
+    "candidateUrl": "https://www.mckeesport-pa.gov/150/Building-Inspector",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:20.288Z"
+  },
+  {
+    "jurisdiction": "Mckinney, TX",
+    "url": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
+    "platform": "Tyler EnerGov Self Service",
+    "sourceUrl": "https://www.mckinneytexas.org/165/Permits",
+    "candidateUrl": "https://egov.mckinneytexas.org/EnerGov_Prod/SelfService#/home",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:52:44.170Z"
+  },
+  {
+    "jurisdiction": "Mcloud, OK",
+    "url": null,
+    "platform": null,
+    "sourceUrl": "https://mcloudok.us/",
+    "candidateUrl": "https://mcloudok.us/city-codes-and-permits",
+    "linkStatus": "none",
+    "lastVerifiedAt": "2026-10-05T23:35:50.876Z"
+  },
+  {
+    "jurisdiction": "Mcminnville, OR",
+    "url": "https://aca-oregon.accela.com/oregon/Default.aspx",
+    "platform": "Oregon ePermitting (Accela)",
+    "sourceUrl": "https://www.mcminnvilleoregon.gov/building/page/epermitting",
+    "candidateUrl": "https://aca-oregon.accela.com/oregon/Default.aspx",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T00:54:41.299Z"
+  },
+  {
+    "jurisdiction": "Mcminnville, TN",
+    "url": "https://www.mcminnvilletn.gov/departments/community_development/index.php",
+    "platform": "City Community Development (permits & inspections) page",
+    "sourceUrl": "https://www.mcminnvilletn.gov/",
+    "candidateUrl": "https://www.mcminnvilletn.gov/departments/community_development/index.php",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:09:15.352Z"
+  },
+  {
+    "jurisdiction": "Mcpherson, KS",
+    "url": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
+    "platform": "CivicPlus FormCenter (online building permit application)",
+    "sourceUrl": "https://www.mcpcity.com/309/Building-Permits",
+    "candidateUrl": "https://www.mcpcity.com/FormCenter/Building-Permit-Application-8/Building-Permit-Application-52",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T03:53:38.938Z"
   },
   {
     "jurisdiction": "Mcville, ND",
@@ -59732,15 +59840,6 @@
     "lastVerifiedAt": "2026-10-05T23:17:28.533Z"
   },
   {
-    "jurisdiction": "Miami-Dade County, FL",
-    "url": "https://www.miamidade.gov/Apps/RER/EPSPortal",
-    "platform": "Miami-Dade EPS Portal",
-    "sourceUrl": "https://www.miamidade.gov/global/economy/building/home.page",
-    "candidateUrl": "https://www.miamidade.gov/Apps/RER/EPSPortal",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T00:51:32.026Z"
-  },
-  {
     "jurisdiction": "Miami, FL",
     "url": "https://apps.miamigov.com/iBuildPortal/Account/LogOn?ReturnUrl=/iBuildPortal",
     "platform": "City portal (iBuild)",
@@ -59757,6 +59856,15 @@
     "candidateUrl": "https://www.miamiok.gov/141/Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:47.362Z"
+  },
+  {
+    "jurisdiction": "Miami-Dade County, FL",
+    "url": "https://www.miamidade.gov/Apps/RER/EPSPortal",
+    "platform": "Miami-Dade EPS Portal",
+    "sourceUrl": "https://www.miamidade.gov/global/economy/building/home.page",
+    "candidateUrl": "https://www.miamidade.gov/Apps/RER/EPSPortal",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T00:51:32.026Z"
   },
   {
     "jurisdiction": "Miamisburg, OH",
@@ -62598,15 +62706,6 @@
     "lastVerifiedAt": "2026-10-05T02:53:32.788Z"
   },
   {
-    "jurisdiction": "Morgan, TX",
-    "url": "https://morgantx.gov/community-development",
-    "platform": "City Community Development (building) page",
-    "sourceUrl": "https://morgantx.gov/business-licenses-and-permits",
-    "candidateUrl": "https://morgantx.gov/community-development",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:17:30.587Z"
-  },
-  {
     "jurisdiction": "Morgan's Point Resort, TX",
     "url": "https://www.mprtx.gov/1451/Building-and-Code-Enforcement",
     "platform": "City building permit page",
@@ -62623,6 +62722,15 @@
     "candidateUrl": "https://www.morganspoint-tx.com/departments/building-permitting/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:29.997Z"
+  },
+  {
+    "jurisdiction": "Morgan, TX",
+    "url": "https://morgantx.gov/community-development",
+    "platform": "City Community Development (building) page",
+    "sourceUrl": "https://morgantx.gov/business-licenses-and-permits",
+    "candidateUrl": "https://morgantx.gov/community-development",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T23:17:30.587Z"
   },
   {
     "jurisdiction": "Morgantown, IN",
@@ -64342,7 +64450,7 @@
     "lastVerifiedAt": "2026-10-05T02:56:30.337Z"
   },
   {
-    "jurisdiction": "Natchitoches County, LA",
+    "jurisdiction": "Natchitoches Parish, LA",
     "url": "https://www.npgov.org/departments/planning-zoning/",
     "platform": "Parish planning & zoning page",
     "sourceUrl": "https://www.npgov.org/",
@@ -66073,15 +66181,6 @@
     "lastVerifiedAt": "2026-10-05T00:54:52.513Z"
   },
   {
-    "jurisdiction": "Newport News County, VA",
-    "url": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService#/home",
-    "platform": "EnerGov CSS (independent city)",
-    "sourceUrl": "https://www.nnva.gov/2195/Building-Permit",
-    "candidateUrl": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService#/home",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:27.647Z"
-  },
-  {
     "jurisdiction": "Newport News, VA",
     "url": "https://cssprod.nnva.gov/EnerGov_Prod/SelfService",
     "platform": null,
@@ -66680,15 +66779,6 @@
     "candidateUrl": "https://www.norcrossga.net/136/Building-Inspections",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:56:20.290Z"
-  },
-  {
-    "jurisdiction": "Norfolk County, VA",
-    "url": "https://norfolkva.my.site.com/",
-    "platform": "Salesforce E-Permitting Portal (independent city)",
-    "sourceUrl": "https://www.norfolk.gov/2799/Permits-and-Inspections",
-    "candidateUrl": "https://norfolkva.my.site.com/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:26.101Z"
   },
   {
     "jurisdiction": "Norfolk, CT",
@@ -67426,7 +67516,7 @@
     "lastVerifiedAt": "2026-10-05T00:54:54.378Z"
   },
   {
-    "jurisdiction": "North Slope County, AK",
+    "jurisdiction": "North Slope Borough, AK",
     "url": "https://northslopeak.portal.opengov.com/",
     "platform": "OpenGov",
     "sourceUrl": "https://www.north-slope.org/departments/planning-community-services/land-management-regulation/applications-forms/",
@@ -67741,7 +67831,7 @@
     "lastVerifiedAt": "2026-10-05T02:54:38.208Z"
   },
   {
-    "jurisdiction": "Northwest Arctic County, AK",
+    "jurisdiction": "Northwest Arctic Borough, AK",
     "url": "https://www.nwabor.org/departments/planning/",
     "platform": "Borough development permits page",
     "sourceUrl": "https://www.nwabor.org/",
@@ -67775,15 +67865,6 @@
     "candidateUrl": "https://northwood.portal.iworq.net/portalhome/northwood",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:58:50.080Z"
-  },
-  {
-    "jurisdiction": "Norton County, VA",
-    "url": "https://nortonva.gov/71/Building-Inspection-Zoning",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://nortonva.gov/8/Departments",
-    "candidateUrl": "https://nortonva.gov/71/Building-Inspection-Zoning",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:46.503Z"
   },
   {
     "jurisdiction": "Norton Shores, MI",
@@ -70303,7 +70384,7 @@
     "lastVerifiedAt": "2026-10-05T01:00:31.866Z"
   },
   {
-    "jurisdiction": "Ouachita County, LA",
+    "jurisdiction": "Ouachita Parish, LA",
     "url": "https://ouachitaparish.portal.iworq.net/portalhome/ouachitaparish",
     "platform": "iWorQ",
     "sourceUrl": "https://www.oppj.org/departments/permit_office/index.php",
@@ -72971,22 +73052,13 @@
     "lastVerifiedAt": "2026-10-05T02:58:03.430Z"
   },
   {
-    "jurisdiction": "Petersburg County, AK",
+    "jurisdiction": "Petersburg Borough, AK",
     "url": "https://www.petersburgak.gov/comdev/page/building-permits-inspections-0",
     "platform": "Borough building permit page",
     "sourceUrl": "https://www.petersburgak.gov/",
     "candidateUrl": "https://www.petersburgak.gov/comdev/page/building-permits-inspections-0",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:53:33.612Z"
-  },
-  {
-    "jurisdiction": "Petersburg County, VA",
-    "url": "https://petersburgva.portal.iworq.net/portalhome/petersburgva",
-    "platform": "iWorQ (independent city)",
-    "sourceUrl": "https://www.petersburgva.gov/369/Permits",
-    "candidateUrl": "https://petersburgva.portal.iworq.net/portalhome/petersburgva",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.475Z"
   },
   {
     "jurisdiction": "Petersburg, AK",
@@ -74329,7 +74401,7 @@
     "lastVerifiedAt": "2026-10-05T02:56:29.301Z"
   },
   {
-    "jurisdiction": "Plaquemines County, LA",
+    "jurisdiction": "Plaquemines Parish, LA",
     "url": "https://plaqueminesparish.gov/265/Permits-Planning-Zoning",
     "platform": "MGO Connect",
     "sourceUrl": "https://plaqueminesparish.gov/",
@@ -74849,7 +74921,7 @@
     "lastVerifiedAt": "2026-10-05T23:17:59.477Z"
   },
   {
-    "jurisdiction": "Pointe Coupee County, LA",
+    "jurisdiction": "Pointe Coupee Parish, LA",
     "url": "https://pointecoupee.portal.iworq.net/portalhome/pointecoupee",
     "platform": "iWorQ",
     "sourceUrl": "https://pcparish.org/apply-for-permit/",
@@ -75114,15 +75186,6 @@
     "candidateUrl": "https://villageofpoplar.com/forms-permits/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:17:59.694Z"
-  },
-  {
-    "jurisdiction": "Poquoson County, VA",
-    "url": "https://poquoson.portal.iworq.net/portalhome/poquoson",
-    "platform": "iWorQ",
-    "sourceUrl": "https://www.poquoson-va.gov/193/Permit-Office",
-    "candidateUrl": "https://poquoson.portal.iworq.net/portalhome/poquoson",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:57:25.151Z"
   },
   {
     "jurisdiction": "Poquoson, VA",
@@ -75642,15 +75705,6 @@
     "candidateUrl": "https://www.cityofportola.gov/building-department",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:09:50.926Z"
-  },
-  {
-    "jurisdiction": "Portsmouth County, VA",
-    "url": "https://www.portsmouthva.gov/about-building-permits-inspections",
-    "platform": "City building permits & inspections page",
-    "sourceUrl": "https://www.portsmouthva.gov/permits-inspections",
-    "candidateUrl": "https://www.portsmouthva.gov/about-building-permits-inspections",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:18:01.077Z"
   },
   {
     "jurisdiction": "Portsmouth, IA",
@@ -76907,15 +76961,6 @@
     "lastVerifiedAt": "2026-10-05T23:18:03.848Z"
   },
   {
-    "jurisdiction": "Radford County, VA",
-    "url": "https://www.radfordva.gov/177/Building-Official",
-    "platform": "City building official page",
-    "sourceUrl": "https://www.radfordva.gov/538/Development-Services",
-    "candidateUrl": "https://www.radfordva.gov/177/Building-Official",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T23:18:06.737Z"
-  },
-  {
     "jurisdiction": "Radford, VA",
     "url": "https://www.radfordva.gov/177/Building-Official",
     "platform": "City-built",
@@ -77292,7 +77337,7 @@
     "lastVerifiedAt": "2026-10-05T02:54:10.749Z"
   },
   {
-    "jurisdiction": "Rapides County, LA",
+    "jurisdiction": "Rapides Parish, LA",
     "url": "https://rapc.info/building-code-enforcement/",
     "platform": "Rapides Area Planning Commission building permit page",
     "sourceUrl": "https://rapc.info/",
@@ -77651,15 +77696,6 @@
     "lastVerifiedAt": "2026-10-05T02:57:34.093Z"
   },
   {
-    "jurisdiction": "Red River County, LA",
-    "url": "https://www.rrppj.org/Permits/Default.aspx",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://www.rrppj.org/",
-    "candidateUrl": "https://www.rrppj.org/Permits/Default.aspx",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T04:29:41.802Z"
-  },
-  {
     "jurisdiction": "Red River County, TX",
     "url": "https://www.co.red-river.tx.us/page/redriver.Permits",
     "platform": "County permits page",
@@ -77667,6 +77703,15 @@
     "candidateUrl": "https://www.co.red-river.tx.us/page/redriver.Permits",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:22.886Z"
+  },
+  {
+    "jurisdiction": "Red River Parish, LA",
+    "url": "https://www.rrppj.org/Permits/Default.aspx",
+    "platform": "Building department permit page",
+    "sourceUrl": "https://www.rrppj.org/",
+    "candidateUrl": "https://www.rrppj.org/Permits/Default.aspx",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T04:29:41.802Z"
   },
   {
     "jurisdiction": "Red Willow County, NE",
@@ -81256,7 +81301,7 @@
     "lastVerifiedAt": "2026-10-05T22:10:02.597Z"
   },
   {
-    "jurisdiction": "Sabine County, LA",
+    "jurisdiction": "Sabine Parish, LA",
     "url": "http://sabineparishpolicejury.com/Divisions/Division.aspx?Name=Building%20Code%20Office",
     "platform": "Parish building code office page (no online portal)",
     "sourceUrl": "http://sabineparishpolicejury.com/",
@@ -82052,15 +82097,6 @@
     "candidateUrl": "https://www.salamancany.gov/code-enforcement.html",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T03:53:18.836Z"
-  },
-  {
-    "jurisdiction": "Salem County, VA",
-    "url": "https://cityworks.salemva.gov/PermitPortal",
-    "platform": "Cityworks PLL Permit Portal (independent city)",
-    "sourceUrl": "https://www.salemva.gov/159/Community-Development",
-    "candidateUrl": "https://cityworks.salemva.gov/PermitPortal",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.224Z"
   },
   {
     "jurisdiction": "Salem Lakes, WI",
@@ -84002,6 +84038,15 @@
     "lastVerifiedAt": "2026-10-05T23:18:21.281Z"
   },
   {
+    "jurisdiction": "SeaTac, WA",
+    "url": "https://lama.seatacwa.gov/Apply.aspx",
+    "platform": "LAMA",
+    "sourceUrl": "https://lama.seatacwa.gov/",
+    "candidateUrl": "https://lama.seatacwa.gov/Apply.aspx",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T22:10:08.074Z"
+  },
+  {
     "jurisdiction": "Seabrook, NH",
     "url": "https://seabrooknh.info/town-departments/building-department-code-enforcement/",
     "platform": "Town building department",
@@ -84144,15 +84189,6 @@
     "candidateUrl": "https://app.govoutreach.com/seatpleasantcitymd/public/register?redirect=/seatpleasantcitymd/public/permits",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T04:29:35.256Z"
-  },
-  {
-    "jurisdiction": "SeaTac, WA",
-    "url": "https://lama.seatacwa.gov/Apply.aspx",
-    "platform": "LAMA",
-    "sourceUrl": "https://lama.seatacwa.gov/",
-    "candidateUrl": "https://lama.seatacwa.gov/Apply.aspx",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T22:10:08.074Z"
   },
   {
     "jurisdiction": "Seattle, WA",
@@ -86135,7 +86171,7 @@
     "lastVerifiedAt": "2026-10-05T23:18:25.389Z"
   },
   {
-    "jurisdiction": "Sitka City and County, AK",
+    "jurisdiction": "Sitka City and Borough, AK",
     "url": "https://www.cityofsitka.com/Government/City-Departments/Building-Department",
     "platform": "City building department permit page",
     "sourceUrl": "https://www.cityofsitka.com/Home",
@@ -88506,7 +88542,7 @@
     "lastVerifiedAt": "2026-10-05T04:29:31.932Z"
   },
   {
-    "jurisdiction": "St. Bernard County, LA",
+    "jurisdiction": "St. Bernard Parish, LA",
     "url": "https://www.mypermitnow.org/login.aspx?ReturnUrl=%2f",
     "platform": "MyGovernmentOnline (MGO)",
     "sourceUrl": "https://www.sbpg.net/151/Community-Development",
@@ -88524,21 +88560,21 @@
     "lastVerifiedAt": "2026-10-05T04:29:36.010Z"
   },
   {
-    "jurisdiction": "St. Charles County, LA",
-    "url": "https://www.stcharlesparish.gov/departments/planning-and-zoning/permits-and-applications",
-    "platform": "Parish permit page",
-    "sourceUrl": "https://www.stcharlesparish.gov/",
-    "candidateUrl": "https://www.stcharlesparish.gov/departments/planning-and-zoning/permits-and-applications",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:24.263Z"
-  },
-  {
     "jurisdiction": "St. Charles County, MO",
     "url": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=165",
     "platform": null,
     "candidateUrl": "https://www.citizenserve.com/Portal/PortalController?Action=showHomePage&ctzPagePrefix=Portal_&installationID=165",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T00:51:12.510Z"
+  },
+  {
+    "jurisdiction": "St. Charles Parish, LA",
+    "url": "https://www.stcharlesparish.gov/departments/planning-and-zoning/permits-and-applications",
+    "platform": "Parish permit page",
+    "sourceUrl": "https://www.stcharlesparish.gov/",
+    "candidateUrl": "https://www.stcharlesparish.gov/departments/planning-and-zoning/permits-and-applications",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:24.263Z"
   },
   {
     "jurisdiction": "St. Charles, MO",
@@ -88593,7 +88629,7 @@
     "lastVerifiedAt": "2026-10-05T00:51:11.708Z"
   },
   {
-    "jurisdiction": "St. Helena County, LA",
+    "jurisdiction": "St. Helena Parish, LA",
     "url": "https://www.sthelenaparish.la.gov/apps/pages/index.jsp?uREC_ID=522389&type=d",
     "platform": "Parish building department page",
     "sourceUrl": "https://www.sthelenaparish.la.gov/",
@@ -88602,7 +88638,7 @@
     "lastVerifiedAt": "2026-10-05T22:10:17.798Z"
   },
   {
-    "jurisdiction": "St. James County, LA",
+    "jurisdiction": "St. James Parish, LA",
     "url": "https://www.mypermitnow.org/login.aspx?ReturnUrl=%2f",
     "platform": "MyGovernmentOnline (MGO)",
     "sourceUrl": "https://www.stjamesla.com/161/Planning-Permitting-Office",
@@ -88611,7 +88647,7 @@
     "lastVerifiedAt": "2026-10-05T00:52:15.628Z"
   },
   {
-    "jurisdiction": "St. John the Baptist County, LA",
+    "jurisdiction": "St. John the Baptist Parish, LA",
     "url": "https://www.sjbparish.gov/Departments/Planning-and-Zoning/Building-Permits",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.sjbparish.gov/Home",
@@ -88637,7 +88673,7 @@
     "lastVerifiedAt": "2026-10-05T00:51:12.719Z"
   },
   {
-    "jurisdiction": "St. Landry County, LA",
+    "jurisdiction": "St. Landry Parish, LA",
     "url": "https://stlandrypg.org/departments/permits/",
     "platform": "Parish permits office page",
     "sourceUrl": "https://stlandrypg.org/",
@@ -88696,7 +88732,7 @@
     "lastVerifiedAt": "2026-10-05T00:51:13.005Z"
   },
   {
-    "jurisdiction": "St. Martin County, LA",
+    "jurisdiction": "St. Martin Parish, LA",
     "url": "https://www.stmartinparish.net/government_services/building_permits/index.php",
     "platform": "Parish building permit page (no online portal)",
     "sourceUrl": "https://www.stmartinparish.net/",
@@ -89160,15 +89196,6 @@
     "candidateUrl": "https://cityofstatham.com/BuildingPermits.aspx",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T22:10:18.832Z"
-  },
-  {
-    "jurisdiction": "Staunton County, VA",
-    "url": "https://cityofstauntonva-energovweb.tylerhost.net/apps/selfservice",
-    "platform": "Tyler EnerGov Self Service (independent city)",
-    "sourceUrl": "https://www.ci.staunton.va.us/departments/community-development/apply-online",
-    "candidateUrl": "https://cityofstauntonva-energovweb.tylerhost.net/apps/selfservice",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.122Z"
   },
   {
     "jurisdiction": "Staunton, VA",
@@ -90149,15 +90176,6 @@
     "candidateUrl": "https://suffieldct.viewpointcloud.com/",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:57:33.543Z"
-  },
-  {
-    "jurisdiction": "Suffolk County, VA",
-    "url": "https://app03.cityworksonline.com/CLIENT_SuffolkVA-Public/login",
-    "platform": "Cityworks PLL (independent city)",
-    "sourceUrl": "https://www.suffolkva.us/1730/Permits",
-    "candidateUrl": "https://app03.cityworksonline.com/CLIENT_SuffolkVA-Public/login",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:28.060Z"
   },
   {
     "jurisdiction": "Suffolk, VA",
@@ -91549,7 +91567,7 @@
     "lastVerifiedAt": "2026-10-05T02:57:44.750Z"
   },
   {
-    "jurisdiction": "Tangipahoa County, LA",
+    "jurisdiction": "Tangipahoa Parish, LA",
     "url": "https://tangipahoa.org/I-would-like-to/apply-for-a-permit/permits-online/",
     "platform": "Parish permits online page",
     "sourceUrl": "https://tangipahoa.org/",
@@ -94492,15 +94510,6 @@
     "lastVerifiedAt": "2026-10-05T02:54:19.091Z"
   },
   {
-    "jurisdiction": "Union County, LA",
-    "url": "https://uppj.org/wp-content/uploads/2025/10/Building-Permit-Instructions.pdf",
-    "platform": "Parish building permit instructions (PDF; no online portal)",
-    "sourceUrl": "https://uppj.org/",
-    "candidateUrl": "https://uppj.org/wp-content/uploads/2025/10/Building-Permit-Instructions.pdf",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:56:30.304Z"
-  },
-  {
     "jurisdiction": "Union County, NC",
     "url": "https://ucinspect.unioncountync.gov/evolvepublic/",
     "platform": "Evolve Public",
@@ -94562,6 +94571,15 @@
     "candidateUrl": "https://uniongrove.portal.iworq.net/portalhome/uniongrove",
     "linkStatus": "unconfirmed",
     "lastVerifiedAt": "2026-10-05T02:55:45.745Z"
+  },
+  {
+    "jurisdiction": "Union Parish, LA",
+    "url": "https://uppj.org/wp-content/uploads/2025/10/Building-Permit-Instructions.pdf",
+    "platform": "Parish building permit instructions (PDF; no online portal)",
+    "sourceUrl": "https://uppj.org/",
+    "candidateUrl": "https://uppj.org/wp-content/uploads/2025/10/Building-Permit-Instructions.pdf",
+    "linkStatus": "unconfirmed",
+    "lastVerifiedAt": "2026-10-05T02:56:30.304Z"
   },
   {
     "jurisdiction": "Union Springs, NY",
@@ -95500,7 +95518,7 @@
     "lastVerifiedAt": "2026-10-05T23:18:47.976Z"
   },
   {
-    "jurisdiction": "Vermilion County, LA",
+    "jurisdiction": "Vermilion Parish, LA",
     "url": "https://vppj.org/2012DEPTpermits.html",
     "platform": "Parish permit page",
     "sourceUrl": "https://vppj.org/2012DEPT.html",
@@ -95563,15 +95581,6 @@
     "lastVerifiedAt": "2026-10-05T22:10:33.761Z"
   },
   {
-    "jurisdiction": "Vernon County, LA",
-    "url": "https://www.vppjla.com/?page_id=51",
-    "platform": "Parish building permits page (no online portal)",
-    "sourceUrl": "https://www.vppjla.com/",
-    "candidateUrl": "https://www.vppjla.com/?page_id=51",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:30.645Z"
-  },
-  {
     "jurisdiction": "Vernon County, WI",
     "url": "https://www.vernoncountywi.gov/departments/zoning_and_sanitarian/forms.php",
     "platform": "County zoning forms page",
@@ -95588,6 +95597,15 @@
     "candidateUrl": "https://www.vernonhills.org/permit",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:54:13.177Z"
+  },
+  {
+    "jurisdiction": "Vernon Parish, LA",
+    "url": "https://www.vppjla.com/?page_id=51",
+    "platform": "Parish building permits page (no online portal)",
+    "sourceUrl": "https://www.vppjla.com/",
+    "candidateUrl": "https://www.vppjla.com/?page_id=51",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:30.645Z"
   },
   {
     "jurisdiction": "Vernon, MI",
@@ -97476,15 +97494,6 @@
     "lastVerifiedAt": "2026-10-05T23:18:52.118Z"
   },
   {
-    "jurisdiction": "Washington County, LA",
-    "url": "https://www.wpgov.org/242/Building-Permits",
-    "platform": "Parish permit page (links MyGov)",
-    "sourceUrl": "https://www.wpgov.org/204/Licensing-Permits",
-    "candidateUrl": "https://www.wpgov.org/242/Building-Permits",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:27.676Z"
-  },
-  {
     "jurisdiction": "Washington County, MD",
     "url": "https://aca-prod.accela.com/WASHCOMD/Default.aspx",
     "platform": "Accela Citizen Access",
@@ -97608,6 +97617,15 @@
     "candidateUrl": "https://washingtongrovemd.gov/government/town-commissions-boards/planning-commission/how-to-get-a-building-permit/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:46.243Z"
+  },
+  {
+    "jurisdiction": "Washington Parish, LA",
+    "url": "https://www.wpgov.org/242/Building-Permits",
+    "platform": "Parish permit page (links MyGov)",
+    "sourceUrl": "https://www.wpgov.org/204/Licensing-Permits",
+    "candidateUrl": "https://www.wpgov.org/242/Building-Permits",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:27.676Z"
   },
   {
     "jurisdiction": "Washington Terrace, UT",
@@ -98683,15 +98701,6 @@
     "lastVerifiedAt": "2026-10-05T04:29:42.055Z"
   },
   {
-    "jurisdiction": "Webster County, LA",
-    "url": "https://www.websterparishla.org/permit-forms.html",
-    "platform": "Parish permits page (building permits by phone/email)",
-    "sourceUrl": "https://www.websterparishla.org/wppjhome.html",
-    "candidateUrl": "https://www.websterparish.citymaker.com/page/page/9114359.htm",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T02:56:31.152Z"
-  },
-  {
     "jurisdiction": "Webster County, MO",
     "url": "https://webstercountymo.gov/service-center/permits-and-licenses/",
     "platform": "Building department permit page",
@@ -98717,6 +98726,15 @@
     "candidateUrl": "https://webstergroves.onlinegovt.com/",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T23:18:54.843Z"
+  },
+  {
+    "jurisdiction": "Webster Parish, LA",
+    "url": "https://www.websterparishla.org/permit-forms.html",
+    "platform": "Parish permits page (building permits by phone/email)",
+    "sourceUrl": "https://www.websterparishla.org/wppjhome.html",
+    "candidateUrl": "https://www.websterparish.citymaker.com/page/page/9114359.htm",
+    "linkStatus": "verified",
+    "lastVerifiedAt": "2026-10-05T02:56:31.152Z"
   },
   {
     "jurisdiction": "Webster, MA",
@@ -99124,7 +99142,7 @@
     "lastVerifiedAt": "2026-10-05T23:18:55.113Z"
   },
   {
-    "jurisdiction": "West Baton Rouge County, LA",
+    "jurisdiction": "West Baton Rouge Parish, LA",
     "url": "https://www.wbrcouncil.org/673/Permits",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.wbrcouncil.org/",
@@ -99340,7 +99358,7 @@
     "lastVerifiedAt": "2026-10-05T01:00:20.145Z"
   },
   {
-    "jurisdiction": "West Feliciana County, LA",
+    "jurisdiction": "West Feliciana Parish, LA",
     "url": "https://www.wfparish.org/buildings-and-permits",
     "platform": "Parish permit page",
     "sourceUrl": "https://www.wfparish.org/",
@@ -101365,15 +101383,6 @@
     "lastVerifiedAt": "2026-10-05T02:56:56.479Z"
   },
   {
-    "jurisdiction": "Williamsburg County, VA",
-    "url": "https://williamsburgva.gov/209/Building-Design-Permit-Information",
-    "platform": "Building department permit page",
-    "sourceUrl": "https://williamsburgva.gov/473/Planning-and-Codes-Compliance",
-    "candidateUrl": "https://williamsburgva.gov/209/Building-Design-Permit-Information",
-    "linkStatus": "verified",
-    "lastVerifiedAt": "2026-10-05T03:53:47.479Z"
-  },
-  {
     "jurisdiction": "Williamsburg, CO",
     "url": "https://townofwilliamsburg.colorado.gov/forms/permits",
     "platform": "Town building permit forms page",
@@ -101855,15 +101864,6 @@
     "candidateUrl": "https://www.townofwinchendon.com/165/Permit-Applications",
     "linkStatus": "verified",
     "lastVerifiedAt": "2026-10-05T02:57:43.660Z"
-  },
-  {
-    "jurisdiction": "Winchester County, VA",
-    "url": "https://winchesterva.portal.opengov.com/",
-    "platform": "OpenGov Permitting (independent city)",
-    "sourceUrl": "https://www.winchesterva.gov/Services-Payments/Permits-Licensing-Applications",
-    "candidateUrl": "https://winchesterva.portal.opengov.com/",
-    "linkStatus": "unconfirmed",
-    "lastVerifiedAt": "2026-10-05T02:57:25.440Z"
   },
   {
     "jurisdiction": "Winchester, ID",
@@ -103277,7 +103277,7 @@
     "lastVerifiedAt": "2026-10-05T22:10:50.047Z"
   },
   {
-    "jurisdiction": "Wrangell City and County, AK",
+    "jurisdiction": "Wrangell City and Borough, AK",
     "url": "https://www.wrangell.com/capital-facilities/building-permit-information",
     "platform": "Borough building permit page",
     "sourceUrl": "https://www.wrangell.com/forms",

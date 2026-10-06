@@ -1,0 +1,1840 @@
+{
+ "renames": [
+  {
+   "from": "Aleutians East County, AK",
+   "to": "Aleutians East Borough, AK",
+   "countyName": "Aleutians East",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Aleutians West County, AK",
+   "to": "Aleutians West Census Area, AK",
+   "countyName": "Aleutians West",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Anchorage, AK",
+   "to": "Anchorage Municipality, AK",
+   "countyName": "Anchorage",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Bethel County, AK",
+   "to": "Bethel Census Area, AK",
+   "countyName": "Bethel",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Bristol Bay County, AK",
+   "to": "Bristol Bay Borough, AK",
+   "countyName": "Bristol Bay",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Denali County, AK",
+   "to": "Denali Borough, AK",
+   "countyName": "Denali",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Dillingham County, AK",
+   "to": "Dillingham Census Area, AK",
+   "countyName": "Dillingham",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Fairbanks, AK",
+   "to": "Fairbanks North Star Borough, AK",
+   "countyName": "Fairbanks North Star",
+   "state": "AK",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Haines County, AK",
+   "to": "Haines Borough, AK",
+   "countyName": "Haines",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Hoonah-Angoon County, AK",
+   "to": "Hoonah-Angoon Census Area, AK",
+   "countyName": "Hoonah-Angoon",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Juneau City and County, AK",
+   "to": "Juneau City and Borough, AK",
+   "countyName": "Juneau City and",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Soldotna, AK",
+   "to": "Kenai Peninsula Borough, AK",
+   "countyName": "Kenai Peninsula",
+   "state": "AK",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Ketchikan Gateway County, AK",
+   "to": "Ketchikan Gateway Borough, AK",
+   "countyName": "Ketchikan Gateway",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Kodiak Island County, AK",
+   "to": "Kodiak Island Borough, AK",
+   "countyName": "Kodiak Island",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lake and Peninsula County, AK",
+   "to": "Lake and Peninsula Borough, AK",
+   "countyName": "Lake and Peninsula",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Palmer, AK",
+   "to": "Matanuska-Susitna Borough, AK",
+   "countyName": "Matanuska-Susitna",
+   "state": "AK",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Nome County, AK",
+   "to": "Nome Census Area, AK",
+   "countyName": "Nome",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "North Slope County, AK",
+   "to": "North Slope Borough, AK",
+   "countyName": "North Slope",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Northwest Arctic County, AK",
+   "to": "Northwest Arctic Borough, AK",
+   "countyName": "Northwest Arctic",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Petersburg County, AK",
+   "to": "Petersburg Borough, AK",
+   "countyName": "Petersburg",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Prince of Wales-Hyder County, AK",
+   "to": "Prince of Wales-Hyder Census Area, AK",
+   "countyName": "Prince of Wales-Hyder",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Sitka City and County, AK",
+   "to": "Sitka City and Borough, AK",
+   "countyName": "Sitka City and",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Skagway County, AK",
+   "to": "Skagway Municipality, AK",
+   "countyName": "Skagway",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Southeast Fairbanks County, AK",
+   "to": "Southeast Fairbanks Census Area, AK",
+   "countyName": "Southeast Fairbanks",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Valdez-Cordova County, AK",
+   "to": "Chugach Census Area, AK",
+   "countyName": "Valdez-Cordova",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Wade Hampton County, AK",
+   "to": "Kusilvak Census Area, AK",
+   "countyName": "Wade Hampton",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Wrangell City and County, AK",
+   "to": "Wrangell City and Borough, AK",
+   "countyName": "Wrangell City and",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Yakutat City and County, AK",
+   "to": "Yakutat City and Borough, AK",
+   "countyName": "Yakutat City and",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Yukon-Koyukuk County, AK",
+   "to": "Yukon-Koyukuk Census Area, AK",
+   "countyName": "Yukon-Koyukuk",
+   "state": "AK",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Los Angeles County",
+   "to": "Los Angeles County, CA",
+   "countyName": "Los Angeles",
+   "state": "CA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Denver, CO",
+   "to": "Denver County, CO",
+   "countyName": "Denver",
+   "state": "CO",
+   "clearPortal": false,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "District of Columbia County, DC",
+   "to": "District of Columbia, DC",
+   "countyName": "District of Columbia",
+   "state": "DC",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Honolulu, HI",
+   "to": "Honolulu County, HI",
+   "countyName": "Honolulu",
+   "state": "HI",
+   "clearPortal": false,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Idaho Falls, ID",
+   "to": "Bonneville County, ID",
+   "countyName": "Bonneville",
+   "state": "ID",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "South Bend, IN",
+   "to": "St. Joseph County, IN",
+   "countyName": "St. Joseph",
+   "state": "IN",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Louisville, KY",
+   "to": "Jefferson County, KY",
+   "countyName": "Jefferson",
+   "state": "KY",
+   "clearPortal": false,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Acadia County, LA",
+   "to": "Acadia Parish, LA",
+   "countyName": "Acadia",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Allen County, LA",
+   "to": "Allen Parish, LA",
+   "countyName": "Allen",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Ascension County, LA",
+   "to": "Ascension Parish, LA",
+   "countyName": "Ascension",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Assumption County, LA",
+   "to": "Assumption Parish, LA",
+   "countyName": "Assumption",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Avoyelles County, LA",
+   "to": "Avoyelles Parish, LA",
+   "countyName": "Avoyelles",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Beauregard County, LA",
+   "to": "Beauregard Parish, LA",
+   "countyName": "Beauregard",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Bienville County, LA",
+   "to": "Bienville Parish, LA",
+   "countyName": "Bienville",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Bossier County, LA",
+   "to": "Bossier Parish, LA",
+   "countyName": "Bossier",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Calcasieu County, LA",
+   "to": "Calcasieu Parish, LA",
+   "countyName": "Calcasieu",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Caldwell County, LA",
+   "to": "Caldwell Parish, LA",
+   "countyName": "Caldwell",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Cameron County, LA",
+   "to": "Cameron Parish, LA",
+   "countyName": "Cameron",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Catahoula County, LA",
+   "to": "Catahoula Parish, LA",
+   "countyName": "Catahoula",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Claiborne County, LA",
+   "to": "Claiborne Parish, LA",
+   "countyName": "Claiborne",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Concordia County, LA",
+   "to": "Concordia Parish, LA",
+   "countyName": "Concordia",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "De Soto County, LA",
+   "to": "De Soto Parish, LA",
+   "countyName": "De Soto",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "East Carroll County, LA",
+   "to": "East Carroll Parish, LA",
+   "countyName": "East Carroll",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "East Feliciana County, LA",
+   "to": "East Feliciana Parish, LA",
+   "countyName": "East Feliciana",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Evangeline County, LA",
+   "to": "Evangeline Parish, LA",
+   "countyName": "Evangeline",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Franklin County, LA",
+   "to": "Franklin Parish, LA",
+   "countyName": "Franklin",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Grant County, LA",
+   "to": "Grant Parish, LA",
+   "countyName": "Grant",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Iberia County, LA",
+   "to": "Iberia Parish, LA",
+   "countyName": "Iberia",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Iberville County, LA",
+   "to": "Iberville Parish, LA",
+   "countyName": "Iberville",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Jackson County, LA",
+   "to": "Jackson Parish, LA",
+   "countyName": "Jackson",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Jefferson Davis County, LA",
+   "to": "Jefferson Davis Parish, LA",
+   "countyName": "Jefferson Davis",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "La Salle County, LA",
+   "to": "LaSalle Parish, LA",
+   "countyName": "La Salle",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lafayette County, LA",
+   "to": "Lafayette Parish, LA",
+   "countyName": "Lafayette",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lafourche County, LA",
+   "to": "Lafourche Parish, LA",
+   "countyName": "Lafourche",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lincoln County, LA",
+   "to": "Lincoln Parish, LA",
+   "countyName": "Lincoln",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Livingston County, LA",
+   "to": "Livingston Parish, LA",
+   "countyName": "Livingston",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Madison County, LA",
+   "to": "Madison Parish, LA",
+   "countyName": "Madison",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Morehouse County, LA",
+   "to": "Morehouse Parish, LA",
+   "countyName": "Morehouse",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Natchitoches County, LA",
+   "to": "Natchitoches Parish, LA",
+   "countyName": "Natchitoches",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Ouachita County, LA",
+   "to": "Ouachita Parish, LA",
+   "countyName": "Ouachita",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Plaquemines County, LA",
+   "to": "Plaquemines Parish, LA",
+   "countyName": "Plaquemines",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Pointe Coupee County, LA",
+   "to": "Pointe Coupee Parish, LA",
+   "countyName": "Pointe Coupee",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Rapides County, LA",
+   "to": "Rapides Parish, LA",
+   "countyName": "Rapides",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Red River County, LA",
+   "to": "Red River Parish, LA",
+   "countyName": "Red River",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Richland County, LA",
+   "to": "Richland Parish, LA",
+   "countyName": "Richland",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Sabine County, LA",
+   "to": "Sabine Parish, LA",
+   "countyName": "Sabine",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Bernard County, LA",
+   "to": "St. Bernard Parish, LA",
+   "countyName": "St. Bernard",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Charles County, LA",
+   "to": "St. Charles Parish, LA",
+   "countyName": "St. Charles",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Helena County, LA",
+   "to": "St. Helena Parish, LA",
+   "countyName": "St. Helena",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. James County, LA",
+   "to": "St. James Parish, LA",
+   "countyName": "St. James",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. John the Baptist County, LA",
+   "to": "St. John the Baptist Parish, LA",
+   "countyName": "St. John the Baptist",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Landry County, LA",
+   "to": "St. Landry Parish, LA",
+   "countyName": "St. Landry",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Martin County, LA",
+   "to": "St. Martin Parish, LA",
+   "countyName": "St. Martin",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "St. Mary County, LA",
+   "to": "St. Mary Parish, LA",
+   "countyName": "St. Mary",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Tangipahoa County, LA",
+   "to": "Tangipahoa Parish, LA",
+   "countyName": "Tangipahoa",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Tensas County, LA",
+   "to": "Tensas Parish, LA",
+   "countyName": "Tensas",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Terrebonne County, LA",
+   "to": "Terrebonne Parish, LA",
+   "countyName": "Terrebonne",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Union County, LA",
+   "to": "Union Parish, LA",
+   "countyName": "Union",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Vermilion County, LA",
+   "to": "Vermilion Parish, LA",
+   "countyName": "Vermilion",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Vernon County, LA",
+   "to": "Vernon Parish, LA",
+   "countyName": "Vernon",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Washington County, LA",
+   "to": "Washington Parish, LA",
+   "countyName": "Washington",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Webster County, LA",
+   "to": "Webster Parish, LA",
+   "countyName": "Webster",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "West Baton Rouge County, LA",
+   "to": "West Baton Rouge Parish, LA",
+   "countyName": "West Baton Rouge",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "West Carroll County, LA",
+   "to": "West Carroll Parish, LA",
+   "countyName": "West Carroll",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "West Feliciana County, LA",
+   "to": "West Feliciana Parish, LA",
+   "countyName": "West Feliciana",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Winn County, LA",
+   "to": "Winn Parish, LA",
+   "countyName": "Winn",
+   "state": "LA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Prince Georges County, MD",
+   "to": "Prince George's County, MD",
+   "countyName": "Prince Georges",
+   "state": "MD",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Durham, NC",
+   "to": "Durham County, NC",
+   "countyName": "Durham",
+   "state": "NC",
+   "clearPortal": false,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Carson County, NV",
+   "to": "Carson City, NV",
+   "countyName": "Carson",
+   "state": "NV",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Elko, NV",
+   "to": "Elko County, NV",
+   "countyName": "Elko",
+   "state": "NV",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Pittsburgh, PA",
+   "to": "Allegheny County, PA",
+   "countyName": "Allegheny",
+   "state": "PA",
+   "clearPortal": true,
+   "why": "city name stored as the county"
+  },
+  {
+   "from": "Shannon County, SD",
+   "to": "Oglala Lakota County, SD",
+   "countyName": "Shannon",
+   "state": "SD",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Alexandria County, VA",
+   "to": "City of Alexandria, VA",
+   "countyName": "Alexandria",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Bristol County, VA",
+   "to": "City of Bristol, VA",
+   "countyName": "Bristol",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Buena Vista County, VA",
+   "to": "City of Buena Vista, VA",
+   "countyName": "Buena Vista",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Charles County, VA",
+   "to": "Charles City County, VA",
+   "countyName": "Charles",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Charlottesville County, VA",
+   "to": "City of Charlottesville, VA",
+   "countyName": "Charlottesville",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Chesapeake County, VA",
+   "to": "City of Chesapeake, VA",
+   "countyName": "Chesapeake",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Colonial Heights County, VA",
+   "to": "City of Colonial Heights, VA",
+   "countyName": "Colonial Heights",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Covington County, VA",
+   "to": "City of Covington, VA",
+   "countyName": "Covington",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Danville County, VA",
+   "to": "City of Danville, VA",
+   "countyName": "Danville",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Emporia County, VA",
+   "to": "City of Emporia, VA",
+   "countyName": "Emporia",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Falls Church County, VA",
+   "to": "City of Falls Church, VA",
+   "countyName": "Falls Church",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Fredericksburg County, VA",
+   "to": "City of Fredericksburg, VA",
+   "countyName": "Fredericksburg",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Galax County, VA",
+   "to": "City of Galax, VA",
+   "countyName": "Galax",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Hampton County, VA",
+   "to": "City of Hampton, VA",
+   "countyName": "Hampton",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Harrisonburg County, VA",
+   "to": "City of Harrisonburg, VA",
+   "countyName": "Harrisonburg",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Hopewell County, VA",
+   "to": "City of Hopewell, VA",
+   "countyName": "Hopewell",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "James County, VA",
+   "to": "James City County, VA",
+   "countyName": "James",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lexington County, VA",
+   "to": "City of Lexington, VA",
+   "countyName": "Lexington",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Lynchburg County, VA",
+   "to": "City of Lynchburg, VA",
+   "countyName": "Lynchburg",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Manassas County, VA",
+   "to": "City of Manassas, VA",
+   "countyName": "Manassas",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Manassas Park County, VA",
+   "to": "City of Manassas Park, VA",
+   "countyName": "Manassas Park",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Martinsville County, VA",
+   "to": "City of Martinsville, VA",
+   "countyName": "Martinsville",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Newport News County, VA",
+   "to": "City of Newport News, VA",
+   "countyName": "Newport News",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Norfolk County, VA",
+   "to": "City of Norfolk, VA",
+   "countyName": "Norfolk",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Norton County, VA",
+   "to": "City of Norton, VA",
+   "countyName": "Norton",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Petersburg County, VA",
+   "to": "City of Petersburg, VA",
+   "countyName": "Petersburg",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Poquoson County, VA",
+   "to": "City of Poquoson, VA",
+   "countyName": "Poquoson",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Portsmouth County, VA",
+   "to": "City of Portsmouth, VA",
+   "countyName": "Portsmouth",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Radford County, VA",
+   "to": "City of Radford, VA",
+   "countyName": "Radford",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Salem County, VA",
+   "to": "City of Salem, VA",
+   "countyName": "Salem",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Staunton County, VA",
+   "to": "City of Staunton, VA",
+   "countyName": "Staunton",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Suffolk County, VA",
+   "to": "City of Suffolk, VA",
+   "countyName": "Suffolk",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Waynesboro County, VA",
+   "to": "City of Waynesboro, VA",
+   "countyName": "Waynesboro",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Williamsburg County, VA",
+   "to": "City of Williamsburg, VA",
+   "countyName": "Williamsburg",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Winchester County, VA",
+   "to": "City of Winchester, VA",
+   "countyName": "Winchester",
+   "state": "VA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Island County (unincorporated)",
+   "to": "Island County, WA",
+   "countyName": "Island",
+   "state": "WA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "San Juan County",
+   "to": "San Juan County, WA",
+   "countyName": "San Juan",
+   "state": "WA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Skagit County (unincorporated)",
+   "to": "Skagit County, WA",
+   "countyName": "Skagit",
+   "state": "WA",
+   "clearPortal": false,
+   "why": "official Census name"
+  },
+  {
+   "from": "Whatcom County (unincorporated)",
+   "to": "Whatcom County, WA",
+   "countyName": "Whatcom",
+   "state": "WA",
+   "clearPortal": false,
+   "why": "official Census name"
+  }
+ ],
+ "adds": [
+  {
+   "jurisdiction": "Madison County, AL",
+   "countyName": "Madison",
+   "state": "AL",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Montgomery County, AL",
+   "countyName": "Montgomery",
+   "state": "AL",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Benton County, AR",
+   "countyName": "Benton",
+   "state": "AR",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Faulkner County, AR",
+   "countyName": "Faulkner",
+   "state": "AR",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Pulaski County, AR",
+   "countyName": "Pulaski",
+   "state": "AR",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Sebastian County, AR",
+   "countyName": "Sebastian",
+   "state": "AR",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Washington County, AR",
+   "countyName": "Washington",
+   "state": "AR",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Fairfield County, CT",
+   "countyName": "Fairfield",
+   "state": "CT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Hartford County, CT",
+   "countyName": "Hartford",
+   "state": "CT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Litchfield County, CT",
+   "countyName": "Litchfield",
+   "state": "CT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Middlesex County, CT",
+   "countyName": "Middlesex",
+   "state": "CT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "New Haven County, CT",
+   "countyName": "New Haven",
+   "state": "CT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Black Hawk County, IA",
+   "countyName": "Black Hawk",
+   "state": "IA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Johnson County, IA",
+   "countyName": "Johnson",
+   "state": "IA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Linn County, IA",
+   "countyName": "Linn",
+   "state": "IA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Polk County, IA",
+   "countyName": "Polk",
+   "state": "IA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Scott County, IA",
+   "countyName": "Scott",
+   "state": "IA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Marion County, IN",
+   "countyName": "Marion",
+   "state": "IN",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Douglas County, KS",
+   "countyName": "Douglas",
+   "state": "KS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Sedgwick County, KS",
+   "countyName": "Sedgwick",
+   "state": "KS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Shawnee County, KS",
+   "countyName": "Shawnee",
+   "state": "KS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Wyandotte County, KS",
+   "countyName": "Wyandotte",
+   "state": "KS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Warren County, KY",
+   "countyName": "Warren",
+   "state": "KY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "East Baton Rouge Parish, LA",
+   "countyName": "East Baton Rouge",
+   "state": "LA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Orleans Parish, LA",
+   "countyName": "Orleans",
+   "state": "LA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Essex County, MA",
+   "countyName": "Essex",
+   "state": "MA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Middlesex County, MA",
+   "countyName": "Middlesex",
+   "state": "MA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Norfolk County, MA",
+   "countyName": "Norfolk",
+   "state": "MA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Suffolk County, MA",
+   "countyName": "Suffolk",
+   "state": "MA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Worcester County, MA",
+   "countyName": "Worcester",
+   "state": "MA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Cumberland County, ME",
+   "countyName": "Cumberland",
+   "state": "ME",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Kennebec County, ME",
+   "countyName": "Kennebec",
+   "state": "ME",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Penobscot County, ME",
+   "countyName": "Penobscot",
+   "state": "ME",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "York County, ME",
+   "countyName": "York",
+   "state": "ME",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Kent County, MI",
+   "countyName": "Kent",
+   "state": "MI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Wayne County, MI",
+   "countyName": "Wayne",
+   "state": "MI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Ramsey County, MN",
+   "countyName": "Ramsey",
+   "state": "MN",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Greene County, MO",
+   "countyName": "Greene",
+   "state": "MO",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Jackson County, MO",
+   "countyName": "Jackson",
+   "state": "MO",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Harrison County, MS",
+   "countyName": "Harrison",
+   "state": "MS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Hinds County, MS",
+   "countyName": "Hinds",
+   "state": "MS",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Gallatin County, MT",
+   "countyName": "Gallatin",
+   "state": "MT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Missoula County, MT",
+   "countyName": "Missoula",
+   "state": "MT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Yellowstone County, MT",
+   "countyName": "Yellowstone",
+   "state": "MT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Burleigh County, ND",
+   "countyName": "Burleigh",
+   "state": "ND",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Cass County, ND",
+   "countyName": "Cass",
+   "state": "ND",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Grand Forks County, ND",
+   "countyName": "Grand Forks",
+   "state": "ND",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Ward County, ND",
+   "countyName": "Ward",
+   "state": "ND",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Douglas County, NE",
+   "countyName": "Douglas",
+   "state": "NE",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Hall County, NE",
+   "countyName": "Hall",
+   "state": "NE",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Lancaster County, NE",
+   "countyName": "Lancaster",
+   "state": "NE",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Hillsborough County, NH",
+   "countyName": "Hillsborough",
+   "state": "NH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Merrimack County, NH",
+   "countyName": "Merrimack",
+   "state": "NH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Rockingham County, NH",
+   "countyName": "Rockingham",
+   "state": "NH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Strafford County, NH",
+   "countyName": "Strafford",
+   "state": "NH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Essex County, NJ",
+   "countyName": "Essex",
+   "state": "NJ",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Hudson County, NJ",
+   "countyName": "Hudson",
+   "state": "NJ",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Middlesex County, NJ",
+   "countyName": "Middlesex",
+   "state": "NJ",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Santa Fe County, NM",
+   "countyName": "Santa Fe",
+   "state": "NM",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Bronx County, NY",
+   "countyName": "Bronx",
+   "state": "NY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Erie County, NY",
+   "countyName": "Erie",
+   "state": "NY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Kings County, NY",
+   "countyName": "Kings",
+   "state": "NY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "New York County, NY",
+   "countyName": "New York",
+   "state": "NY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Queens County, NY",
+   "countyName": "Queens",
+   "state": "NY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Cuyahoga County, OH",
+   "countyName": "Cuyahoga",
+   "state": "OH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Lucas County, OH",
+   "countyName": "Lucas",
+   "state": "OH",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Cleveland County, OK",
+   "countyName": "Cleveland",
+   "state": "OK",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Comanche County, OK",
+   "countyName": "Comanche",
+   "state": "OK",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Oklahoma County, OK",
+   "countyName": "Oklahoma",
+   "state": "OK",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Tulsa County, OK",
+   "countyName": "Tulsa",
+   "state": "OK",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Philadelphia County, PA",
+   "countyName": "Philadelphia",
+   "state": "PA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Kent County, RI",
+   "countyName": "Kent",
+   "state": "RI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Providence County, RI",
+   "countyName": "Providence",
+   "state": "RI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Washington County, RI",
+   "countyName": "Washington",
+   "state": "RI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Minnehaha County, SD",
+   "countyName": "Minnehaha",
+   "state": "SD",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Pennington County, SD",
+   "countyName": "Pennington",
+   "state": "SD",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Davidson County, TN",
+   "countyName": "Davidson",
+   "state": "TN",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Dallas County, TX",
+   "countyName": "Dallas",
+   "state": "TX",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "El Paso County, TX",
+   "countyName": "El Paso",
+   "state": "TX",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Tarrant County, TX",
+   "countyName": "Tarrant",
+   "state": "TX",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Travis County, TX",
+   "countyName": "Travis",
+   "state": "TX",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Washington County, UT",
+   "countyName": "Washington",
+   "state": "UT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "City of Virginia Beach, VA",
+   "countyName": "Virginia Beach",
+   "state": "VA",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Chittenden County, VT",
+   "countyName": "Chittenden",
+   "state": "VT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Rutland County, VT",
+   "countyName": "Rutland",
+   "state": "VT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Washington County, VT",
+   "countyName": "Washington",
+   "state": "VT",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Brown County, WI",
+   "countyName": "Brown",
+   "state": "WI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Dane County, WI",
+   "countyName": "Dane",
+   "state": "WI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Milwaukee County, WI",
+   "countyName": "Milwaukee",
+   "state": "WI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Racine County, WI",
+   "countyName": "Racine",
+   "state": "WI",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Berkeley County, WV",
+   "countyName": "Berkeley",
+   "state": "WV",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Cabell County, WV",
+   "countyName": "Cabell",
+   "state": "WV",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Kanawha County, WV",
+   "countyName": "Kanawha",
+   "state": "WV",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Monongalia County, WV",
+   "countyName": "Monongalia",
+   "state": "WV",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Campbell County, WY",
+   "countyName": "Campbell",
+   "state": "WY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Laramie County, WY",
+   "countyName": "Laramie",
+   "state": "WY",
+   "why": "county missing from the directory"
+  },
+  {
+   "jurisdiction": "Natrona County, WY",
+   "countyName": "Natrona",
+   "state": "WY",
+   "why": "county missing from the directory"
+  }
+ ],
+ "deletes": [
+  {
+   "jurisdiction": "San Diego County",
+   "countyName": "San Diego",
+   "state": "CA",
+   "keep": "San Diego County, CA",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Savannah, GA",
+   "countyName": "Chatham",
+   "state": "GA",
+   "keep": "Chatham County, GA",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Fayetteville, NC",
+   "countyName": "Cumberland",
+   "state": "NC",
+   "keep": "Cumberland County, NC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Winston-Salem, NC",
+   "countyName": "Forsyth",
+   "state": "NC",
+   "keep": "Forsyth County, NC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Greensboro, NC",
+   "countyName": "Guilford",
+   "state": "NC",
+   "keep": "Guilford County, NC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Charlotte, NC",
+   "countyName": "Mecklenburg",
+   "state": "NC",
+   "keep": "Mecklenburg County, NC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Raleigh, NC",
+   "countyName": "Wake",
+   "state": "NC",
+   "keep": "Wake County, NC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Charleston, SC",
+   "countyName": "Charleston",
+   "state": "SC",
+   "keep": "Charleston County, SC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Greenville, SC",
+   "countyName": "Greenville",
+   "state": "SC",
+   "keep": "Greenville County, SC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Myrtle Beach, SC",
+   "countyName": "Horry",
+   "state": "SC",
+   "keep": "Horry County, SC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Columbia, SC",
+   "countyName": "Richland",
+   "state": "SC",
+   "keep": "Richland County, SC",
+   "why": "city name stored as a second county row"
+  },
+  {
+   "jurisdiction": "Spartanburg, SC",
+   "countyName": "Spartanburg",
+   "state": "SC",
+   "keep": "Spartanburg County, SC",
+   "why": "city name stored as a second county row"
+  }
+ ],
+ "countyRenames": [
+  {
+   "state": "AK",
+   "from": "Wade Hampton",
+   "to": "Kusilvak",
+   "why": "renamed 2015"
+  },
+  {
+   "state": "SD",
+   "from": "Shannon",
+   "to": "Oglala Lakota",
+   "why": "renamed 2015"
+  },
+  {
+   "state": "AK",
+   "from": "Valdez-Cordova",
+   "to": "Chugach",
+   "why": "split 2019 into Chugach and Copper River census areas"
+  }
+ ],
+ "countyAdds": [
+  {
+   "state": "AK",
+   "name": "Copper River",
+   "jurisdiction": "Copper River Census Area, AK",
+   "why": "split from Valdez-Cordova 2019"
+  }
+ ],
+ "moveCities": [
+  {
+   "jurisdiction": "Chitina, AK",
+   "toCounty": "Copper River"
+  },
+  {
+   "jurisdiction": "Copper Center, AK",
+   "toCounty": "Copper River"
+  },
+  {
+   "jurisdiction": "Gakona, AK",
+   "toCounty": "Copper River"
+  },
+  {
+   "jurisdiction": "Glennallen, AK",
+   "toCounty": "Copper River"
+  }
+ ]
+}

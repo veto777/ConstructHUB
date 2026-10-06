@@ -27,6 +27,14 @@ export async function seedDatabase() {
     } catch (err: any) {
       console.error("Permit row repair failed (will retry on next boot):", err?.message || err);
     }
+    // County rows: official Census names, the counties the seed skipped or stored under a city name (county-fixes.ts).
+    try {
+      const { applyCountyFixes } = await import("./county-fixes");
+      const s = await applyCountyFixes();
+      if (Object.values(s).some((n) => n > 0)) console.log("County fixes applied:", JSON.stringify(s));
+    } catch (err: any) {
+      console.error("County fixes failed (will retry on next boot):", err?.message || err);
+    }
     await seedAllAppraisers();
     await seedPermitPortals();
     return;

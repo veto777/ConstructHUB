@@ -1,4 +1,5 @@
 import { governmentLinkNotice, governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
+import { countyLabel } from "@shared/county-labels";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -391,6 +392,8 @@ function PaginationControls({
 }
 
 function DatabaseCard({ database, countyName }: { database: PermitDatabase; countyName?: string }) {
+  // "Acadia Parish", "Kusilvak Census Area", "City of Alexandria" — not every county-equivalent is a "County".
+  const stateCode = /, ([A-Z]{2})$/.exec(database.jurisdiction)?.[1] ?? "";
   const [scrapeOpen, setScrapeOpen] = useState(false);
   // "Active", searchable fields and notes describe a portal; a jurisdiction with no
   // usable portal on record gets none of them (never a templated placeholder).
@@ -430,7 +433,7 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
             <p className="text-xs text-muted-foreground mt-0.5">
               {database.jurisdiction}
               {countyName && <span className="ml-1.5 text-border">·</span>}
-              {countyName && <span className="ml-1.5">{countyName} County</span>}
+              {countyName && <span className="ml-1.5">{countyLabel(countyName, stateCode)}</span>}
               {database.platform && <span className="ml-1.5 text-border">·</span>}
               {database.platform && <span className="ml-1.5">{database.platform}</span>}
             </p>
