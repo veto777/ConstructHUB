@@ -1,0 +1,41 @@
+{
+  "capturedAt": "2026-10-06T03:07:00Z",
+  "notes": "Anonymous Chromium observations. HTML trimmed to permit header, work location, role sections and supported label/value fields. JSON retains parser fields and envelope; cookies and request headers removed. Punctuation-only names are portal redactions, not fabricated test data.",
+  "accela": [
+    {
+      "fixture": "accela-118.html",
+      "portal": "Anne Arundel County Building",
+      "searchUrl": "https://aca-prod.accela.com/AACO/Default.aspx",
+      "permit": "F00005377",
+      "recordUrl": "https://aca-prod.accela.com/AACO/Cap/CapDetail.aspx?Module=Permits&TabName=Permits&capID1=24CAP&capID2=00000&capID3=01T6R&agencyCode=AACO&IsToShowInspection="
+    },
+    {
+      "fixture": "accela-4701.html",
+      "portal": "City of Chandler",
+      "searchUrl": "https://aca-prod.accela.com/CHANDLER/Default.aspx",
+      "permit": "BLDREV23-0382",
+      "recordUrl": "https://aca-prod.accela.com/CHANDLER/Cap/CapDetail.aspx?Module=DevServices&TabName=DevServices&capID1=23BDR&capID2=00000&capID3=00382&agencyCode=CHANDLER&IsToShowInspection="
+    },
+    {
+      "fixture": "accela-4863.html",
+      "portal": "City of Berkeley",
+      "searchUrl": "https://aca-prod.accela.com/BERKELEY/Default.aspx",
+      "permit": "B2006-03950",
+      "recordUrl": "https://aca-prod.accela.com/BERKELEY/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=06B01&capID2=00000&capID3=020OK&agencyCode=BERKELEY&IsToShowInspection="
+    },
+    {
+      "fixture": "accela-32967.html",
+      "portal": "Bernalillo County, NM",
+      "searchUrl": "https://aca-prod.accela.com/BERNCO/Default.aspx",
+      "permit": "ELCO2014-0020",
+      "recordUrl": "https://aca-prod.accela.com/BERNCO/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=DUB14&capID2=00000&capID3=000OF&agencyCode=BERNCO&IsToShowInspection="
+    },
+    {
+      "fixture": "accela-28073.html",
+      "portal": "City of Brownsville",
+      "searchUrl": "https://aca-prod.accela.com/brownsville/Default.aspx",
+      "permit": "2026-04324",
+      "recordUrl": "https://aca-prod.accela.com/BROWNSVILLE/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=REC26&capID2=00000&capID3=007NP&agencyCode=BROWNSVILLE&IsToShowInspection="
+    }
+  ]
+}

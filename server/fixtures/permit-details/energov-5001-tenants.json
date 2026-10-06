@@ -1,0 +1,18 @@
+{
+  "source": "https://css.cityofclovis.com/EnerGov_Prod/selfservice/api/Home/GetTenants",
+  "data": {
+    "Result": [
+      {
+        "TenantID": 1,
+        "TenantName": "ClovisCAProd",
+        "TenantUrl": "ClovisCAProd"
+      }
+    ],
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

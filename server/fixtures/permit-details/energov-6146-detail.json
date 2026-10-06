@@ -1,0 +1,26 @@
+{
+  "source": "https://energovcss.bouldercolorado.gov/energov_prod/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+      "PermitNumber": "PMT2002-01976-PLB",
+      "PermitType": "Plumbing Sub-Permit",
+      "PermitStatus": "Letter of Completion",
+      "IssueDate": "2002-05-15T06:00:00Z",
+      "ExpireDate": "2005-05-15T06:00:00Z",
+      "FinalizeDate": "2002-07-08T06:00:00Z",
+      "ApplyDate": "2002-05-15T06:00:00Z",
+      "Description": "Minor interior tenant remodel to accommodate the installation of a gelato case at Cafe Sole in the Table Mesa Shopping Center.  No HVAC proposed and no changes to seating area or are s.f. proposed.",
+      "MainAddress": "637 S BROADWAY",
+      "MainParcelNumber": "230812000055",
+      "Value": null,
+      "ShowValue": false
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

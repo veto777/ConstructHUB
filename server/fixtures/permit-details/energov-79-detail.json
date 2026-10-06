@@ -1,0 +1,26 @@
+{
+  "source": "https://css.dmgov.org/EnerGov_Prod/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "8E68D6D0-02A6-48E6-9E30-D171F4D02304",
+      "PermitNumber": "PLM2003-00666",
+      "PermitType": "Tidemark Import - PLM",
+      "PermitStatus": "Expired",
+      "IssueDate": "2003-03-24T06:00:00Z",
+      "ExpireDate": "2004-03-24T06:00:00Z",
+      "FinalizeDate": "2004-03-24T06:00:00Z",
+      "ApplyDate": "2003-03-24T06:00:00Z",
+      "Description": " ",
+      "MainAddress": "3380   GRAND AVE \r\nDES MOINES, IA",
+      "MainParcelNumber": "09005645000000",
+      "Value": 0,
+      "ShowValue": false
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

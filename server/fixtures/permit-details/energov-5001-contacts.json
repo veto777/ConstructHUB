@@ -1,0 +1,43 @@
+{
+  "source": "https://css.cityofclovis.com/EnerGov_Prod/selfservice/api/energov/entity/contacts/search/search",
+  "data": {
+    "PageCount": 1,
+    "TotalFound": 3,
+    "CacheKey": "",
+    "Result": [
+      {
+        "ModuleId": 1,
+        "EntityId": "88120fef-30b3-4e61-94b1-783d568c2c50",
+        "ContactTypeName": "Applicant",
+        "GlobalEntityName": "",
+        "FirstName": ". . . . .",
+        "LastName": ". . . . .",
+        "Title": ". . . . ."
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "88120fef-30b3-4e61-94b1-783d568c2c50",
+        "ContactTypeName": "Contractor",
+        "GlobalEntityName": "Allstate Roofing Specialist Inc dba Allstate Roofing",
+        "FirstName": "",
+        "LastName": "",
+        "Title": "799414"
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "88120fef-30b3-4e61-94b1-783d568c2c50",
+        "ContactTypeName": "Property Owner",
+        "GlobalEntityName": "",
+        "FirstName": ". . . . .",
+        "LastName": "",
+        "Title": ""
+      }
+    ],
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

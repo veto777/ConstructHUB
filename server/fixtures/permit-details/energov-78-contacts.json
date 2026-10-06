@@ -1,0 +1,12 @@
+{
+  "source": "https://cedarrapidsia-energovpub.tylerhost.net/apps/selfservice/api/energov/entity/contacts/search/search",
+  "data": {
+    "Result": null,
+    "Success": false,
+    "ErrorMessage": "You must be a contact on this record to see this information",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 412,
+    "BrokenRules": []
+  }
+}

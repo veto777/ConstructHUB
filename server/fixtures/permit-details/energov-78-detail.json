@@ -1,0 +1,26 @@
+{
+  "source": "https://cedarrapidsia-energovpub.tylerhost.net/apps/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "107330a1-cdee-484e-92f6-ad2e58c98e22",
+      "PermitNumber": "ELEC015550CR",
+      "PermitType": "MPS Imported Permit - Electrical",
+      "PermitStatus": "Closed",
+      "IssueDate": "2005-03-14T06:00:00Z",
+      "ExpireDate": "2006-03-14T06:00:00Z",
+      "FinalizeDate": null,
+      "ApplyDate": "2005-03-14T06:00:00Z",
+      "Description": "WIRE NEW HOUSE",
+      "MainAddress": "7402 1ST AVE NW",
+      "MainParcelNumber": null,
+      "Value": null,
+      "ShowValue": true
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

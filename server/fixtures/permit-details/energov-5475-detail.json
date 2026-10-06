@@ -1,0 +1,26 @@
+{
+  "source": "https://permits.costamesaca.gov/energov_prod/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "802A9819-E11E-497B-9026-7E9EAC147FD0",
+      "PermitNumber": "TB-23-0001",
+      "PermitType": "Non-Residential Banner Permit",
+      "PermitStatus": "Approved",
+      "IssueDate": null,
+      "ExpireDate": null,
+      "FinalizeDate": null,
+      "ApplyDate": "2023-01-09T08:00:00Z",
+      "Description": "TEMPORARY BANNER PERMIT FOR ORECK COAST VACUUM & SEWING (SUITE A107). DISPLAY DATES JANUARY 9, 2023 THRU MARCH 9, 2023\n\rTitle : \n\rPlanning Note : \n\r",
+      "MainAddress": "1835 NEWPORT BLVD \r\nCosta Mesa",
+      "MainParcelNumber": "424-222-20",
+      "Value": 0,
+      "ShowValue": false
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

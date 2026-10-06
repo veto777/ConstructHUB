@@ -1,0 +1,26 @@
+{
+  "source": "https://accomackcountyva-energovpub.tylerhost.net/apps/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "965334b3-6bf0-42b5-8380-86e4a233636c",
+      "PermitNumber": "WET-000173-2021",
+      "PermitType": "Tidal Wetlands",
+      "PermitStatus": "Complete",
+      "IssueDate": null,
+      "ExpireDate": null,
+      "FinalizeDate": "2023-11-09T16:59:45Z",
+      "ApplyDate": "2021-02-18T20:31:26.86Z",
+      "Description": "installation of a boat lift to an existing dock",
+      "MainAddress": "33532 Smith Farm Road \r\nBelle Haven, VA 23306",
+      "MainParcelNumber": "108-A-18",
+      "Value": 0,
+      "ShowValue": false
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

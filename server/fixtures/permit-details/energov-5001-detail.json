@@ -1,0 +1,26 @@
+{
+  "source": "https://css.cityofclovis.com/EnerGov_Prod/selfservice/api/energov/permits/permitdetail",
+  "data": {
+    "Result": {
+      "PermitId": "88120fef-30b3-4e61-94b1-783d568c2c50",
+      "PermitNumber": "RERF-001928-2012",
+      "PermitType": "Re-Roof - Residential",
+      "PermitStatus": "Finaled",
+      "IssueDate": "2012-08-06T21:19:18.527Z",
+      "ExpireDate": "2013-02-04T22:19:18.527Z",
+      "FinalizeDate": "2013-02-12T19:04:58.35Z",
+      "ApplyDate": "2012-07-19T17:28:21.55Z",
+      "Description": "Re-roof; Tear-off, using existing sheathing (must have pre roof inspection) install 15# felt, 30 yr comp., Must meet cool roof requirements.  Bldg #10 units 170-177 & 270-277.",
+      "MainAddress": "2800  Willow Ave Unit/Suite: 170 \r\nClovis, CA 93612",
+      "MainParcelNumber": "43042311",
+      "Value": 14700,
+      "ShowValue": true
+    },
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

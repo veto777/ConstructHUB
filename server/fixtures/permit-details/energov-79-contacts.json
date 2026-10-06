@@ -1,0 +1,25 @@
+{
+  "source": "https://css.dmgov.org/EnerGov_Prod/selfservice/api/energov/entity/contacts/search/search",
+  "data": {
+    "PageCount": 1,
+    "TotalFound": 1,
+    "CacheKey": "",
+    "Result": [
+      {
+        "ModuleId": 1,
+        "EntityId": "8E68D6D0-02A6-48E6-9E30-D171F4D02304",
+        "ContactTypeName": "Contractor - Plumbing",
+        "GlobalEntityName": "CORELL CONTRACTOR INC",
+        "FirstName": "",
+        "LastName": "",
+        "Title": ""
+      }
+    ],
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

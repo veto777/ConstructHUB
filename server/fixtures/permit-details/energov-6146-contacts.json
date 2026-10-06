@@ -1,0 +1,61 @@
+{
+  "source": "https://energovcss.bouldercolorado.gov/energov_prod/selfservice/api/energov/entity/contacts/search/search",
+  "data": {
+    "PageCount": 1,
+    "TotalFound": 5,
+    "CacheKey": "",
+    "Result": [
+      {
+        "ModuleId": 1,
+        "EntityId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+        "ContactTypeName": "Applicant",
+        "GlobalEntityName": "SOUTHWARD CONTRACTING INC",
+        "FirstName": "DENNIS",
+        "LastName": "SOUTHWARD",
+        "Title": ""
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+        "ContactTypeName": "Applicant",
+        "GlobalEntityName": "",
+        "FirstName": "",
+        "LastName": "CAFE SOLE",
+        "Title": null
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+        "ContactTypeName": "Contractor: Plumbing",
+        "GlobalEntityName": "SOUTHWARD CONTRACTING INC",
+        "FirstName": "DENNIS",
+        "LastName": "SOUTHWARD",
+        "Title": ""
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+        "ContactTypeName": "Contractor: Plumbing",
+        "GlobalEntityName": "NORTHSTAR MECHANICAL INC",
+        "FirstName": "",
+        "LastName": "NORTHSTAR MECHANICAL INC",
+        "Title": null
+      },
+      {
+        "ModuleId": 1,
+        "EntityId": "F92F6CDB-6EF3-4E9A-A4F0-CFC2CD27E318",
+        "ContactTypeName": "Contractor: Plumbing",
+        "GlobalEntityName": "BOULDER ELECTRIC, INC.",
+        "FirstName": "",
+        "LastName": "BOULDER ELECTRIC, INC.",
+        "Title": null
+      }
+    ],
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

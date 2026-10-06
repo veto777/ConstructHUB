@@ -1,0 +1,18 @@
+{
+  "source": "https://cedarrapidsia-energovpub.tylerhost.net/apps/selfservice/api/Home/GetTenants",
+  "data": {
+    "Result": [
+      {
+        "TenantID": 1,
+        "TenantName": "cedarrapidsiahostedprod",
+        "TenantUrl": "CedarRapids"
+      }
+    ],
+    "Success": true,
+    "ErrorMessage": "",
+    "ValidationErrorMessage": "",
+    "ConcurrencyErrorMessage": "",
+    "StatusCode": 200,
+    "BrokenRules": []
+  }
+}

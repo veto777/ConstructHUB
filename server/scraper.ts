@@ -2197,6 +2197,253 @@ export async function scrapeClick2GovDetail(
   }
 }
 
+// Detail adapters use fresh anonymous sessions. Never trust cached contact data or
+// record URLs from rawData: the portal must confirm both jurisdiction and number.
+export function assertAccelaAgency(searchUrl: string, recordUrl: string): void {
+  const source = new URL(searchUrl);
+  const target = new URL(recordUrl);
+  const agency = source.pathname.split('/')[1]?.toLowerCase();
+  if (!agency || target.origin !== source.origin || target.pathname.split('/')[1]?.toLowerCase() !== agency ||
+      [...target.searchParams].some(([key, value]) => /^(agencyCode|agency)$/i.test(key) && value.toLowerCase() !== agency)) {
+    throw new Error(`Accela redirected outside the configured agency: ${target.origin}${target.pathname}`);
+  }
+}
+
+export function assertEnerGovApplication(searchUrl: string, targetUrl: string): void {
+  const app = new URL(enerGovApplicationUrl(searchUrl));
+  const target = new URL(targetUrl);
+  if (target.origin !== app.origin || !target.pathname.toLowerCase().startsWith(app.pathname.toLowerCase() + '/api/')) {
+    throw new Error('EnerGov detail redirected outside the configured application');
+  }
+}
+
+function detailText(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  const text = String(value).replace(/\s+/g, ' ').trim();
+  return /[\p{L}\p{N}]/u.test(text) ? text : '';
+}
+
+function addDetail(details: PermitDetail, key: string, value: unknown) {
+  const text = detailText(value);
+  if (text) details[key] = [...new Set([...(details[key]?.split('; ') || []), text])].join('; ');
+}
+
+export function parseAccelaDetail(html: string, permitNumber: string, searchUrl: string, recordUrl: string): PermitDetail | null {
+  assertAccelaAgency(searchUrl, recordUrl);
+  if (!/\/Cap\/CapDetail\.aspx$/i.test(new URL(recordUrl).pathname)) return null;
+  const $ = cheerio.load(html);
+  const number = $('#ctl00_PlaceHolderMain_lblPermitNumber').text().trim();
+  if (!permitNumber.trim() || number !== permitNumber.trim()) return null;
+  const details: PermitDetail = { Permit: number };
+  addDetail(details, 'Type', $('#ctl00_PlaceHolderMain_lblPermitType').text());
+  addDetail(details, 'Status', $('#ctl00_PlaceHolderMain_lblRecordStatus').text());
+  const location = $("[id$='_workLocation_updatePanel']").clone();
+  location.find('script, style').remove();
+  addDetail(details, 'Address', location.text().replace(/\s*\*\s*$/, ''));
+  // Role sections are siblings of their headings; do not scrape unrelated
+  // condition notices, login forms, or other records' names from the page.
+  $("[id$='_TBPermitDetailTest'] h1").each((_i, heading) => {
+    const label = $(heading).text().trim().replace(/:$/, '');
+    const section = $(heading).next('span');
+    if (/^Project Description$/i.test(label)) {
+      addDetail(details, 'Description', section.text());
+    } else if (/^Applicant$/i.test(label)) {
+      section.find('.contactinfo_firstname').each((_j, first) => {
+        const parent = $(first).parent();
+        addDetail(details, 'Applicant', parent.find('.contactinfo_firstname, .contactinfo_middlename, .contactinfo_lastname').map((_k, el) => $(el).text().trim()).get().join(' '));
+      });
+      section.find('.contactinfo_businessname, .contactinfo_organizationname').each((_j, el) => addDetail(details, 'Applicant', $(el).text()));
+    } else if (/^Owner$/i.test(label)) {
+      // The owner template puts the name in the first row, followed by address
+      // rows. A bare asterisk is a redacted name, not a contact.
+      section.find('table').filter((_j, el) => $(el).find('table').length === 0).each((_j, table) => {
+        addDetail(details, 'Owner', $(table).find('tr').first().text().replace(/\s*\*\s*$/, ''));
+      });
+    } else if (/^Licensed Professional(s)?$/i.test(label)) {
+      section.find("table[id='tbl_licensedps'] > tbody > tr > td:last-child").each((_j, cell) => {
+        const body = $(cell).clone();
+        body.find('table').remove();
+        body.find('br').replaceWith('\n');
+        const lines = body.text().split('\n').map(detailText).filter(Boolean);
+        // Name and optional company precede the mailing address. Licenses
+        // follow the phone table in Accela's public licensed-professional template.
+        const names: string[] = [];
+        for (const line of lines.slice(0, 2)) {
+          if (/^\d+\s|,.*\d|^P\.?\s*O\.?\s*Box\b|^ZBL#|\b(?:contractor|electrician)\s+\d/i.test(line)) break;
+          names.push(line);
+        }
+        addDetail(details, 'Contractor', names.join(' / '));
+        const license = lines.find(line => /^(?:contractor|electrician|electrical|plumber|plumbing|mechanical|general building|general engineering|building contractor)\b.*\s[\w-]*\d[\w-]*$/i.test(line));
+        addDetail(details, 'Contractor license', license);
+        $(cell).find('.ACA_PhoneNumberLTR').each((_k, el) => addDetail(details, 'Contractor phone', $(el).text()));
+        const email = $(cell).text().match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+        email?.forEach(value => addDetail(details, 'Contractor email', value));
+      });
+    }
+  });
+  const labels: Record<string, string> = {
+    'application date': 'Applied', 'applied date': 'Applied', 'issue date': 'Issued', 'issued date': 'Issued',
+    'expiration date': 'Expires', 'finaled date': 'Finaled', 'finalized date': 'Finaled',
+    'job value': 'Job value', 'job valuation': 'Job value', 'valuation': 'Job value', 'parcel number': 'Parcel',
+  };
+  $('.MoreDetail_ItemCol1').each((_i, el) => {
+    const key = labels[$(el).text().trim().replace(/:$/, '').toLowerCase()];
+    if (key) addDetail(details, key, $(el).next('.MoreDetail_ItemCol2').text());
+  });
+  return details;
+}
+
+export function parseEnerGovDetail(data: any, contacts: any, permitNumber: string, caseId: string): PermitDetail | null {
+  const record = data?.Result;
+  if (data?.Success !== true || !permitNumber.trim() || record?.PermitNumber !== permitNumber.trim() ||
+      typeof record?.PermitId !== 'string' || record.PermitId.toLowerCase() !== caseId.toLowerCase()) return null;
+  const details: PermitDetail = {};
+  const fields: Record<string, string> = {
+    PermitNumber: 'Permit', PermitType: 'Type', PermitStatus: 'Status', Description: 'Description',
+    ApplyDate: 'Applied', IssueDate: 'Issued', ExpireDate: 'Expires', FinalizeDate: 'Finaled',
+    MainAddress: 'Address', MainParcelNumber: 'Parcel',
+  };
+  for (const [field, label] of Object.entries(fields)) addDetail(details, label, record[field]);
+  if (record.ShowValue === true) addDetail(details, 'Job value', record.Value);
+  if (contacts?.Success === true && Array.isArray(contacts.Result)) {
+    for (const contact of contacts.Result) {
+      // Reject mixed-case or cross-record responses rather than merging names.
+      if (contact.ModuleId !== 1 || typeof contact.EntityId !== 'string' || contact.EntityId.toLowerCase() !== caseId.toLowerCase()) return null;
+      const type = detailText(contact.ContactTypeName);
+      const role = /contractor|licensed professional/i.test(type) ? 'Contractor' : /applicant/i.test(type) ? 'Applicant' : /owner/i.test(type) ? 'Owner' : ({ agent: 'Agent', architect: 'Architect', engineer: 'Engineer' } as Record<string, string>)[type.toLowerCase()];
+      if (!role) continue;
+      const person = [detailText(contact.FirstName), detailText(contact.LastName)].filter(Boolean).join(' ');
+      const company = detailText(contact.GlobalEntityName);
+      addDetail(details, role, [...new Set([person, company].filter(Boolean))].join(' / '));
+      // Title is a free-text job title, even where a portal stores a license in
+      // it; do not relabel it as a verified contractor license.
+    }
+  }
+  return details;
+}
+
+async function boundedPermitDetail(work: (page: Page, context: BrowserContext) => Promise<PermitDetail | null>): Promise<PermitDetail | null> {
+  let context: BrowserContext | undefined;
+  let expired = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<null>(resolve => {
+      timer = setTimeout(() => { expired = true; void context?.close().catch(() => {}); resolve(null); }, 60_000);
+    });
+    const run = (async () => {
+      const browser = await getBrowser();
+      if (expired) return null;
+      context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      if (expired) { await context.close(); return null; }
+      context.setDefaultTimeout(15_000);
+      context.setDefaultNavigationTimeout(25_000);
+      const page = await context.newPage();
+      return work(page, context);
+    })();
+    return await Promise.race([run, timeout]);
+  } catch (error: any) {
+    log(`Permit detail unavailable: ${error.message}`, 'scraper');
+    return null;
+  } finally {
+    clearTimeout(timer);
+    await context?.close().catch(() => {});
+  }
+}
+
+export async function scrapeAccelaDetail(searchUrl: string, permitNumber: string): Promise<PermitDetail | null> {
+  if (!permitNumber.trim()) return null;
+  return boundedPermitDetail(async page => {
+    const landing = await gotoRetryingGatewayErrors(page, searchUrl);
+    if (landing && !landing.ok()) return null;
+    assertAccelaAgency(searchUrl, page.url());
+    const target = accelaSearchUrl(searchUrl, await page.content());
+    if (page.url() !== target) await page.goto(target, { waitUntil: 'domcontentloaded' });
+    assertAccelaAgency(searchUrl, page.url());
+    await page.locator("input[id*='txtGSPermitNumber'], input[id*='txtPermitNumber']").first().fill(permitNumber.trim());
+    const response = page.waitForResponse(r => r.request().method() === 'POST' && /\/Cap\/CapHome\.aspx$/i.test(new URL(r.url()).pathname));
+    const [submitted] = await Promise.all([response, page.locator("a[id*='btnNewSearch']").first().click()]);
+    if (!submitted.ok()) return null;
+    assertAccelaAgency(searchUrl, submitted.url());
+    await submitted.finished();
+    await page.waitForFunction(() => !!document.querySelector("#ctl00_PlaceHolderMain_lblPermitNumber, table[id*='gdvPermitList'] [id*='lblPermitNumber']"));
+    if (!/CapDetail\.aspx/i.test(page.url())) {
+      // Use the exact matching record link, never the first approximate hit.
+      const link = page.locator("table[id*='gdvPermitList'] a").filter({ hasText: new RegExp(`^\\s*${permitNumber.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`) });
+      if (await link.count() !== 1) return null;
+      await link.click();
+      await page.waitForURL(/\/Cap\/CapDetail\.aspx/i);
+    }
+    await page.locator('#ctl00_PlaceHolderMain_lblPermitNumber').waitFor();
+    return parseAccelaDetail(await page.content(), permitNumber, searchUrl, page.url());
+  });
+}
+
+export async function scrapeEnerGovDetail(searchUrl: string, permitNumber: string, rawData: Record<string, any> | null): Promise<PermitDetail | null> {
+  if (!permitNumber.trim()) return null;
+  return boundedPermitDetail(async (page, context) => {
+    const app = enerGovApplicationUrl(searchUrl);
+    const tenants: Promise<any[]>[] = [];
+    page.on('response', response => {
+      if (/\/api\/Home\/GetTenants(?:\?|$)/i.test(response.url()) && response.ok()) {
+        tenants.push((async () => {
+          assertEnerGovApplication(searchUrl, response.url());
+          const data = await response.json();
+          if (data.Success !== true || !Array.isArray(data.Result)) throw new Error('Invalid tenant list');
+          return data.Result;
+        })().catch(() => [{ TenantID: 'unverified', TenantName: 'unverified' }]));
+      }
+    });
+    let caseId = typeof rawData?.caseId === 'string' && /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(rawData.caseId) ? rawData.caseId : '';
+    const url = new URL(searchUrl);
+    if (!caseId) {
+      url.hash = '/search';
+      await page.goto(url.href, { waitUntil: 'domcontentloaded' });
+      await page.locator('#SearchModule option').filter({ hasText: /^Permit$/ }).waitFor({ state: 'attached' });
+      await page.waitForTimeout(1000);
+      await page.locator('#SearchModule').selectOption({ label: 'Permit' });
+      await page.locator('#SearchKeyword').fill(permitNumber.trim());
+      await page.locator('#button-Search').focus();
+      await page.waitForTimeout(750);
+      const pending = page.waitForResponse(r => /\/api\/energov\/search\/search(?:\?|$)/i.test(r.url()) && r.request().method() === 'POST' && r.request().postDataJSON()?.Keyword === permitNumber.trim());
+      const [response] = await Promise.all([pending, page.locator('#button-Search').click()]);
+      assertEnerGovApplication(searchUrl, response.url());
+      const headers = enerGovReplayHeaders(await response.request().allHeaders());
+      assertEnerGovTenant(searchUrl, (await Promise.all(tenants)).find(list => list.length) || [], headers);
+      const search = await context.request.post(response.url(), { headers, data: enerGovSearchRequest(response.request().postDataJSON(), permitNumber.trim(), 'permit'), maxRedirects: 0 });
+      if (!search.ok()) return null;
+      const matches = parseEnerGovResponse(await search.json()).results.filter(r => r.permitNumber === permitNumber.trim());
+      if (matches.length !== 1 || !matches[0].caseId) return null;
+      caseId = matches[0].caseId;
+    }
+    url.hash = `/permit/${encodeURIComponent(caseId)}`;
+    const pending = page.waitForResponse(r => /\/api\/energov\/permits\/permitdetail(?:\?|$)/i.test(r.url()) && r.request().method() === 'POST' && r.request().postDataJSON()?.EntityId?.toLowerCase() === caseId.toLowerCase());
+    const [response] = await Promise.all([pending, page.goto(url.href, { waitUntil: 'domcontentloaded' })]);
+    assertEnerGovApplication(searchUrl, response.url());
+    const headers = enerGovReplayHeaders(await response.request().allHeaders());
+    assertEnerGovTenant(searchUrl, (await Promise.all(tenants)).find(list => list.length) || [], headers);
+    if (!response.ok()) return null;
+    const data = await response.json();
+    if (!parseEnerGovDetail(data, null, permitNumber, caseId)) return null;
+    const contacts: any = { Success: true, Result: [] };
+    for (let pg = 1; pg <= 100; pg++) {
+      const result = await context.request.post(`${app}/api/energov/entity/contacts/search/search`, {
+        headers, data: { PageNumber: pg, PageSize: 100, SortField: '', IsSortedInAscendingOrder: true, ModuleId: 1, EntityId: caseId },
+        timeout: 15_000, maxRedirects: 0,
+      });
+      // Restricted contacts are deliberately omitted; never attempt login.
+      if ([401, 403, 412].includes(result.status())) break;
+      if (!result.ok()) throw new Error(`EnerGov contacts HTTP ${result.status()}`);
+      const batch = await result.json();
+      if (batch.Success === false && (batch.StatusCode === 412 || /must be a contact|log.?in|not authorized|permission/i.test(batch.ErrorMessage || ''))) break;
+      if (batch.Success !== true || !Array.isArray(batch.Result)) throw new Error('Invalid EnerGov contacts');
+      contacts.Result.push(...batch.Result);
+      if (pg >= Number(batch.PageCount || 1)) break;
+      if (!batch.Result.length || pg === 100) throw new Error('Incomplete EnerGov contacts');
+    }
+    return parseEnerGovDetail(data, contacts, permitNumber, caseId);
+  });
+}
+
 export async function scrapePermitDetail(
   platform: string,
   searchUrl: string,
@@ -2204,6 +2451,10 @@ export async function scrapePermitDetail(
   rawData: Record<string, any> | null
 ): Promise<PermitDetail | null> {
   switch (platform) {
+    case "Accela":
+      return scrapeAccelaDetail(searchUrl, permitNumber);
+    case "Tyler EnerGov":
+      return scrapeEnerGovDetail(searchUrl, permitNumber, rawData);
     case "Click2Gov":
       return scrapeClick2GovDetail(searchUrl, permitNumber);
     default:

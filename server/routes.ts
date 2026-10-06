@@ -748,6 +748,8 @@ export async function registerRoutes(
       if (details) {
         await storage.updateSearchResult(resultId, {
           rawData: { ...(rawData || {}), permitDetails: details, detailsFetchedAt: new Date().toISOString() },
+          ...(!result.contractorName?.trim() && details.Contractor ? { contractorName: details.Contractor } : {}),
+          ...(!result.applicantName?.trim() && details.Applicant ? { applicantName: details.Applicant } : {}),
         });
       }
 
