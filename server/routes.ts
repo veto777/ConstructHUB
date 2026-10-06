@@ -19,6 +19,7 @@ import { storage } from "./storage";
 import { photoDescription, reviewResponse, reviewFunnelDraft } from "./ai-features";
 import { AiAnswerError, aiErrorTag } from "./ai-output";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
+import { liveSearchOutcome } from "./live-search-outcome";
 import { randomUUID } from "crypto";
 import { isIP } from "net";
 import multer from "multer";
@@ -891,10 +892,17 @@ export async function registerRoutes(
       }
       try {
         const query = await storage.createSearchQuery({ userId: null, searchType: schedule.searchType, searchValue: schedule.searchValue, countyId: portal.countyId });
+        const jobId = `schedule-${schedule.id}-${Date.now()}`;
         const found = await scrapeByPlatform(portal.platform!, (portal.searchUrl || portal.portalUrl)!, schedule.searchValue,
-          portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, `schedule-${schedule.id}-${Date.now()}`);
+          portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, jobId);
+        // A failed attempt is not a run: "Last run" only moves when the portal search completed. Adapters catch
+        // their own errors and return what they had, so the job's recorded outcome decides.
+        const outcome = liveSearchOutcome(found.length, getScrapeProgress(jobId));
+        if (outcome.status !== "completed") {
+          console.error(`Scrape schedule ${schedule.id} failed on ${portal.name}: ${outcome.message}`);
+          continue;
+        }
         console.log(`Scrape schedule ${schedule.id} ran on ${portal.name}: ${found.length} results.`);
-        // A failed attempt is not a run: "Last run" only moves when the portal search completed.
         await db.update(scrapeSchedules).set({ lastRunAt: new Date() }).where(eq(scrapeSchedules.id, schedule.id));
       } catch (err: any) {
         console.error(`Scrape schedule ${schedule.id} failed on ${portal.name}:`, err?.message || err);
