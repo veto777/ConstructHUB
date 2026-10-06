@@ -34,7 +34,7 @@ SIGN-IN AND ACCOUNT DELETION
 Sign in with Apple, Google (in the system sign-in sheet, ASWebAuthenticationSession) or email and password. Account deletion is in the app (5.1.1(v)) and takes effect immediately: billing is cancelled, every session ends, a Sign in with Apple grant is revoked, and data is erased within 30 days.
 
 ANSWERS TO THE STANDARD INFORMATION QUESTIONS (2.1)
-1. Screen recording: attached — recorded on a physical iPhone (launch, sign-in, main features, the notification permission prompt, account deletion).
+1. Screen recording: available on request. The demo account above opens every screen, including sign-in, the notification permission prompt (Settings → Notifications → Turn on) and account deletion.
 2. Devices tested: iPhone (see the recording); builds made with Xcode 26 and the iOS 26 SDK.
 3. Purpose and audience: business tools for construction contractors in the United States (roofers, remodelers, builders) and their office staff.
 4. Setup: none — sign in with the demo account.
