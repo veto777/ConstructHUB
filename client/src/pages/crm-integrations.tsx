@@ -256,7 +256,7 @@ export default function CrmIntegrationsPage() {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-                <StatusPill tone="success" data-testid="pill-hover-connected">connected</StatusPill>
+                <StatusPill tone={hoverStatus.needsReconnect ? "warning" : "success"} data-testid="pill-hover-connected">{hoverStatus.needsReconnect ? "reconnect needed" : "connected"}</StatusPill>
                 <span className="text-muted-foreground">
                   since {hoverStatus.connectedAt ? new Date(hoverStatus.connectedAt).toLocaleDateString() : "—"}
                 </span>
@@ -276,7 +276,17 @@ export default function CrmIntegrationsPage() {
                   </span>
                 )}
               </div>
-              {hoverStatus.lastError && (
+              {hoverStatus.needsReconnect ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3" data-testid="notice-hover-reconnect">
+                  <p className="text-sm max-w-prose">
+                    <span className="font-medium text-destructive">HOVER sign-in expired.</span>{" "}
+                    HOVER stopped accepting this connection, so new jobs and measurements are not arriving. Reconnect to resume — your existing jobs stay as they are.
+                  </p>
+                  <a href="/api/crm/integrations/hover/connect" data-testid="button-reconnect-hover">
+                    <Button><Ruler className="h-4 w-4 mr-2" /> Reconnect HOVER</Button>
+                  </a>
+                </div>
+              ) : hoverStatus.lastError && (
                 <p className="text-sm text-destructive" data-testid="text-hover-error">{hoverStatus.lastError}</p>
               )}
               {hoverStatus.lastSyncReport && (

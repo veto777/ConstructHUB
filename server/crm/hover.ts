@@ -151,6 +151,9 @@ export interface HoverConn {
   /** Last auto-sync attempt, success or not — a failing org waits a full cadence too. */
   lastSyncAttemptAt?: string | null;
   lastError?: string | null;
+  /** HOVER refused the stored sign-in (refresh answered 400/401). Only reconnecting fixes it, so auto-sync stops
+   *  trying and the card asks for a reconnect. Cleared by a new connection or a refresh that works. */
+  needsReconnect?: boolean;
   lastSyncReport?: HoverSyncReport | null;
   /** Auto-sync cadence in hours (default 6). */
   syncEveryHours?: number | null;
@@ -208,6 +211,32 @@ export function clearHoverTokenCache(orgId?: string): void {
 
 type FetchFn = typeof fetch;
 
+/** What the card shows when HOVER refuses the stored sign-in. */
+export const HOVER_RECONNECT_MESSAGE = "HOVER sign-in expired. Reconnect HOVER to resume syncing.";
+
+/** A refresh answered 400 (invalid_grant) or 401: the stored sign-in is no longer valid. */
+export const hoverSignInExpired = (status: number) => status === 400 || status === 401;
+
+/**
+ * Is this connection waiting for a reconnect? True for the flag, and for a connection whose recorded error already
+ * says the refresh was refused (the production org had "…HOVER token refresh failed: 400" stored before the flag
+ * existed) — so the card and the scheduler are right immediately, with no data fix.
+ */
+export function hoverConnNeedsReconnect(conn: { needsReconnect?: boolean; lastError?: string | null } | null | undefined): boolean {
+  if (!conn) return false;
+  if (conn.needsReconnect === true) return true;
+  if (conn.needsReconnect === false) return false; // a refresh worked, or the customer just reconnected
+  return /token refresh failed\W+40[01]\b/.test(String(conn.lastError ?? ""));
+}
+
+/** Thrown when HOVER refuses the stored sign-in — a customer action (reconnect), not an incident. */
+export class HoverReconnectError extends Error {
+  constructor(public status: number) {
+    super(`HOVER token refresh failed: ${status}`);
+    this.name = "HoverReconnectError";
+  }
+}
+
 /**
  * A valid access token for the org. Refreshes when the cache is stale and
  * ALWAYS persists a rotated refresh token before returning — HOVER invalidates
@@ -234,13 +263,19 @@ export async function getHoverAccessToken(orgId: string, fetchFn: FetchFn = fetc
     }),
   });
   if (!res.ok) {
-    // A dead refresh token means the connection is broken; say so on the card.
+    if (hoverSignInExpired(res.status)) {
+      // HOVER no longer accepts this sign-in (first confirmed in production 2026-10-07: 400 on every refresh since
+      // 2026-08-11). Nothing we retry can change that — record it once and stop until the customer reconnects.
+      await writeHoverConn(orgId, { needsReconnect: true, lastError: HOVER_RECONNECT_MESSAGE }).catch(() => {});
+      throw new HoverReconnectError(res.status);
+    }
+    // Anything else (HOVER down, 5xx) may pass on its own; say so on the card and let the cadence retry.
     await writeHoverConn(orgId, { lastError: `token refresh failed (${res.status})` }).catch(() => {});
     throw new Error(`HOVER token refresh failed: ${res.status}`);
   }
   const tok = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number };
   if (tok.refresh_token && tok.refresh_token !== refresh) {
-    await writeHoverConn(orgId, { refreshTokenEnc: encryptHoverSecret(tok.refresh_token), lastError: null });
+    await writeHoverConn(orgId, { refreshTokenEnc: encryptHoverSecret(tok.refresh_token), lastError: null, needsReconnect: false });
   }
   tokenCache.set(orgId, {
     token: tok.access_token,
@@ -1185,11 +1220,17 @@ const HOVER_TICK_MS = 10 * 60 * 1000;
 let hoverSchedulerStarted = false;
 const hoverSyncRunning = new Set<string>();
 
+/** The sync failed because HOVER refused the sign-in (directly, or wrapped by the jobs-list error). */
+export function hoverReconnectNeeded(e: unknown): boolean {
+  return e instanceof HoverReconnectError || /HOVER token refresh failed: 40[01]\b/.test(String((e as any)?.message ?? e));
+}
+
 export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
   const orgs = await db.select().from(crmOrgs)
     .where(sql`${crmOrgs.customFields} -> 'hover' ->> 'refreshTokenEnc' IS NOT NULL`);
   for (const org of orgs) {
     const hover = ((org.customFields as any) ?? {}).hover ?? {};
+    if (hoverConnNeedsReconnect(hover)) continue; // waiting for the customer to reconnect; nothing to retry
     if (!hoverSyncDue(hover, now)) continue;
     if (hoverSyncRunning.has(org.id)) continue;
     hoverSyncRunning.add(org.id);
@@ -1200,7 +1241,8 @@ export async function runDueHoverSyncs(now: Date = new Date()): Promise<void> {
     } catch (e: any) {
       // Never crash the app over a sync; the card surfaces lastError.
       console.error(`[hover] auto-sync org ${org.id} failed:`, String(e?.message || e).slice(0, 200));
-      void recordFailure("job", "HOVER auto-sync", e, { orgId: org.id }, "warning");
+      // An expired sign-in is the customer's to fix (the card says so); everything else goes to the issue desk.
+      if (!hoverReconnectNeeded(e)) void recordFailure("job", "HOVER auto-sync", e, { orgId: org.id }, "warning");
     } finally {
       hoverSyncRunning.delete(org.id);
     }
@@ -1260,6 +1302,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
         : null,
       lastSyncAt: conn?.lastSyncAt ?? null,
       lastError: conn?.lastError ?? null,
+      needsReconnect: hoverConnNeedsReconnect(conn),
       lastSyncReport: conn?.lastSyncReport ?? null,
       syncEveryHours: Number(conn?.syncEveryHours) || 6,
     });
@@ -1312,6 +1355,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     clearHoverTokenCache(ctx.org.id);
     await writeHoverConn(ctx.org.id, {
       refreshTokenEnc: encryptHoverSecret(String(tok.refresh_token)),
+      needsReconnect: false,
       scopes: typeof tok.scope === "string" ? tok.scope : null,
       connectedAt: new Date().toISOString(),
       connectedByMemberId: ctx.member.id,

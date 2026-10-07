@@ -45,3 +45,52 @@ describe("hoverListFailureReason", () => {
     expect(hoverListFailureReason(0, null)).toBe("network");
   });
 });
+
+/**
+ * An expired HOVER sign-in (production, 2026-10-07: "HOVER token refresh failed: 400" on every attempt since
+ * 2026-08-11) is something only the customer can fix, by reconnecting. It must not be retried or sent to the
+ * issue desk; anything else still is.
+ */
+import { hoverSignInExpired, hoverReconnectNeeded, hoverConnNeedsReconnect, HoverReconnectError, HOVER_RECONNECT_MESSAGE } from "./hover";
+
+describe("an expired HOVER sign-in", () => {
+  it("is a 400 or 401 from the refresh, nothing else", () => {
+    expect(hoverSignInExpired(400)).toBe(true);
+    expect(hoverSignInExpired(401)).toBe(true);
+    for (const s of [0, 403, 404, 429, 500, 502, 503]) expect(hoverSignInExpired(s)).toBe(false);
+  });
+
+  it("is recognised directly and when the jobs-list error wraps it", () => {
+    expect(hoverReconnectNeeded(new HoverReconnectError(400))).toBe(true);
+    expect(hoverReconnectNeeded(new Error("Could not list HOVER jobs: HOVER token refresh failed: 400"))).toBe(true);
+    expect(hoverReconnectNeeded(new Error("Could not list HOVER jobs: HOVER token refresh failed: 401"))).toBe(true);
+  });
+
+  it("does not swallow failures that may pass on their own", () => {
+    expect(hoverReconnectNeeded(new Error("Could not list HOVER jobs: HOVER token refresh failed: 503"))).toBe(false);
+    expect(hoverReconnectNeeded(new Error("Could not list HOVER jobs: 500"))).toBe(false);
+    expect(hoverReconnectNeeded(new Error("Could not list HOVER jobs: network"))).toBe(false);
+  });
+
+  it("tells the customer what to do", () => {
+    expect(HOVER_RECONNECT_MESSAGE).toMatch(/Reconnect HOVER/);
+  });
+});
+
+describe("hoverConnNeedsReconnect", () => {
+  it("follows the flag", () => {
+    expect(hoverConnNeedsReconnect({ needsReconnect: true })).toBe(true);
+    expect(hoverConnNeedsReconnect({ needsReconnect: false, lastError: "jobs list failed (HOVER token refresh failed: 400)" })).toBe(false);
+  });
+  it("recognises the error recorded before the flag existed", () => {
+    expect(hoverConnNeedsReconnect({ lastError: "jobs list failed (HOVER token refresh failed: 400)" })).toBe(true);
+    expect(hoverConnNeedsReconnect({ lastError: "token refresh failed (401)" })).toBe(true);
+  });
+  it("leaves every other state alone", () => {
+    expect(hoverConnNeedsReconnect(null)).toBe(false);
+    expect(hoverConnNeedsReconnect({})).toBe(false);
+    expect(hoverConnNeedsReconnect({ lastError: "token refresh failed (503)" })).toBe(false);
+    expect(hoverConnNeedsReconnect({ lastError: "jobs list failed (network)" })).toBe(false);
+    expect(hoverConnNeedsReconnect({ lastError: "jobs list failed (4001)" })).toBe(false);
+  });
+});
