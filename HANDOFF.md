@@ -2,6 +2,33 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🗺 2026-10-06/07 — "leftover places" fact-check applied: 8,245 county/town permit routes, +176 portals (deployed)
+- **What:** the owner's 10/06 order ("maybe there is no permit required… fact check all these that are left over") ran
+  as 178 slices × 22,339 places: Codex researched, Claude fact-checked (different company on purpose), every quote
+  mechanically re-verified. Run folder (tower): `/tmp/claude-1000/-home-veto-ConstructHUB/b63db1cc-…/scratchpad/leftover`
+  (`RESUME.md`, `FINDINGS.md` = per-slice results + owner decisions, `collect.py` → `final-verdicts.json`).
+  Result: 20,290 verdicts agreed, 1,701 corrected with checker-passed fixes, 348 rejected without a provable
+  alternative (→ unknown). Codex fabricated nothing; its errors were Census points on same-named places in the
+  wrong county, "no building code" read as "no permit" where a zoning/development permit is mandatory, and giving
+  up at blocked pages.
+- **Applied (this commit):** `scripts/build-permit-routing-from-verdicts.py` → `server/data/permit-routing.json`
+  913 → **8,245** routes (6,2xx county + 1,1xx town/township issuers; each issuer is a directory jurisdiction with a
+  live portal, each route carries the official source + quote); `_permit-candidates.json` +739 `own` permit pages →
+  the normal gate (`PERMIT_BUILD_ONLY_NEW=1 … build-permit-portals.ts`) kept **176** (now 12,564 live portals).
+  Code: `server/routes.ts` + `server/seed-permit-routing.ts` + `server/permit-routing.test.ts` now allow a **town**
+  (and a county row, e.g. Philadelphia County → Philadelphia) as the issuer. Report: `analysis/leftover-apply-report.json`.
+- **Held — needs a directory display first (owner decisions in FINDINGS.md):** `none` 3,032 places with an official
+  "no building permit" statement, `state` 693 (state agency issues), `third_party` 63 (PA UCC opt-out etc.),
+  plus 893 county-issued and 1,993 town-issued places whose issuer has no live portal, 2,906 `own` places with no
+  apply URL, 4,657 honest unknowns (mostly tiny MO/IL/IA/KS/AR/AL towns with no web presence — phone calls).
+  Also: zoning-type permits are labelled county/own (wording?), tribal trust land and federal installations need a
+  caveat, ~60 directory rows have the wrong county or a bad geocode (listed per slice in FINDINGS.md).
+- **Tooling fixed on the way:** `check-authority.py` host blacklist anchored (`x.com` no longer rejects every
+  `*tx.com`; `permits.com` no longer rejects ellispermits.com) and PDF text is no longer tag-stripped; `lane.sh` only
+  deletes its own claim. Tower disk hit 99% once (a lane bulk-downloaded 3.4 GB of hazard-plan PDFs) — briefs now
+  carry a 20 MB download rule and `disk-watch.sh` purges stale downloads. **Owner order 2026-10-06: Claude account A
+  is never used for directory lanes — use C (logged in 10/06) and D.**
+
 ## 2026-09-15 — per-user calendars (Braxton's request)
 - `crm_appointments.created_by_member_id` (stamped on POST; `schema-ensure` adds the column and best-effort
   backfills from `crm_team_activity` "scheduled <title>" rows ±2 min). Prod after deploy: Alpine Exteriors 33

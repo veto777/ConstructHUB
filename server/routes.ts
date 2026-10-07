@@ -464,13 +464,16 @@ export async function registerRoutes(
           limit: Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? ""), 10) || 25)),
         };
         const result = await storage.getDatabasesFiltered(params);
-        // Towns whose county issues their building permits (seed-permit-routing.ts): attach that county's portal,
-        // through the same display rules as any portal (an unavailable link is never shown).
+        // Places whose building permits are issued by another jurisdiction — their county, or a town/township that
+        // contains them (seed-permit-routing.ts): attach that issuer's portal, through the same display rules as any
+        // portal (an unavailable link is never shown). A county row wins when a county and a city share a name.
         const issuerKeys = Array.from(new Set(result.databases.map((d) => d.issuedBy).filter((k): k is string => !!k)));
         const issuers = issuerKeys.length
-          ? await db.select().from(permitDatabases).where(and(inArray(permitDatabases.jurisdiction, issuerKeys), eq(permitDatabases.jurisdictionType, "county")))
+          ? await db.select().from(permitDatabases).where(inArray(permitDatabases.jurisdiction, issuerKeys))
           : [];
-        const issuerBy = new Map(issuers.map((r) => [r.jurisdiction, governmentPermitForDisplay(r)]));
+        const issuerBy = new Map(issuers
+          .sort((a, b) => Number(a.jurisdictionType === "county") - Number(b.jurisdictionType === "county"))
+          .map((r) => [r.jurisdiction, governmentPermitForDisplay(r)]));
         res.json({ ...result, databases: result.databases.map((d) => {
           const shown = governmentPermitForDisplay(d);
           const issuer = d.issuedBy ? issuerBy.get(d.issuedBy) : undefined;

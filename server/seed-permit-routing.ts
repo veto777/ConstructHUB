@@ -1,8 +1,10 @@
 /**
- * "Building permits for <town> are issued by <county>" (2026-10-05, round 4). For towns with no permit office of
- * their own, server/data/permit-routing.json names the county that issues their building permits, with the official
+ * "Building permits for <place> are issued by <county or town>" (2026-10-05 round 4; towns/townships as issuers added
+ * 2026-10-07 from the fact-check). For places with no permit office of their own, server/data/permit-routing.json names
+ * the county (or the town/township that contains them) that issues their building permits, with the official
  * page that says so and a quote from it (each checked by scripts' check-routing.py: the page loads and contains the
- * quote, and names the town or the county). Applied at boot after the portals; a town no longer listed is cleared.
+ * quote, and names the town or the county). Applied at boot after the portals; a place no longer listed is cleared.
+ * County rows can be routed too (a consolidated city-county such as Philadelphia County -> Philadelphia).
  * The directory then links the county's own portal for that town — never a guessed or borrowed URL.
  */
 import { readFileSync } from "fs";
@@ -26,7 +28,7 @@ export async function seedPermitRouting(): Promise<{ set: number; cleared: numbe
     cleared = r.rowCount ?? 0;
     for (const x of routes) {
       const u = await c.query(`UPDATE permit_databases SET issued_by=$2, issued_by_source=$3, issued_by_quote=$4
-        WHERE jurisdiction=$1 AND jurisdiction_type='city'
+        WHERE jurisdiction=$1
           AND (issued_by IS DISTINCT FROM $2 OR issued_by_source IS DISTINCT FROM $3 OR issued_by_quote IS DISTINCT FROM $4)`,
         [x.jurisdiction, x.issuedBy, x.sourceUrl, x.quote]);
       set += u.rowCount ?? 0;
