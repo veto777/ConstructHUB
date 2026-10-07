@@ -150,8 +150,11 @@ export default function PropertyPage() {
     setPage(1);
   };
 
-  const handleSearchChange = (e: any) => {
-    setSearchQuery(e.target.value);
+  // Toolbar hands its search box's text, not the input event (components/app-ui.tsx).
+  // This was typed `(e: any)` and read e.target.value: every keystroke threw
+  // "Cannot read properties of undefined (reading 'value')". Typed, tsc refuses that.
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
     setPage(1);
   };
 
