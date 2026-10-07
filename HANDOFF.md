@@ -26,6 +26,11 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
   Owner asked "can't we build our own?" — answer given: SERP scraping not worth it at our volume (proxies/CAPTCHA/ToS,
   ~same bandwidth cost); keyword volume via Google Ads Keyword Planner API, own-site backlinks via Bing Webmaster, AI mentions
   via direct model queries ARE buildable for free — offered to add those three so DataForSEO becomes optional; awaiting go.
+- **White-labelled 2026-10-07 (merge d4950a7):** customers never see DataForSEO — no vendor name, wholesale prices, queue or env copy on
+  /seo*, usage shown in plan units from `SEO_PLAN_LIMITS` in shared/plans.ts (owner to confirm: Starter 50 keywords / 25 searches /
+  1 refresh, Pro 200/100/4, Growth 1,000/500/12, Agency = Growth); `SEO_MONTHLY_BUDGET_USD` is an internal safety (default 100);
+  platform admins see a "Data source" card + `GET /api/seo/admin/usage`. Retail price / SEO add-on: owner decision — TODO in
+  server/catalog.ts. Tabs CSS (.g-tabs/.g-table/...) restored after the earlier merge dropped it.
 
 ## 🎨 2026-10-06 — Google Business section restyled to look like Google (deployed, merge c5ce9b5)
 - Owner: "use the Google fonts and colors and styles to make the platform feel similar to Google on the GMB feature."
