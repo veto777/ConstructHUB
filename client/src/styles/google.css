@@ -9,8 +9,9 @@
  * so every platform page sits on it.
  *
  * ONE accent, two values:
- *   --g-accent = the brand orange #F97316 everywhere on the platform (the default below), and
- *   --g-accent = Google blue #1a73e8 only inside `.g-surface--google` (the Google Business pages, which imitate
+ *   --g-accent = Google blue #1a73e8 everywhere on the platform (owner, 2026-10-07: "the orange is too obnoxious" —
+ *   blue like Google; the brand orange stays only on the logo, the mascot and the small new/hot badges).
+ *   `.g-surface--google` is kept as a no-op alias (the Google Business pages, which imitate
  *                Google on purpose; <GoogleSurface> adds the modifier).
  * Pills, links, active states, the focus ring and the AI-Overview sparkle read `--g-accent`. Stars stay #fbbc04,
  * "Open" stays green, errors stay red. `--g-accent-ink` is the accent as TEXT: the orange is darkened one step on
@@ -33,9 +34,9 @@
   --g-ai-text: #1f1f1f;
 
   /* ── The accent: brand orange by default (see the header comment) ── */
-  --g-accent: #F97316;
-  --g-accent-ink: #ea580c;
-  --g-accent-soft: #ffedd5;
+  --g-accent: #1a73e8;
+  --g-accent-ink: #1a73e8;
+  --g-accent-soft: #e8f0fe;
   --g-hover: #fff7ed;
   --g-avatar: var(--g-accent);
   --g-avatar-bg: var(--g-accent-soft);
@@ -57,9 +58,9 @@
   --secondary-foreground: 225 6% 13%;
   --accent: 210 12% 95%;
   --accent-foreground: 225 6% 13%;
-  --primary: 25 95% 53%;
+  --primary: 217 89% 51%; /* #1a73e8 */
   --primary-foreground: 0 0% 100%;
-  --ring: 25 95% 53%;
+  --ring: 217 89% 51%;
   --destructive: 4 71% 50%;
   --destructive-foreground: 0 0% 100%;
   --font-sans: var(--g-font);
@@ -89,9 +90,9 @@
   --g-chip: #303134;
   --g-ai-text: #e8eaed;
 
-  --g-accent: #fb923c;
-  --g-accent-ink: #fb923c;
-  --g-accent-soft: rgba(251, 146, 60, .18);
+  --g-accent: #8ab4f8;
+  --g-accent-ink: #8ab4f8;
+  --g-accent-soft: #394457;
   --g-hover: #303134;
 
   --background: 225 6% 13%;
@@ -110,9 +111,9 @@
   --secondary-foreground: 216 12% 92%;
   --accent: 225 4% 20%;
   --accent-foreground: 216 12% 92%;
-  --primary: 27 96% 61%;
-  --primary-foreground: 24 80% 10%;
-  --ring: 27 96% 61%;
+  --primary: 217 89% 75%; /* #8ab4f8 */
+  --primary-foreground: 220 13% 13%;
+  --ring: 217 89% 75%;
   --destructive: 5 81% 73%;
   --destructive-foreground: 225 6% 13%;
 }
