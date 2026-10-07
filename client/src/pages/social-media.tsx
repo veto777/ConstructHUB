@@ -2,11 +2,11 @@ import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/compone
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { AppPage, Notice, PageHeader, Section, StatusPill, Toolbar } from "@/components/app-ui";
+import { AppPage, Notice, Toolbar } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   autoSchema,
@@ -19,7 +19,8 @@ import {
 import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-const selectClass = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
+// Google's rounded field shape for the native selects (the surface supplies the hairline colour).
+const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
 
 // Mirrors the server's curated messages so a bad field is named before saving.
 const settingsMessages: Record<string, string> = {
@@ -60,16 +61,19 @@ export default function SocialMediaPage() {
   const valid = business === "all" || (!!business && /^[1-9]\d*$/.test(business) && Number.isSafeInteger(Number(business)));
   return (
     <AppPage>
-      <PageHeader
+      {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
+      <GoogleSectionHeader
+        as="h1"
         title="Social Media"
         description="Compose once, then review, schedule and track every account."
-        actions={<Button variant="outline" onClick={() => setTab("guides")}>How it works</Button>}
+        flush
+        actions={<GooglePill onClick={() => setTab("guides")} label="How it works" />}
       />
       <BusinessSelector value={business} onChange={v => setBusiness(v, true)} />
       {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} /> : <>
         {/* The guides don't depend on a business: /guides lands here. */}
         {tab === "guides" && <GuidesContent />}
-        {!business && <p className="text-sm text-muted-foreground">Choose a business above. Add or import businesses in <a className="text-primary underline" href="/locations">Locations</a>.</p>}
+        {!business && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
       </>}
     </AppPage>
   );
@@ -247,21 +251,22 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
     <div className="space-y-5 sm:space-y-6">
       {!all && (
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">{data?.business?.business_name || "Business workspace"}</h2>
-          {isLoading && <span className="text-sm text-muted-foreground">Loading…</span>}
-          {error && <span role="alert" className="text-sm text-destructive">Could not refresh Social Media: {apiErrorMessage(error)}</span>}
+          <h2 className="g-header__title">{data?.business?.business_name || "Business workspace"}</h2>
+          {isLoading && <span className="text-sm g-text-2">Loading…</span>}
+          {error && <span role="alert" className="text-sm g-closed">Could not refresh Social Media: {apiErrorMessage(error)}</span>}
         </div>
       )}
 
       {!all && (
-        <Section
-          title="Blotato connection"
-          description="Blotato is a separate subscription you buy from Blotato. Creating a key there activates your paid Blotato subscription; ConstructHUB does not bill for it."
-          actions={<StatusPill tone={data?.connected ? "success" : "neutral"}>{data?.connected ? "Connected" : "Not connected"}</StatusPill>}
-        >
+        <section>
+          <GoogleSectionHeader
+            title="Blotato connection"
+            description="Blotato is a separate subscription you buy from Blotato. Creating a key there activates your paid Blotato subscription; ConstructHUB does not bill for it."
+            actions={<span className={data?.connected ? "g-open text-sm" : "g-text-2 text-sm"}>{data?.connected ? "Connected" : "Not connected"}</span>}
+          />
           <div className="space-y-4">
             <p className="text-sm">
-              <a href="https://www.blotato.com" target="_blank" rel="noreferrer" className="text-primary underline">Visit Blotato</a> to create an API key.
+              <a href="https://www.blotato.com" target="_blank" rel="noreferrer" className="g-link">Visit Blotato</a> to create an API key.
             </p>
             <div className="grid gap-4 sm:grid-cols-2 sm:max-w-2xl">
               <label className="block space-y-1.5">
@@ -283,8 +288,9 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                 value={apiKey}
                 onChange={(e) => setKey(e.target.value)}
               />
-              <Button
-                variant={data?.connected ? "outline" : "default"}
+              <GooglePill
+                variant={data?.connected ? "outline" : "solid"}
+                label={data?.connected ? "Verify / replace key" : "Connect Blotato"}
                 disabled={mutation.isPending || apiKey.length < 8}
                 onClick={async () => {
                   try {
@@ -298,17 +304,14 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                     setKey("");
                   }
                 }}
-              >
-                {data?.connected ? "Verify / replace key" : "Connect Blotato"}
-              </Button>
+              />
               {(connectionScope === "agency" ? data?.agencyConnected : data?.businessConnected ?? data?.connected) && (
-                <Button
-                  variant="outline"
+                <GooglePill
+                  variant="quiet"
                   disabled={mutation.isPending}
                   onClick={() => mutation.mutate({ path: "/disconnect", success: "Blotato disconnected" })}
-                >
-                  Disconnect
-                </Button>
+                  label="Disconnect"
+                />
               )}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -322,7 +325,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
               </p>
             )}
           </div>
-        </Section>
+        </section>
       )}
 
       {!all && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults || []} />}
@@ -335,19 +338,20 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
             ["auto", "Auto mode"],
             ["guides", "Guides"],
           ].map(([key, label]) => (
-            <Button
+            <GooglePill
               key={key}
-              variant={tab === key ? "default" : "outline"}
+              selected={tab === key}
+              ariaPressed={tab === key}
               onClick={() => setTab(key)}
-            >
-              {label}
-            </Button>
+              label={label}
+            />
           ))}
         </nav>
       )}
 
       {tab === "compose" && (
-        <Section title="Compose" description={all ? undefined : "Write once — every chosen account gets its own version."}>
+        <section>
+          <GoogleSectionHeader title="Compose" description={all ? undefined : "Write once — every chosen account gets its own version."} />
           <div className="space-y-5">
             <fieldset className="space-y-3">
               <legend className="mb-2 text-sm font-medium">Post to</legend>
@@ -367,7 +371,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
               {accounts.map((a) => {
                 const d = destinations.find((d) => d.accountId === a.id);
                 return (
-                  <div key={a.id} className="space-y-3 rounded-xl border p-3">
+                  <div key={a.id} className="space-y-3 rounded-lg border p-3">
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -382,8 +386,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                           a.platform,
                         ) && (
                           <>
-                            <Button
-                              variant="outline"
+                            <GooglePill
                               size="sm"
                               disabled={mutation.isPending}
                               onClick={() =>
@@ -392,13 +395,8 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                                   success: a.platform === "pinterest" ? "Boards refreshed" : "Pages refreshed",
                                 })
                               }
-                            >
-                              Refresh{" "}
-                              {a.platform === "pinterest"
-                                ? "boards"
-                                : "pages"}{" "}
-                              for {a.name}
-                            </Button>
+                              label={`Refresh ${a.platform === "pinterest" ? "boards" : "pages"} for ${a.name}`}
+                            />
                             <select
                               aria-label={`${a.name} page or board`}
                               className={selectClass}
@@ -520,7 +518,10 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                 placeholder="https://your-public-media-host/photo.jpg"
               />
             </label>
-            <Input aria-label="Search business photos" value={mediaSearch} onChange={e => { setMediaSearch(e.target.value); setMediaOffset(0); }} placeholder="Search synced business photos" />
+            <div className="g-search sm:max-w-md" role="search">
+              <Search aria-hidden="true" />
+              <input type="search" aria-label="Search business photos" value={mediaSearch} onChange={e => { setMediaSearch(e.target.value); setMediaOffset(0); }} placeholder="Search synced business photos" />
+            </div>
             <Pager offset={mediaOffset} setOffset={setMediaOffset} more={media.length === 25} label="photos" />
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1.5">
@@ -574,34 +575,34 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
               />
             </label>
             <div className="flex flex-wrap items-center gap-2">
-              <Button
+              <GooglePill
+                variant="solid"
                 disabled={!!postBlocker || mutation.isPending}
                 onClick={() => void submit(false)}
-              >
-                {schedule ? "Schedule post" : "Post now"}
-              </Button>
-              <Button
-                variant="outline"
+                label={schedule ? "Schedule post" : "Post now"}
+              />
+              <GooglePill
                 disabled={!!postBlocker || mutation.isPending}
                 onClick={() => void submit(true)}
-              >
-                Save draft
-              </Button>
+                label="Save draft"
+              />
               {postBlocker && (
-                <span className="text-sm text-muted-foreground break-all">
+                <span className="text-sm g-text-2 break-all">
                   {postBlocker}
                 </span>
               )}
             </div>
           </div>
-        </Section>
+        </section>
       )}
 
       {tab === "queue" && (
-        <Section
-          title={all ? "All-clients calendar" : "Calendar & queue"}
-          description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means Blotato confirmed publication; queued means it is still in ConstructHUB."
-        >
+        <section>
+          <GoogleSectionHeader
+            title={all ? "All-clients calendar" : "Calendar & queue"}
+            count={data?.total || 0}
+            description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means Blotato confirmed publication; queued means it is still in ConstructHUB."
+          />
           <div className="space-y-4">
             <Toolbar
               search={{ value: postSearch, onChange: v => { setPostSearch(v); setOffset(0); }, placeholder: "Search calendar" }}
@@ -632,12 +633,13 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
             )}
             <p className="text-sm text-muted-foreground">{data?.total || 0} matching posts</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setSelectedPosts((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => p.id))}>Select this page of posts</Button>
-              {["approve", "cancel"].map(action => <Button key={action} variant="outline" size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action }, success: action === "approve" ? "Selected drafts approved" : "Selected posts cancelled" })}>{action === "approve" ? "Approve selected drafts" : "Cancel selected posts"}</Button>)}
+              <GooglePill size="sm" onClick={() => setSelectedPosts((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => p.id))} label="Select this page of posts" />
+              {["approve", "cancel"].map(action => <GooglePill key={action} size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action }, success: action === "approve" ? "Selected drafts approved" : "Selected posts cancelled" })} label={action === "approve" ? "Approve selected drafts" : "Cancel selected posts"} />)}
             </div>
             <p className="text-xs text-muted-foreground">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
             {bulkErrors.map((error, i) => <p role="alert" key={i} className="text-sm text-destructive">{error}</p>)}
             <Pager offset={offset} setOffset={setOffset} more={offset + 25 < (data?.total || 0)} label="posts" />
+            {(data?.posts || []).length > 0 && <GoogleList testId="list-social-posts">
             {(data?.posts || [])
               .map((p: any) => (
                 <PostRow
@@ -655,16 +657,18 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                   }
                 />
               ))}
+            </GoogleList>}
           </div>
-        </Section>
+        </section>
       )}
 
       {tab === "auto" && (
         <>
-          <Section
-            title="Auto mode"
-            description="AI output is labelled as a draft until approved. Fully automatic mode is your explicit permission to publish generated posts to the saved destinations."
-          >
+          <section>
+            <GoogleSectionHeader
+              title="Auto mode"
+              description="AI output is labelled as a draft until approved. Fully automatic mode is your explicit permission to publish generated posts to the saved destinations."
+            />
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -701,13 +705,11 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                       .join(" · ")
                   : "None"}
               </p>
-              <Button
-                variant="outline"
+              <GooglePill
                 disabled={!destinations.length}
                 onClick={() => update("destinations", destinations)}
-              >
-                Use accounts selected in Compose
-              </Button>
+                label="Use accounts selected in Compose"
+              />
               <div className="grid gap-4 sm:grid-cols-2 sm:max-w-2xl">
                 <label className="block space-y-1.5">
                   <span className="text-sm font-medium">Posts per period</span>
@@ -852,7 +854,9 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                 </p>
               )}
               <div className="flex flex-wrap gap-2">
-                <Button
+                <GooglePill
+                  variant="solid"
+                  label="Save auto settings"
                   disabled={mutation.isPending}
                   onClick={async () => {
                     const problem = settingsProblem(current);
@@ -874,31 +878,26 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                       setSettings(null);
                     } catch {}
                   }}
-                >
-                  Save auto settings
-                </Button>
-                <Button
-                  variant="outline"
+                />
+                <GooglePill
                   disabled={mutation.isPending || !data?.connected}
                   onClick={() => mutation.mutate({ path: "/generate", body: { requestId: crypto.randomUUID() }, success: "Draft generation queued" })}
-                >
-                  Generate draft from saved settings
-                </Button>
+                  label="Generate draft from saved settings"
+                />
               </div>
             </div>
-          </Section>
-          <Section
-            title="Content sources"
-            description="Project photos come from Media Library; review highlights use synced Google reviews. Auto mode refreshes GBP updates before generating a cross-post."
-          >
+          </section>
+          <section>
+            <GoogleSectionHeader
+              title="Content sources"
+              description="Project photos come from Media Library; review highlights use synced Google reviews. Auto mode refreshes GBP updates before generating a cross-post."
+            />
             <div className="space-y-3">
-              <Button
-                variant="outline"
+              <GooglePill
                 disabled={mutation.isPending}
                 onClick={() => mutation.mutate({ path: "/sources/sync-gbp", success: "GBP refresh queued" })}
-              >
-                Sync recent GBP updates
-              </Button>
+                label="Sync recent GBP updates"
+              />
               <label className="block space-y-1.5 sm:max-w-xs">
                 <span className="text-sm font-medium">Source kind</span>
                 <select
@@ -935,13 +934,11 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                         </li>
                       ))}
                     </ul>
-                    <Button
-                      variant="outline"
+                    <GooglePill
                       size="sm"
                       onClick={() => setMediaText("")}
-                    >
-                      Clear attached media (also clears Compose)
-                    </Button>
+                      label="Clear attached media (also clears Compose)"
+                    />
                   </>
                 ) : (
                   <p className="text-muted-foreground">
@@ -955,8 +952,8 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                   </p>
                 )}
               </div>
-              <Button
-                variant="outline"
+              <GooglePill
+                label="Add content source"
                 disabled={
                   mutation.isPending || !sourceText.trim() || !!mediaProblem
                 }
@@ -974,42 +971,46 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                     setSourceText("");
                   } catch {}
                 }}
-              >
-                Add content source
-              </Button>
+              />
               <p className="text-xs text-muted-foreground">
                 Sources expire from generation after 30 days; remove offers
                 when they end.
               </p>
               <p className="text-sm">GBP refresh: {data?.sourcesSync?.sync_requested ? "Queued" : data?.sourcesSync?.synced_at ? new Date(data.sourcesSync.synced_at).toLocaleString() : "Not yet requested"}{data?.sourcesSync?.sync_error ? ` — ${data.sourcesSync.sync_error}` : ""}</p>
-              <Input aria-label="Search content sources" value={sourceSearch} onChange={e => { setSourceSearch(e.target.value); setSourceOffset(0); }} placeholder="Search sources" />
+              <div className="g-search sm:max-w-md" role="search">
+                <Search aria-hidden="true" />
+                <input type="search" aria-label="Search content sources" value={sourceSearch} onChange={e => { setSourceSearch(e.target.value); setSourceOffset(0); }} placeholder="Search sources" />
+              </div>
               <Pager offset={sourceOffset} setOffset={setSourceOffset} more={sources.length === 25} label="sources" />
-              {sources.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border p-3"
-                >
-                  <p className="min-w-0 text-sm">
-                    {s.kind}: {s.text}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={mutation.isPending}
-                    onClick={() =>
-                      mutation.mutate({
-                        path: `/sources/${s.id}`,
-                        success: "Source removed",
-                        method: "DELETE",
-                      })
-                    }
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
+              {sources.length > 0 && (
+                <GoogleList testId="list-social-sources">
+                  {sources.map((s) => (
+                    <GoogleListRow
+                      key={s.id}
+                      size="md"
+                      title={<span className="capitalize">{s.kind}</span>}
+                      meta={s.text}
+                      trailing={
+                        <GooglePill
+                          variant="quiet"
+                          size="sm"
+                          disabled={mutation.isPending}
+                          onClick={() =>
+                            mutation.mutate({
+                              path: `/sources/${s.id}`,
+                              success: "Source removed",
+                              method: "DELETE",
+                            })
+                          }
+                          label="Remove"
+                        />
+                      }
+                    />
+                  ))}
+                </GoogleList>
+              )}
             </div>
-          </Section>
+          </section>
         </>
       )}
 
@@ -1033,21 +1034,21 @@ function PostRow({
 }) {
   const [text, setText] = useState(p.payload.post.content.text);
   return (
-    <article className="space-y-2 rounded-xl border p-4">
+    <article className="g-card space-y-2" data-testid={`card-post-${p.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         {["draft", "queued"].includes(p.state) && <input type="checkbox" aria-label={`Select post ${p.id}`} checked={selected} onChange={e => onSelect(e.target.checked)} />}
-        <Badge>{p.state}</Badge>
-        <span className="text-sm font-semibold">{p.business_name || "Legacy / unassigned"}</span>
-        <span className="text-sm font-medium">{p.payload.post.content.platform}</span>
-        <span className="text-sm text-muted-foreground">
-          {new Date(
+        <span className={`g-chip g-chip--sm ${p.state === "failed" ? "g-closed" : p.state === "published" ? "g-open" : ""}`}>{p.state}</span>
+        <span className="g-card__title g-card__title--md">{p.business_name || "Legacy / unassigned"}</span>
+        <span className="text-sm g-text-2">{p.payload.post.content.platform}</span>
+        <span className="text-sm g-text-2">
+          · {new Date(
             p.scheduled_at || p.created_at || p.due_at,
           ).toLocaleString()}
         </span>
         {p.ai_generated && (
-          <Badge variant="outline">
+          <span className="g-chip g-chip--sm">
             AI-generated{p.state === "draft" ? " draft" : ""}
-          </Badge>
+          </span>
         )}
       </div>
       {p.state === "draft" ? (
@@ -1060,59 +1061,49 @@ function PostRow({
         <p className="whitespace-pre-wrap text-sm">{p.payload.post.content.text}</p>
       )}
       {p.source && (
-        <p className="text-xs text-muted-foreground">Source: {p.source}</p>
+        <p className="g-card__meta">Source: {p.source}</p>
       )}
       {p.error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm g-closed">
           {p.error}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="g-card__actions items-center">
         {p.state === "draft" && (
-          <Button
+          <GooglePill
+            variant="solid"
             disabled={pending || !text.trim()}
             onClick={() => action("approve", text)}
-          >
-            Approve & queue
-          </Button>
+            label="Approve & queue"
+          />
         )}
         {["draft", "queued"].includes(p.state) && (
-          <Button
-            variant="outline"
+          <GooglePill
             disabled={pending}
             onClick={() => action("cancel")}
-          >
-            Cancel
-          </Button>
+            label="Cancel"
+          />
         )}
         {p.public_url && (
-          <a
-            className="text-sm text-primary underline"
-            href={p.public_url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View published post
-          </a>
+          <GooglePill icon={ExternalLink} href={p.public_url} external label="View published post" />
         )}
         {["submitted", "published", "failed", "uncertain"].includes(
           p.state,
         ) && (
           <>
-            <a
-              className="text-sm text-primary underline"
+            <GooglePill
+              icon={ExternalLink}
+              variant="quiet"
               href={
                 p.state === "failed"
                   ? "https://my.blotato.com/failed"
                   : "https://my.blotato.com"
               }
-              target="_blank"
-              rel="noreferrer"
-            >
-              Open Blotato status
-            </a>
+              external
+              label="Open Blotato status"
+            />
             {p.submission_id && (
-              <span className="break-all text-xs text-muted-foreground">
+              <span className="break-all text-xs g-text-2">
                 Submission: {p.submission_id}
               </span>
             )}
