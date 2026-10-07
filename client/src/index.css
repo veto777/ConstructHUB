@@ -165,9 +165,9 @@
   --primary: 217 89% 51%; /* #1a73e8 Google blue (owner 2026-10-07: orange is hard to read) */
   --primary-foreground: 0 0% 100%;
   --ring: 217 89% 51%;
-  --sidebar-primary: 217 89% 51%;
+  --sidebar-primary: 25 95% 53%; /* sidebar stays brand orange (owner 2026-10-07) */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-ring: 217 89% 51%;
+  --sidebar-ring: 25 95% 53%;
   /* Secondary accent: purple/blue, used for the CRM badge and highlights. */
   --crm-accent: 250 84% 60%;
   --crm-accent-foreground: 0 0% 100%;
@@ -212,9 +212,9 @@
   --primary: 217 89% 51%; /* #1a73e8 Google blue (owner 2026-10-07: orange is hard to read) */
   --primary-foreground: 0 0% 100%;
   --ring: 217 89% 51%;
-  --sidebar-primary: 217 89% 51%;
+  --sidebar-primary: 25 95% 53%; /* sidebar stays brand orange (owner 2026-10-07) */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-ring: 217 89% 51%;
+  --sidebar-ring: 25 95% 53%;
   --chart-1: 217 89% 51%;
   --chart-2: 222 45% 30%;
   --chart-3: 38 92% 50%;
@@ -435,9 +435,9 @@
   --primary: 217 89% 75%; /* #8ab4f8 */
   --primary-foreground: 220 13% 13%;
   --ring: 217 89% 75%;
-  --sidebar-primary: 217 89% 75%;
+  --sidebar-primary: 27 96% 61%;
   --sidebar-primary-foreground: 24 80% 10%;
-  --sidebar-ring: 217 89% 75%;
+  --sidebar-ring: 27 96% 61%;
   --chart-1: 217 89% 75%;
 
   --primary-border: hsl(var(--primary));
@@ -450,9 +450,9 @@
   --primary: 217 89% 75%; /* #8ab4f8 */
   --primary-foreground: 220 13% 13%;
   --ring: 217 89% 75%;
-  --sidebar-primary: 217 89% 75%;
+  --sidebar-primary: 27 96% 61%;
   --sidebar-primary-foreground: 24 80% 10%;
-  --sidebar-ring: 217 89% 75%;
+  --sidebar-ring: 27 96% 61%;
   --crm-accent: 252 90% 72%;
   --crm-accent-foreground: 250 60% 12%;
   --chart-1: 217 89% 75%;
