@@ -30,6 +30,7 @@ export const PLATFORM_TAB_ICONS: Record<string, LucideIcon> = {
 export const CRM_TAB_ICONS: Record<string, LucideIcon> = {
   home: LayoutDashboard, schedule: CalendarDays, inbox: Inbox, clients: Users, pipeline: KanbanSquare, estimates: FileText,
   "new-estimate": FilePlus2, invoices: ReceiptText, pricebook: BookOpen, payments: CreditCard, team: Building2, reports: BarChart3,
+  jobcam: Camera,
 };
 
 /** Of the tabs shown, the one for this page: the longest matching path wins ("New estimate" over "Estimates"). */

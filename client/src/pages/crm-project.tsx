@@ -16,8 +16,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiIssueMessage } from "@/lib/api-issue-message";
 import {
   ArrowLeft, Loader2, Plus, DollarSign, FileDiff, ClipboardCheck, ClipboardCopy, NotebookPen,
-  Palette, FileBadge, TrendingUp, TrendingDown, Send, Check, RotateCcw, Pencil, Trash2,
+  Palette, FileBadge, TrendingUp, TrendingDown, Send, Check, RotateCcw, Pencil, Trash2, Camera,
 } from "lucide-react";
+import { JobcamPanel } from "@/components/jobcam/project-panel";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
@@ -34,7 +35,7 @@ const localDay = (d: string) => {
 };
 const cents = (v: string) => Math.round((parseFloat(v) || 0) * 100);
 
-const TABS = ["costing", "change-orders", "punch", "logs", "selections", "permits"] as const;
+const TABS = ["costing", "change-orders", "punch", "logs", "selections", "permits", "jobcam"] as const;
 const SELECTION_STATUSES = ["pending", "chosen", "ordered", "installed"] as const;
 
 /** Server field keys → the words on these forms, for validation toasts. */
@@ -286,7 +287,13 @@ export default function CrmProjectPage() {
           <TabsTrigger value="logs"><NotebookPen className="h-4 w-4 mr-1" /> Daily logs</TabsTrigger>
           <TabsTrigger value="selections"><Palette className="h-4 w-4 mr-1" /> Selections</TabsTrigger>
           <TabsTrigger value="permits"><FileBadge className="h-4 w-4 mr-1" /> Permits</TabsTrigger>
+          <TabsTrigger value="jobcam" data-testid="tab-jobcam"><Camera className="h-4 w-4 mr-1" /> JobCam</TabsTrigger>
         </TabsList>
+
+        {/* JobCam — job-site photos/video for this project (full feed at /crm/projects/:id/jobcam). */}
+        <TabsContent value="jobcam" className="mt-4">
+          <Card><CardContent className="p-4 sm:p-5"><JobcamPanel projectId={id} /></CardContent></Card>
+        </TabsContent>
 
         <TabsContent value="costing" className="mt-4">
           <Card>
