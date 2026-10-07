@@ -5,6 +5,7 @@ import { Loader2, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { GooglePill } from "@/components/google";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { ADDONS, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
@@ -129,8 +130,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             Limits come with a plan. Choose one in Pricing and this page shows what it includes and how much of it you've used.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => navigate("/pricing")} data-testid="button-limits-choose-plan">Compare plans</Button>
-            <Button size="sm" variant="outline" onClick={() => go("billing")} data-testid="button-limits-open-billing">Open billing</Button>
+            <GooglePill variant="solid" label="Compare plans" onClick={() => navigate("/pricing")} testId="button-limits-choose-plan" />
+            <GooglePill label="Open billing" onClick={() => go("billing")} testId="button-limits-open-billing" />
           </div>
         </CardContent>
       </Card>
@@ -333,7 +334,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 space-y-1">
-              <div className="font-semibold flex flex-wrap items-center gap-2" data-testid="text-limits-plan">
+              <div className="g-card__title g-card__title--md flex flex-wrap items-center gap-2" data-testid="text-limits-plan">
                 {admin ? "All features, unlimited" : `${entitlements.planName ?? PLANS[plan].name} plan limits`}
                 {admin && (
                   <Badge variant="outline" className="text-[10px]" data-testid="badge-limits-admin">Platform admin</Badge>
@@ -349,8 +350,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => go("billing")} data-testid="button-limits-billing">Billing</Button>
-              <Button size="sm" onClick={() => navigate("/pricing")} data-testid="button-limits-change-plan">Change plan</Button>
+              <GooglePill label="Billing" onClick={() => go("billing")} testId="button-limits-billing" />
+              <GooglePill variant="solid" label="Change plan" onClick={() => navigate("/pricing")} testId="button-limits-change-plan" />
             </div>
           </div>
         </CardContent>

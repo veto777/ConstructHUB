@@ -1,4 +1,5 @@
-import { AppPage, PageHeader } from "@/components/app-ui";
+import { AppPage } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -63,23 +64,29 @@ export default function SettingsPage() {
   return (
     <div ref={root} className="min-w-0">
       <AppPage>
-        <PageHeader title={<span data-testid="text-settings-title">Account settings</span>} description="Manage your account and workspace." meta={
-          <button
-            type="button"
-            onClick={() => {
-              if (previousEntryIsInApp()) {
-                window.history.back();
-              } else {
-                navigate("/");
-              }
-            }}
-            className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            aria-label="Close settings"
-            data-testid="button-close-settings"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        } />
+        {/* Google's page format (owner, 2026-10-07): a quiet header, pill actions, hairline sections. */}
+        <GoogleSectionHeader
+          as="h1"
+          titleTestId="text-settings-title"
+          title="Account settings"
+          description="Manage your account and workspace."
+          flush
+          actions={
+            <GooglePill
+              icon={X}
+              variant="quiet"
+              label="Close"
+              onClick={() => {
+                if (previousEntryIsInApp()) {
+                  window.history.back();
+                } else {
+                  navigate("/");
+                }
+              }}
+              ariaLabel="Close settings"
+              testId="button-close-settings"
+            />
+          } />
 
         <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
           <SettingsNav active={section} onSelect={(id) => go(id)} />
