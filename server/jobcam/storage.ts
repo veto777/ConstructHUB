@@ -123,7 +123,10 @@ export async function presignUploadPart(key: string, uploadId: string, partNumbe
     port: endpoint.port ? Number(endpoint.port) : undefined,
     path: `/${BUCKET}/${assertKey(key)}`,
     query: { partNumber: String(partNumber), uploadId },
-    headers: { host: endpoint.host },
+    // S3 presigned URLs sign "UNSIGNED-PAYLOAD", not the hash of an empty body: without this header the signer
+    // hashes "" and R2 answers 403 SignatureDoesNotMatch (found on the first real R2 run, 2026-10-07). The signer
+    // hoists it into the query string (X-Amz-Content-Sha256), exactly as @aws-sdk/s3-request-presigner does.
+    headers: { host: endpoint.host, "x-amz-content-sha256": "UNSIGNED-PAYLOAD" },
   });
   const signed = await presigner().presign(req, { expiresIn: PART_URL_TTL_S });
   const port = signed.port ? `:${signed.port}` : "";
