@@ -1835,6 +1835,176 @@
   {
    "jurisdiction": "Glennallen, AK",
    "toCounty": "Copper River"
+  },
+  {
+   "jurisdiction": "Greentop, MO",
+   "toCounty": "Schuyler",
+   "why": "fact-check 2026-10-06 (slice MO-01): was Adair County, MO; \"Greentop is actually in SCHUYLER County per the DNR city list (county FIPS 197) ... the entry's county should be Schuyler.\""
+  },
+  {
+   "jurisdiction": "Asbury, MO",
+   "toCounty": "Jasper",
+   "why": "fact-check 2026-10-06 (slice MO-01): was Barton County, MO; \"Wrong county: Asbury is in JASPER County (DNR city list county FIPS 97 = Jasper), not Barton.\""
+  },
+  {
+   "jurisdiction": "Neosho Falls, KS",
+   "toCounty": "Woodson",
+   "why": "fact-check 2026-10-06 (slice KS-01): was Coffey County, KS; \"The county field is wrong: Neosho Falls is in Woodson County, not Coffey County. The Kansas Department of Administration lists City of Neos"
+  },
+  {
+   "jurisdiction": "Waubun, MN",
+   "toCounty": "Mahnomen",
+   "why": "fact-check 2026-10-06 (slice MN-01): was Becker County, MN; \"The verdict's county field wrongly says 'Becker County, MN'; Waubun is in Mahnomen County, as the researcher's own DLI evidence quote shows"
+  },
+  {
+   "jurisdiction": "Young America, MN",
+   "toCounty": "Carver",
+   "why": "fact-check 2026-10-06 (slice MN-01): was Hennepin County, MN; \"There is no Young America township or city in Hennepin County ... Young America Township is in CARVER County.\""
+  },
+  {
+   "jurisdiction": "Grenloch, NJ",
+   "toCounty": "Camden",
+   "why": "fact-check 2026-10-06 (slice NJ-01): was Gloucester County, NJ; \"Grenloch is in Gloucester Twp, Camden County, per the map. The directory county is wrong; routing is right.\""
+  },
+  {
+   "jurisdiction": "Asbury, NJ",
+   "toCounty": "Warren",
+   "why": "fact-check 2026-10-06 (slice NJ-01): was Hunterdon County, NJ; \"Asbury is in Franklin Twp, Warren County (directory county is wrong).\""
+  },
+  {
+   "jurisdiction": "Blue Gap, AZ",
+   "toCounty": "Apache",
+   "why": "fact-check 2026-10-06 (slice AZ-01): was Navajo County, AZ; \"The county field is wrong ... the Arizona State Library official Blue Book also lists Blue Gap under Apache. Correct county to Apache Count"
+  },
+  {
+   "jurisdiction": "New Town, MA",
+   "toCounty": "Barnstable",
+   "why": "fact-check 2026-10-06 (slice MA-01): was Middlesex County, MA; \"Newtown is the historic western section of Marstons Mills, Barnstable ... Caveat: the record's county field is wrong (should be Barnstable"
+  },
+  {
+   "jurisdiction": "Fort Washington, PA",
+   "toCounty": "Montgomery",
+   "why": "fact-check 2026-10-06 (slice PA-02): was Bucks County, PA; \"The researcher changed the county field to Montgomery, which is factually right (Fort Washington is not in Bucks). Owner: the DB record's c"
+  },
+  {
+   "jurisdiction": "Red Mountain, CA",
+   "toCounty": "San Bernardino",
+   "why": "fact-check 2026-10-06 (slice CA-02): was Kern County, CA; \"Red Mountain (ZIP 93558) really is in San Bernardino County (the directory's Kern County is wrong; neighbouring Randsburg/Johannesburg are"
+  },
+  {
+   "jurisdiction": "Eros, LA",
+   "toCounty": "Jackson",
+   "why": "fact-check 2026-10-06 (slice LA-02): was Ouachita Parish, LA; \"Eros is actually in Jackson Parish; the directory's Ouachita county is wrong.\""
+  },
+  {
+   "jurisdiction": "Kanaranzi, MN",
+   "toCounty": "Rock",
+   "why": "fact-check 2026-10-06 (slice MN-02): was Nobles County, MN; \"Kanaranzi is in Rock County (researcher's county correction is right).\""
+  },
+  {
+   "jurisdiction": "Jacobson, MN",
+   "toCounty": "Aitkin",
+   "why": "fact-check 2026-10-06 (slice MN-02): was Itasca County, MN; \"Also checked: Wikipedia (Jacobson = unincorporated community in Ball Bluff Township, Aitkin County)\" and the fix sets county Aitkin County,"
+  },
+  {
+   "jurisdiction": "Kabetogama, MN",
+   "toCounty": "St. Louis",
+   "why": "fact-check 2026-10-06 (slice MN-02): was Koochiching County, MN; \"County 'Administration of Zoning' map PDF ... shows Kabetogama township in the 'Areas Administered by St. Louis County'\" and the fix sets c"
+  },
+  {
+   "jurisdiction": "Newport, NE",
+   "toCounty": "Rock",
+   "why": "fact-check 2026-10-06 (slice NE-02): was Keya Paha County, NE; \"Newport is actually in Rock County, not Keya Paha (the input county is wrong) ... the county field should be corrected to Rock County.\""
+  },
+  {
+   "jurisdiction": "Orient, SD",
+   "toCounty": "Faulk",
+   "why": "fact-check 2026-10-06 (slice SD-02): was Hand County, SD; \"The entry's county field still says Hand County. Orient is in Faulk County ... Fix replaces source and county.\""
+  },
+  {
+   "jurisdiction": "Kake, AK",
+   "toCounty": "Prince of Wales-Hyder",
+   "why": "fact-check 2026-10-06 (slice AK-02): was Petersburg Borough, AK; \"The input county is wrong (Kake lies in Prince of Wales-Hyder Census Area, outside Petersburg Borough), which does not change the issuer.\""
+  },
+  {
+   "jurisdiction": "Luray, TN",
+   "toCounty": "Henderson",
+   "why": "fact-check 2026-10-06 (slice TN-01): was Chester County, TN; \"Census geocoder places Luray CDP (GEOID 4744200) in Henderson County District 2, unincorporated - so the directory's Chester County/SRBP br"
+  },
+  {
+   "jurisdiction": "Smartsville, CA",
+   "toCounty": "Yuba",
+   "why": "fact-check 2026-10-06 (slice CA-03): was Nevada County, CA; \"The Census geocoder places Smartsville CDP in Yuba County ... so the directory county is the error here, not Codex. OWNER: the row's county"
+  },
+  {
+   "jurisdiction": "Clothier, WV",
+   "toCounty": "Boone",
+   "why": "fact-check 2026-10-06 (slice WV-03): was Logan County, WV; \"USGS GNIS DomesticNames_WV: Clothier is in Boone County (1554157), not Logan. The directory county is wrong.\""
+  },
+  {
+   "jurisdiction": "Proctor, WV",
+   "toCounty": "Wetzel",
+   "why": "fact-check 2026-10-06 (slice WV-03): was Marshall County, WV; \"USGS GNIS: Proctor is in Wetzel County (1555417), not Marshall. The directory county is wrong.\""
+  },
+  {
+   "jurisdiction": "Mount Alto, WV",
+   "toCounty": "Jackson",
+   "why": "fact-check 2026-10-06 (slice WV-03): was Mason County, WV; \"USGS GNIS: the only Mount Alto is in Jackson County (1555165), not Mason. The directory county is wrong.\""
+  },
+  {
+   "jurisdiction": "Eden, MD",
+   "toCounty": "Somerset",
+   "why": "fact-check 2026-10-06 (slice MD-03): was Worcester County, MD; \"Census geocoder at Eden CDP's centroid returns Counties=['Somerset County'] ... confirming the researcher's correction of the input county"
+  },
+  {
+   "jurisdiction": "Cusseta, AL",
+   "toCounty": "Chambers",
+   "why": "fact-check 2026-10-06 (slice AL-03): was Lee County, AL; \"Note the directory county is wrong: Cusseta is in Chambers County.\""
+  },
+  {
+   "jurisdiction": "Cameron, NC",
+   "toCounty": "Moore",
+   "why": "fact-check 2026-10-06 (slice NC-02): was Harnett County, NC; \"The Town of Cameron is in Moore County (the assigned Harnett County is wrong) ... The county field should be corrected to Moore County.\""
+  },
+  {
+   "jurisdiction": "Mora, MO",
+   "toCounty": "Benton",
+   "why": "fact-check 2026-10-06 (slice MO-05): was Pettis County, MO; \"Census geocoder places Mora in Williams township, Benton County (Class 3), not Pettis ... The directory county should be Benton County, MO."
+  },
+  {
+   "jurisdiction": "Hensley, AR",
+   "toCounty": "Pulaski",
+   "why": "fact-check 2026-10-06 (slice AR-04): was Saline County, AR; \"The Census map places Hensley CDP in Pulaski County ... so Saline County sources do not apply ... county should be Pulaski County, AR.\""
+  },
+  {
+   "jurisdiction": "Henrico, VA",
+   "toCounty": "Henrico",
+   "why": "fact-check 2026-10-06 (slice VA-04): was Richmond County, VA; \"Henrico, VA is the USPS place name for unincorporated Henrico County around the City of Richmond. The record's 'Richmond County' is a mix-u"
+  },
+  {
+   "jurisdiction": "Broadford, VA",
+   "toCounty": "Smyth",
+   "why": "fact-check 2026-10-06 (slice VA-05): was Tazewell County, VA; \"Broadford, VA is a Smyth County community. Correcting the Tazewell label to Smyth is right.\""
+  },
+  {
+   "jurisdiction": "Spring, TX",
+   "toCounty": "Harris",
+   "why": "fact-check 2026-10-06 (slice TX-06): was Montgomery County, TX; \"Spring CDP is unincorporated and in Harris County (row's input county Montgomery is wrong).\""
+  },
+  {
+   "jurisdiction": "Mc Clure, PA",
+   "toCounty": "Snyder",
+   "why": "fact-check 2026-10-06 (slice PA-07): was Mifflin County, PA; \"The todo's Mifflin County label is wrong, since the borough is in Snyder County.\""
+  },
+  {
+   "jurisdiction": "Valentine, TX",
+   "toCounty": "Jeff Davis",
+   "why": "fact-check 2026-10-06 (slice TX-07): was Presidio County, TX; \"Reviewer note: the input county is wrong; Valentine is in Jeff Davis County, not Presidio.\""
+  },
+  {
+   "jurisdiction": "Apollo, PA",
+   "toCounty": "Armstrong",
+   "why": "fact-check 2026-10-06 (slice PA-11): was Westmoreland County, PA; \"Apollo Borough is in Armstrong County (L&I row ARMSTRONG APOLLO BOROUGH OPT-IN); no Westmoreland place by that name, so the directory count"
   }
  ]
 }
