@@ -35,6 +35,7 @@ import {
 import { EstimateEngagement } from "@/components/crm-engagement";
 import { EstimateDiscounts } from "@/components/crm-discounts";
 import { EstimateAttach, CustomerPhotos, CustomerComments, OrgPamphlets } from "@/components/client-uploads";
+import { JobcamPanel } from "@/components/jobcam/project-panel";
 import { CustomerMeasurements } from "@/components/client-measurements";
 import { TakePaymentDialog, invoiceDueCents } from "@/components/crm-take-payment";
 import { CustomerNotes, CustomerTimeline, ViewAsClientButton } from "@/components/crm-client-360";
@@ -1835,6 +1836,8 @@ export default function CrmClientPage() {
 
       {/* Client portal v2 — photos/comments from this client + the org pamphlet shelf. */}
       <CustomerPhotos customerId={id!} canUpload={me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true} />
+      {/* JobCam — the crew's job-site shots across this client's projects (same shelf as Project Photos). */}
+      <Card data-testid="section-customer-jobcam"><CardContent className="p-4 sm:p-5"><JobcamPanel customerId={id!} /></CardContent></Card>
       <CustomerComments customerId={id!} />
       <OrgPamphlets />
 

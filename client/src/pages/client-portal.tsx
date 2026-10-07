@@ -13,6 +13,7 @@ import {
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
 import { PortalPamphlets, PortalPhotoShare } from "@/components/client-uploads";
+import { PortalJobcamFeed } from "@/components/jobcam/portal-feed";
 import { PortalMessages, PortalContact, PortalContactFooter } from "@/components/portal-messages";
 import { ContractorPreviewBanner, PortalFinancing } from "@/components/crm-client-360";
 import { CrmLogo } from "@/components/crm-logo";
@@ -579,7 +580,7 @@ function Dashboard({ data }: { data: any }) {
     invoices: invoicesSection,
     contracts: contractsSection,
     reports: reportsSection,
-    photos: <PortalPhotoShare accounts={accounts} photos={photos} />,
+    photos: <><PortalJobcamFeed /><PortalPhotoShare accounts={accounts} photos={photos} /></>,
     messages: <PortalMessages accounts={accounts} focusMemberId={messageTo} onFocusConsumed={() => setMessageTo(null)} />,
     contact: (
       <PortalContact

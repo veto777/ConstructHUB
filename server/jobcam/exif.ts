@@ -1,0 +1,217 @@
+/**
+ * Capture metadata from the file itself (the source of truth; device values
+ * from the client are the fallback): EXIF GPS + DateTimeOriginal for photos
+ * via sharp's raw EXIF buffer + piexifjs, and ffprobe for videos (duration,
+ * dimensions, codec, rotation, creation_time, the QuickTime ISO 6709 location
+ * iPhones write). Nothing here guesses — a missing value stays null.
+ */
+import { execFile } from "child_process";
+import sharp from "sharp";
+import piexif from "piexifjs";
+
+export type ImageMeta = {
+  width: number | null;
+  height: number | null;
+  orientation: number | null;
+  format: string | null;
+  capturedAt: Date | null;
+  lat: number | null;
+  lng: number | null;
+  exif: Record<string, unknown> | null;
+};
+
+const num = (v: unknown): number | null => {
+  if (Array.isArray(v) && v.length === 2 && Number(v[1]) !== 0) return Number(v[0]) / Number(v[1]);
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  return null;
+};
+
+/** [[d,1],[m,1],[s,100]] + "N"/"S" → signed decimal degrees. */
+export function dmsToDecimal(dms: unknown, ref: unknown): number | null {
+  if (!Array.isArray(dms) || dms.length < 3) return null;
+  const d = num(dms[0]), m = num(dms[1]), s = num(dms[2]);
+  if (d === null || m === null || s === null) return null;
+  const v = d + m / 60 + s / 3600;
+  if (!Number.isFinite(v)) return null;
+  const r = String(ref ?? "").toUpperCase();
+  return r === "S" || r === "W" ? -v : v;
+}
+
+/** "YYYY:MM:DD HH:MM:SS" (+ optional "+05:00" EXIF 2.31 offset) → Date, or null. */
+export function parseExifDate(raw: unknown, offset?: unknown): Date | null {
+  if (typeof raw !== "string") return null;
+  const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(raw.trim());
+  if (!m) return null;
+  const off = typeof offset === "string" && /^[+-]\d{2}:\d{2}$/.test(offset.trim()) ? offset.trim() : "";
+  // Without an offset EXIF time is the camera's local wall clock; we keep it as
+  // UTC wall time rather than invent a zone (the client's own timestamp wins
+  // when it has one — see routes.ts resolveCapturedAt).
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}${off || "Z"}`;
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
+export async function readImageMeta(filePath: string): Promise<ImageMeta> {
+  const meta = await sharp(filePath, { failOn: "none" }).metadata();
+  const out: ImageMeta = {
+    width: meta.width ?? null, height: meta.height ?? null,
+    orientation: meta.orientation ?? null, format: meta.format ?? null,
+    capturedAt: null, lat: null, lng: null, exif: null,
+  };
+  if (meta.exif && meta.exif.length > 8) {
+    try {
+      const raw = meta.exif.toString("binary");
+      // sharp hands back the segment starting with "Exif\0\0"; piexif wants exactly that.
+      const dict = piexif.load(raw.startsWith("Exif") ? raw : `Exif\0\0${raw}`);
+      const g = dict?.GPS ?? {};
+      const e = dict?.Exif ?? {};
+      const z = dict?.["0th"] ?? {};
+      out.lat = dmsToDecimal(g[piexif.GPSIFD.GPSLatitude], g[piexif.GPSIFD.GPSLatitudeRef]);
+      out.lng = dmsToDecimal(g[piexif.GPSIFD.GPSLongitude], g[piexif.GPSIFD.GPSLongitudeRef]);
+      out.capturedAt = parseExifDate(e[piexif.ExifIFD.DateTimeOriginal], e[36881]) // OffsetTimeOriginal
+        ?? parseExifDate(e[piexif.ExifIFD.DateTimeDigitized]) ?? parseExifDate(z[piexif.ImageIFD.DateTime]);
+      out.exif = {
+        make: z[piexif.ImageIFD.Make] ?? null,
+        model: z[piexif.ImageIFD.Model] ?? null,
+        software: z[piexif.ImageIFD.Software] ?? null,
+        dateTimeOriginal: e[piexif.ExifIFD.DateTimeOriginal] ?? null,
+        offsetTimeOriginal: e[36881] ?? null,
+        orientation: meta.orientation ?? null,
+        gpsAltitude: num(g[piexif.GPSIFD.GPSAltitude]),
+      };
+    } catch {
+      // Unparseable EXIF is not an error: the photo is still a photo.
+    }
+  }
+  // Swap for EXIF orientations that rotate 90° — the displayed size.
+  if (out.orientation && out.orientation >= 5 && out.width && out.height) {
+    [out.width, out.height] = [out.height, out.width];
+  }
+  return out;
+}
+
+export type VideoMeta = {
+  durationS: number | null;
+  width: number | null;
+  height: number | null;
+  videoCodec: string | null;
+  audioCodec: string | null;
+  container: string | null;
+  rotation: number;
+  capturedAt: Date | null;
+  lat: number | null;
+  lng: number | null;
+  bitRate: number | null;
+  /** Browser-playable as-is: H.264/VP8/VP9/AV1 + AAC/Opus/none, in MP4/WebM, at a size and bitrate a phone can stream. */
+  playable: boolean;
+  /** Right codecs, wrong box (H.264/AAC in a QuickTime .mov): a stream copy into MP4 is enough — no re-encode. */
+  remuxable: boolean;
+};
+
+/** "+37.1234-122.1234+010.000/" (ISO 6709, QuickTime) → lat/lng. */
+export function parseIso6709(raw: unknown): { lat: number; lng: number } | null {
+  if (typeof raw !== "string") return null;
+  const m = /^([+-]\d+(?:\.\d+)?)([+-]\d+(?:\.\d+)?)/.exec(raw.trim());
+  if (!m) return null;
+  const lat = Number(m[1]), lng = Number(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
+
+/**
+ * Input options for every ffmpeg/ffprobe run on an uploaded file: local files
+ * only. A "video" that is really a playlist or a concat script must not be
+ * able to make the server fetch a URL or read another file.
+ */
+export const FFMPEG_SAFE_INPUT: readonly string[] = ["-protocol_whitelist", "file"];
+
+export type SniffedType = "jpeg" | "png" | "webp" | "heif" | "mp4" | "webm";
+
+/**
+ * What the first bytes say the file is — the declared MIME type is the
+ * client's word, this is the file's. Only real images / ISO-BMFF / Matroska
+ * containers get as far as sharp or ffmpeg (no SVG, no playlists, no scripts).
+ */
+export function sniffMedia(head: Uint8Array): SniffedType | null {
+  const b = Buffer.from(head.buffer, head.byteOffset, head.byteLength);
+  if (b.length < 12) return null;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
+  if (b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") return "webp";
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return "webm";
+  const box = b.toString("latin1", 4, 8);
+  if (box === "ftyp") {
+    const brand = b.toString("latin1", 8, 12).toLowerCase();
+    return /^(heic|heix|heim|heis|hevc|hevx|mif1|msf1|avif|avis)$/.test(brand) ? "heif" : "mp4";
+  }
+  // QuickTime files from older cameras can open with another top-level atom.
+  if (["moov", "mdat", "wide", "free", "skip"].includes(box)) return "mp4";
+  return null;
+}
+
+/** Does the sniffed type fit what the row says it is? */
+export function sniffMatchesKind(sniffed: SniffedType | null, kind: string): boolean {
+  if (!sniffed) return false;
+  return kind === "video" ? sniffed === "mp4" || sniffed === "webm" : ["jpeg", "png", "webp", "heif"].includes(sniffed);
+}
+
+export function ffprobeJson(filePath: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    execFile("ffprobe", ["-v", "error", ...FFMPEG_SAFE_INPUT, "-print_format", "json", "-show_format", "-show_streams", filePath],
+      { maxBuffer: 8 * 1024 * 1024, timeout: 60_000, killSignal: "SIGKILL" }, (err, stdout) => {
+        if (err) return reject(err);
+        try { resolve(JSON.parse(stdout)); } catch (e) { reject(e); }
+      });
+  });
+}
+
+/** Above this an original is re-encoded to 720p for playback (the original is still kept). */
+export const PLAY_AS_IS = { maxEdge: 1920, maxBitRate: 16_000_000 } as const;
+
+export function videoMetaFromProbe(probe: any): VideoMeta {
+  const streams: any[] = Array.isArray(probe?.streams) ? probe.streams : [];
+  const v = streams.find((s) => s.codec_type === "video");
+  const a = streams.find((s) => s.codec_type === "audio");
+  const fmt = probe?.format ?? {};
+  const tags = { ...(fmt.tags ?? {}), ...(v?.tags ?? {}) };
+  let rotation = 0;
+  const sd = Array.isArray(v?.side_data_list) ? v.side_data_list.find((s: any) => typeof s.rotation === "number") : null;
+  if (sd) rotation = Math.abs(Number(sd.rotation)) % 360;
+  else if (tags.rotate) rotation = Math.abs(Number(tags.rotate)) % 360;
+  let width = v?.width ?? null, height = v?.height ?? null;
+  if (rotation === 90 || rotation === 270) [width, height] = [height, width];
+  const duration = Number(fmt.duration ?? v?.duration);
+  const formatName = String(fmt.format_name ?? "");
+  // ffprobe reports one demuxer ("mov,mp4,m4a,3gp,3g2,mj2", "QuickTime / MOV")
+  // for the whole ISO-BMFF family — the major brand is what tells a .mov from an .mp4.
+  const brand = String(fmt.tags?.major_brand ?? "").trim().toLowerCase();
+  const container = /mp4|mov|m4a|3gp|3g2|mj2/.test(formatName) ? (brand === "qt" ? "mov" : "mp4")
+    : /webm|matroska/.test(formatName) ? (formatName.includes("webm") ? "webm" : "mkv") : formatName || null;
+  const videoCodec = v?.codec_name ?? null;
+  const audioCodec = a?.codec_name ?? null;
+  const loc = parseIso6709(tags["com.apple.quicktime.location.ISO6709"] ?? tags.location ?? tags["location-eng"]);
+  const created = tags.creation_time ? new Date(tags.creation_time) : null;
+  const playableVideo = ["h264", "vp8", "vp9", "av1"].includes(String(videoCodec));
+  const playableAudio = !a || ["aac", "opus", "vorbis", "mp3"].includes(String(audioCodec));
+  const playableContainer = container === "mp4" || container === "webm";
+  const bitRate = Number(fmt.bit_rate);
+  const light = Math.max(Number(width) || 0, Number(height) || 0) <= PLAY_AS_IS.maxEdge
+    && (!Number.isFinite(bitRate) || bitRate <= PLAY_AS_IS.maxBitRate);
+  // 8-bit 4:2:0 only: 10-bit / 4:2:2 H.264 decodes in few browsers.
+  const pix = String(v?.pix_fmt ?? "");
+  const plainPixels = !pix || pix === "yuv420p" || pix === "yuvj420p";
+  const codecsOk = !!v && playableVideo && playableAudio && plainPixels;
+  return {
+    bitRate: Number.isFinite(bitRate) ? bitRate : null,
+    durationS: Number.isFinite(duration) ? duration : null,
+    width, height, videoCodec, audioCodec, container, rotation,
+    capturedAt: created && Number.isFinite(created.getTime()) ? created : null,
+    lat: loc?.lat ?? null, lng: loc?.lng ?? null,
+    playable: codecsOk && playableContainer && light,
+    remuxable: codecsOk && !playableContainer && light && videoCodec === "h264" && (!a || audioCodec === "aac"),
+  };
+}
+
+export async function readVideoMeta(filePath: string): Promise<VideoMeta> {
+  return videoMetaFromProbe(await ffprobeJson(filePath));
+}

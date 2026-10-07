@@ -120,6 +120,11 @@ const PublicInvoicePage = lazy(() => import("@/pages/public-invoice"));
 const PublicChangeOrderPage = lazy(() => import("@/pages/public-change-order"));
 const PublicLeadFormPage = lazy(() => import("@/pages/public-lead-form"));
 const ClientPortalPage = lazy(() => import("@/pages/client-portal"));
+// JobCam: job-site photos/video (feeds, camera, the client-facing share page).
+const JobcamRecentPage = lazy(() => import("@/pages/jobcam/index"));
+const JobcamProjectPage = lazy(() => import("@/pages/jobcam/project"));
+const JobcamCapturePage = lazy(() => import("@/pages/jobcam/capture"));
+const JobcamSharePage = lazy(() => import("@/pages/jobcam/share"));
 
 /**
  * The old one-off landing pages, retired into /features/<slug>: the old URLs
@@ -257,6 +262,7 @@ function DashboardRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/jc/:token" component={JobcamSharePage} />
       <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={NotFound} />
@@ -426,6 +432,8 @@ function PortalRouter() {
       <Route path="/crm/invoices" component={CrmInvoicesPage} />
       <Route path="/crm/pricebook" component={CrmPriceBookPage} />
       <Route path="/crm/projects/:id" component={CrmProjectPage} />
+      <Route path="/crm/projects/:id/jobcam" component={JobcamProjectPage} />
+      <Route path="/crm/jobcam" component={JobcamRecentPage} />
       <Route path="/crm/payments" component={CrmPaymentsPage} />
       <Route path="/crm/team" component={CrmTeamPage} />
       <Route path="/crm/settings" component={CrmSettingsPage} />
@@ -449,6 +457,7 @@ function PortalRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/jc/:token" component={JobcamSharePage} />
       <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       {/* Unknown portal route -> home, which always offers the next action. */}
@@ -469,6 +478,7 @@ function PortalPublicRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/jc/:token" component={JobcamSharePage} />
       <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
@@ -495,6 +505,7 @@ function ClientRouter() {
       <Route path="/e/:token" component={PublicEstimatePage} />
       <Route path="/i/:token" component={PublicInvoicePage} />
       <Route path="/co/:token" component={PublicChangeOrderPage} />
+      <Route path="/jc/:token" component={JobcamSharePage} />
       <Route path="/lead-form/:token" component={PublicLeadFormPage} />
       <Route path="/portal/:token" component={PublicPortalPage} />
       <Route component={ClientPortalPage} />
@@ -561,6 +572,7 @@ function AppContent() {
     if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+    if (location.startsWith("/jc/")) return <JobcamSharePage />;
     if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
     return <ClientRouter />;
@@ -638,13 +650,17 @@ function AppContent() {
     if (location.startsWith("/e/")) return <PublicEstimatePage />;
     if (location.startsWith("/i/")) return <PublicInvoicePage />;
     if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+    if (location.startsWith("/jc/")) return <JobcamSharePage />;
     if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
     if (location.startsWith("/portal/")) return <PublicPortalPage />;
+    // The JobCam camera is a full-screen surface — no sidebar, no ribbon.
+    if (location.startsWith("/crm/jobcam/capture")) return <Suspense fallback={null}><JobcamCapturePage /></Suspense>;
     const section =
       location.startsWith("/crm/clients") ? "Clients" :
       location.startsWith("/crm/schedule") ? "Schedule" :
       location.startsWith("/crm/inbox") ? "Messages" :
       location.startsWith("/crm/call-assistant") ? "Call Assistant" :
+      location.startsWith("/crm/jobcam") || /^\/crm\/projects\/[^/]+\/jobcam/.test(location) ? "JobCam" :
       location.startsWith("/crm/pipeline") || location.startsWith("/crm/projects") ? "Pipeline" :
       location.startsWith("/crm/pricebook") ? "Price book" :
       location.startsWith("/crm/estimates") ? "Estimates" :
@@ -702,6 +718,7 @@ function AppContent() {
   if (location.startsWith("/e/")) return <PublicEstimatePage />;
   if (location.startsWith("/i/")) return <PublicInvoicePage />;
   if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+    if (location.startsWith("/jc/")) return <JobcamSharePage />;
   if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
   if (location.startsWith("/portal/")) return <PublicPortalPage />;
 

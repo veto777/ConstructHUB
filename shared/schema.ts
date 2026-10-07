@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1713,6 +1713,10 @@ export const crmProjects = pgTable("crm_projects", {
   permitPortalId: integer("permit_portal_id"),
   permitNumber: text("permit_number"),
   parcelNumber: text("parcel_number"),
+  // Site coordinates (JobCam "nearest project"). Null until set — never
+  // guessed from the address; JobCam falls back to where its media was shot.
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
   customFields: jsonb("custom_fields"),
   stageChangedAt: timestamp("stage_changed_at").defaultNow(),
   archivedAt: timestamp("archived_at"),
@@ -2939,3 +2943,234 @@ export type SeoRankRun = typeof seoRankRuns.$inferSelect;
 export type SeoRankCheck = typeof seoRankChecks.$inferSelect;
 export type SeoBacklinkSnapshot = typeof seoBacklinkSnapshots.$inferSelect;
 export type SeoApiUsage = typeof seoApiUsage.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// JobCam — job-site photos and video (CompanyCam-class), riding the CRM's
+// projects/customers/members. DDL mirror: server/jobcam/schema.ts (JOBCAM_DDL,
+// run at boot by ensureCrmSchema and by scripts/apply-schema-migration.ts).
+// Phase A tables carry data; the annotation / note / report / checklist tables
+// are reserved for the later phases and are created empty now so the data
+// model is settled before those branches start.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const JOBCAM_MEDIA_KINDS = ["photo", "video"] as const;
+export type JobcamMediaKind = (typeof JOBCAM_MEDIA_KINDS)[number];
+/** uploading → processing → ready | failed (processor.ts). */
+export const JOBCAM_MEDIA_STATUSES = ["uploading", "processing", "ready", "failed"] as const;
+export type JobcamMediaStatus = (typeof JOBCAM_MEDIA_STATUSES)[number];
+export const JOBCAM_SHARE_KINDS = ["gallery", "timeline"] as const;
+export type JobcamShareKind = (typeof JOBCAM_SHARE_KINDS)[number];
+
+/** Non-destructive stamp preferences rendered at view/share time — the
+ *  original pixels are never burned (CompanyCam's irreversible stamp is a
+ *  documented complaint). */
+export type JobcamStamp = { time?: boolean; gps?: boolean; project?: boolean; logo?: boolean };
+
+export const jobcamMedia = pgTable("jobcam_media", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  // Denormalised from the project so the client portal and the client page
+  // list a customer's media without a join per row.
+  customerId: varchar("customer_id"),
+  uploaderMemberId: varchar("uploader_member_id"),
+  kind: text("kind").notNull(),               // photo | video
+  status: text("status").notNull().default("uploading"),
+  error: text("error"),
+  fileName: text("file_name"),
+  mime: text("mime").notNull(),
+  // Bytes of the ORIGINAL object; renditions are counted separately so the
+  // org's storage meter is the sum of both.
+  bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+  renditionBytes: bigint("rendition_bytes", { mode: "number" }).notNull().default(0),
+  // Storage keys (R2 in production, a local tmp/ tree when R2 isn't configured).
+  r2KeyOriginal: text("r2_key_original").notNull(),
+  r2KeyDisplay: text("r2_key_display"),       // photo ≤ 2048px JPEG
+  r2KeyThumb: text("r2_key_thumb"),           // 400px JPEG (photo + video)
+  r2KeyPoster: text("r2_key_poster"),         // video poster frame
+  r2KeyVideo: text("r2_key_video"),           // 720p H.264/AAC when the original isn't browser-playable
+  width: integer("width"),
+  height: integer("height"),
+  durationS: real("duration_s"),
+  capturedAt: timestamp("captured_at"),       // EXIF DateTimeOriginal → video creation_time → client clock
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  deviceLat: doublePrecision("device_lat"),   // navigator.geolocation at capture (client-reported)
+  deviceLng: doublePrecision("device_lng"),
+  exifLat: doublePrecision("exif_lat"),       // from the file itself (server-read)
+  exifLng: doublePrecision("exif_lng"),
+  gpsAccuracyM: real("gps_accuracy_m"),
+  stamp: jsonb("stamp"),
+  caption: text("caption"),
+  captionSource: text("caption_source"),      // user | voice | ai (later phases)
+  tags: text("tags").array(),                 // tag NAMES (jobcam_tags is the org's list)
+  starred: boolean("starred").notNull().default(false),
+  // The homeowner portal lists ONLY rows a team member switched on ("Show to
+  // client"). Off by default: crews photograph problems too.
+  clientVisible: boolean("client_visible").notNull().default(false),
+  sha256: text("sha256"),
+  exif: jsonb("exif"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type JobcamMedia = typeof jobcamMedia.$inferSelect;
+
+// Org-scoped tag list. ANY member may create one (CompanyCam makes this
+// admin-only; a crew that can't name what it's shooting stops tagging).
+export const jobcamTags = pgTable("jobcam_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color"),
+  createdByMemberId: varchar("created_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type JobcamTag = typeof jobcamTags.$inferSelect;
+
+// Resumable-upload state mirror: one row per multipart upload in flight.
+export const jobcamUploads = pgTable("jobcam_uploads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  mediaId: varchar("media_id").notNull(),
+  memberId: varchar("member_id"),
+  storageMode: text("storage_mode").notNull(),     // r2 | local
+  storageUploadId: text("storage_upload_id"),      // S3 UploadId (r2 mode)
+  key: text("key").notNull(),
+  partSize: integer("part_size").notNull(),
+  partsTotal: integer("parts_total").notNull(),
+  partsDone: jsonb("parts_done"),                  // { "<n>": "<etag>" }
+  bytes: bigint("bytes", { mode: "number" }).notNull(),
+  status: text("status").notNull().default("open"), // open | completed | aborted
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type JobcamUpload = typeof jobcamUploads.$inferSelect;
+
+// Opaque-token share links (gallery = fixed set, timeline = live feed):
+// revocable, expirable, password-gated, view-counted — none of which a
+// signed URL can do.
+export const jobcamShareLinks = pgTable("jobcam_share_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  kind: text("kind").notNull(),                   // gallery | timeline
+  token: text("token").notNull(),
+  title: text("title"),
+  mediaIds: text("media_ids").array(),            // gallery only
+  showDetails: boolean("show_details").notNull().default(true),
+  passwordHash: text("password_hash"),
+  expiresAt: timestamp("expires_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdByMemberId: varchar("created_by_member_id"),
+  viewCount: integer("view_count").notNull().default(0),
+  lastViewedAt: timestamp("last_viewed_at"),
+  sentTo: jsonb("sent_to"),                       // [{ channel, to, at }]
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type JobcamShareLink = typeof jobcamShareLinks.$inferSelect;
+
+// Per-org storage meter (Settings → Limits & usage). Maintained by the
+// processor on ready/delete; recountJobcamUsage() rebuilds it from the rows.
+export const jobcamOrgUsage = pgTable("jobcam_org_usage", {
+  orgId: varchar("org_id").primaryKey(),
+  bytes: bigint("bytes", { mode: "number" }).notNull().default(0),
+  mediaCount: integer("media_count").notNull().default(0),
+  photoCount: integer("photo_count").notNull().default(0),
+  videoCount: integer("video_count").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ── Reserved for later phases (created empty in phase A) ────────────────────
+
+// Phase B: non-destructive annotation layers (photo shapes; video = time-coded pins).
+export const jobcamAnnotations = pgTable("jobcam_annotations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  mediaId: varchar("media_id").notNull(),
+  authorMemberId: varchar("author_member_id"),
+  version: integer("version").notNull().default(1),
+  layer: jsonb("layer").notNull(),                // shapes: draw|polyline|arrow|circle|rect|text|blur|sticker|measure
+  videoTMs: integer("video_t_ms"),                // null for photos
+  renderedR2Key: text("rendered_r2_key"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Phase C: voice/video notes → transcript → structured sections.
+export const jobcamNotes = pgTable("jobcam_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  authorMemberId: varchar("author_member_id"),
+  kind: text("kind").notNull(),                   // voice | video | text
+  sourceMediaId: varchar("source_media_id"),
+  audioR2Key: text("audio_r2_key"),
+  transcript: text("transcript"),
+  segments: jsonb("segments"),                    // [{ start, end, text }]
+  sttModel: text("stt_model"),
+  sttCostCents: integer("stt_cost_cents"),
+  structured: jsonb("structured"),                // sections
+  status: text("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Phase C: editable documents/reports built from media + notes, exported to PDF.
+export const jobcamReports = pgTable("jobcam_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  type: text("type").notNull(),                   // report | daily_log | progress_recap | walkthrough | page
+  title: text("title").notNull(),
+  blocks: jsonb("blocks"),                        // cover|header|footer|text|photo_grid|table|checklist|signature|pagebreak
+  templateId: varchar("template_id"),
+  sourceNoteId: varchar("source_note_id"),
+  visibility: text("visibility").notNull().default("project"), // project | restricted
+  pdfR2Key: text("pdf_r2_key"),
+  pdfGeneratedAt: timestamp("pdf_generated_at"),
+  createdByMemberId: varchar("created_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const jobcamReportTemplates = pgTable("jobcam_report_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  type: text("type").notNull(),
+  name: text("name").notNull(),
+  blocks: jsonb("blocks"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Phase D: checklists built from fields (photo-required, yes/no, choice, rating, note, signature).
+export const jobcamChecklists = pgTable("jobcam_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  projectId: varchar("project_id").notNull(),
+  templateId: varchar("template_id"),
+  title: text("title").notNull(),
+  assigneeMemberId: varchar("assignee_member_id"),
+  dueAt: timestamp("due_at"),
+  status: text("status").notNull().default("open"),
+  createdByMemberId: varchar("created_by_member_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const jobcamChecklistFields = pgTable("jobcam_checklist_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  checklistId: varchar("checklist_id").notNull(),
+  position: integer("position").notNull().default(0),
+  type: text("type").notNull(),                   // photo | yes_no | choice | rating | note | signature
+  label: text("label").notNull(),
+  requiredPhoto: boolean("required_photo").notNull().default(false),
+  condition: jsonb("condition"),                  // show/hide on a prior answer
+  answer: jsonb("answer"),
+  mediaIds: text("media_ids").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
