@@ -5,6 +5,12 @@ import { inNativeApp } from "./app-shell";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+    // A gateway error page (Cloudflare's 502 while the app restarts, a proxy timeout) is HTML, not our JSON. Pages
+    // print the error message as-is, so the whole HTML document landed on screen (owner, 2026-10-07). Give it the
+    // same shape as our own answers instead.
+    if ((res.status >= 502 && res.status <= 504) || (res.status >= 520 && res.status <= 530) || /^\s*<(!doctype|html)\b/i.test(text)) {
+      throw new Error(`${res.status}: ${JSON.stringify({ message: "ConstructHUB is restarting or briefly unavailable. Try again in a minute." })}`);
+    }
     throw new Error(`${res.status}: ${text}`);
   }
 }
