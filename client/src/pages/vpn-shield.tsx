@@ -9,13 +9,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
   AppPage,
-  PageHeader,
   Section,
   Notice,
-  Stat,
-  StatGrid,
   StatusPill,
 } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import {
   AlertTriangle,
   ChevronRight, Copy, Monitor, Smartphone, Tablet,
@@ -100,7 +98,7 @@ function NoSiteCard() {
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <AlertTriangle className="h-5 w-5" strokeWidth={1.6} />
       </div>
-      <div className="mt-3 text-sm font-medium">No site yet</div>
+      <div className="mt-3 g-card__title g-card__title--md">No site yet</div>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground" data-testid="text-no-domain-selected">
         VPN Shield uses the sites you track. Add one in{" "}
         <Link href="/ip-tracker" className="text-primary underline underline-offset-2" data-testid="link-vpn-add-site-ip-tracker">IP Tracker</Link>
@@ -154,19 +152,19 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
         </span>
       </Notice>
 
-      <StatGrid cols={4}>
-        <Stat label="Detections" testId="card-stat-detections"
+      <GoogleStatGrid cols={4}>
+        <GoogleStat label="Detections" testId="card-stat-detections"
           value={stats?.total ?? 0}
           hint="All time, any action" />
-        <Stat label="Detections today" testId="card-stat-detections-today"
+        <GoogleStat label="Detections today" testId="card-stat-detections-today"
           value={stats?.today ?? 0} />
-        <Stat label="Blocked" testId="card-stat-blocked"
+        <GoogleStat label="Blocked" testId="card-stat-blocked"
           value={domainId ? (blockedCount ?? "…") : 0}
           hint="Overlay shown" />
-        <Stat label="Unique VPN IPs" testId="card-stat-unique-vpn-ips"
+        <GoogleStat label="Unique VPN IPs" testId="card-stat-unique-vpn-ips"
           value={stats?.uniqueIps ?? 0}
           hint="All time" />
-      </StatGrid>
+      </GoogleStatGrid>
 
       {stats && stats.topProviders.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
@@ -215,13 +213,14 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-0 flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="g-search min-w-0 flex-1 max-w-sm" role="search">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
             placeholder="Search by IP address…"
+            aria-label="Search by IP address"
             value={ipSearch}
             onChange={e => { setIpSearch(e.target.value); setPage(1); }}
-            className="pl-9"
             data-testid="input-vpn-ip-search"
           />
         </div>
@@ -562,13 +561,13 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
       </Notice>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button
+        <GooglePill
+          variant="solid"
+          label={saveMutation.isPending ? "Saving…" : "Save settings"}
           onClick={() => saveMutation.mutate()}
           disabled={!domainId || saveMutation.isPending || !!redirectError || !!whitelistError}
-          data-testid="button-save-vpn-settings"
-        >
-          {saveMutation.isPending ? "Saving…" : "Save settings"}
-        </Button>
+          testId="button-save-vpn-settings"
+        />
         {redirectError && blockMode !== "redirect" && (
           <span className="text-xs text-destructive" data-testid="text-redirect-url-error-hidden">{redirectError} Switch to Redirect to fix or clear it.</span>
         )}
@@ -604,20 +603,22 @@ export default function VpnShieldPage() {
 
   return (
     <AppPage testId="page-vpn-shield">
-      <PageHeader
-        title={<span data-testid="text-vpn-page-title">VPN Shield</span>}
-        description={<span data-testid="text-vpn-subtitle">Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors.</span>}
-        meta={selectedDomain ? (
-          <StatusPill tone="neutral" data-testid="badge-vpn-shield">
-            {selectedDomain.name || selectedDomain.domain}
-          </StatusPill>
-        ) : undefined}
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-vpn-page-title"
+        title="VPN Shield"
+        description={<>
+          <span data-testid="text-vpn-subtitle">Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors.</span>
+          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-vpn-shield">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
+        </>}
+        flush
         actions={
           domains.length > 0 ? (
             <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-56 sm:flex-none">
               <span className="text-muted-foreground sm:hidden">Site</span>
               <select
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                className="h-10 w-full rounded-full border bg-background px-4 text-sm"
                 value={domainId || ""}
                 onChange={(e) => setSelectedDomainId(Number(e.target.value))}
                 aria-label="Site"

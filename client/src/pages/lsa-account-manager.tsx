@@ -1,5 +1,6 @@
 import { Tabs } from "@/components/ui/tabs";
-import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -163,7 +164,7 @@ export default function LsaAccountManagerPage() {
   }
 
   if (selectedAccountId) {
-    return <AppPage><PageHeader title="LSA account details" description="Review campaigns, budgets and leads for this account." actions={<Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})}>Refresh account</Button>} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
+    return <AppPage><GoogleSectionHeader as="h1" title="LSA account details" description="Review campaigns, budgets and leads for this account." flush actions={<GooglePill icon={RefreshCw} variant="solid" label="Refresh account" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/accounts", selectedAccountId]})} />} /><AccountDetailView accountId={selectedAccountId} onBack={() => setSelectedAccountId(null)} /></AppPage>;
   }
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -175,22 +176,30 @@ export default function LsaAccountManagerPage() {
 
   return (
     <AppPage className="[&_button]:min-h-10">
-      <PageHeader title={<span data-testid="text-page-title">LSA account manager</span>} description="Manage client accounts through your Google Ads manager connection." meta={<Badge variant="outline" data-testid="badge-admin-only">Admin only</Badge>} actions={activeTab === "audit" ? <Button onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})}>Refresh audit</Button> : undefined} />
-        <Tabs value={activeTab}><AppTabsList>
+      {/* Google's page format (owner, 2026-10-07): a quiet header, pill tabs and actions, hairline cards. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="LSA account manager"
+        description={<>Manage client accounts through your Google Ads manager connection. <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-admin-only">Admin only</span></>}
+        flush
+        actions={activeTab === "audit" ? <GooglePill icon={RefreshCw} variant="solid" label="Refresh audit" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})} /> : undefined} />
+        <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0" role="tablist" aria-label="LSA account manager sections">
+          <div className="flex w-max gap-2">
           {tabs.map(tab => (
-            <Button
+            <GooglePill
               key={tab.id}
-              size="sm"
-              variant={activeTab === tab.id ? "secondary" : "ghost"}
-              className={`shrink-0 text-sm ${activeTab === tab.id ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+              icon={tab.icon}
+              label={tab.label}
+              selected={activeTab === tab.id}
+              role="tab"
+              ariaPressed={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              data-testid={`tab-${tab.id}`}
-            >
-              <tab.icon className="h-3.5 w-3.5 mr-1.5" />
-              {tab.label}
-            </Button>
+              testId={`tab-${tab.id}`}
+            />
           ))}
-        </AppTabsList></Tabs>
+          </div>
+        </div>
 
         {activeTab === "manager" && <ManagerConnectionTab />}
         {activeTab === "accounts" && <AccountsTab onSelectAccount={setSelectedAccountId} />}
@@ -487,19 +496,18 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="relative w-full flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
+        <div className="g-search w-full flex-1 min-w-[200px]" role="search">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
             placeholder="Search by customer ID or name..."
+            aria-label="Search by customer ID or name"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(0); }}
-            className="pl-8"
             data-testid="input-search-accounts"
           />
         </div>
-        <Button variant={showAdd ? "outline" : "default"} size="sm" onClick={() => setShowAdd(true)} className="w-full sm:w-auto" data-testid="button-add-account">
-          <Plus className="h-3.5 w-3.5 mr-1.5" /> Add account
-        </Button>
+        <GooglePill icon={Plus} variant={showAdd ? "outline" : "solid"} label="Add account" onClick={() => setShowAdd(true)} className="w-full sm:w-auto" testId="button-add-account" />
       </div>
 
       {showAdd && (
@@ -516,10 +524,8 @@ function AccountsTab({ onSelectAccount }: { onSelectAccount: (id: number) => voi
               </div>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="w-full sm:w-auto" data-testid="button-save-account">
-                {addAccountMutation.isPending ? "Adding..." : "Add account"}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <GooglePill variant="solid" label={addAccountMutation.isPending ? "Adding..." : "Add account"} onClick={() => addAccountMutation.mutate()} disabled={!newCustomerId || addAccountMutation.isPending} className="w-full sm:w-auto" testId="button-save-account" />
+              <GooglePill variant="quiet" label="Cancel" onClick={() => setShowAdd(false)} />
             </div>
           </CardContent>
         </Section>

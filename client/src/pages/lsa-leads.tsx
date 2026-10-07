@@ -1,4 +1,5 @@
-import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useState, useMemo, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -217,22 +218,26 @@ export default function LsaLeadsPage() {
 
   return (
     <AppPage testId="page-lsa-leads" className="[&_button]:min-h-10 [&_select]:min-h-10">
-      <PageHeader title="LSA leads" description="Review your Local Services Ads leads and manage billing disputes." actions={<>
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline rows, pill actions, stat tiles. */}
+      <GoogleSectionHeader as="h1" title="LSA leads" description="Review your Local Services Ads leads and manage billing disputes." flush actions={<>
               {status?.connected ? (
                 <>
-                  <Button variant="default" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="flex items-center gap-2" data-testid="button-sync">
-                    <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? "animate-spin" : ""}`} />
-                    {syncMutation.isPending ? "Syncing…" : "Sync now"}
-                  </Button>
-                  <details className="relative"><summary className="cursor-pointer rounded-md border px-3 py-2 text-sm">More</summary><div className="absolute right-0 z-20 mt-2 rounded-xl border bg-card p-2 shadow-sm">                  <Button variant="ghost" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending} className="flex items-center gap-2" data-testid="button-disconnect">
-                    <Unplug className="w-4 h-4" /> Disconnect
-                  </Button></div></details>
+                  <GooglePill
+                    icon={RefreshCw}
+                    variant="solid"
+                    label={syncMutation.isPending ? "Syncing…" : "Sync now"}
+                    onClick={() => syncMutation.mutate()}
+                    disabled={syncMutation.isPending}
+                    className={syncMutation.isPending ? "[&>svg]:animate-spin" : undefined}
+                    testId="button-sync"
+                  />
+                  <details className="relative"><summary className="g-pill cursor-pointer list-none [&::-webkit-details-marker]:hidden">More</summary><div className="absolute right-0 z-20 mt-2 rounded-xl border bg-card p-2 shadow-sm">
+                    <GooglePill icon={Unplug} variant="quiet" label="Disconnect" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending} testId="button-disconnect" />
+                  </div></details>
                 </>
               ) : status?.configured ? (
-                <Button onClick={connect} className="flex items-center gap-2" data-testid="button-connect">
-                  <Link2 className="w-4 h-4" /> Connect Google Ads
-                </Button>
-              ) : <Button disabled>Connect Google Ads</Button>}</>} />
+                <GooglePill icon={Link2} variant="solid" label="Connect Google Ads" onClick={connect} testId="button-connect" />
+              ) : <GooglePill variant="solid" label="Connect Google Ads" disabled />}</>} />
       {!status?.configured && <Notice tone="warning">Google Ads setup is required before you can connect.</Notice>}
       {status?.configured && <Section title="Connection" contentClassName="space-y-3">
           {status?.configured && !status.connected && status.redirectUri && (
@@ -385,17 +390,19 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <Section flush>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-base flex items-center gap-2"><Building2 className="w-5 h-5" /> Your Google Ads accounts</CardTitle>
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search accounts…" className="pl-8 w-full sm:w-64 h-10" data-testid="input-search-accounts" />
+    <section data-testid="section-lsa-accounts">
+      <GoogleSectionHeader
+        title="Your Google Ads accounts"
+        count={total > 0 ? total : null}
+        flush
+        actions={(
+          <div className="g-search w-full sm:w-72" role="search">
+            <Search aria-hidden="true" />
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search accounts…" aria-label="Search accounts" data-testid="input-search-accounts" />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
+        )}
+      />
+      <div>
         {isLoading ? (
           <div className="py-10 text-center text-muted-foreground"><Loader2 className="w-5 h-5 animate-spin inline" /> Loading accounts…</div>
         ) : accounts.length === 0 ? (
@@ -404,37 +411,28 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
           </p>
         ) : (
           <>
-            <div className="space-y-2">
+            <GoogleList>
               {accounts.map((a) => (
-                <button
+                <GoogleListRow
                   key={a.id}
-                  onClick={() => onOpen(a)}
-                  className="w-full text-left border rounded-lg p-3 hover-elevate flex items-center justify-between gap-3"
-                  data-testid={`card-account-${a.customerId}`}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium text-foreground truncate flex items-center gap-2">
-                      {a.descriptiveName || `Account ${a.customerId}`}
-                      {a.lsaEnrolled === true && <Badge className="bg-green-100 text-green-700 border-green-200">LSA</Badge>}
-                      {a.isManager && <Badge variant="secondary">Manager</Badge>}
-                      {!a.enabled && <Badge variant="outline">Paused</Badge>}
-                    </div>
-                    <div className="text-xs text-muted-foreground">{a.customerId}</div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm shrink-0">
-                    <div className="text-right">
-                      <div className="font-semibold">{a.leadCount ?? 0}</div>
-                      <div className="text-xs text-muted-foreground">leads</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-semibold text-red-600">{a.chargedCount ?? 0}</div>
-                      <div className="text-xs text-muted-foreground">charged</div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </button>
+                  size="md"
+                  testId={`card-account-${a.customerId}`}
+                  title={a.descriptiveName || `Account ${a.customerId}`}
+                  onOpen={() => onOpen(a)}
+                  badges={<>
+                    {a.lsaEnrolled === true && <span className="g-chip g-chip--sm g-open">LSA</span>}
+                    {a.isManager && <span className="g-chip g-chip--sm">Manager</span>}
+                    {!a.enabled && <span className="g-chip g-chip--sm">Paused</span>}
+                  </>}
+                  meta={[
+                    a.customerId,
+                    `${a.leadCount ?? 0} leads`,
+                    <span key="charged" className={(a.chargedCount ?? 0) > 0 ? "g-closed" : undefined}>{a.chargedCount ?? 0} charged</span>,
+                  ]}
+                  trailing={<ChevronRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />}
+                />
               ))}
-            </div>
+            </GoogleList>
             {totalPages > 1 && (
               <div className="flex items-center justify-between gap-3 mt-4 text-sm">
                 <span className="text-muted-foreground">Page {page} of {totalPages} · {total} accounts</span>
@@ -446,8 +444,8 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
             )}
           </>
         )}
-      </CardContent>
-    </Section>
+      </div>
+    </section>
   );
 }
 
@@ -557,23 +555,23 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="ghost" onClick={onBack} data-testid="button-back-accounts"><ArrowLeft className="w-4 h-4" /> Accounts</Button>
-            <CardTitle className="text-base">{account.descriptiveName || `Account ${account.customerId}`}</CardTitle>
+            <GooglePill icon={ArrowLeft} size="sm" variant="quiet" label="Accounts" onClick={onBack} testId="button-back-accounts" />
+            <CardTitle className="g-card__title g-card__title--md">{account.descriptiveName || `Account ${account.customerId}`}</CardTitle>
             <span className="text-xs text-muted-foreground">{account.customerId}</span>
           </div>
         </div>
-        <StatGrid className="mt-3">
+        <GoogleStatGrid cols={4} className="mt-3">
           <LeadStat label="Total leads" value={String(account.leadCount ?? 0)} testid="stat-leads" />
           <LeadStat label="Charged leads" value={String(account.chargedCount ?? 0)} testid="stat-charged" />
           <LeadStat label="Disputed" value={String(account.disputedCount ?? 0)} testid="stat-disputed" />
           <LeadStat label="Total spend" value={`$${money(totalSpend)}`} red testid="stat-spend" />
-        </StatGrid>
+        </GoogleStatGrid>
       </CardHeader>
       <CardContent>
         {/* Filter bar */}
         <Toolbar className="mb-4" filters={<>
           {([["all", "All"], ["charged", "Charged"], ["disputed", "Disputed"]] as const).map(([v, label]) => (
-            <Button key={v} size="sm" variant={filter === v ? "secondary" : "outline"} onClick={() => setFilter(v)} data-testid={`button-filter-${v}`}>{label}</Button>
+            <GooglePill key={v} size="sm" selected={filter === v} ariaPressed={filter === v} label={label} onClick={() => setFilter(v)} testId={`button-filter-${v}`} />
           ))}</>} />
 
         {/* Bulk dispute toolbar */}
@@ -714,7 +712,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
 }
 
 function LeadStat({ label, value, red, testid }: { label: string; value: string; red?: boolean; testid?: string }) {
-  return <Stat label={label} value={<span data-testid={testid}>{value}</span>} />;
+  return <GoogleStat label={label} value={<span data-testid={testid}>{value}</span>} tone={red ? "bad" : "default"} />;
 }
 
 function DetailRow({ label, value, icon, mono }: { label: string; value: string; icon?: ReactNode; mono?: boolean }) {

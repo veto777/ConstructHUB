@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GooglePill } from "@/components/google";
 import { useQuery } from "@tanstack/react-query";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Link } from "wouter";
@@ -160,37 +159,31 @@ export default function GoogleAdsGuidePage() {
       <div className="min-h-screen bg-background text-foreground">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-8" data-testid="view-google-ads-locked">
           <div className="text-center max-w-3xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-[#4285F4]/10 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4">
-              <Lock className="h-4 w-4 text-[#4285F4]" />
-              <span className="text-sm text-[#4285F4] font-medium">Master Class Students Only</span>
+            {/* Google's typography and hairlines (owner, 2026-10-07): the content and the Master Class gate as they were. */}
+            <div className="g-pill g-pill--sm mb-4">
+              <Lock aria-hidden="true" />
+              <span>Master Class Students Only</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3" data-testid="text-locked-title">
+            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-locked-title">
               Google Ads for Contractors:
               <br />
-              <span className="bg-gradient-to-r from-[#4285F4] to-[#34A853] bg-clip-text text-transparent">
-                The Complete Campaign Setup Playbook
-              </span>
+              The Complete Campaign Setup Playbook
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed mb-8">
+            <p className="g-text-2 text-sm leading-relaxed mb-8">
               12 in-depth sections with real Google Ads screenshots showing you exactly how to set up campaigns that generate real leads — and every trap Google sets to drain your budget.
             </p>
           </div>
 
-          <Card className="max-w-2xl mx-auto bg-gradient-to-br from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20" data-testid="card-upgrade-prompt">
+          <Card className="max-w-2xl mx-auto shadow-none" data-testid="card-upgrade-prompt">
             <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#4285F4] to-[#34A853] flex items-center justify-center mx-auto mb-4">
-                <GraduationCap className="h-8 w-8 text-white" />
+              <div className="g-card__lead mx-auto mb-4 !h-16 !w-16">
+                <GraduationCap className="!h-8 !w-8" aria-hidden="true" />
               </div>
-              <h3 className="text-xl font-bold text-foreground mb-2">Unlock the Full Playbook</h3>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              <h3 className="g-header__title mb-2">Unlock the Full Playbook</h3>
+              <p className="g-text-2 text-sm mb-6 max-w-md mx-auto">
                 12 detailed guide pages with step-by-step instructions, real screenshots, and every setting explained.
               </p>
-              <a href="/master-class" data-testid="link-master-class">
-                <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] hover:from-[#3367D6] hover:to-[#2D9A46] text-white px-8 h-11">
-                  <GraduationCap className="h-4 w-4 mr-2" />
-                  Go to Master Class
-                </Button>
-              </a>
+              <GooglePill icon={GraduationCap} variant="solid" href="/master-class" label="Go to Master Class" testId="link-master-class" className="px-8" />
               <p className="text-xs text-muted-foreground mt-3">
                 Any Master Class purchase unlocks the Google Ads content
               </p>
@@ -199,20 +192,20 @@ export default function GoogleAdsGuidePage() {
 
           {/* The outline is public (the same titles and summaries the unlocked page lists); the walkthroughs stay locked. */}
           <section className="max-w-4xl mx-auto" aria-labelledby="locked-outline-title" data-testid="section-locked-outline">
-            <h2 id="locked-outline-title" className="text-xl font-bold text-foreground text-center mb-2">What the 12 Sections Cover</h2>
-            <p className="text-sm text-muted-foreground text-center max-w-2xl mx-auto mb-6">
+            <h2 id="locked-outline-title" className="g-header__title text-center mb-2">What the 12 Sections Cover</h2>
+            <p className="g-text-2 text-sm text-center max-w-2xl mx-auto mb-6">
               Each section is a full walkthrough in the Master Class. Here is what every one of them covers.
             </p>
-            <ol className="space-y-3">
+            <ol className="g-list">
               {GUIDE_SECTIONS.map((s) => (
-                <li key={s.slug} className="flex items-start gap-4 rounded-xl border border-border bg-card p-5" data-testid={`locked-outline-${s.slug}`}>
-                  <span className="text-lg font-bold text-muted-foreground w-7 text-right flex-shrink-0">{s.number}</span>
-                  <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center flex-shrink-0`}>
-                    <s.icon className={`h-5 w-5 ${s.color}`} aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm sm:text-base font-semibold text-foreground">{s.title}</h3>
-                    <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{s.description}</p>
+                <li key={s.slug} className="g-card" data-testid={`locked-outline-${s.slug}`}>
+                  <div className="g-card__row">
+                    <span className="g-text-2 w-7 text-right flex-shrink-0 tabular-nums pt-2">{s.number}</span>
+                    <span className="g-card__lead" aria-hidden="true"><s.icon /></span>
+                    <div className="g-card__body">
+                      <h3 className="g-card__title g-card__title--md">{s.title}</h3>
+                      <p className="g-card__line">{s.description}</p>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -232,29 +225,27 @@ export default function GoogleAdsGuidePage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-10" data-testid="view-ads-masterclass">
             <img src={googleAdsLogo} alt="Google Ads" className="h-12 w-12 rounded-lg object-contain mx-auto mb-4" />
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#4285F4]/20 to-[#34A853]/20 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4 animate-in animate-badge-glow">
-              <GraduationCap className="h-4 w-4 text-[#4285F4]" />
-              <span className="text-sm text-[#4285F4] font-medium">Google Ads Master Class</span>
+            <div className="g-pill g-pill--sm mb-4">
+              <GraduationCap aria-hidden="true" />
+              <span>Google Ads Master Class</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-masterclass-title">
+            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-masterclass-title">
               Google Ads for Contractors:
               <br />
-              <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
-                The Complete Campaign Setup Playbook
-              </span>
+              The Complete Campaign Setup Playbook
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed animate-in-delay-2">
+            <p className="g-text-2 text-sm leading-relaxed">
               12 detailed guide pages showing you exactly how to set up profitable Google Ads campaigns. Each page is a complete walkthrough with real screenshots, step-by-step instructions, and the strategies that actually generate leads.
             </p>
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#FBBC05]/10 to-[#4285F4]/10 border-[#FBBC05]/20 mb-8 animate-in-delay-3" data-testid="card-critical-warning">
+          <Card className="max-w-4xl mx-auto shadow-none mb-8" data-testid="card-critical-warning">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-semibold text-[#FBBC05] mb-1">Critical Warning: Google's Default Settings Are Designed to Drain Your Budget</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <h4 className="g-card__title g-card__title--md mb-1">Critical Warning: Google's Default Settings Are Designed to Drain Your Budget</h4>
+                  <p className="g-card__line">
                     Google Ads comes with Auto-Apply, AI Max, Search Partners, Broad Match, and Automatically Created Assets all enabled by default. Every one of these features increases Google's revenue at your expense. Start with Section 1 and work through every page in order.
                   </p>
                 </div>
@@ -268,75 +259,49 @@ export default function GoogleAdsGuidePage() {
               { label: "Screenshots", value: "11+", sub: "real Google Ads settings", color: "text-[#34A853]" },
               { label: "Contractor CPC", value: "$30-50", sub: "avg cost per click", color: "text-[#FBBC05]" },
               { label: "IP Exclusions", value: "500", sub: "max per Google Ads campaign", color: "text-[#4285F4]" },
-            ].map((stat, i) => (
-              <Card key={stat.label} className={`bg-card border-border text-center card-hover-glow animate-scale-in`} style={{ animationDelay: `${0.3 + i * 0.1}s` }} data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
-                <CardContent className="p-4">
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{stat.sub}</p>
-                </CardContent>
-              </Card>
+            ].map((stat) => (
+              <div key={stat.label} className="g-stat text-center" data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
+                <p className="g-stat__value">{stat.value}</p>
+                <p className="g-stat__label mt-1">{stat.label}</p>
+                <p className="g-stat__hint">{stat.sub}</p>
+              </div>
             ))}
           </div>
 
-          <div className="max-w-4xl mx-auto space-y-3">
-            {GUIDE_SECTIONS.map((s, i) => (
-              <Link key={s.slug} href={`/google-ads-guide/${s.slug}`}>
-                <Card
-                  className="bg-card border-border card-hover-lift cursor-pointer group stagger-item"
-                  style={{ animationDelay: `${0.4 + i * 0.06}s` }}
-                  data-testid={`card-section-${s.slug}`}
-                >
-                  <CardContent className="p-0">
-                    <div className="flex items-center gap-4 p-5">
-                      <div className="flex items-center gap-4 flex-shrink-0">
-                        <span className="text-lg font-bold text-muted-foreground w-7 text-right">{s.number}</span>
-                        <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
-                          <s.icon className={`h-5 w-5 ${s.color}`} />
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-[#4285F4] transition-colors">{s.title}</h3>
-                          {s.critical && (
-                            <Badge className="bg-[#FBBC05]/10 text-[#FBBC05] border-[#FBBC05]/20 text-[9px] px-1.5 py-0 flex-shrink-0">CRITICAL</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{s.description}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        {s.screenshots > 0 && (
-                          <Badge className="bg-card text-muted-foreground border-border text-[9px] hidden sm:flex">
-                            <ImageIcon className="h-3 w-3 mr-1" /> {s.screenshots} {s.screenshots === 1 ? "screenshot" : "screenshots"}
-                          </Badge>
-                        )}
-                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#4285F4] transition-all duration-300 group-hover:translate-x-1" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          <div className="max-w-4xl mx-auto g-list">
+            {GUIDE_SECTIONS.map((s) => (
+              <Link key={s.slug} href={`/google-ads-guide/${s.slug}`} className="g-card group" data-testid={`card-section-${s.slug}`}>
+                <div className="g-card__row items-center">
+                  <span className="g-text-2 w-7 text-right flex-shrink-0 tabular-nums">{s.number}</span>
+                  <span className="g-card__lead" aria-hidden="true"><s.icon /></span>
+                  <div className="g-card__body">
+                    <h3 className="g-card__title g-card__title--md group-hover:underline">
+                      {s.title}
+                      {s.critical && <span className="g-chip g-chip--sm ml-2 align-middle !normal-case">Critical</span>}
+                    </h3>
+                    <p className="g-card__line line-clamp-2">{s.description}</p>
+                    {s.screenshots > 0 && (
+                      <p className="g-card__meta inline-flex items-center gap-1"><ImageIcon className="h-3 w-3" aria-hidden="true" /> {s.screenshots} {s.screenshots === 1 ? "screenshot" : "screenshots"}</p>
+                    )}
+                  </div>
+                  <div className="g-card__trailing">
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                  </div>
+                </div>
               </Link>
             ))}
           </div>
 
-          <Card className="max-w-4xl mx-auto mt-10 bg-gradient-to-r from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20 card-hover-glow" data-testid="card-bottom-cta">
+          <Card className="max-w-4xl mx-auto mt-10 shadow-none" data-testid="card-bottom-cta">
             <CardContent className="p-6 text-center">
-              <Shield className="h-8 w-8 text-[#4285F4] mx-auto mb-3 animate-float" />
-              <h3 className="text-lg font-bold text-foreground mb-2">Ready to Protect Your Ad Budget?</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-4">
+              <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-3" aria-hidden="true" />
+              <h3 className="g-header__title mb-2">Ready to Protect Your Ad Budget?</h3>
+              <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto mb-4">
                 Start with Section 1 and work through the entire guide. Then set up Click Guard to protect your campaigns from click fraud.
               </p>
               <div className="flex items-center justify-center gap-3 flex-wrap">
-                <Link href="/google-ads-guide/campaign-setup">
-                  <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white px-6 h-10" data-testid="button-start-guide">
-                    Start the Guide <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
-                <Link href="/google-ads">
-                  <Button variant="outline" className="border-border px-6 h-10" data-testid="button-click-guard">
-                    <ShieldCheck className="h-4 w-4 mr-2" /> Set Up Click Guard
-                  </Button>
-                </Link>
+                <GooglePill icon={ChevronRight} variant="solid" href="/google-ads-guide/campaign-setup" label="Start the Guide" testId="button-start-guide" />
+                <GooglePill icon={ShieldCheck} href="/google-ads" label="Set Up Click Guard" testId="button-click-guard" />
               </div>
             </CardContent>
           </Card>

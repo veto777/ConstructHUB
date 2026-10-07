@@ -1,5 +1,6 @@
 import { Tabs, TabsTrigger } from "@/components/ui/tabs";
-import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useAppOrigin } from "@/lib/app-origin";
 import { useState } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -263,10 +264,14 @@ export default function ClickGuardPage() {
 
   return (
     <AppPage className="[&_button]:min-h-10">
-      <PageHeader title={<span data-testid="text-page-title">Click fraud protection</span>}
-        description={<span data-testid="text-subtitle">Track website visits and review unusual traffic.</span>}
-        meta={<Badge variant="outline" data-testid="badge-click-guard">Google Click Guard</Badge>}
-        actions={<Button variant={showAddDomain ? "outline" : "default"} onClick={() => setShowAddDomain(true)} data-testid="button-add-domain"><Plus className="mr-2 h-4 w-4" />Add domain</Button>} />
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="Click fraud protection"
+        description={<><span data-testid="text-subtitle">Track website visits and review unusual traffic.</span> <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-click-guard">Google Click Guard</span></>}
+        flush
+        actions={<GooglePill icon={Plus} variant={showAddDomain ? "outline" : "solid"} label="Add domain" onClick={() => setShowAddDomain(true)} testId="button-add-domain" />} />
       {selectedDomain && <select aria-label="Website domain" className="h-10 w-full sm:w-72 rounded-md border bg-card px-3 text-sm" value={domainId || ""} onChange={e => setSelectedDomainId(Number(e.target.value))} data-testid="select-domain">{domains.map(d => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}</select>}
       <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-2">How protection works</summary><p>Signals do not prove fraud. Apply IP exclusions using the separate Google Ads script.</p></details>
           {showAddDomain && (
@@ -288,24 +293,19 @@ export default function ClickGuardPage() {
                     data-testid="input-domain-name"
                   />
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      className=""
+                    <GooglePill
+                      variant="solid"
+                      label={addDomainMutation.isPending ? "Adding..." : "Add"}
                       onClick={() => addDomainMutation.mutate()}
                       disabled={!newDomain.trim() || addDomainMutation.isPending}
-                      data-testid="button-save-domain"
-                    >
-                      {addDomainMutation.isPending ? "Adding..." : "Add"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-muted-foreground"
+                      testId="button-save-domain"
+                    />
+                    <GooglePill
+                      variant="quiet"
+                      label="Cancel"
                       onClick={() => setShowAddDomain(false)}
-                      data-testid="button-cancel-domain"
-                    >
-                      Cancel
-                    </Button>
+                      testId="button-cancel-domain"
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -366,13 +366,7 @@ export default function ClickGuardPage() {
                     <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                     <h2 className="text-base font-semibold text-foreground mb-2" data-testid="text-no-domains">No domains yet</h2>
                     <p className="text-muted-foreground mb-6">Add your first website domain to start tracking visitors and reviewing unusual traffic patterns.</p>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowAddDomain(true)}
-                      data-testid="button-add-first-domain"
-                    >
-                      <Plus className="h-4 w-4 mr-2" /> Add your first domain
-                    </Button>
+                    <GooglePill icon={Plus} label="Add your first domain" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
                   </CardContent>
                 </Section>
               ) : (
@@ -537,11 +531,11 @@ function LinkGoogleAdsView({ domainId, trackingId }: { domainId?: number; tracki
         </Section>
       ) : (
         <>
-          <StatGrid cols={3} className="max-w-4xl mx-auto">
-            <Stat label="IPs ready to sync" value={exclusionCheck?.count ?? activeBlockedCount} testId="card-blocked-count" />
-            <Stat label="Exclusion list" testId="card-api-status" value={<span data-testid="text-api-status">{scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}</span>} hint={exclusionCheck ? `Serving ${exclusionCheck.count} IPs` : "Exclusion list URL"} />
-            <Stat label="Campaign IP limit" value={`${Math.min(exclusionCheck?.count ?? activeBlockedCount, 500)}/500`} testId="card-google-limit" />
-          </StatGrid>
+          <GoogleStatGrid cols={3} className="max-w-4xl mx-auto">
+            <GoogleStat label="IPs ready to sync" value={exclusionCheck?.count ?? activeBlockedCount} testId="card-blocked-count" />
+            <GoogleStat label="Exclusion list" testId="card-api-status" value={<span data-testid="text-api-status">{scriptLoading || exclusionChecking ? "Checking..." : exclusionCheckFailed || !exclusionUrl ? "Unreachable" : "Reachable"}</span>} hint={exclusionCheck ? `Serving ${exclusionCheck.count} IPs` : "Exclusion list URL"} />
+            <GoogleStat label="Campaign IP limit" value={`${Math.min(exclusionCheck?.count ?? activeBlockedCount, 500)}/500`} testId="card-google-limit" />
+          </GoogleStatGrid>
 
           <Section flush className="max-w-4xl mx-auto border-border" testId="card-step1-tracking">
             <CardHeader className="pb-3">
@@ -864,20 +858,19 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
     <div className="space-y-6">
       <Toolbar filters={<>
         {["1d", "7d", "30d"].map(r => (
-          <Button
+          <GooglePill
             key={r}
             size="sm"
-            variant={dateRange === r ? "secondary" : "ghost"}
-            className={dateRange === r ? "bg-muted text-foreground" : "text-muted-foreground border border-border"}
+            selected={dateRange === r}
+            ariaPressed={dateRange === r}
+            label={r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
             onClick={() => setDateRange(r)}
-            data-testid={`button-range-${r}`}
-          >
-            {r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
-          </Button>
+            testId={`button-range-${r}`}
+          />
         ))}
       </>} />
 
-      <StatGrid>{stats.map(s => <Stat key={s.label} label={s.label === "Unique Visitors" ? "Unique visitors" : s.label === "Avg Visits/User" ? "Visits per visitor" : s.label} value={typeof s.value === "number" ? s.value.toLocaleString() : s.value} testId={`card-stat-${s.label.toLowerCase().replace(/[\s\/]/g, "-")}`} />)}</StatGrid>
+      <GoogleStatGrid cols={4}>{stats.map(s => <GoogleStat key={s.label} label={s.label === "Unique Visitors" ? "Unique visitors" : s.label === "Avg Visits/User" ? "Visits per visitor" : s.label} value={typeof s.value === "number" ? s.value.toLocaleString() : s.value} testId={`card-stat-${s.label.toLowerCase().replace(/[\s\/]/g, "-")}`} />)}</GoogleStatGrid>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <Section flush className="lg:col-span-2 bg-card border-border" testId="card-threat-level">
@@ -894,9 +887,9 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                 return (
                   <div key={level} className="flex items-center gap-3">
                     <span className={`text-sm capitalize w-24 ${isActive ? "text-foreground font-medium" : "text-muted-foreground"}`}>{level}</span>
-                    <div className="flex-1 h-3 bg-card rounded-full overflow-hidden">
+                    <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${isActive ? color : "bg-card"}`}
+                        className={`h-full rounded-full transition-all ${isActive ? color : "bg-muted"}`}
                         style={{ width: isActive ? `${Math.max(analytics?.threatPercent || 0, 5)}%` : "0%" }}
                       />
                     </div>
@@ -943,7 +936,7 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                 <div key={date} className="flex-1 flex flex-col items-center gap-1">
                   <div className="w-full flex flex-col items-center justify-end flex-1">
                     <div
-                      className="w-full max-w-[32px]    rounded-t-sm opacity-80"
+                      className="w-full max-w-[32px] bg-orange-500 rounded-t-sm opacity-80"
                       style={{ height: `${(count / maxDailyVisits) * 100}%`, minHeight: "4px" }}
                       title={`${count} visits on ${date}`}
                       data-testid={`bar-${date}`}
@@ -975,8 +968,8 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                       <div key={device} className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm text-muted-foreground capitalize w-20">{device}</span>
-                        <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full    rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="flex-1 h-2 bg-muted rounded-full">
+                          <div className="h-full bg-orange-500 rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground w-16 text-right">{count} ({pct}%)</span>
                       </div>
@@ -1003,8 +996,8 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
                     return (
                       <div key={browser} className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground w-20 truncate">{browser}</span>
-                        <div className="flex-1 h-2 bg-card rounded-full">
-                          <div className="h-full    rounded-full" style={{ width: `${pct}%` }} />
+                        <div className="flex-1 h-2 bg-muted rounded-full">
+                          <div className="h-full bg-orange-500 rounded-full" style={{ width: `${pct}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground w-16 text-right">{count} ({pct}%)</span>
                       </div>
@@ -1034,30 +1027,29 @@ function TrafficSourcesView({ analytics, dateRange, setDateRange }: {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-base font-semibold text-foreground flex items-center gap-2" data-testid="text-traffic-title">
-          <Globe className="h-5 w-5 text-muted-foreground" /> Traffic sources by domain / vendor
+        <h3 className="g-header__title flex items-center gap-2" data-testid="text-traffic-title">
+          <Globe className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> Traffic sources by domain / vendor
         </h3>
         <Toolbar filters={<>
           {["1d", "7d", "30d"].map(r => (
-            <Button
+            <GooglePill
               key={r}
               size="sm"
-              variant={dateRange === r ? "secondary" : "ghost"}
-              className={dateRange === r ? "bg-muted text-foreground" : "text-muted-foreground border border-border"}
+              selected={dateRange === r}
+              ariaPressed={dateRange === r}
+              label={r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
               onClick={() => setDateRange(r)}
-              data-testid={`button-traffic-range-${r}`}
-            >
-              {r === "1d" ? "Daily" : r === "7d" ? "Last 7 days" : "Last 30 days"}
-            </Button>
+              testId={`button-traffic-range-${r}`}
+            />
           ))}
         </>} />
       </div>
 
-      <StatGrid cols={3}>
-        <Stat label="Traffic sources" value={sources.length} testId="card-total-sources" />
-        <Stat label="Page loads" value={totalPageLoads.toLocaleString()} testId="card-total-pageloads" />
-        <Stat label="Visitors" value={totalVisitors.toLocaleString()} testId="card-total-visitors" />
-      </StatGrid>
+      <GoogleStatGrid cols={3}>
+        <GoogleStat label="Traffic sources" value={sources.length} testId="card-total-sources" />
+        <GoogleStat label="Page loads" value={totalPageLoads.toLocaleString()} testId="card-total-pageloads" />
+        <GoogleStat label="Visitors" value={totalVisitors.toLocaleString()} testId="card-total-visitors" />
+      </GoogleStatGrid>
 
       <Section flush className="bg-card border-border" testId="card-traffic-table">
         <CardContent className="p-0">
@@ -1242,7 +1234,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     {Object.entries(analytics.countryBreakdown).sort((a, b) => b[1] - a[1]).map(([country, cnt]) => (
                       <div key={country} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{country}</span>
-                        <div className="flex-1 h-2 bg-card rounded-full">
+                        <div className="flex-1 h-2 bg-muted rounded-full">
                           <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
@@ -1307,7 +1299,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                         <div key={device} className="flex items-center gap-3">
                           <Icon className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm text-muted-foreground capitalize w-20">{device}</span>
-                          <div className="flex-1 h-2 bg-card rounded-full">
+                          <div className="flex-1 h-2 bg-muted rounded-full">
                             <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                           </div>
                           <span className="text-xs text-muted-foreground">{cnt}</span>
@@ -1330,7 +1322,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     {Object.entries(analytics.browserBreakdown).sort((a, b) => b[1] - a[1]).map(([browser, cnt]) => (
                       <div key={browser} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{browser}</span>
-                        <div className="flex-1 h-2 bg-card rounded-full">
+                        <div className="flex-1 h-2 bg-muted rounded-full">
                           <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
@@ -1352,7 +1344,7 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
                     {Object.entries(analytics.osBreakdown).sort((a, b) => b[1] - a[1]).map(([os, cnt]) => (
                       <div key={os} className="flex items-center gap-3">
                         <span className="text-sm text-muted-foreground w-24">{os}</span>
-                        <div className="flex-1 h-2 bg-card rounded-full">
+                        <div className="flex-1 h-2 bg-muted rounded-full">
                           <div className="h-full    rounded-full" style={{ width: `${(cnt / (analytics.totalVisits || 1)) * 100}%` }} />
                         </div>
                         <span className="text-xs text-muted-foreground">{cnt}</span>
@@ -1379,13 +1371,14 @@ function FraudAnalyticsView({ analytics, fraudTab, setFraudTab, visits, blockedI
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
+            <div className="g-search flex-1 w-full sm:max-w-xs" role="search">
+              <Search aria-hidden="true" />
+              <input
+                type="search"
                 placeholder="Search by IP"
+                aria-label="Search by IP"
                 value={ipSearch}
                 onChange={(e) => setIpSearch(e.target.value)}
-                className="bg-card border-border text-foreground pl-9"
                 data-testid="input-search-ip"
               />
             </div>

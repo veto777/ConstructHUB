@@ -14,7 +14,7 @@ import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
-import { Stat, StatGrid } from "@/components/app-ui";
+import { GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { fmtWhen, outcomeLabel, outcomeTone } from "./calls-shared";
 
 type NumberRow = { id?: string | number; phoneNumber?: string; label?: string | null; location?: string | null; status?: string; isTest?: boolean };
@@ -85,43 +85,43 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
       <Section flush className="border-0 bg-transparent">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-xs  text-muted-foreground">Next step</div>
-            <div className="font-medium" data-testid="text-overview-next-step">{nextStep.text}</div>
+            <div className="g-stat__label">Next step</div>
+            <div className="g-card__title g-card__title--md" data-testid="text-overview-next-step">{nextStep.text}</div>
           </div>
-          <Button asChild className="w-full sm:w-auto"><Link href={nextStep.href} data-testid={nextStep.testid}>{nextStep.label} <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+          <GooglePill variant="solid" className="w-full sm:w-auto" href={nextStep.href} label={nextStep.label} testId={nextStep.testid} />
         </div>
       </Section>
-      <StatGrid cols={4}>
+      <GoogleStatGrid cols={4}>
         {ext && !ownLive ? (
-          <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=calls" tone="good"
+          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=calls"
             value="Live" hint={`${ext.name}, your own receptionist · last call ${new Date(ext.lastCallAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`} />
         ) : (
-          <Stat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
+          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
             value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
             hint={paymentPaused ? "Waiting for a payment" : ownLive ? `Version ${status.profile!.publishedVersion} is live` : "Not published yet"} />
         )}
         {ext && numbers.length === 0 ? (
-          <Stat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant?tab=calls"
+          <GoogleStat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant?tab=calls"
             hint={`${ext.lines.length ? ext.lines.join(" & ") + " · " : ""}answered by ${ext.name}`} />
         ) : (
-          <Stat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
+          <GoogleStat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
             hint={`${status.allowance.numbers} included`} />
         )}
         {extMonth ? (
-          <Stat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+          <GoogleStat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
             hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
         ) : (
-          <Stat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+          <GoogleStat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
             hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over${inNativeApp() ? "" : ` (${overageCost})`}` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
         )}
         {extMonth ? (
-          <Stat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+          <GoogleStat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
             hint={`Screened out by ${ext!.name}`} />
         ) : (
-          <Stat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+          <GoogleStat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
             hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
         )}
-      </StatGrid>
+      </GoogleStatGrid>
       {/* "Calls this month" folded into the minutes tile (less is more); the testid stays for links/tests. */}
       <span className="sr-only" data-testid="metric-overview-calls">{extMonth ? extMonth.calls : status.usage?.calls ?? 0} calls this month</span>
 
@@ -137,15 +137,13 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         <CardContent className="p-5 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-xs  text-muted-foreground">Your tier</div>
-              <div className="font-semibold" data-testid="text-overview-tier">
+              <div className="g-stat__label">Your tier</div>
+              <div className="g-card__title g-card__title--md" data-testid="text-overview-tier">
                 {heldTier ? `${heldTier.name} — ${heldTier.minutes} minutes and ${heldTier.numbersLabel} a month` : "No tier on this account"}
               </div>
             </div>
             {status.canManage !== false && (
-              <Button asChild variant="outline" size="sm">
-                <Link href="/settings?tab=billing" data-testid="link-overview-change-tier">{heldTier ? "Change tier" : "Choose a tier"} <ArrowRight className="h-4 w-4 ml-1" /></Link>
-              </Button>
+              <GooglePill icon={ArrowRight} size="sm" href="/settings?tab=billing" label={heldTier ? "Change tier" : "Choose a tier"} testId="link-overview-change-tier" />
             )}
           </div>
           <details className="text-sm"><summary className="cursor-pointer py-2 font-medium">Compare tiers</summary>
@@ -174,7 +172,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         <Section flush>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Minutes used</h3>
+              <h3 className="g-card__title g-card__title--md">Minutes used</h3>
               <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
             {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
@@ -202,8 +200,8 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         <Section flush>
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Numbers ringing the assistant</h3>
-              <Button asChild variant="ghost" size="sm"><Link href="/call-assistant?tab=numbers" data-testid="link-overview-numbers">Manage <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+              <h3 className="g-card__title g-card__title--md">Numbers ringing the assistant</h3>
+              <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant?tab=numbers" label="Manage" testId="link-overview-numbers" />
             </div>
             {numbers.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">
@@ -212,17 +210,20 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
                   : "No number yet. Buy a local number in the Numbers tab, then forward your existing line to it."}
               </p>
             ) : (
-              <ul className="divide-y text-sm" data-testid="list-overview-numbers">
+              <GoogleList as="ul" testId="list-overview-numbers">
                 {numbers.map((n, i) => (
-                  <li key={String(n.id ?? n.phoneNumber ?? i)} className="flex flex-wrap items-center gap-2 px-3 py-2" data-testid={`row-overview-number-${i}`}>
-                    <span className="font-medium tabular-nums">{n.phoneNumber ? prettyPhone(n.phoneNumber) : "—"}</span>
-                    {n.label && <span className="text-muted-foreground">{n.label}</span>}
-                    {n.location && <span className="text-muted-foreground">· {n.location}</span>}
-                    {n.isTest && <Badge variant="outline" className="text-[10px]">test</Badge>}
-                    {n.status && <StatusPill tone={n.status === "active" ? "success" : "warning"} className="ml-auto">{n.status}</StatusPill>}
-                  </li>
+                  <GoogleListRow
+                    as="li"
+                    size="md"
+                    key={String(n.id ?? n.phoneNumber ?? i)}
+                    testId={`row-overview-number-${i}`}
+                    title={<span className="tabular-nums">{n.phoneNumber ? prettyPhone(n.phoneNumber) : "—"}</span>}
+                    badges={n.isTest ? <span className="g-chip g-chip--sm">test</span> : undefined}
+                    meta={[n.label, n.location]}
+                    trailing={n.status ? <StatusPill tone={n.status === "active" ? "success" : "warning"}>{n.status}</StatusPill> : undefined}
+                  />
                 ))}
-              </ul>
+              </GoogleList>
             )}
           </CardContent>
         </Section>
@@ -231,27 +232,30 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
       <Section flush>
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Recent calls</h3>
-            <Button asChild variant="ghost" size="sm"><Link href="/call-assistant?tab=calls" data-testid="link-overview-calls">All calls <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>
+            <h3 className="g-card__title g-card__title--md">Recent calls</h3>
+            <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant?tab=calls" label="All calls" testId="link-overview-calls" />
           </div>
           {calls.isError || recent.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="text-overview-no-calls">
               {calls.isError ? "The call log isn't available yet." : "No calls yet. Once a forwarded line rings the assistant, every call shows here with its outcome and summary."}
             </p>
           ) : (
-            <ul className="divide-y text-sm" data-testid="list-overview-calls">
+            <GoogleList as="ul" testId="list-overview-calls">
               {recent.map((c, i) => (
-                <li key={String(c.id)} data-testid={`row-overview-call-${i}`}>
-                  <Link href={`/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`} className="flex flex-wrap items-center gap-2 px-3 py-2 hover:bg-muted/40" data-testid={`link-overview-call-${i}`}>
-                    <Activity className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>
-                    {c.outcome && <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill>}
-                    <span className="text-muted-foreground truncate flex-1 min-w-0">{c.summary ?? ""}</span>
-                    {c.startedAt && <span className="text-xs text-muted-foreground">{fmtWhen(c.startedAt)}</span>}
-                  </Link>
-                </li>
+                <GoogleListRow
+                  as="li"
+                  size="md"
+                  key={String(c.id)}
+                  testId={`row-overview-call-${i}`}
+                  leading={<Activity aria-hidden="true" />}
+                  title={<span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>}
+                  href={`/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`}
+                  titleTestId={`link-overview-call-${i}`}
+                  badges={c.outcome ? <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill> : undefined}
+                  meta={[c.summary || null, c.startedAt ? fmtWhen(c.startedAt) : null]}
+                />
               ))}
-            </ul>
+            </GoogleList>
           )}
         </CardContent>
       </Section>

@@ -14,8 +14,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
 import {
-  AppPage, PageHeader, Section, Stat, StatGrid, StatusPill,
+  AppPage, Section, StatusPill,
 } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import {
   Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
   Search, ChevronRight, MapPin,
@@ -253,7 +254,7 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
       <div className="space-y-3 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold">Tracking code for {domain.domain}</h3>
+            <h3 className="g-card__title g-card__title--md">Tracking code for {domain.domain}</h3>
             <p className="mt-0.5 text-xs text-muted-foreground" data-testid="text-install-status">
               {noVisits
                 ? "No visits recorded yet. Visits appear here only after this code runs on your site."
@@ -323,14 +324,14 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
         </div>
       )}
 
-      <StatGrid cols={3}>
-        <Stat label="Online now" value={online?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
-        <Stat label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} testId="card-stat-today" />
-        <Stat label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} testId="card-stat-yesterday" />
-        <Stat label="Last 7 days" value={countLabel(last7, partialFrom(chartDays[7][0]))} testId="card-stat-last-7-days" />
-        <Stat label="This month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} testId="card-stat-this-month" />
-        <Stat label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} testId="card-stat-total" hint="All time" />
-      </StatGrid>
+      <GoogleStatGrid cols={3}>
+        <GoogleStat label="Online now" value={online?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
+        <GoogleStat label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} testId="card-stat-today" />
+        <GoogleStat label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} testId="card-stat-yesterday" />
+        <GoogleStat label="Last 7 days" value={countLabel(last7, partialFrom(chartDays[7][0]))} testId="card-stat-last-7-days" />
+        <GoogleStat label="This month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} testId="card-stat-this-month" />
+        <GoogleStat label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} testId="card-stat-total" hint="All time" />
+      </GoogleStatGrid>
 
       {oldestLoaded && (
         <p className="text-xs text-muted-foreground" data-testid="text-visits-capped">
@@ -424,13 +425,14 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative min-w-0 flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="g-search min-w-0 flex-1 max-w-sm" role="search">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
             placeholder="Search by IP address…"
+            aria-label="Search by IP address"
             value={ipSearch}
             onChange={e => { setIpSearch(e.target.value); setPage(1); }}
-            className="pl-9"
             data-testid="input-ip-search"
           />
         </div>
@@ -605,11 +607,11 @@ function TrafficSourcesView({ domainId, analytics, since }: { domainId: number |
       <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
         {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
-      <StatGrid cols={3}>
-        <Stat label="Total sources" value={sources.length} testId="card-stat-total-sources" />
-        <Stat label="Total page loads" value={totalLoads.toLocaleString()} testId="card-stat-total-page-loads" />
-        <Stat label="Unique visitors" value={totalVisitors.toLocaleString()} testId="card-stat-unique-visitors" />
-      </StatGrid>
+      <GoogleStatGrid cols={3}>
+        <GoogleStat label="Total sources" value={sources.length} testId="card-stat-total-sources" />
+        <GoogleStat label="Total page loads" value={totalLoads.toLocaleString()} testId="card-stat-total-page-loads" />
+        <GoogleStat label="Unique visitors" value={totalVisitors.toLocaleString()} testId="card-stat-unique-visitors" />
+      </GoogleStatGrid>
 
       <Section flush title="Traffic sources by domain">
         <div className="overflow-x-auto">
@@ -667,10 +669,10 @@ function PagesView({ domainId }: { domainId: number | null }) {
 
   return (
     <div className="space-y-4">
-      <StatGrid cols={2}>
-        <Stat label="Total pages" value={pages.length} testId="card-stat-total-pages" />
-        <Stat label="Total hits" value={pages.reduce((s, p) => s + p.hits, 0).toLocaleString()} testId="card-stat-total-hits" />
-      </StatGrid>
+      <GoogleStatGrid cols={2}>
+        <GoogleStat label="Total pages" value={pages.length} testId="card-stat-total-pages" />
+        <GoogleStat label="Total hits" value={pages.reduce((s, p) => s + p.hits, 0).toLocaleString()} testId="card-stat-total-hits" />
+      </GoogleStatGrid>
 
       <Section flush title="Pages">
         <div className="overflow-x-auto">
@@ -903,21 +905,23 @@ export default function IpTrackerPage() {
 
   return (
     <AppPage width="wide" testId="page-ip-tracker">
-      <PageHeader
-        title={<span data-testid="text-page-title">IP Tracker</span>}
-        description={<span data-testid="text-subtitle">Real-time website visitor tracking. See who visits your site, where they come from, and what they do.</span>}
-        meta={selectedDomain ? (
-          <StatusPill tone="neutral" data-testid="badge-ip-tracker">
-            {selectedDomain.name || selectedDomain.domain}
-          </StatusPill>
-        ) : undefined}
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="IP Tracker"
+        description={<>
+          <span data-testid="text-subtitle">Real-time website visitor tracking. See who visits your site, where they come from, and what they do.</span>
+          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-ip-tracker">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
+        </>}
+        flush
         actions={
           domains.length > 0 ? (
             <>
               <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
                 <span className="text-muted-foreground sm:hidden">Site</span>
                 <select
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  className="h-10 w-full rounded-full border bg-background px-4 text-sm"
                   value={domainId || ""}
                   onChange={(e) => setSelectedDomainId(Number(e.target.value))}
                   aria-label="Site"
@@ -945,13 +949,14 @@ export default function IpTrackerPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button
+                <GooglePill
+                  icon={Plus}
+                  variant="solid"
+                  label="Add site"
                   className="flex-1 sm:flex-none"
                   onClick={() => setShowAddDomain(o => !o)}
-                  data-testid="button-add-domain"
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Add site
-                </Button>
+                  testId="button-add-domain"
+                />
               </div>
             </>
           ) : undefined
@@ -982,7 +987,7 @@ export default function IpTrackerPage() {
       {showAddDomain && (
         <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-add-domain">
           <div className="space-y-3 p-4 sm:p-5">
-            <h2 className="text-base font-semibold">Add a site</h2>
+            <h2 className="g-card__title g-card__title--md">Add a site</h2>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Input
                 placeholder="example.com"
@@ -998,22 +1003,19 @@ export default function IpTrackerPage() {
               />
             </div>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
+              <GooglePill
+                variant="solid"
+                label={addDomainMutation.isPending ? "Adding…" : "Add"}
                 onClick={() => addDomainMutation.mutate()}
                 disabled={!newDomain.trim() || addDomainMutation.isPending}
-                data-testid="button-save-domain"
-              >
-                {addDomainMutation.isPending ? "Adding…" : "Add"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="text-muted-foreground"
+                testId="button-save-domain"
+              />
+              <GooglePill
+                variant="quiet"
+                label="Cancel"
                 onClick={() => setShowAddDomain(false)}
-                data-testid="button-cancel-domain"
-              >
-                Cancel
-              </Button>
+                testId="button-cancel-domain"
+              />
             </div>
           </div>
         </div>
@@ -1048,13 +1050,11 @@ export default function IpTrackerPage() {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Fingerprint className="h-5 w-5" strokeWidth={1.6} />
           </div>
-          <h2 className="mt-3 text-sm font-medium">No sites being tracked</h2>
+          <h2 className="mt-3 g-card__title g-card__title--md">No sites being tracked</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             Add your first website to start tracking visitors in real time. You'll get a tracking code to embed on your site.
           </p>
-          <Button className="mt-4" onClick={() => setShowAddDomain(true)} data-testid="button-add-first-domain">
-            <Plus className="mr-2 h-4 w-4" /> Add your first site
-          </Button>
+          <GooglePill icon={Plus} variant="solid" className="mt-4" label="Add your first site" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
         </div>
       ) : (
         <>

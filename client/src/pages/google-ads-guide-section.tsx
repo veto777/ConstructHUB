@@ -1,9 +1,8 @@
 import { useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Link, useRoute } from "wouter";
+import { GooglePill } from "@/components/google";
+import { useRoute } from "wouter";
 import {
   ArrowLeft, AlertTriangle, CheckCircle, ShieldCheck,
   Eye, ChevronRight, Lock, GraduationCap, Loader2,
@@ -116,17 +115,11 @@ export default function GoogleAdsGuideSection() {
     return (
       <div className="h-full overflow-y-auto bg-background text-foreground">
         <div className="max-w-2xl mx-auto px-4 py-12 text-center space-y-4" data-testid="view-guide-section-error">
-          <h2 className="text-xl font-bold text-foreground">Couldn't load this section</h2>
-          <p className="text-sm text-muted-foreground">Check your connection and try again.</p>
+          <h2 className="g-header__title">Couldn't load this section</h2>
+          <p className="g-text-2 text-sm">Check your connection and try again.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Button onClick={() => refetch()} disabled={isFetching} data-testid="button-retry-section">
-              {isFetching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Try again
-            </Button>
-            <Link href="/google-ads-guide">
-              <Button variant="ghost" data-testid="button-back-to-guide">
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Google Ads Guide
-              </Button>
-            </Link>
+            <GooglePill variant="solid" label={<>{isFetching && <Loader2 className="h-4 w-4 mr-2 animate-spin inline" aria-hidden="true" />} Try again</>} onClick={() => refetch()} disabled={isFetching} testId="button-retry-section" />
+            <GooglePill icon={ArrowLeft} variant="quiet" href="/google-ads-guide" label="Back to Google Ads Guide" testId="button-back-to-guide" />
           </div>
         </div>
       </div>
@@ -137,28 +130,20 @@ export default function GoogleAdsGuideSection() {
     return (
       <div className="h-full overflow-y-auto bg-background text-foreground">
         <div className="max-w-2xl mx-auto px-4 py-12 space-y-6" data-testid="view-guide-section-locked">
-          <Link href="/google-ads-guide">
-            <Button variant="ghost" className="-ml-3" data-testid="button-back-to-guide">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Google Ads Guide
-            </Button>
-          </Link>
-          <Card className="bg-gradient-to-br from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20">
+          <GooglePill icon={ArrowLeft} variant="quiet" href="/google-ads-guide" label="Back to Google Ads Guide" testId="button-back-to-guide" />
+          <Card className="shadow-none">
             <CardContent className="p-8 text-center">
-              <div className="inline-flex items-center gap-2 bg-[#4285F4]/10 border border-[#4285F4]/20 rounded-full px-4 py-1.5 mb-4">
-                <Lock className="h-4 w-4 text-[#4285F4]" />
-                <span className="text-sm text-[#4285F4] font-medium">Master Class Students Only</span>
+              <div className="g-pill g-pill--sm mb-4">
+                <Lock aria-hidden="true" />
+                <span>Master Class Students Only</span>
               </div>
-              <h2 className="text-xl font-bold text-foreground mb-2" data-testid="text-section-locked-title">
+              <h2 className="g-header__title mb-2" data-testid="text-section-locked-title">
                 {result.title || "Google Ads Playbook"}
               </h2>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+              <p className="g-text-2 text-sm mb-6 max-w-md mx-auto">
                 This section of the Google Ads playbook is included with any Master Class purchase.
               </p>
-              <a href="/master-class" data-testid="link-master-class">
-                <Button className="bg-gradient-to-r from-[#4285F4] to-[#34A853] hover:from-[#3367D6] hover:to-[#2D9A46] text-white px-8 h-11">
-                  <GraduationCap className="h-4 w-4 mr-2" /> Go to Master Class
-                </Button>
-              </a>
+              <GooglePill icon={GraduationCap} variant="solid" href="/master-class" label="Go to Master Class" testId="link-master-class" className="px-8" />
               {!user && (
                 <p className="text-xs text-muted-foreground mt-3">
                   Already purchased? <a href="/auth" className="underline" data-testid="link-sign-in">Sign in</a> to open it.
@@ -175,45 +160,31 @@ export default function GoogleAdsGuideSection() {
     return (
       <div className="h-full overflow-y-auto bg-background text-foreground">
         <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          <h2 className="text-2xl font-bold text-foreground mb-4">Section not found</h2>
-          <Link href="/google-ads-guide">
-            <Button className="bg-[#4285F4] text-white">
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Google Ads Guide
-            </Button>
-          </Link>
+          <h2 className="g-header__title mb-4">Section not found</h2>
+          <GooglePill icon={ArrowLeft} variant="solid" href="/google-ads-guide" label="Back to Google Ads Guide" />
         </div>
       </div>
     );
   }
-
-  const accentMap: Record<string, { text: string; bg: string; border: string }> = {
-    blue: { text: "text-[#4285F4]", bg: "bg-[#4285F4]/10", border: "border-[#4285F4]/20" },
-    green: { text: "text-[#34A853]", bg: "bg-[#34A853]/10", border: "border-[#34A853]/20" },
-    yellow: { text: "text-[#FBBC05]", bg: "bg-[#FBBC05]/10", border: "border-[#FBBC05]/20" },
-  };
-  const accent = accentMap[section.accentColor] || accentMap.blue;
 
   return (
     <div ref={scrollRef} className="h-full overflow-y-auto bg-background text-foreground overflow-x-hidden">
       <section className="relative z-10 pt-8 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
-            <Link href="/google-ads-guide">
-              <Button variant="ghost" className="-ml-3 mb-4" data-testid="button-back-to-guide">
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Google Ads Guide
-              </Button>
-            </Link>
+            {/* Google's typography and hairlines (owner, 2026-10-07): the paid content and its gate as they were. */}
+            <div className="mb-4"><GooglePill icon={ArrowLeft} variant="quiet" size="sm" href="/google-ads-guide" label="Back to Google Ads Guide" testId="button-back-to-guide" /></div>
 
             <div className="flex items-center gap-3 mb-3">
-              <Badge className={`${accent.bg} ${accent.text} ${accent.border} px-3 py-1 animate-in animate-badge-glow`}>
+              <span className="g-chip g-chip--sm">
                 Section {section.sectionNumber} of {section.totalSections}
-              </Badge>
+              </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-section-title">
+            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-section-title">
               {section.title}
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-3xl animate-in-delay-2" data-testid="text-section-subtitle">
+            <p className="g-text-2 text-sm leading-relaxed max-w-3xl" data-testid="text-section-subtitle">
               {section.subtitle}
             </p>
           </div>
@@ -223,22 +194,22 @@ export default function GoogleAdsGuideSection() {
               switch (block.type) {
                 case "heading":
                   return (
-                    <h2 key={idx} className="text-lg sm:text-xl font-bold text-foreground pt-4 border-t border-border mt-8 first:mt-0 first:border-0 first:pt-0 stagger-item" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`heading-${idx}`}>
+                    <h2 key={idx} className="g-header__title pt-4 g-divider mt-8 first:mt-0 first:border-0 first:pt-0" data-testid={`heading-${idx}`}>
                       {block.content}
                     </h2>
                   );
                 case "text":
                   return (
-                    <p key={idx} className="text-sm text-muted-foreground leading-relaxed stagger-item" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`text-${idx}`}>
+                    <p key={idx} className="text-sm g-text-2 leading-relaxed" data-testid={`text-${idx}`}>
                       {block.content}
                     </p>
                   );
                 case "warning":
                   return (
-                    <Card key={idx} className=" bg-gradient-to-r from-[#FBBC05]/10 to-[#4285F4]/10 border-[#FBBC05]/20 stagger-item" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`warning-${idx}`}>
+                    <Card key={idx} className="shadow-none" data-testid={`warning-${idx}`}>
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <AlertTriangle className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5 animate-pulse-soft" />
+                          <AlertTriangle className="h-5 w-5 g-star flex-shrink-0 mt-0.5" aria-hidden="true" />
                           <p className="text-sm text-muted-foreground leading-relaxed">{block.content}</p>
                         </div>
                       </CardContent>
@@ -246,10 +217,10 @@ export default function GoogleAdsGuideSection() {
                   );
                 case "tip":
                   return (
-                    <Card key={idx} className=" bg-gradient-to-r from-[#34A853]/5 to-[#4285F4]/5 border-[#34A853]/20 stagger-item" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`tip-${idx}`}>
+                    <Card key={idx} className="shadow-none" data-testid={`tip-${idx}`}>
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                          <CheckCircle className="h-5 w-5 text-[#34A853] flex-shrink-0 mt-0.5" />
+                          <CheckCircle className="h-5 w-5 g-open flex-shrink-0 mt-0.5" aria-hidden="true" />
                           <p className="text-sm text-muted-foreground leading-relaxed">{block.content}</p>
                         </div>
                       </CardContent>
@@ -258,7 +229,7 @@ export default function GoogleAdsGuideSection() {
                 case "image":
                   if (!block.image || !IMAGES[block.image]) return null;
                   return (
-                    <div key={idx} className="my-6 rounded-xl overflow-hidden border border-border shadow-2xl stagger-item card-hover-glow" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`image-${idx}`}>
+                    <div key={idx} className="my-6 rounded-lg overflow-hidden border border-border" data-testid={`image-${idx}`}>
                       <img
                         src={IMAGES[block.image]}
                         alt={block.caption || "Google Ads screenshot"}
@@ -277,10 +248,10 @@ export default function GoogleAdsGuideSection() {
                   );
                 case "list":
                   return (
-                    <ul key={idx} className="space-y-2 pl-1 stagger-item" style={{ animationDelay: `${0.2 + idx * 0.03}s` }} data-testid={`list-${idx}`}>
+                    <ul key={idx} className="space-y-2 pl-1" data-testid={`list-${idx}`}>
                       {block.items?.map((item, i) => (
-                        <li key={i} className="flex items-start gap-2.5 text-sm text-muted-foreground leading-relaxed">
-                          <ChevronRight className={`h-4 w-4 ${accent.text} flex-shrink-0 mt-0.5`} />
+                        <li key={i} className="flex items-start gap-2.5 text-sm g-text-2 leading-relaxed">
+                          <ChevronRight className="h-4 w-4 g-accent flex-shrink-0 mt-0.5" aria-hidden="true" />
                           <span>{item}</span>
                         </li>
                       ))}
@@ -296,25 +267,13 @@ export default function GoogleAdsGuideSection() {
 
           <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 mt-12 pt-6 border-t border-border">
             {section.prevSection ? (
-              <Link href={`/google-ads-guide/${section.prevSection.slug}`}>
-                <Button variant="ghost" className="max-w-full h-auto min-h-9 whitespace-normal text-left" data-testid="button-prev-section">
-                  <ArrowLeft className="h-4 w-4 mr-2" /> {section.prevSection.title}
-                </Button>
-              </Link>
+              <GooglePill icon={ArrowLeft} variant="quiet" href={`/google-ads-guide/${section.prevSection.slug}`} label={section.prevSection.title} className="max-w-full h-auto py-2 !whitespace-normal text-left" testId="button-prev-section" />
             ) : <div />}
 
             {section.nextSection ? (
-              <Link href={`/google-ads-guide/${section.nextSection.slug}`}>
-                <Button className="max-w-full h-auto min-h-9 whitespace-normal text-left bg-[#4285F4] hover:bg-[#3367D6] text-white" data-testid="button-next-section">
-                  {section.nextSection.title} <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
+              <GooglePill icon={ChevronRight} variant="solid" href={`/google-ads-guide/${section.nextSection.slug}`} label={section.nextSection.title} className="max-w-full h-auto py-2 !whitespace-normal text-left" testId="button-next-section" />
             ) : (
-              <Link href="/google-ads">
-                <Button className="max-w-full h-auto min-h-9 whitespace-normal bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white" data-testid="button-go-click-guard">
-                  <ShieldCheck className="h-4 w-4 mr-2" /> Set Up Click Guard
-                </Button>
-              </Link>
+              <GooglePill icon={ShieldCheck} variant="solid" href="/google-ads" label="Set Up Click Guard" className="max-w-full" testId="button-go-click-guard" />
             )}
           </div>
         </div>

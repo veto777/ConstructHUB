@@ -16,9 +16,11 @@ import {
   Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle,
 } from "lucide-react";
 import {
-  CrmPage, CrmPageHeader, MetricCard, StatusPill, EmptyState, ErrorCard,
+  CrmPage, StatusPill, EmptyState, ErrorCard,
   InitialAvatar, SectionTitle, crmTable, roleTone, statusTone,
 } from "@/components/crm-ui";
+import { GoogleSectionHeader, GoogleStat } from "@/components/google";
+import { InfoTip } from "@/components/info-tip";
 
 /**
  * Platform admin — "watch all our users". Read-only monitoring across every
@@ -300,34 +302,35 @@ export default function CrmAdminPage() {
   return (
     <CrmPage wide className="space-y-8">
       <div data-testid="crm-admin-page" className="contents">
-      <CrmPageHeader
-        icon={ShieldCheck}
-        title="Platform admin"
-        infoKey="admin"
-        subtitle="Every account and organization on ConstructHub — read-only monitoring."
+      {/* Google's page format (owner, 2026-10-07): a quiet header, stat tiles, hairline cards. */}
+      <GoogleSectionHeader
+        as="h1"
+        title={<>Platform admin <InfoTip k="admin" /></>}
+        description="Every account and organization on ConstructHub — read-only monitoring."
+        flush
       />
 
       {/* ── Overview ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="section-overview">
         {/* Users/orgs have no dedicated page — the destination is the section below. */}
-        <a href="#card-users" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <MetricCard icon={Users} label="Users" value={overview?.users ?? "—"} testid="metric-users"
-            context={overview ? `${overview.betaUsers} beta` : undefined} />
+        <a href="#card-users" className="block h-full rounded-lg [&>.g-stat]:hover:bg-[var(--g-surface-2)]">
+          <GoogleStat label="Users" value={overview?.users ?? "—"} testId="metric-users"
+            hint={overview ? `${overview.betaUsers} beta` : undefined} />
         </a>
-        <a href="#card-orgs" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <MetricCard icon={Building2} label="Orgs" value={overview?.orgs ?? "—"} testid="metric-orgs" />
+        <a href="#card-orgs" className="block h-full rounded-lg [&>.g-stat]:hover:bg-[var(--g-surface-2)]">
+          <GoogleStat label="Orgs" value={overview?.orgs ?? "—"} testId="metric-orgs" />
         </a>
         {/* Platform-wide totals: no link, because /crm/clients etc. show only
             the admin's own workspace, not the numbers on these cards. */}
-        <MetricCard icon={UserCircle} label="Clients" value={overview?.customers ?? "—"} testid="metric-customers"
-          context="all orgs" />
-        <MetricCard icon={FileText} label="Estimates" value={overview?.estimates ?? "—"} testid="metric-estimates"
-          context="all orgs" />
-        <MetricCard icon={Receipt} label="Invoices" value={overview?.invoices ?? "—"} testid="metric-invoices"
-          context="all orgs" />
-        <MetricCard icon={CreditCard} label="Payments" value={overview ? moneyCompact(overview.payments.succeededCents) : "—"}
-          testid="metric-payments" valueClassName="text-2xl"
-          context={overview ? `${overview.payments.count} charges, all orgs` : undefined} />
+        <GoogleStat label="Clients" value={overview?.customers ?? "—"} testId="metric-customers"
+          hint="all orgs" />
+        <GoogleStat label="Estimates" value={overview?.estimates ?? "—"} testId="metric-estimates"
+          hint="all orgs" />
+        <GoogleStat label="Invoices" value={overview?.invoices ?? "—"} testId="metric-invoices"
+          hint="all orgs" />
+        <GoogleStat label="Payments" value={overview ? moneyCompact(overview.payments.succeededCents) : "—"}
+          testId="metric-payments"
+          hint={overview ? `${overview.payments.count} charges, all orgs` : undefined} />
       </div>
 
       {/* Growth-site Site Scan leads, after the metrics. The component is its
@@ -665,23 +668,11 @@ export default function CrmAdminPage() {
       <div className="space-y-3" data-testid="section-admin-analytics">
         <SectionTitle icon={Activity} title="Visitor analytics"
           description="Consent-gated first-party tracking — pages, visitors, IPs. Only visitors who accepted the cookie banner appear here." />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card><CardContent className="p-4">
-            <div className="text-2xl font-semibold tabular-nums">{analytics?.last24h?.visitors ?? "—"}</div>
-            <div className="text-xs text-muted-foreground mt-1">visitors · 24h</div>
-          </CardContent></Card>
-          <Card><CardContent className="p-4">
-            <div className="text-2xl font-semibold tabular-nums">{analytics?.last24h?.events ?? "—"}</div>
-            <div className="text-xs text-muted-foreground mt-1">pageviews · 24h</div>
-          </CardContent></Card>
-          <Card><CardContent className="p-4">
-            <div className="text-2xl font-semibold tabular-nums">{analytics?.last7d?.visitors ?? "—"}</div>
-            <div className="text-xs text-muted-foreground mt-1">visitors · 7d</div>
-          </CardContent></Card>
-          <Card><CardContent className="p-4">
-            <div className="text-2xl font-semibold tabular-nums">{analytics?.last7d?.events ?? "—"}</div>
-            <div className="text-xs text-muted-foreground mt-1">pageviews · 7d</div>
-          </CardContent></Card>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <GoogleStat label="Visitors · 24h" value={analytics?.last24h?.visitors ?? "—"} />
+          <GoogleStat label="Pageviews · 24h" value={analytics?.last24h?.events ?? "—"} />
+          <GoogleStat label="Visitors · 7d" value={analytics?.last7d?.visitors ?? "—"} />
+          <GoogleStat label="Pageviews · 7d" value={analytics?.last7d?.events ?? "—"} />
         </div>
         {(analytics?.topPages?.length ?? 0) > 0 && (
           <Card><CardContent className="p-4">

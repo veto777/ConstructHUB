@@ -5,6 +5,7 @@ import { activityLabel, activitySince } from "@/components/account-security";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { LoadingCard, formatDateTime } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -140,9 +141,9 @@ export function AuditLogSection(_props: SettingsSectionProps) {
             </label>
             <label className="text-xs text-muted-foreground space-y-1">
               <span>Search</span>
-              <div className="relative">
-                <Search className="h-4 w-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input aria-label="Search audit log" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Event, IP, device, email" className="h-9 pl-8" data-testid="input-audit-search" />
+              <div className="g-search !min-h-9 !py-0" role="search">
+                <Search aria-hidden="true" />
+                <input type="search" aria-label="Search audit log" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Event, IP, device, email" className="!h-8 !text-sm" data-testid="input-audit-search" />
               </div>
             </label>
           </div>
@@ -153,44 +154,41 @@ export function AuditLogSection(_props: SettingsSectionProps) {
                 ? "No activity recorded yet."
                 : `${shown.length.toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")} events · the most recent 200 are shown. IP and device describe the request and may reflect a proxy.`}
             </p>
-            <Button size="sm" variant="outline" onClick={exportCsv} disabled={shown.length === 0} data-testid="button-audit-export">
-              <Download className="h-4 w-4 mr-2" /> Export CSV
-            </Button>
+            <GooglePill icon={Download} size="sm" label="Export CSV" onClick={exportCsv} disabled={shown.length === 0} testId="button-audit-export" />
           </div>
           {error && <p role="alert" className="text-sm text-destructive" data-testid="text-audit-error">{apiErrorMessage(error)}</p>}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-0">
-          {/* The four-column table needs ~34rem; below xl (app sidebar + this page's padding) a row stacks its fields instead. */}
-          <div className="hidden xl:grid grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] gap-3 px-4 py-2 border-b text-[11px] font-semibold  text-muted-foreground">
-            <span>Time</span><span>Event</span><span>IP</span><span>Device</span>
-          </div>
+      {/* Google's list format (owner, 2026-10-07): hairline rows — the event, then area · email · time, then IP · device. */}
+      <div>
           {rows.length > 0 && shown.length === 0 && (
-            <p className="px-4 py-6 text-sm text-muted-foreground" data-testid="text-audit-no-match">No activity matches these filters.</p>
+            <p className="py-6 text-sm text-muted-foreground" data-testid="text-audit-no-match">No activity matches these filters.</p>
           )}
           {rows.length === 0 && !error && (
-            <p className="px-4 py-6 text-sm text-muted-foreground" data-testid="text-audit-empty">Sign-ins, security changes and tool activity will appear here.</p>
+            <p className="py-6 text-sm text-muted-foreground" data-testid="text-audit-empty">Sign-ins, security changes and tool activity will appear here.</p>
           )}
-          <ul>
+          <GoogleList as="ul">
             {shown.map((r) => {
               const email = (r.detail as any)?.email as string | undefined;
               return (
-                <li key={r.id} className="grid gap-1 xl:grid-cols-[11rem_minmax(0,1fr)_9rem_12rem] xl:gap-3 px-4 py-3 border-b last:border-b-0 text-sm break-words" data-testid="row-audit-event">
-                  <time className="text-muted-foreground tabular-nums xl:text-foreground" dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>
-                  <div className="min-w-0">
-                    <p className="font-medium" title={r.kind} data-testid="text-audit-event">{activityLabel(r.kind, r.detail)}</p>
-                    <p className="text-xs text-muted-foreground">{areaLabel(areaOf(r.kind))}{email ? ` · ${email}` : ""}</p>
-                  </div>
-                  <p className="text-xs xl:text-sm text-muted-foreground font-mono"><span className="xl:hidden">IP: </span>{r.ip || "Unavailable"}</p>
-                  <p className="text-xs xl:text-sm text-muted-foreground" title={r.user_agent || undefined}><span className="xl:hidden">Device: </span>{deviceSummary(r.user_agent)}</p>
-                </li>
+                <GoogleListRow
+                  as="li"
+                  size="md"
+                  key={r.id}
+                  testId="row-audit-event"
+                  title={<span title={r.kind} data-testid="text-audit-event">{activityLabel(r.kind, r.detail)}</span>}
+                  meta={[
+                    areaLabel(areaOf(r.kind)),
+                    email || null,
+                    <time key="t" className="tabular-nums" dateTime={r.created_at}>{formatDateTime(r.created_at)}</time>,
+                  ]}
+                  line={<span title={r.user_agent || undefined}>IP <span className="font-mono">{r.ip || "Unavailable"}</span> · {deviceSummary(r.user_agent)}</span>}
+                />
               );
             })}
-          </ul>
-        </CardContent>
-      </Card>
+          </GoogleList>
+      </div>
     </div>
   );
 }
