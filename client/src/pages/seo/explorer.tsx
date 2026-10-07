@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { ReportView, type TableKey as ReportKey } from "./report-table";
 
 type Footprint = {
   keywords: number; traffic: number; trafficValue: number;
@@ -27,6 +28,7 @@ type Report = {
     referringIps: number | null; brokenBacklinks: number | null; spamScore: number | null; firstSeen: string | null; tlds: { tld: string; links: number }[];
   };
   history: { month: string; traffic: number; keywords: number; top3: number; top10: number; trafficValue: number }[] | null;
+  linkHistory?: { month: string; backlinks: number; referringDomains: number; newBacklinks: number; lostBacklinks: number; authority: number | null }[] | null;
   keywords: { keyword: string; position: number | null; volume: number | null; traffic: number | null; trafficValue: number | null; cpc: number | null; difficulty: number | null; intent: string | null; url: string | null }[] | null;
   keywordsTotal: number | null;
   intents: { intent: string; keywords: number; traffic: number }[] | null;
@@ -88,6 +90,15 @@ function AuthorityRing({ value }: { value: number | null }) {
   );
 }
 
+/** The left menu, grouped the way Site Explorer groups its reports. */
+const MENU: { group: string; items: [ReportKey | "overview", string][] }[] = [
+  { group: "", items: [["overview", "Overview"]] },
+  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["bestByLinks", "Best pages by links"]] },
+  { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"]] },
+  { group: "Paid search", items: [["paidKeywords", "Paid keywords"]] },
+];
+const MENU_LABEL = Object.fromEntries(MENU.flatMap((g) => g.items)) as Record<string, string>;
+
 const TABLES = ["keywords", "pages", "competitors", "referringDomains", "anchors"] as const;
 type TableKey = (typeof TABLES)[number];
 const TABLE_LABEL: Record<TableKey, string> = { keywords: "Organic keywords", pages: "Top pages", competitors: "Organic competitors", referringDomains: "Referring domains", anchors: "Anchors" };
@@ -102,6 +113,7 @@ export default function SeoExplorerPage() {
   const [domain, setDomain] = useState<string | null>(() => new URLSearchParams(window.location.search).get("domain"));
   const [report, setReport] = useState<Report | null>(null);
   const [table, setTable] = useState<TableKey>("keywords");
+  const [view, setView] = useState<ReportKey | "overview">("overview");
   const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
 
   const recent = useQuery<Recent>({ queryKey: ["/api/seo/explorer/recent"] });
@@ -121,17 +133,24 @@ export default function SeoExplorerPage() {
     },
     onError: (e) => toast({ title: "Couldn't analyse that domain", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const trackKeywords = useMutation({
+    mutationFn: (v: { siteId: number; rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[] }) =>
+      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
+    onSuccess: (r: { added: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
+    onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const track = useMutation({
     mutationFn: (d: string) => api("POST", "/api/seo/sites", { domain: d, devices: "both", serpDepth: 10 }),
     onSuccess: (s: { id: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); onSite(s.id); toast({ title: "Added to the rank tracker", description: "Add the keywords you care about under Rank tracker." }); },
     onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
-  const open = (d: string) => { setReport(null); setDomain(d); setInput(d); window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(d)}`); };
+  const open = (d: string) => { setReport(null); setView("overview"); setDomain(d); setInput(d); window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(d)}`); };
   const submit = (refresh = false) => { const d = input.trim(); if (d) { if (!refresh) setReport(null); analyse.mutate({ domain: d, refresh }); } };
   const configured = !!status.data?.configured;
   const affordable = canAfford(status.data, "explorerReport");
-  const tracked = !!report && (sites.data ?? []).some((s) => s.domain === report.domain);
+  const trackedSite = report ? (sites.data ?? []).find((s) => s.domain === report.domain) ?? null : null;
+  const tracked = !!trackedSite;
   const busy = analyse.isPending || (saved.isLoading && !!domain && !report);
   const notFoundYet = !!domain && !report && saved.isError && !analyse.isPending;
 
@@ -200,6 +219,30 @@ export default function SeoExplorerPage() {
           </div>
           {report.missing.length > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-explorer-missing">Some sections didn't load this time ({report.missing.map((m) => TABLE_LABEL[m as TableKey] ?? cap(m)).join(", ")}). Refresh to try again.</p>}
 
+          <div className="flex flex-col gap-5 lg:flex-row">
+            <nav className="flex-none lg:w-48" aria-label="Site explorer reports" data-testid="explorer-menu">
+              {MENU.map((g) => (
+                <div key={g.group || "top"} className="mb-3">
+                  {g.group && <div className="g-text mb-1 text-[13px] font-medium">{g.group}</div>}
+                  <div className="flex flex-wrap gap-1 lg:flex-col lg:gap-0">
+                    {g.items.map(([key, label]) => (
+                      <button key={key} type="button" onClick={() => setView(key)} aria-current={view === key ? "page" : undefined} data-testid={`menu-${key}`}
+                        className={`rounded px-2 py-1 text-left text-[13px] ${view === key ? "g-text font-medium" : "g-text-2"}`} style={view === key ? { background: "var(--g-hover)" } : undefined}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+            <div className="min-w-0 flex-1">
+          {view !== "overview" ? (
+            <>
+              <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
+              <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }}
+                onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
+              {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}
+            </>
+          ) : (
+          <>
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <Panel title="Backlink profile" testId="panel-backlinks">
               <AuthorityRing value={report.links.authority} />
@@ -282,6 +325,26 @@ export default function SeoExplorerPage() {
             </div>
           </div>
 
+          {report.linkHistory && report.linkHistory.length > 1 && (
+            <Panel title="Backlink growth" hint="last 12 months" testId="panel-link-history" className="mb-4">
+              <div style={{ width: "100%", height: 220 }} data-testid="chart-link-history">
+                <ResponsiveContainer>
+                  <ComposedChart data={report.linkHistory} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="var(--g-divider)" vertical={false} />
+                    <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="domains" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} />
+                    <YAxis yAxisId="links" orientation="right" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} />
+                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
+                    <Area yAxisId="domains" type="monotone" dataKey="referringDomains" name="Referring domains" stroke={BLUE} fill={BLUE} fillOpacity={0.15} strokeWidth={2} />
+                    <Line yAxisId="links" type="monotone" dataKey="backlinks" name="Backlinks" stroke="#673ab7" strokeWidth={2} dot={false} />
+                    <Line yAxisId="domains" type="monotone" dataKey="newBacklinks" name="New links that month" stroke={GREEN} strokeWidth={1.5} dot={false} />
+                    <Line yAxisId="domains" type="monotone" dataKey="lostBacklinks" name="Lost links that month" stroke="#d93025" strokeWidth={1.5} dot={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="g-text-2 mt-2 text-[12px]">Blue area: referring domains. Purple: total backlinks (right scale). Green and red: links gained and lost each month.</p>
+            </Panel>
+          )}
           {report.intents && (
             <Panel title="Organic keywords by intent" hint={`of the top ${report.keywords?.length ?? 0} keywords`} testId="panel-intents" className="mb-4">
               <table className="g-table">
@@ -291,6 +354,7 @@ export default function SeoExplorerPage() {
             </Panel>
           )}
 
+          <p className="g-text-2 mb-2 text-[13px]">A first look at each list. The full reports — every row, with filters, sorting and export — are in the menu on the left.</p>
           <nav className="g-tabs" aria-label="Report tables">
             {TABLES.map((t) => <a key={t} href={`#${t}`} aria-current={table === t ? "page" : undefined} onClick={(e) => { e.preventDefault(); setTable(t); }} data-testid={`tab-explorer-${t}`}>{TABLE_LABEL[t]}</a>)}
           </nav>
@@ -364,6 +428,10 @@ export default function SeoExplorerPage() {
               ))}</tbody>
             </table>
           ) : <Empty>No anchor text was found for {report.domain}.</Empty>)}
+          </>
+          )}
+            </div>
+          </div>
         </div>
       )}
     </SeoShell>

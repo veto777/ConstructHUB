@@ -87,6 +87,7 @@ import { pageMetaFor } from "@shared/route-meta";
 // on demand, so the marketing pages (and every signed-out visitor) don't download them.
 const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
 const SeoOverviewPage = lazy(() => import("@/pages/seo"));
+const SeoDashboardPage = lazy(() => import("@/pages/seo/dashboard"));
 const SeoKeywordsPage = lazy(() => import("@/pages/seo/keywords"));
 const SeoExplorerPage = lazy(() => import("@/pages/seo/explorer"));
 const SeoBacklinksPage = lazy(() => import("@/pages/seo/backlinks"));
@@ -205,7 +206,8 @@ function DashboardRouter() {
       <Route path="/cloudflare" component={CloudflarePage} />
       <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
-      <Route path="/seo" component={SeoOverviewPage} />
+      <Route path="/seo" component={SeoDashboardPage} />
+      <Route path="/seo/rank-tracker" component={SeoOverviewPage} />
       <Route path="/seo/explorer" component={SeoExplorerPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
@@ -399,7 +401,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/explorer": "Site explorer", "/seo/keywords": "Keyword research", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",

@@ -28,7 +28,7 @@ export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
 export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
-export type SeoPrices = { explorerReport: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number };
+export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;
@@ -75,9 +75,10 @@ export function useSelectedSite(sites: SeoSite[] | undefined): [SeoSite | null, 
 }
 
 const TABS = [
-  { href: "/seo", label: "Rank tracker" },
+  { href: "/seo", label: "Dashboard" },
   { href: "/seo/explorer", label: "Site explorer" },
-  { href: "/seo/keywords", label: "Keywords" },
+  { href: "/seo/keywords", label: "Keywords explorer" },
+  { href: "/seo/rank-tracker", label: "Rank tracker" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
 ];

@@ -1,4 +1,4 @@
-/** /seo — rank tracker overview: tiles, the positions table with movement, Search Console if connected, recent checks. */
+/** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
 import { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -47,7 +47,7 @@ export default function SeoOverviewPage() {
   const running = o?.runs.some((r) => r.status === "queued" || r.status === "running");
   return (
     <SeoShell
-      title="SEO" description="Where your site ranks on Google, checked every week." site={site} onSite={onSite} sites={sites} status={status}
+      title="Rank tracker" description="Where your site ranks on Google for the keywords you chose, checked every week." site={site} onSite={onSite} sites={sites} status={status}
       actions={site && (
         <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {runNow.isPending || running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}

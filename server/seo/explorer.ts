@@ -4,9 +4,9 @@
  * keywords and pages that earn its traffic, who it competes with, who links to
  * it and with what anchor text. Any domain, not only a tracked site.
  *
- * One report = eight vendor calls made together (labs: domain_rank_overview,
+ * One report = nine vendor calls made together (labs: domain_rank_overview,
  * historical_rank_overview, ranked_keywords, relevant_pages, competitors_domain;
- * backlinks: summary, referring_domains, anchors), about $0.26 wholesale. A
+ * backlinks: summary, history, referring_domains, anchors), about $0.28 wholesale. A
  * report is kept in seo_domain_reports and served from there for REPORT_TTL_DAYS,
  * so reopening a domain costs nothing; "Refresh" buys a new one.
  *
@@ -24,9 +24,9 @@ import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
 
 export const REPORT_TTL_DAYS = 7;
 /** What one fresh report is reserved at before it runs (settled to the real cost after). */
-export const EXPLORER_ESTIMATE_USD = 0.3;
+export const EXPLORER_ESTIMATE_USD = 0.33;
 /** What a report usually costs (measured 2026-10-07), for the price shown before it runs. */
-export const EXPLORER_TYPICAL_USD = 0.26;
+export const EXPLORER_TYPICAL_USD = 0.28;
 const KEYWORD_ROWS = 100, PAGE_ROWS = 20, COMPETITOR_ROWS = 10, LINK_ROWS = 20;
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -181,13 +181,29 @@ export function parseAnchor(item: any): Anchor | null {
   return { anchor: str(item.anchor) ?? "", backlinks: num(item.backlinks), referringDomains: num(item.referring_domains), firstSeen: str(item.first_seen)?.slice(0, 10) ?? null };
 }
 
-export type ReportSection = "history" | "keywords" | "pages" | "competitors" | "referringDomains" | "anchors";
+export type LinkHistoryPoint = { month: string; backlinks: number; referringDomains: number; newBacklinks: number; lostBacklinks: number; authority: number | null };
+/** backlinks/history items (one per month), oldest first. */
+export function parseLinkHistory(items: any[]): LinkHistoryPoint[] {
+  return items
+    .map((i) => {
+      const month = str(i?.date)?.slice(0, 7);
+      if (!month) return null;
+      const rank = num(i?.rank);
+      return { month, backlinks: n0(i?.backlinks), referringDomains: n0(i?.referring_domains), newBacklinks: n0(i?.new_backlinks), lostBacklinks: n0(i?.lost_backlinks), authority: rank == null ? null : Math.round(rank / 10) };
+    })
+    .filter((x): x is LinkHistoryPoint => !!x)
+    .sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export type ReportSection = "history" | "linkHistory" | "keywords" | "pages" | "competitors" | "referringDomains" | "anchors";
 export type DomainReport = {
   domain: string; locationCode: number; languageCode: string; fetchedAt: string;
   organic: SearchFootprint;
   paid: SearchFootprint;
   links: BacklinkProfile;
   history: HistoryPoint[] | null;
+  /** Backlinks and referring domains by month (absent on reports saved before 2026-10-08). */
+  linkHistory?: LinkHistoryPoint[] | null;
   keywords: ExplorerKeyword[] | null;
   keywordsTotal: number | null;
   intents: IntentRow[] | null;
@@ -202,14 +218,14 @@ export type DomainReport = {
 
 type Raw = {
   overview: any; summary: any;
-  history?: any[] | null; keywords?: { items: any[]; total: number | null } | null; pages?: { items: any[]; total: number | null } | null;
+  history?: any[] | null; linkHistory?: any[] | null; keywords?: { items: any[]; total: number | null } | null; pages?: { items: any[]; total: number | null } | null;
   competitors?: any[] | null; referringDomains?: any[] | null; anchors?: any[] | null;
 };
 /** Assemble a report from the raw vendor pieces (a null piece is a missing section). */
 export function buildDomainReport(input: { domain: string; locationCode: number; languageCode: string; fetchedAt?: string }, raw: Raw): DomainReport {
   const keywords = raw.keywords ? raw.keywords.items.map(parseExplorerKeyword).filter((x): x is ExplorerKeyword => !!x) : null;
   const sections: [ReportSection, unknown][] = [
-    ["history", raw.history], ["keywords", raw.keywords], ["pages", raw.pages],
+    ["history", raw.history], ["linkHistory", raw.linkHistory], ["keywords", raw.keywords], ["pages", raw.pages],
     ["competitors", raw.competitors], ["referringDomains", raw.referringDomains], ["anchors", raw.anchors],
   ];
   return {
@@ -219,6 +235,7 @@ export function buildDomainReport(input: { domain: string; locationCode: number;
     paid: parseFootprint(raw.overview?.metrics?.paid),
     links: parseBacklinkProfile(raw.summary),
     history: raw.history ? parseHistory(raw.history) : null,
+    linkHistory: raw.linkHistory ? parseLinkHistory(raw.linkHistory) : null,
     keywords, keywordsTotal: raw.keywords?.total ?? null,
     intents: keywords ? intentBreakdown(keywords) : null,
     pages: raw.pages ? raw.pages.items.map(parseExplorerPage).filter((x): x is ExplorerPage => !!x) : null,
@@ -248,17 +265,19 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
     return { items: taskItems(task), total: num(task.result?.[0]?.total_count) };
   };
 
-  const [overview, summary, history, keywords, pages, competitors, referringDomains, anchors] = await Promise.all([
+  const yearAgo = new Date(Date.now() - 366 * 864e5).toISOString().slice(0, 10);
+  const [overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors] = await Promise.all([
     call("/dataforseo_labs/google/domain_rank_overview/live", { ...labs, limit: 1 }).then((t) => taskItems(t)[0] ?? {}),
     call("/backlinks/summary/live", { ...links, internal_list_limit: 10 }).then((t) => t.result?.[0] ?? {}),
     optional("history", () => list("/dataforseo_labs/google/historical_rank_overview/live", labs).then((r) => r.items)),
+    optional("linkHistory", () => list("/backlinks/history/live", { target: input.domain, date_from: yearAgo, rank_scale: "one_thousand" }).then((r) => r.items)),
     optional("keywords", () => list("/dataforseo_labs/google/ranked_keywords/live", { ...labs, limit: KEYWORD_ROWS, item_types: ["organic"], order_by: ["ranked_serp_element.serp_item.etv,desc"] })),
     optional("pages", () => list("/dataforseo_labs/google/relevant_pages/live", { ...labs, limit: PAGE_ROWS, order_by: ["metrics.organic.etv,desc"] })),
     optional("competitors", () => list("/dataforseo_labs/google/competitors_domain/live", { ...labs, limit: COMPETITOR_ROWS + 1, exclude_top_domains: true }).then((r) => r.items)),
     optional("referringDomains", () => list("/backlinks/referring_domains/live", { ...links, limit: LINK_ROWS, order_by: ["rank,desc"] }).then((r) => r.items)),
     optional("anchors", () => list("/backlinks/anchors/live", { ...links, limit: LINK_ROWS, order_by: ["backlinks,desc"] }).then((r) => r.items)),
   ]);
-  return { data: buildDomainReport(input, { overview, summary, history, keywords, pages, competitors, referringDomains, anchors }), costUsd };
+  return { data: buildDomainReport(input, { overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors }), costUsd };
 }
 
 // ── Storage ────────────────────────────────────────────────────────────────

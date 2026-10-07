@@ -26,6 +26,11 @@ import {
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd } from "./pricing";
 import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
+import {
+  reportInput, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
+  CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
+  type ReportPage, type KeywordOverview,
+} from "./reports";
 import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "./jobs";
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
@@ -37,6 +42,9 @@ import { PLANS } from "@shared/plans";
  */
 export const SEO_PRICES = {
   explorerReport: retailCents(EXPLORER_TYPICAL_USD),
+  /** One page of a Site Explorer or Keywords Explorer table. */
+  reportPage: retailCents(REPORT_TYPICAL_USD),
+  keywordOverview: retailCents(KEYWORD_OVERVIEW_TYPICAL_USD),
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
   backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
@@ -75,6 +83,14 @@ const explorerInput = z.object({
   refresh: z.boolean().default(false),
 }).strict();
 const id = z.coerce.number().int().positive();
+const keywordOverviewInput = z.object({
+  keyword: z.string().trim().min(1).max(200),
+  locationCode: z.number().int().positive().default(2840),
+  languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  peek: z.boolean().default(false),
+  refresh: z.boolean().default(false),
+}).strict();
+const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
 
 /** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
 function vendorErrorMessage(e: DataForSeoError): string {
@@ -376,6 +392,70 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
     await saveReport(user, out.data, out.costUsd);
     res.status(201).json({ report: out.data, fresh: true, reused: false, usage: await planUsage(user, ent) });
+  });
+
+  // ── Reports: one page of a Site Explorer / Keywords Explorer table ──────────
+  // A page already run in the last day is served from seo_report_cache at no charge;
+  // `peek` asks for that only. Anything else is one vendor call on the account's credit.
+  route("post", "/api/seo/report", async (req, res, user) => {
+    const input = reportInput.parse(req.body);
+    const forKeyword = isKeywordTable(input.table);
+    const target = forKeyword ? cleanKeyword(input.keyword ?? "") : normalizeDomain(input.domain ?? "");
+    if (!target) return res.status(400).json({ message: forKeyword ? "Enter a keyword." : "Enter a domain like example.com" });
+    const full = { ...input, target };
+    const key = reportCacheKey(full);
+    const saved = await cached<ReportPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await withBudget(user, REPORT_ESTIMATE_USD, () => fetchReportPage(full));
+    await saveCached(user, key, `report:${input.table}`, out.data, out.costUsd);
+    res.status(201).json({ page: out.data, reused: false });
+  });
+
+  // ── Keywords Explorer: one keyword's overview ───────────────────────────────
+  route("post", "/api/seo/keyword", async (req, res, user) => {
+    const input = keywordOverviewInput.parse(req.body);
+    const keyword = cleanKeyword(input.keyword);
+    if (!keyword) return res.status(400).json({ message: "Enter a keyword." });
+    const key = cacheKey("keyword-overview", [keyword, input.locationCode, input.languageCode]);
+    if (!input.refresh) {
+      const saved = await cached<KeywordOverview>(user, key, KEYWORD_OVERVIEW_TTL_DAYS * 24);
+      if (saved) return res.json({ overview: saved, reused: true });
+    }
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await withBudget(user, KEYWORD_OVERVIEW_ESTIMATE_USD, () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }));
+    await saveCached(user, key, "keyword-overview", out.data, out.costUsd);
+    res.status(201).json({ overview: out.data, reused: false });
+  });
+
+  // ── Dashboard: every tracked site with its saved numbers (never a vendor call) ──
+  route("get", "/api/seo/dashboard", async (_req, res, user) => {
+    const { rows: sites } = await pool.query(
+      `SELECT s.*, (SELECT count(*)::int FROM seo_keywords k WHERE k.site_id=s.id) AS keyword_count,
+              (SELECT report FROM seo_domain_reports r WHERE r.user_id=s.user_id AND r.domain=s.domain ORDER BY r.created_at DESC LIMIT 1) AS report
+         FROM seo_sites s WHERE s.user_id=$1 ORDER BY s.created_at`, [user]);
+    const cards = [];
+    for (const s of sites) {
+      const { rows: [rank] } = await pool.query(
+        `SELECT count(*) FILTER (WHERE position<=3)::int AS top3, count(*) FILTER (WHERE position<=10)::int AS top10,
+                count(*) FILTER (WHERE position IS NOT NULL)::int AS ranked, count(*)::int AS checked, max(checked_on)::text AS checked_on
+           FROM (SELECT DISTINCT ON (keyword_id) position, checked_on FROM seo_rank_checks WHERE site_id=$1 ORDER BY keyword_id, checked_on DESC, position NULLS LAST) x`, [s.id]);
+      const r = s.report;
+      cards.push({
+        site: siteView(s),
+        rank: { top3: rank?.top3 ?? 0, top10: rank?.top10 ?? 0, ranked: rank?.ranked ?? 0, checked: rank?.checked ?? 0, checkedOn: rank?.checked_on ?? null },
+        report: r ? {
+          fetchedAt: r.fetchedAt, authority: r.links?.authority ?? null, backlinks: r.links?.backlinks ?? null, referringDomains: r.links?.referringDomains ?? null,
+          organicKeywords: r.organic?.keywords ?? null, organicTraffic: r.organic?.traffic ?? null, trafficValue: r.organic?.trafficValue ?? null,
+          top3: r.organic?.positions?.top3 ?? null, top10: r.organic?.positions?.top10 ?? null,
+          history: Array.isArray(r.history) ? r.history.map((h: any) => ({ month: h.month, traffic: h.traffic, keywords: h.keywords })) : null,
+          linkHistory: Array.isArray(r.linkHistory) ? r.linkHistory.map((h: any) => ({ month: h.month, referringDomains: h.referringDomains, authority: h.authority })) : null,
+        } : null,
+      });
+    }
+    res.json({ cards, configured: isConfigured() });
   });
 
   // Competitors: keywords a competitor ranks for that this site does not. One keyword search of the plan.
