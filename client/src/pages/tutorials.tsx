@@ -127,7 +127,7 @@ export default function TutorialsPage() {
     <AppPage testId="page-tutorials">
       <GoogleSectionHeader
         as="h1" title="Tutorials" titleTestId="text-page-title" flush
-        description="Every feature: what it’s for, how to run it, how it works — and its walkthrough video."
+        description="Every feature: what it’s for, how to run it and how it works. Walkthrough videos appear here as they are added."
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="g-search sm:w-96" role="search">
@@ -138,7 +138,7 @@ export default function TutorialsPage() {
         <p className="text-sm g-text-2" aria-live="polite" data-testid="text-tutorial-count">
           {shown} of {FEATURES.length} features
           {" · "}
-          {withVideo === 0 ? "walkthrough videos are being recorded" : `${withVideo} with a walkthrough video`}
+          {withVideo === 0 ? "walkthrough videos coming soon" : `${withVideo} with a walkthrough video`}
         </p>
       </div>
       {!q && (
