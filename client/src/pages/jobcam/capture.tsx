@@ -194,8 +194,8 @@ export default function JobcamCapturePage() {
     const rec = new MediaRecorder(s, { mimeType: mime });
     chunksRef.current = [];
     rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+    const since = Date.now();
     rec.onstop = () => {
-      const since = recording?.since ?? Date.now();
       const blob = new Blob(chunksRef.current, { type: mime });
       setRecording(null);
       void startStream(false);
@@ -203,7 +203,7 @@ export default function JobcamCapturePage() {
     };
     recorderRef.current = rec;
     rec.start(1000);
-    setRecording({ since: Date.now() });
+    setRecording({ since });
     setTimeout(() => { if (recorderRef.current === rec && rec.state === "recording") rec.stop(); }, MAX_RECORD_MS);
   };
   const stopRecording = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); };

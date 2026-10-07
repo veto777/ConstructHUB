@@ -101,8 +101,11 @@ export type VideoMeta = {
   capturedAt: Date | null;
   lat: number | null;
   lng: number | null;
-  /** Browser-playable as-is (H.264/VP8/VP9/AV1 in MP4/WebM with AAC/Opus/none). */
+  bitRate: number | null;
+  /** Browser-playable as-is: H.264/VP8/VP9/AV1 + AAC/Opus/none, in MP4/WebM, at a size and bitrate a phone can stream. */
   playable: boolean;
+  /** Right codecs, wrong box (H.264/AAC in a QuickTime .mov): a stream copy into MP4 is enough — no re-encode. */
+  remuxable: boolean;
 };
 
 /** "+37.1234-122.1234+010.000/" (ISO 6709, QuickTime) → lat/lng. */
@@ -162,6 +165,9 @@ export function ffprobeJson(filePath: string): Promise<any> {
   });
 }
 
+/** Above this an original is re-encoded to 720p for playback (the original is still kept). */
+export const PLAY_AS_IS = { maxEdge: 1920, maxBitRate: 16_000_000 } as const;
+
 export function videoMetaFromProbe(probe: any): VideoMeta {
   const streams: any[] = Array.isArray(probe?.streams) ? probe.streams : [];
   const v = streams.find((s) => s.codec_type === "video");
@@ -176,7 +182,10 @@ export function videoMetaFromProbe(probe: any): VideoMeta {
   if (rotation === 90 || rotation === 270) [width, height] = [height, width];
   const duration = Number(fmt.duration ?? v?.duration);
   const formatName = String(fmt.format_name ?? "");
-  const container = /mp4|mov|m4a|3gp|3g2|mj2/.test(formatName) ? (/quicktime|mov/.test(String(fmt.format_long_name ?? "").toLowerCase()) ? "mov" : "mp4")
+  // ffprobe reports one demuxer ("mov,mp4,m4a,3gp,3g2,mj2", "QuickTime / MOV")
+  // for the whole ISO-BMFF family — the major brand is what tells a .mov from an .mp4.
+  const brand = String(fmt.tags?.major_brand ?? "").trim().toLowerCase();
+  const container = /mp4|mov|m4a|3gp|3g2|mj2/.test(formatName) ? (brand === "qt" ? "mov" : "mp4")
     : /webm|matroska/.test(formatName) ? (formatName.includes("webm") ? "webm" : "mkv") : formatName || null;
   const videoCodec = v?.codec_name ?? null;
   const audioCodec = a?.codec_name ?? null;
@@ -185,12 +194,21 @@ export function videoMetaFromProbe(probe: any): VideoMeta {
   const playableVideo = ["h264", "vp8", "vp9", "av1"].includes(String(videoCodec));
   const playableAudio = !a || ["aac", "opus", "vorbis", "mp3"].includes(String(audioCodec));
   const playableContainer = container === "mp4" || container === "webm";
+  const bitRate = Number(fmt.bit_rate);
+  const light = Math.max(Number(width) || 0, Number(height) || 0) <= PLAY_AS_IS.maxEdge
+    && (!Number.isFinite(bitRate) || bitRate <= PLAY_AS_IS.maxBitRate);
+  // 8-bit 4:2:0 only: 10-bit / 4:2:2 H.264 decodes in few browsers.
+  const pix = String(v?.pix_fmt ?? "");
+  const plainPixels = !pix || pix === "yuv420p" || pix === "yuvj420p";
+  const codecsOk = !!v && playableVideo && playableAudio && plainPixels;
   return {
+    bitRate: Number.isFinite(bitRate) ? bitRate : null,
     durationS: Number.isFinite(duration) ? duration : null,
     width, height, videoCodec, audioCodec, container, rotation,
     capturedAt: created && Number.isFinite(created.getTime()) ? created : null,
     lat: loc?.lat ?? null, lng: loc?.lng ?? null,
-    playable: playableVideo && playableAudio && playableContainer,
+    playable: codecsOk && playableContainer && light,
+    remuxable: codecsOk && !playableContainer && light && videoCodec === "h264" && (!a || audioCodec === "aac"),
   };
 }
 

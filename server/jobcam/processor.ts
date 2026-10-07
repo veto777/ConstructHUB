@@ -21,12 +21,12 @@ import crypto from "crypto";
 import { spawn } from "child_process";
 import sharp from "sharp";
 import { eq, and, lt, inArray } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { jobcamMedia, jobcamUploads } from "@shared/schema";
 import { downloadToFile, putObjectFromFile, mediaKey, abortMultipart, keyBelongsTo } from "./storage";
 import { readImageMeta, readVideoMeta, sniffMedia, sniffMatchesKind, FFMPEG_SAFE_INPUT } from "./exif";
 import { LIMITS, UPLOAD_TTL_MS, nextMediaStatus } from "./upload-state";
-import { bumpJobcamUsage } from "./usage";
+import { bumpJobcamUsage, recountJobcamUsage } from "./usage";
 
 const DISPLAY_MAX = 2048;
 const THUMB_MAX = 400;
@@ -99,6 +99,10 @@ export async function resumeJobcamProcessing(): Promise<void> {
     .where(and(eq(jobcamMedia.status, "processing")));
   for (const r of rows) enqueueMedia(r.id);
   if (rows.length) console.log(`[jobcam] re-queued ${rows.length} interrupted media job(s)`);
+  // The storage meter is a running total; rebuild it from the rows at boot so
+  // a crash between "ready" and the bump (or a manual row fix) can't leave it off.
+  const orgs = await pool.query(`SELECT org_id FROM jobcam_org_usage UNION SELECT DISTINCT org_id FROM jobcam_media`);
+  for (const o of orgs.rows) await recountJobcamUsage(o.org_id).catch(() => {});
 }
 
 function run(cmd: string, args: string[], opts: { nice?: boolean; timeoutMs?: number } = {}): Promise<{ code: number; stderr: string }> {
@@ -198,26 +202,44 @@ async function processVideo(row: typeof jobcamMedia.$inferSelect, src: string, w
   renditionBytes += await putObjectFromFile(thumbKey, thumbPath, "image/jpeg");
 
   let r2KeyVideo: string | null = null;
-  if (!meta.playable) {
+  if (meta.remuxable) {
+    // H.264/AAC in a .mov: rewrap into MP4 (stream copy — seconds, no quality loss).
+    const outPath = path.join(work, "video-remux.mp4");
+    const t = await run("ffmpeg", ["-y", "-v", "error", ...FFMPEG_SAFE_INPUT, "-i", src, "-map", "0:v:0", "-map", "0:a:0?", "-c", "copy", "-movflags", "+faststart", outPath],
+      { nice: true, timeoutMs: 10 * 60_000 });
+    if (t.code === 0 && fs.existsSync(outPath)) {
+      r2KeyVideo = mediaKey(row.orgId, row.id, "video-remux.mp4");
+      renditionBytes += await putObjectFromFile(r2KeyVideo, outPath, "video/mp4");
+    }
+  }
+  // In-browser recordings (MediaRecorder WebM) carry no duration and no seek
+  // index: they are re-encoded too, which also measures them against the cap.
+  let durationS = meta.durationS;
+  if ((!meta.playable || durationS === null) && !r2KeyVideo) {
     const outPath = path.join(work, "video-720.mp4");
     // Scale to 720 lines max (never upscale), even dimensions for yuv420p.
     const t = await run("ffmpeg", [
       "-y", "-v", "error", ...FFMPEG_SAFE_INPUT, "-i", src,
       "-map", "0:v:0", "-map", "0:a:0?", "-vf", "scale=-2:'min(720,ih)'",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-threads", "2",
-      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outPath,
+      "-c:a", "aac", "-b:a", "128k", "-t", String(LIMITS.videoSeconds + 5), "-movflags", "+faststart", outPath,
     ], { nice: true, timeoutMs: 45 * 60_000 });
     if (t.code !== 0 || !fs.existsSync(outPath)) {
       throw new Error(`Transcode failed (${t.stderr.trim().split("\n").pop() || "ffmpeg failed"}).`);
+    }
+    if (durationS === null) {
+      durationS = (await readVideoMeta(outPath)).durationS;
+      if (durationS === null) throw new Error("Could not measure this video's length.");
+      if (durationS > LIMITS.videoSeconds + 1) throw new Error("This video is longer than 10 minutes; JobCam clips are capped at 10 minutes.");
     }
     r2KeyVideo = mediaKey(row.orgId, row.id, "video-720.mp4");
     renditionBytes += await putObjectFromFile(r2KeyVideo, outPath, "video/mp4");
   }
   return {
     r2KeyPoster: posterKey, r2KeyThumb: thumbKey, r2KeyVideo, renditionBytes,
-    width: meta.width, height: meta.height, durationS: meta.durationS,
+    width: meta.width, height: meta.height, durationS,
     exifLat: meta.lat, exifLng: meta.lng,
-    exif: { videoCodec: meta.videoCodec, audioCodec: meta.audioCodec, container: meta.container, rotation: meta.rotation, playable: meta.playable },
+    exif: { videoCodec: meta.videoCodec, audioCodec: meta.audioCodec, container: meta.container, rotation: meta.rotation, bitRate: meta.bitRate, playable: meta.playable, remuxed: !!r2KeyVideo && meta.remuxable },
     capturedAt: meta.capturedAt ?? row.capturedAt ?? row.uploadedAt ?? new Date(),
   };
 }

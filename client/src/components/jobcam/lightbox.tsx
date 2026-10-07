@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight, Download, Loader2, MapPin, Star, Trash2, X, User, Clock, FolderOpen, Info } from "lucide-react";
@@ -50,7 +51,7 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
   });
   const del = useMutation({
     mutationFn: () => jobcamFetch(`/api/crm/jobcam/media/${m.id}`, { method: "DELETE" }),
-    onSuccess: () => { toast({ title: "Deleted", description: "Moved to the trash — a manager can restore it from the database later." }); onDeleted?.(m.id); },
+    onSuccess: () => { toast({ title: "Deleted", description: "Removed from the project and from every shared link." }); onDeleted?.(m.id); },
     onError: (e) => toast({ title: "Could not delete", description: jobcamError(e), variant: "destructive" }),
   });
   if (!m) return null;
@@ -72,8 +73,10 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
     m.stamp?.project && m.project ? m.project.name : null,
   ].filter(Boolean) as string[];
 
-  return (
-    <div className="g-surface fixed inset-0 z-[70] flex flex-col bg-black text-white" role="dialog" aria-modal="true" aria-label="Media viewer" data-testid="jobcam-lightbox">
+  // Rendered on <body>: nested inside a page's own .g-surface the viewer's
+  // background is made transparent (google.css) and the page shows through.
+  return createPortal(
+    <div className="g-surface fixed inset-0 z-[70] flex flex-col text-white" style={{ background: "#000" }} role="dialog" aria-modal="true" aria-label="Media viewer" data-testid="jobcam-lightbox">
       <header className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+6px)] pb-2 text-[13px]">
         <button type="button" onClick={onClose} className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10" aria-label="Close" data-testid="jobcam-lightbox-close"><X className="h-5 w-5" /></button>
         <span className="tabular-nums text-white/70">{index + 1} / {items.length}</span>
@@ -144,6 +147,7 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
           )}
         </footer>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

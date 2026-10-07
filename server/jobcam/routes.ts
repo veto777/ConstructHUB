@@ -86,7 +86,8 @@ export function presentMedia(
     lat: details ? lat : null,
     lng: details ? lng : null,
     gpsSource: details ? (m.exifLat != null ? "exif" : m.deviceLat != null ? "device" : null) : null,
-    gpsAccuracyM: details ? m.gpsAccuracyM : null,
+    // The accuracy is the phone's fix; it says nothing about coordinates read from the file.
+    gpsAccuracyM: details && m.exifLat == null && m.deviceLat != null ? m.gpsAccuracyM : null,
     mapUrl: details && lat != null && lng != null ? `https://www.google.com/maps?q=${lat},${lng}` : null,
     uploader: details ? extra.uploader ?? null : null,
     project: extra.project ?? null,
@@ -106,10 +107,22 @@ export function projectSummary(p: typeof crmProjects.$inferSelect) {
   return { id: p.id, name: p.name, number: p.number, address };
 }
 
-export async function membersMap(orgId: string) {
+/** `publicView`: a guest on a share link sees a crew member's display name, never their email address. */
+export async function membersMap(orgId: string, publicView = false) {
   const rows = await db.select({ id: crmMembers.id, displayName: crmMembers.displayName, email: crmMembers.email })
     .from(crmMembers).where(eq(crmMembers.orgId, orgId));
-  return new Map(rows.map((m) => [m.id, { id: m.id, name: m.displayName || m.email }]));
+  const out = new Map<string, { id: string; name: string }>();
+  for (const m of rows) {
+    const name = publicUploaderName(m.displayName, m.email, publicView);
+    if (name) out.set(m.id, { id: m.id, name });
+  }
+  return out;
+}
+
+export function publicUploaderName(displayName: string | null | undefined, email: string | null | undefined, publicView: boolean): string | null {
+  const dn = String(displayName ?? "").trim();
+  if (publicView) return dn && !dn.includes("@") ? dn : null;
+  return dn || String(email ?? "").trim() || null;
 }
 
 /** The variant → key/mime resolution the file routes share (member, share link, client portal). */
@@ -172,6 +185,12 @@ export type FeedQuery = {
   before?: { at: Date; id: string } | null;
 };
 
+/** A JS string list as one Postgres text[] (drizzle would otherwise spread it into a row). */
+export function textArray(values: readonly string[]): SQL {
+  if (!values.length) return sql`'{}'::text[]`;
+  return sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::text[]`;
+}
+
 export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
   const at = sql`coalesce(${jobcamMedia.capturedAt}, ${jobcamMedia.uploadedAt})`;
   const where: SQL[] = [eq(jobcamMedia.orgId, f.orgId), isNull(jobcamMedia.deletedAt)];
@@ -194,7 +213,7 @@ export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
     // Case-insensitive on both sides: "Roof" on the media matches a "roof" filter.
     const wanted = f.tags.map((t) => t.toLowerCase());
     const lowered = sql`(select coalesce(array_agg(lower(x)), '{}') from unnest(coalesce(${jobcamMedia.tags}, '{}')) x)`;
-    where.push(f.tagMode === "or" ? sql`${lowered} && ${wanted}::text[]` : sql`${lowered} @> ${wanted}::text[]`);
+    where.push(f.tagMode === "or" ? sql`${lowered} && ${textArray(wanted)}` : sql`${lowered} @> ${textArray(wanted)}`);
   }
   if (f.before) {
     where.push(sql`(${at}, ${jobcamMedia.id}) < (${f.before.at}, ${f.before.id})`);
@@ -675,7 +694,7 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
       } else if (action === "tag" && tags.length) {
         for (const t of tags) await db.insert(jobcamTags).values({ orgId: ctx.org.id, name: t, createdByMemberId: ctx.member.id }).onConflictDoNothing();
         await db.update(jobcamMedia).set({
-          tags: sql`(select array_agg(distinct x) from unnest(coalesce(${jobcamMedia.tags}, '{}') || ${tags}::text[]) x)`, updatedAt: new Date(),
+          tags: sql`(select array_agg(distinct x) from unnest(coalesce(${jobcamMedia.tags}, '{}') || ${textArray(tags)}) x)`, updatedAt: new Date(),
         }).where(inArray(jobcamMedia.id, tIds));
         n = tIds.length;
       } else if (action === "untag" && tags.length) {

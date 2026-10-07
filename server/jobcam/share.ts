@@ -296,7 +296,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
       tags: p.tags, tagMode: p.tagMode, kind: p.kind, limit: Math.min(p.limit, 120) + 1, before: p.before,
     });
     const page = rows.slice(0, Math.min(p.limit, 120));
-    const members = s.showDetails ? await membersMap(s.orgId) : new Map();
+    const members = s.showDetails ? await membersMap(s.orgId, true) : new Map();
     res.setHeader("Cache-Control", "no-store");
     res.json({
       media: page.map((m) => presentMedia(m, shareBase(s.token), { showDetails: s.showDetails, uploader: m.uploaderMemberId ? members.get(m.uploaderMemberId) ?? null : null })),
