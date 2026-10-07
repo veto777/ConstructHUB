@@ -2,6 +2,22 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🎨 2026-10-06 — Google Business section restyled to look like Google (deployed, merge c5ce9b5)
+- Owner: "use the Google fonts and colors and styles to make the platform feel similar to Google on the GMB feature."
+  Kit: `client/src/styles/google.css` (`.g-surface` tokens light+dark — Google Sans/Roboto, #1a73e8 blue, #188038 open-green,
+  #fbbc04 star, #dadce0 dividers; re-points the shadcn vars inside the surface) + `client/src/components/google/`
+  (GoogleSurface, GooglePill, GoogleStars, GoogleOpenStatus, GoogleLocalCard, GoogleMoreButton, GoogleAiOverview).
+- Applied: /locations = Google local-pack cards (`components/location-local-card.tsx`; rating/count only for linked
+  profiles, Open/Closed from synced hours on the viewer's clock, "N+ years in business" only from `openingDate`,
+  latest review snippet, two photos, Call/Directions/Website/Reviews/Open-profile pills); /competitors = local pack +
+  "More businesses" + an Overview block from the scan's own numbers; /google-reviews = Google-style review list with
+  owner replies indented and AI drafts as "AI reply suggestion" blocks; /gbp-content, /ranking-grid, /gmb-monitor,
+  /photos, /google-profile wrapped in GoogleSurface (fonts/colors/pills only). Screenshots (mock data, gitignored):
+  vb11 `~/ConstructHUB-gstyle/analysis/google-style-shots/`. No real-data screenshots: the dev account owns no Google data.
+- Same deploy: `county-fixes.json` moveCities +34 (fact-check-proven wrong counties, commit 22d67f8).
+- Working copy used: vb11 `~/ConstructHUB-gstyle` (clone of this repo, branch `gstyle`, pushed here) — the vb11
+  `~/ConstructHUB` dev tree is still the stale August checkout.
+
 ## 🗺 2026-10-06/07 — "leftover places" fact-check applied: 8,245 county/town permit routes, +176 portals (deployed)
 - **What:** the owner's 10/06 order ("maybe there is no permit required… fact check all these that are left over") ran
   as 178 slices × 22,339 places: Codex researched, Claude fact-checked (different company on purpose), every quote
