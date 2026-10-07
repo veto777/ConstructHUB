@@ -1,0 +1,12 @@
+{
+  "status_code": 20000, "status_message": "Ok.", "cost": 0.0276,
+  "tasks": [ { "id": "w", "status_code": 20000, "status_message": "Ok.", "cost": 0.0276, "result_count": 1, "path": ["v3","backlinks","backlinks","live"],
+    "result": [ { "target": "constructhub.us", "mode": "one_per_domain", "total_count": 61, "items_count": 2,
+      "items": [
+        { "type": "backlink", "domain_from": "builderdirectory.example", "url_from": "https://builderdirectory.example/florida/permits", "url_to": "https://constructhub.us/", "anchor": "ConstructHUB",
+          "item_type": "anchor", "dofollow": true, "rank": 231, "page_from_rank": 120, "domain_from_rank": 410, "backlink_spam_score": 5, "first_seen": "2026-08-02 10:00:00 +00:00", "last_visited": "2026-10-01 09:12:00 +00:00",
+          "is_new": false, "is_lost": false, "is_broken": false, "links_count": 1, "attributes": null },
+        { "type": "backlink", "domain_from": "spammy.example", "url_from": "https://spammy.example/links", "url_to": "https://constructhub.us/search", "anchor": null,
+          "item_type": "anchor", "dofollow": false, "rank": 2, "domain_from_rank": 3, "backlink_spam_score": 80, "first_seen": "2026-09-28 00:00:00 +00:00", "last_visited": "2026-10-02 00:00:00 +00:00", "is_new": true, "is_lost": false, "attributes": ["nofollow"] }
+      ] } ] } ]
+}

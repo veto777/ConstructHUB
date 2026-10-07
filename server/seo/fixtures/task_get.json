@@ -1,0 +1,19 @@
+{
+  "version": "0.1.20260101", "status_code": 20000, "status_message": "Ok.", "time": "0.05 sec.", "cost": 0, "tasks_count": 1, "tasks_error": 0,
+  "tasks": [
+    { "id": "10061512-1535-0066-0000-aaaaaaaaaaaa", "status_code": 20000, "status_message": "Ok.", "time": "0 sec.", "cost": 0.0006, "result_count": 1,
+      "path": ["v3","serp","google","organic","task_get","advanced","10061512-1535-0066-0000-aaaaaaaaaaaa"],
+      "data": { "api": "serp", "function": "task_get", "se": "google", "se_type": "organic", "keyword": "roofing contractor tampa", "device": "desktop", "tag": "11:desktop" },
+      "result": [
+        { "keyword": "roofing contractor tampa", "type": "organic", "se_domain": "google.com", "location_code": 2840, "language_code": "en",
+          "check_url": "https://www.google.com/search?q=roofing+contractor+tampa", "datetime": "2026-10-06 14:02:11 +00:00",
+          "items_count": 5, "items": [
+            { "type": "local_pack", "rank_group": 1, "rank_absolute": 1, "title": "Tampa Roof Pros", "domain": "tamparoofpros.example", "url": "https://tamparoofpros.example/" },
+            { "type": "people_also_ask", "rank_group": 1, "rank_absolute": 2, "items": [] },
+            { "type": "organic", "rank_group": 1, "rank_absolute": 3, "domain": "bigroofer.example", "title": "Big Roofer", "url": "https://bigroofer.example/tampa" },
+            { "type": "organic", "rank_group": 2, "rank_absolute": 4, "domain": "www.constructhub.us", "title": "Tampa roofing contractors", "url": "https://www.constructhub.us/roofing/tampa" },
+            { "type": "organic", "rank_group": 3, "rank_absolute": 5, "domain": "blog.constructhub.us", "title": "Blog", "url": "https://blog.constructhub.us/roofing" }
+          ] }
+      ] }
+  ]
+}

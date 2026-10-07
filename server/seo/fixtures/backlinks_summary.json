@@ -1,0 +1,11 @@
+{
+  "status_code": 20000, "status_message": "Ok.", "cost": 0.024036,
+  "tasks": [ { "id": "z", "status_code": 20000, "status_message": "Ok.", "cost": 0.024036, "result_count": 1, "path": ["v3","backlinks","summary","live"],
+    "result": [ { "target": "constructhub.us", "first_seen": "2026-07-11 00:00:00 +00:00", "lost_date": null, "rank": 112, "backlinks": 348, "backlinks_spam_score": 7,
+      "crawled_pages": 1204, "info": { "server": "cloudflare", "cms": null, "platform_type": [], "ip_address": "104.21.0.1", "country": null, "is_ip": false, "target_spam_score": 7 },
+      "internal_links_count": 24400, "external_links_count": 1290, "broken_backlinks": 3, "broken_pages": 1, "referring_domains": 61, "referring_domains_nofollow": 12,
+      "referring_main_domains": 58, "referring_main_domains_nofollow": 11, "referring_ips": 55, "referring_subnets": 49, "referring_pages": 301,
+      "referring_pages_nofollow": 40, "referring_links_tld": { "com": 40, "us": 9 }, "referring_links_types": { "anchor": 290 }, "referring_links_attributes": { "nofollow": 40 },
+      "referring_links_platform_types": {}, "referring_links_semantic_locations": {}, "referring_links_countries": {}, "new_backlinks": 9, "lost_backlinks": 4,
+      "new_reffering_domains": 3, "lost_reffering_domains": 1 } ] } ]
+}
