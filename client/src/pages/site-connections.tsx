@@ -10,6 +10,7 @@ import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { Search } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
+import { CloudflareConnectSteps, CloudflareTokenSteps, SearchConsoleConnectSteps } from "./site-connect-steps";
 import {
   PlanRequired,
   planRequiredFrom,
@@ -433,6 +434,22 @@ export default function SiteConnections({
           Google consent failed. Reconnect and grant Search Console access.
         </Notice>
       )}
+      {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
+      {config.data && !(config.data.total > 0) && tab !== "Connections" && (
+        <div className="g-callout mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="connect-first-prompt">
+          <p className="text-[14px] leading-5 g-text">
+            {cf ? "Start here: connect your Cloudflare account." : "Start here: connect Google Search Console."}{" "}
+            <span className="g-text-2">It takes about two minutes and the steps are spelled out.</span>
+          </p>
+          <GooglePill
+            variant="solid"
+            className="w-full sm:w-auto"
+            label="Show me how"
+            onClick={() => T("Connections")}
+            testId="button-connect-first"
+          />
+        </div>
+      )}
       <TabStrip tabs={TABS} active={tab} onChange={T} />
       {tab === "Guide" && <SiteConnectionGuide />}
       {tab === "Connections" && (
@@ -446,6 +463,12 @@ export default function SiteConnections({
                   : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
               }
             />
+            {/* Click-by-click: most people have never fetched a key from Cloudflare (owner, 2026-10-07). */}
+            <div className="mb-4">
+              {cf
+                ? <CloudflareConnectSteps open={!(config.data?.total > 0)} />
+                : <SearchConsoleConnectSteps open={!(config.data?.total > 0)} />}
+            </div>
             {cf ? (
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
@@ -547,12 +570,7 @@ export default function SiteConnections({
                     Fallback: paste a scoped API token
                   </summary>
                   <div className="mt-3 space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Cloudflare → My Profile → API Tokens → Create Token →
-                      Custom token. Add the zone permissions listed above,
-                      choose Include → Specific zone for each client site, then
-                      Continue to summary → Create Token.
-                    </p>
+                    <CloudflareTokenSteps />
                     <Field
                       label="Scoped API token"
                       type="password"
@@ -831,9 +849,17 @@ export default function SiteConnections({
                   ))}
                 </GoogleList>
               ) : (
-                <p className="py-6 text-sm g-text-2">
-                  No connected sites. Open Connections to get started.
-                </p>
+                <div className="py-6 space-y-3">
+                  <p className="text-sm g-text-2">
+                    No connected sites yet. Connect {cf ? "your Cloudflare account" : "Google Search Console"} first — the steps are on the Connections tab.
+                  </p>
+                  <GooglePill
+                    variant="solid"
+                    label={cf ? "Connect Cloudflare — show me how" : "Connect Search Console — show me how"}
+                    onClick={() => T("Connections")}
+                    testId="button-open-connect-steps"
+                  />
+                </div>
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous sites" />
