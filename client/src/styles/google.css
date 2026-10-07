@@ -25,6 +25,10 @@
   --g-ai-text: #1f1f1f;
   --g-avatar: #4285f4;
   --g-avatar-bg: #d2e3fc;
+  /* The accent every interactive token reads (pills, links, focus ring). Google blue by default;
+     `.g-accent-orange` (the SEO pages) swaps it for the platform's orange. Never hard-code either. */
+  --g-accent: var(--g-blue);
+  --g-accent-bg: #e8f0fe;
 
   /* ── The app theme, re-pointed so shadcn parts inside use the same palette ── */
   --background: 0 0% 100%;
@@ -76,6 +80,8 @@
   --g-ai-text: #e8eaed;
   --g-avatar: #8ab4f8;
   --g-avatar-bg: #394457;
+  --g-accent: var(--g-blue);
+  --g-accent-bg: rgb(138 180 248 / 0.15);
 
   --background: 225 6% 13%;
   --foreground: 216 12% 92%;
@@ -137,7 +143,7 @@
 
 /* Google's focus ring: 2px blue outline, 2px off the edge. */
 .g-surface :is(a, button, [role="button"], input, select, textarea, summary):focus-visible {
-  outline: 2px solid var(--g-blue);
+  outline: 2px solid var(--g-accent);
   outline-offset: 2px;
 }
 
@@ -154,7 +160,7 @@
   border: 1px solid var(--g-divider);
   border-radius: 9999px;
   background: var(--g-surface);
-  color: var(--g-blue);
+  color: var(--g-accent);
   font-family: var(--g-font);
   font-size: 14px;
   font-weight: 500;
@@ -176,12 +182,12 @@
 }
 .g-pill--grey:hover { background: var(--g-divider); }
 .g-pill--solid {
-  border-color: var(--g-blue);
-  background: var(--g-blue);
+  border-color: var(--g-accent);
+  background: var(--g-accent);
   color: #fff;
 }
 .dark .g-pill--solid { color: #202124; }
-.g-pill--solid:hover { background: var(--g-blue); filter: brightness(1.06); }
+.g-pill--solid:hover { background: var(--g-accent); filter: brightness(1.06); }
 .g-pill--danger { color: var(--g-red); }
 
 /* Every shadcn <Button> inside the surface takes the pill shape (font and colours come from the theme). */
@@ -206,7 +212,7 @@
   font-size: 14px;
   font-weight: 500;
 }
-.g-link { color: var(--g-blue); text-decoration: none; }
+.g-link { color: var(--g-accent); text-decoration: none; }
 .g-link:hover { text-decoration: underline; }
 .g-text { color: var(--g-text); }
 .g-text-2 { color: var(--g-text-2); }
@@ -333,7 +339,7 @@
   font-weight: 400;
   color: var(--g-ai-text);
 }
-.g-ai__label svg { width: 20px; height: 20px; color: var(--g-blue); }
+.g-ai__label svg { width: 20px; height: 20px; color: var(--g-accent); }
 .g-ai__body { font-size: 18px; line-height: 26px; color: var(--g-ai-text); }
 .g-ai__body p { margin: 0 0 12px; }
 .g-ai__body p:last-child { margin-bottom: 0; }
@@ -352,3 +358,73 @@
 
 /* No horizontal scroll on phones: long names/addresses wrap, pills wrap. */
 .g-surface { overflow-wrap: anywhere; }
+
+/* ── Orange accent (the SEO pages) ─────────────────────────────────────────
+   Same Google surface, the platform's orange where the surface would use blue: pills, links, focus
+   ring, shadcn primary. orange-700 on the light surface keeps 14px text readable; orange-400 on dark. */
+.g-surface.g-accent-orange {
+  --g-accent: #c2410c;
+  --g-accent-bg: #fff7ed;
+  --primary: 22 89% 41%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 22 89% 41%;
+  --accent: 33 100% 96%;
+}
+.dark .g-surface.g-accent-orange {
+  --g-accent: #fb923c;
+  --g-accent-bg: rgb(251 146 60 / 0.15);
+  --primary: 27 96% 61%;
+  --primary-foreground: 225 6% 13%;
+  --ring: 27 96% 61%;
+  --accent: 225 4% 20%;
+}
+.g-surface .bg-orange-500 { background-color: var(--g-accent); }
+.g-surface .text-orange-600, .g-surface .text-orange-700 { color: var(--g-accent); }
+.dark .g-surface .dark\:text-orange-400, .dark .g-surface .dark\:text-orange-300 { color: var(--g-accent); }
+.g-surface.g-accent-orange .bg-orange-100 { background-color: var(--g-accent-bg); }
+
+/* ── SEO tables: a Google results-style list that becomes cards on phones ── */
+.g-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+.g-table th { text-align: left; font-weight: 500; color: var(--g-text-2); font-size: 12px; line-height: 16px; padding: 8px 12px; border-bottom: 1px solid var(--g-divider); white-space: nowrap; }
+.g-table td { padding: 10px 12px; border-bottom: 1px solid var(--g-divider); vertical-align: top; color: var(--g-text); }
+.g-table tr:last-child td { border-bottom: 0; }
+.g-table tbody tr:hover td { background: var(--g-hover); }
+.g-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-table th:first-child, .g-table td:first-child { padding-left: 0; }
+.g-table th:last-child, .g-table td:last-child { padding-right: 0; }
+@media (max-width: 639px) {
+  .g-table thead { display: none; }
+  .g-table, .g-table tbody, .g-table tr { display: block; }
+  .g-table tr { padding: 12px 0; border-bottom: 1px solid var(--g-divider); }
+  .g-table td { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border: 0; }
+  .g-table td::before { content: attr(data-label); color: var(--g-text-2); font-size: 12px; flex: none; }
+  .g-table td:first-child { display: block; font-weight: 500; }
+  .g-table td:first-child::before { content: none; }
+  .g-table .num { text-align: right; }
+}
+/* Movement arrows: glyph + number, never colour alone. */
+.g-move { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; }
+.g-move--up { color: var(--g-green); }
+.g-move--down { color: var(--g-red); }
+.g-move--flat { color: var(--g-text-2); }
+/* Stat tiles (Google card: white, 1px divider, 8px radius). */
+.g-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 640px) { .g-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.g-tile { border: 1px solid var(--g-divider); border-radius: 8px; padding: 12px 16px; background: var(--g-surface); min-width: 0; }
+.g-tile__label { font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-tile__value { margin-top: 4px; font-size: 24px; line-height: 32px; font-weight: 400; color: var(--g-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.g-tile__hint { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+/* Tab strip under the header (Google's underline tabs). */
+.g-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; scrollbar-width: none; }
+.g-tabs a { flex: none; padding: 10px 12px; color: var(--g-text-2); font-size: 14px; font-weight: 500; text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.g-tabs a:hover { color: var(--g-text); background: var(--g-hover); border-radius: 8px 8px 0 0; }
+.g-tabs a[aria-current="page"] { color: var(--g-accent); border-bottom-color: var(--g-accent); }
+/* Connect / empty card. */
+.g-callout { border: 1px solid var(--g-divider); border-radius: 8px; padding: 16px; background: var(--g-surface-2); }
+.g-callout h3 { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
+.g-callout p, .g-callout li { margin: 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
+.g-callout ul { margin: 8px 0 0; padding-left: 18px; }
+.g-callout code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--g-text); background: var(--g-chip); padding: 1px 5px; border-radius: 4px; }
+.g-input { width: 100%; min-height: 40px; padding: 0 14px; border: 1px solid var(--g-divider); border-radius: 8px; background: var(--g-surface); color: var(--g-text); font: inherit; font-size: 14px; }
+.g-input:focus { outline: 2px solid var(--g-accent); outline-offset: -1px; border-color: transparent; }
+.g-select { appearance: auto; }

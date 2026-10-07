@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, boolean, timestamp, jsonb, real, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2839,3 +2839,103 @@ export type VoiceCallRow = typeof voiceCalls.$inferSelect;
 export type VoiceEscalationRow = typeof voiceEscalations.$inferSelect;
 export type VoiceSpamRow = typeof voiceSpam.$inferSelect;
 export type VoiceUsageRow = typeof voiceUsage.$inferSelect;
+
+// ── SEO toolset (server/seo/*) ──────────────────────────────────────────────
+// Rank tracker, keyword research, backlinks, competitor gap and the DataForSEO
+// spend ledger. The DDL that creates these lives in server/seo/schema.ts (run at
+// boot and by scripts/apply-schema-migration.ts); these definitions mirror it.
+export const seoSites = pgTable("seo_sites", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  domain: text("domain").notNull(),
+  /** DataForSEO location_code (2840 = United States). */
+  locationCode: integer("location_code").notNull().default(2840),
+  languageCode: text("language_code").notNull().default("en"),
+  /** 'desktop' | 'mobile' | 'both' */
+  devices: text("devices").notNull().default("both"),
+  /** SERP depth in results (10–100; DataForSEO bills per page of 10). */
+  serpDepth: integer("serp_depth").notNull().default(10),
+  nextRankCheckAt: timestamp("next_rank_check_at", { withTimezone: true }).notNull().defaultNow(),
+  nextBacklinksAt: timestamp("next_backlinks_at", { withTimezone: true }).notNull().defaultNow(),
+  lastRankCheckAt: timestamp("last_rank_check_at", { withTimezone: true }),
+  lastBacklinksAt: timestamp("last_backlinks_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("seo_sites_user_domain").on(t.userId, t.domain)]);
+
+export const seoKeywords = pgTable("seo_keywords", {
+  id: serial("id").primaryKey(),
+  siteId: integer("site_id").notNull(),
+  userId: integer("user_id").notNull(),
+  keyword: text("keyword").notNull(),
+  tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+  searchVolume: integer("search_volume"),
+  cpc: numeric("cpc", { precision: 10, scale: 4 }),
+  difficulty: integer("difficulty"),
+  volumeCheckedAt: timestamp("volume_checked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("seo_keywords_site_keyword").on(t.siteId, t.keyword)]);
+
+export const seoRankRuns = pgTable("seo_rank_runs", {
+  id: uuid("id").primaryKey(),
+  siteId: integer("site_id").notNull(),
+  userId: integer("user_id").notNull(),
+  /** 'weekly' | 'manual' */
+  trigger: text("trigger").notNull().default("weekly"),
+  /** 'queued' | 'running' | 'done' | 'failed' */
+  status: text("status").notNull().default("queued"),
+  /** Posted DataForSEO task ids still being polled: [{taskId, keywordId, device}]. */
+  tasks: jsonb("tasks").notNull().default(sql`'[]'::jsonb`),
+  total: integer("total").notNull().default(0),
+  checked: integer("checked").notNull().default(0),
+  costUsd: numeric("cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
+  error: text("error"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+});
+
+export const seoRankChecks = pgTable("seo_rank_checks", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  keywordId: integer("keyword_id").notNull(),
+  siteId: integer("site_id").notNull(),
+  runId: uuid("run_id"),
+  checkedOn: date("checked_on").notNull().defaultNow(),
+  /** 'desktop' | 'mobile' */
+  device: text("device").notNull(),
+  /** Organic position (rank_group), null = not in the crawled depth. */
+  position: integer("position"),
+  url: text("url"),
+  /** SERP feature types seen on the page (organic, local_pack, ai_overview, …). */
+  serpFeatures: jsonb("serp_features").notNull().default(sql`'[]'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("seo_rank_checks_keyword_day_device").on(t.keywordId, t.checkedOn, t.device)]);
+
+export const seoBacklinkSnapshots = pgTable("seo_backlink_snapshots", {
+  id: serial("id").primaryKey(),
+  siteId: integer("site_id").notNull(),
+  userId: integer("user_id").notNull(),
+  takenOn: date("taken_on").notNull().defaultNow(),
+  /** backlinks/summary result (rank, backlinks, referring_domains, …). */
+  summary: jsonb("summary").notNull(),
+  /** backlinks/backlinks rows (up to 100 per snapshot). */
+  backlinks: jsonb("backlinks").notNull().default(sql`'[]'::jsonb`),
+  costUsd: numeric("cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("seo_backlink_snapshots_site_day").on(t.siteId, t.takenOn)]);
+
+export const seoApiUsage = pgTable("seo_api_usage", {
+  userId: integer("user_id").notNull(),
+  /** 'YYYY-MM' (UTC). */
+  month: text("month").notNull(),
+  costUsd: numeric("cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
+  requests: integer("requests").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.userId, t.month] })]);
+
+export type SeoSite = typeof seoSites.$inferSelect;
+export type SeoKeyword = typeof seoKeywords.$inferSelect;
+export type SeoRankRun = typeof seoRankRuns.$inferSelect;
+export type SeoRankCheck = typeof seoRankChecks.$inferSelect;
+export type SeoBacklinkSnapshot = typeof seoBacklinkSnapshots.$inferSelect;
+export type SeoApiUsage = typeof seoApiUsage.$inferSelect;

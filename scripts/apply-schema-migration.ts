@@ -20,6 +20,7 @@ import { VOICE_SCHEMA_BACKFILL, VOICE_SCHEMA_DDL } from "../server/voice/schema"
 import { DASHBOARD_PREFS_DDL } from "../server/dashboard/prefs";
 import { ACCESS_GRANTS_DDL } from "../server/access-grants-schema";
 import { OPS_ISSUES_DDL } from "../server/ops/schema";
+import { SEO_SCHEMA_DDL } from "../server/seo/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -69,6 +70,9 @@ const STATEMENTS = [
   // The issue desk: one row per captured failure (server/ops/schema.ts; boot
   // and recordIssue's first write also run these).
   ...OPS_ISSUES_DDL,
+  // SEO toolset: seo_sites / seo_keywords / seo_rank_runs / seo_rank_checks /
+  // seo_backlink_snapshots / seo_api_usage (server/seo/schema.ts also runs these at boot).
+  ...SEO_SCHEMA_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

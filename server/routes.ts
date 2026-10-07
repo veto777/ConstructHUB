@@ -382,6 +382,13 @@ export async function registerRoutes(
   registerSiteScanRoutes(app, getDevUser);
   const { startSiteScanWorker } = await import("./sitescan/worker");
   startSiteScanWorker();
+  // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
+  // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
+  const { ensureSeoSchema } = await import("./seo/schema");
+  await ensureSeoSchema();
+  const { registerSeoRoutes } = await import("./seo/routes");
+  registerSeoRoutes(app, getDevUser);
+  (await import("./seo/jobs")).startSeoWorker();
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startAgencyWorker } = await import("./agency/jobs");
