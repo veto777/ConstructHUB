@@ -5,6 +5,7 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { GoogleSurface } from "@/components/google";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -689,7 +690,7 @@ export default function RankingGridPage() {
   }
 
   return (
-    <AppPage className="[&_button]:min-h-10">
+    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10">
       <PageHeader title={<span data-testid="text-page-title">GMB ranking grid</span>} description="See where your business ranks on Google Maps across your service area." actions={            <Button
               className="w-full"
               disabled={!selectedBusiness || !keyword.trim() || startScanMutation.isPending}
@@ -880,7 +881,7 @@ export default function RankingGridPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AppPage>
+    </AppPage></GoogleSurface>
   );
 }
 
@@ -1063,7 +1064,7 @@ function ReportView({ scanId, onBack }: { scanId: number; onBack: () => void }) 
   }
 
   return (
-    <AppPage className="[&_button]:min-h-10"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage>
+    <GoogleSurface page><AppPage className="before:hidden [&_button]:min-h-10"><ScanReport scan={data.scan} results={data.results} onBack={onBack} /></AppPage></GoogleSurface>
   );
 }
 

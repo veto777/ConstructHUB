@@ -7,6 +7,7 @@ import { ProfileGuard, GuardStatus } from "@/components/profile-guard";
 import { GbpConnection } from "@/components/gbp-connection";
 import { startGbpConnect } from "@/components/recent-auth";
 import { InfoTip } from "@/components/info-tip";
+import { GoogleSurface } from "@/components/google";
 import { useEffect, useRef, useState } from "react";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -87,8 +88,9 @@ export default function LocationsPage() {
     connectStarted.current=true;setGbpParam(null);
     void startGbpConnect(message=>toast({title:"Google connection",description:message,variant:"destructive"})).finally(()=>{connectStarted.current=false;});
   },[gbpParam]);
-  if(locationParam&&selectedLocation)return <LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/>;
-  return <AppPage>
+  if(locationParam&&selectedLocation)return <GoogleSurface page><LocationDetail location={selectedLocation} onBack={()=>showLocation(null)} onDeleted={()=>{showLocation(null);queryClient.removeQueries({queryKey:["/api/locations",locationParam],exact:true});refreshLocationLists();}} isPremiumPlus={true}/></GoogleSurface>;
+  // Google look (owner, 2026-10-06): the whole page sits on a GoogleSurface; the list is a local pack.
+  return <GoogleSurface page><AppPage className="before:hidden">
     <PageHeader title={<span data-testid="text-locations-title">Business Profile Locations</span>} description="Manage your locations and their connection to Google." actions={<Button data-testid="button-add-location" onClick={()=>setAddDialogOpen(true)}>Add location</Button>}/>
     <Dialog open={addDialogOpen} onOpenChange={o=>{setAddDialogOpen(o);if(!o&&importParam)setImportParam(null);}}>
       <DialogContent><DialogHeader><DialogTitle>Add location</DialogTitle></DialogHeader><AddLocationDialog initialTab={importParam==="gbp"?"gbp":undefined} onCreated={()=>{setAddDialogOpen(false);setImportParam(null);refreshLocationLists();}}/></DialogContent>
@@ -99,7 +101,7 @@ export default function LocationsPage() {
     </div>}
     <AgencyWorkspace onOpen={id=>{setNotFound(null);showLocation(String(id));}}/>
     <GbpConnection context="locations"/>
-  </AppPage>;
+  </AppPage></GoogleSurface>;
 }
 
 function AddLocationDialog({ onCreated, hasGbpAccess, initialTab }: { onCreated: () => void; hasGbpAccess?: boolean; initialTab?: "gbp" }) {
@@ -401,7 +403,7 @@ function LocationDetail({ location, onBack, onDeleted, isPremiumPlus }: {
   useEffect(() => { if (tabParam && !validTab) setTabParam(null); }, [tabParam, validTab]);
 
   return (
-    <AppPage>
+    <AppPage className="before:hidden">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-to-list"><ArrowLeft className="mr-2 h-4 w-4"/>All locations</Button>
         <PageHeader title={<span data-testid="text-detail-name">{location.businessName}</span>} description={fullAddress(location)||'Manage this Google Business Profile.'}/>
         <div className="flex flex-col md:flex-row gap-6">

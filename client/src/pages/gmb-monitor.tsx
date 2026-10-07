@@ -1,4 +1,5 @@
 import { AppPage, PageHeader, Section } from "@/components/app-ui";
+import { GoogleSurface } from "@/components/google";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
@@ -548,7 +549,7 @@ export default function GmbMonitorPage() {
   const monitoredCount = listings?.filter(l => l.isMonitoring).length ?? 0;
 
   return (
-    <AppPage width="narrow">
+    <GoogleSurface page><AppPage className="before:hidden" width="narrow">
       <PageHeader title={<span data-testid="text-page-title">GMB Edit Monitor</span>} description="Check your Google listings for changes whenever you need." actions={<>
         <Button onClick={()=>setShowAddForm(!showAddForm)} data-testid="button-add-listing">Add business</Button>
         {monitoredCount>0&&<Button variant="outline" onClick={()=>checkAllMutation.mutate()} disabled={checkAllMutation.isPending} data-testid="button-check-all">{checkAllMutation.isPending?<Loader2 className="mr-2 h-4 w-4 animate-spin"/>:null}Check all ({monitoredCount})</Button>}
@@ -636,6 +637,6 @@ export default function GmbMonitorPage() {
           </Card>
         )}
       <details className="rounded-xl border bg-card p-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">Draft a review response</summary><ReviewResponseTool /></details>
-    </AppPage>
+    </AppPage></GoogleSurface>
   );
 }

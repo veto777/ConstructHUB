@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery,useMutation } from '@tanstack/react-query';
 import { apiRequest,queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { GoogleAiOverview } from '@/components/google';
 import { Section, Notice } from '@/components/app-ui';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,15 +84,16 @@ function LocationReplies({id}:{id:number}) {
       {preview.reviews.map((r:any)=><p key={r.id} className="text-sm text-muted-foreground">{r.reviewer_name} · {r.rating} stars · {r.comment||'No text'} — {r.action}</p>)}
       <Button variant="outline" disabled={mutate.isPending||!preview.reviews.length} onClick={()=>act('POST',url+'/confirm',{token:preview.token}).then(()=>{setPreview(null);toast({title:'Backfill queued'});}).catch(()=>{})}>Confirm backfill</Button>
     </div>}
-    <div className="space-y-3">
-      <h3 className="text-base font-semibold">Drafts queue</h3>
+    <GoogleAiOverview label="AI reply suggestions" testId="ai-reply-drafts" footnote="Every draft stays in ConstructHUB until you approve it. Verify facts before publishing.">
       {!data.drafts.length&&<p className="text-sm text-muted-foreground">No drafts awaiting approval.</p>}
+      <div className="space-y-3 text-sm">
       {data.drafts.map((r:any)=><article className="rounded-xl border p-4 space-y-3" key={r.id}>
         <p className="text-sm">{r.reviewer_name} · {r.rating} stars · {r.ai_status?`AI reply: ${r.ai_status}`:'Saved draft'}</p>
         {(r.ai_error||r.reply_error)&&<p role="alert" className="text-sm text-destructive">{r.ai_error||r.reply_error}</p>}
         <Textarea aria-label={`Draft for ${r.reviewer_name}`} value={edits[r.id]??r.reply_draft??''} onChange={e=>setEdits({...edits,[r.id]:e.target.value})}/>
         <Button disabled={mutate.isPending||!(edits[r.id]??r.reply_draft)?.trim()} onClick={()=>act('PATCH',`/api/google-profile-reviews/${r.id}/reply`,{replyComment:edits[r.id]??r.reply_draft,action:'publish'}).catch(()=>{})}>Approve and publish to Google</Button>
       </article>)}
-    </div>
+      </div>
+    </GoogleAiOverview>
   </div>;
 }

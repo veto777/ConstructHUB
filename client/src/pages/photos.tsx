@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { AppPage, PageHeader, Section, Notice } from "@/components/app-ui";
+import { GoogleSurface } from "@/components/google";
 import {
   Select,
   SelectContent,
@@ -1234,7 +1235,7 @@ export default function PhotosPage() {
   const isProcessing = uploadMutation.isPending || processMutation.isPending || !!processingStep;
 
   return (
-    <AppPage width="narrow" testId="page-photos">
+    <GoogleSurface page><AppPage className="before:hidden" width="narrow" testId="page-photos">
       <PageHeader
         title={<span data-testid="text-photos-title">SEO photo optimizer</span>}
         description="Watermark, geotag and rename job photos in one batch."
@@ -2936,6 +2937,6 @@ export default function PhotosPage() {
           </div>
         </Section>
       )}
-    </AppPage>
+    </AppPage></GoogleSurface>
   );
 }
