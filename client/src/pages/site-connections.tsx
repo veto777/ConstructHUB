@@ -1,26 +1,22 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
-import {
-  AppPage,
-  PageHeader,
-  Section,
-  Toolbar,
-  Notice,
-} from "@/components/app-ui";
+import { AppPage, Toolbar, Notice } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { Search } from "lucide-react";
 import {
   PlanRequired,
   planRequiredFrom,
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
+// Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
+  "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
 const sampledBlocks = (snapshot: any) =>
   Array.isArray(snapshot?.events)
     ? snapshot.events.filter((e: any) => e.action === "block").length
@@ -32,15 +28,14 @@ function Field({
 }: React.ComponentProps<typeof Input> & { label: string }) {
   return (
     <label className="block min-w-0 space-y-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
+      <span className="g-text-2">{label}</span>
       <Input {...props} />
     </label>
   );
 }
 /**
- * Tab strip that behaves like the kit's AppTabsList (scrolls sideways on
- * phones, never wraps) but keeps plain buttons: e2e reaches tabs by role
- * "button" (e.g. getByRole("button", { name: "Work queue" })).
+ * The views as Google's filter pills (the selected one tinted); they wrap on phones. Plain buttons:
+ * e2e reaches tabs by role "button" (e.g. getByRole("button", { name: "Work queue" })).
  */
 function TabStrip({ tabs, active, onChange }: {
   tabs: string[];
@@ -48,21 +43,17 @@ function TabStrip({ tabs, active, onChange }: {
   onChange: (t: string) => void;
 }) {
   return (
-    <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-      <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0">
-        {tabs.map((t) => (
-          <Button
-            key={t}
-            variant="ghost"
-            className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${t === active ? "bg-background text-primary font-semibold shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
-            onClick={() => onChange(t)}
-            aria-selected={active === t}
-            data-testid={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
-          >
-            {t}
-          </Button>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-2">
+      {tabs.map((t) => (
+        <GooglePill
+          key={t}
+          label={t}
+          selected={t === active}
+          ariaPressed={t === active}
+          onClick={() => onChange(t)}
+          testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
+        />
+      ))}
     </div>
   );
 }
@@ -88,18 +79,21 @@ function DataList({
   });
   return (
     <section className="space-y-3">
-      <h3 className="text-base font-semibold leading-6">{title}</h3>
+      <GoogleSectionHeader as="h3" title={title} count={data.data?.total} flush />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <Input
-          aria-label={`Search ${title}`}
-          placeholder={`Search ${title.toLowerCase()}`}
-          value={q}
-          onChange={(e) => {
-            Q(e.target.value);
-            P(1);
-          }}
-          className="h-10 sm:w-72"
-        />
+        <div className="g-search sm:w-80" role="search">
+          <Search aria-hidden="true" />
+          <input
+            type="search"
+            aria-label={`Search ${title}`}
+            placeholder={`Search ${title.toLowerCase()}`}
+            value={q}
+            onChange={(e) => {
+              Q(e.target.value);
+              P(1);
+            }}
+          />
+        </div>
         {filters.length > 0 && (
           <select
             aria-label={`Filter ${title}`}
@@ -125,44 +119,30 @@ function DataList({
         </p>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm g-text-2">
             {data.data?.total ?? 0} results
           </p>
-          <div className="divide-y rounded-xl border">
+          <GoogleList>
             {data.data?.items?.map((r: any, i: number) => (
               <div
-                className="px-4 py-3"
+                className="g-card"
                 key={r.id ?? r.url ?? r.path ?? `${r.date}:${r.key}:${i}`}
               >
                 {render(r)}
               </div>
             ))}
             {!data.data?.items?.length && (
-              <p className="px-4 py-6 text-sm text-muted-foreground">
+              <p className="py-6 text-sm g-text-2">
                 No data available yet.
               </p>
             )}
-          </div>
+          </GoogleList>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 1}
-              onClick={() => P(page - 1)}
-            >
-              Previous
-            </Button>
-            <span className="text-sm tabular-nums text-muted-foreground">
+            <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous" />
+            <span className="text-sm tabular-nums g-text-2">
               Page {page}
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page * 25 >= (data.data?.total ?? 0)}
-              onClick={() => P(page + 1)}
-            >
-              Next
-            </Button>
+            <GooglePill size="sm" disabled={page * 25 >= (data.data?.total ?? 0)} onClick={() => P(page + 1)} label="Next" />
           </div>
         </>
       )}
@@ -180,7 +160,7 @@ function MetricRows({ asset }: { asset: any }) {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <label className="block space-y-1.5 text-sm">
-          <span className="text-muted-foreground">Breakdown</span>
+          <span className="g-text-2">Breakdown</span>
           <select
             aria-label="Breakdown"
             className={`${selectClass} block`}
@@ -193,7 +173,7 @@ function MetricRows({ asset }: { asset: any }) {
           </select>
         </label>
         <label className="block space-y-1.5 text-sm">
-          <span className="text-muted-foreground">Group</span>
+          <span className="g-text-2">Group</span>
           <select
             aria-label="Group"
             className={`${selectClass} block`}
@@ -388,14 +368,17 @@ export default function SiteConnections({
     );
     if (d) Z(d);
   }
+  // Google's format (owner, 2026-10-07): a quiet page title, the views as pills, hairline lists, pill actions.
   const header = (
-    <PageHeader
+    <GoogleSectionHeader
+      as="h1"
       title={cf ? "Cloudflare protection" : "Google Search Console"}
       description={
         cf
           ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
           : "Manage client properties, search performance, sitemaps, and indexing monitoring."
       }
+      flush
     />
   );
   const TABS = [
@@ -436,14 +419,15 @@ export default function SiteConnections({
       {tab === "Guide" && <SiteConnectionGuide />}
       {tab === "Connections" && (
         <div className="space-y-5 sm:space-y-6">
-          <Section
-            title={`Connect ${cf ? "Cloudflare" : "Google"}`}
-            description={
-              cf
-                ? "Your Global Key is used once to create a limited ConstructHUB key and is never saved."
-                : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
-            }
-          >
+          <section>
+            <GoogleSectionHeader
+              title={`Connect ${cf ? "Cloudflare" : "Google"}`}
+              description={
+                cf
+                  ? "Your Global Key is used once to create a limited ConstructHUB key and is never saved."
+                  : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
+              }
+            />
             {cf ? (
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
@@ -466,16 +450,16 @@ export default function SiteConnections({
                   value={zoneSearch}
                   onChange={(e) => ZS(e.target.value)}
                 />
-                <Button
+                <GooglePill
+                  variant="solid"
                   disabled={busy || !key || !email}
                   className="w-full sm:w-auto"
                   onClick={() => discover(1)}
-                >
-                  Verify and choose zones
-                </Button>
+                  label="Verify and choose zones"
+                />
                 {zones && (
-                  <section className="space-y-3 rounded-xl border p-4">
-                    <p className="text-sm text-muted-foreground">
+                  <section className="space-y-3 rounded-lg border p-4">
+                    <p className="text-sm g-text-2">
                       {zones.total} zones · page {zonePage}
                     </p>
                     {zones.accounts.map((a: any) => (
@@ -500,22 +484,18 @@ export default function SiteConnections({
                       </label>
                     ))}
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      <Button
-                        variant="outline"
+                      <GooglePill
                         disabled={busy || zonePage === 1}
                         onClick={() => discover(zonePage - 1)}
-                      >
-                        Previous zones
-                      </Button>
-                      <Button
-                        variant="outline"
+                        label="Previous zones"
+                      />
+                      <GooglePill
                         disabled={busy || zonePage * 50 >= zones.total}
                         onClick={() => discover(zonePage + 1)}
-                      >
-                        Next zones
-                      </Button>
-                      <Button
-                        variant="outline"
+                        label="Next zones"
+                      />
+                      <GooglePill
+                        label="Create limited key"
                         disabled={busy || !zoneIds.length}
                         onClick={async () => {
                           try {
@@ -536,9 +516,7 @@ export default function SiteConnections({
                             Key("");
                           }
                         }}
-                      >
-                        Create limited key
-                      </Button>
+                      />
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Permissions: Zone Read, Analytics Read, Zone WAF Edit.
@@ -546,7 +524,7 @@ export default function SiteConnections({
                     </p>
                   </section>
                 )}
-                <details className="rounded-xl border px-4 py-3">
+                <details className="g-card border-t">
                   <summary className="cursor-pointer text-sm font-medium">
                     Fallback: paste a scoped API token
                   </summary>
@@ -564,8 +542,8 @@ export default function SiteConnections({
                       value={token}
                       onChange={(e) => Token(e.target.value)}
                     />
-                    <Button
-                      variant="outline"
+                    <GooglePill
+                      label="Connect scoped token"
                       disabled={busy || !token}
                       onClick={async () => {
                         try {
@@ -577,32 +555,29 @@ export default function SiteConnections({
                           Token("");
                         }
                       }}
-                    >
-                      Connect scoped token
-                    </Button>
+                    />
                   </div>
                 </details>
-                <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-                  <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 g-divider pt-4">
+                  <p className="min-w-0 flex-1 text-sm g-text-2">
                     Agency member email:{" "}
                     {config.data?.agencyEmail ?? "Not configured"}
                   </p>
-                  <Button
+                  <GooglePill
                     disabled={busy}
-                    variant="outline"
                     onClick={() =>
                       act(
                         () => post("/agency", {}),
                         "Agency membership worker connected",
                       )
                     }
-                  >
-                    Enable agency membership connection
-                  </Button>
+                    label="Enable agency membership connection"
+                  />
                 </div>
               </div>
             ) : (
-              <Button
+              <GooglePill
+                variant="solid"
                 disabled={busy}
                 className="w-full sm:w-auto"
                 onClick={() =>
@@ -611,11 +586,10 @@ export default function SiteConnections({
                     window.location.assign(d.url);
                   })
                 }
-              >
-                Connect Google Search Console
-              </Button>
+                label="Connect Google Search Console"
+              />
             )}
-          </Section>
+          </section>
           <DataList
             title="Connections"
             url={`${base}/connections`}
@@ -631,10 +605,10 @@ export default function SiteConnections({
                     />
                     <b>{c.email ?? c.subject}</b>
                   </label>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm g-text-2">
                     {c.token_name ?? c.method}
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm g-text-2">
                     {c.permissions
                       ?.map((p: any) =>
                         typeof p === "string" ? p : (p.name ?? p.id),
@@ -642,21 +616,20 @@ export default function SiteConnections({
                       .join(", ")}
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    disabled={busy}
-                    variant="outline"
+                <div className="flex flex-wrap gap-2">
+                  <GooglePill
                     size="sm"
+                    disabled={busy}
                     onClick={() =>
                       act(() => post("/discover", { connectionIds: [c.id] }))
                     }
-                  >
-                    Discover sites
-                  </Button>
-                  <Button
-                    disabled={busy}
-                    variant="destructive"
+                    label="Discover sites"
+                  />
+                  <GooglePill
                     size="sm"
+                    variant="danger"
+                    label="Disconnect"
+                    disabled={busy}
                     onClick={() => {
                       if (
                         window.confirm(
@@ -675,9 +648,7 @@ export default function SiteConnections({
                           },
                         );
                     }}
-                  >
-                    Disconnect
-                  </Button>
+                  />
                 </div>
               </div>
             )}
@@ -741,7 +712,8 @@ export default function SiteConnections({
               </div>
             )}
             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
-              <Button
+              <GooglePill
+                variant="solid"
                 disabled={busy || !selected.length}
                 className="w-full sm:w-auto"
                 onClick={() =>
@@ -752,12 +724,10 @@ export default function SiteConnections({
                     }),
                   )
                 }
-              >
-                Sync selected ({selected.length})
-              </Button>
-              <Button
+                label={`Sync selected (${selected.length})`}
+              />
+              <GooglePill
                 disabled={busy || !assets.data?.total}
-                variant="outline"
                 className="w-full sm:w-auto"
                 onClick={() =>
                   act(() =>
@@ -769,9 +739,8 @@ export default function SiteConnections({
                     }),
                   )
                 }
-              >
-                Sync all matching sites
-              </Button>
+                label="Sync all matching sites"
+              />
             </div>
           </div>
           {assets.error ? (
@@ -782,105 +751,86 @@ export default function SiteConnections({
             <p className="text-sm text-muted-foreground">Loading sites…</p>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm g-text-2">
                 {assets.data?.total ?? 0} sites
               </p>
-              <div className="rounded-xl border">
-                <label className="flex gap-2 border-b p-3 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    aria-label="Select this page"
-                    checked={
-                      !!assets.data?.items.length &&
-                      assets.data.items.every((a: any) =>
-                        selected.includes(a.id),
-                      )
-                    }
-                    onChange={(e) =>
-                      Select(
-                        e.target.checked
-                          ? assets.data.items.map((a: any) => a.id)
-                          : [],
-                      )
-                    }
-                  />
-                  Select this page
-                </label>
-                {assets.data?.items.map((a: any) => (
-                  <div
-                    className="flex flex-wrap items-center gap-3 border-b p-3 last:border-b-0"
-                    key={a.id}
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${a.name}`}
-                      checked={selected.includes(a.id)}
-                      onChange={() => toggle(a.id)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <button
-                        className="text-sm font-medium text-primary underline"
-                        onClick={() => A(a)}
-                      >
-                        {a.name}
-                      </button>
-                      <p className="text-sm text-muted-foreground">
-                        ID {a.id} · {a.status} · {a.locations} linked locations
-                        ·{" "}
-                        {a.synced_at
+              <label className="flex gap-2 text-sm g-text-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select this page"
+                  checked={
+                    !!assets.data?.items.length &&
+                    assets.data.items.every((a: any) =>
+                      selected.includes(a.id),
+                    )
+                  }
+                  onChange={(e) =>
+                    Select(
+                      e.target.checked
+                        ? assets.data.items.map((a: any) => a.id)
+                        : [],
+                    )
+                  }
+                />
+                Select this page
+              </label>
+              {assets.data?.items.length ? (
+                <GoogleList testId={`list-sites-${provider}`}>
+                  {assets.data.items.map((a: any) => (
+                    <GoogleListRow
+                      key={a.id}
+                      size="md"
+                      title={
+                        <span className="inline-flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${a.name}`}
+                            checked={selected.includes(a.id)}
+                            onChange={() => toggle(a.id)}
+                          />
+                          <button type="button" onClick={() => A(a)}>{a.name}</button>
+                        </span>
+                      }
+                      meta={[
+                        `ID ${a.id}`,
+                        a.status,
+                        `${a.locations} linked locations`,
+                        a.synced_at
                           ? `Synced ${new Date(a.synced_at).toLocaleString()}`
-                          : "Not synced"}
-                      </p>
-                      {a.error && (
-                        <p role="alert" className="text-sm text-destructive">
-                          {a.error}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      disabled={busy}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => act(() => post("/sync", { ids: [a.id] }))}
-                    >
-                      Sync
-                    </Button>
-                  </div>
-                ))}
-                {!assets.data?.items.length && (
-                  <p className="p-6 text-sm text-muted-foreground">
-                    No connected sites. Open Connections to get started.
-                  </p>
-                )}
-              </div>
+                          : "Not synced",
+                      ]}
+                      line={a.error ? <span role="alert" className="g-closed">{a.error}</span> : undefined}
+                      trailing={
+                        <GooglePill
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => act(() => post("/sync", { ids: [a.id] }))}
+                          label="Sync"
+                        />
+                      }
+                    />
+                  ))}
+                </GoogleList>
+              ) : (
+                <p className="py-6 text-sm g-text-2">
+                  No connected sites. Open Connections to get started.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page === 1}
-                  onClick={() => P(page - 1)}
-                >
-                  Previous sites
-                </Button>
-                <span className="text-sm tabular-nums text-muted-foreground">
+                <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous sites" />
+                <span className="text-sm tabular-nums g-text-2">
                   Page {page}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page * 25 >= (assets.data?.total ?? 0)}
-                  onClick={() => P(page + 1)}
-                >
-                  Next sites
-                </Button>
+                <GooglePill size="sm" disabled={page * 25 >= (assets.data?.total ?? 0)} onClick={() => P(page + 1)} label="Next sites" />
               </div>
             </>
           )}
           {cf ? (
-            <Section
-              title="Preview edge protection for selected zones"
-              description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
-            >
+            <section>
+              <GoogleSectionHeader
+                title="Preview edge protection for selected zones"
+                description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
+              />
               <div className="space-y-3">
                 <select
                   aria-label="Rule pack"
@@ -910,8 +860,8 @@ export default function SiteConnections({
                 <p className="text-sm text-muted-foreground">
                   Check office-IP exemptions in Cloudflare first.
                 </p>
-                <Button
-                  variant="outline"
+                <GooglePill
+                  label="Preview rules"
                   disabled={busy || !selected.length}
                   onClick={async () => {
                     const d = await act(
@@ -933,12 +883,10 @@ export default function SiteConnections({
                     );
                     if (d) Preview(d.items);
                   }}
-                >
-                  Preview rules
-                </Button>
+                />
                 {preview.length > 0 && (
-                  <div className="space-y-3 rounded-xl border p-4">
-                    <h3 className="text-base font-semibold leading-6">
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <h3 className="g-card__title g-card__title--md">
                       Review before applying
                     </h3>
                     {preview.map((p) => (
@@ -956,9 +904,10 @@ export default function SiteConnections({
                       </div>
                     ))}
                     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      <Button
+                      <GooglePill
+                        variant="danger"
+                        label="Confirm and queue edge changes"
                         disabled={busy}
-                        variant="destructive"
                         onClick={async () => {
                           const r = await act(
                             () =>
@@ -969,28 +918,25 @@ export default function SiteConnections({
                           );
                           if (r) Preview([]);
                         }}
-                      >
-                        Confirm and queue edge changes
-                      </Button>
-                      <Button variant="outline" onClick={() => Preview([])}>
-                        Cancel preview
-                      </Button>
+                      />
+                      <GooglePill onClick={() => Preview([])} label="Cancel preview" />
                     </div>
                   </div>
                 )}
               </div>
-            </Section>
+            </section>
           ) : (
-            <Section
-              title="Bulk sitemap submission or inspection"
-              description="One property ID and URL per line, separated by a comma. URLs must belong to the property."
-            >
+            <section>
+              <GoogleSectionHeader
+                title="Bulk sitemap submission or inspection"
+                description="One property ID and URL per line, separated by a comma. URLs must belong to the property."
+              />
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
                   Selected IDs: {selected.join(", ") || "None"}.
                 </p>
                 <textarea
-                  className="w-full rounded-md border bg-background p-2 text-sm"
+                  className="w-full rounded-lg border bg-background p-3 text-sm"
                   aria-label="Property IDs and URLs"
                   rows={4}
                   value={urls}
@@ -999,11 +945,13 @@ export default function SiteConnections({
                 />
                 <div className="flex flex-col gap-2 sm:flex-row">
                   {["inspect", "sitemap"].map((kind) => (
-                    <Button
+                    <GooglePill
                       key={kind}
-                      variant="outline"
                       className="w-full sm:w-auto"
                       disabled={busy || !urls.trim()}
+                      label={kind === "inspect"
+                        ? "Queue inspections"
+                        : "Review and submit sitemaps"}
                       onClick={() => {
                         if (
                           kind === "sitemap" &&
@@ -1029,25 +977,18 @@ export default function SiteConnections({
                           }),
                         );
                       }}
-                    >
-                      {kind === "inspect"
-                        ? "Queue inspections"
-                        : "Review and submit sitemaps"}
-                    </Button>
+                    />
                   ))}
                 </div>
               </div>
-            </Section>
+            </section>
           )}
           {asset && (
-            <Section
-              title={asset.name}
-              actions={
-                <Button variant="ghost" size="sm" onClick={() => A(null)}>
-                  Close details
-                </Button>
-              }
-            >
+            <section>
+              <GoogleSectionHeader
+                title={asset.name}
+                actions={<GooglePill variant="quiet" size="sm" onClick={() => A(null)} label="Close details" />}
+              />
               {cf ? (
                 <CloudflareDetails
                   id={asset.id}
@@ -1060,7 +1001,7 @@ export default function SiteConnections({
               ) : (
                 <MetricRows key={asset.id} asset={asset} />
               )}
-            </Section>
+            </section>
           )}
         </div>
       )}
@@ -1082,16 +1023,18 @@ export default function SiteConnections({
             )}
           />
           <label className="block space-y-1.5 text-sm">
-            <span className="text-muted-foreground">Client invitations</span>
+            <span className="g-text-2">Client invitations</span>
             <textarea
-              className="w-full rounded-md border bg-background p-2 text-sm"
+              className="w-full rounded-lg border bg-background p-3 text-sm"
               aria-label="Client invitations"
               rows={4}
               value={inviteRows}
               onChange={(e) => Invites(e.target.value)}
             />
           </label>
-          <Button
+          <GooglePill
+            variant="solid"
+            label="Send onboarding emails"
             disabled={busy || !connection || !inviteRows.trim()}
             className="w-full sm:w-auto"
             onClick={() =>
@@ -1116,9 +1059,7 @@ export default function SiteConnections({
                 "Invitation emails queued",
               )
             }
-          >
-            Send onboarding emails
-          </Button>
+          />
           <DataList
             title="Invitations"
             url={`${base}/invites`}
@@ -1164,16 +1105,14 @@ export default function SiteConnections({
                 after applying; sampled events do not prove causation.
               </p>
               {["applied", "uncertain"].includes(a.state) && (
-                <Button
-                  disabled={busy}
-                  variant="outline"
+                <GooglePill
                   size="sm"
+                  disabled={busy}
                   onClick={() =>
                     act(() => post("/undo", { ids: [a.id] }), "Undo queued")
                   }
-                >
-                  Undo ConstructHUB rules
-                </Button>
+                  label="Undo ConstructHUB rules"
+                />
               )}
             </div>
           )}
@@ -1206,13 +1145,7 @@ function CloudflareDetails({
           render={(r) => (
             <p className="text-sm text-muted-foreground">
               {r.ip_address} · {r.source} · {r.reason}{" "}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onFlag(r.ip_address)}
-              >
-                Add to preview
-              </Button>
+              <GooglePill size="sm" onClick={() => onFlag(r.ip_address)} label="Add to preview" />
             </p>
           )}
         />
@@ -1227,9 +1160,7 @@ function CloudflareDetails({
         render={(r) => (
           <p className="text-sm text-muted-foreground">
             {r.ip_address} · {r.source} · {r.reason}{" "}
-            <Button variant="outline" size="sm" onClick={() => onFlag(r.ip_address)}>
-              Add to preview
-            </Button>
+            <GooglePill size="sm" onClick={() => onFlag(r.ip_address)} label="Add to preview" />
           </p>
         )}
       />
@@ -1239,9 +1170,9 @@ function CloudflareDetails({
           ? "Unavailable on this plan or permission set"
           : `${(d.botShare * 100).toFixed(1)}%`}
       </p>
-      <div className="divide-y rounded-xl border">
+      <GoogleList>
         {d.traffic?.map((day: any) => (
-          <p key={day.dimensions?.date} className="px-4 py-2.5 text-sm text-muted-foreground">
+          <p key={day.dimensions?.date} className="g-card text-sm g-text-2">
             <b className="text-foreground">{day.dimensions?.date} UTC</b> ·
             Requests: {day.sum?.requests ?? "Unavailable"} · Unique visitors:{" "}
             {day.uniq?.uniques ?? "Unavailable"} · Page views:{" "}
@@ -1249,7 +1180,7 @@ function CloudflareDetails({
             {day.sum?.threats ?? "Unavailable"}
           </p>
         ))}
-      </div>
+      </GoogleList>
       {["traffic", "events", "paths", "bots", "countries"].map((field) => (
         <DataList
           key={field}
