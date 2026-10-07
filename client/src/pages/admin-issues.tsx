@@ -56,6 +56,12 @@ function UserReportBadge() {
   );
 }
 
+/** A signed-out visitor's report: held in triage until an admin sends it to the desk. */
+const isAnonymousHold = (i: { source: string; status: string }) => i.source === "user" && i.status === "triage";
+function AnonymousHoldBadge() {
+  return <StatusPill tone="warning" dot={false} data-testid="badge-anonymous-report">Anonymous report — review before sending to the desk</StatusPill>;
+}
+
 /** Who reported (a user report): the account number and the address to answer. */
 const reporterLine = (i: { reporterUserId: number | null; reporterEmail: string | null }) =>
   [i.reporterUserId ? `Account ${i.reporterUserId}` : "Signed out", i.reporterEmail].filter(Boolean).join(" · ");
@@ -183,6 +189,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={issue.status} />
                 <StatusPill tone={issue.severity === "warning" ? "warning" : issue.severity === "info" ? "info" : "danger"} dot={false}>{SEVERITY_LABEL[issue.severity]}</StatusPill>
+                {isAnonymousHold(issue) && <AnonymousHoldBadge />}
                 {issue.source === "user" ? <UserReportBadge /> : <StatusPill tone="neutral" dot={false}>{ISSUE_SOURCE_LABELS[issue.source]}</StatusPill>}
                 <span className="text-xs text-muted-foreground">#{issue.id}</span>
               </div>
@@ -227,7 +234,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               {issue.report ? (
                 <div className="whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 text-sm leading-relaxed" data-testid="text-issue-report">{issue.report}</div>
               ) : (
-                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : issue.status === "triage" ? "Browser reports come from anyone's browser, so Claude only sees one after you press Send to Claude." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
+                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : isAnonymousHold(issue) ? "A signed-out visitor wrote this. Read it first: Claude only sees it after you press Send to Claude." : issue.status === "triage" ? "Browser reports come from anyone's browser, so Claude only sees one after you press Send to Claude." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
               )}
             </section>
 
@@ -348,7 +355,7 @@ export default function AdminIssuesPage() {
                 title={<span className="line-clamp-2">{i.title}</span>}
                 onOpen={() => setOpenId(i.id)}
                 titleTestId={`row-issue-${i.id}`}
-                badges={<>{i.source === "user" && <UserReportBadge />}<StatusBadge status={i.status} /></>}
+                badges={<>{isAnonymousHold(i) && <AnonymousHoldBadge />}{i.source === "user" && <UserReportBadge />}<StatusBadge status={i.status} /></>}
                 meta={[
                   i.source === "user" ? <span key="reporter" className="break-all" data-testid={`text-issue-reporter-${i.id}`}>{reporterLine(i)}</span> : ISSUE_SOURCE_LABELS[i.source],
                   ...(i.source === "user" ? [<span key="sev">{SEVERITY_LABEL[i.severity]}</span>] : []),

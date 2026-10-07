@@ -164,7 +164,10 @@ prompt="${prompt//@@TOOLS@@/"$TOOLS"}"
 prompt="${prompt//@@TEST_DB_NOTE@@/"$test_note"}"
 CLAUDE[2]="$prompt"
 # In the order the app returned them: user blockers, other user reports, then captured failures.
-{ echo "ISSUES JSON (claimed for run $RUN_ID, one issue per line, in working order: user reports first):"; jq -c '.issues[]' "$WORK/issues.json"; } > "$WORK/stdin.txt"
+{ echo "ISSUES JSON (claimed for run $RUN_ID, one issue per line, in working order: user reports first):"; echo '<<<ISSUES_DATA_BEGIN>>>'
+  # Data only (prompt.md): a marker line typed into a report cannot close the block early.
+  jq -c '.issues[]' "$WORK/issues.json" | sed -e 's/<<<ISSUES_DATA_\(BEGIN\|END\)>>>/[marker removed]/g'
+  echo '<<<ISSUES_DATA_END>>>'; } > "$WORK/stdin.txt"
 
 if [ "$DRY_RUN" = 1 ]; then
   echo "== issues (dry run: peeked, not claimed) =="

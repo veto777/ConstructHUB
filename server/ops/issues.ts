@@ -441,12 +441,16 @@ export type UserReportInput = {
   detail: Record<string, unknown>;
   reporterUserId: number | null;
   reporterEmail: string | null;
+  /** `triage` holds it for an admin (a signed-out visitor's report); default `new`. */
+  status?: "new" | "triage";
 };
 
 /**
  * One row per report, always: the fingerprint is random, so two people's
  * reports (or one person's two) are never merged the way captured failures
- * are. Straight to `new` — the next run takes it first (DESK_ORDER_SQL).
+ * are. A signed-in person's report goes straight to `new` — the next run takes
+ * it first (DESK_ORDER_SQL). A signed-out visitor's is anonymous internet text:
+ * it waits in `triage`, which no run claims, until a platform admin sends it on.
  * Unlike recordIssue this throws on failure: the reporter is told the truth.
  */
 export async function createUserReport(input: UserReportInput, q?: Queryable): Promise<OpsIssue> {
@@ -454,10 +458,11 @@ export async function createUserReport(input: UserReportInput, q?: Queryable): P
   const title = scrubText(String(input.title ?? "").replace(/\s+/g, " ").trim(), 200) || "User report";
   const { rows: [r] } = await db.query(
     `INSERT INTO ops_issues (fingerprint, source, severity, title, detail, status, history, reporter_user_id, reporter_email)
-     VALUES ($1, 'user', $2, $3, $4::jsonb, 'new', jsonb_build_array(${historyEntry("'reported'", "'user'")}), $5, $6)
+     VALUES ($1, 'user', $2, $3, $4::jsonb, $7, jsonb_build_array(${historyEntry("'reported'", "'user'")}), $5, $6)
      RETURNING *`,
     [issueFingerprint("user", randomUUID()), isIssueSeverity(input.severity) ? input.severity : "error", title,
-     JSON.stringify(scrubDetail(input.detail ?? {})), input.reporterUserId, input.reporterEmail ? String(input.reporterEmail).slice(0, 254) : null]);
+     JSON.stringify(scrubDetail(input.detail ?? {})), input.reporterUserId, input.reporterEmail ? String(input.reporterEmail).slice(0, 254) : null,
+     input.status === "triage" ? "triage" : "new"]);
   return rowToIssue(r);
 }
 

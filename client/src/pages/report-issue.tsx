@@ -38,7 +38,7 @@ const IMPACT_HINT: Record<UserReportImpact, string> = {
 };
 
 type Mine = { account: { id: number; plan: string | null }; reports: MyIssueReport[] } | null;
-type Sent = { id: number | null; reference: string | null; screenshot: "saved" | "not_saved" | "none"; email: string };
+type Sent = { id: number | null; reference: string | null; review: "desk" | "person"; screenshot: "saved" | "not_saved" | "none"; email: string };
 
 /** The page the person came from: `?from=` (the footers set it), else a same-site referrer. Path only. */
 function cameFrom(): string {
@@ -132,7 +132,7 @@ function ReportIssueView({ crm = false }: { crm?: boolean }) {
         screenshot: shot ? { type: shot.type, data: shot.data } : null,
       });
       const body = await res.json();
-      setSent({ id: body.id, reference: body.reference, screenshot: body.screenshot, email: email.trim() });
+      setSent({ id: body.id, reference: body.reference, review: body.review === "desk" ? "desk" : "person", screenshot: body.screenshot, email: email.trim() });
       setTrying(""); setHappened(""); setImpact(""); setShot(null);
       void queryClient.invalidateQueries({ queryKey: ["/api/issues/mine"] });
       window.scrollTo?.(0, 0);
@@ -155,7 +155,9 @@ function ReportIssueView({ crm = false }: { crm?: boolean }) {
         <div className="mx-auto w-full max-w-2xl px-4 pb-12 pt-5 sm:px-6 sm:pt-8">
           <GoogleSectionHeader
             as="h1" title="Report an issue" titleTestId="text-report-title" titleAfter={<HelpButton k="report-issue" />}
-            description="Reports go straight to our issue desk. Anything that stops the site from working is looked at first."
+            description={signedIn || mineLoading
+              ? "Reports go straight to our issue desk. Anything that stops the site from working is looked at first."
+              : "Reports go to our team. Anything that stops the site from working is looked at first."}
           />
 
           {sent && (
@@ -165,10 +167,17 @@ function ReportIssueView({ crm = false }: { crm?: boolean }) {
                 <span>Thank you. Your report {sent.reference ? <strong data-testid="text-report-reference">{sent.reference}</strong> : null} was received.</span>
               </h3>
               <ul>
-                <li>The issue desk reads every report. Reports that stop the site from working go first.</li>
-                {signedIn
-                  ? <li>Its status and our reply appear under “Your reports” below.</li>
-                  : <li>We kept {sent.email || "your email address"} with the report so we can write back. Sign in next time to follow a report here.</li>}
+                {sent.review === "desk" ? (
+                  <>
+                    <li>The issue desk reads every report. Reports that stop the site from working go first.</li>
+                    <li>Its status and our reply appear under “Your reports” below.</li>
+                  </>
+                ) : (
+                  <>
+                    <li data-testid="text-report-person-review">A person on our team reads it first, because you sent it without signing in. Reports that stop the site from working are read first.</li>
+                    <li>We kept {sent.email || "your email address"} with the report so we can write back. Sign in next time to follow a report here.</li>
+                  </>
+                )}
                 {sent.screenshot === "not_saved" && <li data-testid="text-report-screenshot-not-saved">Your report was saved, but the screenshot could not be stored. If the picture matters, email it to support@constructhub.us with the number above.</li>}
               </ul>
               <div className="mt-3">

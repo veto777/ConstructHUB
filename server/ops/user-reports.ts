@@ -2,13 +2,17 @@
  * A person's own report from /report-issue ("Report an issue" in every footer):
  *
  *   POST /api/issues/report   { trying, happened, page?, impact, email?, website?, diagnostics, screenshot? }
- *     → 201 { id, reference: "#1234", status, screenshot: "saved" | "not_saved" | "none" } | 400 | 403 | 413 | 429
+ *     → 201 { id, reference: "#1234", status, review: "desk" | "person", screenshot: "saved" | "not_saved" | "none" } | 400 | 403 | 413 | 429
  *   GET  /api/issues/mine     → { account: { id, plan }, reports: MyIssueReport[] }   (signed in; 401 otherwise)
  *
  * Every report is its own ops_issues row (source "user", a random fingerprint:
- * never merged), status `new`, and the issue desk takes user reports before
- * anything the app captured itself (issues.ts DESK_ORDER_SQL). "I can't use
- * the site" is the pipeline's highest severity and rings the admins' bell at once.
+ * never merged). A SIGNED-IN person's report is status `new`, and the issue desk
+ * takes user reports before anything the app captured itself (issues.ts
+ * DESK_ORDER_SQL). A SIGNED-OUT visitor's report is anonymous internet text and
+ * must not steer an automated, code-writing run: it is stored as `triage` (the
+ * holding state browser errors use), which no run claims, until a platform admin
+ * sends it on from /admin/issues. "I can't use the site" is the pipeline's highest
+ * severity and rings the admins' bell at once, signed in or out.
  *
  * Works signed out (a person who cannot sign in must be able to say so), so:
  *   - signed out, an email is required — it is where the answer goes;
@@ -176,7 +180,7 @@ export function registerUserReportRoutes(app: Express, opts: UserReportOptions =
     }
     const body = { ...parsed.data, trying: withoutSaidSecrets(parsed.data.trying), happened: withoutSaidSecrets(parsed.data.happened) };
     // A bot filled the field no person can see: it hears "received", nothing is stored.
-    if (body.website) return res.status(201).json({ id: null, reference: null, status: "received", screenshot: "none" });
+    if (body.website) return res.status(201).json({ id: null, reference: null, status: "received", review: "person", screenshot: "none" });
 
     const user = currentUser(req);
     const email = (body.email || "").toLowerCase();
@@ -217,6 +221,8 @@ export function registerUserReportRoutes(app: Express, opts: UserReportOptions =
         title: `User report: ${body.trying}`,
         severity: USER_REPORT_SEVERITY[body.impact],
         reporterUserId: user?.id ?? null,
+        // No account behind it → an admin reads it before any run does.
+        status: user ? "new" : "triage",
         // Where the answer goes: the address typed on the form, else the account's own.
         reporterEmail: email || (user?.email ? String(user.email).toLowerCase() : null),
         detail: {
@@ -241,7 +247,7 @@ export function registerUserReportRoutes(app: Express, opts: UserReportOptions =
         },
       }, q);
       if (body.impact === "blocker") await (opts.notifyBlocker ?? notifyAdminsOfBlockerReport)(issue, q);
-      return res.status(201).json({ id: issue.id, reference: `#${issue.id}`, status: publicReportStatus(issue.status), screenshot: screenshotResult });
+      return res.status(201).json({ id: issue.id, reference: `#${issue.id}`, status: publicReportStatus(issue.status), review: user ? "desk" : "person", screenshot: screenshotResult });
     } catch (e) {
       console.error("[issues] user report failed:", (e as Error)?.message ?? e);
       return res.status(500).json({ message: "We couldn’t save your report. Try again, or email support@constructhub.us." });
