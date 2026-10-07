@@ -65,6 +65,19 @@ function CallAssistantIcon({ className }: { className?: string }) {
   );
 }
 
+function SeoIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="24" fill="#F1592F" />
+      <rect x="11" y="27" width="6" height="10" rx="1.5" fill="#fff" />
+      <rect x="21" y="21" width="6" height="16" rx="1.5" fill="#fff" />
+      <rect x="31" y="14" width="6" height="23" rx="1.5" fill="#fff" />
+      <path d="M12 21l9-7 8 4 9-8" stroke="#3F4650" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M33 10h5v5" stroke="#3F4650" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function SiteScanIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
@@ -266,6 +279,7 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
+  { title: "SEO", url: "/seo", icon: TrendingUp, logoComponent: SeoIcon, badge: "new" },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },

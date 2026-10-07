@@ -20,7 +20,7 @@ import {
   LayoutDashboard, Search, Database, Home, CalendarClock, History, Camera, Images, Eye, Grid3x3, Swords, Briefcase,
   MapPin, Store, Globe, MailWarning, Newspaper, Megaphone, BookOpen, Cloud, LineChart, ScanSearch, GraduationCap,
   LifeBuoy, Building2, MousePointerClick, BarChart3, Users, Fingerprint, Phone, ShieldCheck, Star, Settings,
-  KeyRound, Bug, LayoutGrid, Kanban,
+  KeyRound, Bug, LayoutGrid, Kanban, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ const PAGE_ICONS: [string, LucideIcon, Accent][] = [
   ["/search", Search, "orange"], ["/databases", Database, "orange"], ["/property", Home, "orange"],
   ["/schedules", CalendarClock, "orange"], ["/history", History, "orange"], ["/photos", Camera, "orange"],
   ["/media-library", Images, "orange"], ["/domains", Globe, "orange"], ["/mail-alerts", MailWarning, "orange"],
-  ["/cloudflare", Cloud, "orange"], ["/search-console", LineChart, "orange"], ["/site-scan", ScanSearch, "orange"],
+  ["/cloudflare", Cloud, "orange"], ["/search-console", LineChart, "orange"], ["/site-scan", ScanSearch, "orange"], ["/seo", TrendingUp, "orange"],
   ["/vpn-shield", ShieldCheck, "orange"], ["/ip-tracker", Fingerprint, "orange"], ["/social-media", Megaphone, "orange"],
   ["/guides", BookOpen, "orange"], ["/master-class", GraduationCap, "orange"], ["/settings", Settings, "orange"],
   ["/admin/access", KeyRound, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
