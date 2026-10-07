@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppPage, PageHeader, EmptyState } from "@/components/app-ui";
+import { AppPage, EmptyState } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
   FileText,
@@ -79,87 +78,76 @@ export default function HistoryPage() {
 
   return (
     <AppPage width="narrow" testId="page-history">
-      <PageHeader
-        title={<span data-testid="text-page-title">Search history</span>}
+      {/* Google's list format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="Search history"
+        count={count > 0 ? count : null}
         description="Rerun a recent permit search with one tap."
+        flush
         actions={count > 0 ? (
-          <Button
-            variant="outline"
-            size="sm"
+          <GooglePill
+            icon={Trash2}
+            variant="quiet"
+            label="Clear all"
             onClick={() => setConfirmClearAll(true)}
             disabled={deleteAllMutation.isPending}
-            data-testid="button-clear-all-history"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Clear all
-          </Button>
+            testId="button-clear-all-history"
+          />
         ) : undefined}
       />
 
       {isLoading ? (
         <div className="space-y-2" data-testid="history-loading">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-xl border bg-card" />
+            <div key={i} className="h-16 animate-pulse g-divider" />
           ))}
         </div>
       ) : count > 0 ? (
-        <div className="rounded-xl border bg-card divide-y" data-testid="list-history">
+        <GoogleList testId="list-history">
           {queries!.map((query) => {
             const Icon = typeIcons[query.searchType] ?? Search;
             return (
-              <div
+              <GoogleListRow
                 key={query.id}
-                className="flex items-center gap-3 px-4 py-3 group"
-                data-testid={`card-query-${query.id}`}
-              >
-                <Link
-                  href={searchAgainHref(query)}
-                  className="flex flex-1 min-w-0 items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title="Open this search on the Search page"
-                  data-testid={`link-search-again-${query.id}`}
-                >
-                  <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{query.searchValue}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-                      <span className="capitalize">{query.searchType.replace(/_/g, " ")}</span>
-                      <span className="text-border">·</span>
-                      {new Date(query.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <span className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground flex-shrink-0">
-                    <RotateCcw className="h-3 w-3" />
-                    Search again
-                  </span>
-                </Link>
-                {/* Always visible on touch screens (no hover); revealed on hover/focus with a mouse. */}
-                <button
-                  type="button"
-                  onClick={() => deleteOneMutation.mutate(query.id)}
-                  disabled={deleteOneMutation.isPending}
-                  aria-label={`Delete search "${query.searchValue}"`}
-                  title="Delete search"
-                  className="opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"
-                  data-testid={`button-delete-query-${query.id}`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
+                size="md"
+                testId={`card-query-${query.id}`}
+                leading={<Icon aria-hidden="true" />}
+                title={query.searchValue}
+                href={searchAgainHref(query)}
+                titleTestId={`link-search-again-${query.id}`}
+                meta={[
+                  <span key="type" className="capitalize">{query.searchType.replace(/_/g, " ")}</span>,
+                  new Date(query.createdAt).toLocaleString(),
+                ]}
+                trailing={(
+                  <GooglePill
+                    icon={X}
+                    variant="quiet"
+                    size="sm"
+                    label={<span className="sr-only">Delete</span>}
+                    className="px-2"
+                    onClick={() => deleteOneMutation.mutate(query.id)}
+                    disabled={deleteOneMutation.isPending}
+                    ariaLabel={`Delete search "${query.searchValue}"`}
+                    title="Delete search"
+                    testId={`button-delete-query-${query.id}`}
+                  />
+                )}
+                actions={(
+                  <GooglePill icon={RotateCcw} label="Search again" href={searchAgainHref(query)} title="Open this search on the Search page" testId={`button-search-again-${query.id}`} />
+                )}
+              />
             );
           })}
-        </div>
+        </GoogleList>
       ) : (
         <EmptyState
           icon={FileText}
           title="No searches yet"
           description="Run a permit search and it shows up here, ready to rerun."
-          action={
-            <Button asChild>
-              <Link href="/search" data-testid="link-history-search">Search permits</Link>
-            </Button>
-          }
+          action={<GooglePill icon={Search} variant="solid" label="Search permits" href="/search" testId="link-history-search" />}
         />
       )}
 

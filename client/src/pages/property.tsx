@@ -3,8 +3,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -12,12 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AppPage, PageHeader, Toolbar, EmptyState } from "@/components/app-ui";
+import { AppPage, Toolbar, EmptyState } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   Building,
-  MapPin,
   Search,
-  ArrowUpRight,
+  ExternalLink,
   Phone,
   ChevronLeft,
   ChevronRight,
@@ -162,9 +160,13 @@ export default function PropertyPage() {
 
   return (
     <AppPage width="narrow" testId="page-property">
-      <PageHeader
-        title={<span data-testid="text-property-title">Property records</span>}
+      {/* Google's local-pack format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-property-title"
+        title="Property records"
         description="County appraiser portals for ownership, values, construction history and tax records."
+        flush
       />
 
       <Toolbar
@@ -208,7 +210,7 @@ export default function PropertyPage() {
       {isLoading ? (
         <div className="space-y-3" data-testid="property-loading">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-28 animate-pulse rounded-xl border bg-card" />
+            <div key={i} className="h-24 animate-pulse g-divider" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -224,101 +226,67 @@ export default function PropertyPage() {
         />
       ) : (
         <>
-          <p className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
+          <p className="g-text-2 text-sm tabular-nums" data-testid="text-result-count">
             {filtered.length > perPage
               ? `Showing ${(currentPage - 1) * perPage + 1}–${Math.min(currentPage * perPage, filtered.length)} of ${filtered.length.toLocaleString()} offices`
               : `${filtered.length} office${filtered.length !== 1 ? "s" : ""}`}
           </p>
-          <div className="space-y-3">
-            {paginated.map((appraiser) => (
-              <div
-                key={appraiser.id}
-                className="rounded-xl border bg-card p-4 sm:p-5"
-                data-testid={`card-appraiser-${appraiser.id}`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold">{appraiser.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                      <MapPin className="h-3 w-3 shrink-0" />
-                      {appraiser.county?.name} County, {appraiser.county?.state}
-                    </p>
-
-                    {appraiser.address && (
-                      <p className="text-xs text-muted-foreground mt-1 pl-4">
-                        {appraiser.address}
-                      </p>
+          <GoogleList testId="list-appraisers">
+            {paginated.map((appraiser) => {
+              const linksOk = governmentLinksAvailable(appraiser);
+              const notice = linksOk ? governmentLinkNotice(appraiser) : null;
+              // No usable official link on record: an honest web search, never a fabricated portal.
+              const fallback = !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
+              return (
+                <GoogleListRow
+                  key={appraiser.id}
+                  testId={`card-appraiser-${appraiser.id}`}
+                  title={appraiser.name}
+                  meta={[
+                    appraiser.county ? `${appraiser.county.name} County, ${appraiser.county.state}` : null,
+                    appraiser.address,
+                  ]}
+                  line={notice || appraiser.notes ? (
+                    <>
+                      {notice && <span>{notice}</span>}
+                      {notice && appraiser.notes && <span aria-hidden="true"> · </span>}
+                      {appraiser.notes && <span>{appraiser.notes}</span>}
+                    </>
+                  ) : undefined}
+                  actions={<>
+                    {linksOk && appraiser.portalUrl && (
+                      <GooglePill icon={ExternalLink} label="Open portal" href={appraiser.portalUrl} external testId={`button-visit-appraiser-${appraiser.id}`} />
                     )}
-
-                    {/* The official site opens from "Visit"; no second inline link to the same URL. */}
+                    {linksOk && appraiser.searchUrl && appraiser.searchUrl !== appraiser.portalUrl && (
+                      <GooglePill icon={Search} label="Search records" href={appraiser.searchUrl} external testId={`button-search-appraiser-${appraiser.id}`} />
+                    )}
+                    {fallback && (
+                      <GooglePill
+                        icon={Search}
+                        variant="quiet"
+                        label="Find property records"
+                        external
+                        testId={`link-appraiser-fallback-${appraiser.id}`}
+                        title="No official portal on record — search the web for this county's property records"
+                        href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}
+                      />
+                    )}
                     {appraiser.phone && (
-                      <div className="flex flex-wrap items-center gap-3 mt-2">
-                        <a
-                          href={`tel:${appraiser.phone}`}
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                          data-testid={`link-phone-${appraiser.id}`}
-                        >
-                          <Phone className="h-3 w-3" />
-                          {appraiser.phone}
-                        </a>
-                      </div>
+                      <GooglePill icon={Phone} label="Call" href={`tel:${appraiser.phone.replace(/[^\d+]/g, "")}`} title={appraiser.phone} testId={`link-phone-${appraiser.id}`} />
                     )}
-
-                    {governmentLinksAvailable(appraiser) && governmentLinkNotice(appraiser) && <p className="text-xs text-muted-foreground mt-2">{governmentLinkNotice(appraiser)}</p>}
-
-                    {appraiser.searchableFields && appraiser.searchableFields.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {appraiser.searchableFields.map((field) => (
-                          <span key={field} className="text-[11px] px-2 py-0.5 rounded-md bg-muted capitalize text-muted-foreground">
-                            {field}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {appraiser.notes && (
-                      <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{appraiser.notes}</p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
-                    <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                      {appraiser.county?.stateCode}
-                    </Badge>
-                    {governmentLinksAvailable(appraiser) && appraiser.searchUrl && appraiser.searchUrl !== appraiser.portalUrl && <Button
-                      size="sm"
-                      variant="outline"
-                      asChild
-                      data-testid={`button-search-appraiser-${appraiser.id}`}
-                    >
-                      <a href={appraiser.searchUrl} target="_blank" rel="noopener noreferrer">
-                        <Search className="h-3.5 w-3.5 mr-1.5" />
-                        Search
-                      </a>
-                    </Button>}
-                    {governmentLinksAvailable(appraiser) && appraiser.portalUrl && <Button
-                      size="sm"
-                      variant="outline"
-                      asChild
-                      data-testid={`button-visit-appraiser-${appraiser.id}`}
-                    >
-                      <a href={appraiser.portalUrl} target="_blank" rel="noopener noreferrer">
-                        Visit
-                        <ArrowUpRight className="h-3.5 w-3.5 ml-1" />
-                      </a>
-                    </Button>}
-                    {(!governmentLinksAvailable(appraiser) || (!appraiser.portalUrl && !appraiser.searchUrl)) && (
-                      <a className="text-xs text-muted-foreground hover:underline" target="_blank" rel="noopener noreferrer"
-                        data-testid={`link-appraiser-fallback-${appraiser.id}`}
-                        href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}>
-                        Find property records
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                  </>}
+                >
+                  {appraiser.searchableFields && appraiser.searchableFields.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {appraiser.searchableFields.map((field) => (
+                        <span key={field} className="g-chip g-chip--sm">{field}</span>
+                      ))}
+                    </div>
+                  )}
+                </GoogleListRow>
+              );
+            })}
+          </GoogleList>
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 py-4" data-testid="pagination">
               <Button
@@ -331,7 +299,7 @@ export default function PropertyPage() {
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Prev
               </Button>
-              <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-page-status">
+              <span className="g-text-2 text-sm tabular-nums" data-testid="text-page-status">
                 Page {currentPage} of {totalPages.toLocaleString()}
               </span>
               <Button

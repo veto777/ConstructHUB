@@ -1,8 +1,7 @@
 import { governmentLinkNotice, governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { countyLabel } from "@shared/county-labels";
-import { useState, useMemo } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +23,6 @@ import {
   Database,
   ExternalLink,
   Phone,
-  Mail,
   CheckCircle2,
   XCircle,
   Search,
@@ -32,8 +30,10 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Building,
 } from "lucide-react";
-import { AppPage, PageHeader, StatGrid, Stat, Toolbar, EmptyState } from "@/components/app-ui";
+import { AppPage, Toolbar, EmptyState } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { apiRequest } from "@/lib/queryClient";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { useToast } from "@/hooks/use-toast";
@@ -184,14 +184,18 @@ export default function DatabasesPage() {
 
   return (
     <AppPage width="narrow" testId="page-databases">
-      <PageHeader
-        title={<span data-testid="text-page-title">Database directory</span>}
+      {/* Google's local-pack format (owner, 2026-10-07): a quiet header, number tiles, filter pills, hairline rows. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="Database directory"
         description="Browse US counties and cities for permit offices — official portals where they are on record."
+        flush
       />
 
       {counts && (
-        <StatGrid cols={3}>
-          <Stat
+        <GoogleStatGrid cols={3}>
+          <GoogleStat
             label="Jurisdictions"
             value={counts.total.toLocaleString()}
             testId="text-database-count"
@@ -199,35 +203,27 @@ export default function DatabasesPage() {
               <span data-testid="text-portal-count">{counts.withPortal.toLocaleString()} with a permit portal on record{counts.viaCounty ? <>, {counts.viaCounty.toLocaleString()} through their county</> : null}</span>
             ) : undefined}
           />
-          <Stat label="Counties" value={counts.county.toLocaleString()} />
-          <Stat label="Cities" value={counts.city.toLocaleString()} />
-        </StatGrid>
+          <GoogleStat label="Counties" value={counts.county.toLocaleString()} />
+          <GoogleStat label="Cities" value={counts.city.toLocaleString()} />
+        </GoogleStatGrid>
       )}
 
       <div className="flex flex-col gap-4">
-        <div className="flex w-fit max-w-full gap-1 rounded-xl bg-muted p-1" data-testid="filter-jurisdiction-type">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Jurisdiction type" data-testid="filter-jurisdiction-type">
           {([
             { key: "all" as const, label: "All", count: counts?.total },
             { key: "county" as const, label: "Counties", count: counts?.county },
             { key: "city" as const, label: "Cities", count: counts?.city },
           ]).map(({ key, label, count }) => (
-            <button
+            <GooglePill
               key={key}
+              role="radio"
+              ariaPressed={jurisdictionFilter === key}
+              selected={jurisdictionFilter === key}
               onClick={() => handleFilterChange(setJurisdictionFilter)(key)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                jurisdictionFilter === key
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid={`button-filter-${key}`}
-            >
-              {label}
-              {count != null && (
-                <span className="text-[11px] tabular-nums text-muted-foreground">
-                  {count.toLocaleString()}
-                </span>
-              )}
-            </button>
+              label={<>{label}{count != null && <span className="ml-1.5 text-xs font-normal tabular-nums g-text-2">{count.toLocaleString()}</span>}</>}
+              testId={`button-filter-${key}`}
+            />
           ))}
         </div>
 
@@ -300,18 +296,18 @@ export default function DatabasesPage() {
         />
       ) : (
         <>
-          <p className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
+          <p className="g-text-2 text-sm tabular-nums" data-testid="text-result-count">
             Showing {((currentPage - 1) * PAGE_SIZE + 1).toLocaleString()}–{Math.min(currentPage * PAGE_SIZE, totalResults).toLocaleString()} of {totalResults.toLocaleString()} results
             {isFetching && <Loader2 className="inline h-3 w-3 ml-2 animate-spin" />}
           </p>
-          <div className="space-y-3">
+          <GoogleList testId="list-databases">
             {databases.map((db) => {
               const county = countyMap.get(db.countyId);
               return (
                 <DatabaseCard key={db.id} database={db} countyName={county?.name} />
               );
             })}
-          </div>
+          </GoogleList>
           {totalPages > 1 && (
             <PaginationControls
               currentPage={currentPage}
@@ -410,160 +406,91 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
   const templatedName = database.name === `City of ${database.jurisdiction.replace(/, [A-Z]{2}$/, "")}`
     || database.name === `${database.jurisdiction.replace(/, [A-Z]{2}$/, "")} Building Department`;
   const title = !hasPortal && templatedName ? database.jurisdiction : database.name;
+  // What the meta line says about the link: the verify-links pipeline marks a portal live/verified, a
+  // source-listed link it could not confirm stays "unconfirmed" (never shown as verified).
+  const unconfirmed = hasPortal && database.linkStatus === "unconfirmed";
+  const canScrape = governmentLinksAvailable(database) && canScrapeGovernmentPortal(database);
+  const noPortal = !viaCounty && (!governmentLinksAvailable(database) || (!database.portalUrl && !database.searchUrl));
+  const status = hasPortal
+    ? <span className={unconfirmed ? "g-text-2" : "g-open"} data-testid={`status-portal-${database.id}`}>{unconfirmed ? "Official site · unconfirmed" : "Verified portal"}</span>
+    : viaCounty
+      ? <span className="g-open" data-testid={`status-portal-${database.id}`}>Permits issued by {viaCountyName}</span>
+      : <span className="g-text-2" data-testid={`status-portal-${database.id}`}>No portal on record</span>;
+
+  // The small grey line: the link notice, the official "issued by" source, email, last scrape — only what exists.
+  const notice = governmentLinksAvailable(database) ? governmentLinkNotice(database) : null;
+  const lineParts: ReactNode[] = [];
+  if (notice) lineParts.push(notice);
+  // The county issues this town's building permits: the official page that says so.
+  if (viaCounty && database.issuedBySource) lineParts.push(
+    <a
+      href={database.issuedBySource}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={database.issuedByQuote ? `“${database.issuedByQuote}”` : undefined}
+      data-testid={`link-county-source-${database.id}`}
+    >
+      Source: permits issued by {viaCountyName}
+    </a>,
+  );
+  if (database.email) lineParts.push(<a href={`mailto:${database.email}`}>{database.email}</a>);
+  if (database.lastScrapedAt) lineParts.push(`Last scraped ${new Date(database.lastScrapedAt).toLocaleString()}`);
 
   return (
     <>
-      <div
-        className="rounded-xl border bg-card p-4 space-y-3"
-        data-testid={`card-database-${database.id}`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-sm font-semibold">{title}</h3>
-              {hasPortal ? (
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" data-testid={`status-portal-${database.id}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
-                  Active
-                </span>
-              ) : viaCounty ? (
-                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" data-testid={`status-portal-${database.id}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
-                  Through {viaCountyName}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" data-testid={`status-portal-${database.id}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40"></span>
-                  No portal on record
-                </span>
-              )}
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 capitalize">
-                {database.jurisdictionType}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {database.jurisdiction}
-              {countyName && <span className="ml-1.5 text-border">·</span>}
-              {countyName && <span className="ml-1.5">{countyLabel(countyName, stateCode)}</span>}
-              {database.platform && <span className="ml-1.5 text-border">·</span>}
-              {database.platform && <span className="ml-1.5">{database.platform}</span>}
-            </p>
-          </div>
-          {governmentLinksAvailable(database) && canScrapeGovernmentPortal(database) && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setScrapeOpen(true)}
-              data-testid={`button-scrape-${database.id}`}
-            >
-              <Download className="h-3 w-3 mr-1.5" />
-              Scrape
-            </Button>
-          )}
-        </div>
-
-        {governmentLinksAvailable(database) && governmentLinkNotice(database) && <p className="text-xs text-muted-foreground">{governmentLinkNotice(database)}</p>}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <GoogleListRow
+        testId={`card-database-${database.id}`}
+        title={title}
+        badges={<span className="g-chip g-chip--sm">{database.jurisdictionType}</span>}
+        meta={[
+          title !== database.jurisdiction ? database.jurisdiction : null,
+          database.jurisdictionType === "city" && countyName ? countyLabel(countyName, stateCode) : null,
+          status,
+          database.platform,
+        ]}
+        line={lineParts.length > 0 ? lineParts.map((part, i) => <span key={i}>{i > 0 && <span aria-hidden="true"> · </span>}{part}</span>) : undefined}
+        actions={<>
           {governmentLinksAvailable(database) && database.portalUrl && (
-            <a
-              href={database.portalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 font-medium text-foreground hover:underline transition-colors"
-              data-testid={`link-portal-url-${database.id}`}
-            >
-              <ExternalLink className="h-3 w-3" />
-              Portal
-            </a>
+            <GooglePill icon={ExternalLink} label="Open portal" href={database.portalUrl} external testId={`link-portal-url-${database.id}`} />
           )}
           {governmentLinksAvailable(database) && database.searchUrl && (
-            <a
-              href={database.searchUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 hover:text-foreground transition-colors"
-              data-testid={`link-search-url-${database.id}`}
-            >
-              <Search className="h-3 w-3" />
-              Search
-            </a>
+            <GooglePill icon={Search} label="Search portal" href={database.searchUrl} external testId={`link-search-url-${database.id}`} />
           )}
-          {/* The county issues this town's building permits: its portal, and the official page that says so. */}
+          {/* The county issues this town's building permits: its portal. */}
           {viaCounty && (
-            <>
-              <a
-                href={(viaCounty.portalUrl || viaCounty.searchUrl)!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 font-medium text-foreground hover:underline transition-colors"
-                data-testid={`link-county-portal-${database.id}`}
-              >
-                <ExternalLink className="h-3 w-3" />
-                {viaCountyName} permit portal
-              </a>
-              {database.issuedBySource && (
-                <a
-                  href={database.issuedBySource}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 hover:text-foreground transition-colors"
-                  title={database.issuedByQuote ? `“${database.issuedByQuote}”` : undefined}
-                  data-testid={`link-county-source-${database.id}`}
-                >
-                  Source: permits issued by {viaCountyName}
-                </a>
-              )}
-            </>
+            <GooglePill icon={ExternalLink} label={`${viaCountyName} permit portal`} href={(viaCounty.portalUrl || viaCounty.searchUrl)!} external testId={`link-county-portal-${database.id}`} />
           )}
           {/* No official portal on record: offer an honest web search rather than a
               fabricated link. Clearly labeled and styled as a "find", not a portal. */}
-          {!viaCounty && (!governmentLinksAvailable(database) || (!database.portalUrl && !database.searchUrl)) && (
-            <a
+          {noPortal && (
+            <GooglePill
+              icon={Search}
+              variant="quiet"
+              label="Find permit portal"
               href={`https://www.google.com/search?q=${encodeURIComponent(`${database.jurisdiction} building permit search portal`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 italic hover:text-foreground transition-colors"
-              data-testid={`link-search-fallback-${database.id}`}
+              external
+              testId={`link-search-fallback-${database.id}`}
               title="No official portal on record — search the web for this jurisdiction's permit portal"
-            >
-              <Search className="h-3 w-3" />
-              Find permit portal
-            </a>
+            />
           )}
           {database.phone && (
-            <span className="flex items-center gap-1">
-              <Phone className="h-3 w-3" />
-              {database.phone}
-            </span>
+            <GooglePill icon={Phone} label="Call" href={`tel:${database.phone.replace(/[^\d+]/g, "")}`} title={database.phone} testId={`link-phone-${database.id}`} />
           )}
-          {database.email && (
-            <a href={`mailto:${database.email}`} className="flex items-center gap-1 hover:text-foreground transition-colors">
-              <Mail className="h-3 w-3" />
-              {database.email}
-            </a>
+          <GooglePill icon={Building} label="Property lookup" href={`/property?countyId=${database.countyId}`} testId={`link-property-lookup-${database.id}`} />
+          {canScrape && (
+            <GooglePill icon={Download} label="Scrape" onClick={() => setScrapeOpen(true)} testId={`button-scrape-${database.id}`} />
           )}
-        </div>
-
+        </>}
+      >
         {hasPortal && database.searchableFields && database.searchableFields.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {database.searchableFields.map((field) => (
-              <span key={field} className="text-[11px] px-2 py-0.5 rounded-md bg-muted capitalize text-muted-foreground">
-                {field}
-              </span>
+              <span key={field} className="g-chip g-chip--sm">{field}</span>
             ))}
           </div>
         )}
-
-        {database.lastScrapedAt && (
-          <p className="text-[11px] text-muted-foreground">
-            Last scraped {new Date(database.lastScrapedAt).toLocaleString()}
-          </p>
-        )}
-
-        {notes && (
-          <p className="text-xs text-muted-foreground border-t border-border/40 pt-3">{notes}</p>
-        )}
-      </div>
+        {notes && <p className="g-card__meta mt-2">{notes}</p>}
+      </GoogleListRow>
 
       <ScrapeDialog
         database={database}
