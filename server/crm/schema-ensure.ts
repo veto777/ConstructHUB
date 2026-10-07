@@ -1,6 +1,7 @@
 import { ensurePaymentLedgerSchema } from "./payment-ledger-schema";
 import { ensureDocNumberUniqueIndexes } from "./doc-number";
 import { pool } from "../db";
+import { JOBCAM_DDL } from "../jobcam/schema";
 
 // Idempotent schema setup for the CRM tenancy layer. Run on boot instead of
 // db:push (the live DB has pre-existing drift that trips drizzle-kit). Every
@@ -806,6 +807,10 @@ export async function ensureCrmSchema(): Promise<void> {
     console.warn("[crm] sku backfill skipped:", e?.message || e);
   }
   await ensurePaymentLedgerSchema();
+
+  // JobCam (job-site photos/video): media, tags, uploads, share links, the
+  // org storage meter and the reserved phase B–D tables (server/jobcam/schema.ts).
+  for (const stmt of JOBCAM_DDL) await pool.query(stmt);
 
   // Schema backstop for document numbers: UNIQUE (org_id, number) on every
   // numbered table. Guarded — an existing index is left alone, and a table
