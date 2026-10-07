@@ -8,6 +8,16 @@ import { ISSUE_SOURCES, ISSUE_STATUSES, ISSUE_SEVERITIES } from "@shared/ops-iss
 
 const list = (xs: readonly string[]) => xs.map((x) => `'${x}'`).join(", ");
 
+/**
+ * What a digest tells the admins about one issue, as one comparable string:
+ * its status, its fix branch, and when it last came back (reopened after
+ * "fixed", or sent back by an admin — the time of the last such event and how
+ * many the timeline holds). A run notifies about an issue only when
+ * this differs from ops_issues.notified_sig.
+ */
+export const NOTIFY_SIG_SQL = `(status || '|' || coalesce(branch, '') || '|' || coalesce(
+  (SELECT max(e->>'at') || '#' || count(*) FROM jsonb_array_elements(history) e WHERE e->>'event' IN ('reopened', 'reinspect')), ''))`;
+
 export const OPS_ISSUES_DDL: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS ops_issues (
      id bigserial PRIMARY KEY,
@@ -33,6 +43,16 @@ export const OPS_ISSUES_DDL: readonly string[] = [
                     AND pg_get_constraintdef(oid) LIKE '%status%' AND pg_get_constraintdef(oid) LIKE '%triage%') THEN
        ALTER TABLE ops_issues DROP CONSTRAINT IF EXISTS ops_issues_status_check;
        ALTER TABLE ops_issues ADD CONSTRAINT ops_issues_status_check CHECK (status IN (${list(ISSUE_STATUSES)}));
+     END IF;
+   END $$`,
+  // What the admins were last told about this issue (digest.ts): "<status>|<branch>|<last reopen/re-inspect>".
+  // Added once; issues Claude had already reported on by then count as told, so the first run after
+  // this ships does not announce old news.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_attribute
+                     WHERE attrelid = 'ops_issues'::regclass AND attname = 'notified_sig' AND NOT attisdropped) THEN
+       ALTER TABLE ops_issues ADD COLUMN notified_sig text;
+       UPDATE ops_issues SET notified_sig = ${NOTIFY_SIG_SQL} WHERE inspected_at IS NOT NULL;
      END IF;
    END $$`,
   `CREATE INDEX IF NOT EXISTS ops_issues_status_idx ON ops_issues (status, last_seen DESC)`,

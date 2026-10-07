@@ -47,9 +47,11 @@ export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
 /** One entry of an issue's timeline (ops_issues.history). */
 export type IssueHistoryEntry = {
   at: string;
-  event: "reported" | "reopened" | "claimed" | "inspected" | "fix_ready" | "ignored" | "fixed" | "reinspect";
+  event: "reported" | "reopened" | "claimed" | "inspected" | "fix_ready" | "ignored" | "fixed" | "reinspect" | "merged";
   /** "claude", "issue desk" or a masked admin email. */
   by?: string;
+  /** "merged": which duplicate rows were folded into this one. */
+  note?: string;
 };
 
 /** An issue as the admin API and the internal API send it. */

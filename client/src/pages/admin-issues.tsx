@@ -42,6 +42,7 @@ const SEVERITY_LABEL: Record<IssueSeverity, string> = { critical: "Critical", er
 const EVENT_LABEL: Record<string, string> = {
   reported: "First reported", reopened: "Happened again after it was fixed", claimed: "Handed to Claude",
   inspected: "Claude inspected it", fix_ready: "Claude prepared a fix", ignored: "Ignored", fixed: "Marked fixed", reinspect: "Sent back for inspection",
+  merged: "Duplicate reports merged into this issue",
 };
 
 const ago = (iso: string | null) => (iso ? `${formatDistanceToNowStrict(new Date(iso))} ago` : "—");
@@ -145,6 +146,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
                     <span className="absolute -left-[1.3rem] top-1.5 h-2 w-2 rounded-full bg-border" aria-hidden="true" />
                     <span className="font-medium">{EVENT_LABEL[h.event] ?? h.event}</span>
                     {h.by && <span className="text-muted-foreground"> · {h.by}</span>}
+                    {h.note && <div className="text-xs text-muted-foreground">{h.note}</div>}
                     <div className="text-xs text-muted-foreground">{when(h.at)}</div>
                   </li>
                 ))}

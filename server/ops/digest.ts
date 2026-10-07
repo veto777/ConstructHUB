@@ -1,15 +1,21 @@
 /**
- * After a tower run reported on any issue: a bell notification for the platform admins (internal only — no email
- * since 2026-10-05 unless ISSUE_DESK_EMAIL=true; it used to email them (server/admin.ts ADMIN_EMAILS) through the transactional outbox
- * (deliverTransactionalEmail — a send the provider refuses is retried by the
- * outbox drainer), plus a bell notification ("Claude inspected 3 issues — 1
- * fix ready") linking to /admin/issues. Deduped per run and admin, so a
- * retried "run complete" call sends nothing twice.
+ * After a tower run: a bell notification for the platform admins, linking to
+ * /admin/issues — but ONLY for issues with news (issues.ts issuesWithNews):
+ * the first verdict on an issue, a verdict that changed, a fix that became
+ * ready, or a failure that came back after it was marked fixed. A run that
+ * re-inspected what the admins already know sends nothing at all (owner,
+ * 2026-10-07: the bell repeated "Claude inspected 1 issue — no fix ready" run
+ * after run). /admin/issues stays the full list.
+ *
+ * Internal only — no email since 2026-10-05 unless ISSUE_DESK_EMAIL=true (then
+ * through the transactional outbox, deliverTransactionalEmail). Deduped per
+ * run and admin, so a retried "run complete" call sends nothing twice.
  */
 import type { OpsIssue } from "@shared/ops-issues";
 import { ISSUE_STATUS_LABELS } from "@shared/ops-issues";
 import { ADMIN_EMAILS, isPlatformAdminEmail } from "../admin";
 import type { Queryable } from "./schema";
+import { issuesWithNews, markAnnounced, reportedIssues } from "./issues";
 
 export const DIGEST_EMAIL_KIND = "ops.issue_desk_digest";
 export const DIGEST_BELL_KIND = "ops.issue_desk";
@@ -28,7 +34,8 @@ export function digestTitle(issues: Pick<OpsIssue, "status">[]): string {
 export function digestMessage(issues: OpsIssue[], baseUrl: string): { subject: string; html: string; text: string; body: string } {
   const title = digestTitle(issues);
   const link = `${baseUrl}/admin/issues`;
-  const line = (i: OpsIssue) => `#${i.id} [${ISSUE_STATUS_LABELS[i.status]}] ${i.title}${i.branch ? ` (branch ${i.branch})` : ""}`;
+  const cameBack = (i: OpsIssue) => (i.history ?? []).some((h) => h.event === "reopened");
+  const line = (i: OpsIssue) => `#${i.id} [${ISSUE_STATUS_LABELS[i.status]}] ${i.title}${i.branch ? ` (branch ${i.branch})` : ""}${cameBack(i) ? " — back after it was marked fixed" : ""}`;
   const summary = (i: OpsIssue) => (i.report ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
   const text = [
     title, "",
@@ -91,4 +98,22 @@ export async function sendRunDigest(
     }
   }
   return { title, emailed, notified, admins: admins.length };
+}
+
+/**
+ * "Run complete" (POST /api/ops-internal/runs/:runId/complete): notify about
+ * the issues of this run that have news, then remember what was told. Nothing
+ * new → no notification (title null). The issues are marked as announced only
+ * once a bell was written (or there is no admin to tell), so a failed write
+ * can be retried by calling again.
+ */
+export async function completeRun(
+  runId: string, ids: number[],
+  opts: { q: Queryable; deliver?: Deliver; baseUrl?: string },
+): Promise<{ reported: number; changed: number; title: string | null; emailed: number; notified: number; admins: number }> {
+  const reported = await reportedIssues(ids, opts.q);
+  const news = await issuesWithNews(ids, opts.q);
+  const sent = await sendRunDigest(runId, news, opts);
+  if (news.length && (sent.notified > 0 || sent.admins === 0)) await markAnnounced(news.map((i) => i.id), opts.q);
+  return { reported: reported.length, changed: news.length, ...sent };
 }

@@ -2539,7 +2539,9 @@ export const opsIssues = pgTable("ops_issues", {
   /** When the tower claimed it (a claim older than 3 h is taken again). */
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
   /** The timeline: reported / claimed / inspected / fixed / … (last 50). */
-  history: jsonb("history").$type<{ at: string; event: string; by?: string }[]>().notNull().default([]),
+  history: jsonb("history").$type<{ at: string; event: string; by?: string; note?: string }[]>().notNull().default([]),
+  /** What the admins were last notified of: "<status>|<branch>|<last reopen>" (server/ops/digest.ts). */
+  notifiedSig: text("notified_sig"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 export type OpsIssueRecord = typeof opsIssues.$inferSelect;

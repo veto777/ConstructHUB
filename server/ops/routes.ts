@@ -11,7 +11,7 @@
  *   tower (bearer ISSUE_DESK_SECRET, internal-auth.ts):
  *     GET  /api/ops-internal/issues?status=new[&limit=10][&claim=0]   claims → inspecting (claim=0 peeks)
  *     POST /api/ops-internal/issues/:id/report { status, report, branch? }
- *     POST /api/ops-internal/runs/:runId/complete { ids }             the digest email + bell
+ *     POST /api/ops-internal/runs/:runId/complete { ids }             the bell, only for issues with news
  *
  *   browser:
  *     POST /api/ops/client-error   (client-errors.ts)
@@ -21,11 +21,11 @@ import { z } from "zod";
 import { ISSUE_ADMIN_STATUSES, ISSUE_REPORT_STATUSES, ISSUE_SOURCES, ISSUE_STATUSES } from "@shared/ops-issues";
 import { requirePlatformAdmin } from "../crm/admin";
 import {
-  claimIssues, getIssue, issueSummary, listIssues, MAX_CLAIM, peekNewIssues, reportIssue, reportedIssues, setIssueStatusByAdmin,
+  claimIssues, getIssue, issueSummary, listIssues, MAX_CLAIM, peekNewIssues, reportIssue, setIssueStatusByAdmin,
 } from "./issues";
 import { OPS_INTERNAL_PATH, requireIssueDesk } from "./internal-auth";
 import { registerClientErrorRoute, type ClientErrorOptions } from "./client-errors";
-import { sendRunDigest } from "./digest";
+import { completeRun, type sendRunDigest } from "./digest";
 import { maskEmailAddress } from "./scrub";
 import type { Queryable } from "./schema";
 
@@ -140,8 +140,8 @@ export function registerOpsIssueRoutes(app: Express, getDevUser: GetUser, opts: 
     if (!runId.success || !body.success) return res.status(400).json({ code: "invalid" });
     try {
       const db = q ?? (await import("../db")).pool;
-      const issues = await reportedIssues(body.data.ids, db);
-      res.json({ reported: issues.length, ...(await sendRunDigest(runId.data, issues, { q: db, deliver: opts.deliver })) });
+      // Only issues with news reach the bell; a run with nothing new notifies no one (digest.ts).
+      res.json(await completeRun(runId.data, body.data.ids, { q: db, deliver: opts.deliver }));
     } catch (e) { failed(res, "send the digest", e); }
   });
 

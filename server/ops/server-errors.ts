@@ -2,8 +2,9 @@
  * Server-side capture for the issue desk (server/index.ts wires these):
  *
  *   recordUnhandledError — the Express error handler, for any 5xx: method +
- *     route + status + the error's identity (name, normalized message, top
- *     frames) make the fingerprint; the stack goes into the detail.
+ *     route + status + the error's name and normalized message make the
+ *     fingerprint (fingerprint.ts — never a stack frame: bundle positions
+ *     change with every build); the stack goes into the detail.
  *   watchHandledFailures — a response a route answered 500 by itself (it
  *     caught and logged its own error): method + route; the app journal has
  *     the logged cause. Skipped when the error handler already recorded it.
@@ -11,7 +12,8 @@
  */
 import type { NextFunction, Request, Response } from "express";
 import { errorFacts } from "./scrub";
-import { errorKey, normalizePath, recordIssue, shortMessage, type IssueInput } from "./issues";
+import { normalizePath, recordIssue, shortMessage, type IssueInput } from "./issues";
+import { processFailureKey, serverErrorKey } from "./fingerprint";
 
 /** The route pattern that matched (/api/crm/estimates/:id), else the normalized path. */
 export function routeOf(req: Request): string {
@@ -34,7 +36,7 @@ export function createServerErrorCapture(record: RecordFn = recordIssue) {
       void record({
         source: "server",
         severity: status === 500 ? "error" : "warning",
-        key: `${req.method} ${route}|${status}|${errorKey(err)}`,
+        key: serverErrorKey,
         title: `${status} on ${req.method} ${route}: ${shortMessage(err)}`,
         detail: { method: req.method, route, status, path: normalizePath(req.originalUrl || req.path), signedIn: !!(req as any).user, error: errorFacts(err) },
       });
@@ -49,7 +51,7 @@ export function createServerErrorCapture(record: RecordFn = recordIssue) {
         const route = routeOf(req);
         void record({
           source: "server",
-          key: `${req.method} ${route}|500|handled`,
+          key: serverErrorKey,
           title: `500 on ${req.method} ${route}`,
           detail: {
             method: req.method, route, status: 500, path: normalizePath(req.originalUrl || req.path), signedIn: !!(req as any).user,
@@ -66,7 +68,7 @@ export function createServerErrorCapture(record: RecordFn = recordIssue) {
       void record({
         source: "server",
         severity: kind === "uncaughtException" ? "critical" : "error",
-        key: `${kind}|${errorKey(err)}`,
+        key: processFailureKey,
         title: `${kind === "uncaughtException" ? "Uncaught exception" : "Unhandled promise rejection"}: ${shortMessage(err)}`,
         detail: { kind, error: errorFacts(err) },
       });

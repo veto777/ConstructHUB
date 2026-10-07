@@ -17,7 +17,8 @@
  *     opaque cross-origin "Script error.", network blips and known injected-script errors.
  */
 import type { Express, Request, Response } from "express";
-import { recordIssue, normalizeForKey, normalizePath, type IssueInput } from "./issues";
+import { recordIssue, normalizePath, type IssueInput } from "./issues";
+import { CHUNK_LOAD_RE, clientErrorKey, stableFile } from "./fingerprint";
 import { scrubText } from "./scrub";
 
 export const CLIENT_ERROR_PATH = "/api/ops/client-error";
@@ -59,11 +60,6 @@ export function summarizeUserAgent(ua: unknown): string {
     /Version\/(\d+).*Safari/.exec(s) ? `Safari ${/Version\/(\d+).*Safari/.exec(s)![1]}` : "other";
   const os = /Windows/.test(s) ? "Windows" : /Android/.test(s) ? "Android" : /iPhone|iPad|iPod/.test(s) ? "iOS" : /Mac OS X/.test(s) ? "macOS" : /Linux/.test(s) ? "Linux" : "other";
   return `${browser} · ${os}${/Mobi/.test(s) ? " · mobile" : ""}`;
-}
-
-/** A bundle URL without the origin and the build hash: "/assets/index.js". */
-function stableFile(url: string): string {
-  return url.replace(/^https?:\/\/[^/]+/i, "").replace(/[?#].*$/, "").replace(/-[A-Za-z0-9_-]{8}(\.m?js)$/, "$1");
 }
 
 /** The top stack frames, origin stripped, each line scrubbed. */
@@ -125,15 +121,18 @@ export function clientErrorHandler(opts: ClientErrorOptions = {}) {
     const frames = clientFrames(stack);
     const page = normalizePath(typeof body.path === "string" ? body.path.slice(0, 500) : "");
     const topFile = stableFile(source || (/(https?:\/\/[^\s)]+?):\d+:\d+/.exec(stack)?.[1] ?? ""));
-    const chunk = /Loading chunk|ChunkLoadError|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i.test(message);
+    // A page bundle that would not load. The browser reloads to the new build by itself after a deploy
+    // (client/src/lib/stale-build.ts) and reports only when that did not explain it.
+    const chunk = CHUNK_LOAD_RE.test(message);
 
     // Awaited (it never rejects, and is one upsert at most): the browser's keepalive post doesn't wait on anyone.
     await record({
       source: "client",
       severity: chunk ? "warning" : "error",
-      // A stale-bundle chunk failure after a deploy is one issue, whatever page it hit.
-      key: chunk ? "chunk-load" : `${kind}|${normalizeForKey(message)}|${topFile}`,
-      title: chunk ? "Browser could not load a page bundle (stale tab after a deploy?)" : `Browser ${kind === "error" ? "error" : "unhandled rejection"}: ${message.split("\n")[0].slice(0, 140)}`,
+      // From the stored detail (fingerprint.ts): message normalized, script name without its build hash,
+      // no line/column; a bundle that would not load is one issue, whatever page it hit.
+      key: clientErrorKey,
+      title: chunk ? "Browser could not load a page bundle (and reloading to the current build did not explain it)" : `Browser ${kind === "error" ? "error" : "unhandled rejection"}: ${message.split("\n")[0].slice(0, 140)}`,
       detail: {
         kind, message, page, file: topFile || null,
         line: Number.isFinite(Number(body.line)) ? Number(body.line) : null,

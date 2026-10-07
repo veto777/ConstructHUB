@@ -27,6 +27,7 @@ import path from "path";
 import pg from "pg";
 import { randomUUID } from "crypto";
 import { OPS_ISSUES_DDL } from "./schema";
+import { scrubDetail } from "./scrub";
 import { claimIssues, createIssueRecorder, getIssue, issueFingerprint, reportIssue, type IssueInput } from "./issues";
 import { registerOpsIssueRoutes } from "./routes";
 import { CLIENT_ERROR_BODY_LIMIT, CLIENT_ERROR_PATH } from "./client-errors";
@@ -456,11 +457,14 @@ describe("server capture (server/ops/server-errors.ts, wired in server/index.ts)
     } finally { srv.close(); }
     expect(seen).toHaveLength(3);
     const [a, b, c] = seen;
-    expect(a.key).toBe(b.key); // same route, same error identity → one issue
-    expect(a.key).toMatch(/^GET \/api\/things\/:id\|500\|Error\|boom for <n> by <email>\|/);
+    // The key is computed from the scrubbed detail that gets stored (fingerprint.ts).
+    const keyOf = (i: IssueInput) => (typeof i.key === "function" ? i.key(scrubDetail(i.detail)) : i.key);
+    expect(keyOf(a)).toBe(keyOf(b)); // same route, same error identity → one issue
+    expect(keyOf(a)).toBe("GET /api/things/:id|500|Error|boom for <n> by <email>"); // no stack frame: those change with every build
     expect(a).toMatchObject({ source: "server", severity: "error", title: "500 on GET /api/things/:id: boom for 123 by e***@example.com" });
     expect((a.detail as any).error.stack.length).toBeGreaterThan(0);
-    expect(c).toMatchObject({ key: "GET /api/handled|500|handled", title: "500 on GET /api/handled", detail: { route: "/api/handled", path: "/api/handled" } });
+    expect(keyOf(c)).toBe("GET /api/handled|500|handled");
+    expect(c).toMatchObject({ title: "500 on GET /api/handled", detail: { route: "/api/handled", path: "/api/handled" } });
     const p = createServerErrorCapture(async (i) => { seen.push(i); });
     p.recordProcessFailure("unhandledRejection", new Error("lost promise"));
     expect(seen.at(-1)).toMatchObject({ severity: "error", title: "Unhandled promise rejection: lost promise" });

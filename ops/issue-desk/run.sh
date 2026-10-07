@@ -10,8 +10,8 @@
 #      a fix only on a branch issue/<id> — never a push, deploy or restart;
 #   4. POST each issue's report back (POST /api/ops-internal/issues/:id/report);
 #      an issue Claude did not report on is marked inspected with a note saying so;
-#   5. POST /api/ops-internal/runs/<run>/complete → the app emails the admins a
-#      digest through its outbox and rings the bell.
+#   5. POST /api/ops-internal/runs/<run>/complete → the app rings the admins' bell,
+#      only for issues with news (a run with nothing new notifies no one).
 #
 # Config: ops/issue-desk/.env (mode 600, gitignored; see env.example). Read, never
 # sourced, and never exported: Claude's environment does not hold the secret.
@@ -217,7 +217,7 @@ done
 if [ "${#posted[@]}" -gt 0 ]; then
   printf '%s\n' "${posted[@]}" | jq -s '{ids: map(tonumber)}' > "$WORK/done.json"
   code="$(api POST "/api/ops-internal/runs/$RUN_ID/complete" "$WORK/done.json")"
-  if [ "$code" = 200 ]; then log "digest: $(jq -r '"\(.title) — emailed \(.emailed), bell \(.notified)"' "$WORK/resp")"
+  if [ "$code" = 200 ]; then log "digest: $(jq -r 'if .title == null then "nothing new for the admins — no notification" else "\(.title) — emailed \(.emailed), bell \(.notified)" end' "$WORK/resp")"
   else log "digest failed: HTTP $code $(head -c 200 "$WORK/resp")"; fi
 fi
 

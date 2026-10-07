@@ -24,57 +24,29 @@ import {
   type IssueAdminStatus, type IssueHistoryEntry, type IssueReportStatus, type IssueSeverity, type IssueSource,
   type IssueStatus, type OpsIssue, type OpsIssueRow,
 } from "@shared/ops-issues";
-import { ensureOpsIssuesSchema, type Queryable } from "./schema";
+import { ensureOpsIssuesSchema, NOTIFY_SIG_SQL, type Queryable } from "./schema";
+import { failureKey, issueFingerprint } from "./fingerprint";
 import { errorFacts, scrubDetail, scrubText } from "./scrub";
 
 export type IssueInput = {
   source: IssueSource;
-  /** What makes two occurrences "the same issue" (hashed with the source into the fingerprint). */
-  key: string;
+  /**
+   * What makes two occurrences "the same issue" (hashed with the source into
+   * the fingerprint): a fixed string, or a function of the scrubbed detail —
+   * the form fingerprint.ts uses, so a stored row's key can be recomputed.
+   * Never put anything build-specific in it (stack frames, bundle positions,
+   * hashed asset names): see fingerprint.ts.
+   */
+  key: string | ((detail: Record<string, unknown>) => string);
   title: string;
   detail?: unknown;
   severity?: IssueSeverity;
 };
 
-export function issueFingerprint(source: string, key: string): string {
-  return createHash("sha256").update(`${source}\u0000${key}`).digest("hex").slice(0, 32);
-}
-
-/** A message or path made stable across occurrences: ids, numbers and addresses become placeholders. */
-export function normalizeForKey(text: unknown, max = 200): string {
-  return String(text ?? "")
-    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, "<uuid>")
-    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>")
-    .replace(/\b[0-9a-f]{12,}\b/gi, "<hex>")
-    .replace(/\d+/g, "<n>")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, max);
-}
-
-/** A URL path with its variable segments replaced (/api/crm/estimates/:id), no query string. */
-export function normalizePath(path: unknown): string {
-  const p = String(path ?? "").split(/[?#]/)[0];
-  return p.split("/").map((seg) => {
-    if (!seg) return seg;
-    if (/^\d+$/.test(seg)) return ":n";
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(seg)) return ":id";
-    if (/@/.test(seg)) return ":email";
-    if (/^[0-9a-f]{16,}$/i.test(seg) || /^[A-Za-z0-9_-]{20,}$/.test(seg)) return ":token";
-    return seg.length > 60 ? ":long" : seg;
-  }).join("/").slice(0, 200) || "/";
-}
-
-/** The identity of an error for a fingerprint: name, normalized message, top frames without line numbers. */
-export function errorKey(err: unknown): string {
-  if (err instanceof Error) {
-    const frames = (err.stack ?? "").split("\n").slice(1, 4)
-      .map((l) => l.trim().replace(/:\d+:\d+\)?$/, "").replace(/^at /, "").replace(/\(.*\/(?=[^/]+$)/, "("))
-      .join(" < ");
-    return `${err.name}|${normalizeForKey(err.message)}|${frames}`;
-  }
-  return `thrown|${normalizeForKey(typeof err === "object" ? safeJson(err) : String(err))}`;
-}
+export {
+  issueFingerprint, normalizeForKey, normalizePath, errorIdentity, failureKey, serverErrorKey, processFailureKey,
+  clientErrorKey, stableKeyForRow,
+} from "./fingerprint";
 
 const safeJson = (v: unknown) => { try { return JSON.stringify(v); } catch { return "[object]"; } };
 
@@ -138,9 +110,11 @@ const UPSERT_SQL = `
 function prepare(input: IssueInput): Prepared {
   const source: IssueSource = isIssueSource(input?.source) ? input.source : "server";
   const severity: IssueSeverity = isIssueSeverity(input?.severity) ? input.severity : "error";
-  const key = String(input?.key ?? "").slice(0, 1000) || "unkeyed";
+  const detail = scrubDetail(input?.detail ?? {});
+  const rawKey = typeof input?.key === "function" ? input.key(detail) : input?.key;
+  const key = String(rawKey ?? "").slice(0, 1000) || "unkeyed";
   const title = scrubText(String(input?.title ?? "").replace(/\s+/g, " ").trim(), 200) || "Untitled issue";
-  return { fingerprint: issueFingerprint(source, key), source, severity, title, detail: scrubDetail(input?.detail ?? {}) };
+  return { fingerprint: issueFingerprint(source, key), source, severity, title, detail };
 }
 
 export function createIssueRecorder(opts: RecorderOptions = {}): IssueRecorder {
@@ -237,8 +211,9 @@ export function recordIssue(input: IssueInput): Promise<void> {
 
 /**
  * The common case: something threw. `what` names the failing piece ("Agency
- * queue tick", "email outbox"); the error's identity (name, normalized
- * message, top frames) completes the key.
+ * queue tick", "email outbox"); the error's name and normalized message
+ * complete the key, plus orgId / locationId when `extra` carries them
+ * (fingerprint.ts failureKey). The stack is stored in the detail, never keyed.
  */
 export function recordFailure(
   source: IssueSource, what: string, err: unknown,
@@ -247,7 +222,7 @@ export function recordFailure(
   try {
     return recordIssue({
       source, severity,
-      key: `${what}|${errorKey(err)}`,
+      key: failureKey,
       title: `${what} failed: ${shortMessage(err)}`,
       detail: { what, ...extra, error: errorFacts(err) },
     });
@@ -388,4 +363,29 @@ export async function reportedIssues(ids: number[], q?: Queryable): Promise<OpsI
         AND status IN ('inspected','fix_ready','ignored') ORDER BY id`,
     [ids.slice(0, 50)]);
   return rows.map(rowToIssue);
+}
+
+/**
+ * Of a run's reported issues, the ones with news for the admins: an issue is
+ * announced when what a digest says about it — status, fix branch, the last
+ * time it came back (reopened after "fixed", or sent back by an admin) —
+ * differs from what they were last told (ops_issues.notified_sig). So: the
+ * first verdict on an issue, a verdict that changed, a fix that became ready,
+ * a recurrence after "fixed". The same verdict on the same issue again is not news.
+ */
+export async function issuesWithNews(ids: number[], q?: Queryable): Promise<OpsIssue[]> {
+  const db = await defaultPool(q);
+  if (!ids.length) return [];
+  const { rows } = await db.query(
+    `SELECT * FROM ops_issues WHERE id = ANY($1::bigint[]) AND inspected_at > now() - interval '1 day'
+        AND status IN ('inspected','fix_ready','ignored') AND notified_sig IS DISTINCT FROM ${NOTIFY_SIG_SQL} ORDER BY id`,
+    [ids.slice(0, 50)]);
+  return rows.map(rowToIssue);
+}
+
+/** The admins have been told about these issues as they stand now. */
+export async function markAnnounced(ids: number[], q?: Queryable): Promise<void> {
+  const db = await defaultPool(q);
+  if (!ids.length) return;
+  await db.query(`UPDATE ops_issues SET notified_sig = ${NOTIFY_SIG_SQL} WHERE id = ANY($1::bigint[])`, [ids.slice(0, 50)]);
 }

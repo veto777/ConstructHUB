@@ -24,6 +24,14 @@ failure → recordIssue() → ops_issues (new)
 
 `server/ops/issues.ts` provides `recordIssue({ source, key, title, detail, severity })`. It upserts one row per fingerprint, `sha256(source + key)`. A repeat increases `count` and moves `last_seen`. The worst severity wins, and the title and detail update to the latest occurrence. When a `fixed` issue happens again it goes back to `new`; an `ignored` issue stays ignored.
 
+### Fingerprints
+
+A key is built only from things that survive a rebuild and a redeploy (`server/ops/fingerprint.ts`): the failing piece (`what`, or method + route pattern + status), the error's name and its normalized message (ids, numbers, hashes, file paths with their line numbers and hashed asset names become placeholders), plus `orgId` / `locationId` when the caller passed them. A browser error is keyed by kind + normalized message + script name without its build hash; every "could not load a bundle" report is one issue.
+
+A key never contains a stack frame. The server ships as one minified bundle, so a frame reads `at wlt (dist/index.cjs:2938:27264)` and changes with every build. Until 2026-10-07 the top frames were part of the key, so each deploy recorded every recurring failure as a new issue. Keys are computed from the scrubbed detail that is stored, so a stored row's key can be recomputed.
+
+`server/ops/merge.ts` folds the duplicates that left behind: per recomputed fingerprint it keeps the oldest row, sums `count`, takes the earliest `first_seen` and latest `last_seen`, the worst severity, the most advanced status (triage < new < inspecting < inspected < fix_ready < ignored < fixed; "fixed" only when nothing was seen after it) with its report and branch, appends a `merged` line to the timeline and deletes the rest. Boot runs it after the schema is ensured; it is idempotent (a second run changes nothing). By hand: `npx tsx --env-file=.env scripts/merge-ops-issues.ts --dry-run`.
+
 `recordIssue` never throws and its promise never rejects. Rate limits: at most one write per fingerprint per minute (repeats in that window are counted and written once when it ends), and 120 writes per minute in total.
 
 Every title, detail and report is scrubbed first (`server/ops/scrub.ts`):
@@ -35,7 +43,7 @@ Every title, detail and report is scrubbed first (`server/ops/scrub.ts`):
 
 | Source | Captured | Where |
 |---|---|---|
-| `server` | Any 5xx that reaches the Express error handler. The fingerprint is method + route pattern + status + the error's name, normalized message and top frames; the stack goes into the detail. | `server/index.ts` → `ops/server-errors.ts` |
+| `server` | Any 5xx that reaches the Express error handler. The fingerprint is method + route pattern + status + the error's name and normalized message (never a stack frame); the stack goes into the detail. | `server/index.ts` → `ops/server-errors.ts` |
 | `server` | A route that caught its own error and answered **500** (by route; the journal has the logged cause). | `watchHandledFailures` |
 | `server` | `uncaughtException` / `unhandledRejection` | `server/index.ts` |
 | `job` | Worker ticks that fail: Agency queue, onboarding, GBP profile discovery, GBP content/reply/Profile Guard workers, GBP discovery queue, Site Scan, edge search, Ads, Social, Domains, Mail Alerts, HOVER scheduler + per-org auto-sync, CRM backups (tick + per org), LSA rotating sync, LSA manager lead sync, scrape schedules, review reminders and scheduled reviews, Agency location billing sync, billing event listeners | the `console.error` next to each, kept |
@@ -63,7 +71,7 @@ Not captured:
 |---|---|---|
 | `GET /api/ops-internal/issues?status=new[&limit=10][&claim=0]` | bearer | Claims up to 10 (`new` → `inspecting`, worst severity then newest; a claim older than 3 h is taken again). One `UPDATE … FOR UPDATE SKIP LOCKED`, so concurrent runs never share an issue. `claim=0` peeks (the dry run). |
 | `POST /api/ops-internal/issues/:id/report` `{status: inspected\|fix_ready\|ignored, report, branch?}` | bearer | Only an issue in `inspecting` takes a report (otherwise 409). `fix_ready` needs `branch`. The report is scrubbed. |
-| `POST /api/ops-internal/runs/:runId/complete` `{ids}` | bearer | Sends the digest for the issues reported in that run: email to each platform admin in `server/admin.ts` who has an account, through the email outbox (`ops.issue_desk_digest`, deduped per run and admin), and a bell row (`ops.issue_desk`, link `/admin/issues`). |
+| `POST /api/ops-internal/runs/:runId/complete` `{ids}` | bearer | Notifies only about issues with news: the first verdict on an issue, a verdict or fix branch that changed, or a failure that came back after it was marked fixed (compared with `ops_issues.notified_sig`). A run with nothing new sends nothing and answers `title: null`. `/admin/issues` is the full list. When there is news: email to each platform admin in `server/admin.ts` who has an account, through the email outbox (`ops.issue_desk_digest`, deduped per run and admin), and a bell row (`ops.issue_desk`, link `/admin/issues`). |
 | `GET /api/admin/issues`, `/summary`, `/:id`, `POST /:id/status {fixed\|ignored\|new}` | platform admin (`requirePlatformAdmin`, second factor included) | The admin page and the sidebar count. |
 
 Bearer auth uses `Authorization: Bearer $ISSUE_DESK_SECRET` with a constant-time compare. If the secret is unset or shorter than 24 characters, the API answers **503**. A missing or wrong bearer gets **401**. A request that came through Cloudflare (it carries `cf-connecting-ip`) gets **404**, so the internal API is reachable only over the tailnet. Response bodies from these routes never enter the request log.
@@ -78,7 +86,7 @@ Bearer auth uses `Authorization: Bearer $ISSUE_DESK_SECRET` with a constant-time
 6. Posts each report:
    - An issue Claude did not report on gets `inspected` with "Not inspected: … (reason). Use Re-inspect to try again". This prevents retry loops that cost money.
    - A `fix_ready` whose branch does not exist is filed as `inspected`, with a note.
-7. Calls `runs/<run>/complete`, which sends the digest.
+7. Calls `runs/<run>/complete`, which rings the bell only when an issue has news.
 8. Keeps the last 60 runs' outputs in `~/.local/state/constructhub-issue-desk/<run>.json`. Each output has the session id, so `claude --resume <id>` with `CLAUDE_CONFIG_DIR=~/.claude-accountB` shows the whole session.
 
 ### The Claude command and why each flag

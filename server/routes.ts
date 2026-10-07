@@ -295,6 +295,15 @@ export async function registerRoutes(
   // the browser's error reports and the tower's hand-off to Claude.
   const { ensureOpsIssuesSchema } = await import("./ops/schema");
   await ensureOpsIssuesSchema();
+  // One issue per failure: fold rows an earlier build recorded under build-specific fingerprints
+  // (server/ops/merge.ts). Idempotent — after the first boot it finds nothing to do.
+  try {
+    const { mergeDuplicateIssues } = await import("./ops/merge");
+    const merged = await mergeDuplicateIssues();
+    if (merged.folded || merged.rekeyed) console.log(`[issues] merged duplicates: ${merged.folded} folded into ${merged.groups.length} issue(s), ${merged.rekeyed} given a stable fingerprint`);
+  } catch (e) {
+    console.warn(`[issues] duplicate merge skipped: ${(e as Error)?.message ?? e}`);
+  }
   const { registerOpsIssueRoutes } = await import("./ops/routes");
   registerOpsIssueRoutes(app, getDevUser);
   const { ensureGbpSchema } = await import("./gbp/schema");
