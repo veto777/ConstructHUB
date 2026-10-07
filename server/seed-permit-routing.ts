@@ -26,13 +26,13 @@ export async function seedPermitRouting(): Promise<{ set: number; cleared: numbe
     const r = await c.query(`UPDATE permit_databases SET issued_by=NULL, issued_by_source=NULL, issued_by_quote=NULL
       WHERE issued_by IS NOT NULL AND NOT (jurisdiction = ANY($1::text[]))`, [routes.map((x) => x.jurisdiction)]);
     cleared = r.rowCount ?? 0;
-    for (const x of routes) {
-      const u = await c.query(`UPDATE permit_databases SET issued_by=$2, issued_by_source=$3, issued_by_quote=$4
-        WHERE jurisdiction=$1
-          AND (issued_by IS DISTINCT FROM $2 OR issued_by_source IS DISTINCT FROM $3 OR issued_by_quote IS DISTINCT FROM $4)`,
-        [x.jurisdiction, x.issuedBy, x.sourceUrl, x.quote]);
-      set += u.rowCount ?? 0;
-    }
+    // One statement for all routes (8,000+ since 2026-10-07): a per-row loop took a minute at boot.
+    const u = await c.query(`UPDATE permit_databases p SET issued_by=r.issued_by, issued_by_source=r.source, issued_by_quote=r.quote
+      FROM unnest($1::text[], $2::text[], $3::text[], $4::text[]) AS r(jurisdiction, issued_by, source, quote)
+      WHERE p.jurisdiction = r.jurisdiction
+        AND (p.issued_by IS DISTINCT FROM r.issued_by OR p.issued_by_source IS DISTINCT FROM r.source OR p.issued_by_quote IS DISTINCT FROM r.quote)`,
+      [routes.map((x) => x.jurisdiction), routes.map((x) => x.issuedBy), routes.map((x) => x.sourceUrl), routes.map((x) => x.quote)]);
+    set = u.rowCount ?? 0;
     await c.query("COMMIT");
   } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
   return { set, cleared };
