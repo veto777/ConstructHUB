@@ -1,6 +1,7 @@
 import { AgencyWorkspace, Pager, useAgencyFilter } from "@/components/agency-workspace";
 import { GoogleReport } from "@/components/profile-guard";
 import { AiReplySettings } from "@/components/ai-review-replies";
+import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -477,8 +478,9 @@ export default function GoogleReviewsPage() {
   const hasGoogleUrl = !!((user?.googleProfileUrl || templates.find((t: any) => String(t.id) === selectedTemplateId)?.googleProfileUrl));
   const canSend = !!(clientName && clientEmail && hasGoogleUrl);
 
+  // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; profile reviews read like Google's.
   return (
-    <AppPage>
+    <GoogleSurface page><AppPage className="before:hidden">
       <PageHeader
         title={<span data-testid="text-reviews-title">Google Reviews</span>}
         description={pageTab === "requests"
@@ -1726,7 +1728,7 @@ export default function GoogleReviewsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </AppPage>
+    </AppPage></GoogleSurface>
   );
 }
 
@@ -2001,7 +2003,7 @@ function GoogleProfileReviewsTab() {
               description="Reviews from your Google Business Profiles appear here once synced. Connect your Google account, import a location, then choose Sync now."
             />
           ) : (
-            <div className="space-y-4">
+            <div className="-mt-2">
               {reviews.map((review: any) => {
                 const isExpanded = expandedReviewId === review.id;
                 const locationName = (() => {
@@ -2023,224 +2025,196 @@ function GoogleProfileReviewsTab() {
                   return "";
                 })();
 
+                const reviewDate = new Date(review.reviewDate);
+                const absoluteDate = `${reviewDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${reviewDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+                const canPublish = !!(gbp?.connected && review.googleReviewId);
                 return (
-                  <article key={review.id} className="overflow-hidden rounded-xl border" data-testid={`card-profile-review-${review.id}`}>
-                    <div className={`flex items-center gap-2 border-b px-4 py-2 ${locationName ? "justify-between" : "justify-end"}`}>
-                      {locationName && (
-                        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                          <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                          <span className="truncate font-medium text-foreground">{locationName}</span>
-                          {locationCategories && (
-                            <>
-                              <span className="text-border">|</span>
-                              <span className="truncate">{locationCategories}</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1 text-xs"
-                        onClick={() => {
-                          setNoteEditId(review.id);
-                          setNoteText(review.internalNote || "");
-                        }}
-                        data-testid={`button-add-note-${review.id}`}
-                      >
-                        <StickyNote className="h-3 w-3" aria-hidden="true" />
-                        {review.internalNote ? "Edit note" : "Add internal note"}
-                      </Button>
-                    </div>
+                  <article key={review.id} className="g-review" data-testid={`card-profile-review-${review.id}`}>
+                    {locationName && (
+                      <p className="g-card__meta mb-2 flex min-w-0 items-center gap-1.5">
+                        <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate g-text">{locationName}</span>
+                        {locationCategories && <><span aria-hidden="true">·</span><span className="truncate">{locationCategories}</span></>}
+                      </p>
+                    )}
 
-                    <div className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
-                          {review.reviewerPhotoUrl ? (
-                            <img src={review.reviewerPhotoUrl} alt="" className="h-full w-full rounded-full object-cover" />
-                          ) : (
-                            <span className="text-sm font-semibold text-muted-foreground">{review.reviewerName?.charAt(0)?.toUpperCase() || "?"}</span>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <p className="text-sm font-semibold" data-testid={`text-reviewer-name-${review.id}`}>{review.reviewerName}</p>
-                            {renderStars(review.rating)}
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(review.reviewDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              {" "}
-                              {new Date(review.reviewDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                            </span>
-                          </div>
-                          {review.comment && (
-                            <p className="mt-2 text-sm leading-relaxed" data-testid={`text-review-comment-${review.id}`}>
-                              {isExpanded ? review.comment : review.comment.length > 200 ? review.comment.slice(0, 200) + "..." : review.comment}
-                            </p>
-                          )}
-                          {review.comment?.length > 200 && (
-                            <button
-                              onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
-                              className="mt-1 text-xs text-primary hover:underline"
-                              data-testid={`button-expand-review-${review.id}`}
-                            >
-                              {isExpanded ? "Show less" : "Read more"}
-                            </button>
-                          )}
-
-                          {review.internalNote && noteEditId !== review.id && (
-                            <div className="mt-2 rounded-lg border-l-2 border-amber-400 bg-muted/40 p-2 text-xs">
-                              <span className="mb-0.5 flex items-center gap-1 font-medium text-muted-foreground">
-                                <StickyNote className="h-3 w-3" aria-hidden="true" />Internal note
-                              </span>
-                              <span className="text-muted-foreground">{review.internalNote}</span>
-                            </div>
-                          )}
-
-                          {noteEditId === review.id && (
-                            <div className="mt-3 space-y-2">
-                              <Textarea
-                                value={noteText}
-                                onChange={(e) => setNoteText(e.target.value)}
-                                placeholder="Add an internal note (only visible to you)..."
-                                className="min-h-[60px] text-sm"
-                                data-testid={`input-note-${review.id}`}
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() => noteMutation.mutate({ id: review.id, internalNote: noteText })}
-                                  disabled={noteMutation.isPending}
-                                  data-testid={`button-save-note-${review.id}`}
-                                >
-                                  {noteMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
-                                  Save note
-                                </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setNoteEditId(null)}>Cancel</Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          {!review.replyComment && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
-                              title="Reply"
-                              data-testid={`button-reply-${review.id}`}
-                            >
-                              <MessageSquare className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                          )}
-                          {confirmDeleteReviewId === review.id ? (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs font-semibold text-destructive hover:bg-destructive hover:text-white"
-                                onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteReviewId(null); }}
-                                data-testid={`button-confirm-delete-review-${review.id}`}
-                              >
-                                Delete
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs text-muted-foreground"
-                                onClick={() => setConfirmDeleteReviewId(null)}
-                                data-testid={`button-cancel-delete-review-${review.id}`}
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => setConfirmDeleteReviewId(review.id)}
-                              title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
-                              data-testid={`button-delete-review-${review.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                          )}
-                        </div>
+                    <div className="g-review__head">
+                      <GoogleAvatar src={review.reviewerPhotoUrl} initial={review.reviewerName?.charAt(0)?.toUpperCase() || "?"} alt="" />
+                      <div className="min-w-0 flex-1">
+                        <p className="g-review__name" data-testid={`text-reviewer-name-${review.id}`}>{review.reviewerName}</p>
+                        {!review.googleReviewId && <p className="g-review__sub">Manually entered record — not synced from Google.</p>}
                       </div>
+                    </div>
+                    <div className="g-review__rating">
+                      <GoogleStarRow rating={review.rating} />
+                      <span title={absoluteDate}>{relativeTime(review.reviewDate) || absoluteDate}</span>
+                    </div>
+                    {review.comment && (
+                      <p className="g-review__text" data-testid={`text-review-comment-${review.id}`}>
+                        {isExpanded ? review.comment : review.comment.length > 200 ? review.comment.slice(0, 200) + "..." : review.comment}
+                      </p>
+                    )}
+                    {review.comment?.length > 200 && (
+                      <button
+                        onClick={() => setExpandedReviewId(isExpanded ? null : review.id)}
+                        className="g-link mt-1 text-sm"
+                        data-testid={`button-expand-review-${review.id}`}
+                      >
+                        {isExpanded ? "Show less" : "Read more"}
+                      </button>
+                    )}
 
-                      {replyingToId === review.id && !review.replyComment && (
-                        <div className="ml-4 space-y-2 border-l-2 pl-4 sm:ml-12">
-                          <Label className="text-xs font-medium">Reply to this review:</Label>
-                          <Textarea
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            placeholder="Write your reply..."
-                            className="min-h-[80px] text-sm"
-                            data-testid={`input-reply-${review.id}`}
-                          />
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: gbp?.connected && review.googleReviewId ? "publish" : "draft" })}
-                              disabled={!replyText.trim() || replyMutation.isPending}
-                              data-testid={`button-submit-reply-${review.id}`}
-                            >
-                              {replyMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : <Send className="mr-1 h-3 w-3" aria-hidden="true" />}
-                              {gbp?.connected && review.googleReviewId ? "Publish reply to Google" : "Save draft in ConstructHUB"}
-                            </Button>
-                            {gbp?.connected && review.googleReviewId && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
-                            <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
-                          </div>
-                        </div>
-                      )}
+                    {review.internalNote && noteEditId !== review.id && (
+                      <div className="mt-2 rounded-lg border-l-2 border-amber-400 bg-muted/40 p-2 text-xs">
+                        <span className="mb-0.5 flex items-center gap-1 font-medium text-muted-foreground">
+                          <StickyNote className="h-3 w-3" aria-hidden="true" />Internal note
+                        </span>
+                        <span className="text-muted-foreground">{review.internalNote}</span>
+                      </div>
+                    )}
 
-                      <GoogleReport type="reviews" id={review.id} />
-                      {!review.googleReviewId && <p className="mt-2 text-xs text-muted-foreground">Manually entered record — not synced from Google.</p>}
-                      {review.replyDraft && (
-                        <div className="mt-3 flex items-start gap-2 rounded-lg border bg-muted/30 p-3" data-testid={`reply-draft-${review.id}`}>
-                          <p className="min-w-0 flex-1 break-words text-sm">Draft saved in ConstructHUB: {review.replyDraft}</p>
+                    {noteEditId === review.id && (
+                      <div className="mt-3 space-y-2">
+                        <Textarea
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          placeholder="Add an internal note (only visible to you)..."
+                          className="min-h-[60px] text-sm"
+                          data-testid={`input-note-${review.id}`}
+                        />
+                        <div className="flex gap-2">
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="h-7 shrink-0 px-2 text-xs text-muted-foreground hover:text-destructive"
-                            disabled={replyMutation.isPending}
-                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "draft" })}
-                            data-testid={`button-discard-draft-${review.id}`}
+                            onClick={() => noteMutation.mutate({ id: review.id, internalNote: noteText })}
+                            disabled={noteMutation.isPending}
+                            data-testid={`button-save-note-${review.id}`}
                           >
-                            Discard draft
+                            {noteMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : null}
+                            Save note
                           </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setNoteEditId(null)}>Cancel</Button>
                         </div>
+                      </div>
+                    )}
+
+                    <div className="g-review__actions">
+                      {!review.replyComment && (
+                        <GooglePill
+                          icon={MessageSquare}
+                          label="Reply"
+                          onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
+                          title="Reply"
+                          testId={`button-reply-${review.id}`}
+                        />
                       )}
-                      {review.replyError && <p role="alert" className="mt-2 text-sm text-destructive">{review.replyError}</p>}
-                      {review.replyComment && (
-                        <div className="mt-3 rounded-lg border bg-muted/30 p-3 sm:ml-12">
-                          <div className="mb-2 flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-muted-foreground">{review.replyStatus === "posted" ? "Posted on Google:" : "Local draft (not posted):"}</span>
-                            <div className="flex items-center gap-2">
-                              {review.replyDate && (
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(review.replyDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                  {" "}
-                                  {new Date(review.replyDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                                </span>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
-                                title="Delete reply"
-                                data-testid={`button-delete-reply-${review.id}`}
-                              >
-                                <Trash2 className="h-3 w-3" aria-hidden="true" />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-sm leading-relaxed">{review.replyComment}</p>
-                        </div>
+                      <GooglePill
+                        icon={StickyNote}
+                        label={review.internalNote ? "Edit note" : "Add internal note"}
+                        onClick={() => { setNoteEditId(review.id); setNoteText(review.internalNote || ""); }}
+                        testId={`button-add-note-${review.id}`}
+                      />
+                      {confirmDeleteReviewId === review.id ? (
+                        <>
+                          <GooglePill
+                            icon={Trash2}
+                            variant="danger"
+                            label="Delete"
+                            onClick={() => { deleteMutation.mutate(review.id); setConfirmDeleteReviewId(null); }}
+                            testId={`button-confirm-delete-review-${review.id}`}
+                          />
+                          <GooglePill
+                            label="Cancel"
+                            className="g-text-2"
+                            onClick={() => setConfirmDeleteReviewId(null)}
+                            testId={`button-cancel-delete-review-${review.id}`}
+                          />
+                        </>
+                      ) : (
+                        <GooglePill
+                          icon={Trash2}
+                          label="Delete"
+                          className="g-text-2"
+                          onClick={() => setConfirmDeleteReviewId(review.id)}
+                          title={review.googleReviewId ? "Remove local copy (returns on sync)" : "Delete local record"}
+                          testId={`button-delete-review-${review.id}`}
+                        />
                       )}
                     </div>
+
+                    {replyingToId === review.id && !review.replyComment && (
+                      <div className="mt-3 space-y-2 border-l-2 pl-4 sm:ml-11">
+                        <Label className="text-xs font-medium">Reply to this review:</Label>
+                        <Textarea
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder="Write your reply..."
+                          className="min-h-[80px] text-sm"
+                          data-testid={`input-reply-${review.id}`}
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: replyText, action: canPublish ? "publish" : "draft" })}
+                            disabled={!replyText.trim() || replyMutation.isPending}
+                            data-testid={`button-submit-reply-${review.id}`}
+                          >
+                            {replyMutation.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden="true" /> : <Send className="mr-1 h-3 w-3" aria-hidden="true" />}
+                            {canPublish ? "Publish reply to Google" : "Save draft in ConstructHUB"}
+                          </Button>
+                          {canPublish && <Button size="sm" variant="outline" disabled={replyMutation.isPending} onClick={() => replyMutation.mutate({id:review.id,replyComment:replyText})}>Save draft</Button>}
+                          <Button size="sm" variant="ghost" onClick={() => setReplyingToId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <GoogleReport type="reviews" id={review.id} />
+                    {review.replyDraft && (
+                      /* The AI (or hand-saved) reply draft: Google's "AI Overview" shape for our own suggestion. */
+                      <GoogleAiOverview
+                        label="AI reply suggestion"
+                        testId={`reply-draft-${review.id}`}
+                        footnote="Draft saved in ConstructHUB — nothing is posted until you publish it."
+                        actions={<>
+                          {!review.replyComment && (
+                            <GooglePill
+                              icon={Send}
+                              label={canPublish ? "Use this reply" : "Edit draft"}
+                              onClick={() => { setReplyingToId(review.id); setReplyText(review.replyDraft || ""); }}
+                              testId={`button-use-draft-${review.id}`}
+                            />
+                          )}
+                          <GooglePill
+                            label="Discard draft"
+                            className="g-text-2"
+                            disabled={replyMutation.isPending}
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "draft" })}
+                            testId={`button-discard-draft-${review.id}`}
+                          />
+                        </>}
+                      >
+                        <p className="break-words">{review.replyDraft}</p>
+                      </GoogleAiOverview>
+                    )}
+                    {review.replyError && <p role="alert" className="mt-2 text-sm text-destructive">{review.replyError}</p>}
+                    {review.replyComment && (
+                      <div className="g-review__reply">
+                        <div className="g-review__reply-head">
+                          <b>Response from the owner</b>
+                          <span>{review.replyStatus === "posted" ? "Posted on Google" : "Local draft (not posted)"}</span>
+                          {review.replyDate && <span title={`${new Date(review.replyDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} ${new Date(review.replyDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`}>{relativeTime(review.replyDate)}</span>}
+                          <button
+                            type="button"
+                            className="g-link ml-auto inline-flex items-center gap-1 text-xs"
+                            onClick={() => replyMutation.mutate({ id: review.id, replyComment: "", action: "delete" })}
+                            title="Delete reply"
+                            data-testid={`button-delete-reply-${review.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" aria-hidden="true" /> Delete reply
+                          </button>
+                        </div>
+                        <p className="mt-1 text-sm leading-relaxed">{review.replyComment}</p>
+                      </div>
+                    )}
                   </article>
                 );
               })}
