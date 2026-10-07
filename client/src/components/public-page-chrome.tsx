@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { SiteNavBar } from "@/components/site-nav";
 import { copyrightNotice } from "@/lib/marketing";
+import { reportIssueHref } from "@/lib/report-issue-link";
 
 function useSignedOut(): boolean {
   const { data: user, isLoading } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -91,6 +92,11 @@ export function PublicPageFooter() {
           <span aria-hidden className="opacity-40">·</span>
           <a href="/support" className="hover:text-mkt-navy-ink transition-colors">Support</a>
           <span aria-hidden className="opacity-40">·</span>
+          {/* Help and the report page sell nothing, so they stay inside the apps too. */}
+          <Link href="/tutorials" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
+          <span aria-hidden className="opacity-40">·</span>
+          <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
+          <span aria-hidden className="opacity-40">·</span>
           <a href="/terms" className="hover:text-mkt-navy-ink transition-colors">Terms</a>
           <span aria-hidden className="opacity-40">·</span>
           <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
@@ -109,6 +115,10 @@ export function PublicPageFooter() {
         <Link href="/done-for-you" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-dfy">Done-For-You</Link>
         <span aria-hidden className="opacity-40">·</span>
         <Link href="/call-assistant" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-call-assistant">AI Call Assistant</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <Link href="/tutorials" onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-help">Help</Link>
+        <span aria-hidden className="opacity-40">·</span>
+        <Link href={reportIssueHref()} onClick={startAtTop} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-public-footer-report-issue">Report an issue</Link>
         <span aria-hidden className="opacity-40">·</span>
         <a href="mailto:support@constructhub.us" className="hover:text-mkt-navy-ink transition-colors">support@constructhub.us</a>
         <span aria-hidden className="opacity-40">·</span>

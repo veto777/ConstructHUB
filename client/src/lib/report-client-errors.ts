@@ -5,6 +5,10 @@
  * the stack, the script and the page path (no query string, no user data).
  * At most a few distinct reports per page load; a failed post is dropped.
  * The server filters extension noise and scrubs what it keeps.
+ *
+ * The last few errors of this page load are also kept in memory (never in
+ * storage) so "Report an issue" can attach them — and show them to the person
+ * first (pages/report-issue.tsx, "What we send with your report").
  */
 const ENDPOINT = "/api/ops/client-error";
 const MAX_REPORTS_PER_PAGE = 5;
@@ -21,7 +25,24 @@ function describe(reason: unknown): { message: string; stack?: string } {
   try { return { message: JSON.stringify(reason) ?? String(reason) }; } catch { return { message: String(reason) }; }
 }
 
+export type RecentClientError = { kind: string; message: string; at: string; source?: string };
+const MAX_RECENT = 10;
+const recent: RecentClientError[] = [];
+
+/** The last errors this tab saw since it loaded, oldest first (at most 10). */
+export function recentClientErrors(): RecentClientError[] {
+  return recent.slice();
+}
+
+function remember(report: Report) {
+  const message = String(report.message ?? "").slice(0, 300);
+  if (!message) return;
+  recent.push({ kind: report.kind, message, at: new Date().toISOString(), source: report.source ? String(report.source).slice(0, 200) : undefined });
+  if (recent.length > MAX_RECENT) recent.shift();
+}
+
 function send(report: Report) {
+  try { remember(report); } catch { /* reporting must never throw */ }
   if (sent >= MAX_REPORTS_PER_PAGE) return;
   const message = String(report.message ?? "").slice(0, 1000);
   const key = `${report.kind}|${message}`;
