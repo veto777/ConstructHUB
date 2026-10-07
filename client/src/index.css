@@ -162,16 +162,16 @@
  * sheets and menus portal out to <body> and would otherwise escape the scope.
  */
 .crm-theme {
-  --primary: 25 95% 53%; /* #F97316 — the marketing orange */
+  --primary: 217 89% 51%; /* #1a73e8 Google blue (owner 2026-10-07: orange is hard to read) */
   --primary-foreground: 0 0% 100%;
-  --ring: 25 95% 53%;
-  --sidebar-primary: 25 95% 53%;
+  --ring: 217 89% 51%;
+  --sidebar-primary: 217 89% 51%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-ring: 25 95% 53%;
+  --sidebar-ring: 217 89% 51%;
   /* Secondary accent: purple/blue, used for the CRM badge and highlights. */
   --crm-accent: 250 84% 60%;
   --crm-accent-foreground: 0 0% 100%;
-  --chart-1: 25 95% 53%;
+  --chart-1: 217 89% 51%;
   --chart-2: 215 50% 40%;
   --chart-3: 32 95% 44%;
   --chart-4: 250 84% 60%;
@@ -209,13 +209,13 @@
   --accent-foreground: 222 38% 14%;
   --secondary: 36 18% 94%;
   --secondary-foreground: 222 38% 14%;
-  --primary: 25 95% 53%; /* #F97316 */
+  --primary: 217 89% 51%; /* #1a73e8 Google blue (owner 2026-10-07: orange is hard to read) */
   --primary-foreground: 0 0% 100%;
-  --ring: 25 95% 53%;
-  --sidebar-primary: 25 95% 53%;
+  --ring: 217 89% 51%;
+  --sidebar-primary: 217 89% 51%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-ring: 25 95% 53%;
-  --chart-1: 25 95% 53%;
+  --sidebar-ring: 217 89% 51%;
+  --chart-1: 217 89% 51%;
   --chart-2: 222 45% 30%;
   --chart-3: 38 92% 50%;
   --chart-4: 199 70% 45%;
@@ -432,13 +432,13 @@
   --accent-foreground: 36 20% 94%;
   --secondary: 222 22% 18%;
   --secondary-foreground: 36 20% 94%;
-  --primary: 27 96% 61%;
-  --primary-foreground: 24 80% 10%;
-  --ring: 27 96% 61%;
-  --sidebar-primary: 27 96% 61%;
+  --primary: 217 89% 75%; /* #8ab4f8 */
+  --primary-foreground: 220 13% 13%;
+  --ring: 217 89% 75%;
+  --sidebar-primary: 217 89% 75%;
   --sidebar-primary-foreground: 24 80% 10%;
-  --sidebar-ring: 27 96% 61%;
-  --chart-1: 27 96% 61%;
+  --sidebar-ring: 217 89% 75%;
+  --chart-1: 217 89% 75%;
 
   --primary-border: hsl(var(--primary));
   --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
@@ -447,15 +447,15 @@
 }
 
 .dark.crm-theme {
-  --primary: 27 96% 61%; /* orange-400 — keeps contrast on dark surfaces */
-  --primary-foreground: 24 80% 10%;
-  --ring: 27 96% 61%;
-  --sidebar-primary: 27 96% 61%;
+  --primary: 217 89% 75%; /* #8ab4f8 */
+  --primary-foreground: 220 13% 13%;
+  --ring: 217 89% 75%;
+  --sidebar-primary: 217 89% 75%;
   --sidebar-primary-foreground: 24 80% 10%;
-  --sidebar-ring: 27 96% 61%;
+  --sidebar-ring: 217 89% 75%;
   --crm-accent: 252 90% 72%;
   --crm-accent-foreground: 250 60% 12%;
-  --chart-1: 27 96% 61%;
+  --chart-1: 217 89% 75%;
   --chart-4: 252 90% 72%;
 
   --primary-border: hsl(var(--primary));
