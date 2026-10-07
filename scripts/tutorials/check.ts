@@ -40,6 +40,8 @@ async function main() {
   need(a?.codec_name === "aac" && Number(a?.sample_rate) === 48000 && a?.channels === 2, `audio is ${a?.codec_name} ${a?.sample_rate} Hz ${a?.channels} ch, not AAC 48 kHz stereo`);
   need(Math.abs(seconds - (built.cardMs + timings.endMs - timings.trimStartMs + (built.endCardMs ?? 0)) / 1000) < 0.25, "the video's length differs from the recording's");
   need(Math.round(seconds) === built.durationSec, "video.json durationSec is not the measured length");
+  // The picture runs the whole length (a capture that stopped early leaves the voice playing over nothing).
+  need(Math.abs(Number(v?.duration) - seconds) < 0.25 && Math.abs(Number(a?.duration) - seconds) < 0.25, `the picture is ${Number(v?.duration).toFixed(1)} s and the sound ${Number(a?.duration).toFixed(1)} s of a ${seconds.toFixed(1)} s file`);
   // Fast start: the index must come before the media, or a player has to fetch the whole file first.
   const fd = fs.openSync(at("walkthrough.mp4"), "r");
   const boxes: string[] = [];
@@ -113,6 +115,7 @@ async function main() {
     await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4", "-ss", (t / 1000).toFixed(3), "-i", at("walkthrough.mp4"), "-frames:v", "1", "-vf", "scale=1280:-2", "-q:v", "3", "-update", "1",
       path.join(frames, `${String(i).padStart(2, "0")}-${name}@${(t / 1000).toFixed(1)}s.jpg`)], { nice: true });
   }
+  need(fs.readdirSync(frames).length === shots.length, `only ${fs.readdirSync(frames).length} of ${shots.length} frames could be read from the video`);
   // …and contact sheets (six frames each) for a quick look at the whole video.
   for (const f of fs.readdirSync(dir)) if (/^contact-sheet-\d+\.(png|jpg)$/.test(f)) fs.rmSync(at(f));
   const all = fs.readdirSync(frames).sort();

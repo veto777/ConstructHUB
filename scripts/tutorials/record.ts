@@ -5,8 +5,8 @@
  *        [--out analysis/video-out/<helpKey>] [--pad 450] [--lead 150] [--label "Demo Account"]
  *        [--company "Aspire Interiors"] [--shots] [--no-narration] [--dry]
  *
- * Plays the step script in headless Chromium with Playwright's `recordVideo`, and writes
- *   raw.webm      the screen capture (with a pre-roll that mux.ts cuts off)
+ * Plays the step script in headless Chromium, films it from Chromium's own screencast, and writes
+ *   raw.mkv       the screen capture at device pixels (with a pre-roll that mux.ts cuts off)
  *   timings.json  where every step starts and ends in it
  *
  * Run narrate.ts FIRST: each step is held for its measured narration clip plus a short pad, so the
@@ -24,6 +24,7 @@
  */
 import fs from "fs";
 import path from "path";
+import { spawn } from "child_process";
 import { chromium, type Locator, type Page } from "playwright";
 import type { TutorialStep } from "../../shared/help/step-script";
 import { flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type NarrationIndex, type StepTiming, type Timings } from "./lib";
@@ -47,6 +48,8 @@ function overlay() {
     #__tut .url{position:absolute;left:0;bottom:0;max-width:70%;padding:5px 12px 6px;border-top-right-radius:8px;background:#f1f3f4;color:#3c4043;
       border:1px solid #dadce0;border-left:0;border-bottom:0;font:13px/1.3 system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .15s}
     #__tut .url.on{opacity:1}
+    #__tut .veil{position:absolute;inset:0;background:#fff;opacity:1;transition:opacity .18s ease}
+    #__tut .veil.off{opacity:0}
     #__tut .sync{position:absolute;inset:0;background:#000;display:none}
     #__tut .sync.on{display:block}
     .__tut-blur{filter:blur(7px)!important}
@@ -59,7 +62,7 @@ function overlay() {
   const root = document.createElement("div");
   root.id = "__tut";
   root.setAttribute("aria-hidden", "true");
-  root.innerHTML = `<style>${css}</style><div class="ring"></div><div class="url"></div>
+  root.innerHTML = `<style>${css}</style><div class="veil"></div><div class="ring"></div><div class="url"></div>
     <svg class="cur" viewBox="0 0 26 26"><path d="M5 3v18.2l4.7-4.4 3 7 3.1-1.3-3-6.9H19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="sync"></div>`;
   const ring = root.querySelector(".ring") as HTMLElement, cur = root.querySelector(".cur") as HTMLElement;
   const url = root.querySelector(".url") as HTMLElement;
@@ -92,11 +95,22 @@ function overlay() {
     rip.className = "rip"; rip.style.left = `${pos.x}px`; rip.style.top = `${pos.y}px`;
     root.appendChild(rip); setTimeout(() => rip.remove(), 600);
   }, true);
+  // A page that loads whole (a link that opens a new document, Back) first shows the plain text the
+  // server sends for search engines, for as long as the app takes to start. A white veil covers that
+  // moment; it lifts when the app has drawn something of its own (or after six seconds, whatever).
+  const veil = root.querySelector(".veil") as HTMLElement;
+  const veilFrom = Date.now();
+  const lift = () => {
+    if (document.querySelector("[data-testid]:not(#__tut *)") || Date.now() - veilFrom > 6000 || location.protocol === "about:") { veil.classList.add("off"); setTimeout(() => veil.remove(), 250); return; }
+    requestAnimationFrame(lift);
+  };
+  requestAnimationFrame(lift);
   const mount = () => { if (!root.isConnected) document.documentElement.appendChild(root); accent(); };
   if (document.documentElement) mount();
   document.addEventListener("DOMContentLoaded", mount);
   w.__tut = {
     ring(el: Element | null, padding = 6) { mount(); target = el; pad = padding; accent(); ring.classList.toggle("on", !!el); },
+    has() { return !!(target && target.isConnected); },
     blur(el: Element) { el.classList.add("__tut-blur"); },
     /** A full black frame: the mark mux.ts looks for to line the video's clock up with the recorder's. */
     sync(on: boolean) { mount(); (root.querySelector(".sync") as HTMLElement).classList.toggle("on", on); },
@@ -108,6 +122,17 @@ function overlay() {
       return { x: r.left, y: r.top, width: r.width, height: r.height };
     },
   };
+}
+
+/** Width and height of a JPEG, from its SOF marker. */
+function jpegSize(b: Buffer): { width: number; height: number } | null {
+  for (let i = 2; i + 9 < b.length;) {
+    if (b[i] !== 0xff) return null;
+    const marker = b[i + 1];
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) };
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
 }
 
 /** The strip at the bottom of the page (CSS px) that captions cover: ~17% of the height. */
@@ -138,9 +163,21 @@ class Player {
     this.pos = to;
   }
 
+  private ringed: Locator | null = null;
   async ring(target: Locator | null) {
+    this.ringed = target;
     if (target) await target.evaluate((el) => (window as any).__tut?.ring(el));
     else await this.page.evaluate(() => (window as any).__tut?.ring(null)).catch(() => {});
+  }
+  /**
+   * A list that reloads replaces its rows, and the ring's element with them. Called while a step is
+   * held: when the ring has lost its element, it is put back on whatever the selector matches now.
+   */
+  async keepRing() {
+    const target = this.ringed;
+    if (!target) return;
+    const lost = await this.page.evaluate(() => !(window as any).__tut?.has()).catch(() => false);
+    if (lost && this.ringed === target) await target.evaluate((el) => (window as any).__tut?.ring(el), undefined, { timeout: 400 }).catch(() => {});
   }
 
   /** Bring the target on screen and return the point to aim at (inside it, never over its far edge). */
@@ -161,13 +198,15 @@ class Player {
       last = box;
     }
     if (!last) throw new Error("target has no box");
-    if (last.y + last.height > this.viewport.height - CAPTION_SAFE(this.viewport.height) + 4)
-      console.warn(`  ! “${String(target)}” stays in the caption area at the bottom (it cannot scroll up) — check the frame`);
     const wide = last.width > 320;
-    return {
+    const point = {
       x: Math.round(last.x + (wide ? Math.min(last.width * 0.3, 220) : last.width / 2)),
       y: Math.round(last.y + (last.height > 120 ? last.height * 0.6 : last.height / 2)),
     };
+    // A big block may run into the caption strip; what matters is where the pointer lands.
+    if (point.y > this.viewport.height - CAPTION_SAFE(this.viewport.height))
+      console.warn(`  ! ${String(target)} is in the caption area at the bottom and cannot scroll up — keep that line short and check the frame`);
+    return point;
   }
 
   async play(step: TutorialStep, base: string) {
@@ -204,7 +243,7 @@ class Player {
         await sleep(350);
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         // The click has done its job; a ring left behind would sit on whatever the click put there (a dialog, a new page).
-        setTimeout(() => { void this.ring(null); }, 900);
+        setTimeout(() => { void this.ring(null); }, 450);
         break;
       case "type":
         await sleep(250);
@@ -241,8 +280,14 @@ class Player {
         let at = await inside();
         if (at.off !== 0) {
           await this.glide({ x: Math.round(at.l.x + Math.min(70, at.l.width / 2)), y: Math.round(at.l.y + at.l.height / 2) });
-          for (let i = 0; i < 400 && at.off !== 0; i++) { await page.mouse.wheel(0, at.off * 16); await sleep(16); at = await inside(); }
-          if (at.off !== 0) throw new Error(`Could not scroll to the option “${value}”`);
+          // A short list does not scroll: its first and last options sit near the edge and are fine where they are.
+          let still = 0;
+          for (let i = 0; i < 400 && at.off !== 0 && still < 12; i++) {
+            const before = at.o.y;
+            await page.mouse.wheel(0, at.off * 16); await sleep(16); at = await inside();
+            still = Math.abs(at.o.y - before) < 0.5 ? still + 1 : 0;
+          }
+          if (at.off !== 0 && (at.o.y < at.l.y - 1 || at.o.y + at.o.height > at.l.y + at.l.height + 1)) throw new Error(`Could not scroll to the option “${value}”`);
           await sleep(350);
         }
         await this.ring(option);
@@ -302,17 +347,19 @@ async function main() {
     });
   }
 
-  const videoDir = path.join(dir, "_capture");
-  fs.rmSync(videoDir, { recursive: true, force: true });
   const shotsDir = path.join(dir, "steps");
   if (args.flags.shots) { fs.rmSync(shotsDir, { recursive: true, force: true }); fs.mkdirSync(shotsDir, { recursive: true }); }
 
   // The CRM renders only on its own host name; the name is pointed at this machine for this browser only.
-  const browser = await chromium.launch({ headless: true, args: ["--host-resolver-rules=MAP portal.constructhub.us 127.0.0.1, MAP client.constructhub.us 127.0.0.1", "--force-color-profile=srgb"] });
-  const context = await browser.newContext({
-    viewport: script.viewport, deviceScaleFactor: zoom, locale: "en-US", timezoneId: "America/New_York",
-    ...(dry ? {} : { recordVideo: { dir: videoDir, size: video } }),
-  });
+  // ZOOM IS THE BROWSER'S OWN DEVICE SCALE, NOT AN EMULATED ONE. A context with `deviceScaleFactor` lays
+  // the page out correctly, but Chromium's screencast (and Playwright's recordVideo) then films it at
+  // CSS size — 1024×576 — and the "1080p" would be an upscale. With --force-device-scale-factor and a
+  // window of the CSS size, the surface itself is 1920×1080 and so is every captured frame.
+  const browser = await chromium.launch({ headless: true, args: [
+    "--host-resolver-rules=MAP portal.constructhub.us 127.0.0.1, MAP client.constructhub.us 127.0.0.1", "--force-color-profile=srgb",
+    `--force-device-scale-factor=${zoom}`, `--window-size=${script.viewport.width},${script.viewport.height}`, "--hide-scrollbars",
+  ] });
+  const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
   const origin = new URL(base);
   await context.addCookies([{ name: "ch_consent", value: "denied", domain: origin.hostname, path: "/" }]);
   // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
@@ -343,6 +390,47 @@ async function main() {
     route.request().method() === "GET" ? route.fulfill({ json: { unread: 0, notifications: [] } }) : route.fallback());
 
   const page = await context.newPage();
+  {
+    const got = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio }));
+    if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
+      throw new Error(`the browser window is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
+  }
+  // THE CAPTURE. Frames are taken straight from Chromium's screencast, at device pixels (1920×1080 —
+  // see the launch flags above), and written as they arrive: JPEG frames copied (not re-encoded) into raw.mkv,
+  // each stamped with the time it arrived. mux.ts makes the constant-rate H.264 from that.
+  const raw = path.join(dir, "raw.mkv");
+  let capture: { stop: () => Promise<number>; frames: () => number } | null = null;
+  if (!dry) {
+    const cdp = await context.newCDPSession(page);
+    const writer = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-use_wallclock_as_timestamps", "1", "-c:v", "mjpeg", "-i", "-", "-c", "copy", raw], { stdio: ["pipe", "ignore", "inherit"] });
+    let frames = 0, badFrames = 0;
+    writer.stdin.on("error", () => { /* the writer stopped; its exit code says why */ });
+    cdp.on("Page.screencastFrame", (e) => {
+      frames++;
+      const jpeg = Buffer.from(e.data, "base64");
+      // Every frame must be the full size: one of another size would end the picture in the encode.
+      const size = jpegSize(jpeg);
+      if (!size || size.width !== video.width || size.height !== video.height) { badFrames++; cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {}); return; }
+      writer.stdin.write(jpeg);
+      cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {});
+    });
+    // EVERY compositor frame (none arrive while nothing on the page moves). Skipping frames is not an
+    // option: a change that happens in one frame — a sync mark, a dialog closing — would be missed and
+    // the picture would stay stale until something else moved.
+    await cdp.send("Page.startScreencast", { format: "jpeg", quality: 93, maxWidth: video.width, maxHeight: video.height, everyNthFrame: 1 });
+    capture = {
+      frames: () => frames,
+      stop: async () => {
+        await cdp.send("Page.stopScreencast").catch(() => {});
+        await sleep(300);
+        writer.stdin.end();
+        const code = await new Promise<number>((r) => writer.on("close", (c) => r(c ?? 1)));
+        if (code !== 0) throw new Error(`the capture writer exited ${code}`);
+        if (badFrames > 3) throw new Error(`${badFrames} captured frames were not ${video.width}x${video.height} — the capture is not at device pixels`);
+        return frames;
+      },
+    };
+  }
   const t0 = Date.now();
   const now = () => Date.now() - t0;
   page.on("pageerror", (e) => console.warn(`  page error: ${e.message}`));
@@ -359,6 +447,11 @@ async function main() {
     return at;
   };
   await page.setContent(`<body style="margin:0;background:#fff"></body>`);
+  // The capture's clock starts with its first frame: wait for one before showing the first sync mark.
+  for (let i = 0; capture && capture.frames() === 0 && i < 100; i++) {
+    await page.evaluate((n) => { document.body.style.background = n % 2 ? "#fff" : "#fefefe"; }, i);
+    await sleep(100);
+  }
   await sleep(1500);
   const syncStartMs = await flash();
 
@@ -375,7 +468,8 @@ async function main() {
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
     const until = dry ? now() + 350 : Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
-    await sleep(until - now());
+    while (until - now() > 300) { await sleep(250); await player.keepRing(); }
+    await sleep(Math.max(0, until - now()));
     if (script.thumbnail?.step === i) {
       // The thumbnail's screenshot: this frame, full resolution, the cursor off, and where its ring is.
       const ring = await page.evaluate(() => (window as any).__tut.shot(true));
@@ -404,17 +498,15 @@ async function main() {
   const endMs = now();
   await player.ring(null);
   const syncEndMs = await flash();
-  const capture = page.video();
+  await sleep(400);
+  const frames = capture ? await capture.stop() : 0;
   await context.close();
   await browser.close();
   if (dry) { console.log(`dry run: ${script.steps.length} steps played, screenshots → ${shotsDir}`); return; }
-  const raw = path.join(dir, "raw.webm");
-  fs.renameSync(await capture!.path(), raw);
-  fs.rmSync(videoDir, { recursive: true, force: true });
 
   const timings: Timings = { helpKey: script.helpKey, viewport: script.viewport, zoom, video, base, recordedAt: new Date().toISOString(), syncStartMs, syncEndMs, trimStartMs, endMs, steps };
   fs.writeFileSync(path.join(dir, "timings.json"), JSON.stringify(timings, null, 2) + "\n");
-  console.log(`raw.webm ${(fs.statSync(raw).size / 1e6).toFixed(1)} MB · ${((endMs - trimStartMs) / 1000).toFixed(1)} s of walkthrough → ${dir}`);
+  console.log(`raw.mkv ${video.width}x${video.height} · ${frames} frames · ${(fs.statSync(raw).size / 1e6).toFixed(1)} MB · ${((endMs - trimStartMs) / 1000).toFixed(1)} s of walkthrough → ${dir}`);
 }
 
 main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

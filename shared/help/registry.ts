@@ -692,7 +692,7 @@ const entries: Draft[] = [
       "CRM → Clients → add a client with name, email, phone and address.",
       "Use the search box to find anyone by name, email, phone or address.",
       "Open a client to create an estimate, record a payment or schedule a visit.",
-      "“View as client” shows exactly what they see in their portal.",
+      "“See what the client sees” opens their portal the way they see it.",
     ],
     howItWorks: "Notes are private to your team and never appear in the portal. The timeline is kept for you from what happens: estimates sent, emails opened, payments made.",
     needs: ["A CRM workspace."],

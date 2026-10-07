@@ -4,7 +4,7 @@
  *   tsx scripts/tutorials/mux.ts docs/tutorials/scripts/<helpKey>.json [--out analysis/video-out/<helpKey>]
  *        [--card 1.8] [--end 4] [--crf 23] [--poster-step 1]
  *
- * Reads raw.webm + timings.json (record.ts) and narration/*.wav + narration.json (narrate.ts); writes
+ * Reads raw.mkv + timings.json (record.ts) and narration/*.wav + narration.json (narrate.ts); writes
  *   walkthrough.mp4  THE MASTER, and the file the app plays: a branded intro card (≤ 2 s), the capture,
  *                    an end card (~4 s). H.264 High yuv420p 30 fps at the capture's size (1920×1080 in the
  *                    house style) + AAC 48 kHz stereo, loudness-normalised to −14 LUFS integrated with
@@ -82,12 +82,12 @@ async function main() {
   // 1 ── Tie the recorder's clock to the video's: find the two black sync frames record.ts showed.
   // The one after the last step is always in the capture and sets the offset; the pre-roll one (when
   // the capture had already started by then) must agree with it, or the clocks drifted apart.
-  const probe = await run("ffmpeg", ["-hide_banner", "-threads", "4", "-i", at("raw.webm"), "-vf", "blackdetect=d=0.2:pic_th=0.98:pix_th=0.08", "-an", "-f", "null", "-"], { nice: true });
+  const probe = await run("ffmpeg", ["-hide_banner", "-threads", "4", "-i", at("raw.mkv"), "-vf", "blackdetect=d=0.2:pic_th=0.98:pix_th=0.08", "-an", "-f", "null", "-"], { nice: true });
   const blacks = [...probe.stderr.matchAll(/black_start:([\d.]+) black_end:([\d.]+)/g)]
     .map((m) => ({ start: Number(m[1]) * 1000, length: (Number(m[2]) - Number(m[1])) * 1000 }))
     .filter((b) => b.length > 300 && b.length < 1200);
   const last = blacks[blacks.length - 1];
-  if (!last || last.start < timings.endMs - 4000) throw new Error("No sync frame found at the end of raw.webm — record again");
+  if (!last || last.start < timings.endMs - 4000) throw new Error("No sync frame found at the end of raw.mkv — record again");
   const offsetMs = Math.round(last.start - timings.syncEndMs);
   if (offsetMs > 200 || offsetMs < -8000) throw new Error(`The video clock is ${offsetMs} ms from the recorder's — record again`);
   const first = blacks.length > 1 ? blacks[0] : null;
@@ -141,7 +141,7 @@ async function main() {
   await run("ffmpeg", [
     ...FF,
     "-loop", "1", "-framerate", String(FPS), "-t", String(cardS), "-i", at("_intro.png"),
-    "-i", at("raw.webm"),
+    "-i", at("raw.mkv"),
     "-loop", "1", "-framerate", String(FPS), "-t", String(endS), "-i", at("_end.png"),
     "-i", at("narration.wav"),
     "-filter_complex", graph, "-map", "[v]", "-map", "[a]",

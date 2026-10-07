@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-schedule",
+  "durationSec": 70,
+  "video": {
+    "key": "tutorials/crm-schedule.caf01312.mp4",
+    "bytes": 5393458,
+    "sha256": "caf01312e71c613aff353289121d2f5d858076abd3e0644606d865ad70a07f03"
+  },
+  "captions": {
+    "key": "tutorials/crm-schedule.1625db64.vtt",
+    "bytes": 1822,
+    "sha256": "1625db6469e2c240aa2ab63a2a848e2c746ba75f73601f15dc17fe1a93ea5dd1"
+  },
+  "poster": {
+    "key": "tutorials/crm-schedule.e4320372.jpg",
+    "bytes": 66018,
+    "sha256": "e43203725e65387ccaa176fe5c3ab6fc380642d3fe4a1c942600033464c0acf6"
+  },
+  "uploaded": {
+    "at": "2026-10-07T23:36:24.534Z",
+    "video": "d16a6f25ae65a11a6c0d5b780b5cae51",
+    "captions": "cda7c318f940359051d31209e5b98739",
+    "poster": "9477e7ffcba3df31776202ee3c49d522"
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-create-estimate",
+  "title": "Create and send an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "Start a new estimate",
+      "narration": "Let's write an estimate and send it to a client. Start on the Estimates page."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"New estimate\"), a:has-text(\"New estimate\")",
+      "caption": "New estimate",
+      "narration": "Choose New estimate."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder^=\"Search clients\"]",
+      "value": "Whit",
+      "caption": "Step 1: pick the client",
+      "narration": "Step one is the client. Search by name, email or phone."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Dana Whitfield\")",
+      "caption": "Dana Whitfield",
+      "narration": "We'll pick Dana Whitfield."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-search\"]",
+      "value": "backsplash",
+      "caption": "Step 2: search the price book",
+      "chapter": "Add work from the price book",
+      "narration": "Step two is the work. Search your price book for an item."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-row-\"]:has-text(\"Kitchen backsplash\") [data-testid^=\"button-add-\"]",
+      "caption": "Add the item",
+      "narration": "Choose Add. The item comes in with its price and its scope of work."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-qty-\"]",
+      "value": "30",
+      "caption": "Quantity",
+      "narration": "Set the quantity. This kitchen needs thirty square feet, and the total updates."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"input-scope-\"]",
+      "caption": "Price and wording can be changed",
+      "narration": "You can change the price and the wording for this job."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review\"]",
+      "caption": "Review",
+      "chapter": "Review and send",
+      "narration": "When everything is in, choose Review."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-title\"]",
+      "value": "Kitchen backsplash",
+      "caption": "Step 3: title",
+      "narration": "Give the estimate a title your client will recognise."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-review-total\"]",
+      "caption": "Check the total",
+      "narration": "Check the lines and the total."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send\"]",
+      "caption": "Send estimate",
+      "narration": "Then choose Send estimate. The client gets an email with a private link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"step-done\"] >> text=/^E-\\d+$/",
+      "caption": "Sent, with its number",
+      "narration": "The estimate now has a number, and it's marked as sent."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-open-estimate\"]",
+      "caption": "Open this estimate",
+      "chapter": "Preview what the client sees",
+      "narration": "Open it to see how it's doing."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Sent, opened, valid until",
+      "narration": "This line shows when it was sent, and whether the client has opened it yet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview-estimate\"]",
+      "caption": "Preview",
+      "narration": "Preview shows you the client's view, in a new tab."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"preview-banner\"]",
+      "caption": "The client's view",
+      "narration": "This is what your client sees after confirming their email. They approve the estimate by typing their full name."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-total\"]",
+      "caption": "Company details, work, total",
+      "narration": "Your company details are at the top, then the work and the total."
+    },
+    {
+      "action": "back",
+      "caption": "Back to the CRM",
+      "narration": "Back in the CRM, the estimate waits for the client's answer."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Menu: Estimates",
+      "narration": "You'll find Estimates in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to create and send an estimate | ConstructHUB CRM",
+    "description": "A short walkthrough of writing an estimate in the ConstructHUB CRM. You will pick a client, add work from the price book, set the quantity, review the total and send it. Then you will open the preview to see what the client sees before they approve.",
+    "tags": [
+      "contractor estimate",
+      "how to send an estimate",
+      "estimating software",
+      "construction estimate",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "e-signature",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Send estimates fast",
+    "accent": "estimates",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}

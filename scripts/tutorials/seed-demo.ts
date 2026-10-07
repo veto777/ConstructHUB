@@ -116,19 +116,18 @@ async function main() {
            where org_id = $1 and id not like 'demo-appt-%' and extract(second from starts_at) <> 0`, [orgId]);
 
   // ── Messages: three client threads, one still waiting for an answer ────────────────────────────
-  type Msg = { n: number; client: string; from: "client" | string; body: string; minutesAgo: number; read?: boolean };
+  type Msg = { n: number; client: string; from: "client" | string; body: string; at: Date; read?: boolean };
   const msgs: Msg[] = [
-    { n: 1, client: "Joe & Mary Kane", from: "client", body: "Morning! Will the crew need the garage cleared out before they start on the stairs?", minutesAgo: 26 * 60, read: true },
-    { n: 2, client: "Joe & Mary Kane", from: "Rita Santos", body: "Good morning. Just the side by the door, please — that is where the saw goes. Thank you!", minutesAgo: 25 * 60 },
-    { n: 3, client: "Joe & Mary Kane", from: "client", body: "Done. The floors look wonderful so far.", minutesAgo: 20 * 60, read: true },
-    { n: 4, client: "Luis Orozco", from: "client", body: "Can we look at a lighter oak colour for the downstairs before you finish the estimate?", minutesAgo: 95 },
-    { n: 5, client: "Greta Ellison", from: "client", body: "Is Thursday still the start date for the master suite?", minutesAgo: 3 * 24 * 60, read: true },
-    { n: 6, client: "Greta Ellison", from: "Demo Account", body: "Yes — Dee and Marco will be there at 8. We will text when they are on the way.", minutesAgo: 3 * 24 * 60 - 40 },
+    { n: 1, client: "Joe & Mary Kane", from: "client", body: "Morning! Will the crew need the garage cleared out before they start on the stairs?", at: local(-1, 7, 42), read: true },
+    { n: 2, client: "Joe & Mary Kane", from: "Rita Santos", body: "Good morning. Just the side by the door, please — that is where the saw goes. Thank you!", at: local(-1, 7, 58) },
+    { n: 3, client: "Joe & Mary Kane", from: "client", body: "Done. The floors look wonderful so far.", at: local(-1, 12, 15), read: true },
+    { n: 4, client: "Luis Orozco", from: "client", body: "Can we look at a lighter oak colour for the downstairs before you finish the estimate?", at: ago(95) },
+    { n: 5, client: "Greta Ellison", from: "client", body: "Is the start date for the master suite still on?", at: local(-3, 9, 10), read: true },
+    { n: 6, client: "Greta Ellison", from: "Demo Account", body: "Yes — Dee and Marco will be there at 8. We will text when they are on the way.", at: local(-3, 9, 50) },
   ];
   for (const m of msgs) {
-    const at = ago(m.minutesAgo);
     await q(`insert into crm_client_comments (id, org_id, customer_id, body, author_member_id, created_at, read_at) values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
-      [`demo-msg-${String(m.n).padStart(2, "0")}`, orgId, customer(m.client), m.body, m.from === "client" ? null : member(m.from), at, m.from === "client" && !m.read ? null : at]);
+      [`demo-msg-${String(m.n).padStart(2, "0")}`, orgId, customer(m.client), m.body, m.from === "client" ? null : member(m.from), m.at, m.from === "client" && !m.read ? null : m.at]);
   }
 
   // ── Payments in several states (the seed already has one paid invoice) ─────────────────────────

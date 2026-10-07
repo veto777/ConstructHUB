@@ -41,6 +41,31 @@ export async function stopPort(port: number): Promise<void> {
   if ((await listeningPid(port)) === pid) { try { process.kill(pid, "SIGKILL"); } catch { /* gone */ } await sleep(500); }
 }
 
+/**
+ * Compile the client before the camera rolls. The dev server (Vite) transforms a page's code the first
+ * time a browser asks for it; cold, that is seconds of blank page after a click — on camera. Asking
+ * for every page module once makes Vite transform it and what it imports, so the recording sees warm
+ * pages. Read-only: these are GETs of source modules, nothing in the workspace is touched.
+ */
+export async function warmApp(port: number): Promise<number> {
+  const pages: string[] = [];
+  const walk = (dir: string) => { for (const d of fs.readdirSync(dir, { withFileTypes: true })) { const p = path.join(dir, d.name); if (d.isDirectory()) walk(p); else if (/\.tsx?$/.test(d.name) && !/\.test\./.test(d.name)) pages.push(p); } };
+  walk(path.join(ROOT, "client/src/pages"));
+  const urls = ["/crm", "/src/main.tsx", "/src/App.tsx", ...pages.map((p) => `/src/${path.relative(path.join(ROOT, "client/src"), p).split(path.sep).join("/")}`)];
+  let ok = 0, next = 0;
+  const worker = async () => {
+    while (next < urls.length) {
+      const url = urls[next++];
+      const good = await fetch(`http://127.0.0.1:${port}${url}`, { signal: AbortSignal.timeout(120_000) }).then(async (r) => { await r.arrayBuffer(); return r.ok; }, () => false);
+      if (good) ok++;
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  // The transforms of what those modules import finish a moment after the responses.
+  await sleep(3000);
+  return ok;
+}
+
 export async function startApp(o: { slot: number; database: string; bootTimeoutMs?: number }): Promise<RunningApp> {
   const port = SLOT_PORT(o.slot), dir = slotDir(o.slot);
   const busy = await listeningPid(port);
@@ -95,6 +120,7 @@ async function main() {
   if (cmd === "down") { await stopPort(SLOT_PORT(slot)); await drop(database); console.log(`slot ${slot}: stopped and dropped`); return; }
   await fresh(database);
   const app = await startApp({ slot, database });
+  await warmApp(app.port);
   console.log(`slot ${slot}: http://portal.constructhub.us:${app.port}/crm  (Chromium: --host-resolver-rules="MAP portal.constructhub.us 127.0.0.1") · pid ${app.pid} · log ${app.log}`);
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().then(() => process.exit(0), (e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

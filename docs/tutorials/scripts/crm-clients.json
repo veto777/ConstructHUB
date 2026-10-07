@@ -1,0 +1,131 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-clients",
+  "title": "Clients",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "The client list",
+      "chapter": "Find a client",
+      "narration": "This is Clients. Everyone you do business with is listed here, with their contact details."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tabs-bid-status\"]",
+      "caption": "Tabs: Job Won, Undecided, Declined",
+      "narration": "The tabs sort clients by where their bid stands: Job Won, Undecided, or Declined."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Kane",
+      "caption": "Search by name, email, phone or address",
+      "narration": "To find someone, type a name, an email, a phone number or an address. Let's look for Kane."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Joe & Mary Kane\")",
+      "caption": "Open the client",
+      "narration": "Click the name to open the client's page."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"link-client-phone\"]/ancestor::div[.//*[@data-testid=\"link-client-address\"]][1]",
+      "caption": "Email, phone, address",
+      "chapter": "What the client page holds",
+      "narration": "At the top are the client's email, phone and address, with buttons to call or text."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-quick-actions\"]",
+      "caption": "Quick actions",
+      "narration": "Quick actions start the common jobs: schedule an appointment, write an estimate, add the client to your pipeline, or take a payment."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"Outstanding balance\")]/..",
+      "caption": "Payments: owed and collected",
+      "narration": "Below that, the page keeps everything about this client together. Payments shows what is still owed, and what you've collected."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"appointment-demo-appt-04\"]",
+      "caption": "Schedule: this client's visits",
+      "narration": "Schedule lists every visit you've booked for them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]",
+      "caption": "Estimates, with status and opens",
+      "narration": "Estimates shows each bid with its status, and tells you when the client opened it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"invoice-\"]",
+      "caption": "Invoices",
+      "chapter": "Invoices, projects and messages",
+      "narration": "Invoices come next, each with a Record payment button."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"project-\"]",
+      "caption": "Projects",
+      "narration": "Projects links to the job itself."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-message-thread\"]",
+      "caption": "Messages with the client",
+      "narration": "Messages holds your conversation with the client, and you can reply right here."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-notes\"]",
+      "caption": "Notes: team only",
+      "narration": "Notes are for your team only. The client never sees them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "See what the client sees",
+      "chapter": "See what the client sees",
+      "narration": "Back at the top, See what the client sees opens this client's portal the way they see it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find Clients in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to find a client and read their page | ConstructHUB CRM",
+    "description": "A short walkthrough of Clients in the ConstructHUB CRM. You will see how to search the client list, open a client, and find what their page keeps together: payments, appointments, estimates, invoices, projects, messages and private notes.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "client management",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "customer list",
+      "contractor business"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Every client one page",
+    "accent": "client",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

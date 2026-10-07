@@ -1,0 +1,162 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-schedule",
+  "title": "Schedule",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "caption": "The Schedule",
+      "chapter": "The calendar",
+      "narration": "This is the Schedule. Every visit and appointment you book shows up on this calendar."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-week\"]",
+      "caption": "Month, Week, Agenda",
+      "narration": "Month, Week and Agenda change how much you see. Let's switch to Week."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-appointment\"]",
+      "caption": "Add",
+      "chapter": "Add an appointment",
+      "narration": "To book a visit, choose Add."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-title\"]",
+      "value": "Tile samples with Dana",
+      "caption": "Title",
+      "narration": "Give it a title."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-date\"]",
+      "value": "{{DATE+1}}",
+      "caption": "Date",
+      "narration": "Pick the date. We'll make it tomorrow."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-start\"]",
+      "value": "10:00",
+      "caption": "Start",
+      "narration": "Set the time it starts."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-end\"]",
+      "value": "11:00",
+      "caption": "End",
+      "narration": "And the time it ends."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"select-appt-customer-search\"]",
+      "value": "Dana",
+      "caption": "Link a client",
+      "narration": "Link it to a client, so the visit also shows on their page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"select-appt-customer-option-\"]",
+      "caption": "Dana Whitfield",
+      "narration": "We'll choose Dana Whitfield."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkbox-crew-demo-member-priya\"]",
+      "caption": "Crew",
+      "narration": "Tick who is going. Priya will take this one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-appt-save\"]",
+      "caption": "Schedule it",
+      "narration": "Then choose Schedule it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"event-\"]:has-text(\"Tile samples\")",
+      "caption": "On the calendar",
+      "narration": "The visit is on the calendar."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-calendar-scope\"]",
+      "value": "Everyone's calendar",
+      "caption": "My calendar or everyone's",
+      "chapter": "My calendar or everyone's",
+      "narration": "This list chooses whose calendar you see. My calendar shows the visits you booked or are going to. Everyone's calendar shows the whole team."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"calendar-week\"]",
+      "caption": "The whole team's week",
+      "narration": "Now the crew's jobs are here too. You can also pick one person from the same list."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"event-\"]:has-text(\"Tile samples\")",
+      "caption": "Open a visit to change it",
+      "chapter": "Edit an appointment",
+      "narration": "To change a visit, click it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-start\"]",
+      "value": "13:00",
+      "caption": "New start",
+      "narration": "Change what you need. We'll move this one to one o'clock."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appt-end\"]",
+      "value": "14:00",
+      "caption": "New end",
+      "narration": "It will end at two."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-appt-save\"]",
+      "caption": "Save changes",
+      "narration": "Choose Save changes, and the calendar is up to date."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "caption": "Menu: Schedule",
+      "narration": "You'll find Schedule in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to schedule and edit an appointment | ConstructHUB CRM",
+    "description": "A short walkthrough of the Schedule in the ConstructHUB CRM. You will add an appointment, link it to a client and choose who is going. Then you will switch between your own calendar and everyone's, and change a visit's time.",
+    "tags": [
+      "contractor scheduling",
+      "crew schedule",
+      "job scheduling software",
+      "appointment calendar",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Book the crew fast",
+    "accent": "crew",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

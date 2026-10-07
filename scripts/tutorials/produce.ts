@@ -5,7 +5,8 @@
  *
  * fresh recording database `constructhub_tut_slot<N>` (a copy of the demo workspace, its dates moved
  * to today) → the app for that slot on port 8180+N (dev server; signed in as the demo owner; no
- * outbound email, texts, payments or background workers — app.ts) → narrate → record → mux →
+ * outbound email, texts, payments or background workers — app.ts), its pages compiled before the
+ * camera rolls → narrate → record → mux →
  * thumbnail → check → upload to R2 and write the manifest (unless --no-upload) → stop the app by its
  * listening pid → drop the database → delete the raw capture and the per-step clips.
  *
@@ -20,7 +21,7 @@ import fs from "fs";
 import path from "path";
 import { ROOT, WORK_DIR, flagNum, loadScript, parseArgs, withLock } from "./lib";
 import { drop, fresh, seedDemo, dbMode } from "./db";
-import { SLOT_PORT, startApp, stopPort, type RunningApp } from "./app";
+import { SLOT_PORT, startApp, stopPort, warmApp, type RunningApp } from "./app";
 import { isCrmRoute, helpEntry } from "../../shared/help/registry";
 
 const TSX = path.join(ROOT, "node_modules/.bin/tsx");
@@ -73,6 +74,7 @@ async function main() {
       await stage("fresh database", async () => { await fresh(database); console.log(`  ${await seedDemo(database)}`); });
       app = await stage("start the app", () => startApp({ slot, database }));
       console.log(`  listening on :${app.port} (pid ${app.pid}) · log ${app.log}`);
+      await stage("warm the app", async () => { console.log(`  ${await warmApp(app!.port)} client modules compiled`); });
       await narrated;
       await stage("record", () => tool("record", [scriptFile, "--out", out, "--base", base]));
       await stage("stop the app", async () => { await app!.stop(); app = null; });
@@ -82,7 +84,7 @@ async function main() {
       if (!args.flags["no-upload"]) await stage("upload", () => tool("upload", [helpKey, "--out", out]));
       if (!args.flags["keep-raw"]) {
         // The capture and the per-step clips are scratch (the disk is nearly full); the voice clips stay in the shared cache.
-        for (const f of ["raw.webm", "narration.wav", "narration", "steps", "_capture"]) fs.rmSync(path.join(out, f), { recursive: true, force: true });
+        for (const f of ["raw.mkv", "narration.wav", "narration", "steps", "_capture"]) fs.rmSync(path.join(out, f), { recursive: true, force: true });
       }
     } finally {
       process.off("SIGINT", onSignal); process.off("SIGTERM", onSignal);

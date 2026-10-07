@@ -189,7 +189,7 @@ export const pcmMs = (p: Pcm): number => Math.round((p.samples.length / p.sample
 export type NarrationClip = { index: number; text: string; file: string; durationMs: number; sha256: string };
 export type NarrationIndex = { helpKey: string; persona: string; sampleRate: number; clips: NarrationClip[] };
 
-/** timings.json — where each step sits in raw.webm (all times in ms since the recorder's clock started). */
+/** timings.json — where each step sits in raw.mkv (all times in ms since the recorder's clock started). */
 export type StepTiming = { index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number };
 export type Timings = {
   helpKey: string; viewport: { width: number; height: number }; base: string; recordedAt: string;

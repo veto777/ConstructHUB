@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-create-estimate",
+  "durationSec": 81,
+  "video": {
+    "key": "tutorials/crm-create-estimate.01139266.mp4",
+    "bytes": 6183741,
+    "sha256": "0113926615beea57f566766f6dde24a5e237d3f6319e9550ed2bfb3b1bb92210"
+  },
+  "captions": {
+    "key": "tutorials/crm-create-estimate.1fb47661.vtt",
+    "bytes": 2056,
+    "sha256": "1fb47661e8bb4707d9c5f3a60953f47958f1e4cae6b0a40eaafe000f6fd43d47"
+  },
+  "poster": {
+    "key": "tutorials/crm-create-estimate.58f89665.jpg",
+    "bytes": 87108,
+    "sha256": "58f8966519970f178e3ef6d910229f4a5e8db0471babbb2121b65eb47f14f7c0"
+  },
+  "uploaded": {
+    "at": "2026-10-07T23:36:21.136Z",
+    "video": "b96577d7a3319c368760f4793bfdfd60",
+    "captions": "2fb0de79369e48ecd20b2437357d9a23",
+    "poster": "1dba8b5443976c7cf5fae730f4785652"
+  }
+}

@@ -85,6 +85,10 @@ export const tutorialScriptSchema = z.object({
   }).optional(),
 }).superRefine((s, ctx) => {
   if (s.thumbnail && s.thumbnail.step >= s.steps.length) ctx.addIssue({ code: "custom", message: "thumbnail.step is not a step", path: ["thumbnail", "step"] });
+  // The thumbnail's screenshot is taken at the END of that step, and wants the ring on the key element:
+  // a click drops its ring (and usually changes the screen), a goto / back / wait / press has none.
+  else if (s.thumbnail && !["highlight", "hover", "type", "select", "scroll"].includes(s.steps[s.thumbnail.step].action))
+    ctx.addIssue({ code: "custom", message: "thumbnail.step must be a highlight, hover, type, select or scroll step (the ring stays on those)", path: ["thumbnail", "step"] });
   if (s.thumbnail?.accent && !s.thumbnail.headline.toLowerCase().split(/\s+/).includes(s.thumbnail.accent.toLowerCase())) ctx.addIssue({ code: "custom", message: "thumbnail.accent must be a word of the headline", path: ["thumbnail", "accent"] });
 });
 export type TutorialScript = z.infer<typeof tutorialScriptSchema>;

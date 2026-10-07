@@ -70,14 +70,14 @@ export const introCardHtml = (title: string, kicker: string) => page(`
   <div class="burst" style="right:-190px;top:-120px;width:760px;height:1100px;transform:rotate(14deg);box-shadow:-18px 0 0 rgba(255,255,255,.95),-34px 0 0 rgba(11,63,168,.55)"></div>
   <img class="gator" src="${GATOR}" style="right:60px;bottom:-30px;height:660px">
   <div class="kicker" style="left:64px;top:150px">${esc(kicker)}</div>
-  <h1 data-fit="700,300,120" style="left:60px;top:226px;max-width:720px">${esc(title)}</h1>
+  <h1 data-fit="720,300,120" style="left:60px;top:226px;max-width:720px">${esc(title)}</h1>
   <img class="logo" src="${LOGO}" style="left:64px;bottom:56px">`);
 
 /** The ~4 s closing card. */
 export const endCardHtml = () => page(`
   <div class="burst" style="left:-190px;top:-120px;width:700px;height:1100px;transform:rotate(-14deg);box-shadow:18px 0 0 rgba(255,255,255,.95),34px 0 0 rgba(11,63,168,.55)"></div>
   <img class="gator" src="${GATOR}" style="left:70px;bottom:-30px;height:660px">
-  <h1 data-fit="640,260,130" style="left:590px;top:150px;max-width:660px">More<br>tutorials</h1>
+  <h1 data-fit="660,260,130" style="left:590px;top:150px;max-width:660px">More<br>tutorials</h1>
   <div class="kicker" style="left:590px;top:446px;font-size:44px;letter-spacing:1px;text-transform:none;padding:10px 30px 14px">constructhub.us/tutorials</div>
   <img class="logo" src="${LOGO}" style="left:594px;bottom:56px">`, ``);
 
@@ -123,11 +123,15 @@ export function thumbnailHtml(t: ThumbSpec): string {
   const W = 600, H = 400, ratio = W / H;
   const cropW = Math.min(t.shotSize.width, Math.max(900, (t.ring?.width ?? 0) * 2.2)), cropH = cropW / ratio;
   const cx = t.ring ? t.ring.x + t.ring.width / 2 : t.shotSize.width / 2, cy = t.ring ? t.ring.y + t.ring.height / 2 : t.shotSize.height / 2;
-  const x0 = Math.max(0, Math.min(t.shotSize.width - cropW, cx - cropW * 0.45)), y0 = Math.max(0, Math.min(t.shotSize.height - cropH, cy - cropH * 0.5));
+  // Where in the crop the key element sits: clear of the headline and the gator. With the gator on the
+  // right that is the middle of the crop; with the gator on the left (words on the right) it is the
+  // lower left third, under the headline.
+  const ax = right ? 0.45 : 0.33, ay = right ? 0.5 : 0.76;
+  const x0 = Math.max(0, Math.min(t.shotSize.width - cropW, cx - cropW * ax)), y0 = Math.max(0, Math.min(t.shotSize.height - cropH, cy - cropH * ay));
   const k = W / cropW;
   const ring = t.ring ? `<div class="ring" style="left:${(t.ring.x - x0) * k - 10}px;top:${(t.ring.y - y0) * k - 10}px;width:${t.ring.width * k + 20}px;height:${t.ring.height * k + 20}px"></div>` : "";
   const tilt = (v === 0 || v === 3) ? -5 : 5;
-  const shotLeft = right ? 430 : 300, shotTop = 286;
+  const shotLeft = right ? 430 : 400, shotTop = 286;
   const shot = `<div class="shot" style="left:${shotLeft}px;top:${shotTop}px;width:${W}px;height:${H}px;transform:rotate(${tilt}deg)">
       <img src="${pathToFileURL(t.shot).href}" style="position:absolute;left:${-x0 * k}px;top:${-y0 * k}px;width:${t.shotSize.width * k}px">${ring}</div>`;
 
