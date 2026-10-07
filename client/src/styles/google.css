@@ -1,0 +1,326 @@
+/*
+ * Google-style surface for the "Google Business" section (owner, 2026-10-06: "use the Google fonts and
+ * colors and styles to make the platform feel similar to Google on the GMB feature").
+ *
+ * `.g-surface` scopes Google's real design tokens (fonts, colours, shapes) to one subtree. Inside it the
+ * app's own theme variables are re-pointed at the same tokens, so shadcn controls (buttons, inputs,
+ * tabs, cards) pick the palette up without being rewritten. `.dark .g-surface` carries the dark palette.
+ * Everything else on the platform keeps its current look.
+ */
+
+.g-surface {
+  /* ── Google tokens (light) ─────────────────────────────────────────── */
+  --g-font: 'Google Sans', 'Roboto', Arial, sans-serif;
+  --g-text: #202124;
+  --g-text-2: #5f6368;
+  --g-blue: #1a73e8;
+  --g-green: #188038;
+  --g-red: #d93025;
+  --g-star: #fbbc04;
+  --g-divider: #dadce0;
+  --g-surface: #ffffff;
+  --g-surface-2: #f8f9fa;
+  --g-chip: #f1f3f4;
+  --g-hover: #f6fafe;
+  --g-ai-text: #1f1f1f;
+  --g-avatar: #4285f4;
+  --g-avatar-bg: #d2e3fc;
+
+  /* ── The app theme, re-pointed so shadcn parts inside use the same palette ── */
+  --background: 0 0% 100%;
+  --foreground: 225 6% 13%;
+  --card: 0 0% 100%;
+  --card-foreground: 225 6% 13%;
+  --card-border: 220 9% 87%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 225 6% 13%;
+  --popover-border: 220 9% 87%;
+  --border: 220 9% 87%;
+  --input: 220 9% 87%;
+  --muted: 200 12% 95%;
+  --muted-foreground: 213 5% 39%;
+  --secondary: 200 12% 95%;
+  --secondary-foreground: 225 6% 13%;
+  --accent: 210 80% 98%;
+  --accent-foreground: 225 6% 13%;
+  --primary: 214 82% 51%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 214 82% 51%;
+  --destructive: 4 71% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --font-sans: var(--g-font);
+  --font-display: var(--g-font);
+  --radius: .5rem;
+  --tracking-normal: 0;
+
+  font-family: var(--g-font);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0;
+  color: var(--g-text);
+  background: var(--g-surface);
+}
+
+.dark .g-surface {
+  --g-text: #e8eaed;
+  --g-text-2: #9aa0a6;
+  --g-blue: #8ab4f8;
+  --g-green: #81c995;
+  --g-red: #f28b82;
+  --g-star: #fdd663;
+  --g-divider: #3c4043;
+  --g-surface: #202124;
+  --g-surface-2: #303134;
+  --g-chip: #303134;
+  --g-hover: #303134;
+  --g-ai-text: #e8eaed;
+  --g-avatar: #8ab4f8;
+  --g-avatar-bg: #394457;
+
+  --background: 225 6% 13%;
+  --foreground: 216 12% 92%;
+  --card: 225 4% 20%;
+  --card-foreground: 216 12% 92%;
+  --card-border: 206 6% 25%;
+  --popover: 225 4% 20%;
+  --popover-foreground: 216 12% 92%;
+  --popover-border: 206 6% 25%;
+  --border: 206 6% 25%;
+  --input: 206 6% 25%;
+  --muted: 225 4% 20%;
+  --muted-foreground: 210 6% 63%;
+  --secondary: 225 4% 20%;
+  --secondary-foreground: 216 12% 92%;
+  --accent: 225 4% 20%;
+  --accent-foreground: 216 12% 92%;
+  --primary: 217 89% 76%;
+  --primary-foreground: 225 6% 13%;
+  --ring: 217 89% 76%;
+  --destructive: 5 81% 73%;
+  --destructive-foreground: 225 6% 13%;
+}
+
+/* Google never uses heavy display weights: titles are 400–500, same family. */
+.g-surface h1, .g-surface h2, .g-surface h3, .g-surface h4,
+.g-surface .font-bold, .g-surface .font-semibold, .g-surface .font-display {
+  font-family: var(--g-font);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.g-surface h1 { font-size: 22px; line-height: 28px; font-weight: 400; }
+@media (min-width: 640px) { .g-surface h1 { font-size: 24px; line-height: 32px; } }
+
+/* Google's focus ring: 2px blue outline, 2px off the edge. */
+.g-surface :is(a, button, [role="button"], input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--g-blue);
+  outline-offset: 2px;
+}
+
+/* ── Utilities ─────────────────────────────────────────────────────────── */
+
+/* Pill: Call / Directions / Website / Reviews in the local pack. */
+.g-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--g-divider);
+  border-radius: 9999px;
+  background: var(--g-surface);
+  color: var(--g-blue);
+  font-family: var(--g-font);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+.g-pill:hover { background: var(--g-hover); }
+.g-pill:disabled, .g-pill[aria-disabled="true"] { opacity: .5; cursor: default; }
+.g-pill > svg { width: 18px; height: 18px; flex: none; }
+.g-pill--grey {
+  width: 100%;
+  min-height: 44px;
+  border-color: transparent;
+  background: var(--g-chip);
+  color: var(--g-text);
+}
+.g-pill--grey:hover { background: var(--g-divider); }
+.g-pill--solid {
+  border-color: var(--g-blue);
+  background: var(--g-blue);
+  color: #fff;
+}
+.dark .g-pill--solid { color: #202124; }
+.g-pill--solid:hover { background: var(--g-blue); filter: brightness(1.06); }
+.g-pill--danger { color: var(--g-red); }
+
+/* Every shadcn <Button> inside the surface takes the pill shape (font and colours come from the theme). */
+.g-surface button[class*="rounded-md"]:not(.g-pill):not([role="tab"]):not([role="switch"]):not([role="combobox"]) {
+  border-radius: 9999px;
+  font-family: var(--g-font);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.g-surface a > button[class*="rounded-md"] { border-radius: 9999px; }
+
+.g-divider { border-top: 1px solid var(--g-divider); }
+.g-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--g-chip);
+  color: var(--g-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+.g-link { color: var(--g-blue); text-decoration: none; }
+.g-link:hover { text-decoration: underline; }
+.g-text { color: var(--g-text); }
+.g-text-2 { color: var(--g-text-2); }
+.g-open { color: var(--g-green); }
+.g-closed { color: var(--g-red); }
+.g-star { color: var(--g-star); }
+
+/* ── Local-pack card ───────────────────────────────────────────────────── */
+.g-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--g-divider);
+  color: var(--g-text);
+}
+.g-card:last-child { border-bottom: 0; }
+.g-card__body { flex: 1 1 auto; min-width: 0; }
+.g-card__title {
+  margin: 0;
+  font-family: var(--g-font);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 400;
+  color: var(--g-text);
+  overflow-wrap: anywhere;
+}
+.g-card__title button, .g-card__title a {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.g-card__title button:hover, .g-card__title a:hover { text-decoration: underline; }
+.g-card__line { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); overflow-wrap: anywhere; }
+.g-card__meta { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-card__snippet {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--g-text-2);
+}
+.g-card__snippet b { font-weight: 700; color: var(--g-text); }
+.g-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.g-card__photos {
+  display: flex;
+  gap: 4px;
+  flex: none;
+  width: 132px;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.g-card__photos a, .g-card__photos span { display: block; flex: 1 0 128px; height: 100%; }
+.g-card__photos img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 8px; }
+.g-card__photos--two a, .g-card__photos--two span { flex-basis: 64px; }
+@media (min-width: 640px) {
+  .g-card__photos { width: 200px; height: 120px; }
+  .g-card__photos a, .g-card__photos span { flex-basis: 196px; }
+  .g-card__photos--two a, .g-card__photos--two span { flex-basis: 98px; }
+}
+
+/* Reviewer avatar: blue person circle, or the initial. */
+.g-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--g-avatar-bg);
+  color: var(--g-avatar);
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+}
+.g-avatar--sm { width: 20px; height: 20px; font-size: 11px; }
+.g-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Star row (5 icons), Google review style. */
+.g-stars { display: inline-flex; align-items: center; gap: 1px; vertical-align: middle; }
+.g-stars svg { width: 14px; height: 14px; }
+.g-stars__on { color: var(--g-star); }
+.g-stars__off { color: var(--g-divider); }
+
+/* ── Google review ─────────────────────────────────────────────────────── */
+.g-review { padding: 16px 0; border-bottom: 1px solid var(--g-divider); }
+.g-review:last-child { border-bottom: 0; }
+.g-review__head { display: flex; align-items: center; gap: 12px; }
+.g-review__name { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--g-text); margin: 0; }
+.g-review__sub { font-size: 12px; line-height: 16px; color: var(--g-text-2); margin: 0; }
+.g-review__rating { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--g-text-2); }
+.g-review__text { margin: 8px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text); white-space: pre-line; overflow-wrap: anywhere; }
+.g-review__reply {
+  margin: 12px 0 0 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--g-surface-2);
+  color: var(--g-text);
+}
+@media (min-width: 640px) { .g-review__reply { margin-left: 44px; } }
+.g-review__reply-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-review__reply-head b { font-weight: 500; color: var(--g-text); }
+.g-review__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* ── AI Overview ───────────────────────────────────────────────────────── */
+.g-ai {
+  padding: 16px 0;
+  color: var(--g-ai-text);
+}
+.g-ai__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-family: var(--g-font);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 400;
+  color: var(--g-ai-text);
+}
+.g-ai__label svg { width: 20px; height: 20px; color: var(--g-blue); }
+.g-ai__body { font-size: 18px; line-height: 26px; color: var(--g-ai-text); }
+.g-ai__body p { margin: 0 0 12px; }
+.g-ai__body p:last-child { margin-bottom: 0; }
+.g-ai__body b, .g-ai__body strong { font-weight: 700; }
+.g-ai__entity { text-decoration: underline dotted; text-underline-offset: 4px; font-weight: 700; }
+.g-ai__foot { margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+@media (max-width: 639px) { .g-ai__body { font-size: 17px; line-height: 25px; } }
+
+/* ── Header strip ──────────────────────────────────────────────────────── */
+.g-header { padding: 0 0 12px; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; }
+.g-header__title { margin: 0; font-size: 20px; line-height: 24px; font-weight: 400; color: var(--g-text); }
+.g-header__sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
+
+/* No horizontal scroll on phones: long names/addresses wrap, pills wrap. */
+.g-surface { overflow-wrap: anywhere; }
