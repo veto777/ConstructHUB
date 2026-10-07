@@ -27,6 +27,7 @@ import { PLANS, PLAN_KEYS, type PlanKey } from "@shared/plans";
 import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
+import { GoogleSurface, GoogleLocalCard, GooglePill, GoogleMoreButton, GoogleAiOverview, AiEntity } from "@/components/google";
 
 /**
  * The server decides who may use Competitor Intel (server/entitlements.ts):
@@ -165,15 +166,15 @@ export default function CompetitorsPage() {
     // it isn't on this account — no plan names, no "See plans" button.
     if (inNativeApp()) {
       return (
-        <AppPage width="narrow">
+        <GoogleSurface page><AppPage width="narrow" className="before:hidden">
           <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
           <AppLocked name="Competitor Intel" testId="text-plan-required" />
-        </AppPage>
+        </AppPage></GoogleSurface>
       );
     }
     const requiredName = planRequired.requiredPlan ? PLANS[planRequired.requiredPlan].name : null;
     return (
-      <AppPage width="narrow">
+      <GoogleSurface page><AppPage width="narrow" className="before:hidden">
         <PageHeader title={<span data-testid="text-locked-title">Competitor intelligence</span>} description="Compare businesses and review signals in your local market." />
         <Section>
           <p className="text-muted-foreground" data-testid="text-plan-required">
@@ -191,12 +192,13 @@ export default function CompetitorsPage() {
             {requiredName ? `See the ${requiredName} plan` : "See plans"}
           </Button>
         </Section>
-      </AppPage>
+      </AppPage></GoogleSurface>
     );
   }
 
+  // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; scan results are a local pack.
   return (
-    <AppPage>
+    <GoogleSurface page><AppPage className="before:hidden">
       <PageHeader title={<span data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
         <Tabs defaultValue="market-scan" className="space-y-6">
           <AppTabsList className="bg-muted/50">
@@ -301,7 +303,7 @@ export default function CompetitorsPage() {
             </TabsContent>
           )}
         </Tabs>
-    </AppPage>
+    </AppPage></GoogleSurface>
   );
 }
 
@@ -770,6 +772,9 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
 }) {
   const [expandedListing, setExpandedListing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Google's local pack shows a few entries and a "More businesses" button; each press reveals the next batch.
+  const PACK_SIZE = 5;
+  const [shown, setShown] = useState(PACK_SIZE);
   const { data, isLoading } = useQuery<{ scan: any; listings: any[] }>({
     queryKey: ["/api/competitors/scans", scan.id],
     enabled: expanded,
@@ -781,6 +786,11 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
   const highRisk = listings.filter((l: any) => (l.bsScore || 0) >= 60).length;
   const moderate = listings.filter((l: any) => (l.bsScore || 0) >= 30 && (l.bsScore || 0) < 60).length;
   const organic = listings.filter((l: any) => (l.bsScore || 0) < 30).length;
+  // The overview names the best-rated listings that have a rating — a sentence built only from the scan's own numbers.
+  const topRated = listings
+    .filter((l: any) => Number(l.rating) > 0)
+    .sort((a: any, b: any) => Number(b.rating) - Number(a.rating) || (b.reviewCount || 0) - (a.reviewCount || 0))
+    .slice(0, 3);
 
   return (
     <Section flush testId={`card-scan-${scan.id}`}>
@@ -903,90 +913,85 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">All competitors</h3>
-                <div className="space-y-2 max-h-[800px] overflow-y-auto pr-1">
-                  {listings.map((listing: any, idx: number) => {
+              {topRated.length > 0 && (
+                <GoogleAiOverview label="Overview" testId={`text-scan-overview-${scan.id}`}
+                  footnote={`Built from the ${listings.length} listings this scan indexed on ${new Date(scan.createdAt).toLocaleDateString()} — ratings and counts as Google showed them then.`}>
+                  <p>
+                    Top-rated {scan.industry.toLowerCase()} options near {scan.location} include{" "}
+                    {topRated.map((l: any, i: number) => (
+                      <span key={l.id || i}>
+                        {i > 0 && (i === topRated.length - 1 ? ", and " : ", ")}
+                        <AiEntity>{l.businessName}</AiEntity> with a <b>{Number(l.rating).toFixed(1)}/5</b> rating
+                        {l.reviewCount ? <> across <b>{l.reviewCount} review{l.reviewCount === 1 ? "" : "s"}</b></> : null}
+                      </span>
+                    ))}.
+                    {" "}Of the <b>{listings.length}</b> businesses indexed, <b>{organic}</b> show few review signals worth a closer look, <b>{moderate}</b> some, and <b>{highRisk}</b> more.
+                  </p>
+                </GoogleAiOverview>
+              )}
+
+              <div className="space-y-0">
+                <h3 className="text-sm font-medium g-text-2">All competitors</h3>
+                <div data-testid={`list-competitors-${scan.id}`}>
+                  {listings.slice(0, shown).map((listing: any, idx: number) => {
                     const bsBadge = getBsBadge(listing.bsScore || 0);
                     const isExpanded = expandedListing === (listing.id || idx);
+                    const website = listing.website && /^https?:\/\//i.test(listing.website) ? listing.website : listing.website ? `https://${listing.website}` : null;
                     return (
-                      <div
+                      <GoogleLocalCard
                         key={listing.id || idx}
-                        className="p-3 rounded-lg border border-border/50 hover:border-border transition-colors"
-                        data-testid={`card-competitor-${listing.id}`}
+                        testId={`card-competitor-${listing.id}`}
+                        name={listing.businessName}
+                        rating={listing.rating}
+                        reviewCount={listing.reviewCount}
+                        category={listing.category}
+                        open={null}
+                        address={listing.address}
+                        badges={<>
+                          {listing.isNew && <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">NEW</Badge>}
+                          <Badge variant="outline" className={`text-[10px] px-1.5 ${bsBadge.color}`}>{bsBadge.label}</Badge>
+                          {listing.reviewAnalysis?.reviewsLookingAi > 0 && (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">
+                              <Bot className="w-2.5 h-2.5 mr-0.5" />{listing.reviewAnalysis.reviewsLookingAi} AI
+                            </Badge>
+                          )}
+                        </>}
+                        actions={<>
+                          {listing.phone && <GooglePill icon={Phone} label="Call" href={`tel:${String(listing.phone).replace(/[^\d+]/g, "")}`} />}
+                          {listing.address && <GooglePill icon={MapPin} label="Directions" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${listing.businessName} ${listing.address}`)}${listing.placeId ? `&query_place_id=${encodeURIComponent(listing.placeId)}` : ""}`} external />}
+                          {website && <GooglePill icon={Globe} label="Website" href={website} external />}
+                          <GooglePill
+                            icon={Eye}
+                            label={isExpanded ? "Hide review analysis" : "Review analysis"}
+                            onClick={() => setExpandedListing(isExpanded ? null : (listing.id || idx))}
+                            testId={`button-review-analysis-${listing.id}`}
+                          />
+                        </>}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0 space-y-1.5">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-sm truncate">{listing.businessName}</p>
-                              {listing.isNew && (
-                                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">NEW</Badge>
-                              )}
-                              <Badge variant="outline" className={`text-[10px] px-1.5 ${bsBadge.color}`}>
-                                {bsBadge.label}
-                              </Badge>
-                              {listing.reviewAnalysis?.reviewsLookingAi > 0 && (
-                                <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">
-                                  <Bot className="w-2.5 h-2.5 mr-0.5" />{listing.reviewAnalysis.reviewsLookingAi} AI
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                              {listing.address && (
-                                <span className="flex items-center gap-1">
-                                  <MapPin className="w-3 h-3" />{listing.address}
-                                </span>
-                              )}
-                              {listing.rating && (
-                                <span className="flex items-center gap-1">
-                                  <Star className="w-3 h-3 text-muted-foreground" />{listing.rating} ({listing.reviewCount || 0} reviews)
-                                </span>
-                              )}
-                              {listing.phone && (
-                                <span className="flex items-center gap-1">
-                                  <Phone className="w-3 h-3" />{listing.phone}
-                                </span>
-                              )}
-                              {listing.website && (
-                                <a href={listing.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-muted-foreground hover:underline">
-                                  <Globe className="w-3 h-3" />Website
-                                </a>
-                              )}
-                            </div>
-                            {listing.bsReasons && (listing.bsReasons as string[]).length > 0 && (listing.bsScore || 0) > 0 && (
-                              <div className="mt-1.5 space-y-0.5">
-                                {(listing.bsReasons as string[]).slice(0, isExpanded ? 20 : 3).map((reason: string, ri: number) => (
-                                  <p key={ri} className="text-xs flex items-start gap-1.5">
-                                    <AlertTriangle className={`w-3 h-3 mt-0.5 shrink-0 ${getBsColor(listing.bsScore || 0)}`} />
-                                    <span className="text-muted-foreground">{reason}</span>
-                                  </p>
-                                ))}
-                                {!isExpanded && (listing.bsReasons as string[]).length > 3 && (
-                                  <p className="text-xs text-muted-foreground/60">+ {(listing.bsReasons as string[]).length - 3} more flags</p>
-                                )}
-                              </div>
+                        {listing.bsReasons && (listing.bsReasons as string[]).length > 0 && (listing.bsScore || 0) > 0 && (
+                          <div className="mt-1.5 space-y-0.5">
+                            {(listing.bsReasons as string[]).slice(0, isExpanded ? 20 : 3).map((reason: string, ri: number) => (
+                              <p key={ri} className="text-xs flex items-start gap-1.5">
+                                <AlertTriangle className={`w-3 h-3 mt-0.5 shrink-0 ${getBsColor(listing.bsScore || 0)}`} />
+                                <span className="text-muted-foreground">{reason}</span>
+                              </p>
+                            ))}
+                            {!isExpanded && (listing.bsReasons as string[]).length > 3 && (
+                              <p className="text-xs text-muted-foreground/60">+ {(listing.bsReasons as string[]).length - 3} more flags</p>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs px-2 mt-1"
-                              onClick={() => setExpandedListing(isExpanded ? null : (listing.id || idx))}
-                              data-testid={`button-review-analysis-${listing.id}`}
-                            >
-                              <Eye className="w-3 h-3 mr-1" />
-                              {isExpanded ? "Hide" : "View"} Review analysis
-                              {isExpanded ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
-                            </Button>
-                            {isExpanded && <ReviewAnalysisPanel analysis={listing.reviewAnalysis} />}
                           </div>
-                          <div className="w-28 shrink-0">
-                            <BsMeter score={listing.bsScore || 0} />
-                          </div>
-                        </div>
-                      </div>
+                        )}
+                        <div className="mt-2 max-w-xs"><BsMeter score={listing.bsScore || 0} /></div>
+                        {isExpanded && <ReviewAnalysisPanel analysis={listing.reviewAnalysis} />}
+                      </GoogleLocalCard>
                     );
                   })}
                 </div>
+                {shown < listings.length && (
+                  <div className="pt-3">
+                    <GoogleMoreButton label={`More businesses (${listings.length - shown} more)`} onClick={() => setShown((n) => n + PACK_SIZE)} testId={`button-more-competitors-${scan.id}`} />
+                  </div>
+                )}
               </div>
             </>
           )}
