@@ -26,6 +26,8 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   // Pages a contractor's own customer opens from a link.
   "/review/:token", "/review/:token/unsubscribe", "/contract/sign/:token", "/e/:token", "/i/:token", "/co/:token",
   "/lead-form/:token", "/portal/:token",
+  // JobCam share pages (gallery / timeline links; the portal host serves them, the main site must not 404 one).
+  "/jc/:token",
   // The CRM's paths (the portal's own host serves them; the main site hands them over).
   "/crm", "/crm/*",
 ];
