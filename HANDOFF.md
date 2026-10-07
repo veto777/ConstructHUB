@@ -2,6 +2,35 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 📷 2026-10-07 (evening) — JobCam plans + storage, fast boot, Cloudflare/Search Console worker ON (deployed 1f4a0ea)
+- **JobCam is a CRM feature only** (owner: attached to a jobsite; not a platform tool). Included in **CRM Max**; a
+  **$39/mo add-on on CRM Basic and CRM Essentials** (`CRM_ADDONS.jobcam` in shared/crm-plans.ts; annual = 12 × $39 =
+  $468, NO discount assumed — owner to confirm). Gate: `jobcamEntitled()` in server/jobcam/plan.ts (plan | addon |
+  admin | beta); every member route answers 402 `crm_plan_required`; share links already sent and the homeowner
+  portal keep working after a downgrade. Upgrade card → PurchaseReviewDialog → `POST /api/crm/billing/change`
+  (owner only, prorated, lazy Stripe price `chub_v1_crmaddon_jobcam_*`). NOT yet exercised with real money: the add-on
+  purchase/removal and its webhook path — watch the first one. Marketing: `/features/jobcam` (49 prerendered pages
+  now) linked under Pricing & Plans; no Tools entry by owner's choice.
+- **JobCam storage tiers** (owner: 5 GB included, then 10 / 100 / 500 / 1,000 / 2,000 GB): `shared/jobcam-storage.ts`,
+  `jobcam_org_usage.storage_tier_gb`; upload open refused 403 `limit_reached` (stored + in-flight + new file, row
+  lock), re-check at complete with cleanup. Tiers have NO prices yet: only a platform admin changes a tier
+  (/admin "JobCam storage", `POST /api/admin/jobcam/storage-tier`); customers get the meter, an 80% note, "Storage
+  full — next size" and "Request more storage" (requests show in that admin card only; no email).
+- **Boot is fast when nothing changed:** `seed_state` remembers the permit-portals file hash + directory row count;
+  an unchanged pair skips the 13k row-by-row apply (80 s → 0.1 s on dev). `FORCE_PORTAL_SEED=1` forces it. Every
+  restart used to be an ~80 s outage (Cloudflare 502) — the owner hit one while testing.
+- **Gateway errors are no longer printed raw** (client/src/lib/queryClient.ts): 502–504/52x or an HTML body reads
+  "ConstructHUB is restarting or briefly unavailable."
+- **Cloudflare + Search Console:** `EDGE_SEARCH_WORKER_ENABLED=true` set on vb11 (it was missing, so nothing queued
+  ever ran; backup `.env.bak-*-pre-edgeworker`). Owner registered `https://constructhub.us/api/gsc/callback` and
+  `/api/mail-alerts/oauth/callback` on the Google OAuth client (Google propagation took ~10 min). Cloudflare has no
+  third-party "allow access" sign-in: Connections tab = Global API Key → we mint a limited token; or a pasted scoped
+  token; the ops-only agency-membership path needs `CLOUDFLARE_AGENCY_*` (unset). No real connect has been run yet;
+  the `webmasters` scope is a Google "sensitive" scope (unverified app warning / 100-user cap until verified).
+- **In progress (branch `help-tutorials`, vb11 `~/ConstructHUB-seo`):** "i" info buttons on Cloudflare and Search
+  Console written from the code, a walkthrough-video slot beside them, a `/tutorials` section for every feature, and
+  `docs/tutorials/VIDEO-PIPELINE.md` (Playwright capture + Janice voice + Higgsfield; needs a Higgsfield key).
+
 ## 📷 2026-10-07 — JobCam: storage sizes, CRM-plan gate, $39/mo add-on (branch `jobcam-storage`, NOT deployed)
 - **Owner decisions (2026-10-07):** storage "5 gigs and then 10, 100, 500, 1000, 2000"; JobCam "is part of the upper tier
   plan" = INCLUDED in CRM Max; "the upgrade will cost $39 a month on basic and essential" = the JobCam add-on on CRM Basic
