@@ -27,7 +27,7 @@ import { messageNoteBody } from "../crm/messages";
 import { canManageJobcam, visibleProject } from "./access";
 import { requireJobcamPlan } from "./plan";
 import { presentMedia, projectSummary, membersMap, streamVariant, queryFeed, parseFeedParams, feedCursor } from "./routes";
-import { expiryFromPreset, hashSharePassword, newShareToken, shareAccess, shareLinkState, signShareSession, verifySharePassword } from "./share-auth";
+import { expiryFromPreset, hashSharePassword, looksLikeShareToken, newShareToken, safeEqual, shareAccess, shareLinkState, shareSecret, signShareSession, verifySharePassword } from "./share-auth";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -59,7 +59,10 @@ function rememberUnlock(req: any, res: any, token: string, secret: string) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   res.setHeader("Set-Cookie", `${COOKIE}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${secure}`);
 }
-const secret = () => process.env.SESSION_SECRET || "";
+// Empty when unset in production: every password check then fails closed (share-auth.ts).
+const secret = () => shareSecret() ?? "";
+const cleanLine = (v?: string | null) => String(v ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+const clientIp = (req: any) => String(req?.ip || req?.socket?.remoteAddress || "unknown");
 
 export function presentShare(s: JobcamShareLink, baseUrl: string) {
   return {
@@ -125,7 +128,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     }
     const [row] = await db.insert(jobcamShareLinks).values({
       orgId: ctx.org.id, projectId: project.id, kind: b.kind, token: newShareToken(),
-      title: b.title || (b.kind === "gallery" ? `${project.name} — photos` : `${project.name} — live timeline`),
+      title: cleanLine(b.title) || (b.kind === "gallery" ? `${project.name} — photos` : `${project.name} — live timeline`),
       mediaIds, showDetails: b.showDetails ?? true, passwordHash: b.password ? hashSharePassword(b.password) : null,
       expiresAt, createdByMemberId: ctx.member.id, sentTo: [],
     }).returning();
@@ -169,7 +172,8 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Enter who to send it to", issues: parsed.error.issues });
     const { channel, message } = parsed.data;
-    const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, s.projectId)).limit(1);
+    if (!rateAllow(`jcsend:${ctx.member.id}`, 30)) return res.status(429).json({ message: "That's a lot of sends — wait a few minutes." });
+    const [project] = await db.select().from(crmProjects).where(and(eq(crmProjects.orgId, ctx.org.id), eq(crmProjects.id, s.projectId))).limit(1);
     const [customer] = project ? await db.select().from(crmCustomers).where(and(eq(crmCustomers.orgId, ctx.org.id), eq(crmCustomers.id, project.customerId))).limit(1) : [];
     const url = `${portalBaseUrl(req)}/jc/${s.token}`;
     const what = s.kind === "gallery" ? "photos" : "live photo timeline";
@@ -179,7 +183,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
       to = parsed.data.to;
       await sendWithFallback({
         to,
-        subject: `${s.title || `${project?.name ?? "Your project"} ${what}`} — from ${ctx.org.name}`,
+        subject: cleanLine(`${s.title || `${project?.name ?? "Your project"} ${what}`} — from ${ctx.org.name}`).slice(0, 200),
         replyTo: ctx.org.email || undefined,
         html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px">
           ${ctx.org.logoUrl ? `<img src="${esc(ctx.org.logoUrl)}" alt="" style="max-height:48px;margin-bottom:12px">` : ""}
@@ -223,9 +227,15 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
   // ── Public: /api/jc/:token ────────────────────────────────────────────────
 
   const linkByToken = async (token: string) => {
-    if (!token || token.length < 20 || token.length > 64) return null;
+    if (!looksLikeShareToken(token)) return null;
     const [s] = await db.select().from(jobcamShareLinks).where(eq(jobcamShareLinks.token, token)).limit(1);
-    return s ?? null;
+    // The unique index found the row; the constant-time compare is the actual auth decision.
+    return s && safeEqual(s.token, token) ? s : null;
+  };
+  /** A link only ever serves a project that still exists in its own org. */
+  const projectOf = async (s: JobcamShareLink) => {
+    const [p] = await db.select().from(crmProjects).where(and(eq(crmProjects.orgId, s.orgId), eq(crmProjects.id, s.projectId))).limit(1);
+    return p ?? null;
   };
   const shareBase = (token: string) => `/api/jc/${token}/media`;
 
@@ -234,17 +244,20 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     if (!s) return res.status(404).json({ message: "This link isn't valid." });
     const state = shareLinkState(s);
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, s.orgId)).limit(1);
-    const [project] = await db.select().from(crmProjects).where(eq(crmProjects.id, s.projectId)).limit(1);
+    const project = await projectOf(s);
+    if (!project) return res.status(404).json({ message: "This link isn't valid." });
     const access = shareAccess(s, unlockedSig(req, s.token), secret());
     if (state === "ok" && access.allowed) {
       await db.update(jobcamShareLinks).set({ viewCount: sql`${jobcamShareLinks.viewCount} + 1`, lastViewedAt: new Date() }).where(eq(jobcamShareLinks.id, s.id)).catch(() => {});
     }
     res.setHeader("Cache-Control", "no-store");
     res.json({
-      kind: s.kind, title: s.title, state, locked: !access.allowed && (access as any).reason === "locked",
-      showDetails: s.showDetails, expiresAt: s.expiresAt,
+      kind: s.kind, title: access.allowed ? s.title : null, state, locked: !access.allowed && (access as any).reason === "locked",
+      showDetails: s.showDetails, expiresAt: access.allowed ? s.expiresAt : null,
       org: org ? { name: org.name, logoUrl: org.logoUrl, phone: org.phone, email: org.email, website: org.website } : null,
-      project: project ? projectSummary(project) : null,
+      // Who shared it is always shown (the page is branded); WHAT was shared —
+      // the job's name and address — only once the link actually opens.
+      project: access.allowed ? { ...projectSummary(project), ...(s.showDetails ? {} : { address: null }) } : null,
     });
   });
 
@@ -252,10 +265,12 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const s = await linkByToken(String(req.params.token));
     if (!s) return res.status(404).json({ message: "This link isn't valid." });
     if (shareLinkState(s) !== "ok") return res.status(410).json({ message: `This link has been ${shareLinkState(s)}.` });
-    if (!rateAllow(`jcunlock:${s.id}`, 20)) return res.status(429).json({ message: "Too many tries — wait a few minutes." });
+    const key = secret();
+    if (!key) return res.status(503).json({ message: "Password-protected links are unavailable right now." });
+    if (!rateAllow(`jcunlock:${s.id}`, 20) || !rateAllow(`jcunlock-ip:${clientIp(req)}`, 40)) return res.status(429).json({ message: "Too many tries — wait a few minutes." });
     const password = String(req.body?.password ?? "");
     if (!verifySharePassword(password, s.passwordHash)) return res.status(401).json({ message: "That password isn't right." });
-    rememberUnlock(req, res, s.token, secret());
+    rememberUnlock(req, res, s.token, key);
     res.json({ ok: true });
   });
 
@@ -265,9 +280,11 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const access = shareAccess(s, unlockedSig(req, s.token), secret());
     if (!access.allowed) {
       const reason = (access as any).reason as string;
+      res.setHeader("Cache-Control", "no-store");
       res.status(reason === "locked" ? 401 : 410).json({ message: reason === "locked" ? "Enter the password first." : `This link has been ${reason}.`, reason });
       return null;
     }
+    if (!(await projectOf(s))) { res.status(404).json({ message: "This link isn't valid." }); return null; }
     return s;
   };
 
@@ -296,7 +313,8 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const variant = String(req.params.variant);
     // Guests never get the untouched original unless the link allows details; the display rendition is the share copy.
     if (variant === "original" && !s.showDetails) return res.status(404).json({ message: "Not available on this link" });
-    await streamVariant(req, res, m, variant, req.query.download === "1");
+    // Short cache: a revoked or expired link must stop showing its files quickly.
+    await streamVariant(req, res, m, variant, req.query.download === "1", 300);
   });
 
   // ── Client portal: read-only feed of the homeowner's projects ────────────

@@ -27,6 +27,7 @@ import {
   crmCostEntries, crmPhases, crmMeasurements, crmNotifications,
   CRM_PROJECT_STATUSES, CRM_JOB_STATUSES, CRM_LINE_ITEM_KINDS,
   CRM_PROJECT_STAGE_META, CRM_ESTIMATE_STATUSES, CRM_INVOICE_STATUSES,
+  jobcamMedia, jobcamShareLinks,
 } from "@shared/schema";
 import {
   and, eq, desc, asc, ilike, or, sql, isNull, isNotNull, inArray, gte, lte, lt,
@@ -794,6 +795,12 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
           .where(and(eq(crmAttachments.orgId, orgId), inArray(crmAttachments.refId, projIds)));
         await tx.delete(crmJobs)
           .where(and(eq(crmJobs.orgId, orgId), inArray(crmJobs.projectId, projIds)));
+        // JobCam: public share links die with the project and its media leaves
+        // every feed (soft delete — the stored files are purged separately).
+        await tx.delete(jobcamShareLinks)
+          .where(and(eq(jobcamShareLinks.orgId, orgId), inArray(jobcamShareLinks.projectId, projIds)));
+        await tx.update(jobcamMedia).set({ deletedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(jobcamMedia.orgId, orgId), inArray(jobcamMedia.projectId, projIds), isNull(jobcamMedia.deletedAt)));
         await tx.delete(crmProjects)
           .where(and(eq(crmProjects.orgId, orgId), inArray(crmProjects.id, projIds)));
       }

@@ -36,11 +36,13 @@ export function verifySharePassword(password: string, stored: string | null | un
 
 /** The cookie value that proves this browser unlocked this link: HMAC(token) under the app secret. */
 export function signShareSession(token: string, secret: string): string {
+  if (!secret) throw new Error("A signing secret is required");
   return createHmac("sha256", secret).update(`jobcam-share:${token}`).digest("base64url");
 }
 
 export function verifyShareSession(token: string, cookieValue: string | null | undefined, secret: string): boolean {
-  if (!cookieValue) return false;
+  // No secret → nothing can be proven: fail closed (an empty HMAC key would be forgeable).
+  if (!cookieValue || !secret) return false;
   const want = Buffer.from(signShareSession(token, secret));
   const got = Buffer.from(String(cookieValue));
   return want.length === got.length && timingSafeEqual(want, got);
@@ -59,4 +61,25 @@ export function shareAccess(link: ShareLinkLike, cookieValue: string | null | un
 export function expiryFromPreset(preset: string | null | undefined, now = new Date()): Date | null {
   const days = preset === "7d" ? 7 : preset === "30d" ? 30 : preset === "90d" ? 90 : null;
   return days ? new Date(now.getTime() + days * 86_400_000) : null;
+}
+
+/** Constant-time string equality (the token a request presents vs the row's). */
+export function safeEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+  const x = Buffer.from(String(a ?? "")), y = Buffer.from(String(b ?? ""));
+  return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
+}
+
+/** Tokens are 24 random bytes, base64url — anything else never reaches the database. */
+export function looksLikeShareToken(token: unknown): token is string {
+  return typeof token === "string" && /^[A-Za-z0-9_-]{32}$/.test(token);
+}
+
+/**
+ * The signing secret for unlock cookies: SESSION_SECRET, exactly as the
+ * session layer resolves it — required in production, a labelled dev-only
+ * value otherwise. Never an empty string.
+ */
+export function shareSecret(env: Record<string, string | undefined> = process.env): string | null {
+  if (env.SESSION_SECRET) return env.SESSION_SECRET;
+  return env.NODE_ENV === "production" ? null : "dev-only-insecure-session-secret";
 }

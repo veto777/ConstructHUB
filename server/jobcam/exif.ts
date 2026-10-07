@@ -115,10 +115,47 @@ export function parseIso6709(raw: unknown): { lat: number; lng: number } | null 
   return { lat, lng };
 }
 
+/**
+ * Input options for every ffmpeg/ffprobe run on an uploaded file: local files
+ * only. A "video" that is really a playlist or a concat script must not be
+ * able to make the server fetch a URL or read another file.
+ */
+export const FFMPEG_SAFE_INPUT: readonly string[] = ["-protocol_whitelist", "file"];
+
+export type SniffedType = "jpeg" | "png" | "webp" | "heif" | "mp4" | "webm";
+
+/**
+ * What the first bytes say the file is — the declared MIME type is the
+ * client's word, this is the file's. Only real images / ISO-BMFF / Matroska
+ * containers get as far as sharp or ffmpeg (no SVG, no playlists, no scripts).
+ */
+export function sniffMedia(head: Uint8Array): SniffedType | null {
+  const b = Buffer.from(head.buffer, head.byteOffset, head.byteLength);
+  if (b.length < 12) return null;
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpeg";
+  if (b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "png";
+  if (b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") return "webp";
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return "webm";
+  const box = b.toString("latin1", 4, 8);
+  if (box === "ftyp") {
+    const brand = b.toString("latin1", 8, 12).toLowerCase();
+    return /^(heic|heix|heim|heis|hevc|hevx|mif1|msf1|avif|avis)$/.test(brand) ? "heif" : "mp4";
+  }
+  // QuickTime files from older cameras can open with another top-level atom.
+  if (["moov", "mdat", "wide", "free", "skip"].includes(box)) return "mp4";
+  return null;
+}
+
+/** Does the sniffed type fit what the row says it is? */
+export function sniffMatchesKind(sniffed: SniffedType | null, kind: string): boolean {
+  if (!sniffed) return false;
+  return kind === "video" ? sniffed === "mp4" || sniffed === "webm" : ["jpeg", "png", "webp", "heif"].includes(sniffed);
+}
+
 export function ffprobeJson(filePath: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    execFile("ffprobe", ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", filePath],
-      { maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => {
+    execFile("ffprobe", ["-v", "error", ...FFMPEG_SAFE_INPUT, "-print_format", "json", "-show_format", "-show_streams", filePath],
+      { maxBuffer: 8 * 1024 * 1024, timeout: 60_000, killSignal: "SIGKILL" }, (err, stdout) => {
         if (err) return reject(err);
         try { resolve(JSON.parse(stdout)); } catch (e) { reject(e); }
       });

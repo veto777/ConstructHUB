@@ -58,3 +58,46 @@ describe("jobcam share-link auth (pure)", () => {
     expect(expiryFromPreset("custom", now)).toBeNull();
   });
 });
+
+import { looksLikeShareToken, safeEqual, shareSecret } from "./share-auth";
+
+describe("jobcam share-link auth — fail closed", () => {
+  it("never accepts an unlock cookie when there is no signing secret", () => {
+    const link = { ...base, passwordHash: hashSharePassword("pw-1234") };
+    // An empty-key HMAC is computable by anyone — it must not open the link.
+    const forged = require("crypto").createHmac("sha256", "").update(`jobcam-share:${link.token}`).digest("base64url");
+    expect(verifyShareSession(link.token, forged, "")).toBe(false);
+    expect(shareAccess(link, forged, "")).toEqual({ allowed: false, reason: "locked" });
+    expect(() => signShareSession(link.token, "")).toThrow();
+  });
+
+  it("resolves the secret like the session layer: required in production", () => {
+    expect(shareSecret({ SESSION_SECRET: "abc", NODE_ENV: "production" })).toBe("abc");
+    expect(shareSecret({ NODE_ENV: "production" })).toBeNull();
+    expect(shareSecret({ NODE_ENV: "development" })).toBeTruthy();
+  });
+
+  it("a cookie for one link does not open another", () => {
+    const a = { ...base, token: newShareToken(), passwordHash: hashSharePassword("pw-1234") };
+    const b = { ...base, token: newShareToken(), passwordHash: hashSharePassword("pw-1234") };
+    expect(shareAccess(b, signShareSession(a.token, SECRET), SECRET)).toEqual({ allowed: false, reason: "locked" });
+    expect(shareAccess(a, signShareSession(a.token, SECRET), SECRET)).toEqual({ allowed: true });
+  });
+
+  it("revocation and expiry beat a valid unlock cookie", () => {
+    const link = { ...base, passwordHash: hashSharePassword("pw-1234") };
+    const cookie = signShareSession(link.token, SECRET);
+    expect(shareAccess({ ...link, revokedAt: new Date() }, cookie, SECRET)).toEqual({ allowed: false, reason: "revoked" });
+    expect(shareAccess({ ...link, expiresAt: new Date(Date.now() - 1000) }, cookie, SECRET)).toEqual({ allowed: false, reason: "expired" });
+  });
+
+  it("only well-formed tokens reach the lookup, compared in constant time", () => {
+    const t = newShareToken();
+    expect(looksLikeShareToken(t)).toBe(true);
+    for (const bad of ["", "short", `${t}x`, `${t.slice(0, 31)}%`, "../../../../etc/passwd-padding-1234", null, 42]) expect(looksLikeShareToken(bad)).toBe(false);
+    expect(safeEqual(t, t)).toBe(true);
+    expect(safeEqual(t, `${t.slice(0, 31)}A`.replace(t, `${t.slice(0, 31)}B`))).toBe(false);
+    expect(safeEqual("", "")).toBe(false);
+    expect(safeEqual(t, null)).toBe(false);
+  });
+});

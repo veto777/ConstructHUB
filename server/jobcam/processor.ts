@@ -20,12 +20,12 @@ import path from "path";
 import crypto from "crypto";
 import { spawn } from "child_process";
 import sharp from "sharp";
-import { eq, and } from "drizzle-orm";
+import { eq, and, lt, inArray } from "drizzle-orm";
 import { db } from "../db";
-import { jobcamMedia } from "@shared/schema";
-import { downloadToFile, putObjectFromFile, mediaKey } from "./storage";
-import { readImageMeta, readVideoMeta } from "./exif";
-import { LIMITS, nextMediaStatus } from "./upload-state";
+import { jobcamMedia, jobcamUploads } from "@shared/schema";
+import { downloadToFile, putObjectFromFile, mediaKey, abortMultipart, keyBelongsTo } from "./storage";
+import { readImageMeta, readVideoMeta, sniffMedia, sniffMatchesKind, FFMPEG_SAFE_INPUT } from "./exif";
+import { LIMITS, UPLOAD_TTL_MS, nextMediaStatus } from "./upload-state";
 import { bumpJobcamUsage } from "./usage";
 
 const DISPLAY_MAX = 2048;
@@ -65,6 +65,34 @@ async function drain(): Promise<void> {
   }
 }
 
+/**
+ * Uploads nobody finished: after UPLOAD_TTL the multipart upload is aborted
+ * (R2 frees the parts, the local part files go) and the never-completed media
+ * row is dropped. Runs at boot and hourly; touches only `open` uploads.
+ */
+export async function sweepExpiredUploads(now = Date.now()): Promise<number> {
+  const stale = await db.select().from(jobcamUploads)
+    .where(and(eq(jobcamUploads.status, "open"), lt(jobcamUploads.createdAt, new Date(now - UPLOAD_TTL_MS)))).limit(200);
+  for (const u of stale) {
+    await abortMultipart({ mode: u.storageMode as "r2" | "local", key: u.key, storageUploadId: u.storageUploadId }, u.id).catch(() => {});
+    await db.update(jobcamUploads).set({ status: "aborted", updatedAt: new Date() }).where(and(eq(jobcamUploads.id, u.id), eq(jobcamUploads.status, "open")));
+  }
+  if (stale.length) {
+    await db.delete(jobcamMedia).where(and(inArray(jobcamMedia.id, stale.map((u) => u.mediaId)), eq(jobcamMedia.status, "uploading")));
+    console.log(`[jobcam] swept ${stale.length} abandoned upload(s)`);
+  }
+  return stale.length;
+}
+
+let sweeper: NodeJS.Timeout | null = null;
+export function startJobcamSweeper(): void {
+  if (sweeper) return;
+  const tick = () => sweepExpiredUploads().catch((e: any) => console.error("[jobcam] sweep failed:", e?.message || e));
+  void tick();
+  sweeper = setInterval(tick, 60 * 60 * 1000);
+  sweeper.unref();
+}
+
 /** Boot: anything still `processing` was interrupted by a restart — run it again. */
 export async function resumeJobcamProcessing(): Promise<void> {
   const rows = await db.select({ id: jobcamMedia.id }).from(jobcamMedia)
@@ -93,6 +121,15 @@ function sha256File(p: string): Promise<string> {
   });
 }
 
+async function readHead(p: string, n = 32): Promise<Buffer> {
+  const fh = await fs.promises.open(p, "r");
+  try {
+    const buf = Buffer.alloc(n);
+    const { bytesRead } = await fh.read(buf, 0, n, 0);
+    return buf.subarray(0, bytesRead);
+  } finally { await fh.close(); }
+}
+
 async function fail(id: string, message: string): Promise<void> {
   const [row] = await db.select({ status: jobcamMedia.status }).from(jobcamMedia).where(eq(jobcamMedia.id, id)).limit(1);
   if (!row || !nextMediaStatus(row.status as any, "fail")) return;
@@ -108,7 +145,7 @@ async function toWorkingJpeg(src: string, work: string, mime: string): Promise<s
     return out;
   } catch (e: any) {
     if (!/hei[cf]/i.test(mime)) throw e;
-    const r = await run("ffmpeg", ["-y", "-v", "error", "-i", src, "-frames:v", "1", "-q:v", "2", out], { nice: true, timeoutMs: 60_000 });
+    const r = await run("ffmpeg", ["-y", "-v", "error", ...FFMPEG_SAFE_INPUT, "-i", src, "-frames:v", "1", "-q:v", "2", out], { nice: true, timeoutMs: 60_000 });
     if (r.code !== 0 || !fs.existsSync(out)) {
       throw new Error("This HEIC photo uses HEVC, which this server can't decode. Set the phone camera to 'Most Compatible' (JPEG) or let Safari convert it (the JobCam picker already asks for JPEG).");
     }
@@ -142,13 +179,14 @@ async function processPhoto(row: typeof jobcamMedia.$inferSelect, src: string, w
 
 async function processVideo(row: typeof jobcamMedia.$inferSelect, src: string, work: string) {
   const meta = await readVideoMeta(src);
+  if (!meta.videoCodec) throw new Error("This file has no video track.");
   if (meta.durationS !== null && meta.durationS > LIMITS.videoSeconds + 1) {
     throw new Error(`This video is ${Math.round(meta.durationS / 60)} minutes long; JobCam clips are capped at 10 minutes.`);
   }
   const posterPath = path.join(work, "poster.jpg");
   const thumbPath = path.join(work, "thumb.jpg");
   const at = meta.durationS !== null && meta.durationS < 1.5 ? "0" : "1";
-  const poster = await run("ffmpeg", ["-y", "-v", "error", "-ss", at, "-i", src, "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", posterPath],
+  const poster = await run("ffmpeg", ["-y", "-v", "error", ...FFMPEG_SAFE_INPUT, "-ss", at, "-i", src, "-frames:v", "1", "-vf", "scale='min(1280,iw)':-2", "-q:v", "3", posterPath],
     { nice: true, timeoutMs: 120_000 });
   if (poster.code !== 0 || !fs.existsSync(posterPath)) {
     throw new Error(`Could not read this video (${poster.stderr.trim().split("\n").pop() || "ffmpeg failed"}).`);
@@ -164,8 +202,8 @@ async function processVideo(row: typeof jobcamMedia.$inferSelect, src: string, w
     const outPath = path.join(work, "video-720.mp4");
     // Scale to 720 lines max (never upscale), even dimensions for yuv420p.
     const t = await run("ffmpeg", [
-      "-y", "-v", "error", "-i", src,
-      "-vf", "scale=-2:'min(720,ih)'",
+      "-y", "-v", "error", ...FFMPEG_SAFE_INPUT, "-i", src,
+      "-map", "0:v:0", "-map", "0:a:0?", "-vf", "scale=-2:'min(720,ih)'",
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-threads", "2",
       "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", outPath,
     ], { nice: true, timeoutMs: 45 * 60_000 });
@@ -190,7 +228,16 @@ async function processOne(id: string): Promise<void> {
   const work = await fs.promises.mkdtemp(path.join(os.tmpdir(), "jobcam-"));
   try {
     const src = path.join(work, `original.${row.r2KeyOriginal.split(".").pop() || "bin"}`);
+    if (!keyBelongsTo(row.r2KeyOriginal, row.orgId, row.id)) throw new Error("Stored file key does not belong to this media row.");
     await downloadToFile(row.r2KeyOriginal, src);
+    // Caps are re-checked on what actually landed, and the bytes must be the
+    // kind of file the row claims before any decoder touches them.
+    const stat = await fs.promises.stat(src);
+    const cap = row.kind === "video" ? LIMITS.videoBytes : LIMITS.photoBytes;
+    if (stat.size > cap) throw new Error(row.kind === "video" ? "Videos are capped at 1 GB each." : "Photos are capped at 25 MB each.");
+    if (!sniffMatchesKind(sniffMedia(await readHead(src)), row.kind)) {
+      throw new Error(row.kind === "video" ? "This isn't an MP4, MOV or WebM video file." : "This isn't a JPEG, PNG, WebP or HEIC photo.");
+    }
     const sha256 = await sha256File(src);
     const patch = row.kind === "video" ? await processVideo(row, src, work) : await processPhoto(row, src, work);
     const [fresh] = await db.select({ status: jobcamMedia.status, deletedAt: jobcamMedia.deletedAt }).from(jobcamMedia).where(eq(jobcamMedia.id, id)).limit(1);

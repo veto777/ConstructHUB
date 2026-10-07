@@ -53,7 +53,7 @@ import { registerCrmStatsRoutes } from "./stats";
 import { registerCrmInboxRoutes } from "./inbox";
 import { registerJobcamRoutes } from "../jobcam/routes";
 import { registerJobcamShareRoutes } from "../jobcam/share";
-import { resumeJobcamProcessing } from "../jobcam/processor";
+import { resumeJobcamProcessing, startJobcamSweeper } from "../jobcam/processor";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
@@ -405,6 +405,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerJobcamRoutes(app, getDevUser);
   registerJobcamShareRoutes(app, getDevUser);
   resumeJobcamProcessing().catch((e: any) => console.error("[jobcam] resume failed:", e?.message || e));
+  startJobcamSweeper();
 
   // ── Identity ──────────────────────────────────────────────────────────────
 

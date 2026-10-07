@@ -105,7 +105,7 @@ export default function JobcamSharePage() {
             <span className="text-[var(--g-text)]">{meta.org.name}</span>
             {meta.org.phone && <a href={`tel:${meta.org.phone}`} className="g-link inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {meta.org.phone}</a>}
             {meta.org.email && <a href={`mailto:${meta.org.email}`} className="g-link inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> {meta.org.email}</a>}
-            {meta.org.website && <a href={meta.org.website} target="_blank" rel="noopener noreferrer" className="g-link inline-flex items-center gap-1"><Globe className="h-3.5 w-3.5" /> {meta.org.website.replace(/^https?:\/\//, "")}</a>}
+            {meta.org.website && /^https?:\/\//i.test(meta.org.website) && <a href={meta.org.website} target="_blank" rel="noopener noreferrer" className="g-link inline-flex items-center gap-1"><Globe className="h-3.5 w-3.5" /> {meta.org.website.replace(/^https?:\/\//, "")}</a>}
           </footer>
         )}
       </main>

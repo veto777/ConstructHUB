@@ -36,7 +36,7 @@ import {
   PART_URL_TTL_S, PART_SIZE,
 } from "./upload-state";
 import {
-  createMultipart, directPartUrl, putPart, completeMultipart, abortMultipart, objectSize, getObject, deleteObject, mediaKey, storageMode,
+  createMultipart, directPartUrl, putPart, completeMultipart, abortMultipart, objectSize, getObject, deleteObject, mediaKey, storageMode, keyBelongsTo,
   type MultipartHandle,
 } from "./storage";
 import { enqueueMedia } from "./processor";
@@ -127,15 +127,18 @@ export function variantKey(m: JobcamMedia, variant: string): { key: string; mime
 }
 
 /** Stream one object with Range support; the caller has already authorised the media row. */
-export async function streamVariant(req: any, res: any, m: JobcamMedia, variant: string, download = false) {
+export async function streamVariant(req: any, res: any, m: JobcamMedia, variant: string, download = false, cacheS = 3600) {
   const v = variantKey(m, variant);
   if (!v) return res.status(404).json({ message: "Not available yet" });
+  // The key must be this row's own object — never another tenant's, whatever the column says.
+  if (!keyBelongsTo(v.key, m.orgId, m.id)) return res.status(404).json({ message: "File not found" });
   const obj = await getObject(v.key, v.mime, req.headers.range);
   if (!obj) return res.status(404).json({ message: "File not found" });
   res.status(obj.status);
   res.setHeader("Content-Type", obj.contentType || v.mime);
   res.setHeader("Accept-Ranges", "bytes");
-  res.setHeader("Cache-Control", "private, max-age=3600");
+  res.setHeader("Cache-Control", `private, max-age=${cacheS}`);
+  res.setHeader("X-Content-Type-Options", "nosniff");
   if (obj.contentLength !== undefined) res.setHeader("Content-Length", String(obj.contentLength));
   if (obj.contentRange) res.setHeader("Content-Range", obj.contentRange);
   if (download) {
@@ -143,6 +146,8 @@ export async function streamVariant(req: any, res: any, m: JobcamMedia, variant:
     res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
   }
   obj.body.on("error", () => { if (!res.headersSent) res.status(500); res.end(); });
+  // A viewer who scrubs or closes the tab must not leave the storage read open.
+  res.on("close", () => { if (!obj.body.destroyed) obj.body.destroy(); });
   obj.body.pipe(res);
 }
 
@@ -416,8 +421,20 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
   });
 
   const uploadFor = async (ctx: OrgContext, id: string) => {
-    const [u] = await db.select().from(jobcamUploads).where(and(eq(jobcamUploads.orgId, ctx.org.id), eq(jobcamUploads.id, id))).limit(1);
+    // An upload belongs to the seat that opened it: nobody else in the org can
+    // push parts into it, finish it or cancel it.
+    const [u] = await db.select().from(jobcamUploads)
+      .where(and(eq(jobcamUploads.orgId, ctx.org.id), eq(jobcamUploads.id, id), eq(jobcamUploads.memberId, ctx.member.id))).limit(1);
     return u ?? null;
+  };
+
+  /** Merge one part into parts_done in a single statement, so parallel parts never overwrite each other. */
+  const recordPart = async (uploadRowId: string, n: number, etag: string): Promise<Record<string, string>> => {
+    const [row] = await db.update(jobcamUploads).set({
+      partsDone: sql`coalesce(${jobcamUploads.partsDone}, '{}'::jsonb) || jsonb_build_object(${String(n)}::text, ${etag}::text)`,
+      updatedAt: new Date(),
+    }).where(and(eq(jobcamUploads.id, uploadRowId), eq(jobcamUploads.status, "open"))).returning({ partsDone: jobcamUploads.partsDone });
+    return ((row?.partsDone as any) ?? markPart(null, n, etag)) as Record<string, string>;
   };
 
   app.get("/api/crm/jobcam/uploads/:id", async (req: any, res) => {
@@ -445,8 +462,7 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     if (body.length !== expected) return res.status(400).json({ message: `Part ${n} should be ${expected} bytes, got ${body.length}` });
     try {
       const etag = await putPart(handleOf(u), u.id, n, body);
-      const done = markPart(u.partsDone as any, n, etag);
-      await db.update(jobcamUploads).set({ partsDone: done, updatedAt: new Date() }).where(eq(jobcamUploads.id, u.id));
+      const done = await recordPart(u.id, n, etag);
       res.json({ n, etag, partsDone: Object.keys(done).length });
     } catch (e: any) {
       console.error("[jobcam] part upload failed:", e?.message || e);
@@ -462,8 +478,8 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     const n = Number(req.params.n);
     const etag = String(req.body?.etag ?? "").trim();
     if (!Number.isInteger(n) || n < 1 || n > u.partsTotal || !etag || etag.length > 200) return res.status(400).json({ message: "Bad part" });
-    const done = markPart(u.partsDone as any, n, etag);
-    await db.update(jobcamUploads).set({ partsDone: done, updatedAt: new Date() }).where(eq(jobcamUploads.id, u.id));
+    if (u.storageMode !== "r2") return res.status(400).json({ message: "Send the part body to this URL with PUT" });
+    const done = await recordPart(u.id, n, etag);
     res.json({ n, etag, partsDone: Object.keys(done).length });
   });
 
@@ -471,22 +487,32 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res); if (!ctx) return;
     const u = await uploadFor(ctx, req.params.id);
     if (!u) return res.status(404).json({ message: "Upload not found" });
-    const [m] = await db.select().from(jobcamMedia).where(eq(jobcamMedia.id, u.mediaId)).limit(1);
+    const [m] = await db.select().from(jobcamMedia)
+      .where(and(eq(jobcamMedia.orgId, ctx.org.id), eq(jobcamMedia.id, u.mediaId))).limit(1);
     if (!m) return res.status(404).json({ message: "Media not found" });
+    if (m.deletedAt) return res.status(409).json({ message: "This shot was deleted" });
     if (u.status === "completed") return res.json(presentMedia(m, base));
     if (u.status !== "open") return res.status(409).json({ message: "This upload was cancelled" });
     const done = (u.partsDone as any) ?? {};
     if (!canComplete(done, u.partsTotal)) {
       return res.status(409).json({ message: "Some parts are missing", missing: missingParts(done, u.partsTotal) });
     }
+    if (uploadExpired(u.createdAt)) return res.status(409).json({ message: "This upload expired — send the file again." });
     try {
       await completeMultipart(handleOf(u), u.id, completedParts(done, u.partsTotal));
     } catch (e: any) {
-      console.error("[jobcam] complete failed:", e?.message || e);
-      return res.status(502).json({ message: `Storage could not finish the upload: ${String(e?.message || e).slice(0, 200)}` });
+      // A retried /complete after storage already assembled the object lands
+      // here (the multipart id is gone); the size check below decides.
+      if ((await objectSize(u.key)) === null) {
+        console.error("[jobcam] complete failed:", e?.message || e);
+        return res.status(502).json({ message: `Storage could not finish the upload: ${String(e?.message || e).slice(0, 200)}` });
+      }
     }
+    // The announced size is what the caps were checked against, so the stored
+    // object must be exactly that — an unreadable size is a refusal, not a pass.
     const size = await objectSize(u.key);
-    if (size !== null && size !== u.bytes) {
+    if (size === null) return res.status(502).json({ message: "Storage did not confirm the upload — try again." });
+    if (size !== u.bytes) {
       await deleteObject(u.key).catch(() => {});
       await db.update(jobcamUploads).set({ status: "aborted", updatedAt: new Date() }).where(eq(jobcamUploads.id, u.id));
       await db.delete(jobcamMedia).where(eq(jobcamMedia.id, m.id));
@@ -494,7 +520,10 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     }
     const next = nextMediaStatus(m.status as any, "complete");
     if (!next) return res.status(409).json({ message: `Media is already ${m.status}` });
-    await db.update(jobcamUploads).set({ status: "completed", updatedAt: new Date() }).where(eq(jobcamUploads.id, u.id));
+    // Only one request wins the open → completed move (a double tap must not log or queue twice).
+    const [won] = await db.update(jobcamUploads).set({ status: "completed", updatedAt: new Date() })
+      .where(and(eq(jobcamUploads.id, u.id), eq(jobcamUploads.status, "open"))).returning({ id: jobcamUploads.id });
+    if (!won) return res.json(presentMedia(m, base));
     const [updated] = await db.update(jobcamMedia).set({ status: next, uploadedAt: new Date(), updatedAt: new Date() })
       .where(eq(jobcamMedia.id, m.id)).returning();
     enqueueMedia(m.id);
@@ -589,12 +618,15 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
   const softDelete = async (ctx: OrgContext, rows: JobcamMedia[]) => {
     const ids = rows.map((m) => m.id);
     if (!ids.length) return 0;
-    await db.update(jobcamMedia).set({ deletedAt: new Date(), updatedAt: new Date() }).where(inArray(jobcamMedia.id, ids));
-    for (const m of rows) {
+    // Only rows this statement actually flipped are taken off the storage meter
+    // (two deletes of the same shot must not subtract twice).
+    const flipped = await db.update(jobcamMedia).set({ deletedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(jobcamMedia.orgId, ctx.org.id), inArray(jobcamMedia.id, ids), isNull(jobcamMedia.deletedAt))).returning();
+    for (const m of flipped) {
       if (m.status === "ready") await bumpJobcamUsage(ctx.org.id, { bytes: -(m.bytes + m.renditionBytes), kind: m.kind as "photo" | "video", count: -1 });
       logActivity(ctx, "jobcam.media.deleted", { entityType: "jobcam_media", entityId: m.id, customerId: m.customerId, meta: { kind: m.kind, projectId: m.projectId } });
     }
-    return ids.length;
+    return flipped.length;
   };
 
   app.delete("/api/crm/jobcam/media/:id", async (req: any, res) => {
@@ -604,6 +636,19 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     if (!canTouch(ctx, m)) return res.status(403).json({ message: "Only the uploader or a manager can delete this" });
     await softDelete(ctx, [m]);
     res.json({ ok: true });
+  });
+
+  // A failed job (ffmpeg hiccup, storage blip) can be run again by whoever may edit the shot.
+  app.post("/api/crm/jobcam/media/:id/retry", async (req: any, res) => {
+    const ctx = await ctxFor(req, res); if (!ctx) return;
+    const m = await mediaFor(ctx, req.params.id);
+    if (!m) return res.status(404).json({ message: "Media not found" });
+    if (!canTouch(ctx, m)) return res.status(403).json({ message: "Only the uploader or a manager can retry this" });
+    if (m.status !== "failed" || !nextMediaStatus("failed", "retry")) return res.status(409).json({ message: `Media is ${m.status}` });
+    const [row] = await db.update(jobcamMedia).set({ status: "processing", error: null, updatedAt: new Date() })
+      .where(and(eq(jobcamMedia.id, m.id), eq(jobcamMedia.status, "failed"))).returning();
+    if (row) enqueueMedia(row.id);
+    res.json(presentMedia(row ?? m, base));
   });
 
   app.post("/api/crm/jobcam/media/bulk", async (req: any, res) => {

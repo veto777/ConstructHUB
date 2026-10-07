@@ -49,16 +49,50 @@ export function storageMode(): StorageMode {
   return r2Configured() && !!process.env.R2_ENDPOINT ? "r2" : "local";
 }
 
+/**
+ * New objects go under `jobcam/…`, or `jobcam-<suffix>/…` when JOBCAM_KEY_PREFIX
+ * is set (a dev or staging box that shares the production bucket must never
+ * write into production's tree). An unusable value fails loudly at first use.
+ */
+export function keyPrefix(raw: string | undefined = process.env.JOBCAM_KEY_PREFIX): string {
+  const v = String(raw ?? "").trim();
+  if (!v) return "jobcam";
+  if (!/^jobcam(-[a-z0-9]{1,24})?$/.test(v)) throw new Error("JOBCAM_KEY_PREFIX must be 'jobcam' or 'jobcam-<suffix>' (a-z, 0-9)");
+  return v;
+}
+
 /** Keys are built by us; a hand-edited row must still never escape the prefix. */
 export function assertKey(key: string): string {
-  if (!/^jobcam\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/.test(key) || key.includes("..")) {
+  if (typeof key !== "string" || key.length > 300 || key.includes("..")
+    || !/^jobcam(-[a-z0-9]{1,24})?\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test(key)) {
     throw new Error("Invalid JobCam storage key");
   }
   return key;
 }
 
 export function mediaKey(orgId: string, mediaId: string, name: string): string {
-  return assertKey(`jobcam/${orgId}/${mediaId}/${name}`);
+  return assertKey(`${keyPrefix()}/${orgId}/${mediaId}/${name}`);
+}
+
+/**
+ * Every key on a media row is `<prefix>/<its org>/<its id>/…`. The file routes
+ * check this before streaming, so a row can never be pointed at another
+ * tenant's object (or anything outside the tree), whatever is in the column.
+ */
+export function keyBelongsTo(key: string | null | undefined, orgId: string, mediaId: string): boolean {
+  if (!key) return false;
+  try { assertKey(key); } catch { return false; }
+  const [, org, media] = key.split("/");
+  return org === orgId && media === mediaId;
+}
+
+/** A single well-formed byte range, or undefined — anything else is served whole (RFC 9110 lets us ignore it). */
+export function cleanRange(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const m = /^bytes=(\d{0,15})-(\d{0,15})$/.exec(raw.trim());
+  if (!m || (!m[1] && !m[2])) return undefined;
+  if (m[1] && m[2] && Number(m[1]) > Number(m[2])) return undefined;
+  return `bytes=${m[1]}-${m[2]}`;
 }
 
 const localPath = (key: string) => path.join(LOCAL_ROOT, assertKey(key));
@@ -202,8 +236,9 @@ export type ObjectStream = {
 };
 
 /** `range` is the raw HTTP Range header ("bytes=0-99"), honoured in both modes so video seeks work. */
-export async function getObject(key: string, mime: string, range?: string): Promise<ObjectStream | null> {
+export async function getObject(key: string, mime: string, rawRange?: string): Promise<ObjectStream | null> {
   assertKey(key);
+  const range = cleanRange(rawRange);
   if (storageMode() === "r2") {
     try {
       const r = await client().send(new GetObjectCommand({ Bucket: BUCKET, Key: key, ...(range ? { Range: range } : {}) }));
@@ -219,6 +254,8 @@ export async function getObject(key: string, mime: string, range?: string): Prom
       };
     } catch (e: any) {
       if (e?.$metadata?.httpStatusCode === 404 || e?.name === "NoSuchKey") return null;
+      // A range past the end of the object: serve it whole rather than 500.
+      if (range && (e?.$metadata?.httpStatusCode === 416 || e?.name === "InvalidRange")) return getObject(key, mime);
       throw e;
     }
   }
@@ -227,9 +264,9 @@ export async function getObject(key: string, mime: string, range?: string): Prom
   try { size = (await fs.promises.stat(p)).size; } catch { return null; }
   const m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
   if (m && (m[1] || m[2])) {
-    let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
-    let end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
-    if (start > end || start >= size) { start = 0; end = size - 1; }
+    const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+    const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+    if (start > end || start >= size) return { body: fs.createReadStream(p), contentType: mime, contentLength: size, status: 200 };
     return {
       body: fs.createReadStream(p, { start, end }), contentType: mime,
       contentLength: end - start + 1, contentRange: `bytes ${start}-${end}/${size}`, status: 206,
