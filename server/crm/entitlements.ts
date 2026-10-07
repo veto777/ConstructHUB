@@ -5,10 +5,13 @@
  * from the account's CRM subscription, never from a ConstructHUB platform plan.
  * A platform plan grants NO CRM access, and a CRM plan grants NO platform tools.
  *
- * Both products live in `subscriptions`, one row each, told apart by the
- * `product` column ('platform' | 'crm'; server/billing/schema.ts adds it, default
- * 'platform' so every pre-split row stays a platform row). The platform's
- * getEntitlements() reads product='platform'; this reads product='crm'.
+ * The CRM subscription lives in its OWN table, `crm_subscriptions` (one row per
+ * account), not in `subscriptions`: every platform billing path reads
+ * `subscriptions` by user or by Stripe customer and assumes one row, so a second
+ * row there could be picked up as the platform plan. Both products share the
+ * account's Stripe customer; a CRM Stripe subscription carries
+ * metadata.product = "crm" and CRM prices (server/billing/prices.ts), which is
+ * how the webhook tells the two apart (server/crm/billing.ts).
  */
 import { pool } from "../db";
 import { ACCESS_STATUSES } from "../../shared/plans";
@@ -16,62 +19,139 @@ import {
   CRM_PLANS, isCrmPlanKey, CRM_EXTRA_SEAT_MONTHLY_CENTS,
   type CrmPlanKey, type CrmPlanLimits,
 } from "../../shared/crm-plans";
+import { isPlatformAdminEmail } from "../admin";
 
-/** The add-on key for one more CRM seat, stored in the CRM row's `addons`. */
-export const CRM_EXTRA_SEAT_ADDON = "crm_extra_seat";
+/** Idempotent, additive. Run once per process before anything reads the table. */
+export const CRM_SUBSCRIPTION_DDL: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS crm_subscriptions (
+     id integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+     user_id integer NOT NULL UNIQUE,
+     stripe_customer_id text,
+     stripe_subscription_id text,
+     stripe_price_id text,
+     plan text,
+     status text NOT NULL DEFAULT 'inactive',
+     billing_interval text,
+     extra_seats integer NOT NULL DEFAULT 0,
+     current_period_end timestamp,
+     trial_end timestamp,
+     cancel_at_period_end boolean,
+     created_at timestamp NOT NULL DEFAULT now(),
+     updated_at timestamp NOT NULL DEFAULT now()
+   )`,
+  `CREATE INDEX IF NOT EXISTS crm_subscriptions_stripe_sub_idx ON crm_subscriptions (stripe_subscription_id)`,
+];
+
+let schemaReady: Promise<void> | null = null;
+export function crmBillingSchemaReady(): Promise<void> {
+  schemaReady ??= (async () => {
+    for (const ddl of CRM_SUBSCRIPTION_DDL) await pool.query(ddl);
+  })().catch((e: any) => {
+    console.error("[crm-billing] could not create crm_subscriptions:", e?.message || e);
+    schemaReady = null;
+  });
+  return schemaReady;
+}
+
+export type CrmSubscriptionRow = {
+  id: number;
+  user_id: number;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_price_id: string | null;
+  plan: string | null;
+  status: string;
+  billing_interval: string | null;
+  extra_seats: number;
+  current_period_end: Date | null;
+  trial_end: Date | null;
+  cancel_at_period_end: boolean | null;
+};
 
 export type CrmEntitlements = {
   /** The active CRM plan, or null when the account has no CRM subscription. */
   plan: CrmPlanKey | null;
   limits: CrmPlanLimits | null;
-  /** Seats included by the plan plus any Extra seat add-ons. 0 without a CRM plan. */
+  /** Seats included by the plan plus Extra seats. 0 without a CRM plan; -1 = unlimited. */
   seats: number;
   extraSeats: number;
   status: string | null;
   /** True when the CRM is usable right now. */
   active: boolean;
+  /** Why it is usable: a paid/trialing CRM plan, a beta account, or ConstructHUB staff. */
+  via: "plan" | "beta" | "admin" | null;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
 };
 
 export const NO_CRM: CrmEntitlements = {
-  plan: null, limits: null, seats: 0, extraSeats: 0, status: null, active: false,
+  plan: null, limits: null, seats: 0, extraSeats: 0, status: null, active: false, via: null,
+  trialEndsAt: null, currentPeriodEnd: null,
 };
 
-function parseAddons(value: unknown): Record<string, number> {
-  if (!value || typeof value !== "object") return {};
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    const n = typeof v === "number" ? v : Number(v);
-    if (Number.isFinite(n) && n > 0) out[k] = Math.floor(n);
-  }
-  return out;
-}
-
 /** The account's CRM subscription row, or undefined. */
-export async function crmSubscriptionRow(userId: number): Promise<any | undefined> {
-  const { rows: [row] } = await pool.query(
-    `SELECT * FROM subscriptions x
-       WHERE x.user_id = $1 AND x.product = 'crm'
-       ORDER BY (x.status = ANY($2::text[])) DESC, x.id DESC
-       LIMIT 1`,
-    [userId, ACCESS_STATUSES],
-  );
+export async function crmSubscriptionRow(userId: number): Promise<CrmSubscriptionRow | undefined> {
+  await crmBillingSchemaReady();
+  const { rows: [row] } = await pool.query(`SELECT * FROM crm_subscriptions WHERE user_id = $1 LIMIT 1`, [userId]);
   return row;
 }
 
-export async function getCrmEntitlements(userId: number | null | undefined): Promise<CrmEntitlements> {
+// requireOrg() asks on every CRM request, so the answer is cached briefly per
+// account; every write to crm_subscriptions forgets it (forgetCrmEntitlements).
+const TTL_MS = 30_000;
+const cache = new Map<number, { at: number; ent: CrmEntitlements }>();
+export function forgetCrmEntitlements(userId?: number | null) {
+  if (userId) cache.delete(userId); else cache.clear();
+}
+
+export async function getCrmEntitlements(userId: number | null | undefined, opts: { fresh?: boolean } = {}): Promise<CrmEntitlements> {
   if (!userId) return NO_CRM;
-  const row = await crmSubscriptionRow(userId);
+  const hit = cache.get(userId);
+  if (hit && !opts.fresh && Date.now() - hit.at < TTL_MS) return hit.ent;
+  const ent = await loadCrmEntitlements(userId);
+  cache.set(userId, { at: Date.now(), ent });
+  return ent;
+}
+
+async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
+  await crmBillingSchemaReady();
+  const { rows: [row] } = await pool.query(
+    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.trial_end, s.current_period_end
+       FROM users u LEFT JOIN crm_subscriptions s ON s.user_id = u.id
+      WHERE u.id = $1`, [userId]);
   if (!row) return NO_CRM;
-  const status = row.status ?? null;
-  const active = !!status && (ACCESS_STATUSES as readonly string[]).includes(status);
+  // ConstructHUB staff and beta accounts use the CRM without a subscription.
+  const top = CRM_PLANS.crm_max;
+  if (isPlatformAdminEmail(row.email)) {
+    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, status: row.status ?? null, active: true, via: "admin" };
+  }
+  if (row.beta_at) {
+    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, status: row.status ?? null, active: true, via: "beta" };
+  }
+  const status: string | null = row.status ?? null;
+  const live = !!status && (ACCESS_STATUSES as readonly string[]).includes(status);
   const storedPlan: unknown = row.plan;
-  const plan: CrmPlanKey | null = active && isCrmPlanKey(storedPlan) ? storedPlan : null;
+  const plan: CrmPlanKey | null = live && isCrmPlanKey(storedPlan) ? storedPlan : null;
   if (!plan) return { ...NO_CRM, status };
   const limits = CRM_PLANS[plan].limits;
-  const extraSeats = parseAddons(row.addons)[CRM_EXTRA_SEAT_ADDON] ?? 0;
-  const seats = limits.seats < 0 ? limits.seats : limits.seats + extraSeats;
-  return { plan, limits, seats, extraSeats, status, active: true };
+  const extraSeats = Math.max(0, Number(row.extra_seats) || 0);
+  return {
+    plan, limits, extraSeats, status, active: true, via: "plan",
+    seats: limits.seats < 0 ? limits.seats : limits.seats + extraSeats,
+    trialEndsAt: status === "trialing" && row.trial_end ? new Date(row.trial_end) : null,
+    currentPeriodEnd: row.current_period_end ? new Date(row.current_period_end) : null,
+  };
 }
 
 /** Price of one more CRM seat, for upgrade copy. */
 export const crmExtraSeatCents = () => CRM_EXTRA_SEAT_MONTHLY_CENTS;
+
+/** The body of the 402 a CRM route answers when the org's owner has no CRM plan. */
+export function crmPlanRequiredBody() {
+  const cheapest = CRM_PLANS.crm_basic;
+  return {
+    code: "crm_plan_required",
+    message: `The ConstructHUB CRM is its own subscription, separate from the ConstructHUB platform plans, from $${(cheapest.monthlyCents / 100).toFixed(0)}/mo. Choose a CRM plan to open it.`,
+    href: "/pricing#crm",
+  };
+}

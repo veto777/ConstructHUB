@@ -18,6 +18,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
+import { CrmPaywall } from "@/components/crm-plans";
 import { CrmRibbon } from "@/components/crm-ribbon";
 import { AppTabBar } from "@/components/app-tabbar";
 import { inNativeApp } from "@/lib/app-shell";
@@ -56,7 +57,7 @@ import GoogleAdFraudPage from "@/pages/google-ad-fraud";
 import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
-import { FeaturesCataloguePage, FeaturePageRoute, LegacyLanding } from "@/pages/features";
+import { FeaturesCataloguePage, FeaturePageRoute, FeatureAdLanding, LegacyLanding } from "@/pages/features";
 import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
@@ -226,6 +227,9 @@ function DashboardRouter() {
       <Route path="/call-assistant" component={CrmCallAssistantPage} />
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
+      {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
+      <Route path="/googleads-features" component={FeaturesCataloguePage} />
+      <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
       <Route path="/features/:slug" component={FeaturePageRoute} />
       {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
       <Route path="/done-for-you" component={DfyCataloguePage} />
@@ -331,6 +335,9 @@ function PublicRouter() {
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/features" component={FeaturesCataloguePage} />
+      {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
+      <Route path="/googleads-features" component={FeaturesCataloguePage} />
+      <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
       <Route path="/features/:slug" component={FeaturePageRoute} />
       <Route path="/done-for-you" component={DfyCataloguePage} />
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />
@@ -410,6 +417,27 @@ const sidebarStyle = {
 };
 
 /** The portal (portal.constructhub.*) is the CRM only — no marketing routes. */
+/**
+ * The CRM is its own subscription (the org owner's). Without one the app shows
+ * the CRM plans instead of the workspace — /api/crm/me says which. Joining a
+ * team, the platform console and the legal pages stay reachable.
+ */
+const CRM_GATE_OPEN = [/^\/crm\/join/, /^\/crm\/admin/, /^\/admin/, /^\/auth/, /^\/crm-terms/, /^\/crm-privacy/];
+function CrmPlanGate({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
+  const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  // Back from Stripe: the webhook may land a moment after the redirect.
+  const justPaid = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("crm_success");
+  useEffect(() => {
+    if (!justPaid || me?.crm?.active) return;
+    const timer = window.setInterval(() => { void queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] }); }, 2500);
+    return () => window.clearInterval(timer);
+  }, [justPaid, me?.crm?.active]);
+  if (!me?.crm || me.crm.active || CRM_GATE_OPEN.some((re) => re.test(location))) return <>{children}</>;
+  if (justPaid) return <div className="p-10 text-center text-muted-foreground" data-testid="text-crm-activating">Activating your CRM plan…</div>;
+  return <CrmPaywall isOwner={!!me.crm.isOwner} orgName={me.org?.name} />;
+}
+
 function PortalRouter() {
   return (
     <Suspense fallback={null}>
@@ -687,7 +715,7 @@ function AppContent() {
             </header>
             {/* Bottom padding keeps content clear of the mobile ribbon; desktop is unchanged. */}
             <main className="flex-1 overflow-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
-              <PortalRouter />
+              <CrmPlanGate><PortalRouter /></CrmPlanGate>
             </main>
           </div>
           <CrmRibbon />

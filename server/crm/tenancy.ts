@@ -19,7 +19,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
 import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
 import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse, type Entitlements } from "../entitlements";
-import { getCrmEntitlements } from "./entitlements";
+import { getCrmEntitlements, crmPlanRequiredBody } from "./entitlements";
 import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
 
 export type OrgContext = {
@@ -111,7 +111,27 @@ export async function listOrgsForUser(userId: number) {
 export async function requireOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
   const ctx = await resolveOrg(req, res, userId);
   if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
+  if (!await crmPlanOk(req, res, ctx)) return null;
   return ctx;
+}
+
+/**
+ * The CRM is a separate product (shared/crm-plans.ts): every staff route runs
+ * on the ORG OWNER's CRM plan — a team member rides the owner's subscription.
+ * Without one the route answers 402 crm_plan_required and the app shows the
+ * CRM plans. /api/crm/me and the billing routes stay open so the app can boot,
+ * say why, and sell the plan. Beta accounts and ConstructHUB staff pass
+ * (getCrmEntitlements). CRM_REQUIRE_PLAN=0 switches the gate off (the demo).
+ */
+const CRM_OPEN_PATHS = [/^\/api\/crm\/me(\/|$)/, /^\/api\/crm\/billing(\/|$)/, /^\/api\/crm\/orgs(\/|$)/];
+async function crmPlanOk(req: any, res: any, ctx: OrgContext): Promise<boolean> {
+  if (process.env.CRM_REQUIRE_PLAN === "0") return true;
+  const path = String(req?.originalUrl || req?.path || "").split("?")[0];
+  if (CRM_OPEN_PATHS.some((re) => re.test(path))) return true;
+  const crm = await getCrmEntitlements(ctx.org.ownerUserId);
+  if (crm.active) return true;
+  res.status(402).json(crmPlanRequiredBody());
+  return false;
 }
 
 async function resolveOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {

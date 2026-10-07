@@ -10,7 +10,7 @@ import {
   CALL_ASSISTANT_OVERAGE_RATES, callAssistantTier,
   type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey,
 } from "./plans";
-import { CRM_PLANS, CRM_PLAN_KEYS } from "./crm-plans";
+import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "./crm-plans";
 
 /** "Talk to a sales rep" — the label for anything at or above SALES_THRESHOLD_CENTS. */
 export const SALES_REP_LABEL = "Talk to a sales rep";
@@ -370,6 +370,13 @@ export const COMPETITOR_INTEL_PLANS = planNamesWhere((plan) => plan.limits.compe
 export const PROTECTED_SITE_PLANS = planNamesWhere((plan) => plan.limits.protectedSites > 0);
 /** Plans with team text alerts. */
 export const TEXTING_PLANS = planNamesWhere((plan) => plan.limits.teamTextSegments > 0);
+/** CRM plans with texting — the CRM is a separate product (shared/crm-plans.ts). */
+export const CRM_TEXTING_PLANS = joinNames(CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.teamTextSegments > 0).map((k) => CRM_PLANS[k].name));
+/** "CRM Basic $39/month or $348/year (1 seat), …" */
+export const crmPlansLine = () => CRM_PLAN_KEYS.map((k) => {
+  const p = CRM_PLANS[k];
+  return `${p.name} ${formatUsd(p.monthlyCents)}/month or ${formatUsd(p.annualCents)}/year (${p.limits.seats} seat${p.limits.seats === 1 ? "" : "s"})`;
+}).join("; ");
 
 /**
  * The price book as plain text for the AI assistants' system prompts. It lists
@@ -389,7 +396,7 @@ There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans ar
 ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.
-The CRM (clients, estimates, invoices, payments, pipeline) is included in every plan. CRM seats per plan: ${CRM_SEATS_LINE}.
+The CRM (clients, estimates, invoices, payments, pipeline) is a SEPARATE product with its own subscription: none of the plans above includes it, and a CRM subscription does not include the tools above. CRM pricing: ${crmPlansLine()}. A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial.
 Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is included with ${TEXTING_PLANS}.
 
 ### Add-ons (single features are sold only as add-ons to a plan)

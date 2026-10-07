@@ -187,7 +187,7 @@ const services = [
     icon: Users,
     title: "Contractor CRM",
     href: featureIntroPath("crm"),
-    description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — included with every plan.",
+    description: "Clients, estimates, invoices, pipeline, messaging and payments in one place — its own product, with its own plans.",
   },
   {
     icon: Phone,
@@ -391,7 +391,7 @@ export default function LandingPage() {
             {Array.from({ length: fillerCells }, (_, i) => (
               i === 0 ? (
                 <Link key="filler-cta" href="/features" className="hidden lg:flex bg-mkt-paper-2 p-8 flex-col justify-end hover:bg-mkt-card transition-colors" data-testid="link-services-all-features">
-                  <span className="font-display italic text-xl text-mkt-ink">Every plan includes the CRM.</span>
+                  <span className="font-display italic text-xl text-mkt-ink">The CRM is sold separately.</span>
                   <span className="mt-2 inline-flex items-center gap-2 text-[15px] font-semibold text-mkt-orange-ink">See every tool <ArrowRight className="h-4 w-4" /></span>
                 </Link>
               ) : (
@@ -478,7 +478,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
-              A new account's first plan starts with a {TRIAL_LABEL}, and every plan includes the CRM. Pay monthly, or yearly at 10 times the monthly price.
+              A new account's first plan starts with a {TRIAL_LABEL}. The CRM is a separate product with its own plans. Pay monthly, or yearly at 10 times the monthly price.
             </p>
           </div>
 

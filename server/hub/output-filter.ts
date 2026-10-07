@@ -8,7 +8,7 @@
  * Pure: no DB, no request, no model.
  */
 import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, CALL_ASSISTANT_TIERS, type PlanKey } from "@shared/plans";
-import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
+import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "@shared/crm-plans";
 import { hubLinkFor } from "@shared/hub-links";
 import { CALL_ASSISTANT_INTRO } from "@shared/plan-copy";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
@@ -452,7 +452,11 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   for (const re of TRIAL_LENGTHS) {
     for (const m of linkless.matchAll(re)) {
       const n = /^\d+$/.test(m[1]) ? Number(m[1]) : NUM_WORDS[m[1].toLowerCase()];
-      if (n !== TRIAL_DAYS || m[2].toLowerCase() !== "day") block("O10");
+      // The CRM is a separate product with its own trial length (shared/crm-plans.ts):
+      // that length is right only in a sentence about the CRM.
+      const about = linkless.slice(Math.max(0, m.index! - 200), m.index! + m[0].length + 40);
+      const crmTrial = n === CRM_TRIAL_DAYS && m[2].toLowerCase() === "day" && /\bCRM\b/.test(about);
+      if (!crmTrial && (n !== TRIAL_DAYS || m[2].toLowerCase() !== "day")) block("O10");
     }
   }
   for (const m of linkless.matchAll(/\b([A-Z][A-Za-z]*) ([Pp]lan|[Tt]ier|[Pp]ackage|[Mm]embership)\b/g)) {

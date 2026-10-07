@@ -17,6 +17,7 @@ import { BRAND_NAME } from "@/lib/marketing";
 import { StandingGator } from "@/components/mascot";
 import { inNativeApp } from "@/lib/app-shell";
 import { BTN_OUTLINE, BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
+import { trackConversion } from "@/lib/gtag";
 
 type AuthMode = "2fa" | "login" | "signup" | "forgot-password" | "reset-password";
 
@@ -123,6 +124,7 @@ export default function AuthPage() {
       });
       const data = await res.json();
       setMessage(data.message);
+      trackConversion("signup");
       toast({ title: "Account created!", description: "Check your email for a verification link." });
     } catch (err: any) {
       toast({ title: "Signup failed", description: apiErrorMessage(err, "Signup failed"), variant: "destructive" });

@@ -21,6 +21,9 @@ import {
   planPriceCents, addonPriceCents, isPlanKey, isAddonKey, isBillingInterval,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
+import {
+  CRM_PLANS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS, crmPlanPriceCents, isCrmPlanKey, type CrmPlanKey,
+} from "@shared/crm-plans";
 
 const PREFIX = "chub_v1";
 
@@ -28,7 +31,10 @@ export type PriceRole =
   | { kind: "plan"; key: PlanKey; interval: BillingInterval }
   | { kind: "addon"; key: AddonKey; interval: BillingInterval }
   | { kind: "agency_locations"; interval: BillingInterval }
-  | { kind: "setup"; key: AddonKey };
+  | { kind: "setup"; key: AddonKey }
+  // The CRM is a separate product with its own subscription (server/crm/billing.ts).
+  | { kind: "crm_plan"; key: CrmPlanKey; interval: BillingInterval }
+  | { kind: "crm_seat"; interval: BillingInterval };
 
 export type PriceSpec = {
   lookupKey: string;
@@ -117,6 +123,36 @@ export function addonSetupPriceSpec(addon: AddonKey): PriceSpec | null {
   };
 }
 
+/** A CRM plan (shared/crm-plans.ts). Annual is its own price, not ANNUAL_MONTHS x monthly. */
+export function crmPlanPriceSpec(plan: CrmPlanKey, interval: BillingInterval): PriceSpec {
+  const cents = crmPlanPriceCents(plan, interval);
+  return {
+    lookupKey: `${PREFIX}_crmplan_${plan}_${interval}_${cents}`,
+    role: { kind: "crm_plan", key: plan, interval },
+    params: {
+      currency: "usd",
+      unit_amount: cents,
+      recurring: { interval },
+      product_data: { name: `ConstructHUB ${CRM_PLANS[plan].name}` },
+    },
+  };
+}
+
+/** One extra CRM seat, on a CRM subscription. */
+export function crmSeatPriceSpec(interval: BillingInterval): PriceSpec {
+  const cents = interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS;
+  return {
+    lookupKey: `${PREFIX}_crmseat_${interval}_${cents}`,
+    role: { kind: "crm_seat", interval },
+    params: {
+      currency: "usd",
+      unit_amount: cents,
+      recurring: { interval },
+      product_data: { name: "ConstructHUB CRM — extra seat" },
+    },
+  };
+}
+
 export function agencyLocationsPriceSpec(interval: BillingInterval): PriceSpec {
   const tiers = agencyLocationTiers(interval);
   const signature = tiers.map((t) => `${t.up_to}x${t.unit_amount}`).join("-");
@@ -183,6 +219,10 @@ export function roleOfPrice(price: Stripe.Price | null | undefined): PriceRole |
       return isBillingInterval(interval) ? { kind: "agency_locations", interval } : null;
     case "setup":
       return isAddonKey(meta.chub_key) ? { kind: "setup", key: meta.chub_key } : null;
+    case "crm_plan":
+      return isCrmPlanKey(meta.chub_key) && isBillingInterval(interval) ? { kind: "crm_plan", key: meta.chub_key, interval } : null;
+    case "crm_seat":
+      return isBillingInterval(interval) ? { kind: "crm_seat", interval } : null;
     default:
       return null;
   }

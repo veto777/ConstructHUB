@@ -304,12 +304,6 @@ export type InsertCompetitorListing = z.infer<typeof insertCompetitorListingSche
 export const subscriptions = pgTable("subscriptions", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id").notNull(),
-  /**
-   * Which product this subscription is for. The CRM is sold separately from
-   * the platform (shared/crm-plans.ts), and an account may hold one row of
-   * each. Default \'platform\' so every pre-split row stays a platform row.
-   */
-  product: text("product").notNull().default("platform"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   stripePriceId: text("stripe_price_id"),

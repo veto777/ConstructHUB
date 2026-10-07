@@ -59,6 +59,7 @@ import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
 import { forgetDashboard } from "../dashboard/cache";
 import { sendWithFallback, sendPasswordResetEmail } from "../email";
+import { getCrmEntitlements } from "./entitlements";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -419,6 +420,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     const [account] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
     const orgs = await listOrgsForUser(user.id);
     const seats = await getSeatUsage(ctx.org);
+    // The CRM is its own subscription (the org owner's). The app shows the CRM
+    // plans instead of the workspace when it is not active.
+    const crmEnt = await getCrmEntitlements(ctx.org.ownerUserId);
 
     // Best-effort activity stamp; never fail the request over it.
     db.update(crmMembers)
@@ -438,6 +442,14 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       permissions: ctx.permissions,
       orgs,
       seats,
+      crm: {
+        active: crmEnt.active || process.env.CRM_REQUIRE_PLAN === "0",
+        via: crmEnt.via,
+        plan: crmEnt.plan,
+        status: crmEnt.status,
+        trialEndsAt: crmEnt.trialEndsAt,
+        isOwner: ctx.org.ownerUserId === user.id,
+      },
       roles: CRM_ROLES,
       permissionKeys: CRM_PERMISSIONS,
       roleDefaults: CRM_ROLE_DEFAULTS,

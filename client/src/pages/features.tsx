@@ -192,6 +192,12 @@ function Replace({ to }: { to: string }) {
 }
 
 /** /features/:slug — the feature's page; an unknown slug (or a flagged-off feature) is the 404 page. */
+/** A Google Ads landing door (server/ads-landing.ts): the feature's own page at the door's URL. */
+export function FeatureAdLanding({ slug }: { slug: string }) {
+  const page = featurePageBySlug(slug);
+  return page ? <FeatureLanding key={page.slug} page={page} /> : <NotFound />;
+}
+
 export function FeaturePageRoute() {
   const { slug = "" } = useParams<{ slug: string }>();
   const page = featurePageBySlug(slug);

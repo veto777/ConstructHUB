@@ -441,7 +441,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 pb-3">
-        <Link href="/" className="flex items-center justify-between gap-3 cursor-pointer" data-testid="link-logo-home">
+        <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-center justify-between gap-3 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
           <span className="flex flex-col min-w-0">
             <CHLogo height={36} />
             <p className="sr-only" data-testid="text-app-title">The All-in-One Growth Platform for Contractors</p>
@@ -629,7 +629,7 @@ export function AppSidebar() {
           <div className="border-t border-sidebar-border pt-3 mt-2">
             {user ? (
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
+                <Link href="/settings?tab=profile" className="flex items-center gap-2 min-w-0 rounded-md hover:opacity-80" aria-label="Your profile" data-testid="link-profile">
                   {user.avatarUrl ? (
                     <img src={user.avatarUrl} alt="" className="h-6 w-6 rounded-full shrink-0" referrerPolicy="no-referrer" />
                   ) : (
@@ -642,7 +642,7 @@ export function AppSidebar() {
                   <span className="text-xs truncate" data-testid="text-user-name">
                     {user.displayName || user.email}
                   </span>
-                </div>
+                </Link>
                 <div className="flex items-center gap-0.5 shrink-0">
                   <Button asChild variant="ghost" size="sm" className="h-10 w-10 p-0">
                     <Link href="/settings" aria-label="Settings" data-testid="button-settings">

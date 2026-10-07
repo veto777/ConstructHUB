@@ -121,7 +121,7 @@ export function CrmSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-4 pt-5 pb-4 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:pt-4 group-data-[collapsible=icon]:pb-2">
-        <Link href="/" onClick={closeOnPhone} className="flex items-center gap-2.5 cursor-pointer min-w-0 group-data-[collapsible=icon]:justify-center" data-testid="link-portal-home">
+        <Link href="/crm/team?tab=profile" onClick={closeOnPhone} className="flex items-center gap-2.5 cursor-pointer min-w-0 group-data-[collapsible=icon]:justify-center" aria-label="Your profile" data-testid="link-portal-home">
           {/* Full brand lockup (mark + CRM badge); collapses to the bare mark. */}
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <CrmLogo height={26} testid="text-crm-brand" />
@@ -226,7 +226,7 @@ export function CrmSidebar() {
 
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
         <div className="flex items-center justify-between gap-1 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-2 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-          <div className="flex items-center gap-2 min-w-0 group-data-[collapsible=icon]:hidden">
+          <Link href="/crm/team?tab=profile" onClick={closeOnPhone} className="flex items-center gap-2 min-w-0 rounded-md hover:opacity-80 group-data-[collapsible=icon]:hidden" aria-label="Your profile" data-testid="link-profile">
             {user?.avatarUrl ? (
               <img src={user.avatarUrl} alt="" className="h-7 w-7 rounded-full shrink-0" referrerPolicy="no-referrer" />
             ) : (
@@ -244,7 +244,7 @@ export function CrmSidebar() {
                 </div>
               )}
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-0.5 shrink-0 group-data-[collapsible=icon]:flex-col">
             <ThemeToggle className="h-7 w-7 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent" />
             <button

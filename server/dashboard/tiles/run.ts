@@ -24,7 +24,7 @@ const LEAD_ROWS = 5000; // audit lane 1 F: 1,000 hid ~600 of a real account's 1,
 /** No CRM org yet: the gateway sets one up (the dashboard never creates it). */
 const NO_ORG: TileOutcome = {
   status: "empty",
-  message: "Your CRM is included with your plan.",
+  message: "The CRM is a separate subscription with its own plans.",
   cta: { label: "Set up the CRM", href: "/crm-app", surface: "app" },
 };
 

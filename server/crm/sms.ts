@@ -43,6 +43,8 @@ import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
 import { smsSegments } from "./sms-segments";
 import { pushSoon } from "../apns";
+import { getCrmEntitlements } from "./entitlements";
+import { CRM_PLANS, CRM_PLAN_KEYS, type CrmPlanLimits } from "@shared/crm-plans";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -90,8 +92,11 @@ const TEXTING_PLANS = PLAN_KEYS.filter((k) => planIncludesTexting(PLANS[k].limit
 /** The cheapest plan with texting, for the 402 upgrade prompt. */
 export const SMS_REQUIRED_PLAN: PlanKey = TEXTING_PLANS[0] ?? PLAN_KEYS[PLAN_KEYS.length - 1];
 const listNames = (names: string[]) => names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names.join("");
+/** CRM plans with texting (shared/crm-plans.ts) — the CRM is its own product, with its own text allowance. */
+const crmIncludesTexting = (l: CrmPlanLimits) => l.teamTextSegments !== 0 || l.clientTexting !== "none";
+const CRM_TEXTING_PLANS = CRM_PLAN_KEYS.filter((k) => crmIncludesTexting(CRM_PLANS[k].limits));
 export const SMS_NEEDS_PLAN =
-  `Text messaging is included with the ${listNames(TEXTING_PLANS.map((k) => PLANS[k].name))} plans. Upgrade in Pricing to turn it on.`;
+  `Text messaging is included with the ${listNames(CRM_TEXTING_PLANS.map((k) => CRM_PLANS[k].name))} plans. Change your CRM plan in Pricing to turn it on.`;
 /** The 402 body when an org's plan has no texting. */
 export const smsPlanRequired = () => ({ code: "plan_required", requiredPlan: SMS_REQUIRED_PLAN, message: SMS_NEEDS_PLAN, planAllowsSms: false });
 
@@ -112,8 +117,11 @@ export async function orgSmsEntitled(orgId: string): Promise<boolean> {
       .where(eq(crmOrgs.id, orgId))
       .limit(1);
     if (org) {
-      const ent = await getEntitlements(org.ownerUserId);
-      ok = ent.isPlatformAdmin || (!!ent.allowances && planIncludesTexting(ent.allowances));
+      // Texting comes with the owner's CRM plan (Essentials, Max) — or with a
+      // ConstructHUB platform plan that lists team text alerts (Pro and up).
+      const [ent, crm] = await Promise.all([getEntitlements(org.ownerUserId), getCrmEntitlements(org.ownerUserId)]);
+      ok = ent.isPlatformAdmin || (!!ent.allowances && planIncludesTexting(ent.allowances))
+        || (crm.active && !!crm.limits && crmIncludesTexting(crm.limits));
     }
   } catch (e: any) {
     console.error("[sms] plan check failed (not sending):", e?.message || e);
@@ -164,7 +172,10 @@ async function reserveSmsSegments(orgId: string, body: string): Promise<SmsMeter
       .where(eq(crmOrgs.id, orgId))
       .limit(1);
     if (!org) return { ok: false, error: SMS_NEEDS_PLAN };
-    result = await reserveQuotaFor(org.ownerUserId, "texts", segments);
+    // One monthly pool: the CRM plan's segments plus a platform plan's, if the owner has both.
+    const crm = await getCrmEntitlements(org.ownerUserId);
+    const crmTexts = crm.active && crm.limits && crm.plan ? { limit: crm.limits.teamTextSegments, planName: CRM_PLANS[crm.plan].name } : null;
+    result = await reserveQuotaFor(org.ownerUserId, "texts", segments, crmTexts);
   } catch (e: any) {
     console.error("[sms] allowance check failed (not sending):", e?.message || e);
     return { ok: false, error: "This month's text allowance could not be checked — not sent." };

@@ -24,6 +24,7 @@ import {
 } from "@shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
+import { CRM_PLANS, CRM_PLAN_KEYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 
 export const KNOWLEDGE_FILE = "hub-knowledge.md";
 /** Characters of knowledge one model call may carry (keeps TruthCoder prefill fast). */
@@ -223,5 +224,12 @@ export function priceBookCents(): Set<number> {
   for (const band of AGENCY_LOCATION_BANDS) {
     if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * ANNUAL_MONTHS); }
   }
+  // The CRM's own price book (a separate product): each plan monthly, yearly and
+  // the yearly price per month, and the extra seat.
+  for (const key of CRM_PLAN_KEYS) {
+    const plan = CRM_PLANS[key];
+    cents.add(plan.monthlyCents); cents.add(plan.annualCents); cents.add(Math.round(plan.annualCents / 12));
+  }
+  cents.add(CRM_EXTRA_SEAT_MONTHLY_CENTS); cents.add(CRM_EXTRA_SEAT_ANNUAL_CENTS);
   return cents;
 }

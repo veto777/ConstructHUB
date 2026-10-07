@@ -35,6 +35,9 @@ import { callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote 
 import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
 import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
+import { CrmPlanCards } from "@/components/crm-plans";
+import { PurchaseReviewDialog } from "@/components/purchase-review";
+import { trackConversion, trackEvent } from "@/lib/gtag";
 
 // Design B (the marketing site's editorial look): hairline cards on cream, ONE
 // orange for the recommended plan, the navy panel colour for Agency (it turns
@@ -108,6 +111,8 @@ export default function PricingPage() {
   const [agencyInput, setAgencyInput] = useState(String(AGENCY_INCLUDED_LOCATIONS));
   const agencyLocations = normalizeLocations(agencyInput);
   const [confirm, setConfirm] = useState<PlanRequest | null>(null);
+  /** A first purchase is reviewed before Stripe: what the plan includes, and what it does NOT (owner, 2026-10-07). */
+  const [review, setReview] = useState<PlanRequest | null>(null);
 
   const { data: subscription, isPending: subscriptionPending } = useQuery<SubscriptionInfo>({
     queryKey: ["/api/stripe/subscription"],
@@ -122,11 +127,17 @@ export default function PricingPage() {
       // A new plan: anything cached in this tab from before checkout is stale.
       void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      trackConversion("purchase");
       toast({ title: "You're subscribed", description: "Welcome to ConstructHUB. Your plan, renewal date and add-ons are in Settings → Billing." });
-    } else if (params.get("canceled")) {
+    } else if (params.get("crm_success")) {
+      void queryClient.invalidateQueries({ queryKey: ["/api/crm/billing/subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
+      trackConversion("crm_purchase");
+      toast({ title: "Your CRM plan is active", description: "The ConstructHUB CRM is open. It is billed separately from any ConstructHUB platform plan." });
+    } else if (params.get("canceled") || params.get("crm_canceled")) {
       toast({ title: "Checkout canceled", description: "No charges were made." });
     } else return;
-    params.delete("success"); params.delete("canceled");
+    params.delete("success"); params.delete("canceled"); params.delete("crm_success"); params.delete("crm_canceled");
     const qs = params.toString();
     window.history.replaceState({}, "", `/pricing${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [toast]);
@@ -164,6 +175,7 @@ export default function PricingPage() {
     mutationFn: async (r: PlanRequest) => (await apiRequest("POST", "/api/stripe/create-checkout", planBody(r))).json(),
     onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
     onError: async (err, r) => {
+      setReview(null);
       if (apiErrorCode(err) !== "has_subscription") return handlePlanError("Couldn't start checkout", r, err);
       // Already subscribed (another tab, or a webhook this page hadn't seen): change the one
       // subscription in place instead, unless its last payment failed, which the portal fixes.
@@ -199,7 +211,7 @@ export default function PricingPage() {
   const choosePlan = (r: PlanRequest) => {
     if (!user) { setLocation(`/auth?next=${encodeURIComponent(`/pricing${r.interval === "year" ? "?interval=year" : ""}`)}`); return; }
     if (view.changesInPlace) setConfirm(r);
-    else checkoutMutation.mutate(r);
+    else setReview(r);
   };
 
   /** The trial is for an account's first subscription only (the server decides; this mirrors it). */
@@ -402,6 +414,13 @@ export default function PricingPage() {
                           <span>{feature}</span>
                         </li>
                       ))}
+                      <li className="pt-3 text-[11.5px] font-bold uppercase tracking-[0.12em] text-mkt-muted">Not included</li>
+                      {plan.notIncluded.map((line) => (
+                        <li key={line} className="flex items-start gap-2.5 text-[13px] leading-snug text-mkt-muted" data-testid={`text-not-included-${key}`}>
+                          <X className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                          <span>{line}</span>
+                        </li>
+                      ))}
                     </ul>
                     <div className="space-y-2 pt-6">
                       <Button
@@ -429,6 +448,17 @@ export default function PricingPage() {
             No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
           </p>
         </div>
+
+        <section id="crm" className="scroll-mt-16" aria-labelledby="crm-heading" data-testid="section-crm-plans">
+          <div className="text-center max-w-3xl mx-auto">
+            <h2 id="crm-heading" className={H2} data-testid="text-crm-heading">ConstructHUB CRM: <em className="text-mkt-orange-ink">a separate product</em></h2>
+            <p className={`${LEAD} mt-4`}>
+              Estimates, invoices, payments, scheduling and a client portal. The CRM has its own plans and its own subscription:
+              the ConstructHUB plans above do not include it, and a CRM plan does not include the tools above. Buy either one, or both.
+            </p>
+          </div>
+          <div className="mt-10"><CrmPlanCards interval={interval} signedIn={!!user} /></div>
+        </section>
 
         <section id="comparison" className="scroll-mt-16" aria-labelledby="comparison-heading">
           <SectionHead n="01" kicker="Compare" lede="What each plan includes, side by side.">
@@ -683,6 +713,19 @@ export default function PricingPage() {
       <PublicPageFooter />
     </div>
 
+    <PurchaseReviewDialog
+      review={review ? {
+        name: `ConstructHUB ${PLANS[review.plan].name}`,
+        product: "ConstructHUB platform",
+        price: planRequestPrice(review),
+        note: `A new account's first plan starts with the ${TRIAL_DAYS}-day trial. The CRM is a separate product and is not part of this plan.`,
+        included: PLANS[review.plan].features,
+        notIncluded: PLANS[review.plan].notIncluded,
+      } : null}
+      pending={checkoutMutation.isPending}
+      onClose={() => setReview(null)}
+      onConfirm={() => { if (review) { trackEvent("begin_checkout", { item_category: "platform", plan: review.plan }); checkoutMutation.mutate(review); } }}
+    />
     <AlertDialog open={!!confirm} onOpenChange={(open) => { if (!open && !changePlanMutation.isPending) setConfirm(null); }}>
       <AlertDialogContent data-testid="dialog-change-plan">
         <AlertDialogHeader>

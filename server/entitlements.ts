@@ -259,7 +259,7 @@ export async function accountSubscriptionRow(userId: number): Promise<(Subscript
   const { rows: [row] } = await pool.query(
     `SELECT u.email, s.* FROM users u
        LEFT JOIN LATERAL (
-         SELECT * FROM subscriptions x WHERE x.user_id = u.id AND x.product = 'platform' ${SUBSCRIPTION_ORDER}
+         SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
       WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   return row;

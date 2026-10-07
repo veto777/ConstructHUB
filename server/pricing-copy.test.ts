@@ -266,6 +266,8 @@ describe("AI assistant prompts use the price book", () => {
     const planAnnual = new Set([
       ...PLAN_KEYS.map((k) => PLANS[k].annualCents),
       ...Object.values(ADDONS).map((a) => a.annualCents),
+      // The CRM is its own product: its plans' yearly prices are listed prices too.
+      ...CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].annualCents),
       SALES_THRESHOLD_CENTS,
     ]);
     const text = HUB_TEXT;

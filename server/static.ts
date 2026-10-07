@@ -11,6 +11,8 @@ import {
 import { MARKETING_ROUTES, canonicalPath } from "@shared/seo";
 import { isKnownPath, marketingRouteForCase } from "@shared/app-routes";
 import { withRouteMeta, withSeoHead } from "./seo-html";
+import { withGoogleTag } from "./google-tag";
+import { registerAdsLanding, ADS_LANDING_PATHS } from "./ads-landing";
 
 export { withRouteMeta, withSeoHead };
 
@@ -108,6 +110,10 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
   // signed in — crawler or person alike, never by user agent) and the build's
   // lastmod dates; the build date stands in for a page without one.
   const prerendered = loadPrerenderedPages(distPath, indexHtml);
+  // The Google tag (Ads conversions / GA4) rides on the marketing hosts' pages
+  // only — never the CRM app or the client portal, which keep `indexHtml`.
+  for (const [route, html] of prerendered) prerendered.set(route, withGoogleTag(html));
+  const marketingHtml = withGoogleTag(indexHtml);
   const builtOn = fs.statSync(path.resolve(distPath, "index.html")).mtime.toISOString().slice(0, 10);
   const sitemapXml = buildSitemap(readLastmod(path.resolve(distPath, "..")), builtOn);
 
@@ -137,8 +143,13 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
     }
     res
       .type("text/plain")
-      .send(`User-agent: *\nAllow: /\nSitemap: ${BASE}/sitemap.xml\n`);
+      .send(`User-agent: *\nAllow: /\n${ADS_LANDING_PATHS.map((p) => `Disallow: ${p}\n`).join("")}Sitemap: ${BASE}/sitemap.xml\n`);
   });
+
+  // The Google Ads landing doors (server/ads-landing.ts): the public page behind
+  // a click-id + campaign-key check, bots blocked and fed to Click Guard.
+  registerAdsLanding(app, (publicPath) =>
+    prerendered.get(publicPath) ?? withSeoHead(marketingHtml, publicPath, { origin: BASE }));
 
   for (const [from, to] of Object.entries(RETIRED_ROUTES)) {
     app.get(from, (_req, res) => res.redirect(301, to));
@@ -183,12 +194,12 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
     // page), never a 200 that reads as the home page to a search engine.
     if (!isKnownPath(pagePath)) {
       // No canonical: a page that doesn't exist names no URL as its original.
-      const html = indexHtml.replace(
+      const html = marketingHtml.replace(
         /<\/title>/i,
         () => `</title>\n    <meta name="robots" content="noindex" />`,
       );
       return res.status(404).type("html").send(html);
     }
-    res.type("html").send(withSeoHead(indexHtml, pagePath, { origin: BASE }));
+    res.type("html").send(withSeoHead(marketingHtml, pagePath, { origin: BASE }));
   });
 }

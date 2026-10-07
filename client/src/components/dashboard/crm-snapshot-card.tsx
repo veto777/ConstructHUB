@@ -55,7 +55,7 @@ export function CrmSnapshotCard({ tile, leads, schedule }: { tile: DashboardTile
             <h2 id="dashboard-crm-title" className="g-header__title">{CRM_NAME}</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {/* The iPhone apps sell nothing (App Store 3.1.3(f)): the CRM comes with the account, not "your plan". */}
-              {isEmpty ? (inNativeApp() ? "Your CRM is included with your account." : "Your CRM is included with your plan.") : tile.description}
+              {isEmpty ? (inNativeApp() ? "Open the CRM to get started." : "The CRM is a separate subscription with its own plans.") : tile.description}
             </p>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { db } from "./db";
 import { subscriptions, masterClassModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
+import { appReturnBaseUrl } from "./site-context";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sendTalkToSales } from "./catalog";
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
@@ -32,6 +33,9 @@ import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, markIntrosUsedByHeldAddons, type StripeForIntro } from "./billing/intro";
 import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/number-release";
+import {
+  registerCrmBillingRoutes, isCrmSubscription, isCrmCheckoutSession, applyCrmSubscription, endCrmSubscription,
+} from "./crm/billing";
 
 export { PaymentsNotConfiguredError };
 
@@ -215,6 +219,12 @@ export function registerStripeRoutes(app: Express) {
   // schedule the daily Agency location sync (off without a Stripe key).
   void billingSchemaReady();
   startAgencyLocationSync();
+  // The CRM is sold separately, on its own subscription (same Stripe customer).
+  registerCrmBillingRoutes(app, {
+    getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
+    sendStripeError,
+    recentAuthOk,
+  });
 
   app.get("/api/stripe/plans", (_req: Request, res: Response) => {
     res.json(priceBook());
@@ -267,7 +277,10 @@ export function registerStripeRoutes(app: Express) {
         // trial is for a customer who never had a subscription.
         let trial = trialEligible(row);
         if (row?.stripeCustomerId) {
-          const history = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+          // The CRM is its own subscription on the same customer (server/crm/billing.ts):
+          // it is neither "the plan" nor a reason to withhold the platform trial.
+          const all = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
+          const history = { data: all.data.filter((s) => !isCrmSubscription(s)) };
           const live = history.data.find((s) => LIVE_STATUSES.has(s.status));
           if (live) {
             // Record it (as the webhook will), so the account gets what it pays
@@ -283,7 +296,7 @@ export function registerStripeRoutes(app: Express) {
         // tab is expired first, so finishing both can't start two subscriptions.
         const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
         for (const stale of open.data) {
-          if (stale.mode === "subscription") await stripe.checkout.sessions.expire(stale.id);
+          if (stale.mode === "subscription" && !isCrmCheckoutSession(stale)) await stripe.checkout.sessions.expire(stale.id);
         }
         const metadata = orderMetadata(user.id, order);
         // Intro price for an add-on bought with the plan (Checkout takes one session-level coupon; it
@@ -299,8 +312,8 @@ export function registerStripeRoutes(app: Express) {
             ...(trial ? { trial_period_days: TRIAL_DAYS } : {}),
             metadata,
           },
-          success_url: `${getBaseUrl(req)}/pricing?success=true`,
-          cancel_url: `${getBaseUrl(req)}/pricing?canceled=true`,
+          success_url: `${appReturnBaseUrl(req)}/pricing?success=true`,
+          cancel_url: `${appReturnBaseUrl(req)}/pricing?canceled=true`,
           metadata,
         });
         if (intro) await recordIntro(user.id, intro.addon, intro.couponId, session.id);
@@ -431,7 +444,7 @@ export function registerStripeRoutes(app: Express) {
 
       const session = await stripe.billingPortal.sessions.create({
         customer: sub.stripeCustomerId,
-        return_url: `${getBaseUrl(req)}/pricing`,
+        return_url: `${appReturnBaseUrl(req)}/pricing`,
       });
 
       res.json({ url: session.url });
@@ -471,8 +484,8 @@ export function registerStripeRoutes(app: Express) {
               quantity: 1,
             },
           ],
-          success_url: `${getBaseUrl(req)}/master-class?success=true`,
-          cancel_url: `${getBaseUrl(req)}/master-class?canceled=true`,
+          success_url: `${appReturnBaseUrl(req)}/master-class?success=true`,
+          cancel_url: `${appReturnBaseUrl(req)}/master-class?canceled=true`,
           metadata: { userId: String(user.id), type: "master_class", bundle: "true" },
         });
 
@@ -504,8 +517,8 @@ export function registerStripeRoutes(app: Express) {
             quantity: 1,
           },
         ],
-        success_url: `${getBaseUrl(req)}/master-class?success=true`,
-        cancel_url: `${getBaseUrl(req)}/master-class?canceled=true`,
+        success_url: `${appReturnBaseUrl(req)}/master-class?success=true`,
+        cancel_url: `${appReturnBaseUrl(req)}/master-class?canceled=true`,
         metadata: { userId: String(user.id), type: "master_class", moduleId: String(mod.id) },
       });
 
@@ -601,8 +614,8 @@ export function registerStripeRoutes(app: Express) {
         customer: customerId,
         mode: "payment",
         line_items,
-        success_url: `${getBaseUrl(req)}/pricing?cart_success=true`,
-        cancel_url: `${getBaseUrl(req)}/pricing?cart_canceled=true`,
+        success_url: `${appReturnBaseUrl(req)}/pricing?cart_success=true`,
+        cancel_url: `${appReturnBaseUrl(req)}/pricing?cart_canceled=true`,
         metadata: {
           userId: String(user.id),
           type: "cart",
@@ -689,6 +702,12 @@ export function registerStripeRoutes(app: Express) {
             // is granted by async_payment_succeeded below, through the same
             // path — never from the metadata alone.
             await applyOneTimeCheckout(session, userId);
+          } else if (userId && session.subscription && isCrmCheckoutSession(session)) {
+            // The CRM is a separate product: its subscription is recorded in
+            // crm_subscriptions and never touches the platform row.
+            const crmSub = await stripe.subscriptions.retrieve(session.subscription as string);
+            await applyCrmSubscription(crmSub, userId);
+            sendBillingEmail = false;
           } else if (userId && session.subscription) {
             // Plan, interval, add-ons and Agency locations are read from the
             // subscription's items (prices we created), not from metadata.
@@ -742,6 +761,7 @@ export function registerStripeRoutes(app: Express) {
         }
         case "customer.subscription.trial_will_end": {
           const sub = event.data.object as Stripe.Subscription;
+          if (isCrmSubscription(sub)) { sendBillingEmail = false; break; }
           const [tracked] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, sub.customer as string)).limit(1);
           eventUserId = await onTrialWillEnd(event, tracked?.plan ?? null);
           break;
@@ -750,6 +770,12 @@ export function registerStripeRoutes(app: Express) {
         case "customer.subscription.updated": {
           const payload = event.data.object as Stripe.Subscription;
           const customerId = payload.customer as string;
+          if (isCrmSubscription(payload)) {
+            // As below, the row takes the subscription as Stripe has it NOW.
+            eventUserId = await applyCrmSubscription(await stripe.subscriptions.retrieve(payload.id));
+            sendBillingEmail = false;
+            break;
+          }
           await billingSchemaReady();
 
           const [existingSub] = await db
@@ -790,6 +816,11 @@ export function registerStripeRoutes(app: Express) {
         case "customer.subscription.deleted": {
           const sub = event.data.object as Stripe.Subscription;
           const customerId = sub.customer as string;
+          if (isCrmSubscription(sub)) {
+            eventUserId = await endCrmSubscription(sub);
+            sendBillingEmail = false;
+            break;
+          }
           await billingSchemaReady();
 
           // Only the subscription this account is on ends its plan; ending a

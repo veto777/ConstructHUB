@@ -44,6 +44,7 @@ import { describeSubscription, roleOfPrice, agencyLocationTiers, tieredAmountCen
 import { subscriptionPeriodEnd, cancellationOf } from "../billing/sync";
 import { COURSE_BUNDLE } from "../catalog";
 import { recordFailure, recordIssue } from "../ops/issues";
+import { CRM_PLANS } from "@shared/crm-plans";
 import {
   welcomeEmail, subscriptionStartedEmail, receiptEmail, paymentFailedEmail, planChangedEmail,
   cancellationScheduledEmail, cancellationRevertedEmail, subscriptionEndedEmail, purchaseReceiptEmail,
@@ -372,6 +373,9 @@ function labelForRole(price: Stripe.Price | null, fallback: string | null): stri
     case "addon": return `${ADDONS[role.key].name} (${intervalWord(role.interval)})`;
     case "agency_locations": return `Agency locations above ${PLANS.agency.limits.locations} (${intervalWord(role.interval)})`;
     case "setup": return `${ADDONS[role.key].name} setup (one time)`;
+    // The CRM is its own subscription: its receipt lines say so.
+    case "crm_plan": return `ConstructHUB ${CRM_PLANS[role.key].name} plan (${intervalWord(role.interval)})`;
+    case "crm_seat": return `ConstructHUB CRM extra seat (${intervalWord(role.interval)})`;
     default: return fallback?.trim() || price?.nickname || "Item";
   }
 }

@@ -155,6 +155,31 @@ export function oauthBaseUrl(req: any): string {
   return `https://${PRIMARY_DOMAIN}`;
 }
 
+/**
+ * Where Stripe sends a buyer back to (checkout success / cancel, the billing
+ * portal's return): the APP origin — Pricing, Settings and the tools live
+ * there. siteBaseUrl() must NOT be used for this: in production it is the CRM
+ * portal's origin (PORTAL_URL), which has no /pricing page and keeps its own
+ * sign-in session, so a buyer landed on the CRM, possibly as a different
+ * account (2026-10-07). A request made on one of our marketing hosts returns
+ * to that same host, where the buyer is signed in; anything else gets APP_URL.
+ */
+export function appReturnBaseUrl(req: any): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) return siteBaseUrl(req);
+  let host = requestHost(req);
+  if (host.startsWith("www.")) host = host.slice(4);
+  if (isKnownHost(host) && !isPortalHost(host) && !isClientHost(host)) return `https://${host}`;
+  return envUrl("APP_URL") || `https://${PRIMARY_DOMAIN}`;
+}
+
+/** The CRM portal's origin for a buyer who started inside the CRM app: the portal host they are on, else PORTAL_URL. */
+export function portalReturnBaseUrl(req: any): string {
+  if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) return siteBaseUrl(req);
+  const host = requestHost(req);
+  if (isKnownHost(host) && isPortalHost(host)) return `https://${host}`;
+  return portalBaseUrl(req);
+}
+
 export function siteBaseUrl(req: any): string {
   if (process.env.NODE_ENV !== "production" && !process.env.REPLIT_DEPLOYMENT) {
     const proto = req?.headers?.["x-forwarded-proto"] || req?.protocol || "http";

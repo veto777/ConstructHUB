@@ -149,6 +149,8 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
 /** One more CRM seat, beyond the plan's included count. Half of Housecall Pro's $35. */
 export const CRM_EXTRA_SEAT_MONTHLY_CENTS = 1700;
 export const CRM_EXTRA_SEAT_ANNUAL_CENTS = 17000;
+/** Self-serve ceiling on extra seats; above it is a sales conversation. */
+export const CRM_EXTRA_SEAT_MAX = 50;
 
 /** Free trial on the CRM, in days. Housecall Pro gives 14; we match it. */
 export const CRM_TRIAL_DAYS = 14;

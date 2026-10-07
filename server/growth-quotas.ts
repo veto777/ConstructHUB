@@ -144,9 +144,15 @@ async function countUnlimited(key: string, amount: number): Promise<boolean> {
 }
 
 /** Reserve `amount` of a monthly quota for an account (no request needed: workers use this too). */
-export async function reserveQuotaFor(userId: number, feature: MeteredFeature, amount = 1): Promise<QuotaResult> {
-  const { ent, limit } = await allowanceFor(userId, feature);
-  if (!ent.accessPlan || limit === 0) return { ok: false, status: 402, body: planRequiredBody(feature) };
+export async function reserveQuotaFor(
+  userId: number, feature: MeteredFeature, amount = 1,
+  /** An allowance from outside the platform plan — the CRM plan's texts (server/crm/sms.ts). -1 = unlimited. */
+  extra: { limit: number; planName: string } | null = null,
+): Promise<QuotaResult> {
+  const { ent, limit: base } = await allowanceFor(userId, feature);
+  const extraLimit = extra?.limit ?? 0;
+  const limit = base === -1 || extraLimit === -1 ? -1 : base + extraLimit;
+  if (limit === 0 || (!ent.accessPlan && !extraLimit)) return { ok: false, status: 402, body: planRequiredBody(feature) };
   const key = quotaKey(userId, feature);
   if (limit === -1) {
     // Unlimited (platform admins): never refused. A counted meter still records
@@ -159,7 +165,16 @@ export async function reserveQuotaFor(userId: number, feature: MeteredFeature, a
   const allowed = await takeBudget(key, limit, amount, Number.MAX_SAFE_INTEGER);
   if (!allowed) {
     const { rows: [row] } = await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [key]);
-    return { ok: false, status: 403, body: limitBody(ent, feature, limit, Number(row?.used ?? 0), amount) };
+    const used = Number(row?.used ?? 0);
+    if (!ent.accessPlan) {
+      // No platform plan: the whole allowance is the other product's.
+      const unit = METERS[feature].unit[0];
+      return { ok: false, status: 403, body: {
+        code: "limit_reached", feature, limit, used, upgradePlan: null, addon: null, resetsAt: resetsAt(),
+        message: `You've used the ${limit.toLocaleString("en-US")} ${unit}s your ${extra?.planName ?? "plan"} plan includes this month. The count resets on the 1st (UTC).`,
+      } };
+    }
+    return { ok: false, status: 403, body: limitBody(ent, feature, limit, used, amount) };
   }
   return { ok: true, reservation: { key, remaining: amount }, ent, limit };
 }

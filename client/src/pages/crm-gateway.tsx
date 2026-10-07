@@ -112,7 +112,7 @@ export default function CrmGatewayPage() {
           <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 lg:grid lg:grid-cols-12 lg:gap-10 lg:items-center">
             <div className="lg:col-span-7 pt-8 sm:pt-12 lg:pt-16 pb-8 lg:pb-16">
               <Kicker n="">
-                <span className="inline-flex items-center gap-1.5"><KanbanSquare className="h-3.5 w-3.5" aria-hidden /> Included with every plan</span>
+                <span className="inline-flex items-center gap-1.5"><KanbanSquare className="h-3.5 w-3.5" aria-hidden /> A separate product with its own plans</span>
               </Kicker>
               <h1 className="font-display mt-5 font-semibold text-[2.6rem] leading-[1.02] sm:text-[3.4rem] lg:text-[3.9rem] tracking-[-0.02em]">
                 ConstructHub <span className="mkt-marker">CRM</span>
