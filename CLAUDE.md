@@ -2,8 +2,8 @@
 
 Construction-permit data aggregator + GMB/Google-Ads toolset. Express 5 + React/Vite/shadcn +
 Drizzle (Postgres). Imported from Replit 2026-07-06; **LIVE at https://constructhub.us since
-2026-07-10** (self-hosted on vb7 — see Deploy below). GBP/GMB API access: twice rejected by Google,
-reapply on/after **2026-09-08** (details in `HANDOFF.md` → "GBP API access timeline").
+2026-07-10** (self-hosted on vb7 — see Deploy below). GBP/GMB API access: **approved by Google
+2026-09-23** (application #3, after two rejections — details in `HANDOFF.md` → "GBP API access timeline").
 
 ## 🚫 HARD RULE — never fabricate data
 This project shipped from Replit with **~100% fabricated government data** (guessed `.gov` URLs,

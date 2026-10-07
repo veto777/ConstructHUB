@@ -2,11 +2,11 @@ import { AppPage, PageHeader, Section } from "@/components/app-ui";
 import { Button } from "@/components/ui/button";
 /**
  * CRM gateway — the pathway from the growth platform (constructhub.us) into
- * ConstructHub CRM (portal.constructhub.us). The CRM is included in every
- * plan (seats per plan, shared/plans.ts); this page is the bridge:
+ * ConstructHub CRM (portal.constructhub.us). The CRM is a separate product
+ * with its own plans (seats per CRM plan, shared/crm-plans.ts); this page is the bridge:
  *   - already in a workspace → "Open your CRM" jumps to the portal host
- *   - no workspace yet       → what the CRM is, the plans that include it, and
- *                              how to have a workspace set up (on request)
+ *   - in a workspace, no active CRM plan → "See CRM plans" (never "Your CRM is active")
+ *   - no workspace found     → what the CRM is, that it has its own plans, and who to email
  *   - signed out             → sign in (?next=/crm-app), then this page routes them
  *
  * Membership is decided by /api/crm/me returning an org the user belongs to.
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { portalUrl } from "@/lib/site";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { CRM_SEATS_LINE } from "@shared/plan-copy";
+import { CRM_FROM_PRICE, CRM_SEATS_LINE } from "@shared/plan-copy";
 import { StandingGator } from "@/components/mascot";
 import { BTN_LG, BTN_OUTLINE, BTN_PRIMARY, Kicker, TEXT_LINK } from "@/components/feature-landing/primitives";
 
@@ -49,6 +49,12 @@ export default function CrmGatewayPage() {
   const isLoading = userLoading || (!!user && crmLoading);
   const isMember = !signedOut && !!data?.org?.id;
   const orgName = data?.org?.name as string | undefined;
+  // A workspace exists as soon as the CRM is first opened (server/crm/tenancy.ts ensureOrgForUser), but it only
+  // opens on an active CRM plan — the org owner's (GET /api/crm/me → crm.active). Without one the portal shows the
+  // CRM plans, so this page must not say "Your CRM is active".
+  const crmActive = isMember && data?.crm?.active !== false;
+  const isOwner = data?.crm?.isOwner !== false;
+  const needsPlan = isMember && !crmActive;
   const openCrm = () => { window.location.href = portalUrl("/crm"); };
 
   // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)):
@@ -61,8 +67,8 @@ export default function CrmGatewayPage() {
         <Button onClick={openCrm} data-testid="button-open-crm">Open your CRM <ArrowRight className="ml-2 h-4 w-4" /></Button> :
         <Button asChild><a href={CRM_ACCESS_MAILTO} data-testid="button-crm-get-access">Request access</a></Button>
       } />
-      <Section title={isLoading ? "Checking your access…" : isMember ? "Your CRM is active" : signedOut ? "Sign in to open your CRM" : "Get your CRM workspace"} testId="card-crm-gateway-action">
-        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : signedOut ? "Sign in with your ConstructHUB account and we'll check whether your company has a CRM workspace." : "Workspaces are set up on request. Email us to get started."}</p>
+      <Section title={isLoading ? "Checking your access…" : needsPlan ? "Your CRM workspace" : isMember ? "Your CRM is active" : signedOut ? "Sign in to open your CRM" : "Get your CRM workspace"} testId="card-crm-gateway-action">
+        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : signedOut ? "Sign in with your ConstructHUB account and we'll check whether your company has a CRM workspace." : "We couldn't find a CRM workspace for your account. Email us and we'll sort it out."}</p>
         {!isLoading && (signedOut || !isMember) && (
           <div className="mt-4 flex flex-wrap gap-2">
             {signedOut && <Button asChild><Link href={`/auth?next=${encodeURIComponent("/crm-app")}`} data-testid="button-crm-signin">Sign in <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>}
@@ -84,14 +90,14 @@ export default function CrmGatewayPage() {
         <Button onClick={openCrm} data-testid="button-open-crm">Open your CRM <ArrowRight className="ml-2 h-4 w-4" /></Button> :
         <Button asChild><a href={CRM_ACCESS_MAILTO} data-testid="button-crm-get-access">Request access</a></Button>
       } />
-      <Section title={isLoading ? "Checking your access…" : isMember ? "Your CRM is active" : "Get your CRM workspace"} testId="card-crm-gateway-action">
-        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.</> : "Workspaces are set up on request. Email us to get started."}</p>
+      <Section title={isLoading ? "Checking your access…" : needsPlan ? "Choose a CRM plan to open your CRM" : isMember ? "Your CRM is active" : "Get your CRM workspace"} testId="card-crm-gateway-action">
+        <p className="text-sm text-muted-foreground">{isMember ? <>You're in <strong className="text-foreground">{orgName || "your workspace"}</strong>.{needsPlan && !inNativeApp() ? (isOwner ? " It opens once you choose a CRM plan." : " It opens once the account owner chooses a CRM plan.") : ""}</> : "We couldn't find a CRM workspace for your account. Email us and we'll sort it out."}</p>
         <p className="mt-3 text-sm text-muted-foreground" data-testid="text-crm-included">
           {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan names or seat-per-plan lines. */}
-          {inNativeApp() ? "Your CRM is included with your ConstructHUB account." : <>Your CRM is included with every ConstructHUB plan. {CRM_SEATS_LINE}.</>}
+          {inNativeApp() ? "Your CRM runs on your ConstructHUB account." : <>The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}. Seats per CRM plan: {CRM_SEATS_LINE}.</>}
         </p>
-        {!isLoading && !isMember && <div className="mt-4 flex flex-wrap gap-2">
-          {!inNativeApp() && <Button asChild variant="outline"><Link href="/pricing" data-testid="button-crm-plans">See plans</Link></Button>}
+        {!isLoading && (!isMember || needsPlan) && <div className="mt-4 flex flex-wrap gap-2">
+          {!inNativeApp() && <Button asChild variant="outline"><Link href="/pricing#crm" data-testid="button-crm-plans">See CRM plans</Link></Button>}
           <Button asChild variant="ghost"><a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer" data-testid="button-crm-preview">Visit CRM <ExternalLink className="ml-2 h-4 w-4" /></a></Button>
         </div>}
       </Section>
@@ -119,7 +125,7 @@ export default function CrmGatewayPage() {
               </h1>
               <p className="mt-5 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] leading-relaxed" data-testid="text-crm-included">
                 The contractor CRM — clients, estimates, invoices, pipeline, messaging and payments — is
-                included with every ConstructHUB plan. Your plan sets the number of team seats:
+                a separate product with its own plans, from {CRM_FROM_PRICE}. Your CRM plan sets the number of team seats:
                 {" "}{CRM_SEATS_LINE}.
               </p>
             </div>
@@ -172,16 +178,18 @@ export default function CrmGatewayPage() {
                 <div className="flex flex-wrap items-center justify-between gap-5">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 font-display font-semibold text-[1.45rem] leading-tight">
-                      <Check className="h-5 w-5 text-mkt-orange-ink" /> Your CRM is active
+                      <Check className="h-5 w-5 text-mkt-orange-ink" /> {needsPlan ? "Choose a CRM plan to open your CRM" : "Your CRM is active"}
                     </div>
                     <p className="text-[15px] text-mkt-ink-soft mt-2">
                       {orgName ? <>You're in <strong className="text-mkt-ink">{orgName}</strong>. </> : null}
-                      It lives at your portal address.
+                      {needsPlan ? (isOwner ? "The workspace opens once you choose a CRM plan." : "The workspace opens once the account owner chooses a CRM plan.") : "It lives at your portal address."}
                     </p>
                   </div>
-                  <button type="button" onClick={openCrm} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid="button-open-crm">
+                  {needsPlan
+                    ? <Link href="/pricing#crm" className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid="button-crm-plans">See CRM plans <ArrowRight className="h-4 w-4" /></Link>
+                    : <button type="button" onClick={openCrm} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid="button-open-crm">
                     Open your CRM <ArrowRight className="h-4 w-4" />
-                  </button>
+                  </button>}
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-5">
@@ -190,17 +198,17 @@ export default function CrmGatewayPage() {
                       <Building2 className="h-5 w-5 text-mkt-orange-ink" /> Get your CRM workspace
                     </div>
                     <p className="text-[15px] text-mkt-ink-soft mt-2 max-w-md leading-relaxed">
-                      We couldn't find a CRM workspace for your account. The CRM comes with every
-                      plan, and workspaces are set up on request — email us and we'll get your
-                      company a brand-new, empty workspace.
+                      We couldn't find a CRM workspace for your account. The CRM is a separate
+                      product with its own plans; a workspace is normally created the first time you open the
+                      CRM — email us and we'll sort it out.
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 w-full sm:w-auto">
                     <a href={CRM_ACCESS_MAILTO} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid="button-crm-get-access">
                       <Mail className="h-4 w-4" /> Request access
                     </a>
-                    <Link href="/pricing" className={`${BTN_OUTLINE} ${BTN_LG}`} data-testid="button-crm-plans">
-                      See plans <ArrowRight className="h-4 w-4" />
+                    <Link href="/pricing#crm" className={`${BTN_OUTLINE} ${BTN_LG}`} data-testid="button-crm-plans">
+                      See CRM plans <ArrowRight className="h-4 w-4" />
                     </Link>
                     <a href={portalUrl("/crm")} target="_blank" rel="noopener noreferrer" className={`${TEXT_LINK} inline-flex items-center justify-center gap-1.5 h-12 px-2`} data-testid="button-crm-preview">
                       Visit CRM <ExternalLink className="h-4 w-4" />

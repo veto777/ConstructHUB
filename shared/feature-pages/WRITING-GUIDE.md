@@ -83,6 +83,7 @@ a content file. Pick how the feature is **sold** and the template prices it from
 | a one-time service in the price book | `{ kind: "service", service }` |
 | quoted by a sales rep (at or above the sales threshold) | `{ kind: "sales", topic }` |
 | a CRM add-on (`CRM_ADDONS` in `shared/crm-plans.ts`: included in some CRM plans, an add-on on the rest) | `{ kind: "crmAddon", addon }` |
+| part of the CRM itself (a separate product with its own plans, `CRM_PLANS`; never `plan` — no platform plan includes the CRM) | `{ kind: "crmPlan" }` |
 
 An `allowance` names a numeric key of `PlanLimits` (`limit`), an optional per-location key for Agency
 (`perLocation`), a plural `unit` and `period` (`"month"` or `"count"`). The page then lists it plan by plan.

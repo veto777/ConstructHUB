@@ -1,7 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { ADDONS, PLANS } from "../plans";
-import { TEXTING_PLANS, joinNames, planNamesWhere } from "../plan-copy";
+import { CLIENT_NUMBER_INCLUDED_PLANS, CRM_TEXTING_PLANS, CRM_TEXT_SEGMENTS_LINE, TEXTING_EITHER_LINE, joinNames } from "../plan-copy";
 
 /**
  * Texting — team alert texts and client texts from the CRM (Settings → SMS, /crm/settings).
@@ -30,7 +30,6 @@ import { TEXTING_PLANS, joinNames, planNamesWhere } from "../plan-copy";
  */
 
 const SEGMENTS: FeatureAllowance = { limit: "teamTextSegments", unit: "text segments", period: "month" };
-const NUMBER_INCLUDED = planNamesWhere((plan) => plan.limits.clientTexting === "included");
 const NUMBER_ADDON = joinNames(ADDONS.texting_number.availableOn.map((key) => PLANS[key].name));
 
 const page: FeaturePage = {
@@ -112,16 +111,16 @@ const page: FeaturePage = {
   pricing: {
     kind: "allowance",
     allowance: SEGMENTS,
-    note: "Every text your CRM sends counts, to your team or to a client. A client-texting number is a separate add-on on some plans.",
+    note: `Every text your CRM sends counts, to your team or to a client. Texting also comes with the ${CRM_TEXTING_PLANS} CRM plans. A client-texting number is a separate add-on on some plans.`,
   },
   faqs: [
     {
       q: "What do I need to text my clients?",
-      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${NUMBER_INCLUDED} includes a client-texting number we set up for you; on ${NUMBER_ADDON} it is the ${ADDONS.texting_number.name} add-on. You can also connect your own SignalWire account. Either way, the number needs its carrier registration (10DLC).`,
+      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${CLIENT_NUMBER_INCLUDED_PLANS} each include a client-texting number we set up for you; on the ${NUMBER_ADDON} platform plans it is the ${ADDONS.texting_number.name} add-on. You can also connect your own SignalWire account. Either way, the number needs its carrier registration (10DLC).`,
     },
     {
       q: "Which plans include texting, and how many texts?",
-      a: `Texting is included with the ${TEXTING_PLANS} plans. ${allowanceLine(SEGMENTS)}. On other plans, emails and in-app alerts keep working.`,
+      a: `Texts are sent from ConstructHub CRM, and texting is included with ${TEXTING_EITHER_LINE}. On the CRM plans, text segments a month: ${CRM_TEXT_SEGMENTS_LINE}. On the platform plans, ${allowanceLine(SEGMENTS)}. An account with both has the two allowances as one monthly pool. On other plans, emails and in-app alerts keep working.`,
     },
     {
       q: "What's a segment?",

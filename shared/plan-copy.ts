@@ -10,7 +10,7 @@ import {
   CALL_ASSISTANT_OVERAGE_RATES, callAssistantTier,
   type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey,
 } from "./plans";
-import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "./crm-plans";
+import { CRM_ADDONS, CRM_EXTRA_SEAT_ANNUAL_CENTS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "./crm-plans";
 
 /** "Talk to a sales rep" — the label for anything at or above SALES_THRESHOLD_CENTS. */
 export const SALES_REP_LABEL = "Talk to a sales rep";
@@ -61,6 +61,11 @@ export function planPriceLine(key: PlanKey): string {
   const plan = PLANS[key];
   return `${formatUsd(plan.monthlyCents)}/month or ${formatUsd(plan.annualCents)}/year`;
 }
+
+/** The cheapest CRM plan (the CRM is a separate product: shared/crm-plans.ts) — for "CRM plans from $X". */
+export const CRM_STARTING_PLAN = CRM_PLANS[CRM_PLAN_KEYS.reduce((a, b) => (CRM_PLANS[b].monthlyCents < CRM_PLANS[a].monthlyCents ? b : a))];
+/** "$39/mo" — the lowest CRM plan price, for "its own plans, from $39/mo". */
+export const CRM_FROM_PRICE = `${formatUsd(CRM_STARTING_PLAN.monthlyCents)}/mo`;
 
 /** "CRM Basic 1, CRM Essentials 5 and CRM Max 8" — the CRM is its own product. */
 export const CRM_SEATS_LINE = joinNames(CRM_PLAN_KEYS.map((key) => `${CRM_PLANS[key].name} ${CRM_PLANS[key].limits.seats}`));
@@ -358,7 +363,7 @@ export function callAssistantAvailabilityLine(): string {
 }
 
 /** Add-ons whose yearly price is their own, not ANNUAL_MONTHS × monthly: ", except the AI Call Assistant, which is $1,999/year". */
-function annualExceptionsLine(): string {
+export function annualExceptionsLine(): string {
   const odd = Object.values(ADDONS).filter((a) => a.annualCents !== a.monthlyCents * ANNUAL_MONTHS);
   if (!odd.length) return "";
   return `, except ${joinNames(odd.map((a) => `the ${a.name}, which is ${formatUsd(a.annualCents)}/year`))}`;
@@ -372,6 +377,22 @@ export const PROTECTED_SITE_PLANS = planNamesWhere((plan) => plan.limits.protect
 export const TEXTING_PLANS = planNamesWhere((plan) => plan.limits.teamTextSegments > 0);
 /** CRM plans with texting — the CRM is a separate product (shared/crm-plans.ts). */
 export const CRM_TEXTING_PLANS = joinNames(CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.teamTextSegments > 0).map((k) => CRM_PLANS[k].name));
+/** Every plan that carries texting, CRM plans first: "the CRM Essentials and CRM Max CRM plans, or the Pro, Growth and Agency platform plans" (server/crm/sms.ts accepts either). */
+export const TEXTING_EITHER_LINE = `the ${CRM_TEXTING_PLANS} CRM plans, or the ${TEXTING_PLANS} platform plans`;
+/** "CRM Essentials 500 and CRM Max 1,500" — team text segments a month on the CRM plans that have them. */
+export const CRM_TEXT_SEGMENTS_LINE = joinNames(CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.teamTextSegments > 0).map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.teamTextSegments.toLocaleString("en-US")}`));
+/** Plans that come with one client-texting number, CRM plans first: "CRM Max and Growth". */
+export const CLIENT_NUMBER_INCLUDED_PLANS = joinNames([
+  ...CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.clientTexting === "included").map((k) => CRM_PLANS[k].name),
+  ...PLAN_KEYS.filter((k) => PLANS[k].limits.clientTexting === "included").map((k) => PLANS[k].name),
+]);
+/** The CRM's own add-ons and what they cost: JobCam (included in the plans that carry it) and extra seats. */
+export function crmAddonsLine(): string {
+  const jobcam = CRM_ADDONS.jobcam;
+  const includedIn = CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.jobcam).map((k) => CRM_PLANS[k].name);
+  const addonOn = joinNames(jobcam.availableOn.map((k) => CRM_PLANS[k].name));
+  return `${jobcam.name} (job photos and video) is ${includedIn.length ? `included in ${joinNames(includedIn)} and is ` : ""}an add-on on ${addonOn} at ${formatUsd(jobcam.monthlyCents)}/month or ${formatUsd(jobcam.annualCents)}/year. An extra CRM seat is ${formatUsd(CRM_EXTRA_SEAT_MONTHLY_CENTS)}/month or ${formatUsd(CRM_EXTRA_SEAT_ANNUAL_CENTS)}/year`;
+}
 /** "CRM Basic $39/month or $348/year (1 seat), …" */
 export const crmPlansLine = () => CRM_PLAN_KEYS.map((k) => {
   const p = CRM_PLANS[k];
@@ -396,8 +417,8 @@ There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans ar
 ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.
-The CRM (clients, estimates, invoices, payments, pipeline) is a SEPARATE product with its own subscription: none of the plans above includes it, and a CRM subscription does not include the tools above. CRM pricing: ${crmPlansLine()}. A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial.
-Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is included with ${TEXTING_PLANS}.
+The CRM (clients, estimates, invoices, payments, pipeline) is a SEPARATE product with its own subscription: none of the plans above includes it, and a CRM subscription does not include the tools above. CRM pricing: ${crmPlansLine()}. CRM yearly prices are their own, not ${ANNUAL_MONTHS} times the monthly price. A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial. ${crmAddonsLine()}.
+Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is sent from the CRM and is included with ${TEXTING_EITHER_LINE}.
 
 ### Add-ons (single features are sold only as add-ons to a plan)
 ${addonLines().map((line) => `- ${line}`).join("\n")}

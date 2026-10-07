@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { ADDONS, PLANS, PLAN_KEYS } from "../shared/plans";
 import {
   CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantTierAdvice,
-  callAssistantYearlyNote, callAssistantOverageRule, joinNames, planPriceLine,
+  callAssistantYearlyNote, callAssistantOverageRule, joinNames, planPriceLine, CRM_SEATS_LINE,
 } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
@@ -200,10 +200,11 @@ test("Master Class: modules and bundle at $1,000+ are sold through a sales rep",
   await expect(page.getByTestId("text-feature-price")).toHaveCount(0);
 });
 
-test("CRM gateway says the CRM is included in every plan", async ({ page }) => {
+test("CRM gateway says the CRM is a separate product with its own plans", async ({ page }) => {
   await page.goto("/crm-app");
-  await expect(page.getByTestId("text-crm-included")).toContainText("included with every ConstructHUB plan");
-  await expect(page.getByTestId("text-crm-included")).toContainText("Starter 1, Pro 3, Growth 10 and Agency 10");
+  await expect(page.getByTestId("text-crm-included")).toContainText("a separate product with its own plans");
+  await expect(page.getByTestId("text-crm-included")).not.toContainText("included with every");
+  await expect(page.getByTestId("text-crm-included")).toContainText(CRM_SEATS_LINE);
 });
 
 test("Competitor Intel: a 402 plan_required shows an honest upgrade prompt", async ({ page }) => {

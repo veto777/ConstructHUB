@@ -453,7 +453,7 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        {/* ConstructHub CRM — included in every paid plan, on its own portal.
+        {/* ConstructHub CRM — a separate product with its own plans, on its own portal.
             Prominent pathway in through the /crm-app gateway (member → portal, else plans). */}
         <SidebarGroup>
           <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Workspace</div>

@@ -64,7 +64,7 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 
 ## 1. What ConstructHUB is
 
-ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account and one plan cover:
+ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and a platform plan does not include it:
 
 - **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, and {{AGENCY_PLAN}}-plan agency tools.
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
@@ -97,7 +97,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 - **Change plan or billing interval:** Pricing → **Switch to [plan]**. This changes your existing subscription (it never starts a second one). The change is prorated and invoiced right away; a reduction becomes account credit. If your card can't be charged, nothing changes.
 - **Add-ons:** Settings → Billing (or Pricing → Add-ons → **Manage add-ons**) once you are subscribed to a plan that sells that add-on.
 - **Card, invoices and cancellation:** Settings → Billing → **Manage billing** opens Stripe's billing portal.
-- **Failed payment:** update the card in Manage billing. Access continues while Stripe retries the card.
+- **Failed payment:** the plan's features pause until the payment goes through. Update the card in Manage billing; as soon as the payment is collected everything comes back, with nothing to buy again.
 - **Reached a limit?** The message says which add-on or which plan raises it.
 - Plans sold before September 30, 2026 under older names keep their price until you change plans; their features follow the closest current plan.
 
@@ -107,7 +107,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 3. On each location, turn on **Profile Guard** (section 6) and set up **AI review replies** (section 8).
 4. **Google Reviews:** add your review link and send your first review request (section 8).
 5. If your plan includes it, **Click Guard:** add your website and install the tracking code (section 15).
-6. **CRM:** click **ConstructHub CRM** at the top of the sidebar, fill in your company profile, build your price book, connect Stripe and invite your team (section 24).
+6. **CRM** (a separate product: it needs its own CRM plan, section 3): click **ConstructHub CRM** at the top of the sidebar, fill in your company profile, build your price book, connect Stripe and invite your team (section 24).
 7. Run a **Site Scan** and a **Ranking Grid** scan to see where to improve (sections 11 and 12).
 
 ## 3. Plans, prices and add-ons
@@ -117,7 +117,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 ### How to read the price book
 - **Published self-serve prices** are every plan's monthly and yearly price, the {{AGENCY_PLAN}} per-location bands (up to the self-serve maximum) and the add-on prices. Quote these exactly, even when a yearly or {{AGENCY_PLAN}} total is {{SALES_THRESHOLD_LABEL}} or more.
 - **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, {{AGENCY_PLAN}} above the self-serve location maximum, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
-- Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free.
+- Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free. The exceptions are the AI Call Assistant tiers and the CRM plans, which have their own yearly prices (listed above).
 - Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
 - Profile Guard checks: {{GUARD_CADENCE_LINE}}.
@@ -482,7 +482,7 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 ## 24. The ConstructHub CRM
 
-**Access:** included with every plan, with CRM seats per plan ({{CRM_SEATS_LINE}}) and an Extra seat add-on. Click **ConstructHub CRM** at the top of the growth sidebar (/crm-app) → **Open your CRM** (portal.constructhub.us). If no workspace is found for your account, click **Request access**: workspaces are set up on request, and the team creates a brand-new, empty workspace for your company. On a phone the CRM has a bottom bar (Dashboard, Schedule, Inbox, Clients, More).
+**Access:** the CRM is a separate product with its own plans and subscription (prices in section 3); a platform plan does not include it. Seats per CRM plan: {{CRM_SEATS_LINE}}, plus an Extra seat add-on. Click **ConstructHub CRM** at the top of the growth sidebar (/crm-app) → **Open your CRM** (portal.constructhub.us). Your workspace is created the first time you open the CRM; without an active CRM plan (or its trial) the CRM shows the CRM plans instead of the workspace. On a phone the CRM has a bottom bar (Dashboard, Schedule, Inbox, Clients, More).
 
 **Home:** headline numbers (new leads, pipeline value, unscheduled jobs, open invoices), a **Needs attention** list (follow-ups due, new leads, leads waiting on an estimate), team activity and a setup checklist (your profile, company details, inviting your crew). Set weekly or biweekly follow-up reminders per client so nobody goes cold.
 
@@ -526,9 +526,9 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 **Divisions** give one company separate operating arms, each with its own name, address, license and sales tax, printed on that division's documents; admins can be limited to one division.
 
-**Texting** (included with {{TEXTING_PLANS}}). In CRM Settings → SMS choose where texts come from:
+**Texting** (included with {{TEXTING_EITHER_LINE}}). In CRM Settings → SMS choose where texts come from:
 - **Shared ConstructHUB number:** nothing to set up, but it texts your own team only (bid signed, money landed, client re-opened an estimate).
-- **My own number, billed through ConstructHUB:** {{CLIENT_TEXTING_INCLUDED_PLANS}} includes one; on {{TEXTING_ADDON_PLANS}} it's the Client texting number add-on.
+- **My own number, billed through ConstructHUB:** {{CLIENT_NUMBER_INCLUDED_PLANS}} each include one; on the {{TEXTING_ADDON_PLANS}} platform plans it's the Client texting number add-on.
 - **My own SignalWire account,** billed to you.
 
 Texting clients needs your own registered number, because carriers no longer let one shared number text on behalf of many businesses. You can text a bid link when you send it, and a "check your email" voice call works with any sender. Your own account alerts by text need your consent on your profile, and STOP opts out.
@@ -590,10 +590,10 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **Can I cancel?** Yes, from Settings → Billing → Manage billing (Stripe's billing portal).
 - **Results:** nothing is guaranteed, not rankings, leads or reinstatement. ConstructHUB gives you tools, data and guidance; Google and the market decide outcomes.
 - **Do I need a Google Business Profile?** For the Google tools, yes, and you need Owner or Manager access to it. ConstructHUB can't create one for you, but the done-for-you service can help.
-- **Can my office manager or crew use it?** Yes. Invite them in the CRM (Team & Company) within your plan's seats; {{AGENCY_PLAN}} workspaces also have agency team roles.
+- **Can my office manager or crew use it?** Yes. Invite them in the CRM (Team & Company) within your CRM plan's seats; {{AGENCY_PLAN}} workspaces also have agency team roles.
 - **Does ConstructHUB hold my customers' payments?** No. Payments go straight to your own Stripe account.
 - **Is Blotato included?** No. It's a separate subscription you buy from Blotato.
-- **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations and a bigger team: the plan with more locations and seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
+- **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations: the plan with more locations. A team in the CRM: that is the CRM plan, chosen separately by its seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
 - **Who else uses ConstructHUB?** That isn't something you can share. Talk about features instead.
 - **Can ConstructHUB answer my phone?** That is what the AI Call Assistant add-on does ({{CALL_ASSISTANT_STATUS}}): it answers calls on a local number, files the lead in the CRM and texts the right person for emergencies. See section 30.
 

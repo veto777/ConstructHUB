@@ -18,13 +18,13 @@ import {
 } from "@shared/plans";
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
-  SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE,
+  SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE, TEXTING_EITHER_LINE, CLIENT_NUMBER_INCLUDED_PLANS,
   CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
   CALL_ASSISTANT_SPAM, callAssistantMinuteRule, callAssistantOverageRule, callAssistantSpamAllowanceLine, callAssistantTierAdvice, callAssistantTierNumbersLine, callAssistantTiersLine,
 } from "@shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
-import { CRM_PLANS, CRM_PLAN_KEYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
+import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import { SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import { SEO_PLAN_LIMITS } from "@shared/plans";
 
@@ -54,6 +54,7 @@ export function knowledgeTokens(): Record<string, string> {
     AUTO_REPLY_PLANS: planNamesWhere((p) => p.limits.autoPublishAiReplies),
     DRAFT_ONLY_REPLY_PLANS: planNamesWhere((p) => !p.limits.autoPublishAiReplies),
     CLIENT_TEXTING_INCLUDED_PLANS: planNamesWhere((p) => p.limits.clientTexting === "included"),
+    TEXTING_EITHER_LINE, CLIENT_NUMBER_INCLUDED_PLANS,
     TEXTING_ADDON_PLANS: joinNames(ADDONS.texting_number.availableOn.map((k) => PLANS[k].name)),
     GUARD_CADENCE_LINE: joinNames(PLAN_KEYS.map((k) => `${PLANS[k].name} every ${PLANS[k].limits.guardCadenceMinutes} minutes`)),
     REVIEW_TEMPLATES_LINE: joinNames(PLAN_KEYS.map((k) => `${PLANS[k].name} ${PLANS[k].limits.reviewTemplates}`)),
@@ -233,6 +234,8 @@ export function priceBookCents(): Set<number> {
     cents.add(plan.monthlyCents); cents.add(plan.annualCents); cents.add(Math.round(plan.annualCents / 12));
   }
   cents.add(CRM_EXTRA_SEAT_MONTHLY_CENTS); cents.add(CRM_EXTRA_SEAT_ANNUAL_CENTS);
+  // The CRM's own add-ons (JobCam), monthly and yearly.
+  for (const addon of Object.values(CRM_ADDONS)) { cents.add(addon.monthlyCents); cents.add(addon.annualCents); }
   // SEO data: each plan's monthly allowance and the prepaid credit packs (shared/seo-credits.ts).
   for (const key of PLAN_KEYS) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
   for (const pack of SEO_CREDIT_PACKS) cents.add(pack);

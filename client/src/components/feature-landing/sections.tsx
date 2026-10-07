@@ -60,8 +60,8 @@ export function ComingSoonPill({ className = "" }: { className?: string }) {
 export function priceSentence(s: FeaturePriceSummary): { strong: string; rest: string } {
   if (!s.price && s.headline === SALES_REP_LABEL) return { strong: "Quoted by a sales rep", rest: " for your business." };
   if (!s.price) return { strong: s.headline, rest: "." };
-  const from = s.plans.length > 1 ? "from " : "";
-  return { strong: s.headline, rest: ` — ${from}${s.price}${s.per}.` };
+  const from = s.plans.length > 1 || s.from ? "from " : "";
+  return { strong: s.headline, rest: ` — ${from}${s.price}${s.per}${s.priceTail ?? ""}.` };
 }
 
 // ── Hero ─────────────────────────────────────────────────────────────────────
@@ -344,7 +344,7 @@ export function PricingSection({
           </div>
           {price.price ? (
             <div className="mt-5 font-display font-semibold text-[3.4rem] leading-none text-mkt-ink" data-testid="text-feature-price">
-              {price.plans.length > 1 && <span className="font-sans text-base font-medium text-mkt-muted mr-1.5">from</span>}
+              {(price.plans.length > 1 || price.from) && <span className="font-sans text-base font-medium text-mkt-muted mr-1.5">from</span>}
               {price.price}<span className="font-sans text-base font-medium text-mkt-muted ml-1">{price.per.trim()}</span>
             </div>
           ) : null}

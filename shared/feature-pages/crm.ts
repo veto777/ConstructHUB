@@ -146,14 +146,13 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "plan",
-    allowance: SEATS,
+    kind: "crmPlan",
     note: "The CRM is a separate subscription from the ConstructHUB platform plans. Your CRM plan sets how many people can use it, and extra seats are an add-on.",
   },
   faqs: [
     {
       q: "What do I need to get started?",
-      a: "A ConstructHUB account and plan. Your CRM workspace is created the first time you open it. To take payments online, connect your own Stripe account; to text clients, you need a plan with texting and a number of your own. Everything else works by email.",
+      a: "A ConstructHUB account and a CRM plan. Your CRM workspace is created the first time you open it. To take payments online, connect your own Stripe account; to text clients, you need a plan with texting and a number of your own. Everything else works by email.",
     },
     {
       q: "Which plans include it, and how many people can use it?",
