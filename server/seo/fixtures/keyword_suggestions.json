@@ -1,0 +1,13 @@
+{
+  "status_code": 20000, "status_message": "Ok.", "cost": 0.01236,
+  "tasks": [ { "id": "x", "status_code": 20000, "status_message": "Ok.", "cost": 0.01236, "result_count": 1, "path": ["v3","dataforseo_labs","google","keyword_suggestions","live"],
+    "result": [ { "se_type": "google", "seed_keyword": "roof repair", "location_code": 2840, "language_code": "en", "total_count": 1840, "items_count": 3,
+      "items": [
+        { "se_type": "google", "keyword": "roof repair near me", "location_code": 2840, "language_code": "en",
+          "keyword_info": { "se_type": "google", "last_updated_time": "2026-09-30 00:00:00 +00:00", "competition": 0.62, "competition_level": "MEDIUM", "cpc": 18.4, "search_volume": 60500, "monthly_searches": [] },
+          "keyword_properties": { "se_type": "google", "core_keyword": null, "keyword_difficulty": 41, "detected_language": "en" },
+          "search_intent_info": { "se_type": "google", "main_intent": "commercial", "foreign_intent": null } },
+        { "se_type": "google", "keyword": "emergency roof repair", "keyword_info": { "competition": null, "cpc": null, "search_volume": 5400 }, "keyword_properties": { "keyword_difficulty": null }, "search_intent_info": null },
+        { "se_type": "google", "keyword": null, "keyword_info": { "search_volume": 10 } }
+      ] } ] } ]
+}

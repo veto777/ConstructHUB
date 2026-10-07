@@ -1,0 +1,8 @@
+{
+  "status_code": 20000, "status_message": "Ok.", "cost": 0.09,
+  "tasks": [ { "id": "v", "status_code": 20000, "status_message": "Ok.", "cost": 0.09, "result_count": 2, "path": ["v3","keywords_data","google_ads","search_volume","live"],
+    "result": [
+      { "keyword": "roofing contractor tampa", "spell": null, "location_code": 2840, "language_code": "en", "search_partners": false, "competition": "HIGH", "competition_index": 88, "search_volume": 1300, "low_top_of_page_bid": 6.2, "high_top_of_page_bid": 31.5, "cpc": 22.7, "monthly_searches": [] },
+      { "keyword": "zzz unknown keyword", "search_volume": null, "cpc": null, "competition": null }
+    ] } ]
+}

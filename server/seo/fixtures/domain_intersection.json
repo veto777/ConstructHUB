@@ -1,0 +1,13 @@
+{
+  "status_code": 20000, "status_message": "Ok.", "cost": 0.012,
+  "tasks": [ { "id": "y", "status_code": 20000, "status_message": "Ok.", "cost": 0.01224, "result_count": 1, "path": ["v3","dataforseo_labs","google","domain_intersection","live"],
+    "result": [ { "se_type": "google", "target1": "bigroofer.example", "target2": "constructhub.us", "location_code": 2840, "language_code": "en", "total_count": 912, "items_count": 2,
+      "items": [
+        { "se_type": "google", "keyword_data": { "keyword": "metal roof cost", "keyword_info": { "search_volume": 33100, "cpc": 9.12, "competition": 0.41 }, "keyword_properties": { "keyword_difficulty": 58 }, "search_intent_info": { "main_intent": "informational" } },
+          "first_domain_serp_element": { "se_type": "google", "type": "organic", "rank_group": 4, "rank_absolute": 6, "url": "https://bigroofer.example/metal-roof-cost", "etv": 1210.5 },
+          "second_domain_serp_element": null },
+        { "se_type": "google", "keyword_data": { "keyword": "roof inspection checklist", "keyword_info": { "search_volume": 880, "cpc": 2.1 }, "keyword_properties": { "keyword_difficulty": 12 } },
+          "first_domain_serp_element": { "type": "organic", "rank_group": 1, "rank_absolute": 1, "url": "https://bigroofer.example/inspection", "etv": 400 },
+          "second_domain_serp_element": null }
+      ] } ] } ]
+}

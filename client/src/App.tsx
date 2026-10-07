@@ -85,6 +85,10 @@ import { pageMetaFor } from "@shared/route-meta";
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
 // on demand, so the marketing pages (and every signed-out visitor) don't download them.
 const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
+const SeoOverviewPage = lazy(() => import("@/pages/seo"));
+const SeoKeywordsPage = lazy(() => import("@/pages/seo/keywords"));
+const SeoBacklinksPage = lazy(() => import("@/pages/seo/backlinks"));
+const SeoCompetitorsPage = lazy(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazy(() => import("@/pages/admin-access"));
 const AdminIssuesPage = lazy(() => import("@/pages/admin-issues"));
 const CrmTeamPage = lazy(() => import("@/pages/crm-team"));
@@ -194,6 +198,10 @@ function DashboardRouter() {
       <Route path="/cloudflare" component={CloudflarePage} />
       <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
+      <Route path="/seo" component={SeoOverviewPage} />
+      <Route path="/seo/keywords" component={SeoKeywordsPage} />
+      <Route path="/seo/backlinks" component={SeoBacklinksPage} />
+      <Route path="/seo/competitors" component={SeoCompetitorsPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
@@ -345,7 +353,7 @@ function PublicRouter() {
 /** Dashboard routes that need an account (everything else here is public). */
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
-  "/social-media", "/guides", "/cloudflare", "/search-console", "/lsa-leads", "/lsa-account-manager", "/settings",
+  "/social-media", "/guides", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
   "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/admin/feature-pages", "/admin/access", "/admin/issues",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
@@ -376,6 +384,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
+  "/seo": "SEO", "/seo/keywords": "Keyword research", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
