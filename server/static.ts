@@ -94,6 +94,29 @@ function readLastmod(distRoot: string): Record<string, string> {
   }
 }
 
+/** The build's content-hashed bundles: /assets/<name>-<hash>.js|css|… (vite's assetsDir). */
+export const HASHED_ASSETS_PREFIX = "/assets/";
+
+const STATIC_FILE_RE = /\.(?:m?js|css|map|json|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot|mp3|mp4|m4a|webm|wav|ogg|pdf|txt|xml|webmanifest|wasm)$/i;
+
+/**
+ * A URL that names a static file: anything under /assets/ and any path ending
+ * in a file extension the build ships. When no file matches, the answer is a
+ * plain 404 — never the app's HTML. A tab opened before a deploy asks for a
+ * hashed bundle the deploy deleted (script/deploy-vb11.sh rsyncs assets with
+ * --delete); answered with index.html the browser rejects it ("'text/html' is
+ * not a valid JavaScript MIME type") and Cloudflare, which caches by file
+ * extension, kept such an HTML answer under an image URL for 4 h (HANDOFF.md).
+ */
+export function isStaticFilePath(pathname: string): boolean {
+  return pathname.startsWith(HASHED_ASSETS_PREFIX) || STATIC_FILE_RE.test(pathname);
+}
+
+/** A hashed bundle never changes under its name; everything else is revalidated. */
+export const IMMUTABLE_CACHE = "public, max-age=31536000, immutable";
+/** The HTML names the current bundles, so it is revalidated on every load (a reload after a deploy gets the new names). */
+export const HTML_CACHE = "no-cache";
+
 /** Signed in (a session the auth middleware recognised)? Then the page is the app frame, not the marketing snapshot. */
 const isSignedIn = (req: express.Request) =>
   typeof (req as any).isAuthenticated === "function" ? !!(req as any).isAuthenticated() : !!(req as any).user;
@@ -163,12 +186,33 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
   // The prerendered files are served only at their page's own URL (below), never as /prerender/….
   app.use(`/${PRERENDER_DIR}`, (_req, res) => { res.status(404).type("text/plain").send("Not found"); });
 
-  app.use(express.static(distPath, { index: false }));
+  const assetsDir = path.join(distPath, HASHED_ASSETS_PREFIX);
+  app.use(express.static(distPath, {
+    index: false,
+    setHeaders: (res, filePath) => {
+      if (filePath.startsWith(assetsDir)) res.setHeader("Cache-Control", IMMUTABLE_CACHE);
+      else if (filePath.endsWith(".html")) res.setHeader("Cache-Control", HTML_CACHE);
+    },
+  }));
+
+  // A static file that is not there (a bundle an earlier build shipped, a
+  // mistyped image) is a short plain 404 on every host, marked no-store so no
+  // browser or edge cache keeps it under that file's URL. A real app route
+  // that happens to end in ".pdf" or the like still gets the app.
+  app.use((req, res, next) => {
+    if (!isStaticFilePath(req.path)) return next();
+    if (!req.path.startsWith(HASHED_ASSETS_PREFIX) && isKnownPath(canonicalPath(req.originalUrl))) return next();
+    res.status(404).setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.type("text/plain").send("Not found\n");
+  });
 
   // Fall through to index.html with a per-path canonical injected, so every
   // SPA route declares its own canonical URL (GSC: "Duplicate without
   // user-selected canonical" fix).
   app.use("/{*path}", (req, res) => {
+    // Every HTML answer below is revalidated: it names this build's hashed bundles.
+    res.setHeader("Cache-Control", HTML_CACHE);
     // originalUrl, not req.path — inside app.use() req.path is stripped to the
     // mount remainder and always reads "/".
     if (isPortalHost(requestHost(req)) || isClientHost(requestHost(req))) {

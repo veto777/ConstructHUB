@@ -410,7 +410,10 @@ describe("the prerendered pages on the server", () => {
   });
 
   it("answers an unknown URL with an honest 404 (noindex, no canonical), and a wrong-case marketing URL with a 301", async () => {
-    for (const p of ["/nonexistent-xyz", "/features/no-such-feature", "/done-for-you/nope", "/assets/gone.js"]) {
+    // A missing static file is not a page: a plain 404, never the app's HTML (server/static-assets.test.ts).
+    const gone = await get("/assets/gone.js");
+    expect([gone.status, gone.headers.get("content-type"), gone.headers.get("cache-control")]).toEqual([404, "text/plain; charset=utf-8", "no-store"]);
+    for (const p of ["/nonexistent-xyz", "/features/no-such-feature", "/done-for-you/nope"]) {
       const res = await get(p);
       expect(res.status, p).toBe(404);
       const html = await res.text();
