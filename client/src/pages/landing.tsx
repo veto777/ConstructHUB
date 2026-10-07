@@ -576,6 +576,10 @@ export default function LandingPage() {
               <span aria-hidden className="opacity-40">·</span>
               <Link href={CALL_ASSISTANT_PATH} className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-call-assistant">AI Call Assistant</Link>
               <span aria-hidden className="opacity-40">·</span>
+              <Link href="/tutorials" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-help">Help</Link>
+              <span aria-hidden className="opacity-40">·</span>
+              <Link href="/report-issue" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-report-issue">Report an issue</Link>
+              <span aria-hidden className="opacity-40">·</span>
               <a href="/terms" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-terms">Terms of Use</a>
               <span aria-hidden className="opacity-40">·</span>
               <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>

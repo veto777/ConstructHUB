@@ -10,6 +10,11 @@
  * the tab reloads once to the new build instead (lib/stale-build.ts). It is
  * reported only when that is not the explanation (same build, or it still
  * fails right after the reload).
+ *
+ * The last few errors of this page load are also kept in memory (never in
+ * storage) so "Report an issue" can attach them — and show them to the person
+ * first (pages/report-issue.tsx, "What we send with your report"). That list
+ * holds every error the tab saw, including one that was not sent to the server.
  */
 import { isChunkLoadMessage, recoverFromStaleBuild } from "./stale-build";
 
@@ -28,7 +33,25 @@ function describe(reason: unknown): { message: string; stack?: string } {
   try { return { message: JSON.stringify(reason) ?? String(reason) }; } catch { return { message: String(reason) }; }
 }
 
-function send(report: Report, checked = false) {
+export type RecentClientError = { kind: string; message: string; at: string; source?: string };
+const MAX_RECENT = 10;
+const recent: RecentClientError[] = [];
+
+/** The last errors this tab saw since it loaded, oldest first (at most 10). */
+export function recentClientErrors(): RecentClientError[] {
+  return recent.slice();
+}
+
+function remember(report: Report) {
+  const message = String(report.message ?? "").slice(0, 300);
+  if (!message) return;
+  recent.push({ kind: report.kind, message, at: new Date().toISOString(), source: report.source ? String(report.source).slice(0, 200) : undefined });
+  if (recent.length > MAX_RECENT) recent.shift();
+}
+
+function send(report: Report, checked = false, remembered = false) {
+  // Once per error: the stale-build check below re-enters with remembered = true.
+  if (!remembered) { try { remember(report); } catch { /* reporting must never throw */ } }
   if (sent >= MAX_REPORTS_PER_PAGE) return;
   const message = String(report.message ?? "").slice(0, 1000);
   const key = `${report.kind}|${message}`;
@@ -36,7 +59,7 @@ function send(report: Report, checked = false) {
   if (!checked && isChunkLoadMessage(message)) {
     // Expected after a deploy: reload to the new build, report nothing. Offline is not a fault either.
     void recoverFromStaleBuild().then((outcome) => {
-      if (outcome !== "reloading" && outcome !== "offline") send(report, true);
+      if (outcome !== "reloading" && outcome !== "offline") send(report, true, true);
     });
     return;
   }

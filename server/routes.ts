@@ -300,7 +300,10 @@ export async function registerRoutes(
   try {
     const { mergeDuplicateIssues } = await import("./ops/merge");
     const merged = await mergeDuplicateIssues();
-    if (merged.folded || merged.rekeyed) console.log(`[issues] merged duplicates: ${merged.folded} folded into ${merged.groups.length} issue(s), ${merged.rekeyed} given a stable fingerprint`);
+    // Always one line, so a boot's log shows what the merge did — including "nothing".
+    console.log(merged.folded || merged.rekeyed
+      ? `[issues] merged duplicates: ${merged.folded} folded into ${merged.groups.length} issue(s), ${merged.rekeyed} given a stable fingerprint (${merged.scanned} scanned, ${merged.userReports} user report(s) left untouched)`
+      : `[issues] duplicate merge: nothing to do (${merged.scanned} scanned, ${merged.userReports} user report(s) left untouched)`);
   } catch (e) {
     console.warn(`[issues] duplicate merge skipped: ${(e as Error)?.message ?? e}`);
   }

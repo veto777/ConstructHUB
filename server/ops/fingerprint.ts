@@ -123,8 +123,12 @@ export function clientErrorKey(detail: Record<string, unknown>): string {
  * The key a stored row would get today, from its scrubbed detail — or null
  * for a row whose key is not derived from its detail (callers that pass their
  * own fixed key: health probes, one-way-audio, …); those were always stable.
+ * Also null for every user report (source "user"), whatever its detail holds.
  */
 export function stableKeyForRow(source: string, detail: unknown): string | null {
+  // A person's own report (/report-issue) has a random fingerprint on purpose — one row per report,
+  // whatever its text says. It has no stable key: never re-keyed, never merged (merge.ts).
+  if (source === "user") return null;
   if (!isRecord(detail)) return null;
   if (source === "client") {
     return typeof detail.message === "string" && (detail.kind === "error" || detail.kind === "unhandledrejection") ? clientErrorKey(detail) : null;

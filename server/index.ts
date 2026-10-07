@@ -38,6 +38,9 @@ app.use(["/api/site-assistant", "/api/ads-consultant", "/api/review", "/api/phot
 // The browser's error reports (issue desk): small, anonymous, capped before the big parser below.
 import { CLIENT_ERROR_PATH, CLIENT_ERROR_BODY_LIMIT } from "./ops/client-errors";
 app.use(CLIENT_ERROR_PATH, express.json({ limit: CLIENT_ERROR_BODY_LIMIT }));
+// A person's own report (/report-issue): text plus an optional screenshot (≤ 5 MB), capped before the big parser below.
+import { USER_REPORT_PATH, USER_REPORT_BODY_LIMIT } from "./ops/user-reports";
+app.use(USER_REPORT_PATH, express.json({ limit: USER_REPORT_BODY_LIMIT }));
 app.use("/api/ads", express.json({ limit: "512kb" }));
 app.use(
   express.json({

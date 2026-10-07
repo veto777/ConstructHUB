@@ -1,14 +1,43 @@
-/** /seo/keywords — research: seed keyword → suggestions with volume / CPC / difficulty, "Track" buttons. */
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Search } from "lucide-react";
+/**
+ * /seo/keywords — Keywords Explorer. Type a keyword: its monthly search volume
+ * with the trend over the years, difficulty, cost per click, intent, who ranks
+ * for it today and how strong those sites are; then the ideas around it —
+ * matching terms, related terms and questions — filterable, sortable, paged,
+ * exportable, and trackable on one of your sites.
+ * The overview is one lookup (free to reopen for a week); each page of an idea
+ * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
+ */
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { ReportView, type TableKey } from "./report-table";
 
-type Idea = { keyword: string; searchVolume: number | null; cpc: number | null; difficulty: number | null; competition: number | null; intent: string | null };
-type Research = { seed: string; items: Idea[] };
+type Overview = {
+  keyword: string; fetchedAt: string;
+  volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competition: string | null;
+  bidLow: number | null; bidHigh: number | null; results: number | null;
+  trend: { month: string; volume: number }[];
+  features: string[];
+  topAvg: { authority: number | null; backlinks: number | null; referringDomains: number | null };
+  serp: { position: number; domain: string; url: string; title: string | null; authority: number | null }[];
+};
+
+const IDEAS: [TableKey, string][] = [["matchingTerms", "Matching terms"], ["relatedTerms", "Related terms"], ["questions", "Questions"]];
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+const FEATURE: Record<string, string> = {
+  local_pack: "Map pack", people_also_ask: "People also ask", featured_snippet: "Featured snippet", images: "Images", video: "Videos", paid: "Ads",
+  related_searches: "Related searches", people_also_search: "People also search", knowledge_graph: "Knowledge panel", shopping: "Shopping", top_stories: "Top stories", ai_overview: "AI overview",
+};
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return <div className="g-tile"><div className="g-tile__label">{label}</div><div className="g-tile__value">{value}</div>{hint && <div className="g-tile__hint">{hint}</div>}</div>;
+}
 
 export default function SeoKeywordsPage() {
   const status = useSeoStatus();
@@ -16,66 +45,122 @@ export default function SeoKeywordsPage() {
   const [site, onSite] = useSelectedSite(sites.data);
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [seed, setSeed] = useState("");
-  const [picked, setPicked] = useState<Set<string>>(new Set());
-  const research = useMutation({
-    mutationFn: () => api("POST", "/api/seo/keywords/research", { seed, locationCode: site?.locationCode ?? 2840, languageCode: site?.languageCode ?? "en" }) as Promise<Research>,
-    onSuccess: () => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
-    onError: (e) => toast({ title: "Research failed", description: apiErrorMessage(e), variant: "destructive" }),
+  const initial = new URLSearchParams(window.location.search).get("keyword") ?? "";
+  const [input, setInput] = useState(initial);
+  const [keyword, setKeyword] = useState<string | null>(initial || null);
+  const [ideas, setIdeas] = useState<TableKey>("matchingTerms");
+  const [overview, setOverview] = useState<Overview | null>(null);
+
+  // A keyword looked up in the last week opens without spending.
+  const saved = useQuery<{ overview: Overview } | null>({
+    queryKey: ["/api/seo/keyword", keyword], enabled: !!keyword && !overview, retry: false,
+    queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true }); } catch { return null; } },
+  });
+  useEffect(() => { if (saved.data?.overview && !overview) setOverview(saved.data.overview); }, [saved.data, overview]);
+
+  const lookup = useMutation({
+    mutationFn: (k: string) => api("POST", "/api/seo/keyword", { keyword: k }),
+    onSuccess: (data: { overview: Overview }) => {
+      setOverview(data.overview); setKeyword(data.overview.keyword); setInput(data.overview.keyword);
+      window.history.replaceState({}, "", `/seo/keywords?keyword=${encodeURIComponent(data.overview.keyword)}`);
+      void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+    },
+    onError: (e) => toast({ title: "Couldn't look that keyword up", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
-    mutationFn: (keywords: Idea[]) => api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: keywords.map((k) => k.keyword), volumes: keywords.map((k) => ({ keyword: k.keyword, searchVolume: k.searchVolume, cpc: k.cpc, difficulty: k.difficulty })) }),
-    onSuccess: (r: { added: number }) => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked for ${site!.domain}` }); },
+    mutationFn: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) =>
+      api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: rows.map((r) => r.keyword), volumes: rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
+    onSuccess: (r: { added: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const volumes = useMutation({
-    mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/keywords/volumes`),
-    onSuccess: (r: { updated: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Search volume updated for ${r.updated} keyword${r.updated === 1 ? "" : "s"}` }); },
-    onError: (e) => toast({ title: "Couldn't fetch volumes", description: apiErrorMessage(e), variant: "destructive" }),
-  });
+
+  const submit = () => { const k = input.trim(); if (!k) return; setOverview(null); setKeyword(k.toLowerCase()); lookup.mutate(k); };
   const configured = !!status.data?.configured;
-  const items = research.data?.items ?? [];
-  const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const affordable = canAfford(status.data, "keywordOverview");
+  const price = status.data?.prices ? money(status.data.prices.keywordOverview) : "";
+  const busy = lookup.isPending || (saved.isLoading && !!keyword && !overview);
+  const o = overview;
+  const peak = o && o.trend.length ? o.trend.reduce((a, b) => (b.volume > a.volume ? b : a)) : null;
+
   return (
-    <SeoShell title="Keyword research" description="Start from one keyword and get up to 50 related searches with monthly volume, cost per click and difficulty." site={site} onSite={onSite} sites={sites} status={status}
-      actions={site && <button type="button" className="g-pill" disabled={!configured || volumes.isPending} onClick={() => volumes.mutate()} data-testid="button-fetch-volumes" title="Google search volume for tracked keywords that have none yet">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get volumes for tracked keywords</button>}>
-      <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (seed.trim()) research.mutate(); }} data-testid="form-research">
-        <input className="g-input" placeholder="e.g. roof repair" value={seed} onChange={(e) => setSeed(e.target.value)} data-testid="input-seed" />
-        <Button type="submit" className="sm:w-auto" disabled={!configured || !seed.trim() || research.isPending || !canAfford(status.data, "keywordResearch")} data-testid="button-research" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
-          {research.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find keywords
+    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranks today, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
+      <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
+        <label className="relative min-w-0 flex-1 sm:max-w-xl">
+          <span className="sr-only">Keyword</span>
+          <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
+          <input className="g-input w-full pl-9" placeholder="e.g. siding contractor" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-keyword" autoComplete="off" />
+        </label>
+        <Button type="submit" disabled={busy || !input.trim() || !configured || !affordable} data-testid="button-keyword-lookup">
+          {lookup.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking up…</> : "Look up"}
         </Button>
       </form>
-      {!research.data && (
-        <Empty testId="seo-research-empty">
-          <h3>What people search for</h3>
-          <p>Each search returns up to 50 related keywords with Google search volume (United States), average cost per click, keyword difficulty (0–100) and intent. Tick the ones worth ranking for and track them on {site ? site.domain : "a site"}.</p>
-          {status.data && <p className="mt-2" data-testid="text-research-price">Each search costs {priceOf(status.data, "keywordResearch")} of your SEO data.</p>}
-        </Empty>
-      )}
-      {research.data && (
-        <>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] g-text-2">
-            <span data-testid="text-research-meta">{items.length} suggestions for "{research.data.seed}"</span>
-            {site && picked.size > 0 && <Button size="sm" disabled={track.isPending} onClick={() => track.mutate(items.filter((i) => picked.has(i.keyword)))} data-testid="button-track-selected">{track.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Track ${picked.size} on ${site.domain}`}</Button>}
+      <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
+        A keyword's overview costs about {price} of your SEO data and is free to reopen for a week. United States, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
+      </p>
+      {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and today's results…" : "Opening the saved overview…"}</p>}
+      {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who holds the top ten today — and hundreds of related searches you can track.</p></Empty>}
+      {!o && !busy && keyword && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
+
+      {o && (
+        <div data-testid="keyword-overview">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <h2 className="g-text text-[20px] font-medium">"{o.keyword}"</h2>
+            <span className="g-text-2 text-[12px]">as of {fmtDate(o.fetchedAt)}</span>
+            {site && <button type="button" className="g-pill g-pill--sm ml-auto" disabled={track.isPending} onClick={() => track.mutate([{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }])} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
           </div>
-          {items.length === 0 ? <Empty>No suggestions came back for that seed. Try a shorter or more common phrase.</Empty> : (
-            <table className="g-table" data-testid="table-suggestions">
-              <thead><tr><th>Keyword</th><th className="num">Volume / mo</th><th className="num">CPC</th><th className="num">Difficulty</th><th>Intent</th><th aria-label="Track" /></tr></thead>
-              <tbody>
-                {items.map((i) => (
-                  <tr key={i.keyword}>
-                    <td><label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={picked.has(i.keyword)} onChange={() => toggle(i.keyword)} aria-label={`Select ${i.keyword}`} /> {i.keyword}</label></td>
-                    <td className="num" data-label="Volume / mo">{fmtNum(i.searchVolume)}</td>
-                    <td className="num" data-label="CPC">{i.cpc == null ? "—" : `$${i.cpc.toFixed(2)}`}</td>
-                    <td className="num" data-label="Difficulty">{kd(i.difficulty)}</td>
-                    <td data-label="Intent" className="capitalize">{i.intent ?? "—"}</td>
-                    <td className="num">{site && <button type="button" className="g-pill !min-h-8" disabled={track.isPending} onClick={() => track.mutate([i])} data-testid={`button-track-${i.keyword.replace(/\W+/g, "-")}`}>Track</button>}</td>
+          <div className="g-tiles mb-4">
+            <Stat label="Search volume" value={fmtNum(o.volume)} hint={peak ? `Peak ${fmtNum(peak.volume)} in ${monthLabel(peak.month)}` : "per month"} />
+            <Stat label="Difficulty" value={kd(o.difficulty)} hint={o.topAvg.referringDomains != null ? `Top pages average ${fmtNum(o.topAvg.referringDomains)} referring domains` : "0–100"} />
+            <Stat label="Cost per click" value={o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`} hint={o.bidLow != null && o.bidHigh != null ? `Top-of-page bids $${o.bidLow.toFixed(2)}–$${o.bidHigh.toFixed(2)}` : o.competition ? `${cap(o.competition.toLowerCase())} ad competition` : undefined} />
+            <Stat label="Intent" value={o.intent ? cap(o.intent) : "—"} hint={o.results != null ? `${fmtNum(o.results)} results` : undefined} />
+          </div>
+          <div className="mb-4 grid gap-4 lg:grid-cols-3">
+            <section className="rounded-lg border p-4 lg:col-span-2" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-trend">
+              <h3 className="g-text mb-2 text-[15px] font-medium">Search volume by month</h3>
+              {o.trend.length > 1 ? (
+                <div style={{ width: "100%", height: 220 }}>
+                  <ResponsiveContainer>
+                    <AreaChart data={o.trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                      <CartesianGrid stroke="var(--g-divider)" vertical={false} />
+                      <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={40} />
+                      <YAxis tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}K` : String(v))} />
+                      <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number) => [fmtNum(v), "Searches"]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
+                      <Area type="monotone" dataKey="volume" stroke="#1a73e8" fill="#1a73e8" fillOpacity={0.15} strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : <p className="g-text-2 text-[13px]">No monthly history for this keyword.</p>}
+            </section>
+            <section className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-features">
+              <h3 className="g-text mb-2 text-[15px] font-medium">On the results page</h3>
+              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <span key={f} className="g-chip g-chip--sm">{FEATURE[f] ?? cap(f.replace(/_/g, " "))}</span>)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
+              <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "Google shows a map pack here, so a strong Google Business Profile matters as much as the website." : "No map pack: this one is won by the website."}</p>
+            </section>
+          </div>
+          <section className="mb-5" data-testid="panel-keyword-serp">
+            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks today</h3>
+            {o.serp.length ? (
+              <table className="g-table">
+                <thead><tr><th className="num w-10">#</th><th>Page</th><th className="num">Site authority</th><th></th></tr></thead>
+                <tbody>{o.serp.map((s) => (
+                  <tr key={`${s.position}-${s.url}`}>
+                    <td className="num">{s.position}</td>
+                    <td><a href={s.url} className="g-link" target="_blank" rel="noreferrer">{s.title ?? s.domain}</a><span className="g-text-2 block max-w-[520px] truncate text-[12px]">{s.url.replace(/^https?:\/\/(www\.)?/, "")}</span></td>
+                    <td className="num" data-label="Site authority">{s.authority ?? "—"}</td>
+                    <td className="num"><a className="g-link" href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} data-testid={`link-explore-${s.position}`}>Explore site</a></td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </>
+                ))}</tbody>
+              </table>
+            ) : <p className="g-text-2 text-[13px]">Today's results weren't available for this keyword.</p>}
+          </section>
+
+          <h3 className="g-text mb-2 text-[15px] font-medium">Keyword ideas</h3>
+          <nav className="g-tabs" aria-label="Keyword ideas">
+            {IDEAS.map(([k, label]) => <a key={k} href={`#${k}`} aria-current={ideas === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setIdeas(k); }} data-testid={`tab-ideas-${k}`}>{label}</a>)}
+          </nav>
+          <ReportView table={ideas} keyword={o.keyword} status={status.data} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
+          {!site && <p className="g-text-2 mt-2 text-[13px]">Add a site above to track keywords from these lists.</p>}
+        </div>
       )}
     </SeoShell>
   );

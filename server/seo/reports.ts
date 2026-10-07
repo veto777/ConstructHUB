@@ -1,0 +1,332 @@
+/**
+ * Site Explorer's reports and the Keywords Explorer — the tables behind the
+ * overview, each filterable, sortable and paged, plus one keyword's overview.
+ *
+ *   Domain reports (POST /api/seo/report { domain, table, ... }):
+ *     keywords, paidKeywords, pages, competitors            (labs)
+ *     backlinks, newBacklinks, lostBacklinks, brokenBacklinks,
+ *     referringDomains, anchors, bestByLinks                (backlinks)
+ *   Keyword reports (the same endpoint with { keyword, table }):
+ *     matchingTerms, relatedTerms, questions
+ *   Keyword overview (POST /api/seo/keyword): volume, difficulty, CPC, intent,
+ *     the monthly trend, the top organic results with each site's authority.
+ *
+ * Every page of every report is one vendor call, charged to the account's SEO
+ * data credit through withBudget (server/seo/budget.ts). The exact page asked
+ * for is kept in seo_report_cache and served from there for CACHE_HOURS, so
+ * paging back, re-sorting to a page already seen or reopening costs nothing.
+ * `peek` asks for the saved page only and never spends.
+ *
+ * Pure builders (reportRequest, parse*) are tested against real responses
+ * (server/seo/reports.test.ts). Request shapes follow OpenSEO's
+ * src/server/lib/dataforseo (MIT — notice in server/seo/dataforseo.ts).
+ */
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import { pool } from "../db";
+import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
+import { parseExplorerKeyword, parseExplorerPage, parseCompetitors, parseReferringDomain, parseAnchor, INTENTS, type Intent } from "./explorer";
+
+export const CACHE_HOURS = 24;
+export const KEYWORD_OVERVIEW_TTL_DAYS = 7;
+/** Wholesale estimates reserved before a call (settled to the real cost after). */
+export const REPORT_ESTIMATE_USD = 0.03;
+export const REPORT_TYPICAL_USD = 0.025;
+export const KEYWORD_OVERVIEW_ESTIMATE_USD = 0.05;
+export const KEYWORD_OVERVIEW_TYPICAL_USD = 0.04;
+
+export const DOMAIN_TABLES = ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "referringDomains", "anchors", "bestByLinks"] as const;
+export const KEYWORD_TABLES = ["matchingTerms", "relatedTerms", "questions"] as const;
+export type DomainTable = (typeof DOMAIN_TABLES)[number];
+export type KeywordTable = (typeof KEYWORD_TABLES)[number];
+export type ReportTable = DomainTable | KeywordTable;
+export const isKeywordTable = (t: string): t is KeywordTable => (KEYWORD_TABLES as readonly string[]).includes(t);
+
+const optNum = z.number().finite().min(0).max(1_000_000_000).optional();
+export const reportFilters = z.object({
+  positionMin: optNum, positionMax: optNum,
+  volumeMin: optNum, volumeMax: optNum,
+  difficultyMin: optNum, difficultyMax: optNum,
+  intent: z.enum(INTENTS).optional(),
+  /** Text the keyword / anchor / linking domain must contain. */
+  contains: z.string().trim().min(1).max(80).regex(/^[^%_\\]+$/, "No % _ or \\ in the search text").optional(),
+  follow: z.enum(["followed", "nofollow"]).optional(),
+  /** Backlinks: one row per linking domain (default) or every link. */
+  everyLink: z.boolean().optional(),
+}).strict();
+export type ReportFilters = z.infer<typeof reportFilters>;
+
+export const reportInput = z.object({
+  domain: z.string().min(3).max(253).optional(),
+  keyword: z.string().trim().min(1).max(200).optional(),
+  table: z.enum([...DOMAIN_TABLES, ...KEYWORD_TABLES]),
+  limit: z.union([z.literal(25), z.literal(50), z.literal(100)]).default(50),
+  offset: z.number().int().min(0).max(9900).default(0),
+  sort: z.string().regex(/^[a-zA-Z]{2,24}$/).optional(),
+  filters: reportFilters.default({}),
+  locationCode: z.number().int().positive().default(2840),
+  languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  /** Return the saved page only; never call the source, never spend. */
+  peek: z.boolean().default(false),
+}).strict();
+export type ReportInput = z.infer<typeof reportInput>;
+
+type Clause = [string, string, unknown];
+/** Clauses joined with "and" the way the source wants them: [c1, "and", c2, ...]. At most 8 conditions. */
+export function andClauses(clauses: Clause[]): unknown[] | undefined {
+  const kept = clauses.slice(0, 8);
+  if (!kept.length) return undefined;
+  if (kept.length === 1) return kept[0];
+  return kept.flatMap((c, i) => (i ? ["and", c] : [c]));
+}
+
+/** Sort keys each table accepts → the source's order_by. The first is the default. */
+export const SORTS: Record<ReportTable, Record<string, string>> = {
+  keywords: { traffic: "ranked_serp_element.serp_item.etv,desc", volume: "keyword_data.keyword_info.search_volume,desc", position: "ranked_serp_element.serp_item.rank_group,asc", difficulty: "keyword_data.keyword_properties.keyword_difficulty,asc", cpc: "keyword_data.keyword_info.cpc,desc" },
+  paidKeywords: { traffic: "ranked_serp_element.serp_item.etv,desc", volume: "keyword_data.keyword_info.search_volume,desc", cpc: "keyword_data.keyword_info.cpc,desc" },
+  pages: { traffic: "metrics.organic.etv,desc", keywords: "metrics.organic.count,desc" },
+  competitors: { shared: "intersections,desc" },
+  backlinks: { authority: "domain_from_rank,desc", newest: "first_seen,desc", oldest: "first_seen,asc" },
+  newBacklinks: { newest: "first_seen,desc", authority: "domain_from_rank,desc" },
+  lostBacklinks: { newest: "last_seen,desc", authority: "domain_from_rank,desc" },
+  brokenBacklinks: { authority: "domain_from_rank,desc", newest: "first_seen,desc" },
+  referringDomains: { authority: "rank,desc", links: "backlinks,desc", newest: "first_seen,desc" },
+  anchors: { links: "backlinks,desc", domains: "referring_domains,desc" },
+  bestByLinks: { links: "backlinks,desc", domains: "referring_domains,desc" },
+  matchingTerms: { volume: "keyword_info.search_volume,desc", difficulty: "keyword_properties.keyword_difficulty,asc", cpc: "keyword_info.cpc,desc" },
+  relatedTerms: { volume: "keyword_data.keyword_info.search_volume,desc", difficulty: "keyword_data.keyword_properties.keyword_difficulty,asc" },
+  questions: { volume: "keyword_info.search_volume,desc", difficulty: "keyword_properties.keyword_difficulty,asc" },
+};
+export const defaultSort = (table: ReportTable) => Object.keys(SORTS[table])[0];
+
+const QUESTION_RE = "^(how|what|why|when|where|who|which|can|does|do|is|are|should|will) ";
+
+/** The vendor request for one page of one report. Pure. */
+export function reportRequest(input: ReportInput & { target: string }): { path: string; body: Record<string, unknown> } {
+  const f = input.filters, t = input.table;
+  const sort = SORTS[t][input.sort ?? ""] ?? SORTS[t][defaultSort(t)];
+  const labs = { location_code: input.locationCode, language_code: input.languageCode, limit: input.limit, offset: input.offset };
+  const links = { target: input.target, include_subdomains: true, rank_scale: "one_thousand", limit: input.limit, offset: input.offset };
+  const range = (field: string, min?: number, max?: number): Clause[] => [
+    ...(min != null ? [[field, ">=", min] as Clause] : []), ...(max != null ? [[field, "<=", max] as Clause] : []),
+  ];
+  const like = (field: string): Clause[] => (f.contains ? [[field, "like", `%${f.contains}%`]] : []);
+  const follow: Clause[] = f.follow ? [["dofollow", "=", f.follow === "followed"]] : [];
+
+  switch (t) {
+    case "keywords":
+    case "paidKeywords": {
+      const kd = "keyword_data";
+      const clauses = [
+        ...range("ranked_serp_element.serp_item.rank_group", f.positionMin, f.positionMax),
+        ...range(`${kd}.keyword_info.search_volume`, f.volumeMin, f.volumeMax),
+        ...range(`${kd}.keyword_properties.keyword_difficulty`, f.difficultyMin, f.difficultyMax),
+        ...(f.intent ? [[`${kd}.search_intent_info.main_intent`, "=", f.intent] as Clause] : []),
+        ...like(`${kd}.keyword`),
+      ];
+      return { path: "/dataforseo_labs/google/ranked_keywords/live", body: { ...labs, target: input.target, item_types: [t === "keywords" ? "organic" : "paid"], filters: andClauses(clauses), order_by: [sort] } };
+    }
+    case "pages":
+      return { path: "/dataforseo_labs/google/relevant_pages/live", body: { ...labs, target: input.target, filters: andClauses(f.contains ? [["page_address", "like", `%${f.contains}%`]] : []), order_by: [sort] } };
+    case "competitors":
+      return { path: "/dataforseo_labs/google/competitors_domain/live", body: { ...labs, target: input.target, exclude_top_domains: true, order_by: [sort] } };
+    case "backlinks":
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([...follow, ...like("anchor")]), order_by: [sort] } };
+    case "newBacklinks":
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([["is_new", "=", true], ...follow, ...like("anchor")]), order_by: [sort] } };
+    case "lostBacklinks":
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "lost", filters: andClauses([...follow, ...like("anchor")]), order_by: [sort] } };
+    case "brokenBacklinks":
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: "as_is", backlinks_status_type: "live", filters: andClauses([["is_broken", "=", true], ...follow]), order_by: [sort] } };
+    case "referringDomains":
+      return { path: "/backlinks/referring_domains/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("domain")), order_by: [sort] } };
+    case "anchors":
+      return { path: "/backlinks/anchors/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("anchor")), order_by: [sort] } };
+    case "bestByLinks":
+      return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", order_by: [sort] } };
+    case "matchingTerms":
+    case "questions": {
+      const clauses = [
+        ...range("keyword_info.search_volume", f.volumeMin, f.volumeMax),
+        ...range("keyword_properties.keyword_difficulty", f.difficultyMin, f.difficultyMax),
+        ...(f.intent ? [["search_intent_info.main_intent", "=", f.intent] as Clause] : []),
+        ...(t === "questions" ? [["keyword", "regex", QUESTION_RE] as Clause] : []),
+        ...(f.contains ? [["keyword", "like", `%${f.contains}%`] as Clause] : []),
+      ];
+      return { path: "/dataforseo_labs/google/keyword_suggestions/live", body: { ...labs, keyword: input.target, filters: andClauses(clauses), order_by: [sort] } };
+    }
+    case "relatedTerms": {
+      const kd = "keyword_data";
+      const clauses = [
+        ...range(`${kd}.keyword_info.search_volume`, f.volumeMin, f.volumeMax),
+        ...range(`${kd}.keyword_properties.keyword_difficulty`, f.difficultyMin, f.difficultyMax),
+      ];
+      return { path: "/dataforseo_labs/google/related_keywords/live", body: { ...labs, keyword: input.target, depth: 2, filters: andClauses(clauses), order_by: [sort] } };
+    }
+  }
+}
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const str = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+const day = (v: unknown) => str(v)?.slice(0, 10) ?? null;
+const r2 = (v: number | null) => (v == null ? null : Math.round(v * 100) / 100);
+const auth = (rank: unknown) => { const n = num(rank); return n == null ? null : Math.max(0, Math.min(100, Math.round(n / 10))); };
+
+export type BacklinkRow = {
+  domain: string | null; url: string | null; title: string | null; target: string | null; anchor: string | null;
+  followed: boolean; authority: number | null; spamScore: number | null; firstSeen: string | null; lastSeen: string | null;
+  isNew: boolean; isLost: boolean; isBroken: boolean; country: string | null; type: string | null;
+};
+export function parseBacklink(i: any): BacklinkRow | null {
+  if (!i || typeof i !== "object" || !str(i.url_from)) return null;
+  return {
+    domain: str(i.domain_from), url: str(i.url_from), title: str(i.page_from_title), target: str(i.url_to), anchor: str(i.anchor),
+    followed: i.dofollow === true, authority: auth(i.domain_from_rank), spamScore: num(i.backlink_spam_score),
+    firstSeen: day(i.first_seen), lastSeen: day(i.last_seen), isNew: i.is_new === true, isLost: i.is_lost === true, isBroken: i.is_broken === true,
+    country: str(i.domain_from_country), type: str(i.item_type),
+  };
+}
+
+export type LinkedPageRow = { url: string; backlinks: number | null; referringDomains: number | null; authority: number | null; brokenBacklinks: number | null; firstSeen: string | null };
+export function parseLinkedPage(i: any): LinkedPageRow | null {
+  const url = str(i?.url);
+  return url ? { url, backlinks: num(i.backlinks), referringDomains: num(i.referring_domains), authority: auth(i.rank), brokenBacklinks: num(i.broken_backlinks), firstSeen: day(i.first_seen) } : null;
+}
+
+export type KeywordIdeaRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent: Intent | null; competition: string | null };
+/** A keyword_suggestions row, or the `keyword_data` of a related_keywords row. */
+export function parseKeywordIdea(i: any): KeywordIdeaRow | null {
+  const d = i?.keyword_data ?? i, keyword = str(d?.keyword);
+  if (!keyword) return null;
+  const intent = str(d?.search_intent_info?.main_intent);
+  return {
+    keyword, volume: num(d?.keyword_info?.search_volume), cpc: r2(num(d?.keyword_info?.cpc)), difficulty: num(d?.keyword_properties?.keyword_difficulty),
+    intent: (INTENTS as readonly string[]).includes(intent ?? "") ? (intent as Intent) : null, competition: str(d?.keyword_info?.competition_level),
+  };
+}
+
+/** Rows of one report page, parsed for the client. */
+export function parseReportRows(table: ReportTable, items: any[], target: string): unknown[] {
+  const keep = <T>(rows: (T | null)[]) => rows.filter((x): x is T => !!x);
+  switch (table) {
+    case "keywords": case "paidKeywords": return keep(items.map(parseExplorerKeyword));
+    case "pages": return keep(items.map(parseExplorerPage));
+    case "competitors": return parseCompetitors(items, target);
+    case "backlinks": case "newBacklinks": case "lostBacklinks": case "brokenBacklinks": return keep(items.map(parseBacklink));
+    case "referringDomains": return keep(items.map(parseReferringDomain));
+    case "anchors": return keep(items.map(parseAnchor));
+    case "bestByLinks": return keep(items.map(parseLinkedPage));
+    case "matchingTerms": case "relatedTerms": case "questions": return keep(items.map(parseKeywordIdea));
+  }
+}
+
+export type ReportPage = { table: ReportTable; target: string; rows: unknown[]; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+
+/** Run one page at the source. */
+export async function fetchReportPage(input: ReportInput & { target: string }): Promise<{ data: ReportPage; costUsd: number }> {
+  const { path, body } = reportRequest(input);
+  const task: DfsTask = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+  return {
+    data: {
+      table: input.table, target: input.target, rows: parseReportRows(input.table, taskItems(task), input.target),
+      total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
+      sort: input.sort && SORTS[input.table][input.sort] ? input.sort : defaultSort(input.table), fetchedAt: new Date().toISOString(),
+    },
+    costUsd: typeof task.cost === "number" ? task.cost : 0,
+  };
+}
+
+// ── Keyword overview ───────────────────────────────────────────────────────
+
+export type SerpRow = { position: number; domain: string; url: string; title: string | null; authority: number | null };
+export type KeywordOverview = {
+  keyword: string; locationCode: number; fetchedAt: string;
+  volume: number | null; cpc: number | null; difficulty: number | null; intent: Intent | null; competition: string | null;
+  bidLow: number | null; bidHigh: number | null; results: number | null;
+  /** Monthly searches, oldest first. */
+  trend: { month: string; volume: number }[];
+  /** What else Google shows for it (local pack, people also ask, ...). */
+  features: string[];
+  /** Average authority and links of the pages ranking today. */
+  topAvg: { authority: number | null; backlinks: number | null; referringDomains: number | null };
+  serp: SerpRow[];
+};
+
+export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], input: { keyword: string; locationCode: number; fetchedAt?: string }): KeywordOverview {
+  const idea = parseKeywordIdea(item) ?? { keyword: input.keyword, volume: null, cpc: null, difficulty: null, intent: null, competition: null };
+  const rankOf = new Map(ranks.map((r) => [String(r?.target ?? "").replace(/^www\./, ""), auth(r?.rank)]));
+  const trend = (Array.isArray(item?.keyword_info?.monthly_searches) ? item.keyword_info.monthly_searches : [])
+    .map((m: any) => (num(m?.year) && num(m?.month) ? { month: `${m.year}-${String(m.month).padStart(2, "0")}`, volume: num(m.search_volume) ?? 0 } : null))
+    .filter((x: any): x is { month: string; volume: number } => !!x)
+    .sort((a: any, b: any) => a.month.localeCompare(b.month));
+  const serp = serpItems.filter((s) => s?.type === "organic" && str(s.domain) && str(s.url)).slice(0, 10).map((s) => {
+    const domain = String(s.domain).replace(/^www\./, "");
+    return { position: num(s.rank_group) ?? 0, domain, url: String(s.url), title: str(s.title), authority: rankOf.get(domain) ?? null };
+  });
+  return {
+    keyword: idea.keyword, locationCode: input.locationCode, fetchedAt: input.fetchedAt ?? new Date().toISOString(),
+    volume: idea.volume, cpc: idea.cpc, difficulty: idea.difficulty, intent: idea.intent, competition: idea.competition,
+    bidLow: r2(num(item?.keyword_info?.low_top_of_page_bid)), bidHigh: r2(num(item?.keyword_info?.high_top_of_page_bid)),
+    results: num(item?.serp_info?.se_results_count), trend,
+    features: (Array.isArray(item?.serp_info?.serp_item_types) ? item.serp_info.serp_item_types : []).filter((t: unknown) => typeof t === "string" && t !== "organic"),
+    topAvg: { authority: auth(item?.avg_backlinks_info?.rank), backlinks: num(item?.avg_backlinks_info?.backlinks) == null ? null : Math.round(item.avg_backlinks_info.backlinks), referringDomains: num(item?.avg_backlinks_info?.referring_domains) == null ? null : Math.round(item.avg_backlinks_info.referring_domains) },
+    serp,
+  };
+}
+
+/** Overview + today's top results + their authority: three calls. */
+export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number }> {
+  let costUsd = 0;
+  const call = async (path: string, body: Record<string, unknown>) => {
+    const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+    costUsd += typeof task.cost === "number" ? task.cost : 0;
+    return task;
+  };
+  const loc = { location_code: input.locationCode, language_code: input.languageCode };
+  const [overview, serp] = await Promise.all([
+    call("/dataforseo_labs/google/keyword_overview/live", { ...loc, keywords: [input.keyword], include_serp_info: true }),
+    call("/serp/google/organic/live/advanced", { ...loc, keyword: input.keyword, depth: 10, device: "desktop" }).catch((e: any) => { console.warn(`[seo] keyword ${input.keyword}: results unavailable — ${e?.message ?? e}`); return null; }),
+  ]);
+  const serpItems = serp ? taskItems(serp) : [];
+  const domains = [...new Set(serpItems.filter((s) => s?.type === "organic" && typeof s.domain === "string").slice(0, 10).map((s) => String(s.domain).replace(/^www\./, "")))];
+  const ranks = domains.length
+    ? await call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => [])
+    : [];
+  return { data: parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), costUsd };
+}
+
+// ── Saved pages ────────────────────────────────────────────────────────────
+
+export const REPORT_SCHEMA_DDL = [
+  `CREATE TABLE IF NOT EXISTS seo_report_cache (
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    key text NOT NULL,
+    kind text NOT NULL,
+    data jsonb NOT NULL,
+    cost_usd numeric(12,6) NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS seo_report_cache_age ON seo_report_cache(created_at)`,
+];
+
+/** One saved page per account per exact request (table, target, filters, sort, page, location). */
+export function cacheKey(kind: string, parts: unknown): string {
+  return createHash("sha1").update(kind).update("\n").update(JSON.stringify(parts)).digest("hex");
+}
+export const reportCacheKey = (i: ReportInput & { target: string }) =>
+  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, i.sort ?? defaultSort(i.table), i.locationCode, i.languageCode, Object.entries(i.filters).sort(([a], [b]) => a.localeCompare(b))]);
+
+export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
+  const { rows: [row] } = await pool.query(
+    `SELECT data FROM seo_report_cache WHERE user_id=$1 AND key=$2 AND created_at > now() - make_interval(hours => $3)`, [userId, key, maxAgeHours]);
+  return row ? (row.data as T) : null;
+}
+export async function saveCached(userId: number, key: string, kind: string, data: unknown, costUsd: number): Promise<void> {
+  await pool.query(
+    `INSERT INTO seo_report_cache(user_id, key, kind, data, cost_usd) VALUES($1,$2,$3,$4,$5)
+     ON CONFLICT (user_id, key) DO UPDATE SET data=EXCLUDED.data, cost_usd=EXCLUDED.cost_usd, kind=EXCLUDED.kind, created_at=now()`,
+    [userId, key, kind, JSON.stringify(data), costUsd]);
+  // Old pages are of no use once stale: keep the table small.
+  if (Math.random() < 0.02) void pool.query(`DELETE FROM seo_report_cache WHERE created_at < now() - interval '30 days'`).catch(() => {});
+}

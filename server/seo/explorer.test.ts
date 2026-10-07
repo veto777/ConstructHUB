@@ -65,7 +65,7 @@ describe("Site Explorer report", () => {
 
   it("assembles the whole report", () => {
     const r = buildDomainReport(input, fx);
-    expect(r).toMatchObject({ domain: "alpineexteriorsfl.com", keywordsTotal: 48, pagesTotal: 15, missing: [] });
+    expect(r).toMatchObject({ domain: "alpineexteriorsfl.com", keywordsTotal: 48, pagesTotal: 15, missing: ["linkHistory"] });
     expect(r.organic.keywords).toBe(48);
     expect(r.paid.keywords).toBe(0);
     expect(r.links.authority).toBe(37);
@@ -79,7 +79,7 @@ describe("Site Explorer report", () => {
 
   it("a list the source did not return leaves its section null and is named, the rest stands", () => {
     const r = buildDomainReport(input, { overview: fx.overview, summary: fx.summary, history: null, keywords: null, pages: fx.pages });
-    expect(r.missing).toEqual(["history", "keywords", "competitors", "referringDomains", "anchors"]);
+    expect(r.missing).toEqual(["history", "linkHistory", "keywords", "competitors", "referringDomains", "anchors"]);
     expect(r.history).toBeNull();
     expect(r.intents).toBeNull();
     expect(r.pages).toHaveLength(3);
@@ -88,7 +88,7 @@ describe("Site Explorer report", () => {
 
   it("a report is free to reopen for a week, and reserved above what it really costs", () => {
     expect(REPORT_TTL_DAYS).toBe(7);
-    // The eight calls measured $0.2529 for this domain on 2026-10-07.
-    expect(EXPLORER_ESTIMATE_USD).toBeGreaterThan(0.2529);
+    // Eight calls measured $0.2529 on 2026-10-07; the backlink history added on 10-08 is about $0.0244 more.
+    expect(EXPLORER_ESTIMATE_USD).toBeGreaterThan(0.2529 + 0.0245);
   });
 });

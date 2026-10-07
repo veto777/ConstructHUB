@@ -46,12 +46,15 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
 
   it("the price shown before a lookup is the wholesale estimate at the markup", () => {
     expect(SEO_PRICES.explorerReport).toBe(retailCents(EXPLORER_TYPICAL_USD));
-    expect(SEO_PRICES.explorerReport).toBe(104);
+    expect(SEO_PRICES.explorerReport).toBe(112);
+    expect(SEO_PRICES.reportPage).toBe(10);
+    expect(SEO_PRICES.keywordOverview).toBe(16);
     expect(SEO_PRICES.keywordResearch).toBe(8);
     expect(SEO_PRICES.competitorGap).toBe(10);
     expect(SEO_PRICES.rankChecksPer100).toBe(24);
-    // A Starter allowance covers about nine Site Explorer reports.
-    expect(Math.floor(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_PRICES.explorerReport)).toBe(9);
+    // A Starter allowance covers about eight Site Explorer reports, or a hundred report pages.
+    expect(Math.floor(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_PRICES.explorerReport)).toBe(8);
+    expect(Math.floor(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_PRICES.reportPage)).toBe(100);
     // The reservation is never smaller than the price shown.
     expect(retailCents(EXPLORER_ESTIMATE_USD)).toBeGreaterThanOrEqual(SEO_PRICES.explorerReport);
   });

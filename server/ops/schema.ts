@@ -12,11 +12,14 @@ const list = (xs: readonly string[]) => xs.map((x) => `'${x}'`).join(", ");
  * What a digest tells the admins about one issue, as one comparable string:
  * its status, its fix branch, and when it last came back (reopened after
  * "fixed", or sent back by an admin — the time of the last such event and how
- * many the timeline holds). A run notifies about an issue only when
- * this differs from ops_issues.notified_sig.
+ * many the timeline holds). For a user report (source "user") also whether a
+ * reply for the reporter exists — so the reply being written is news once,
+ * and a later edit of its wording is not. A run notifies about an issue only
+ * when this differs from ops_issues.notified_sig.
  */
 export const NOTIFY_SIG_SQL = `(status || '|' || coalesce(branch, '') || '|' || coalesce(
-  (SELECT max(e->>'at') || '#' || count(*) FROM jsonb_array_elements(history) e WHERE e->>'event' IN ('reopened', 'reinspect')), ''))`;
+  (SELECT max(e->>'at') || '#' || count(*) FROM jsonb_array_elements(history) e WHERE e->>'event' IN ('reopened', 'reinspect')), '')
+  || CASE WHEN source = 'user' AND public_reply IS NOT NULL THEN '|reply' ELSE '' END)`;
 
 export const OPS_ISSUES_DDL: readonly string[] = [
   `CREATE TABLE IF NOT EXISTS ops_issues (
@@ -45,7 +48,21 @@ export const OPS_ISSUES_DDL: readonly string[] = [
        ALTER TABLE ops_issues ADD CONSTRAINT ops_issues_status_check CHECK (status IN (${list(ISSUE_STATUSES)}));
      END IF;
    END $$`,
-  // What the admins were last told about this issue (digest.ts): "<status>|<branch>|<last reopen/re-inspect>".
+  // user reports (/report-issue): the "user" source, who reported, and the reply the reporter reads
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'ops_issues'::regclass AND contype = 'c'
+                    AND pg_get_constraintdef(oid) LIKE '%source%' AND pg_get_constraintdef(oid) LIKE '%''user''%') THEN
+       ALTER TABLE ops_issues DROP CONSTRAINT IF EXISTS ops_issues_source_check;
+       ALTER TABLE ops_issues ADD CONSTRAINT ops_issues_source_check CHECK (source IN (${list(ISSUE_SOURCES)}));
+     END IF;
+   END $$`,
+  `ALTER TABLE ops_issues ADD COLUMN IF NOT EXISTS reporter_user_id integer`,
+  `ALTER TABLE ops_issues ADD COLUMN IF NOT EXISTS reporter_email text`,
+  `ALTER TABLE ops_issues ADD COLUMN IF NOT EXISTS public_reply text`,
+  `ALTER TABLE ops_issues ADD COLUMN IF NOT EXISTS public_reply_at timestamptz`,
+  `CREATE INDEX IF NOT EXISTS ops_issues_reporter_idx ON ops_issues (reporter_user_id, id DESC) WHERE reporter_user_id IS NOT NULL`,
+  // What the admins were last told about this issue (digest.ts): "<status>|<branch>|<last reopen/re-inspect>[|reply]".
+  // AFTER the user-report columns above: NOTIFY_SIG_SQL reads source and public_reply.
   // Added once; issues Claude had already reported on by then count as told, so the first run after
   // this ships does not announce old news.
   `DO $$ BEGIN

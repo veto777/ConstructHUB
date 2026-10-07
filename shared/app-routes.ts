@@ -17,12 +17,12 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   // Signed-out and signed-in pages (PublicRouter, DashboardRouter).
   "/landing", "/auth", "/search", "/databases", "/property", "/schedules", "/history", "/photos", "/media-library",
   "/gmb-monitor", "/google-profile", "/ranking-grid", "/competitors", "/competitors-landing", "/agency", "/locations", "/domains",
-  "/mail-alerts", "/gbp-content", "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/seo/explorer", "/seo/keywords", "/seo/backlinks", "/seo/competitors", "/site-scan",
+  "/mail-alerts", "/gbp-content", "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/seo/rank-tracker", "/seo/explorer", "/seo/keywords", "/seo/backlinks", "/seo/competitors", "/site-scan",
   "/free-site-scan", "/site-scan/report/*", "/master-class", "/master-class-landing", "/google-ads", "/ads-manager",
   "/google-ads-landing", "/permits-landing", "/google-ads-guide/:section", "/lsa-leads", "/lsa-account-manager",
   "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages", "/admin/access", "/admin/issues",
   "/vpn-shield", "/individual-pricing", "/google-reviews", "/settings", "/settings/billing", "/settings/api", "/account/delete",
-  "/developers", "/crm-terms", "/crm-privacy", "/invite/:code",
+  "/developers", "/crm-terms", "/crm-privacy", "/invite/:code", "/report-issue",
   // Pages a contractor's own customer opens from a link.
   "/review/:token", "/review/:token/unsubscribe", "/contract/sign/:token", "/e/:token", "/i/:token", "/co/:token",
   "/lead-form/:token", "/portal/:token",

@@ -24,6 +24,12 @@
  * A row that is alone under its new fingerprint just gets the new fingerprint.
  * Rows whose key never came from their detail (fixed keys) are left alone.
  *
+ * A USER REPORT (source "user", /report-issue) is never part of this: its
+ * fingerprint is random so that every report is its own row, with its own
+ * reporter and its own reply. planMerge drops such rows before grouping, so
+ * one is never the row that is kept, never a duplicate that is deleted, and
+ * never re-keyed — even if its detail looks exactly like a captured failure's.
+ *
  * Idempotent: once folded, every row already carries its recomputed
  * fingerprint and the next call changes nothing. Boot runs it after the schema
  * is ensured (server/routes.ts); `npx tsx scripts/merge-ops-issues.ts [--dry-run]`
@@ -50,6 +56,11 @@ export type MergeResult = {
   /** Rows that only took their new fingerprint (no duplicate). */
   rekeyed: number;
   groups: MergeGroup[];
+  /** User reports seen and left exactly as they are. */
+  userReports: number;
+  /** Rows per status as read, and as they are (or, in a dry run, would be) afterwards. */
+  statusBefore: Record<string, number>;
+  statusAfter: Record<string, number>;
   dryRun: boolean;
 };
 
@@ -67,12 +78,16 @@ export function statusSource<T extends Pick<Row, "status" | "last_seen" | "inspe
     STATUS_RANK[b.status] - STATUS_RANK[a.status] || ms(b.inspected_at) - ms(a.inspected_at) || ms(b.last_seen) - ms(a.last_seen) || num(a.id) - num(b.id))[0];
 }
 
+/** A person's own report: outside the merge entirely (see the header). */
+export const isUserReport = (r: Pick<Row, "source">) => r.source === "user";
+
 type Plan = { fingerprint: string; keep: Row; fold: Row[]; set: Record<string, unknown> | null };
 
 /** What to do with these rows — pure, so the rules are unit-tested without a database. */
 export function planMerge(rows: Row[], nowIso = new Date().toISOString()): Plan[] {
   const groups = new Map<string, Row[]>();
   for (const r of rows) {
+    if (isUserReport(r)) continue; // never a target, never a duplicate, never re-keyed
     const key = stableKeyForRow(r.source, r.detail);
     // A row with a fixed key keeps its fingerprint — and still claims it, so no rekeyed row can collide with it.
     const fp = key === null ? r.fingerprint : issueFingerprint(r.source, key);
@@ -127,14 +142,20 @@ export async function mergeDuplicateIssues(q?: Connectable, opts: { dryRun?: boo
   // A transaction needs one connection; a bare Queryable (a client the caller already holds) is used as it is.
   const client: Client = typeof pool.connect === "function" ? await pool.connect() : pool;
   try {
-    await client.query("BEGIN");
+    // A dry run cannot write even by mistake, and reads the table as it is: SELECT * so it also works
+    // on a database this build's columns (notified_sig, the reporter columns) have not been added to yet.
+    await client.query(dryRun ? "BEGIN READ ONLY" : "BEGIN");
     if (!dryRun) await client.query("LOCK TABLE ops_issues IN SHARE ROW EXCLUSIVE MODE");
-    const { rows } = await client.query(
-      `SELECT id, fingerprint, source, severity, title, detail, count, first_seen, last_seen, status, report, branch,
-              inspected_at, claimed_at, history, notified_sig FROM ops_issues ORDER BY id`);
+    const { rows } = await client.query(`SELECT * FROM ops_issues ORDER BY id`);
     const plans = planMerge(rows as Row[]);
+    const tally = (statuses: string[]) => statuses.reduce<Record<string, number>>((n, s) => { n[s] = (n[s] ?? 0) + 1; return n; }, {});
+    const gone = new Set(plans.flatMap((p) => p.fold.map((r) => String(r.id))));
+    const merged = new Map(plans.filter((p) => p.set).map((p) => [String(p.keep.id), p.set!.status as string]));
     const result: MergeResult = {
       scanned: rows.length, dryRun,
+      userReports: (rows as Row[]).filter(isUserReport).length,
+      statusBefore: tally((rows as Row[]).map((r) => r.status)),
+      statusAfter: tally((rows as Row[]).filter((r) => !gone.has(String(r.id))).map((r) => merged.get(String(r.id)) ?? r.status)),
       folded: plans.reduce((n, p) => n + p.fold.length, 0),
       rekeyed: plans.filter((p) => !p.fold.length).length,
       groups: plans.filter((p) => p.fold.length).map((p) => ({
@@ -144,12 +165,13 @@ export async function mergeDuplicateIssues(q?: Connectable, opts: { dryRun?: boo
     };
     if (!dryRun) {
       // Deletes first: a duplicate may already hold the fingerprint its keeper is about to take.
-      const gone = plans.flatMap((p) => p.fold.map((r) => r.id));
-      if (gone.length) await client.query(`DELETE FROM ops_issues WHERE id = ANY($1::bigint[])`, [gone]);
+      // source <> 'user' on every write below: a second lock on the rule that a user report is never touched.
+      const dupes = plans.flatMap((p) => p.fold.map((r) => r.id));
+      if (dupes.length) await client.query(`DELETE FROM ops_issues WHERE id = ANY($1::bigint[]) AND source <> 'user'`, [dupes]);
       // Two passes over the fingerprints: a keeper's new fingerprint can be the OLD one of a row that is
       // itself being rekeyed, so park every changing row on a placeholder first.
       const moving = plans.filter((p) => p.keep.fingerprint !== p.fingerprint);
-      for (const p of moving) await client.query(`UPDATE ops_issues SET fingerprint = $2 WHERE id = $1`, [p.keep.id, `moving:${p.keep.id}`]);
+      for (const p of moving) await client.query(`UPDATE ops_issues SET fingerprint = $2 WHERE id = $1 AND source <> 'user'`, [p.keep.id, `moving:${p.keep.id}`]);
       for (const p of plans) {
         if (p.set) {
           const s = p.set;
@@ -157,7 +179,7 @@ export async function mergeDuplicateIssues(q?: Connectable, opts: { dryRun?: boo
             `UPDATE ops_issues SET fingerprint = $2, count = $3, first_seen = $4, last_seen = $5, severity = $6, title = $7,
                     detail = $8::jsonb, status = $9, claimed_at = $10, report = $11, branch = $12, inspected_at = $13,
                     notified_sig = $14, history = $15::jsonb, updated_at = now()
-              WHERE id = $1`,
+              WHERE id = $1 AND source <> 'user'`,
             [p.keep.id, p.fingerprint, s.count, s.first_seen, s.last_seen, s.severity, s.title, s.detail, s.status, s.claimed_at,
               s.report, s.branch, s.inspected_at, s.notified_sig, s.history]);
           // Told before → still told: restate it over the merged status and history, so the merge announces nothing.
@@ -165,7 +187,7 @@ export async function mergeDuplicateIssues(q?: Connectable, opts: { dryRun?: boo
             await client.query(`UPDATE ops_issues SET notified_sig = ${NOTIFY_SIG_SQL} WHERE id = $1`, [p.keep.id]);
           }
         } else {
-          await client.query(`UPDATE ops_issues SET fingerprint = $2 WHERE id = $1`, [p.keep.id, p.fingerprint]);
+          await client.query(`UPDATE ops_issues SET fingerprint = $2 WHERE id = $1 AND source <> 'user'`, [p.keep.id, p.fingerprint]);
         }
       }
     }

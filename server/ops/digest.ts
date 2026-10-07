@@ -7,6 +7,12 @@
  * 2026-10-07: the bell repeated "Claude inspected 1 issue — no fix ready" run
  * after run). /admin/issues stays the full list.
  *
+ * A user report (/report-issue) is news the first time a run reports on it, at
+ * each status change, and once when its reply for the reporter is written.
+ * Separately, a BLOCKER report rings at once when it is submitted, once per
+ * report (notifyAdminsOfBlockerReport below) — that bell does not wait for a
+ * run and is not repeated by one.
+ *
  * Internal only — no email since 2026-10-05 unless ISSUE_DESK_EMAIL=true (then
  * through the transactional outbox, deliverTransactionalEmail). Deduped per
  * run and admin, so a retried "run complete" call sends nothing twice.
@@ -35,7 +41,9 @@ export function digestMessage(issues: OpsIssue[], baseUrl: string): { subject: s
   const title = digestTitle(issues);
   const link = `${baseUrl}/admin/issues`;
   const cameBack = (i: OpsIssue) => (i.history ?? []).some((h) => h.event === "reopened");
-  const line = (i: OpsIssue) => `#${i.id} [${ISSUE_STATUS_LABELS[i.status]}] ${i.title}${i.branch ? ` (branch ${i.branch})` : ""}${cameBack(i) ? " — back after it was marked fixed" : ""}`;
+  // A person's own report says so, and whether the reporter now has an answer to read.
+  const user = (i: OpsIssue) => i.source === "user";
+  const line = (i: OpsIssue) => `${user(i) ? "User report " : ""}#${i.id} [${ISSUE_STATUS_LABELS[i.status]}] ${i.title}${i.branch ? ` (branch ${i.branch})` : ""}${cameBack(i) ? " — back after it was marked fixed" : ""}${user(i) && i.publicReply ? " — reply written for the reporter" : ""}`;
   const summary = (i: OpsIssue) => (i.report ?? "").replace(/\s+/g, " ").trim().slice(0, 300);
   const text = [
     title, "",
@@ -116,4 +124,37 @@ export async function completeRun(
   const sent = await sendRunDigest(runId, news, opts);
   if (news.length && (sent.notified > 0 || sent.admins === 0)) await markAnnounced(news.map((i) => i.id), opts.q);
   return { reported: reported.length, changed: news.length, ...sent };
+}
+
+// ── A user's blocker report: the bell rings now, not at the next run ─────────
+
+export const USER_REPORT_BELL_KIND = "ops.user_report";
+
+/**
+ * "I can't use the site" from /report-issue: one bell notification per report
+ * and platform admin, at once (the run digest above only speaks after Claude
+ * looked). Deduped on the report's number, so nothing — a retry, a later run —
+ * rings twice for the same report. The body carries the scrubbed title only.
+ * Never throws: the report is already stored when this runs.
+ */
+export async function notifyAdminsOfBlockerReport(issue: Pick<OpsIssue, "id" | "title">, q: Queryable): Promise<number> {
+  let notified = 0;
+  try {
+    const marker = `Report #${issue.id}`;
+    for (const admin of await platformAdminUsers(q)) {
+      try {
+        const { rowCount } = await q.query(
+          `INSERT INTO user_notifications (user_id, kind, title, body, link, severity)
+           SELECT $1, $2, $3, $4, '/admin/issues', 'warning'
+            WHERE NOT EXISTS (SELECT 1 FROM user_notifications WHERE user_id = $1 AND kind = $2 AND body LIKE $5)`,
+          [admin.id, USER_REPORT_BELL_KIND, "A user can’t use the site", `${issue.title}\n${marker}`, `%\n${marker}`]);
+        if (rowCount) notified++;
+      } catch (e) {
+        console.warn(`[issues] blocker bell for admin ${admin.id} failed: ${(e as Error)?.message ?? e}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`[issues] blocker bell failed: ${(e as Error)?.message ?? e}`);
+  }
+  return notified;
 }

@@ -82,6 +82,7 @@ import MediaLibraryPage from "@/pages/media-library";
 import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
+import { reportIssueHref } from "@/lib/report-issue-link";
 import { useSeoHead } from "@/lib/seo-head";
 import { pageMetaFor } from "@shared/route-meta";
 
@@ -89,12 +90,16 @@ import { pageMetaFor } from "@shared/route-meta";
 // on demand, so the marketing pages (and every signed-out visitor) don't download them.
 const AdminFeaturePagesPage = lazyPage(() => import("@/pages/admin-feature-pages"));
 const SeoOverviewPage = lazyPage(() => import("@/pages/seo"));
+const SeoDashboardPage = lazyPage(() => import("@/pages/seo/dashboard"));
 const SeoKeywordsPage = lazyPage(() => import("@/pages/seo/keywords"));
 const SeoExplorerPage = lazyPage(() => import("@/pages/seo/explorer"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
+// "Report an issue" (every footer): the platform page, and the same page inside the CRM frame.
+const ReportIssuePage = lazyPage(() => import("@/pages/report-issue"));
+const CrmReportIssuePage = lazyPage(() => import("@/pages/report-issue").then((m) => ({ default: m.CrmReportIssuePage })));
 const CrmTeamPage = lazyPage(() => import("@/pages/crm-team"));
 const CrmJoinPage = lazyPage(() => import("@/pages/crm-join"));
 const CrmHomePage = lazyPage(() => import("@/pages/crm-home"));
@@ -208,7 +213,8 @@ function DashboardRouter() {
       <Route path="/cloudflare" component={CloudflarePage} />
       <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
-      <Route path="/seo" component={SeoOverviewPage} />
+      <Route path="/seo" component={SeoDashboardPage} />
+      <Route path="/seo/rank-tracker" component={SeoOverviewPage} />
       <Route path="/seo/explorer" component={SeoExplorerPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
@@ -245,6 +251,8 @@ function DashboardRouter() {
       <Route path="/admin/access" component={AdminAccessPage} />
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
+      {/* Anyone, signed in or out: a report to the issue desk (POST /api/issues/report) and the reporter's own list. */}
+      <Route path="/report-issue" component={ReportIssuePage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
@@ -312,6 +320,7 @@ const Ribboned = {
   VpnShieldPage: withRibbon(VpnShieldPage),
   CrmTermsPage: withRibbon(CrmTermsPage),
   CrmPrivacyPage: withRibbon(CrmPrivacyPage),
+  ReportIssuePage: withRibbon(ReportIssuePage),
 };
 
 function PublicRouter() {
@@ -361,6 +370,8 @@ function PublicRouter() {
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/landing" component={LandingPage} />
+      {/* A visitor who cannot sign in must still be able to say so: the report page works signed out (it asks for an email). */}
+      <Route path="/report-issue">{() => <Suspense fallback={null}><Ribboned.ReportIssuePage /></Suspense>}</Route>
       {/* Signed-in tools send a signed-out visitor to sign in and back; any
           other unknown URL is an honest 404, never the landing page. */}
       <Route component={SignedOutFallback} />
@@ -402,13 +413,13 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/explorer": "Site explorer", "/seo/keywords": "Keyword research", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
   "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
-  "/call-assistant": "AI Call Assistant",
+  "/call-assistant": "AI Call Assistant", "/report-issue": "Report an issue",
 };
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */
@@ -427,7 +438,8 @@ const sidebarStyle = {
  * the CRM plans instead of the workspace — /api/crm/me says which. Joining a
  * team, the platform console and the legal pages stay reachable.
  */
-const CRM_GATE_OPEN = [/^\/crm\/join/, /^\/crm\/admin/, /^\/admin/, /^\/auth/, /^\/crm-terms/, /^\/crm-privacy/];
+// …and /crm/report-issue: a person locked out by the paywall can still tell us something is wrong.
+const CRM_GATE_OPEN = [/^\/crm\/join/, /^\/crm\/admin/, /^\/admin/, /^\/auth/, /^\/crm-terms/, /^\/crm-privacy/, /^\/crm\/report-issue/];
 function CrmPlanGate({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
@@ -479,6 +491,7 @@ function PortalRouter() {
           across the platform; the page 403s anyone but platform admins. */}
       <Route path="/admin" component={CrmAdminPage} />
       <Route path="/crm/join" component={CrmJoinPage} />
+      <Route path="/crm/report-issue" component={CrmReportIssuePage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
       {/* /auth must exist on the SIGNED-IN portal too: a beta-invite link
@@ -626,7 +639,7 @@ function AppContent() {
   // Signed out, the app is the sign-in screen (plus the legal pages and the links customers open from email);
   // signed in, the sales pages go back to Home.
   if (inNativeApp() && !portal) {
-    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/support", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
+    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/support", "/report-issue", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
       .some((p) => location === p || location.startsWith(p.endsWith("/") ? p : `${p}`));
     if (!user && !open) return <Redirect to="/auth" />;
     if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
@@ -705,6 +718,7 @@ function AppContent() {
       location.startsWith("/crm/integrations") ? "Integrations" :
       location.startsWith("/crm/reports") ? "Reports" :
       location.startsWith("/crm/admin") ? "Platform Admin" :
+      location.startsWith("/crm/report-issue") ? "Report an issue" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
@@ -721,6 +735,12 @@ function AppContent() {
             {/* Bottom padding keeps content clear of the mobile ribbon; desktop is unchanged. */}
             <main className="flex-1 overflow-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
               <CrmPlanGate><PortalRouter /></CrmPlanGate>
+              {/* Help and "Report an issue" under every CRM page (they sell nothing, so the iPhone app keeps them too). */}
+              <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
+                <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
+                <span className="mx-2 text-border">&middot;</span>
+                <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
+              </footer>
             </main>
           </div>
           <CrmRibbon />
@@ -784,6 +804,10 @@ function AppContent() {
             </div>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
             <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 md:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
+              <Link href="/tutorials" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-help">Help</Link>
+              <span className="mx-2 text-border">&middot;</span>
+              <Link href={reportIssueHref()} className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-report-issue">Report an issue</Link>
+              <span className="mx-2 text-border">&middot;</span>
               <a href="mailto:support@constructhub.us" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-email">support@constructhub.us</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>
