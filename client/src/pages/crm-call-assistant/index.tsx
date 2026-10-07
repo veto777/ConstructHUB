@@ -4,7 +4,8 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { AppPage, AppTabsList, Notice, PageHeader, StatusPill } from "@/components/app-ui";
+import { AppPage, AppTabsList, Notice, StatusPill } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -96,20 +97,18 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
       <CardHeader className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
-          <h2 id="call-assistant-gate" className="text-base font-semibold leading-none tracking-tight">{CALL_ASSISTANT_NAME}</h2>
-          <Badge variant="secondary">Add-on</Badge>
-          {preview && <Badge variant="outline" data-testid="badge-call-assistant-preview">Coming soon</Badge>}
+          <h2 id="call-assistant-gate" className="g-card__title g-card__title--md">{CALL_ASSISTANT_NAME}</h2>
+          <span className="g-chip g-chip--sm">Add-on</span>
+          {preview && <span className="g-chip g-chip--sm" data-testid="badge-call-assistant-preview">Coming soon</span>}
         </div>
         <p className="text-sm" data-testid="text-plan-required-message">{message}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}
         {preview ? (
-          <Button className="w-full sm:w-auto" disabled data-testid="button-call-assistant-unavailable">Not available yet</Button>
+          <GooglePill variant="solid" className="w-full sm:w-auto" disabled label="Not available yet" testId="button-call-assistant-unavailable" />
         ) : (
-          <Button asChild className="w-full sm:w-auto">
-            <a href="/settings?tab=billing" data-testid="link-call-assistant-billing">Add it in Billing</a>
-          </Button>
+          <GooglePill variant="solid" className="w-full sm:w-auto" href="/settings?tab=billing" label="Add it in Billing" testId="link-call-assistant-billing" />
         )}
         <details><summary className="cursor-pointer py-2 text-sm font-medium">What’s included</summary><ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Answers every call, 24/7, in a voice and name you choose, and says it is a virtual assistant when asked.</li>
@@ -159,16 +158,22 @@ export default function CrmCallAssistantPage() {
 
   return (
     <AppPage testId="page-call-assistant">
-      <PageHeader
-        title={<span data-testid="text-call-assistant-title">Call Assistant</span>}
-        description="Answer calls, capture leads and keep your team informed."
-        meta={status.data?.external && status.data.profile?.publishedVersion == null ? (
-          <StatusPill tone="success" data-testid="badge-call-assistant-status">live · {status.data.external.name}</StatusPill>
-        ) : status.data?.profile?.status ? (
-          <StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
-            {status.data.profile.status}
-          </StatusPill>
-        ) : null}
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-call-assistant-title"
+        title="Call Assistant"
+        description={<>
+          Answer calls, capture leads and keep your team informed.
+          {status.data?.external && status.data.profile?.publishedVersion == null ? (
+            <>{" "}<StatusPill tone="success" data-testid="badge-call-assistant-status">live · {status.data.external.name}</StatusPill></>
+          ) : status.data?.profile?.status ? (
+            <>{" "}<StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
+              {status.data.profile.status}
+            </StatusPill></>
+          ) : null}
+        </>}
+        flush
       />
 
       {status.isError && planRequiredFrom(status.error) ? (
