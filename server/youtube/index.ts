@@ -14,7 +14,16 @@ export { YoutubeError, type UploadVideoInput, type VideoAnalyticsRow } from "./c
 export { youtubeStatus } from "./store";
 
 export const getYoutubeAccessToken = () => yt.getYoutubeAccessToken(youtubeDeps());
-export const uploadVideo = (input: yt.UploadVideoInput) => yt.uploadVideo(input, youtubeDeps());
+/**
+ * The company channel's upload. It is counted in the project's daily upload
+ * tally (youtube_upload_daily, user 0) that customers' uploads share, so the
+ * customer cap leaves room for it — and it is never refused by that tally.
+ */
+export const uploadVideo = async (input: yt.UploadVideoInput) => {
+  const done = await yt.uploadVideo(input, youtubeDeps());
+  await import("./customer-store").then((m) => m.noteCompanyUpload()).catch(() => undefined);
+  return done;
+};
 export const setThumbnail = (videoId: string, jpgPath: string) => yt.setThumbnail(videoId, jpgPath, youtubeDeps());
 export const uploadCaption = (videoId: string, srtPath: string, language: string) => yt.uploadCaption(videoId, srtPath, language, youtubeDeps());
 export const addToPlaylist = (videoId: string, playlistTitle: string, opts?: { privacyStatus?: "private" | "unlisted" | "public" }) =>

@@ -40,7 +40,8 @@ const BILLABLE = ["active", "trialing", "past_due", "unpaid", "incomplete", "pau
 
 /** Tables that hold a connected service's grant or token for this user — deleted at closing, not 30 days later. */
 const GRANT_TABLES = [
-  "gbp_grants", "ads_grants", "social_connections", "domain_connections", "edge_connections", "lsa_connections",
+  "gbp_grants", "ads_grants", "social_connections", "youtube_customer_connections", "youtube_customer_videos",
+  "domain_connections", "edge_connections", "lsa_connections",
   "app_auth_codes", "app_oauth_states", "app_push_tokens", "user_apple_ids",
   "mail_alert_grants", "agency_poll_grants", "account_api_keys", "account_trusted_devices", "account_recovery_codes",
 ] as const;
@@ -102,6 +103,11 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
 
   // Sign in with Apple: revoke the grant at Apple before its row goes (guideline 5.1.1(v)); best-effort.
   await revokeAppleSignIn(userId).catch((e) => console.warn(`[account-delete] Apple revoke failed: ${e?.message ?? e}`));
+
+  // The customer's own YouTube channel: revoke the grant at Google and delete the connection, the video records and
+  // any stored video file now (best-effort; the DELETEs below remove the rows even if this could not run).
+  await import("../youtube/customer-service").then((m) => m.purgeCustomerYoutube(userId))
+    .catch((e) => console.warn(`[account-delete] YouTube disconnect failed: ${e?.message ?? e}`));
 
   const grantTables: string[] = [];
   for (const t of GRANT_TABLES) if (await tableExists(t)) grantTables.push(t);

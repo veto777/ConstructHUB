@@ -61,10 +61,15 @@ export function keyPrefix(raw: string | undefined = process.env.JOBCAM_KEY_PREFI
   return v;
 }
 
-/** Keys are built by us; a hand-edited row must still never escape the prefix. */
+/**
+ * Keys are built by us; a hand-edited row must still never escape the prefix.
+ * A second tree, `ytvideo(-<suffix>)/<userId>/<videoId>/…`, holds the videos
+ * customers send to their own YouTube channel (server/youtube/customer-media.ts);
+ * it reuses the multipart + ranged-read code below and nothing else of JobCam.
+ */
 export function assertKey(key: string): string {
   if (typeof key !== "string" || key.length > 300 || key.includes("..")
-    || !/^jobcam(-[a-z0-9]{1,24})?\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test(key)) {
+    || !/^(?:jobcam|ytvideo)(-[a-z0-9]{1,24})?\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-]{1,64}\/[A-Za-z0-9_-][A-Za-z0-9_.-]{0,63}$/.test(key)) {
     throw new Error("Invalid JobCam storage key");
   }
   return key;
@@ -82,6 +87,7 @@ export function mediaKey(orgId: string, mediaId: string, name: string): string {
 export function keyBelongsTo(key: string | null | undefined, orgId: string, mediaId: string): boolean {
   if (!key) return false;
   try { assertKey(key); } catch { return false; }
+  if (!key.startsWith("jobcam")) return false; // the ytvideo tree is never a JobCam row's
   const [, org, media] = key.split("/");
   return org === orgId && media === mediaId;
 }

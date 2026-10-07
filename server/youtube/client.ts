@@ -6,10 +6,14 @@
  * pass a fake), and every network call goes through the `http` passed in, so
  * the unit tests never reach Google.
  *
- * The site has ONE connection: the company channel (YOUTUBE_CHANNEL_ID). It is
- * made once by a platform admin on /admin/youtube (server/youtube/routes.ts)
- * with the app's existing Google OAuth client (GOOGLE_CLIENT_ID / _SECRET —
- * the same one Google sign-in and the Search Console connect use).
+ * Two kinds of connection use this one library, each through its own store:
+ *   - the SITE connection: the company channel (YOUTUBE_CHANNEL_ID), made once
+ *     by a platform admin on /admin/youtube (server/youtube/routes.ts);
+ *   - a CUSTOMER connection: a customer's own channel, one per account, made in
+ *     Social Media (server/youtube/customer-routes.ts) with fewer scopes
+ *     (CUSTOMER_SCOPES) and no expected channel (`anyChannel`).
+ * Both go through the app's existing Google OAuth client (GOOGLE_CLIENT_ID /
+ * _SECRET — the same one Google sign-in and the Search Console connect use).
  *
  * No function logs or returns a token; errors carry a short code and a
  * message that never includes Google's response body verbatim.
@@ -39,6 +43,9 @@ export function requestedScopes(): string[] {
   const extra = (process.env.YOUTUBE_EXTRA_SCOPES || "").split(/[\s,]+/).map((s) => s.trim()).filter((s) => /^https:\/\/www\.googleapis\.com\/auth\/[a-z.-]+$/.test(s));
   return [...new Set([YT_UPLOAD_SCOPE, YT_READONLY_SCOPE, YT_ANALYTICS_SCOPE, ...extra])];
 }
+
+/** What a customer's consent asks for: upload the videos they choose and read back which channel it is. Nothing else. */
+export const CUSTOMER_SCOPES: readonly string[] = [YT_UPLOAD_SCOPE, YT_READONLY_SCOPE];
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
@@ -107,12 +114,12 @@ export function stateMatches(pending: PendingState | undefined | null, userId: n
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export function consentUrl(state: string, redirectUri: string): string {
+export function consentUrl(state: string, redirectUri: string, scopes: readonly string[] = requestedScopes()): string {
   const q = new URLSearchParams({
     client_id: clientCreds().id,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: requestedScopes().join(" "),
+    scope: scopes.join(" "),
     access_type: "offline",
     include_granted_scopes: "false",
     prompt: "consent select_account",
@@ -135,6 +142,8 @@ export function oauthErrorCode(error: unknown): YoutubeErrorCode {
 export type CompletedConnect = {
   channelId: string;
   channelTitle: string;
+  /** Customer flow only: the channel's small picture as Google returned it (null when it sent none). */
+  channelThumbnail?: string | null;
   refreshToken: string;
   accessToken: string;
   expiresAt: Date;
@@ -151,9 +160,13 @@ export type CompletedConnect = {
  * youtube.upload is required. youtube.readonly is what lets us read the
  * channel back, so without it the check cannot pass. The analytics scope is
  * optional: the returned `scopes` say what was really granted.
+ *
+ * `anyChannel` is the customer flow: there is no expected channel, so the
+ * channel of the account that was picked is the one connected (the caller
+ * shows the customer which one that was).
  */
 export async function completeConnect(
-  input: { code: string; redirectUri: string; expected?: string },
+  input: { code: string; redirectUri: string; expected?: string; anyChannel?: boolean },
   http: typeof fetch = fetch,
   now: () => number = Date.now,
 ): Promise<CompletedConnect> {
@@ -203,7 +216,9 @@ export async function completeConnect(
   const items: any[] = Array.isArray(d?.items) ? d.items : [];
   if (!items.length)
     throw new YoutubeError("no_channel", "The Google account that was picked has no YouTube channel. Connect again and pick the Construct HUB channel.", 400);
-  const match = items.find((i) => i?.id === expected);
+  const match = input.anyChannel ? items.find((i) => typeof i?.id === "string" && i.id) : items.find((i) => i?.id === expected);
+  if (!match && input.anyChannel)
+    throw new YoutubeError("no_channel", "The Google account that was picked has no YouTube channel.", 400);
   if (!match) {
     const picked = items.map((i) => ({ id: String(i?.id ?? ""), title: String(i?.snippet?.title ?? "") }));
     const names = picked.map((p) => `"${p.title || "untitled"}" (${p.id})`).join(", ");
@@ -211,9 +226,11 @@ export async function completeConnect(
       `The channel that was picked is ${names}, not the company channel (${expected}). Nothing was connected. Connect again and pick the Construct HUB channel when Google asks which account or channel.`,
       400, { picked, expected });
   }
+  const thumb = match.snippet?.thumbnails?.default?.url;
   return {
-    channelId: expected,
+    channelId: String(match.id),
     channelTitle: String(match.snippet?.title ?? ""),
+    ...(input.anyChannel ? { channelThumbnail: typeof thumb === "string" && /^https:\/\/[a-z0-9.-]+\.(ggpht|googleusercontent)\.com\//i.test(thumb) ? thumb : null } : {}),
     refreshToken: t.refresh_token,
     accessToken: t.access_token,
     expiresAt: new Date(now() + Number(t.expires_in || 3600) * 1000),
@@ -307,8 +324,21 @@ function apiError(status: number, d: any): YoutubeError {
 
 /* ── Upload (resumable protocol) ──────────────────────────────────────────── */
 
+/**
+ * Where the bytes come from when they are not a local file: a size and a way
+ * to read one byte range at a time. The uploader asks for one chunk
+ * (UPLOAD_CHUNK_BYTES) and sends it before asking for the next, so a video in
+ * object storage is never held in memory whole.
+ */
+export type VideoSource = { size: number; read(offset: number, length: number): Promise<Buffer> };
+
 export type UploadVideoInput = {
-  filePath: string;
+  /** A local file… */
+  filePath?: string;
+  /** …or a ranged reader (object storage). Exactly one of the two. */
+  source?: VideoSource;
+  /** Called after each chunk YouTube confirmed, with the bytes stored so far. */
+  onProgress?: (sentBytes: number, totalBytes: number) => void | Promise<void>;
   title: string;
   description?: string;
   tags?: string[];
@@ -346,20 +376,40 @@ export function uploadSessionRequest(input: UploadVideoInput, size: number): { u
  */
 export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<{ videoId: string; privacyStatus: string | null; uploadStatus: string | null }> {
   const http = deps.http ?? fetch;
-  const { size } = await stat(input.filePath);
-  if (!size) throw new YoutubeError("upload", "The video file is empty", 400);
+  if (!input.source === !input.filePath) throw new YoutubeError("upload", "Give the video as a file path or as a source, not both", 400);
+  const file = input.source ? null : await open(input.filePath!, "r");
+  try {
+    const size = input.source ? input.source.size : (await stat(input.filePath!)).size;
+    if (!Number.isSafeInteger(size) || size <= 0) throw new YoutubeError("upload", "The video file is empty", 400);
+    const readChunk = async (offset: number, length: number): Promise<Buffer> => {
+      if (input.source) {
+        const got = await input.source.read(offset, length);
+        if (got.length !== length) throw new YoutubeError("upload", "The stored video could not be read in full", 502);
+        return got;
+      }
+      const chunk = Buffer.alloc(length);
+      await file!.read(chunk, 0, length, offset);
+      return chunk;
+    };
+    return await sendVideo(input, size, readChunk, deps, http);
+  } finally {
+    await file?.close();
+  }
+}
+
+async function sendVideo(
+  input: UploadVideoInput, size: number, readChunk: (offset: number, length: number) => Promise<Buffer>, deps: Deps, http: typeof fetch,
+): Promise<{ videoId: string; privacyStatus: string | null; uploadStatus: string | null }> {
   const session = uploadSessionRequest(input, size);
   const { r: opened } = await call(deps, session.url, { method: "POST", headers: session.headers, body: JSON.stringify(session.body) });
   const location = opened.headers.get("location");
   if (!location || !location.startsWith("https://www.googleapis.com/")) throw new YoutubeError("upload", "YouTube did not open an upload session");
 
-  const file = await open(input.filePath, "r");
-  try {
+  {
     let offset = 0, failures = 0;
     for (;;) {
       const length = Math.min(UPLOAD_CHUNK_BYTES, size - offset);
-      const chunk = Buffer.alloc(length);
-      await file.read(chunk, 0, length, offset);
+      const chunk = await readChunk(offset, length);
       let r: Response;
       try {
         // The session URI is the credential for the bytes; the bearer token is sent as well, as Google's clients do.
@@ -377,7 +427,7 @@ export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<
         if (!d?.id) throw new YoutubeError("upload", "YouTube accepted the file but returned no video id");
         return { videoId: String(d.id), privacyStatus: d.status?.privacyStatus ?? null, uploadStatus: d.status?.uploadStatus ?? null };
       }
-      if (r.status === 308) { offset = nextOffset(r); failures = 0; continue; }
+      if (r.status === 308) { offset = nextOffset(r); failures = 0; await input.onProgress?.(offset, size); continue; }
       if (r.status >= 500 && ++failures <= 5) {
         // Ask how much arrived, then carry on from there.
         await new Promise((ok) => setTimeout(ok, (deps.retryDelayMs ?? 1000) * 2 ** failures));
@@ -393,9 +443,23 @@ export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<
       }
       throw apiError(r.status, await r.json().catch(() => ({})));
     }
-  } finally {
-    await file.close();
   }
+}
+
+/**
+ * What YouTube says about one of the channel's own videos after the upload:
+ * `uploadStatus` is uploaded → processed, or rejected / failed / deleted with
+ * a reason. Null when YouTube no longer lists the video. (videos.list, part
+ * status — covered by youtube.readonly.)
+ */
+export type VideoStatus = { uploadStatus: string | null; privacyStatus: string | null; rejectionReason: string | null; failureReason: string | null };
+export async function getVideoStatus(videoId: string, deps: Deps): Promise<VideoStatus | null> {
+  if (!idOk(videoId)) throw new YoutubeError("request", "Invalid video id", 400);
+  const { d } = await call(deps, `${API}/videos?part=status&id=${encodeURIComponent(videoId)}`);
+  const s = (Array.isArray(d?.items) ? d.items : [])[0]?.status;
+  if (!s) return null;
+  const text = (v: unknown) => (typeof v === "string" && /^[A-Za-z]{1,40}$/.test(v) ? v : null);
+  return { uploadStatus: text(s.uploadStatus), privacyStatus: text(s.privacyStatus), rejectionReason: text(s.rejectionReason), failureReason: text(s.failureReason) };
 }
 
 /** "Range: bytes=0-N" on a 308 says N+1 bytes are stored; no Range header means none are. */

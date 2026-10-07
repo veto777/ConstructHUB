@@ -419,6 +419,12 @@ export async function registerRoutes(
   registerSocialRoutes(app, getDevUser);
   const { startSocialWorker } = await import("./social/service");
   startSocialWorker();
+  // Customers' own YouTube channels (Social Media → YouTube): connect, send a video, the upload worker.
+  const { ensureYoutubeCustomerSchema } = await import("./youtube/customer-schema");
+  await ensureYoutubeCustomerSchema();
+  const { registerCustomerYoutubeRoutes } = await import("./youtube/customer-routes");
+  registerCustomerYoutubeRoutes(app, getDevUser);
+  (await import("./youtube/customer-service")).startCustomerYoutubeWorker();
 
   // Public API (/api/v1, chub_ keys). Mounted before the CRM so requests
   // without a chub_ token reach the CRM's chk_-key routes unchanged.
