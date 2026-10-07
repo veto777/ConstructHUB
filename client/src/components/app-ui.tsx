@@ -85,9 +85,8 @@ export function AppPage({ children, width = "default", className, testId }: {
 }) {
   return (
     <div className={cn(
+      // Flat, like Google: no glow behind the header (the platform sits on the Google surface, App.tsx).
       "relative isolate mx-auto w-full px-4 pb-10 pt-5 sm:px-6 sm:pt-8 space-y-5 sm:space-y-6",
-      // a soft warm glow behind the header — color without noise
-      "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:-z-10 before:h-64 before:bg-[radial-gradient(60%_100%_at_15%_0%,hsl(25_95%_53%/0.08),transparent_72%)]",
       WIDTHS[width], className)} data-testid={testId}>
       {children}
     </div>
@@ -180,12 +179,12 @@ export function Stat({ label, value, hint, href, tone = "default", accent, icon:
       "h-full rounded-xl border bg-card p-3.5 sm:p-4",
       // one brand color, used lightly: a white tile, an orange dot (owner, 2026-10-04: no rainbow)
       href && "transition-shadow hover:shadow-md",
-    )} data-testid={testId}>
-      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+    )} data-testid={testId} data-ui="stat">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground" data-ui="stat-label">
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : a ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", a.dot)} aria-hidden="true" /> : null}
         <span className="truncate">{label}</span>
       </div>
-      <div className={cn("mt-1 truncate text-2xl font-semibold tabular-nums tracking-tight", toneClass)}>{value}</div>
+      <div className={cn("mt-1 truncate text-2xl font-semibold tabular-nums tracking-tight", toneClass)} data-ui="stat-value">{value}</div>
       {hint && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
