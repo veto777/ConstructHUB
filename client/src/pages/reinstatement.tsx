@@ -1,4 +1,5 @@
-import { AppPage, PageHeader, Section, StatGrid, Stat } from "@/components/app-ui";
+import { AppPage } from "@/components/app-ui";
+import { GoogleSurface, GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -167,9 +168,18 @@ export default function ReinstatementPage() {
                       data-testid="textarea-problem-description"
                     />
                   </div>
+                  {user ? (
+                    <GooglePill
+                      type="submit"
+                      variant="solid"
+                      className="w-full"
+                      disabled={!canSubmit || submitMutation.isPending}
+                      testId="button-submit-reinstatement"
+                      label={<>{submitMutation.isPending ? <Loader2 className="mr-2 inline h-4 w-4 animate-spin" aria-hidden="true" /> : null}Submit</>}
+                    />
+                  ) : (
                   <Button
                     type="submit"
-                    variant={user ? "outline" : "default"}
                     className="w-full h-12 rounded-lg text-base font-semibold"
                     disabled={!canSubmit || submitMutation.isPending}
                     data-testid="button-submit-reinstatement"
@@ -177,25 +187,28 @@ export default function ReinstatementPage() {
                     {submitMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
                     Submit
                   </Button>
+                  )}
                 </form>);
-  if (user) return <AppPage width="narrow" testId="page-reinstatement">
-    <PageHeader title={<span data-testid="text-reinstatement-title">Profile reinstatement</span>} description="Request help with a suspended Google Business Profile." actions={<Button asChild><a href="#request" data-testid="button-get-reinstated">Review request form</a></Button>}/>
-    <div data-testid="reinstatement-facts"><StatGrid cols={2}><Stat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><Stat label="Initial review" value="1–2 days" hint="Business days"/></StatGrid></div>
-    <Section id="request" title={<span data-testid="text-form-title">Tell us about your suspension</span>} testId="card-reinstatement-form" description="We’ll review your case before taking it on.">
+  // Google's format (owner, 2026-10-07): quiet title, number tiles, a hairline section for the form.
+  if (user) return <GoogleSurface page><AppPage width="narrow" testId="page-reinstatement">
+    <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush actions={<GooglePill variant="solid" label="Review request form" href="#request" testId="button-get-reinstated"/>}/>
+    <div data-testid="reinstatement-facts"><GoogleStatGrid cols={2}><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></GoogleStatGrid></div>
+    <section id="request" data-testid="card-reinstatement-form">
+      <GoogleSectionHeader titleTestId="text-form-title" title="Tell us about your suspension" description="We’ll review your case before taking it on."/>
       {requestForm}
-    </Section>
-    <details className="rounded-xl border bg-card p-4 space-y-4"><summary className="cursor-pointer min-h-10 py-2 font-medium">How reinstatement works</summary>
-      <p className="text-sm text-muted-foreground" data-testid="badge-service-label">Google Business Profile reinstatement service</p>
-      <h2 className="font-semibold" data-testid="text-process-title">How we get you back on the map</h2>
-      <ol className="space-y-4">{PROCESS_STEPS.map(step=><li key={step.num} data-testid={`process-step-${step.num}`}><h3 className="text-sm font-medium">{step.num}. {step.title}</h3><p className="text-sm text-muted-foreground">{step.desc}</p></li>)}</ol>
-      <h2 className="font-semibold" data-testid="text-suspension-reasons-title">Common suspension reasons</h2>
+    </section>
+    <details className="g-card space-y-4"><summary className="cursor-pointer min-h-10 py-2 g-card__title g-card__title--md">How reinstatement works</summary>
+      <p className="text-sm g-text-2" data-testid="badge-service-label">Google Business Profile reinstatement service</p>
+      <h2 className="g-card__title g-card__title--md" data-testid="text-process-title">How we get you back on the map</h2>
+      <ol className="space-y-4">{PROCESS_STEPS.map(step=><li key={step.num} data-testid={`process-step-${step.num}`}><h3 className="text-sm font-medium">{step.num}. {step.title}</h3><p className="text-sm g-text-2">{step.desc}</p></li>)}</ol>
+      <h2 className="g-card__title g-card__title--md" data-testid="text-suspension-reasons-title">Common suspension reasons</h2>
       {SUSPENSION_REASONS.map((reason,i)=><p className="text-sm" key={i} data-testid={`suspension-reason-${i}`}><strong>{reason.title}.</strong> {reason.desc}</p>)}
-      <h2 className="font-semibold" data-testid="text-consequences-title">What a suspension affects</h2>
+      <h2 className="g-card__title g-card__title--md" data-testid="text-consequences-title">What a suspension affects</h2>
       {CONSEQUENCES.map((item,i)=><p className="text-sm" key={i} data-testid={`card-consequence-${i}`}>{item.title}: {item.desc}</p>)}
-      <h2 className="font-semibold" data-testid="text-trust-title">What to expect</h2>
+      <h2 className="g-card__title g-card__title--md" data-testid="text-trust-title">What to expect</h2>
       {TRUST_POINTS.map((item,i)=><p className="text-sm" key={i} data-testid={`card-trust-${i}`}><strong>{item.title}.</strong> {item.desc}</p>)}
     </details>
-  </AppPage>;
+  </AppPage></GoogleSurface>;
 
   return (
     <div className="h-full overflow-y-auto">

@@ -1,26 +1,19 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Eye, Globe, Link2, Plus, RefreshCw, ShieldCheck, Undo2 } from "lucide-react";
 import { apiRequest, queryClient, apiErrorMessage } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
-import {
-  AppPage,
-  PageHeader,
-  Section,
-  Toolbar,
-  Notice,
-  appTable,
-  appTableCards,
-} from "@/components/app-ui";
+import { AppPage, Toolbar, Notice } from "@/components/app-ui";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   PlanRequired,
   planRequiredFrom,
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
+// Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
+  "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
 // Mirrors the server's domainName check (server/domains/types.ts).
 const domainPattern = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 export default function DomainsPage() {
@@ -104,32 +97,36 @@ export default function DomainsPage() {
     setSelected((s) =>
       s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
     );
+  // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, pill actions.
   const header = (
-    <PageHeader
+    <GoogleSectionHeader
+      as="h1"
       title="Domains"
       description="Watch client domains, expiry and DNS — registration stays with your registrar."
+      flush
       actions={
-        <Button variant="ghost" asChild>
-          <Link href="/mail-alerts" data-testid="link-domains-mail-alerts">
-            Provider mail alerts <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Link>
-        </Button>
+        <Link href="/mail-alerts" asChild>
+          <GooglePill icon={ArrowRight} label="Provider mail alerts" href="/mail-alerts" testId="link-domains-mail-alerts" />
+        </Link>
       }
     />
   );
   const planGate = [loadError, guidesError].find((e) => planRequiredFrom(e));
   if (planGate)
     return (
-      <AppPage width="wide" testId="page-domains">
-        {header}
-        <PlanRequired
-          module="domainsMailAlerts"
-          error={planGate}
-          className="max-w-3xl"
-        />
-      </AppPage>
+      <GoogleSurface page>
+        <AppPage width="wide" testId="page-domains">
+          {header}
+          <PlanRequired
+            module="domainsMailAlerts"
+            error={planGate}
+            className="max-w-3xl"
+          />
+        </AppPage>
+      </GoogleSurface>
     );
   return (
+    <GoogleSurface page>
     <AppPage width="wide" testId="page-domains">
       {header}
       {error && <Notice tone="danger">{error}</Notice>}
@@ -140,10 +137,11 @@ export default function DomainsPage() {
           it before queued previews, changes and monitoring can run.
         </Notice>
       )}
-      <Section
-        title="Connect registrar"
-        description="Use a Porkbun or Name.com API key to sync and change client DNS."
-      >
+      <section>
+        <GoogleSectionHeader
+          title="Connect registrar"
+          description="Use a Porkbun or Name.com API key to sync and change client DNS."
+        />
         <form
           className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
           onSubmit={async (e) => {
@@ -155,7 +153,7 @@ export default function DomainsPage() {
           }}
         >
           <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
-            <span className="text-muted-foreground">Registrar</span>
+            <span className="g-text-2">Registrar</span>
             <select
               aria-label="Registrar"
               className={selectClass}
@@ -167,7 +165,7 @@ export default function DomainsPage() {
             </select>
           </label>
           <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
-            <span className="text-muted-foreground">Connection label</span>
+            <span className="g-text-2">Connection label</span>
             <Input
               aria-label="Connection label"
               placeholder="Client / account label"
@@ -178,7 +176,7 @@ export default function DomainsPage() {
             />
           </label>
           <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
-            <span className="text-muted-foreground">
+            <span className="g-text-2">
               {provider === "namecom" ? "Username" : "API key"}
             </span>
             <Input
@@ -193,7 +191,7 @@ export default function DomainsPage() {
             />
           </label>
           <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:flex-none">
-            <span className="text-muted-foreground">Secret / API token</span>
+            <span className="g-text-2">Secret / API token</span>
             <Input
               aria-label="API secret or token"
               type="password"
@@ -205,23 +203,25 @@ export default function DomainsPage() {
               className="sm:w-56"
             />
           </label>
-          <Button disabled={busy} className="w-full sm:w-auto">
-            Connect {provider === "namecom" ? "Name.com" : "Porkbun"}
-          </Button>
+          <GooglePill
+            type="submit"
+            variant="solid"
+            icon={Link2}
+            disabled={busy}
+            className="w-full sm:w-auto"
+            label={`Connect ${provider === "namecom" ? "Name.com" : "Porkbun"}`}
+          />
         </form>
         {(connections?.items || []).length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-2 g-divider pt-4">
             {connections.items.map((c: any) => (
-              <span
-                key={c.id}
-                className="inline-flex items-center rounded-full border bg-muted/50 px-2.5 py-1 text-xs text-muted-foreground"
-              >
+              <span key={c.id} className="g-chip g-chip--sm">
                 {c.label} · {c.provider}
               </span>
             ))}
-            <div className="ml-auto flex items-center gap-1">
-              <Button
-                variant="outline"
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <GooglePill
+                icon={RefreshCw}
                 size="sm"
                 disabled={busy}
                 onClick={() =>
@@ -231,33 +231,31 @@ export default function DomainsPage() {
                     ),
                   })
                 }
-              >
-                Sync connections
-              </Button>
-              <Button
-                variant="ghost"
+                label="Sync connections"
+              />
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={connectionPage === 1}
                 onClick={() => setConnectionPage((p) => p - 1)}
-              >
-                Previous connections
-              </Button>
-              <Button
-                variant="ghost"
+                label="Previous connections"
+              />
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={connections?.items?.length < 25}
                 onClick={() => setConnectionPage((p) => p + 1)}
-              >
-                Next connections
-              </Button>
+                label="Next connections"
+              />
             </div>
           </div>
         )}
-      </Section>
-      <Section
-        title="Add domains"
-        description="Track domains your registrar can't reach — comma-separated, up to 100 at a time."
-      >
+      </section>
+      <section>
+        <GoogleSectionHeader
+          title="Add domains"
+          description="Track domains your registrar can't reach — comma-separated, up to 100 at a time."
+        />
         <form
           className="flex flex-col gap-3 sm:flex-row"
           onSubmit={async (e) => {
@@ -294,22 +292,17 @@ export default function DomainsPage() {
             required
             className="w-full sm:max-w-md"
           />
-          <Button variant="outline" disabled={busy} className="w-full sm:w-auto">
-            Add domains
-          </Button>
+          <GooglePill type="submit" icon={Plus} disabled={busy} className="w-full sm:w-auto" label="Add domains" />
         </form>
         {manualError && (
-          <p id="manual-domains-error" role="alert" className="mt-2 text-sm text-destructive">
+          <p id="manual-domains-error" role="alert" className="mt-2 text-sm g-closed">
             {manualError}
           </p>
         )}
-      </Section>
-      <Section
-        title="Domain inventory"
-        flush
-        testId="section-domain-inventory"
-      >
-        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+      </section>
+      <section data-testid="section-domain-inventory">
+        <GoogleSectionHeader title="Domain inventory" count={domains?.total || 0} />
+        <div className="space-y-3">
           <Toolbar
             search={{
               value: q,
@@ -348,7 +341,7 @@ export default function DomainsPage() {
             }
           />
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+            <label className="flex h-10 items-center gap-2 text-sm g-text-2">
               <input
                 aria-label="Select page"
                 type="checkbox"
@@ -369,19 +362,18 @@ export default function DomainsPage() {
               Select page
             </label>
             {selected.length > 0 && (
-              <span className="text-sm tabular-nums text-muted-foreground">
+              <span className="text-sm tabular-nums g-text-2">
                 {selected.length} selected
               </span>
             )}
             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                variant="outline"
+              <GooglePill
+                icon={ShieldCheck}
                 size="sm"
                 disabled={!selected.length || busy}
                 onClick={() => act("/monitor", { ids: selected })}
-              >
-                Check selected domains
-              </Button>
+                label="Check selected domains"
+              />
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
                   aria-label="Find client location"
@@ -406,26 +398,23 @@ export default function DomainsPage() {
                     </option>
                   ))}
                 </select>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
+                <div className="flex flex-wrap items-center gap-2">
+                  <GooglePill
+                    variant="quiet"
                     size="sm"
                     disabled={locationPage === 1}
                     onClick={() => setLocationPage((p) => p - 1)}
-                  >
-                    Previous clients
-                  </Button>
-                  <Button
-                    variant="ghost"
+                    label="Previous clients"
+                  />
+                  <GooglePill
+                    variant="quiet"
                     size="sm"
                     disabled={locations?.items?.length < 25}
                     onClick={() => setLocationPage((p) => p + 1)}
-                  >
-                    Next clients
-                  </Button>
+                    label="Next clients"
+                  />
                 </div>
-                <Button
-                  variant="outline"
+                <GooglePill
                   size="sm"
                   disabled={!selected.length || busy}
                   onClick={() =>
@@ -434,131 +423,86 @@ export default function DomainsPage() {
                       locationId: location ? Number(location) : null,
                     })
                   }
-                >
-                  Map selected to client
-                </Button>
+                  label="Map selected to client"
+                />
               </div>
             </div>
           </div>
           {loadError && <Notice tone="danger">Could not load domains.</Notice>}
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading domains…</p>
+            <p className="text-sm g-text-2">Loading domains…</p>
           ) : (
             <>
-              <div className={appTable.wrapper}>
-                <table className={appTable.table}>
-                  <thead className={appTable.thead}>
-                    <tr>
-                      <th className={appTable.th} />
-                      <th className={appTable.th}>Domain</th>
-                      <th className={appTable.th}>Registrar</th>
-                      <th className={appTable.th}>Client location</th>
-                      <th className={`${appTable.th} hidden sm:table-cell`}>
-                        Expiry / auto-renew
-                      </th>
-                      <th className={`${appTable.th} hidden sm:table-cell`}>
-                        Last DNS check
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {domains?.items?.map((d: any) => (
-                      <tr
-                        key={d.id}
-                        className={`${appTable.tr} ${appTableCards.tr}`}
-                      >
-                        <td className={`${appTable.td} ${appTableCards.td}`}>
+              {domains?.items?.length ? (
+                <GoogleList testId="list-domains">
+                  {domains.items.map((d: any) => (
+                    <GoogleListRow
+                      key={d.id}
+                      size="md"
+                      testId={`row-domain-${d.id}`}
+                      title={
+                        <label className="inline-flex cursor-pointer items-center gap-3">
                           <input
                             aria-label={`Select ${d.domain}`}
                             type="checkbox"
                             checked={selected.includes(Number(d.id))}
                             onChange={() => toggle(Number(d.id))}
                           />
-                        </td>
-                        <td className={`${appTable.td} ${appTableCards.td}`}>
-                          <span className="font-medium">{d.domain}</span>
-                          <p className="break-all text-xs text-muted-foreground">
-                            {d.state?.nameservers?.join(", ") ||
-                              "Nameservers not yet checked"}
-                          </p>
-                        </td>
-                        <td className={`${appTable.td} ${appTableCards.td}`}>
-                          <span className="sm:hidden text-muted-foreground">
-                            Registrar:{" "}
-                          </span>
-                          {d.registrar}
-                        </td>
-                        <td className={`${appTable.td} ${appTableCards.td}`}>
-                          <span className="sm:hidden text-muted-foreground">
-                            Client location:{" "}
-                          </span>
-                          {d.location_name || d.location_id || "Unmapped"}
-                        </td>
-                        <td
-                          className={`${appTable.td} ${appTableCards.td} hidden sm:table-cell`}
-                        >
-                          {d.state?.expires
-                            ? new Date(d.state.expires).toLocaleDateString()
-                            : "Unknown"}{" "}
-                          /{" "}
-                          {d.state?.autoRenew === true
-                            ? "On"
-                            : d.state?.autoRenew === false
-                              ? "Off"
-                              : "Unknown"}
-                        </td>
-                        <td
-                          className={`${appTable.td} ${appTableCards.td} hidden sm:table-cell`}
-                        >
-                          {d.checked_at
-                            ? new Date(d.checked_at).toLocaleString()
-                            : "Never"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!domains?.items?.length && (
-                  <p className="px-4 py-6 text-sm text-muted-foreground">
-                    No domains found. Connect a registrar or add domains above.
-                  </p>
-                )}
-              </div>
+                          <span>{d.domain}</span>
+                        </label>
+                      }
+                      meta={[
+                        d.registrar,
+                        d.location_name || d.location_id || "Unmapped",
+                        d.state?.expires
+                          ? `Expires ${new Date(d.state.expires).toLocaleDateString()}`
+                          : "Expiry unknown",
+                        `Auto-renew ${d.state?.autoRenew === true ? "On" : d.state?.autoRenew === false ? "Off" : "Unknown"}`,
+                        d.checked_at
+                          ? `DNS checked ${new Date(d.checked_at).toLocaleString()}`
+                          : "DNS never checked",
+                      ]}
+                      line={d.state?.nameservers?.join(", ") || "Nameservers not yet checked"}
+                    />
+                  ))}
+                </GoogleList>
+              ) : (
+                <p className="py-6 text-sm g-text-2">
+                  No domains found. Connect a registrar or add domains above.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
+                <GooglePill
                   size="sm"
                   disabled={page === 1}
                   onClick={() => {
                     setPage((p) => p - 1);
                     setSelected([]);
                   }}
-                >
-                  Previous domains
-                </Button>
-                <span className="text-sm tabular-nums text-muted-foreground">
+                  label="Previous domains"
+                />
+                <span className="text-sm tabular-nums g-text-2">
                   Page {page} · {domains?.total || 0} domains
                 </span>
-                <Button
-                  variant="outline"
+                <GooglePill
                   size="sm"
                   disabled={page * 25 >= (domains?.total || 0)}
                   onClick={() => {
                     setPage((p) => p + 1);
                     setSelected([]);
                   }}
-                >
-                  Next domains
-                </Button>
+                  label="Next domains"
+                />
               </div>
             </>
           )}
         </div>
-      </Section>
-      <div className="grid gap-4 md:grid-cols-2 sm:gap-5">
-        <Section title="Nameservers for selected domains">
+      </section>
+      <div className="grid gap-6 md:grid-cols-2">
+        <section>
+          <GoogleSectionHeader title="Nameservers for selected domains" />
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm g-text-2">
               Copy website and email records first. A nameserver change can
               interrupt the website and email.
             </p>
@@ -569,8 +513,8 @@ export default function DomainsPage() {
               onChange={(e) => setNs(e.target.value)}
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button
-                variant="outline"
+              <GooglePill
+                icon={Eye}
                 disabled={!selected.length || busy}
                 onClick={() =>
                   act("/preview", {
@@ -581,22 +525,21 @@ export default function DomainsPage() {
                     },
                   })
                 }
-              >
-                Preview nameservers
-              </Button>
-              <Button
-                variant="ghost"
+                label="Preview nameservers"
+              />
+              <GooglePill
+                variant="quiet"
                 disabled={!selected.length || busy}
                 onClick={() => act("/cloudflare-preview", { ids: selected })}
-              >
-                Preview assigned Cloudflare pair
-              </Button>
+                label="Preview assigned Cloudflare pair"
+              />
             </div>
           </div>
-        </Section>
-        <Section title="DNS record change">
+        </section>
+        <section>
+          <GoogleSectionHeader title="DNS record change" />
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm g-text-2">
               Applies to every selected domain. Cloudflare-hosted zones are
               managed in Cloudflare.
             </p>
@@ -636,7 +579,7 @@ export default function DomainsPage() {
             />
             <div className="flex gap-2">
               <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
-                <span className="text-muted-foreground">TTL</span>
+                <span className="g-text-2">TTL</span>
                 <Input
                   aria-label="Record TTL"
                   type="number"
@@ -645,7 +588,7 @@ export default function DomainsPage() {
                 />
               </label>
               <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
-                <span className="text-muted-foreground">MX priority</span>
+                <span className="g-text-2">MX priority</span>
                 <Input
                   aria-label="MX priority"
                   type="number"
@@ -654,8 +597,8 @@ export default function DomainsPage() {
                 />
               </label>
             </div>
-            <Button
-              variant="outline"
+            <GooglePill
+              icon={Eye}
               disabled={!selected.length || busy}
               onClick={() =>
                 act("/preview", {
@@ -666,78 +609,82 @@ export default function DomainsPage() {
                   },
                 })
               }
-            >
-              Preview DNS change
-            </Button>
+              label="Preview DNS change"
+            />
           </div>
-        </Section>
+        </section>
       </div>
-      <Section
-        title="Previews and change history"
-        description="Review the diff, confirm, and verify your identity. Applied changes stay pending until public DNS agrees."
-        flush
-        testId="section-domain-jobs"
-      >
-        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
-          {(jobs?.items || []).map((j: any) => (
-            <details key={j.id} className="rounded-xl border px-4 py-3">
-              <summary className="cursor-pointer text-sm">
-                <input
-                  aria-label={`Select job ${j.id}`}
-                  type="checkbox"
-                  checked={jobSelection.includes(j.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) =>
-                    setJobSelection((s) =>
-                      e.target.checked
-                        ? [...s, j.id]
-                        : s.filter((x) => x !== j.id),
-                    )
-                  }
-                  className="mr-3"
-                />
-                {j.domain || "Registrar inventory"} · {j.kind} ·{" "}
-                <strong>{j.status}</strong>
-              </summary>
-              {j.error && (
-                <p role="alert" className="mt-2 text-sm text-destructive">
-                  {j.error}
-                </p>
-              )}
-              {j.before_state && (
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <h3 className="text-sm font-semibold">Before</h3>
-                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">
-                      {JSON.stringify(
-                        {
-                          nameservers: j.before_state.nameservers,
-                          records: j.before_state.records,
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">After</h3>
-                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">
-                      {JSON.stringify(
-                        {
-                          nameservers: j.after_state?.nameservers,
-                          records: j.after_state?.records,
-                        },
-                        null,
-                        2,
-                      )}
-                    </pre>
-                  </div>
-                </div>
-              )}
-            </details>
-          ))}
+      <section data-testid="section-domain-jobs">
+        <GoogleSectionHeader
+          title="Previews and change history"
+          description="Review the diff, confirm, and verify your identity. Applied changes stay pending until public DNS agrees."
+          flush
+        />
+        <div className="space-y-3">
+          {(jobs?.items || []).length > 0 && (
+            <GoogleList testId="list-domain-jobs">
+              {(jobs?.items || []).map((j: any) => (
+                <details key={j.id} className="g-card">
+                  <summary className="cursor-pointer text-sm">
+                    <input
+                      aria-label={`Select job ${j.id}`}
+                      type="checkbox"
+                      checked={jobSelection.includes(j.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) =>
+                        setJobSelection((s) =>
+                          e.target.checked
+                            ? [...s, j.id]
+                            : s.filter((x) => x !== j.id),
+                        )
+                      }
+                      className="mr-3"
+                    />
+                    <span className="g-text">{j.domain || "Registrar inventory"}</span>
+                    <span className="g-text-2"> · {j.kind} · </span>
+                    <strong>{j.status}</strong>
+                  </summary>
+                  {j.error && (
+                    <p role="alert" className="mt-2 text-sm g-closed">
+                      {j.error}
+                    </p>
+                  )}
+                  {j.before_state && (
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div>
+                        <h3 className="text-sm">Before</h3>
+                        <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs g-text-2">
+                          {JSON.stringify(
+                            {
+                              nameservers: j.before_state.nameservers,
+                              records: j.before_state.records,
+                            },
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                      <div>
+                        <h3 className="text-sm">After</h3>
+                        <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs g-text-2">
+                          {JSON.stringify(
+                            {
+                              nameservers: j.after_state?.nameservers,
+                              records: j.after_state?.records,
+                            },
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </details>
+              ))}
+            </GoogleList>
+          )}
           {!jobs?.items?.length && (
-            <p className="text-sm text-muted-foreground">
+            <p className="pt-4 text-sm g-text-2">
               No previews yet. Select domains above and preview a change.
             </p>
           )}
@@ -751,8 +698,8 @@ export default function DomainsPage() {
             nameserver changes can break email and website access.
           </label>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
+            <GooglePill
+              icon={ShieldCheck}
               disabled={!jobSelection.length || busy}
               onClick={async () => {
                 if (
@@ -766,71 +713,70 @@ export default function DomainsPage() {
                   setWarning(false);
                 }
               }}
-            >
-              Confirm selected previews
-            </Button>
-            <Button
-              variant="ghost"
+              label="Confirm selected previews"
+            />
+            <GooglePill
+              icon={Undo2}
+              variant="quiet"
               disabled={!jobSelection.length || busy}
               onClick={() => act("/rollback-preview", { jobIds: jobSelection })}
-            >
-              Preview rollback of selected changes
-            </Button>
-            <div className="flex items-center gap-1 sm:ml-auto">
-              <Button
-                variant="ghost"
+              label="Preview rollback of selected changes"
+            />
+            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={jobPage === 1}
                 onClick={() => {
                   setJobSelection([]);
                   setJobPage((p) => p - 1);
                 }}
-              >
-                Previous jobs
-              </Button>
-              <Button
-                variant="ghost"
+                label="Previous jobs"
+              />
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={jobs?.items?.length < 25}
                 onClick={() => {
                   setJobSelection([]);
                   setJobPage((p) => p + 1);
                 }}
-              >
-                Next jobs
-              </Button>
+                label="Next jobs"
+              />
             </div>
           </div>
         </div>
-      </Section>
-      <Section title="Registrar walkthroughs">
+      </section>
+      <section>
+        <GoogleSectionHeader title="Registrar walkthroughs" flush />
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="pt-4 text-sm g-text-2">
             Server egress IP for allowlists:{" "}
             {guides?.egressIp || "Not configured — ask your administrator"}
           </p>
-          {guides?.guides?.map((g: any) => (
-            <details key={g.id} className="rounded-xl border px-4 py-3">
-              <summary className="cursor-pointer text-sm">
-                {g.name} · {g.mode}
-              </summary>
-              <ol className="list-decimal py-2 pl-6 text-sm">
-                {g.steps.map((s: string, i: number) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ol>
-              <a
-                className="text-sm text-primary underline"
-                href={g.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Official documentation
-              </a>
-            </details>
-          ))}
+          {guides?.guides?.length > 0 && (
+            <GoogleList testId="list-registrar-guides">
+              {guides.guides.map((g: any) => (
+                <details key={g.id} className="g-card">
+                  <summary className="cursor-pointer text-sm">
+                    <span className="g-text">{g.name}</span>
+                    <span className="g-text-2"> · {g.mode}</span>
+                  </summary>
+                  <ol className="list-decimal py-2 pl-6 text-sm">
+                    {g.steps.map((s: string, i: number) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ol>
+                  <div className="g-card__actions">
+                    <GooglePill icon={Globe} size="sm" label="Official documentation" href={g.url} external />
+                  </div>
+                </details>
+              ))}
+            </GoogleList>
+          )}
         </div>
-      </Section>
+      </section>
     </AppPage>
+    </GoogleSurface>
   );
 }

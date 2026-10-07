@@ -1,26 +1,20 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCheck, ExternalLink, Mail, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient, apiErrorMessage } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
 import { requestRecentAuth } from "@/components/recent-auth";
-import {
-  AppPage,
-  PageHeader,
-  Section,
-  Toolbar,
-  Notice,
-  StatusPill,
-} from "@/components/app-ui";
+import { AppPage, Toolbar, Notice } from "@/components/app-ui";
+import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   PlanRequired,
   planRequiredFrom,
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
+// Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
+  "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
 export default function MailAlertsPage() {
   const [q, setQ] = useState(""),
     [page, setPage] = useState(1),
@@ -66,16 +60,17 @@ export default function MailAlertsPage() {
       setBusy(false);
     }
   };
+  // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, alerts as rows.
   const header = (
-    <PageHeader
+    <GoogleSectionHeader
+      as="h1"
       title="Mail alerts"
       description="Known provider alerts for your client accounts. Matched messages expire within 30 days."
+      flush
       actions={
-        <Button variant="ghost" asChild>
-          <Link href="/domains" data-testid="link-mail-alerts-domains">
-            Manage domains <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Link>
-        </Button>
+        <Link href="/domains" asChild>
+          <GooglePill icon={ArrowRight} label="Manage domains" href="/domains" testId="link-mail-alerts-domains" />
+        </Link>
       }
     />
   );
@@ -84,26 +79,30 @@ export default function MailAlertsPage() {
   );
   if (planGate)
     return (
-      <AppPage testId="page-mail-alerts">
-        {header}
-        <PlanRequired
-          module="domainsMailAlerts"
-          error={planGate}
-          className="max-w-3xl"
-        />
-      </AppPage>
+      <GoogleSurface page>
+        <AppPage testId="page-mail-alerts">
+          {header}
+          <PlanRequired
+            module="domainsMailAlerts"
+            error={planGate}
+            className="max-w-3xl"
+          />
+        </AppPage>
+      </GoogleSurface>
     );
   return (
+    <GoogleSurface page>
     <AppPage testId="page-mail-alerts">
       {header}
       {error && <Notice tone="danger">{error}</Notice>}
-      <Section
-        title="Set up Gmail forwarding"
-        description="Forward provider mail to your private address and alerts appear below."
-      >
+      <section>
+        <GoogleSectionHeader
+          title="Set up Gmail forwarding"
+          description="Forward provider mail to your private address and alerts appear below."
+        />
         <div className="space-y-3">
           <label className="block space-y-1.5 text-sm">
-            <span className="text-muted-foreground">
+            <span className="g-text-2">
               Your private forwarding address
             </span>
             <Input
@@ -112,57 +111,62 @@ export default function MailAlertsPage() {
               value={settings?.address || "Inbound mail domain is not configured"}
             />
           </label>
-          <details className="rounded-xl border px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium">
-              How to set up
-            </summary>
-            <ol className="list-decimal py-2 pl-6 text-sm text-muted-foreground">
-              <li>
-                In Gmail, open Settings → See all settings → Forwarding and
-                POP/IMAP.
-              </li>
-              <li>
-                Choose Add a forwarding address and paste the address above.
-              </li>
-              <li>
-                Find the forwarding confirmation below. Use its code or the
-                Google confirmation link to finish setup.
-              </li>
-              <li>
-                Create a Gmail filter for the provider senders, then choose
-                “Forward it to” your private address. Keep general inbox
-                forwarding off to avoid sending unrelated mail.
-              </li>
-            </ol>
-          </details>
-          <details className="rounded-xl border px-4 py-3">
-            <summary className="cursor-pointer text-sm font-medium">
-              Known senders
-            </summary>
-            <p className="break-words py-2 text-sm text-muted-foreground">
-              {Object.values(settings?.senders || {}).flat().join(", ")}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Registrar domains: {settings?.registrarSenders?.join(", ")}.
-              Blotato: blotato.com. Only recognized alert subjects are
-              retained.
-            </p>
-          </details>
-          <p className="text-xs text-muted-foreground">
+          <GoogleList>
+            <details className="g-card">
+              <summary className="cursor-pointer text-sm font-medium">
+                How to set up
+              </summary>
+              <ol className="list-decimal py-2 pl-6 text-sm g-text-2">
+                <li>
+                  In Gmail, open Settings → See all settings → Forwarding and
+                  POP/IMAP.
+                </li>
+                <li>
+                  Choose Add a forwarding address and paste the address above.
+                </li>
+                <li>
+                  Find the forwarding confirmation below. Use its code or the
+                  Google confirmation link to finish setup.
+                </li>
+                <li>
+                  Create a Gmail filter for the provider senders, then choose
+                  “Forward it to” your private address. Keep general inbox
+                  forwarding off to avoid sending unrelated mail.
+                </li>
+              </ol>
+            </details>
+            <details className="g-card">
+              <summary className="cursor-pointer text-sm font-medium">
+                Known senders
+              </summary>
+              <p className="break-words py-2 text-sm g-text-2">
+                {Object.values(settings?.senders || {}).flat().join(", ")}
+              </p>
+              <p className="text-sm g-text-2">
+                Registrar domains: {settings?.registrarSenders?.join(", ")}.
+                Blotato: blotato.com. Only recognized alert subjects are
+                retained.
+              </p>
+            </details>
+          </GoogleList>
+          <p className="text-xs g-text-2">
             Treat forwarded email as a reported alert, not proof of the
             sender's identity. Open provider dashboards directly for security
             and billing actions.
           </p>
         </div>
-      </Section>
-      <Section
-        title="Optional Gmail API connection"
-        description="Read provider mail directly instead of forwarding. Forwarding works without it."
-      >
+      </section>
+      <section>
+        <GoogleSectionHeader
+          title="Optional Gmail API connection"
+          description="Read provider mail directly instead of forwarding. Forwarding works without it."
+        />
         {settings?.oauthEnabled ? (
           <div className="space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-              <Button
+              <GooglePill
+                icon={Mail}
+                variant="solid"
                 disabled={busy}
                 className="w-full sm:w-auto"
                 onClick={async () => {
@@ -173,74 +177,69 @@ export default function MailAlertsPage() {
                     setError("Identity verification was not completed");
                   }
                 }}
-              >
-                Connect Gmail with read-only access
-              </Button>
-              <Button
-                variant="outline"
+                label="Connect Gmail with read-only access"
+              />
+              <GooglePill
+                icon={RefreshCw}
                 disabled={busy}
                 onClick={() => action("/sync", {})}
-              >
-                Sync all connected Gmail accounts
-              </Button>
+                label="Sync all connected Gmail accounts"
+              />
             </div>
-            {settings?.grants?.map((g: any) => (
-              <div
-                key={g.google_subject}
-                className="flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3 text-sm"
-              >
-                <span className="min-w-0 flex-1">
-                  {g.email}{" "}
-                  <span className="text-muted-foreground">
-                    · {g.needs_reconnect ? "Reconnect required" : "Connected"}
-                  </span>{" "}
-                  {g.last_error && (
-                    <span role="alert" className="text-destructive">
-                      {g.last_error}
-                    </span>
-                  )}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() =>
-                    action("/oauth/disconnect", { subject: g.google_subject })
-                  }
-                >
-                  Disconnect
-                </Button>
-              </div>
-            ))}
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
+            {settings?.grants?.length > 0 && (
+              <GoogleList testId="list-gmail-grants">
+                {settings.grants.map((g: any) => (
+                  <GoogleListRow
+                    key={g.google_subject}
+                    size="md"
+                    title={g.email}
+                    meta={[
+                      g.needs_reconnect ? <span key="state" className="g-closed">Reconnect required</span> : <span key="state" className="g-open">Connected</span>,
+                      g.last_error ? <span key="err" role="alert" className="g-closed">{g.last_error}</span> : null,
+                    ]}
+                    trailing={
+                      <GooglePill
+                        variant="quiet"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() =>
+                          action("/oauth/disconnect", { subject: g.google_subject })
+                        }
+                        label="Disconnect"
+                      />
+                    }
+                  />
+                ))}
+              </GoogleList>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={accountPage === 1}
                 onClick={() => setAccountPage((p) => p - 1)}
-              >
-                Previous accounts
-              </Button>
-              <Button
-                variant="ghost"
+                label="Previous accounts"
+              />
+              <GooglePill
+                variant="quiet"
                 size="sm"
                 disabled={settings?.grants?.length < 25}
                 onClick={() => setAccountPage((p) => p + 1)}
-              >
-                Next accounts
-              </Button>
+                label="Next accounts"
+              />
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm g-text-2">
             Gmail API access is disabled. Forwarding works without Gmail
             restricted scopes. Public API use requires Google restricted-scope
             verification and the applicable annual CASA security assessment.
           </p>
         )}
-      </Section>
-      <Section title="Provider inbox" flush testId="section-mail-inbox">
-        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+      </section>
+      <section data-testid="section-mail-inbox">
+        <GoogleSectionHeader title="Provider inbox" count={messages?.total || 0} />
+        <div className="space-y-3">
           <Toolbar
             search={{
               value: q,
@@ -296,7 +295,7 @@ export default function MailAlertsPage() {
             }
           />
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-10 items-center gap-2 text-sm text-muted-foreground">
+            <label className="flex h-10 items-center gap-2 text-sm g-text-2">
               <input
                 type="checkbox"
                 aria-label="Select alert page"
@@ -317,19 +316,18 @@ export default function MailAlertsPage() {
               Select page
             </label>
             {selected.length > 0 && (
-              <span className="text-sm tabular-nums text-muted-foreground">
+              <span className="text-sm tabular-nums g-text-2">
                 {selected.length} selected
               </span>
             )}
             <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                variant="outline"
+              <GooglePill
+                icon={CheckCheck}
                 size="sm"
                 disabled={!selected.length || busy}
                 onClick={() => action("/read", { ids: selected })}
-              >
-                Mark selected as read
-              </Button>
+                label="Mark selected as read"
+              />
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                 <Input
                   aria-label="Search client for alerts"
@@ -354,26 +352,23 @@ export default function MailAlertsPage() {
                     </option>
                   ))}
                 </select>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
+                <div className="flex flex-wrap items-center gap-2">
+                  <GooglePill
+                    variant="quiet"
                     size="sm"
                     disabled={clientPage === 1}
                     onClick={() => setClientPage((p) => p - 1)}
-                  >
-                    Previous clients
-                  </Button>
-                  <Button
-                    variant="ghost"
+                    label="Previous clients"
+                  />
+                  <GooglePill
+                    variant="quiet"
                     size="sm"
                     disabled={clients?.items?.length < 25}
                     onClick={() => setClientPage((p) => p + 1)}
-                  >
-                    Next clients
-                  </Button>
+                    label="Next clients"
+                  />
                 </div>
-                <Button
-                  variant="ghost"
+                <GooglePill
                   size="sm"
                   disabled={!selected.length || busy}
                   onClick={() =>
@@ -382,118 +377,105 @@ export default function MailAlertsPage() {
                       locationId: clientId ? Number(clientId) : null,
                     })
                   }
-                >
-                  Map selected alerts
-                </Button>
+                  label="Map selected alerts"
+                />
               </div>
             </div>
           </div>
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading alerts…</p>
+            <p className="text-sm g-text-2">Loading alerts…</p>
           ) : !messages?.items?.length ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="py-4 text-sm g-text-2">
               No matching provider alerts.
             </p>
           ) : (
-            <div className="space-y-2">
+            <GoogleList testId="list-alerts">
               {messages.items.map((m: any) => (
-                <article
+                <GoogleListRow
                   key={m.id}
-                  className={`rounded-xl border p-4 ${
-                    m.severity === "critical"
-                      ? "border-red-200 dark:border-red-900/60"
-                      : ""
-                  }`}
-                  data-testid={`card-alert-${m.id}`}
+                  size="md"
+                  testId={`card-alert-${m.id}`}
+                  title={
+                    <label className="inline-flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        className="mt-1.5"
+                        aria-label={`Select alert ${m.id}`}
+                        checked={selected.includes(Number(m.id))}
+                        onChange={(e) =>
+                          setSelected((s) =>
+                            e.target.checked
+                              ? [...s, Number(m.id)]
+                              : s.filter((x) => x !== m.id),
+                          )
+                        }
+                      />
+                      <span className={m.read_at ? "g-text-2" : undefined}>{m.subject}</span>
+                    </label>
+                  }
+                  badges={
+                    m.severity === "critical" ? <span className="g-chip g-chip--sm g-closed">Critical</span>
+                      : m.severity === "warning" ? <span className="g-chip g-chip--sm">Warning</span>
+                      : null
+                  }
+                  meta={[
+                    m.category,
+                    m.severity === "critical" ? <span key="sev" className="g-closed">{m.severity}</span> : m.severity,
+                    m.sender,
+                    new Date(m.received_at).toLocaleString(),
+                    m.read_at ? "Read" : "Unread",
+                    m.location_id
+                      ? `Client location ${m.location_id}`
+                      : "Unmapped / ambiguous client",
+                  ]}
+                  actions={m.confirmation_link ? (
+                    <GooglePill icon={ExternalLink} size="sm" label="Confirm forwarding at Google" href={m.confirmation_link} external />
+                  ) : undefined}
                 >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select alert ${m.id}`}
-                      checked={selected.includes(Number(m.id))}
-                      onChange={(e) =>
-                        setSelected((s) =>
-                          e.target.checked
-                            ? [...s, Number(m.id)]
-                            : s.filter((x) => x !== m.id),
-                        )
-                      }
-                    />
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold">{m.subject}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {m.category} · {m.severity} · {m.sender} ·{" "}
-                        {new Date(m.received_at).toLocaleString()} ·{" "}
-                        {m.read_at ? "Read" : "Unread"} ·{" "}
-                        {m.location_id
-                          ? `Client location ${m.location_id}`
-                          : "Unmapped / ambiguous client"}
-                      </p>
-                    </div>
-                    {m.severity === "critical" && (
-                      <StatusPill tone="danger">Critical</StatusPill>
-                    )}
-                    {m.severity === "warning" && (
-                      <StatusPill tone="warning">Warning</StatusPill>
-                    )}
-                  </div>
                   {m.confirmation_code && (
-                    <p className="mt-2">
+                    <p className="mt-2 text-sm">
                       Forwarding confirmation code:{" "}
                       <strong>{m.confirmation_code}</strong>
                     </p>
                   )}
-                  {m.confirmation_link && (
-                    <a
-                      className="mt-2 inline-block text-primary underline"
-                      href={m.confirmation_link}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Confirm forwarding at Google
-                    </a>
-                  )}
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-sm">
+                    <summary className="cursor-pointer text-sm g-accent">
                       Read matched message
                     </summary>
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm g-text-2">
                       {m.body}
                     </p>
                   </details>
-                </article>
+                </GoogleListRow>
               ))}
-            </div>
+            </GoogleList>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
+            <GooglePill
               size="sm"
               disabled={page === 1}
               onClick={() => {
                 setPage((p) => p - 1);
                 setSelected([]);
               }}
-            >
-              Previous alerts
-            </Button>
-            <span className="text-sm tabular-nums text-muted-foreground">
+              label="Previous alerts"
+            />
+            <span className="text-sm tabular-nums g-text-2">
               Page {page} · {messages?.total || 0} alerts
             </span>
-            <Button
-              variant="outline"
+            <GooglePill
               size="sm"
               disabled={page * 25 >= (messages?.total || 0)}
               onClick={() => {
                 setPage((p) => p + 1);
                 setSelected([]);
               }}
-            >
-              Next alerts
-            </Button>
+              label="Next alerts"
+            />
           </div>
         </div>
-      </Section>
+      </section>
     </AppPage>
+    </GoogleSurface>
   );
 }
