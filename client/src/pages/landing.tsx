@@ -478,7 +478,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
-              A new account's first plan starts with a {TRIAL_LABEL}. The CRM is a separate product with its own plans. Pay monthly, or yearly at 10 times the monthly price.
+              A new account's first plan starts with a {TRIAL_LABEL}. Pay monthly, or yearly at 10 times the monthly price. The CRM is a separate product with its own plans.
             </p>
           </div>
 

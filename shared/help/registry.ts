@@ -26,6 +26,9 @@ const EDGE = moduleNeed("cloudflareSearchConsole");
 const IDENTITY = "Sensitive buttons ask you to confirm it’s you first (password, authenticator code or an emailed code).";
 const PROTECTED = `Included with the ${PROTECTED_SITE_PLANS} plans; the number of protected websites depends on the plan.`;
 
+/** The CRM is a separate product (shared/crm-plans.ts): its pages need a CRM plan, not a platform plan. */
+const CRM_NEED = "A ConstructHub CRM plan — the CRM is a separate product with its own plans.";
+
 type Draft = Omit<HelpEntry, "video">;
 const entries: Draft[] = [
   /* ══ Tools → Cloudflare ═══════════════════════════════════════════════════════════════════════ */
@@ -695,7 +698,7 @@ const entries: Draft[] = [
       "Work through the setup checklist: your profile, company details and inviting your crew.",
     ],
     howItWorks: "The numbers are read live from your workspace. The checklist goes away once it is done or you dismiss it.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-clients", group: "CRM", route: "/crm/clients", title: "Clients",
@@ -708,7 +711,7 @@ const entries: Draft[] = [
       "“View as client” shows exactly what they see in their portal.",
     ],
     howItWorks: "Notes are private to your team and never appear in the portal. The timeline is kept for you from what happens: estimates sent, emails opened, payments made.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-messages", group: "CRM", route: "/crm/inbox", title: "Messages",
@@ -720,7 +723,7 @@ const entries: Draft[] = [
       "Check the Client activity tab to see what clients are doing.",
     ],
     howItWorks: "A reply is emailed when the client has an email address on file. Unread threads are counted on the Messages tab.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-pipeline", group: "CRM", route: "/crm/pipeline", title: "Pipeline",
@@ -733,7 +736,7 @@ const entries: Draft[] = [
       "Open a card to work on the project.",
     ],
     howItWorks: "When a client approves an estimate, its project moves to Approved by itself. A change order the client approves on its link adjusts the contract value.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-schedule", group: "CRM", route: "/crm/schedule", title: "Schedule",
@@ -746,7 +749,7 @@ const entries: Draft[] = [
       "From Settings, subscribe from Apple Calendar, Outlook or Google Calendar with the private feed link.",
     ],
     howItWorks: "Nothing lands on the schedule by itself — you add each visit. Anyone with the private feed link can read it, so regenerate the link to cut off old copies.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "jobcam", group: "CRM", route: "/crm/jobcam", title: "JobCam",
@@ -760,7 +763,7 @@ const entries: Draft[] = [
       "Copy the link or send it by email or text. Revoke it under “Existing links”.",
     ],
     howItWorks: "Each capture is saved on the phone first and uploaded from a queue, so a lost connection does not lose a shot. A share link can be a fixed gallery of the shots you picked or a live timeline that keeps updating, and can have a password. A revoked or expired link shows the client an honest “turned off” or “expired” page.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-estimates", group: "CRM", route: "/crm/estimates", title: "Estimates",
@@ -774,7 +777,7 @@ const entries: Draft[] = [
       "“Extend” adds seven days when a client needs more time.",
     ],
     howItWorks: "The first time a client opens the link they confirm their email with a one-time code. An estimate expires 7 days after it is sent. A signed estimate is locked, and permanent delete is for owners only.",
-    needs: ["A CRM workspace.", "Price book items to pick from."],
+    needs: [CRM_NEED, "Price book items to pick from."],
   },
   {
     key: "crm-invoices", group: "CRM", route: "/crm/invoices", title: "Invoices",
@@ -787,7 +790,7 @@ const entries: Draft[] = [
       "Filter the Invoices list by status to chase what is overdue.",
     ],
     howItWorks: "Online payments go to your own Stripe account. A receipt builds itself from the invoice once a payment is recorded. Voiding keeps the paper trail.",
-    needs: ["A CRM workspace.", "A connected Stripe account for online payment."],
+    needs: [CRM_NEED, "A connected Stripe account for online payment."],
   },
   {
     key: "crm-pricebook", group: "CRM", route: "/crm/pricebook", title: "Price book",
@@ -800,7 +803,7 @@ const entries: Draft[] = [
       "Change a price once and every new estimate uses it.",
     ],
     howItWorks: "Per-square-foot items multiply by the measured square footage, plus waste, in Quick Bid. The Price floor lock in Settings stops reps pricing below the price book.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-payments", group: "CRM", route: "/crm/payments", title: "Payments",
@@ -812,7 +815,7 @@ const entries: Draft[] = [
       "From a client’s page choose “Take a payment”: send a secure link, or record a payment you already have.",
     ],
     howItWorks: "Money goes straight to your own Stripe account; ConstructHUB never holds it. The page shows Stripe’s standard processing rates.",
-    needs: ["A CRM workspace.", "A Stripe account."],
+    needs: [CRM_NEED, "A Stripe account."],
   },
   {
     key: "crm-team", group: "CRM", route: "/crm/team", title: "Team & Company",
@@ -825,7 +828,7 @@ const entries: Draft[] = [
       "Add a division if you run a second branch.",
     ],
     howItWorks: "The role decides what a person can see and change, and the server enforces it. Removing someone cuts their access immediately; what they created stays.",
-    needs: ["A CRM workspace.", "Owner or admin access to manage the team."],
+    needs: [CRM_NEED, "Owner or admin access to manage the team."],
   },
   {
     key: "crm-integrations", group: "CRM", route: "/crm/integrations", title: "Integrations",
@@ -838,7 +841,7 @@ const entries: Draft[] = [
       "Create an API key only if a tool or developer asks for one.",
     ],
     howItWorks: "A HOVER report lands on the client whose address matches. Lead-form submissions become clients tagged as website leads. An API key is shown in full only once, when it is created.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   /* ══ Tools → Report an issue ══════════════════════════════════════════════════════════════════ */
   {

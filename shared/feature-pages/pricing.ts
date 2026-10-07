@@ -9,7 +9,7 @@ import {
   ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
   type AddonModuleKey, type CountLimitKey, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "../plans";
-import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS } from "../crm-plans";
+import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "../crm-plans";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, joinNames, plansWhere, priceOrSalesRep } from "../plan-copy";
 import type { FeatureAllowance, FeaturePricing } from "./types";
 
@@ -22,6 +22,10 @@ export type FeaturePriceSummary = {
   price: string | null;
   /** "/mo", " one-time" or "" — printed right after `price`. */
   per: string;
+  /** `price` is the lowest of several prices (the cheapest CRM plan, the cheapest Call Assistant tier): the page says "from $X". */
+  from?: boolean;
+  /** Words that finish the price in a sentence: " on CRM Basic and CRM Essentials; included in CRM Max ($164/mo)". */
+  priceTail?: string;
   /** One sentence about the price: which plan it is, how yearly billing works. */
   priceNote: string;
   /** Plan by plan: what each one gets ("2 Site Scans a month", "Not included"). */
@@ -111,10 +115,29 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
     case "addon": {
       const addon = ADDONS[spec.addon];
       const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
+      const soldOn = `the ${joinNames(addon.availableOn.map((k) => PLANS[k].name))} plan${addon.availableOn.length > 1 ? "s" : ""}`;
+      // An add-on sold in tiers (the AI Call Assistant: one tier per subscription) is priced from its
+      // cheapest tier, and the note lists every tier — never one middle tier's price as if it were the price.
+      const tiers = addon.exclusiveGroup
+        ? Object.values(ADDONS).filter((a) => a.exclusiveGroup === addon.exclusiveGroup).sort((a, b) => a.monthlyCents - b.monthlyCents)
+        : [];
+      if (tiers.length > 1) {
+        return {
+          headline: "Add-on",
+          price: formatUsd(tiers[0].monthlyCents), per: PER_MONTH, from: true,
+          priceNote: `${joinNames(tiers.map((t) => `${t.name}: ${formatUsd(t.monthlyCents)}/mo or ${formatUsd(t.annualCents)}/yr`))}. One tier per subscription, added to ${soldOn}.`,
+          rows: PLAN_KEYS.map((key) => ({
+            label: PLANS[key].name,
+            value: addon.availableOn.includes(key) ? "Available as an add-on" : "Not available",
+            included: addon.availableOn.includes(key),
+          })),
+          plans: [], comingSoon: tiers.every((t) => t.preview === true), link: { label: "See add-ons", href: "/pricing#add-ons" }, note,
+        };
+      }
       return {
         headline: "Add-on",
         price: formatUsd(addon.monthlyCents), per: PER_MONTH,
-        priceNote: `${addon.name}: ${formatUsd(addon.monthlyCents)}/mo or ${formatUsd(addon.annualCents)}/yr${setup}, added to the ${joinNames(addon.availableOn.map((k) => PLANS[k].name))} plan${addon.availableOn.length > 1 ? "s" : ""}.`,
+        priceNote: `${addon.name}: ${formatUsd(addon.monthlyCents)}/mo or ${formatUsd(addon.annualCents)}/yr${setup}, added to ${soldOn}.`,
         rows: PLAN_KEYS.map((key) => ({
           label: PLANS[key].name,
           value: addon.availableOn.includes(key) ? "Available as an add-on" : "Not available",
@@ -123,15 +146,34 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
         plans: [], comingSoon: addon.preview === true, link: { label: "See add-ons", href: "/pricing#add-ons" }, note,
       };
     }
+    case "crmPlan": {
+      // The CRM is a separate product (shared/crm-plans.ts): priced from the cheapest CRM plan, never a platform plan.
+      const cheapest = CRM_PLAN_KEYS.reduce((a, b) => (CRM_PLANS[b].monthlyCents < CRM_PLANS[a].monthlyCents ? b : a));
+      const plan = CRM_PLANS[cheapest];
+      return {
+        headline: "Separate CRM plan",
+        price: formatUsd(plan.monthlyCents), per: PER_MONTH, from: CRM_PLAN_KEYS.length > 1,
+        priceNote: `From ${plan.name}, ${formatUsd(plan.monthlyCents)}/mo or ${formatUsd(plan.annualCents)}/yr. The CRM is a separate product with its own plans; the ConstructHUB platform plans do not include it. A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial.`,
+        rows: CRM_PLAN_KEYS.map((key) => {
+          const seats = CRM_PLANS[key].limits.seats;
+          return { label: CRM_PLANS[key].name, value: seats < 0 ? "Unlimited seats (fair use)" : `${seats} seat${seats === 1 ? "" : "s"}`, included: true };
+        }),
+        plans: [], comingSoon: false, link: { label: "See CRM plans", href: "/pricing#crm" }, note,
+      };
+    }
     case "crmAddon": {
       // Sold on the CRM subscription, not a platform plan: the rows are the CRM's plans.
       const addon = CRM_ADDONS[spec.addon];
       const includedIn = CRM_PLAN_KEYS.filter((k) => !addon.availableOn.includes(k));
       const names = (keys: readonly (typeof CRM_PLAN_KEYS)[number][]) => joinNames(keys.map((k) => CRM_PLANS[k].name));
+      // The figure is the ADD-ON's price, so the headline and the words after it say where that price
+      // applies; the plan that includes the feature has its own price, stated beside its name.
+      const withPrice = (keys: readonly (typeof CRM_PLAN_KEYS)[number][]) => joinNames(keys.map((k) => `${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`));
       return {
-        headline: includedIn.length ? `Included in ${names(includedIn)}` : "CRM add-on",
+        headline: "CRM add-on",
         price: formatUsd(addon.monthlyCents), per: PER_MONTH,
-        priceNote: `${addon.name} add-on: ${formatUsd(addon.monthlyCents)}/mo or ${formatUsd(addon.annualCents)}/yr, added to ${names(addon.availableOn)}.${includedIn.length ? ` ${names(includedIn)} includes it at no extra charge.` : ""}`,
+        priceTail: ` on ${names(addon.availableOn)}${includedIn.length ? `; included in ${withPrice(includedIn)}` : ""}`,
+        priceNote: `${addon.name} add-on: ${formatUsd(addon.monthlyCents)}/mo or ${formatUsd(addon.annualCents)}/yr, added to ${names(addon.availableOn)}.${includedIn.length ? ` ${withPrice(includedIn)} includes it at no extra charge.` : ""}`,
         rows: CRM_PLAN_KEYS.map((key) => ({
           label: CRM_PLANS[key].name,
           value: addon.availableOn.includes(key) ? "Available as an add-on" : "Included",
