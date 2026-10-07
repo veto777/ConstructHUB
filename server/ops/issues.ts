@@ -18,7 +18,7 @@
  * The store functions below (list/get/claim/report/…) back the admin page
  * and the tower's internal API (routes.ts).
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   ISSUE_SEVERITIES, isIssueSeverity, isIssueSource,
   type IssueAdminStatus, type IssueHistoryEntry, type IssueReportStatus, type IssueSeverity, type IssueSource,
@@ -266,6 +266,8 @@ function rowToIssue(r: any): OpsIssue {
     detail: r.detail ?? {}, count: Number(r.count), firstSeen: iso(r.first_seen)!, lastSeen: iso(r.last_seen)!,
     status: r.status, report: r.report ?? null, branch: r.branch ?? null, inspectedAt: iso(r.inspected_at),
     claimedAt: iso(r.claimed_at), history: Array.isArray(r.history) ? (r.history as IssueHistoryEntry[]) : [],
+    reporterUserId: r.reporter_user_id == null ? null : Number(r.reporter_user_id), reporterEmail: r.reporter_email ?? null,
+    publicReply: r.public_reply ?? null, publicReplyAt: iso(r.public_reply_at),
   };
 }
 function rowToListRow(r: any): OpsIssueRow {
@@ -291,7 +293,8 @@ export async function listIssues(query: IssueListQuery = {}, q?: Queryable): Pro
   // tab counts its own status, so the counts don't move when one tab is chosen.
   const sourceOnly = query.source ? "WHERE source = $1" : "";
   const [{ rows }, { rows: [t] }, { rows: c }] = await Promise.all([
-    db.query(`SELECT id, source, severity, title, count, first_seen, last_seen, status, report, branch, inspected_at, claimed_at
+    db.query(`SELECT id, source, severity, title, count, first_seen, last_seen, status, report, branch, inspected_at, claimed_at,
+                     reporter_user_id, reporter_email, public_reply, public_reply_at
                 FROM ops_issues ${w} ORDER BY last_seen DESC, id DESC LIMIT ${limit} OFFSET ${offset}`, params),
     db.query(`SELECT count(*)::int n FROM ops_issues ${w}`, params),
     db.query(`SELECT status, count(*)::int n FROM ops_issues ${sourceOnly} GROUP BY status`, query.source ? [query.source] : []),
@@ -333,11 +336,37 @@ export const CLAIM_STALE_MINUTES = 180;
 export const MAX_CLAIM = 10;
 
 /**
- * Claim up to MAX_CLAIM issues for one tower run: new ones (worst severity,
- * then most recent first) and stale claims. One UPDATE … FOR UPDATE SKIP
- * LOCKED: two concurrent runs never get the same issue.
+ * The order a run takes issues in — and the order Claude is given them:
+ *   1. a user's blocker report ("I can't use the site": source user + critical),
+ *   2. every other user report, worst first, then the one that has waited longest,
+ *   3. everything the app captured itself, worst severity then most recent.
+ * A user report is therefore inside the first MAX_CLAIM of every run, ahead of
+ * any number of recurring job warnings.
  */
-export async function claimIssues(limit = MAX_CLAIM, q?: Queryable): Promise<OpsIssue[]> {
+export const DESK_ORDER_SQL = `(source = 'user' AND severity = 'critical') DESC, (source = 'user') DESC,
+         array_position($2::text[], severity) DESC,
+         (CASE WHEN source = 'user' THEN first_seen END) ASC NULLS LAST, last_seen DESC, id`;
+
+/** DESK_ORDER_SQL for rows already in memory (an UPDATE … RETURNING comes back in no order). */
+export function compareForDesk(a: OpsIssue, b: OpsIssue): number {
+  const user = (i: OpsIssue) => (i.source === "user" ? 1 : 0);
+  const blocker = (i: OpsIssue) => (i.source === "user" && i.severity === "critical" ? 1 : 0);
+  return blocker(b) - blocker(a)
+    || user(b) - user(a)
+    || SEVERITY_ORDER.indexOf(b.severity) - SEVERITY_ORDER.indexOf(a.severity)
+    || (user(a) && user(b) ? a.firstSeen.localeCompare(b.firstSeen) : 0)
+    || b.lastSeen.localeCompare(a.lastSeen)
+    || a.id - b.id;
+}
+
+export type ClaimOptions = { /** Only this source (the over-the-daily-cap run takes user reports only). */ source?: IssueSource };
+
+/**
+ * Claim up to MAX_CLAIM issues for one tower run, in DESK_ORDER_SQL order: new
+ * ones and stale claims. One UPDATE … FOR UPDATE SKIP LOCKED: two concurrent
+ * runs never get the same issue.
+ */
+export async function claimIssues(limit = MAX_CLAIM, q?: Queryable, opts: ClaimOptions = {}): Promise<OpsIssue[]> {
   const db = await defaultPool(q);
   const n = Math.min(Math.max(Math.trunc(limit) || MAX_CLAIM, 1), MAX_CLAIM);
   const { rows } = await db.query(
@@ -345,35 +374,49 @@ export async function claimIssues(limit = MAX_CLAIM, q?: Queryable): Promise<Ops
             history = ${appendHistory("history", historyEntry("'claimed'", "'issue desk'"))}
       WHERE id IN (
         SELECT id FROM ops_issues
-         WHERE status = 'new' OR (status = 'inspecting' AND claimed_at < now() - interval '${CLAIM_STALE_MINUTES} minutes')
-         ORDER BY array_position($2::text[], severity) DESC, last_seen DESC, id
+         WHERE (status = 'new' OR (status = 'inspecting' AND claimed_at < now() - interval '${CLAIM_STALE_MINUTES} minutes'))
+           AND ($3::text IS NULL OR source = $3)
+         ORDER BY ${DESK_ORDER_SQL}
          LIMIT $1
          FOR UPDATE SKIP LOCKED)
       RETURNING *`,
-    [n, SEVERITY_ORDER]);
-  return rows.map(rowToIssue).sort((a: OpsIssue, b: OpsIssue) => SEVERITY_ORDER.indexOf(b.severity) - SEVERITY_ORDER.indexOf(a.severity) || b.lastSeen.localeCompare(a.lastSeen));
+    [n, SEVERITY_ORDER, opts.source ?? null]);
+  return rows.map(rowToIssue).sort(compareForDesk);
 }
 
-/** What a claim would return, without claiming (the tower's dry run). */
-export async function peekNewIssues(limit = MAX_CLAIM, q?: Queryable): Promise<OpsIssue[]> {
+/** What a claim would return, without claiming (the tower's dry run, and its "are user reports waiting?" check). */
+export async function peekNewIssues(limit = MAX_CLAIM, q?: Queryable, opts: ClaimOptions = {}): Promise<OpsIssue[]> {
   const db = await defaultPool(q);
   const n = Math.min(Math.max(Math.trunc(limit) || MAX_CLAIM, 1), MAX_CLAIM);
   const { rows } = await db.query(
-    `SELECT * FROM ops_issues WHERE status = 'new' ORDER BY array_position($2::text[], severity) DESC, last_seen DESC, id LIMIT $1`,
-    [n, SEVERITY_ORDER]);
+    `SELECT * FROM ops_issues WHERE status = 'new' AND ($3::text IS NULL OR source = $3) ORDER BY ${DESK_ORDER_SQL} LIMIT $1`,
+    [n, SEVERITY_ORDER, opts.source ?? null]);
   return rows.map(rowToIssue);
 }
 
-export type IssueReportInput = { status: IssueReportStatus; report: string; branch?: string | null };
+export type IssueReportInput = {
+  status: IssueReportStatus; report: string; branch?: string | null;
+  /** A user report's answer for the person who sent it (plain language, no internals). Ignored for other sources. */
+  publicReply?: string | null;
+};
+
+/** The reply a reporter reads: short, and scrubbed like everything else stored here. */
+export const PUBLIC_REPLY_MAX = 1500;
+const cleanReply = (text: unknown): string | null => {
+  const t = scrubText(String(text ?? "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim(), PUBLIC_REPLY_MAX);
+  return t || null;
+};
 
 /** Claude's verdict on a claimed issue. Only an issue in `inspecting` takes one. */
 export async function reportIssue(id: number, input: IssueReportInput, q?: Queryable): Promise<{ issue: OpsIssue } | { error: "not_found" | "not_claimed"; status?: IssueStatus }> {
   const db = await defaultPool(q);
   const { rows: [r] } = await db.query(
     `UPDATE ops_issues SET status = $2, report = $3, branch = $4, inspected_at = now(), updated_at = now(),
+            public_reply = CASE WHEN source = 'user' AND $5::text IS NOT NULL THEN $5 ELSE public_reply END,
+            public_reply_at = CASE WHEN source = 'user' AND $5::text IS NOT NULL THEN now() ELSE public_reply_at END,
             history = ${appendHistory("history", historyEntry("$2::text", "'claude'"))}
       WHERE id = $1 AND status = 'inspecting' RETURNING *`,
-    [id, input.status, scrubText(input.report, 20_000), input.branch ? scrubText(input.branch, 120) : null]);
+    [id, input.status, scrubText(input.report, 20_000), input.branch ? scrubText(input.branch, 120) : null, cleanReply(input.publicReply)]);
   if (r) return { issue: rowToIssue(r) };
   const { rows: [cur] } = await db.query(`SELECT status FROM ops_issues WHERE id = $1`, [id]);
   return cur ? { error: "not_claimed", status: cur.status } : { error: "not_found" };
@@ -388,4 +431,99 @@ export async function reportedIssues(ids: number[], q?: Queryable): Promise<OpsI
         AND status IN ('inspected','fix_ready','ignored') ORDER BY id`,
     [ids.slice(0, 50)]);
   return rows.map(rowToIssue);
+}
+
+// ── User reports (/report-issue → server/ops/user-reports.ts) ─────────────────
+
+export type UserReportInput = {
+  title: string;
+  severity: IssueSeverity;
+  detail: Record<string, unknown>;
+  reporterUserId: number | null;
+  reporterEmail: string | null;
+  /** `triage` holds it for an admin (a signed-out visitor's report); default `new`. */
+  status?: "new" | "triage";
+};
+
+/**
+ * One row per report, always: the fingerprint is random, so two people's
+ * reports (or one person's two) are never merged the way captured failures
+ * are. A signed-in person's report goes straight to `new` — the next run takes
+ * it first (DESK_ORDER_SQL). A signed-out visitor's is anonymous internet text:
+ * it waits in `triage`, which no run claims, until a platform admin sends it on.
+ * Unlike recordIssue this throws on failure: the reporter is told the truth.
+ */
+export async function createUserReport(input: UserReportInput, q?: Queryable): Promise<OpsIssue> {
+  const db = await defaultPool(q);
+  const title = scrubText(String(input.title ?? "").replace(/\s+/g, " ").trim(), 200) || "User report";
+  const { rows: [r] } = await db.query(
+    `INSERT INTO ops_issues (fingerprint, source, severity, title, detail, status, history, reporter_user_id, reporter_email)
+     VALUES ($1, 'user', $2, $3, $4::jsonb, $7, jsonb_build_array(${historyEntry("'reported'", "'user'")}), $5, $6)
+     RETURNING *`,
+    [issueFingerprint("user", randomUUID()), isIssueSeverity(input.severity) ? input.severity : "error", title,
+     JSON.stringify(scrubDetail(input.detail ?? {})), input.reporterUserId, input.reporterEmail ? String(input.reporterEmail).slice(0, 254) : null,
+     input.status === "triage" ? "triage" : "new"]);
+  return rowToIssue(r);
+}
+
+/** The signed-in person's own reports, newest first. Tenant-safe by construction: the only filter is their user id. */
+export async function listUserReports(userId: number, q?: Queryable, limit = 50): Promise<OpsIssue[]> {
+  const db = await defaultPool(q);
+  const { rows } = await db.query(
+    `SELECT * FROM ops_issues WHERE source = 'user' AND reporter_user_id = $1 ORDER BY id DESC LIMIT $2`,
+    [userId, Math.min(Math.max(Math.trunc(limit) || 50, 1), 100)]);
+  return rows.map(rowToIssue);
+}
+
+/** How many times a user report may go back to the front of the queue before it is filed for a person instead. */
+export const MAX_RELEASES = 3;
+
+/**
+ * A run ended before Claude reported on a claimed user report: back to `new`
+ * (the reporter keeps reading "Received") and first in the next run. After
+ * MAX_RELEASES the report itself may be what ends runs: the tower then files
+ * it as inspected with a note, for an admin.
+ */
+export async function releaseUserReport(id: number, why: string, q?: Queryable): Promise<{ issue: OpsIssue } | { error: "not_found" | "not_claimed" | "not_user_report" | "too_many"; status?: IssueStatus }> {
+  const db = await defaultPool(q);
+  const { rows: [r] } = await db.query(
+    `UPDATE ops_issues SET status = 'new', claimed_at = NULL, updated_at = now(),
+            history = ${appendHistory("history", historyEntry("'released'", "$2::text"))}
+      WHERE id = $1 AND source = 'user' AND status = 'inspecting'
+        AND (SELECT count(*) FROM jsonb_array_elements(history) h WHERE h->>'event' = 'released') < ${MAX_RELEASES}
+      RETURNING *`,
+    [id, scrubText(why, 80) || "issue desk"]);
+  if (r) return { issue: rowToIssue(r) };
+  const { rows: [cur] } = await db.query(`SELECT status, source FROM ops_issues WHERE id = $1`, [id]);
+  if (!cur) return { error: "not_found" };
+  if (cur.source !== "user") return { error: "not_user_report", status: cur.status };
+  return cur.status === "inspecting" ? { error: "too_many", status: cur.status } : { error: "not_claimed", status: cur.status };
+}
+
+/**
+ * The tower skipped a run for its daily cap while user reports wait: each one
+ * is marked (once in a row) so the skip is on its timeline, never silent.
+ * They stay `new` and are first in the next run.
+ */
+export async function deferUserReports(why: string, q?: Queryable): Promise<number[]> {
+  const db = await defaultPool(q);
+  const { rows } = await db.query(
+    `UPDATE ops_issues SET updated_at = now(), history = ${appendHistory("history", historyEntry("'deferred'", "$1::text"))}
+      WHERE source = 'user' AND status = 'new' AND COALESCE(history->-1->>'event', '') <> 'deferred'
+      RETURNING id`,
+    [scrubText(why, 80) || "daily cap"]);
+  return rows.map((r: any) => Number(r.id)).sort((a: number, b: number) => a - b);
+}
+
+/** An admin's (or a corrected) reply to the reporter. User reports only. */
+export async function setPublicReply(id: number, reply: string, by: string, q?: Queryable): Promise<{ issue: OpsIssue } | { error: "not_found" | "not_user_report" }> {
+  const db = await defaultPool(q);
+  const { rows: [r] } = await db.query(
+    `UPDATE ops_issues SET public_reply = $2, public_reply_at = CASE WHEN $2::text IS NULL THEN NULL ELSE now() END, updated_at = now(),
+            history = ${appendHistory("history", historyEntry("'public_reply'", "$3::text"))}
+      WHERE id = $1 AND source = 'user' RETURNING *`,
+    [id, cleanReply(reply), scrubText(by, 80)]);
+  if (r) return { issue: rowToIssue(r) };
+  const { rows: [cur] } = await db.query(`SELECT 1 FROM ops_issues WHERE id = $1`, [id]);
+  return { error: cur ? "not_user_report" : "not_found" };
 }

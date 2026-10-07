@@ -11,12 +11,12 @@ import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/co
  * apiRequest opens the verify-identity dialog and retries the request.
  * Nothing on this page deploys or pushes; a fix waits on its branch.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
-import { Bug, CheckCircle2, ChevronRight, EyeOff, GitBranch, Loader2, Lock, RotateCcw } from "lucide-react";
+import { Bug, CheckCircle2, ChevronRight, EyeOff, GitBranch, Loader2, Lock, MessageSquare, RotateCcw, UserRound } from "lucide-react";
 import {
-  ISSUE_SOURCES, ISSUE_SOURCE_LABELS, ISSUE_STATUSES, ISSUE_STATUS_LABELS,
+  ISSUE_SOURCES, ISSUE_SOURCE_LABELS, ISSUE_STATUSES, ISSUE_STATUS_LABELS, PUBLIC_REPORT_STATUS_LABELS, USER_REPORT_IMPACT_LABELS, publicReportStatus,
   type IssueAdminStatus, type IssueSeverity, type IssueStatus, type OpsIssue, type OpsIssueRow,
 } from "@shared/ops-issues";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -42,7 +42,101 @@ const SEVERITY_LABEL: Record<IssueSeverity, string> = { critical: "Critical", er
 const EVENT_LABEL: Record<string, string> = {
   reported: "First reported", reopened: "Happened again after it was fixed", claimed: "Handed to Claude",
   inspected: "Claude inspected it", fix_ready: "Claude prepared a fix", ignored: "Ignored", fixed: "Marked fixed", reinspect: "Sent back for inspection",
+  released: "The run ended before Claude reached it — first in the next run", deferred: "A run was skipped (daily cap) — first in the next run",
+  public_reply: "Reply to the reporter saved",
 };
+const PUBLIC_REPLY_MAX = 1500;
+
+/** "User report": a person wrote this on /report-issue (never merged, first in every run). */
+function UserReportBadge() {
+  return (
+    <StatusPill tone="violet" dot={false} data-testid="badge-user-report">
+      <UserRound className="h-3 w-3" aria-hidden="true" /> User report
+    </StatusPill>
+  );
+}
+
+/** A signed-out visitor's report: held in triage until an admin sends it to the desk. */
+const isAnonymousHold = (i: { source: string; status: string }) => i.source === "user" && i.status === "triage";
+function AnonymousHoldBadge() {
+  return <StatusPill tone="warning" dot={false} data-testid="badge-anonymous-report">Anonymous report — review before sending to the desk</StatusPill>;
+}
+
+/** Who reported (a user report): the account number and the address to answer. */
+const reporterLine = (i: { reporterUserId: number | null; reporterEmail: string | null }) =>
+  [i.reporterUserId ? `Account ${i.reporterUserId}` : "Signed out", i.reporterEmail].filter(Boolean).join(" · ");
+
+/** A user report's own words, its diagnostics and the reply its reporter reads. */
+function UserReportSections({ issue, onSaved }: { issue: OpsIssue; onSaved: (updated: OpsIssue) => void }) {
+  const { toast } = useToast();
+  const [reply, setReply] = useState(issue.publicReply ?? "");
+  useEffect(() => { setReply(issue.publicReply ?? ""); }, [issue.id, issue.publicReply]);
+  const save = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/admin/issues/${issue.id}/reply`, { reply })).json() as Promise<OpsIssue>,
+    onSuccess: (updated) => { onSaved(updated); toast({ title: reply.trim() ? "Reply saved" : "Reply removed", description: reply.trim() ? "The reporter sees it under “Your reports”." : undefined }); },
+    onError: (e) => toast({ title: "Could not save the reply", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const d = issue.detail as Record<string, any>;
+  const diag = (d.diagnostics ?? {}) as Record<string, any>;
+  const errors: { kind?: string; message?: string; at?: string }[] = Array.isArray(diag.recentErrors) ? diag.recentErrors : [];
+  const impact = USER_REPORT_IMPACT_LABELS[d.impact as keyof typeof USER_REPORT_IMPACT_LABELS];
+  return (
+    <>
+      <section data-testid="section-user-report">
+        <h3 className="mb-1.5 text-sm font-semibold">The report</h3>
+        <dl className="space-y-3 rounded-lg border p-3 text-sm">
+          <div><dt className="text-xs text-muted-foreground">Reporter</dt><dd className="break-words" data-testid="text-issue-reporter">{reporterLine(issue)}{d.reporter?.plan ? ` · plan ${d.reporter.plan}` : ""}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">How bad</dt><dd data-testid="text-issue-impact">{impact ?? "—"}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Trying to</dt><dd className="whitespace-pre-wrap break-words">{String(d.trying ?? "—")}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">What happened</dt><dd className="whitespace-pre-wrap break-words" data-testid="text-issue-happened">{String(d.happened ?? "—")}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Page</dt><dd className="break-all font-mono text-xs">{String(d.page || "—")}</dd></div>
+          {d.screenshot?.key && (
+            <div>
+              <dt className="text-xs text-muted-foreground">Screenshot</dt>
+              <dd><a className="text-primary underline-offset-2 hover:underline" href={`/api/admin/issues/${issue.id}/screenshot`} target="_blank" rel="noopener noreferrer" data-testid="link-issue-screenshot">Open the screenshot</a></dd>
+            </div>
+          )}
+        </dl>
+      </section>
+
+      <section data-testid="section-user-diagnostics">
+        <h3 className="mb-1.5 text-sm font-semibold">Diagnostics</h3>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border p-3 text-sm">
+          <div><dt className="text-xs text-muted-foreground">Browser</dt><dd>{String(diag.browser ?? "—")}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Window</dt><dd className="tabular-nums">{String(diag.viewport ?? "—")}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Language, time zone</dt><dd>{[diag.language, diag.timezone].filter(Boolean).join(", ") || "—"}</dd></div>
+          <div><dt className="text-xs text-muted-foreground">Sent from</dt><dd className="break-all font-mono text-xs">{String(diag.sentFrom ?? "—")}</dd></div>
+          <div className="col-span-2">
+            <dt className="text-xs text-muted-foreground">Browser errors before the report ({errors.length})</dt>
+            <dd>
+              {errors.length === 0 ? <span className="text-muted-foreground">None</span> : (
+                <ul className="mt-1 space-y-1 font-mono text-xs">
+                  {errors.map((e, i) => <li key={i} className="break-words">{String(e.message ?? "")}</li>)}
+                </ul>
+              )}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section data-testid="section-public-reply">
+        <h3 className="mb-1.5 text-sm font-semibold">Reply to the reporter</h3>
+        <p className="mb-1.5 text-xs text-muted-foreground">
+          Shown to them under “Your reports”, next to “{PUBLIC_REPORT_STATUS_LABELS[publicReportStatus(issue.status)]}”. Plain language; no file names or internals. It is not emailed{issue.reporterUserId ? "" : " — this reporter was signed out, so write to the address above"}.
+        </p>
+        <textarea value={reply} onChange={(e) => setReply(e.target.value)} maxLength={PUBLIC_REPLY_MAX} rows={4}
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          placeholder="What we found, and whether it is fixed, being fixed, or we need more from you." aria-label="Reply to the reporter" data-testid="input-issue-reply" />
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground">{reply.length}/{PUBLIC_REPLY_MAX}</span>
+          <Button size="sm" variant="outline" onClick={() => save.mutate()} disabled={save.isPending || reply.trim() === (issue.publicReply ?? "")} data-testid="button-issue-reply-save">
+            <MessageSquare className="mr-1.5 h-4 w-4" aria-hidden="true" /> {save.isPending ? "Saving…" : "Save reply"}
+          </Button>
+        </div>
+      </section>
+    </>
+  );
+}
 
 const ago = (iso: string | null) => (iso ? `${formatDistanceToNowStrict(new Date(iso))} ago` : "—");
 const when = (iso: string | null) => (iso ? format(new Date(iso), "MMM d, yyyy h:mm a") : "—");
@@ -74,7 +168,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
       queryClient.setQueryData(["/api/admin/issues", String(id)], updated);
       // Every list (whatever its filter) and the sidebar's count.
       void queryClient.invalidateQueries({ predicate: (q) => q.queryKey.length === 1 && String(q.queryKey[0]).startsWith("/api/admin/issues") });
-      toast({ title: status === "fixed" ? "Marked fixed" : status === "ignored" ? "Ignored" : "Sent back for inspection", description: status === "new" ? "The next issue-desk run, within 15 minutes, hands it to Claude." : undefined });
+      toast({ title: status === "fixed" ? "Marked fixed" : status === "ignored" ? (updated.source === "user" ? "Marked not a bug" : "Ignored") : "Sent back for inspection", description: status === "new" ? "The next issue-desk run, within 15 minutes, hands it to Claude." : undefined });
     },
     onError: (e) => toast({ title: "Could not update the issue", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -95,7 +189,8 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge status={issue.status} />
                 <StatusPill tone={issue.severity === "warning" ? "warning" : issue.severity === "info" ? "info" : "danger"} dot={false}>{SEVERITY_LABEL[issue.severity]}</StatusPill>
-                <StatusPill tone="neutral" dot={false}>{ISSUE_SOURCE_LABELS[issue.source]}</StatusPill>
+                {isAnonymousHold(issue) && <AnonymousHoldBadge />}
+                {issue.source === "user" ? <UserReportBadge /> : <StatusPill tone="neutral" dot={false}>{ISSUE_SOURCE_LABELS[issue.source]}</StatusPill>}
                 <span className="text-xs text-muted-foreground">#{issue.id}</span>
               </div>
               <SheetTitle className="break-words text-base leading-snug" data-testid="text-issue-title">{issue.title}</SheetTitle>
@@ -107,7 +202,7 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
                 <CheckCircle2 className="mr-1.5 h-4 w-4" aria-hidden="true" /> Mark fixed
               </Button>
               <Button size="sm" variant="outline" onClick={() => setStatus.mutate("ignored")} disabled={busy || issue.status === "ignored"} data-testid="button-issue-ignore">
-                <EyeOff className="mr-1.5 h-4 w-4" aria-hidden="true" /> Ignore
+                <EyeOff className="mr-1.5 h-4 w-4" aria-hidden="true" /> {issue.source === "user" ? "Not a bug" : "Ignore"}
               </Button>
               <Button size="sm" variant="outline" onClick={() => setStatus.mutate("new")} disabled={busy || issue.status === "new" || issue.status === "inspecting"} data-testid="button-issue-reinspect">
                 <RotateCcw className="mr-1.5 h-4 w-4" aria-hidden="true" /> {issue.status === "triage" ? "Send to Claude" : "Re-inspect"}
@@ -127,12 +222,19 @@ function IssueDrawer({ id, onClose }: { id: number | null; onClose: () => void }
               </div>
             </dl>
 
+            {issue.source === "user" && (
+              <UserReportSections issue={issue} onSaved={(updated) => {
+                queryClient.setQueryData(["/api/admin/issues", String(id)], updated);
+                void queryClient.invalidateQueries({ predicate: (q) => q.queryKey.length === 1 && String(q.queryKey[0]).startsWith("/api/admin/issues") });
+              }} />
+            )}
+
             <section>
               <h3 className="mb-1.5 text-sm font-semibold">Claude's report</h3>
               {issue.report ? (
                 <div className="whitespace-pre-wrap break-words rounded-lg bg-muted/50 p-3 text-sm leading-relaxed" data-testid="text-issue-report">{issue.report}</div>
               ) : (
-                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : issue.status === "triage" ? "Browser reports come from anyone's browser, so Claude only sees one after you press Send to Claude." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
+                <p className="text-sm text-muted-foreground">{issue.status === "inspecting" ? "Claude is looking at it now." : isAnonymousHold(issue) ? "A signed-out visitor wrote this. Read it first: Claude only sees it after you press Send to Claude." : issue.status === "triage" ? "Browser reports come from anyone's browser, so Claude only sees one after you press Send to Claude." : "Not inspected yet. The issue desk on the tower picks up new issues every 15 minutes."}</p>
               )}
             </section>
 
@@ -253,9 +355,10 @@ export default function AdminIssuesPage() {
                 title={<span className="line-clamp-2">{i.title}</span>}
                 onOpen={() => setOpenId(i.id)}
                 titleTestId={`row-issue-${i.id}`}
-                badges={<StatusBadge status={i.status} />}
+                badges={<>{isAnonymousHold(i) && <AnonymousHoldBadge />}{i.source === "user" && <UserReportBadge />}<StatusBadge status={i.status} /></>}
                 meta={[
-                  ISSUE_SOURCE_LABELS[i.source],
+                  i.source === "user" ? <span key="reporter" className="break-all" data-testid={`text-issue-reporter-${i.id}`}>{reporterLine(i)}</span> : ISSUE_SOURCE_LABELS[i.source],
+                  ...(i.source === "user" ? [<span key="sev">{SEVERITY_LABEL[i.severity]}</span>] : []),
                   <span key="count" className="tabular-nums">{i.count.toLocaleString()}×</span>,
                   <span key="seen" title={when(i.lastSeen)}>{ago(i.lastSeen)}</span>,
                 ]}

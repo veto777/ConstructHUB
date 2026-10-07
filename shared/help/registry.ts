@@ -823,6 +823,21 @@ const entries: Draft[] = [
     howItWorks: "A HOVER report lands on the client whose address matches. Lead-form submissions become clients tagged as website leads. An API key is shown in full only once, when it is created.",
     needs: ["A CRM workspace."],
   },
+  /* ══ Tools → Report an issue ══════════════════════════════════════════════════════════════════ */
+  {
+    key: "report-issue", group: "Tools", route: "/report-issue", title: "Report an issue",
+    whatItIs: "The page for telling us something on ConstructHUB is broken, confusing or missing. “Report an issue” at the bottom of every page opens it.",
+    whatItDoes: "Sends your description to our issue desk as its own numbered report, together with a short list of technical details the page shows you before you send. Under “Your reports” you can follow each report: Received, Being looked at, Fix ready, then Fixed or Not a bug, with our reply when there is one.",
+    howToUse: [
+      "Choose “Report an issue” at the bottom of the page where the problem happened.",
+      "Say what you were trying to do and what happened instead. Check “Which page?” — it is filled in from where you came from.",
+      "Choose how bad it is, and add a screenshot if a picture helps (one image, 5 MB at most).",
+      "Open “What we send with your report” to see the details that go with it, then choose Send report.",
+      "Keep the report number, and come back to “Your reports” for its status and our reply.",
+    ],
+    howItWorks: "Each report is stored separately and is never merged with someone else’s. The issue desk takes reports from people before the errors the site records by itself, and “I can’t use the site” before everything else; that choice also alerts our team straight away. Before a report is stored, email addresses and phone numbers in the text are masked and anything that looks like a password, key or card number is removed. Signed out, the page asks for an email address so we can write back; the list of your reports needs an account.",
+    needs: ["Nothing: it works on every plan, and signed out too."],
+  },
 ];
 
 /** Every entry, with `video: null` — no walkthrough exists yet. */
