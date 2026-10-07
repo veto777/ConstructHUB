@@ -1,5 +1,5 @@
-import { AppPage, PageHeader, Section, Stat, StatGrid } from "@/components/app-ui";
-import { Button } from "@/components/ui/button";
+import { AppPage } from "@/components/app-ui";
+import { GoogleList, GoogleListRow, GooglePill, GoogleSectionHeader, GoogleStat, GoogleStatGrid } from "@/components/google";
 /**
  * /admin/feature-pages — platform admins' map of every feature intro page:
  * its group, whether it is written yet (stub / ready), the public page and the
@@ -14,8 +14,6 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ExternalLink, LayoutGrid, Lock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { DashLink, FOCUS_RING } from "@/components/dashboard/dash-link";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
 
@@ -34,10 +32,10 @@ type Counts = { ready: number; stub: number };
 type Payload = { catalogue: string; services?: string; pages: Row[]; counts: Counts; serviceCounts?: Counts };
 
 const STATUS: Record<Row["status"], { label: string; className: string; title: string }> = {
-  ready: { label: "Ready", className: "border-emerald-500/50 text-emerald-700 dark:text-emerald-400", title: "Written and checked; in the sitemap" },
-  stub: { label: "Stub", className: "border-amber-500/50 text-amber-700 dark:text-amber-400", title: "Placeholder: title, one line and the in-app link only" },
-  external: { label: "Own page", className: "text-muted-foreground", title: "A hand-built page outside the feature template" },
-  page: { label: "Page", className: "text-muted-foreground", title: "A site page" },
+  ready: { label: "Ready", className: "!text-[var(--g-green)]", title: "Written and checked; in the sitemap" },
+  stub: { label: "Stub", className: "!text-[var(--g-red)]", title: "Placeholder: title, one line and the in-app link only" },
+  external: { label: "Own page", className: "", title: "A hand-built page outside the feature template" },
+  page: { label: "Page", className: "", title: "A site page" },
 };
 
 const linkClass = `inline-flex items-center gap-1 rounded-sm text-sm font-medium text-primary hover:underline underline-offset-4 break-all ${FOCUS_RING}`;
@@ -71,61 +69,49 @@ export default function AdminFeaturePagesPage() {
 
   return (
     <AppPage testId="page-admin-feature-pages">
-      <PageHeader title="Feature pages" description="Review public pages and open their tools." actions={<>
-        <Button asChild><Link href={data.catalogue} data-testid="link-admin-features-catalogue">Open public catalogue</Link></Button>
-        {data.services && <Button asChild variant="outline"><Link href={data.services} data-testid="link-admin-dfy-catalogue">Services catalogue</Link></Button>}
+      {/* Google's list format (owner, 2026-10-07): a quiet header, stat tiles, hairline rows with pill links. */}
+      <GoogleSectionHeader as="h1" title="Feature pages" description="Review public pages and open their tools." flush actions={<>
+        <GooglePill variant="solid" href={data.catalogue} label="Open public catalogue" testId="link-admin-features-catalogue" />
+        {data.services && <GooglePill href={data.services} label="Services catalogue" testId="link-admin-dfy-catalogue" />}
       </>} />
       <div data-testid="text-feature-pages-counts">
-        <StatGrid cols={3}>
-          <Stat label="Features written" value={data.counts.ready} hint={`of ${data.counts.ready + data.counts.stub} feature pages`} />
-          <Stat label="Feature stubs" value={data.counts.stub} />
-          <Stat label="Services written" value={data.serviceCounts?.ready ?? 0} hint={`of ${(data.serviceCounts?.ready ?? 0) + (data.serviceCounts?.stub ?? 0)} service pages`} />
-        </StatGrid>
+        <GoogleStatGrid cols={3}>
+          <GoogleStat label="Features written" value={data.counts.ready} hint={`of ${data.counts.ready + data.counts.stub} feature pages`} />
+          <GoogleStat label="Feature stubs" value={data.counts.stub} />
+          <GoogleStat label="Services written" value={data.serviceCounts?.ready ?? 0} hint={`of ${(data.serviceCounts?.ready ?? 0) + (data.serviceCounts?.stub ?? 0)} service pages`} />
+        </GoogleStatGrid>
       </div>
-      <div className="mt-6 space-y-6">
+      <div className="mt-6 space-y-8">
         {groups.map((group) => (
-          <Section flush key={group.key} className="overflow-hidden" testId={`card-admin-feature-group-${group.key}`}>
-            <div className="grid border-b bg-muted/40 px-4 py-2.5 text-sm md:grid-cols-12">
-              <h2 className="font-semibold md:col-span-4">{group.label}</h2>
-              <span className="hidden text-xs font-medium text-muted-foreground md:col-span-4 md:block">Public page</span>
-              <span className="hidden text-xs font-medium text-muted-foreground md:col-span-4 md:block">In the app</span>
-            </div>
-            <ul className="divide-y">
+          <section key={group.key} data-testid={`card-admin-feature-group-${group.key}`}>
+            <GoogleSectionHeader title={group.label} count={group.rows.length} flush />
+            <GoogleList as="ul">
               {group.rows.map((row) => {
                 const status = STATUS[row.status];
                 return (
-                  <li key={row.key} className="grid gap-2 px-4 py-3 md:grid-cols-12 md:items-center" data-testid={`row-admin-feature-${row.key}`} data-status={row.status}>
-                    <div className="min-w-0 md:col-span-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{row.title}</span>
-                        <Badge variant="outline" className={`font-medium ${status.className}`} title={status.title}>{status.label}</Badge>
-                      </div>
-                      {row.legacyPath && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Replaces {row.legacyPath}{row.status === "ready" ? " (redirects here)" : " (still live until this page is ready)"}
-                        </p>
-                      )}
-                    </div>
-                    <div className="min-w-0 md:col-span-4">
-                      <span className="text-xs text-muted-foreground md:hidden">Public page: </span>
-                      <Link href={row.path} className={linkClass} data-testid={`link-admin-feature-public-${row.key}`}>{row.path}</Link>
-                    </div>
-                    <div className="min-w-0 md:col-span-4">
-                      {row.app ? (
-                        <>
-                          <span className="text-xs text-muted-foreground md:hidden">In the app: </span>
-                          <DashLink href={row.app.href} surface={row.app.surface} className={linkClass} data-testid={`link-admin-feature-app-${row.key}`}>
-                            {row.app.surface === "portal" ? `CRM ${row.app.href}` : row.app.href}
-                            {row.app.surface === "portal" && <ExternalLink className="h-3 w-3" aria-hidden="true" />}
-                          </DashLink>
-                        </>
-                      ) : <span className="text-sm text-muted-foreground">—</span>}
-                    </div>
-                  </li>
+                  <GoogleListRow
+                    as="li"
+                    size="md"
+                    key={row.key}
+                    testId={`row-admin-feature-${row.key}`}
+                    data-status={row.status}
+                    title={row.title}
+                    badges={<span className={`g-chip g-chip--sm !normal-case ${status.className}`} title={status.title}>{status.label}</span>}
+                    meta={[
+                      <Link key="public" href={row.path} data-testid={`link-admin-feature-public-${row.key}`}>{row.path}</Link>,
+                      row.app ? (
+                        <DashLink key="app" href={row.app.href} surface={row.app.surface} className="inline-flex items-center gap-1" data-testid={`link-admin-feature-app-${row.key}`}>
+                          {row.app.surface === "portal" ? `CRM ${row.app.href}` : row.app.href}
+                          {row.app.surface === "portal" && <ExternalLink className="h-3 w-3" aria-hidden="true" />}
+                        </DashLink>
+                      ) : null,
+                    ]}
+                    line={row.legacyPath ? <>Replaces {row.legacyPath}{row.status === "ready" ? " (redirects here)" : " (still live until this page is ready)"}</> : undefined}
+                  />
                 );
               })}
-            </ul>
-          </Section>
+            </GoogleList>
+          </section>
         ))}
       </div>
     </AppPage>

@@ -1,4 +1,5 @@
-import { AppPage, PageHeader, Section, Toolbar } from "@/components/app-ui";
+import { AppPage } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 /**
  * /admin/access — platform admins give an account one of the plans for 1–1000
  * days (no card), extend it by granting again, and revoke it. Owner,
@@ -481,7 +482,7 @@ export default function AdminAccessPage() {
         <Lock className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-3 text-lg font-semibold">Verify it's you</h1>
         <p className="mt-1 text-sm text-muted-foreground">Admin tools need a recent identity check.</p>
-        <Button className="mt-4" onClick={() => void refetch()} data-testid="button-admin-access-verify">Verify identity</Button>
+        <GooglePill variant="solid" className="mt-4" label="Verify identity" onClick={() => void refetch()} testId="button-admin-access-verify" />
       </div>
     );
   }
@@ -501,23 +502,23 @@ export default function AdminAccessPage() {
 
   return (
     <AppPage testId="page-admin-access">
-      <PageHeader title="Access grants" description="Give an account temporary access to a plan." />
+      {/* Google's page format (owner, 2026-10-07): a quiet header, the rounded search box, hairline cards. */}
+      <GoogleSectionHeader as="h1" title="Access grants" description="Give an account temporary access to a plan." flush />
 
       <Card className="overflow-hidden" data-testid="card-find-account">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Find an account</CardTitle>
-          <div className="relative mt-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input
+          <div className="g-search mt-2" role="search">
+            <Search aria-hidden="true" />
+            <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Email, name, company or account #"
               aria-label="Search accounts"
-              className="pl-9"
               data-testid="input-access-search"
             />
-            {isFetching && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Searching" />}
+            {isFetching && <Loader2 className="mr-3 h-4 w-4 animate-spin text-muted-foreground" aria-label="Searching" />}
           </div>
           <p className="text-xs text-muted-foreground">{q ? `Accounts matching “${q}” (up to 20).` : "The newest accounts. Search to find someone."}</p>
         </CardHeader>

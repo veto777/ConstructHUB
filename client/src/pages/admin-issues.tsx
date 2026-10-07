@@ -1,4 +1,5 @@
-import { AppPage, PageHeader, Section, Toolbar } from "@/components/app-ui";
+import { AppPage, Toolbar } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 /**
  * /admin/issues — the issue desk (docs/ops/ISSUE-DESK.md): every failure the
  * app captured (server 5xx, background jobs, browser errors, the Call
@@ -188,7 +189,7 @@ export default function AdminIssuesPage() {
         <Lock className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
         <h1 className="mt-3 text-lg font-semibold">Verify it's you</h1>
         <p className="mt-1 text-sm text-muted-foreground">Admin tools need a recent identity check.</p>
-        <Button className="mt-4" onClick={() => void refetch()} data-testid="button-admin-issues-verify">Verify identity</Button>
+        <GooglePill variant="solid" className="mt-4" label="Verify identity" onClick={() => void refetch()} testId="button-admin-issues-verify" />
       </div>
     );
   }
@@ -211,14 +212,14 @@ export default function AdminIssuesPage() {
 
   return (
     <AppPage testId="page-admin-issues">
-      <PageHeader title="Issues" description="Review failures, inspect reports, and track fixes." />
+      {/* Google's list format (owner, 2026-10-07): a quiet header, pill filters, hairline rows. */}
+      <GoogleSectionHeader as="h1" title="Issues" count={total > 0 ? total : null} description="Review failures, inspect reports, and track fixes." flush />
 
       <div className="min-w-0 space-y-3">
         <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Filter by status">
           {chips.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={status === c.key} onClick={() => setStatusFilter(c.key)}
-              className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                status === c.key ? "border-border bg-background text-foreground shadow-sm" : "border-transparent bg-muted/70 text-muted-foreground hover:text-foreground")}
+              className={cn("g-pill g-pill--sm shrink-0", status === c.key && "g-pill--on")}
               data-testid={`filter-status-${c.key}`}>
               {c.label}
               <span className={cn("tabular-nums text-xs", status === c.key ? "opacity-80" : "text-muted-foreground")}>{c.n}</span>
@@ -234,14 +235,7 @@ export default function AdminIssuesPage() {
         </Select>} activeFilters={source === "all" ? 0 : 1} />
       </div>
 
-      <Section flush className="overflow-hidden">
-        <div className="hidden grid-cols-12 gap-3 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground md:grid">
-          <span className="col-span-5">Issue</span>
-          <span className="col-span-2">Source</span>
-          <span className="col-span-1 text-right">Count</span>
-          <span className="col-span-2">Last seen</span>
-          <span className="col-span-2 text-right">Status</span>
-        </div>
+      <div>
         {data.issues.length === 0 ? (
           <div className="px-4 py-14 text-center" data-testid="empty-issues">
             <Bug className="mx-auto h-6 w-6 text-muted-foreground" aria-hidden="true" />
@@ -249,34 +243,29 @@ export default function AdminIssuesPage() {
             <p className="mt-1 text-sm text-muted-foreground">When something fails, it shows up here and Claude takes a look.</p>
           </div>
         ) : (
-          <ul className="divide-y">
+          <GoogleList as="ul" testId="list-issues">
             {data.issues.map((i) => (
-              <li key={i.id}>
-                <button type="button" onClick={() => setOpenId(i.id)} data-testid={`row-issue-${i.id}`}
-                  className="grid w-full grid-cols-1 gap-2 px-4 py-3 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none md:grid-cols-12 md:items-center md:gap-3">
-                  <div className="flex min-w-0 gap-2.5 md:col-span-5">
-                    <SeverityDot severity={i.severity} />
-                    <div className="min-w-0">
-                      <p className="line-clamp-2 break-words text-sm font-medium">{i.title}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground md:hidden">
-                        <span>{ISSUE_SOURCE_LABELS[i.source]}</span>·<span className="tabular-nums">{i.count.toLocaleString()}×</span>·<span>{ago(i.lastSeen)}</span>
-                      </p>
-                      {i.branch && <p className="mt-0.5 flex items-center gap-1 truncate font-mono text-xs text-emerald-700 dark:text-emerald-400"><GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />{i.branch}</p>}
-                    </div>
-                  </div>
-                  <span className="hidden text-sm text-muted-foreground md:col-span-2 md:block">{ISSUE_SOURCE_LABELS[i.source]}</span>
-                  <span className="hidden text-right text-sm tabular-nums md:col-span-1 md:block">{i.count.toLocaleString()}</span>
-                  <span className="hidden whitespace-nowrap text-sm text-muted-foreground md:col-span-2 md:block" title={when(i.lastSeen)}>{ago(i.lastSeen)}</span>
-                  <span className="flex items-center gap-1 pl-5 md:col-span-2 md:justify-end md:pl-0">
-                    <StatusBadge status={i.status} />
-                    <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground md:ml-0" aria-hidden="true" />
-                  </span>
-                </button>
-              </li>
+              <GoogleListRow
+                as="li"
+                size="md"
+                key={i.id}
+                leading={<SeverityDot severity={i.severity} />}
+                title={<span className="line-clamp-2">{i.title}</span>}
+                onOpen={() => setOpenId(i.id)}
+                titleTestId={`row-issue-${i.id}`}
+                badges={<StatusBadge status={i.status} />}
+                meta={[
+                  ISSUE_SOURCE_LABELS[i.source],
+                  <span key="count" className="tabular-nums">{i.count.toLocaleString()}×</span>,
+                  <span key="seen" title={when(i.lastSeen)}>{ago(i.lastSeen)}</span>,
+                ]}
+                line={i.branch ? <span className="inline-flex items-center gap-1 font-mono text-emerald-700 dark:text-emerald-400"><GitBranch className="h-3 w-3 shrink-0" aria-hidden="true" />{i.branch}</span> : undefined}
+                trailing={<ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />}
+              />
             ))}
-          </ul>
+          </GoogleList>
         )}
-      </Section>
+      </div>
       {data.total > data.issues.length && (
         <p className="mt-2 text-xs text-muted-foreground">Showing the {data.issues.length} most recent of {data.total.toLocaleString()}.</p>
       )}
