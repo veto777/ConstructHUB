@@ -2,6 +2,31 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🎨 2026-10-06/07 — Google format platform-wide (orange accent) + our own SEO tool (deployed, merge 0acc82d)
+- Owner: "Let's use this same format and update the other pages and maybe keep the orange. This format will sell better since
+  Google has proven it." Every signed-in platform page now sits on `.g-surface` (App.tsx layout; CRM portal untouched):
+  Google Sans/Roboto, hairline cards, pill buttons, `--g-accent` = brand orange #F97316 (dark #fb923c) everywhere except the
+  Google Business pages, which keep Google blue via `<GoogleSurface accent="google">`. Kit additions in
+  `client/src/components/google/`: GoogleSectionHeader, GoogleListRow/GoogleList/GoogleMeta, GoogleStat/GoogleStatGrid,
+  `.g-search`. Converted: dashboard, Permits & Databases (/databases /property /search /history /schedules), Google Business
+  remainder (/domains /mail-alerts /reinstatement /google-business /media-library), tools (/social-media /site-scan
+  /cloudflare /search-console /google-ads /google-ad-fraud /ads-manager /lsa-leads /lsa-account-manager /ip-tracker
+  /vpn-shield /call-assistant), guides (typography only), /settings, /admin. Left as is: public marketing pages, /developers,
+  big data tables inside Click Guard / LSA account manager, dialogs rendered on body (app font). Screenshots (gitignored):
+  vb11 `~/ConstructHUB-gstyle/analysis/google-style-shots/{phase2,phase2a}/`, `~/ConstructHUB-gstyle-b/analysis/google-style-shots/phase2b/`.
+- **SEO tool ("our own OpenSEO")** — `server/seo/` (dataforseo client with MIT notice for ported parts, price sheet, budget
+  cap, schema, jobs, routes), tables `seo_sites/seo_keywords/seo_rank_runs/seo_rank_checks/seo_backlink_snapshots/seo_api_usage`
+  (created at boot + in apply-schema-migration.ts), pages `/seo` `/seo/keywords` `/seo/backlinks` `/seo/competitors`
+  (client/src/pages/seo/*), sidebar "SEO", Settings → Limits & usage row. In-process worker (60 s tick, advisory lock,
+  `SEO_JOBS_DISABLED=true` to stop): weekly rank run per site (standard queue), monthly backlink snapshot. Plan gate = Site Scan's.
+  **Owner-pending env on vb11:** `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` (dataforseo.com, $50 minimum top-up, never expires),
+  optional `SEO_MONTHLY_BUDGET_USD` (default 25, platform-wide, enforced reserve→settle in seo_api_usage). Until set, every SEO
+  page shows the "Connect DataForSEO" card (prices quoted from the 2026-10-06 report) and nothing is charged. 200 keywords × 2
+  devices weekly ≈ $0.24/run ≈ $1.04/month at top-10 depth. Report: run folder `openseo-report.md`.
+  Owner asked "can't we build our own?" — answer given: SERP scraping not worth it at our volume (proxies/CAPTCHA/ToS,
+  ~same bandwidth cost); keyword volume via Google Ads Keyword Planner API, own-site backlinks via Bing Webmaster, AI mentions
+  via direct model queries ARE buildable for free — offered to add those three so DataForSEO becomes optional; awaiting go.
+
 ## 🎨 2026-10-06 — Google Business section restyled to look like Google (deployed, merge c5ce9b5)
 - Owner: "use the Google fonts and colors and styles to make the platform feel similar to Google on the GMB feature."
   Kit: `client/src/styles/google.css` (`.g-surface` tokens light+dark — Google Sans/Roboto, #1a73e8 blue, #188038 open-green,
