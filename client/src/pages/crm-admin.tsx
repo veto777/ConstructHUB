@@ -13,9 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
-  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive, Youtube,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { marketingUrl } from "@/lib/site";
 import { JOBCAM_INCLUDED_GB, JOBCAM_STORAGE_TIERS_GB, formatJobcamTier } from "@shared/jobcam-storage";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard,
@@ -571,6 +572,19 @@ export default function CrmAdminPage() {
 
       {/* ── JobCam storage ───────────────────────────────────────────────── */}
       <JobcamStorageAdminCard enabled={isAdmin && gateOpen} />
+
+      {/* ── YouTube channel ──────────────────────────────────────────────────
+          The connection page lives on the main site (/admin/youtube), not here: Google sends the
+          admin back to ONE registered redirect URI, and that one is on the main site's address. */}
+      {isAdmin && gateOpen && (
+        <Card data-testid="card-admin-youtube" id="card-youtube" className="scroll-mt-6">
+          <CardContent className="p-4 sm:p-5">
+            <SectionTitle icon={Youtube} title="YouTube channel"
+              description="Connect the company channel once so tutorial videos can be uploaded to it."
+              actions={<Button asChild size="sm" variant="outline"><a href={marketingUrl("/admin/youtube")} data-testid="link-admin-youtube">Open YouTube channel</a></Button>} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Beta invites ─────────────────────────────────────────────────── */}
       <Card data-testid="card-beta-invites">

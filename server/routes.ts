@@ -292,6 +292,11 @@ export async function registerRoutes(
   const { ensureAccessGrantsSchema, registerAccessGrantRoutes } = await import("./access-grants");
   await ensureAccessGrantsSchema();
   registerAccessGrantRoutes(app, getDevUser);
+  // The company YouTube channel (/admin/youtube): one site-level connection the tutorial uploader uses.
+  const { ensureYoutubeSchema } = await import("./youtube/schema");
+  await ensureYoutubeSchema();
+  const { registerYoutubeRoutes } = await import("./youtube/routes");
+  registerYoutubeRoutes(app, getDevUser);
   // The issue desk (docs/ops/ISSUE-DESK.md): captured failures, /admin/issues,
   // the browser's error reports and the tower's hand-off to Claude.
   const { ensureOpsIssuesSchema } = await import("./ops/schema");
