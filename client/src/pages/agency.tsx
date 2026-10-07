@@ -1,4 +1,5 @@
 import { AppPage, PageHeader, AppTabsList, Section } from '@/components/app-ui';
+import { GoogleSurface } from '@/components/google';
 import { Tabs, TabsTrigger } from '@/components/ui/tabs';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -56,12 +57,13 @@ export default function AgencyPage(){
   const otherWorkspaces=me?.workspaces?.filter((w:any)=>w.user_id!==me.actor)??[];
   const switcher=<div className="flex flex-wrap gap-3 items-center text-sm"><label>Workspace <select className={selectClass} aria-label="Workspace" value={me?.owner||''} onChange={async e=>{await run('/workspace',{owner:Number(e.target.value)});queryClient.clear();window.location.reload();}}><option value={me?.actor}>My workspace</option>{otherWorkspaces.map((w:any)=><option value={w.user_id} key={w.user_id}>{w.name}</option>)}</select></label><span>{me?.role}</span></div>;
   // Without the plan: say so, and still let a team member open an agency workspace they belong to.
-  if(me&&!entitled)return <AppPage><PageHeader title="Agency workspace" description="Manage clients, locations and the people who look after them."/>
+  if(me&&!entitled)return <GoogleSurface page><AppPage><PageHeader title="Agency workspace" description="Manage clients, locations and the people who look after them."/>
     {otherWorkspaces.length>0&&<section className="space-y-2" aria-label="Workspaces you belong to"><p>You're a member of {otherWorkspaces.length===1?'an agency workspace':'agency workspaces'}. Open one to work on its clients.</p>{switcher}</section>}
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
     <PlanRequired module="agencyWorkspace" className="max-w-3xl"/>
-  </AppPage>;
-  return <AppPage><PageHeader title="Agency workspace" description="Manage clients, locations and the people who look after them." actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
+  </AppPage></GoogleSurface>;
+  // The Google Business group: Google's blue like its siblings (owner, 2026-10-07).
+  return <GoogleSurface page><AppPage><PageHeader title="Agency workspace" description="Manage clients, locations and the people who look after them." actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
     {switcher}
     <Tabs value={tab} onValueChange={t=>{setTabParam(t==='locations'?null:t);setOffset(0);say('');}}><AppTabsList>{tabs.map(t=><TabsTrigger key={t} value={t}>{t[0].toUpperCase()+t.slice(1)}</TabsTrigger>)}</AppTabsList></Tabs>
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
@@ -78,5 +80,5 @@ export default function AgencyPage(){
       {tab==='jobs'&&<>{list?.items?.map((j:any)=><article key={j.id} className="border-b py-3 break-words"><strong>{j.business_name}</strong> · {j.action} · {j.status}{j.error&&<p role="alert">{j.error}</p>}</article>)}{list&&!list.items?.length&&<p>No queued actions.</p>}</>}
       {tab!=='settings'&&<Pager offset={offset} total={list?.total??(list?.items?.length===50?offset+51:offset+(list?.items?.length||0))} onChange={setOffset}/>}
     </Section>}
-  </AppPage>;
+  </AppPage></GoogleSurface>;
 }

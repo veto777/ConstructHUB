@@ -2,6 +2,7 @@ import { ArrowRight, ArrowUpRight, LayoutGrid, Lock, SlidersHorizontal } from "l
 import { DASHBOARD_GROUPS, type DashboardGroupKey, type DashboardTile, type DashboardTileKey } from "@shared/dashboard";
 import { DASHBOARD_CRM_CARD_TILES, dashboardGroupsInOrder } from "@shared/dashboard-prefs";
 import { Button } from "@/components/ui/button";
+import { GoogleSectionHeader } from "@/components/google";
 import { featureIntroPath } from "@shared/feature-pages";
 import { ADDONS, MODULE_NAMES, PLANS, type AddonKey } from "@shared/plans";
 import { joinNames } from "@shared/plan-copy";
@@ -152,10 +153,7 @@ export function TileGrid({ tiles, keepGroups = true, onCustomize }: { tiles: Das
     const locked = gridTiles.filter((t) => t.status === "locked");
     return (
       <section aria-labelledby="dashboard-group-all" data-testid="section-dashboard-all">
-        <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h2 id="dashboard-group-all" className="text-sm font-semibold">Your tools</h2>
-          <p className="text-sm text-muted-foreground">In your order.</p>
-        </div>
+        <GoogleSectionHeader title={<span id="dashboard-group-all">Your tools</span>} description="In your order." />
         {open.length > 0 && (
           <div className={GRID_COLS}>
             {open.map((tile) => <DashboardTileCard key={tile.key} tile={tile} />)}
@@ -177,10 +175,7 @@ export function TileGrid({ tiles, keepGroups = true, onCustomize }: { tiles: Das
         const headingId = `dashboard-group-${group.key}`;
         return (
           <section key={group.key} aria-labelledby={headingId} data-testid={`section-dashboard-${group.key}`}>
-            <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <h2 id={headingId} className="text-sm font-semibold">{group.label}</h2>
-              <p className="text-sm text-muted-foreground">{group.blurb}</p>
-            </div>
+            <GoogleSectionHeader title={<span id={headingId}>{group.label}</span>} description={group.blurb} />
             {open.length > 0 && (
               <div className={GRID_COLS}>
                 {open.map((tile) => <DashboardTileCard key={tile.key} tile={tile} />)}

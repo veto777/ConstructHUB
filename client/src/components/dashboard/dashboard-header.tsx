@@ -95,6 +95,7 @@ export function DashboardHeader({
 
   return (
     <PageHeader
+      icon={null}
       title={<span data-testid="text-dashboard-greeting">{account.firstName ? greeting : "Welcome back"}</span>}
       description={
         <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 pt-1">
@@ -129,7 +130,7 @@ export function UsageCard({ account }: { account: DashboardAccount }) {
   if (!account.usage.length) return null;
   return (
     <Card className="px-4 py-3 sm:px-5 sm:py-4" role="region" aria-labelledby="dashboard-usage-title" data-testid="card-dashboard-usage">
-      <h2 id="dashboard-usage-title" className="mb-3 text-sm font-semibold">{inNativeApp() ? "This month's usage" : "Plan usage"}</h2>
+      <h2 id="dashboard-usage-title" className="g-header__title mb-3">{inNativeApp() ? "This month's usage" : "Plan usage"}</h2>
       <UsageStrip usage={account.usage} />
     </Card>
   );

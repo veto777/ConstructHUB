@@ -1,11 +1,20 @@
 /*
- * Google-style surface for the "Google Business" section (owner, 2026-10-06: "use the Google fonts and
- * colors and styles to make the platform feel similar to Google on the GMB feature").
+ * Google-style surface — the platform's signed-in look (owner, 2026-10-06: "use the Google fonts and colors and
+ * styles"; 2026-10-07, after seeing the Google Business pages: "use this same format and update the other pages and
+ * maybe keep the orange. This format will sell better since Google has proven it").
  *
- * `.g-surface` scopes Google's real design tokens (fonts, colours, shapes) to one subtree. Inside it the
- * app's own theme variables are re-pointed at the same tokens, so shadcn controls (buttons, inputs,
- * tabs, cards) pick the palette up without being rewritten. `.dark .g-surface` carries the dark palette.
- * Everything else on the platform keeps its current look.
+ * `.g-surface` scopes Google's real design tokens (font, text colours, hairlines, pill shapes) to one subtree.
+ * Inside it the app's own theme variables are re-pointed at the same tokens, so shadcn controls (buttons, inputs,
+ * tabs, cards) pick the palette up without being rewritten. App.tsx puts it on the signed-in platform layout,
+ * so every platform page sits on it.
+ *
+ * ONE accent, two values:
+ *   --g-accent = the brand orange #F97316 everywhere on the platform (the default below), and
+ *   --g-accent = Google blue #1a73e8 only inside `.g-surface--google` (the Google Business pages, which imitate
+ *                Google on purpose; <GoogleSurface> adds the modifier).
+ * Pills, links, active states, the focus ring and the AI-Overview sparkle read `--g-accent`. Stars stay #fbbc04,
+ * "Open" stays green, errors stay red. `--g-accent-ink` is the accent as TEXT: the orange is darkened one step on
+ * white (#ea580c, 3.6:1 at 14px/500) because #F97316 on white is 2.8:1; the blue is already legible.
  */
 
 .g-surface {
@@ -21,14 +30,15 @@
   --g-surface: #ffffff;
   --g-surface-2: #f8f9fa;
   --g-chip: #f1f3f4;
-  --g-hover: #f6fafe;
   --g-ai-text: #1f1f1f;
-  --g-avatar: #4285f4;
-  --g-avatar-bg: #d2e3fc;
-  /* The accent every interactive token reads (pills, links, focus ring). Google blue by default;
-     `.g-accent-orange` (the SEO pages) swaps it for the platform's orange. Never hard-code either. */
-  --g-accent: var(--g-blue);
-  --g-accent-bg: #e8f0fe;
+
+  /* ── The accent: brand orange by default (see the header comment) ── */
+  --g-accent: #F97316;
+  --g-accent-ink: #ea580c;
+  --g-accent-soft: #ffedd5;
+  --g-hover: #fff7ed;
+  --g-avatar: var(--g-accent);
+  --g-avatar-bg: var(--g-accent-soft);
 
   /* ── The app theme, re-pointed so shadcn parts inside use the same palette ── */
   --background: 0 0% 100%;
@@ -45,11 +55,11 @@
   --muted-foreground: 213 5% 39%;
   --secondary: 200 12% 95%;
   --secondary-foreground: 225 6% 13%;
-  --accent: 210 80% 98%;
+  --accent: 210 12% 95%;
   --accent-foreground: 225 6% 13%;
-  --primary: 214 82% 51%;
+  --primary: 25 95% 53%;
   --primary-foreground: 0 0% 100%;
-  --ring: 214 82% 51%;
+  --ring: 25 95% 53%;
   --destructive: 4 71% 50%;
   --destructive-foreground: 0 0% 100%;
   --font-sans: var(--g-font);
@@ -61,6 +71,7 @@
   font-size: 14px;
   line-height: 20px;
   letter-spacing: 0;
+  word-spacing: 0;
   color: var(--g-text);
   background: var(--g-surface);
 }
@@ -76,12 +87,12 @@
   --g-surface: #202124;
   --g-surface-2: #303134;
   --g-chip: #303134;
-  --g-hover: #303134;
   --g-ai-text: #e8eaed;
-  --g-avatar: #8ab4f8;
-  --g-avatar-bg: #394457;
-  --g-accent: var(--g-blue);
-  --g-accent-bg: rgb(138 180 248 / 0.15);
+
+  --g-accent: #fb923c;
+  --g-accent-ink: #fb923c;
+  --g-accent-soft: rgba(251, 146, 60, .18);
+  --g-hover: #303134;
 
   --background: 225 6% 13%;
   --foreground: 216 12% 92%;
@@ -99,15 +110,41 @@
   --secondary-foreground: 216 12% 92%;
   --accent: 225 4% 20%;
   --accent-foreground: 216 12% 92%;
-  --primary: 217 89% 76%;
-  --primary-foreground: 225 6% 13%;
-  --ring: 217 89% 76%;
+  --primary: 27 96% 61%;
+  --primary-foreground: 24 80% 10%;
+  --ring: 27 96% 61%;
   --destructive: 5 81% 73%;
   --destructive-foreground: 225 6% 13%;
 }
 
-/* The theme's derived borders are computed where they are declared (:root), so re-derive them here from the Google primary. */
-.g-surface, .dark .g-surface {
+/* The Google Business pages: Google's own blue, exactly as shipped there. */
+.g-surface--google {
+  --g-accent: #1a73e8;
+  --g-accent-ink: #1a73e8;
+  --g-accent-soft: #e8f0fe;
+  --g-hover: #f6fafe;
+  --g-avatar: #4285f4;
+  --g-avatar-bg: #d2e3fc;
+  --accent: 210 80% 98%;
+  --primary: 214 82% 51%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 214 82% 51%;
+}
+.dark .g-surface--google {
+  --g-accent: #8ab4f8;
+  --g-accent-ink: #8ab4f8;
+  --g-accent-soft: #394457;
+  --g-hover: #303134;
+  --g-avatar: #8ab4f8;
+  --g-avatar-bg: #394457;
+  --accent: 225 4% 20%;
+  --primary: 217 89% 76%;
+  --primary-foreground: 225 6% 13%;
+  --ring: 217 89% 76%;
+}
+
+/* The theme's derived borders are computed where they are declared (:root), so re-derive them here from the surface's primary. */
+.g-surface, .dark .g-surface, .g-surface--google, .dark .g-surface--google {
   --primary-border: hsl(var(--primary));
   --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
   --secondary-border: hsl(var(--secondary));
@@ -120,16 +157,17 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
-/* The app's orange accent (section markers, icon chips, stat dots) reads as Google blue inside the surface. */
-.g-surface .bg-orange-500 { background-color: var(--g-blue); }
-.g-surface .bg-orange-100 { background-color: #e8f0fe; }
-.g-surface .text-orange-600, .g-surface .text-orange-700 { color: var(--g-blue); }
+/* The app's orange utility classes (section markers, icon chips, stat dots) follow the surface's accent, so the
+   same markup is orange on the platform and blue on the Google pages. */
+.g-surface .bg-orange-500 { background-color: var(--g-accent); }
+.g-surface .bg-orange-100 { background-color: var(--g-accent-soft); }
+.g-surface .text-orange-600, .g-surface .text-orange-700 { color: var(--g-accent-ink); }
 .g-surface .border-orange-200\/80 { border-color: var(--g-divider); }
-.g-surface .from-orange-50 { --tw-gradient-from: #f6fafe var(--tw-gradient-from-position); --tw-gradient-to: rgb(246 250 254 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
-.dark .g-surface .dark\:bg-orange-500\/15 { background-color: rgb(138 180 248 / 0.15); }
-.dark .g-surface .dark\:text-orange-400, .dark .g-surface .dark\:text-orange-300 { color: var(--g-blue); }
+.g-surface .from-orange-50 { --tw-gradient-from: var(--g-hover) var(--tw-gradient-from-position); --tw-gradient-to: transparent var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .g-surface .dark\:bg-orange-500\/15 { background-color: var(--g-accent-soft); }
+.dark .g-surface .dark\:text-orange-400, .dark .g-surface .dark\:text-orange-300 { color: var(--g-accent-ink); }
 .dark .g-surface .dark\:border-orange-500\/25 { border-color: var(--g-divider); }
-.dark .g-surface .dark\:from-orange-500\/\[0\.09\] { --tw-gradient-from: rgb(138 180 248 / 0.09) var(--tw-gradient-from-position); --tw-gradient-to: rgb(138 180 248 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .g-surface .dark\:from-orange-500\/\[0\.09\] { --tw-gradient-from: var(--g-hover) var(--tw-gradient-from-position); --tw-gradient-to: transparent var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
 
 /* Google never uses heavy display weights: titles are 400–500, same family. */
 .g-surface h1, .g-surface h2, .g-surface h3, .g-surface h4,
@@ -139,12 +177,31 @@
   letter-spacing: 0;
 }
 .g-surface h1 { font-size: 22px; line-height: 28px; font-weight: 400; }
+/* Titles in the kit itself are Google's 400 (the heading rule above would make them 500). */
+.g-surface .g-card__title, .g-surface .g-header__title, .g-surface .g-ai__label { font-weight: 400; }
 @media (min-width: 640px) { .g-surface h1 { font-size: 24px; line-height: 32px; } }
 
-/* Google's focus ring: 2px blue outline, 2px off the edge. */
+/* Google's focus ring: 2px accent outline, 2px off the edge. */
 .g-surface :is(a, button, [role="button"], input, select, textarea, summary):focus-visible {
   outline: 2px solid var(--g-accent);
   outline-offset: 2px;
+}
+
+/* Cards are hairlines, never shadowed boxes: shadcn <Card> and the pages' hand-rolled `rounded-xl border bg-card`. */
+.g-surface .shadcn-card,
+.g-surface .rounded-xl.border.bg-card {
+  border-radius: 8px;
+  border-color: var(--g-divider);
+  box-shadow: none;
+}
+
+/* The sidebar and the phone tab bar keep their own layout and colours; only the family changes (and the active
+   state is already the brand orange). */
+.app-theme [data-sidebar="sidebar"],
+.app-theme [data-testid="app-tabbar"] {
+  font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+  letter-spacing: 0;
+  word-spacing: 0;
 }
 
 /* ── Utilities ─────────────────────────────────────────────────────────── */
@@ -160,7 +217,7 @@
   border: 1px solid var(--g-divider);
   border-radius: 9999px;
   background: var(--g-surface);
-  color: var(--g-accent);
+  color: var(--g-accent-ink);
   font-family: var(--g-font);
   font-size: 14px;
   font-weight: 500;
@@ -172,7 +229,9 @@
 }
 .g-pill:hover { background: var(--g-hover); }
 .g-pill:disabled, .g-pill[aria-disabled="true"] { opacity: .5; cursor: default; }
-.g-pill > svg { width: 18px; height: 18px; flex: none; }
+.g-pill > svg { width: 18px; height: 18px; flex: none; color: var(--g-accent); }
+.g-pill--sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.g-pill--sm > svg { width: 16px; height: 16px; }
 .g-pill--grey {
   width: 100%;
   min-height: 44px;
@@ -180,15 +239,29 @@
   background: var(--g-chip);
   color: var(--g-text);
 }
+.g-pill--grey > svg { color: currentColor; }
 .g-pill--grey:hover { background: var(--g-divider); }
 .g-pill--solid {
   border-color: var(--g-accent);
   background: var(--g-accent);
   color: #fff;
 }
+.g-pill--solid > svg { color: currentColor; }
 .dark .g-pill--solid { color: #202124; }
 .g-pill--solid:hover { background: var(--g-accent); filter: brightness(1.06); }
+/* A selected filter pill (search types, All / Counties / Cities). */
+.g-pill--on {
+  border-color: transparent;
+  background: var(--g-accent-soft);
+  color: var(--g-accent-ink);
+}
+.g-pill--on:hover { background: var(--g-accent-soft); }
+/* A quiet pill: grey text and icon until hovered (a secondary action, a "find on the web" fallback). */
+.g-pill--quiet { color: var(--g-text-2); }
+.g-pill--quiet > svg { color: var(--g-text-2); }
+.g-pill--quiet:hover { color: var(--g-text); }
 .g-pill--danger { color: var(--g-red); }
+.g-pill--danger > svg { color: var(--g-red); }
 
 /* Every shadcn <Button> inside the surface takes the pill shape (font and colours come from the theme). */
 .g-surface button[class*="rounded-md"]:not(.g-pill):not([role="tab"]):not([role="switch"]):not([role="combobox"]) {
@@ -198,6 +271,43 @@
   letter-spacing: 0;
 }
 .g-surface a > button[class*="rounded-md"] { border-radius: 9999px; }
+/* The page kit's search field (Toolbar) is Google's rounded search box. */
+.g-surface input[type="search"] {
+  border-radius: 9999px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+/* Google's search box: a rounded field with the magnifier, a shadow when focused, the button at the end. */
+.g-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 4px 4px 16px;
+  border: 1px solid var(--g-divider);
+  border-radius: 9999px;
+  background: var(--g-surface);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+.g-search:focus-within { border-color: transparent; box-shadow: 0 1px 6px rgba(32, 33, 36, .28); }
+.dark .g-search:focus-within { box-shadow: 0 1px 6px rgba(0, 0, 0, .6); border-color: var(--g-divider); }
+.g-search > svg { width: 20px; height: 20px; flex: none; color: var(--g-text-2); }
+.g-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--g-font);
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--g-text);
+}
+.g-search input::placeholder { color: var(--g-text-2); }
+.g-search input:focus { outline: none; }
+.g-search input::-webkit-search-decoration, .g-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
 .g-divider { border-top: 1px solid var(--g-divider); }
 .g-chip {
@@ -212,15 +322,17 @@
   font-size: 14px;
   font-weight: 500;
 }
-.g-link { color: var(--g-accent); text-decoration: none; }
+.g-chip--sm { min-height: 24px; padding: 0 8px; font-size: 12px; font-weight: 400; color: var(--g-text-2); text-transform: capitalize; }
+.g-link { color: var(--g-accent-ink); text-decoration: none; }
 .g-link:hover { text-decoration: underline; }
 .g-text { color: var(--g-text); }
 .g-text-2 { color: var(--g-text-2); }
 .g-open { color: var(--g-green); }
 .g-closed { color: var(--g-red); }
 .g-star { color: var(--g-star); }
+.g-accent { color: var(--g-accent-ink); }
 
-/* ── Local-pack card ───────────────────────────────────────────────────── */
+/* ── Local-pack card / generic list row ────────────────────────────────── */
 .g-card {
   display: block;
   padding: 16px 0;
@@ -228,6 +340,8 @@
   color: var(--g-text);
 }
 .g-card:last-child { border-bottom: 0; }
+.g-list { display: block; margin: 0; padding: 0; list-style: none; }
+.g-list > .g-card:first-child { padding-top: 8px; }
 .g-card__row { display: flex; gap: 12px; align-items: flex-start; }
 .g-card__body { flex: 1 1 auto; min-width: 0; }
 .g-card__title {
@@ -239,6 +353,7 @@
   color: var(--g-text);
   overflow-wrap: anywhere;
 }
+.g-card__title--md { font-size: 16px; line-height: 24px; }
 .g-card__title button, .g-card__title a {
   font: inherit;
   color: inherit;
@@ -247,10 +362,15 @@
   border: 0;
   padding: 0;
   cursor: pointer;
+  text-decoration: none;
 }
 .g-card__title button:hover, .g-card__title a:hover { text-decoration: underline; }
 .g-card__line { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); overflow-wrap: anywhere; }
+.g-card__line a { color: inherit; }
+.g-card__line a:hover { color: var(--g-text); text-decoration: underline; }
 .g-card__meta { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-card__meta a { color: inherit; }
+.g-card__meta a:hover { text-decoration: underline; color: var(--g-text); }
 .g-card__snippet {
   display: flex;
   gap: 8px;
@@ -261,6 +381,30 @@
 }
 .g-card__snippet b { font-weight: 700; color: var(--g-text); }
 .g-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.g-card__trailing { display: flex; flex: none; align-items: center; gap: 4px; }
+/* An icon circle before the row (search type, activity kind). */
+.g-card__lead {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--g-chip);
+  color: var(--g-text-2);
+}
+.g-card__lead > svg { width: 20px; height: 20px; }
+/* One square thumbnail on the right. */
+.g-card__thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--g-chip);
+}
+.g-card__thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .g-card__photos {
   display: flex;
   gap: 4px;
@@ -279,7 +423,7 @@
   .g-card__photos--two a, .g-card__photos--two span { flex-basis: 98px; }
 }
 
-/* Reviewer avatar: blue person circle, or the initial. */
+/* Reviewer avatar: accent person circle, or the initial. */
 .g-avatar {
   display: inline-flex;
   align-items: center;
@@ -302,6 +446,27 @@
 .g-stars svg { width: 14px; height: 14px; }
 .g-stars__on { color: var(--g-star); }
 .g-stars__off { color: var(--g-divider); }
+
+/* ── Numbers: a quiet stat tile (hairline, 20px/400 number, grey label) ──── */
+.g-stat {
+  display: block;
+  height: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--g-divider);
+  border-radius: 8px;
+  background: var(--g-surface);
+  color: var(--g-text);
+  text-decoration: none;
+}
+a.g-stat:hover { background: var(--g-surface-2); }
+.g-stat__label { margin: 0; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-stat__value { margin: 4px 0 0; font-size: 20px; line-height: 24px; font-weight: 400; color: var(--g-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.g-stat__value--bad { color: var(--g-red); }
+.g-stat__hint { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+/* The page kit's <Stat> (app-ui.tsx) takes the same shape inside the surface. */
+.g-surface [data-ui="stat"] { border-radius: 8px; border-color: var(--g-divider); box-shadow: none; }
+.g-surface [data-ui="stat"] [data-ui="stat-label"] { font-weight: 400; color: var(--g-text-2); }
+.g-surface [data-ui="stat"] [data-ui="stat-value"] { font-size: 20px; line-height: 24px; font-weight: 400; letter-spacing: 0; }
 
 /* ── Google review ─────────────────────────────────────────────────────── */
 .g-review { padding: 16px 0; border-bottom: 1px solid var(--g-divider); }
@@ -348,83 +513,15 @@
 .g-ai__foot { margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
 @media (max-width: 639px) { .g-ai__body { font-size: 17px; line-height: 25px; } }
 
-/* ── Header strip ──────────────────────────────────────────────────────── */
+/* ── Section header: 20px/400 title, 14px grey line, hairline below ───── */
 .g-header { padding: 0 0 12px; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; }
-.g-header__title { margin: 0; font-size: 20px; line-height: 24px; font-weight: 400; color: var(--g-text); }
+.g-header--flush { margin-bottom: 0; }
+.g-header__title { margin: 0; font-family: var(--g-font); font-size: 20px; line-height: 24px; font-weight: 400; color: var(--g-text); letter-spacing: 0; }
 .g-header__sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
+.g-header__count { margin-left: 8px; font-size: 14px; color: var(--g-text-2); font-variant-numeric: tabular-nums; }
 
 /* A surface inside a surface (a card list inside a surfaced page) inherits the parent's background. */
 .g-surface .g-surface { background: transparent; }
 
 /* No horizontal scroll on phones: long names/addresses wrap, pills wrap. */
 .g-surface { overflow-wrap: anywhere; }
-
-/* ── Orange accent (the SEO pages) ─────────────────────────────────────────
-   Same Google surface, the platform's orange where the surface would use blue: pills, links, focus
-   ring, shadcn primary. orange-700 on the light surface keeps 14px text readable; orange-400 on dark. */
-.g-surface.g-accent-orange {
-  --g-accent: #c2410c;
-  --g-accent-bg: #fff7ed;
-  --primary: 22 89% 41%;
-  --primary-foreground: 0 0% 100%;
-  --ring: 22 89% 41%;
-  --accent: 33 100% 96%;
-}
-.dark .g-surface.g-accent-orange {
-  --g-accent: #fb923c;
-  --g-accent-bg: rgb(251 146 60 / 0.15);
-  --primary: 27 96% 61%;
-  --primary-foreground: 225 6% 13%;
-  --ring: 27 96% 61%;
-  --accent: 225 4% 20%;
-}
-.g-surface .bg-orange-500 { background-color: var(--g-accent); }
-.g-surface .text-orange-600, .g-surface .text-orange-700 { color: var(--g-accent); }
-.dark .g-surface .dark\:text-orange-400, .dark .g-surface .dark\:text-orange-300 { color: var(--g-accent); }
-.g-surface.g-accent-orange .bg-orange-100 { background-color: var(--g-accent-bg); }
-
-/* ── SEO tables: a Google results-style list that becomes cards on phones ── */
-.g-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
-.g-table th { text-align: left; font-weight: 500; color: var(--g-text-2); font-size: 12px; line-height: 16px; padding: 8px 12px; border-bottom: 1px solid var(--g-divider); white-space: nowrap; }
-.g-table td { padding: 10px 12px; border-bottom: 1px solid var(--g-divider); vertical-align: top; color: var(--g-text); }
-.g-table tr:last-child td { border-bottom: 0; }
-.g-table tbody tr:hover td { background: var(--g-hover); }
-.g-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.g-table th:first-child, .g-table td:first-child { padding-left: 0; }
-.g-table th:last-child, .g-table td:last-child { padding-right: 0; }
-@media (max-width: 639px) {
-  .g-table thead { display: none; }
-  .g-table, .g-table tbody, .g-table tr { display: block; }
-  .g-table tr { padding: 12px 0; border-bottom: 1px solid var(--g-divider); }
-  .g-table td { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border: 0; }
-  .g-table td::before { content: attr(data-label); color: var(--g-text-2); font-size: 12px; flex: none; }
-  .g-table td:first-child { display: block; font-weight: 500; }
-  .g-table td:first-child::before { content: none; }
-  .g-table .num { text-align: right; }
-}
-/* Movement arrows: glyph + number, never colour alone. */
-.g-move { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; }
-.g-move--up { color: var(--g-green); }
-.g-move--down { color: var(--g-red); }
-.g-move--flat { color: var(--g-text-2); }
-/* Stat tiles (Google card: white, 1px divider, 8px radius). */
-.g-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-@media (min-width: 640px) { .g-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.g-tile { border: 1px solid var(--g-divider); border-radius: 8px; padding: 12px 16px; background: var(--g-surface); min-width: 0; }
-.g-tile__label { font-size: 12px; line-height: 16px; color: var(--g-text-2); }
-.g-tile__value { margin-top: 4px; font-size: 24px; line-height: 32px; font-weight: 400; color: var(--g-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.g-tile__hint { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
-/* Tab strip under the header (Google's underline tabs). */
-.g-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; scrollbar-width: none; }
-.g-tabs a { flex: none; padding: 10px 12px; color: var(--g-text-2); font-size: 14px; font-weight: 500; text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
-.g-tabs a:hover { color: var(--g-text); background: var(--g-hover); border-radius: 8px 8px 0 0; }
-.g-tabs a[aria-current="page"] { color: var(--g-accent); border-bottom-color: var(--g-accent); }
-/* Connect / empty card. */
-.g-callout { border: 1px solid var(--g-divider); border-radius: 8px; padding: 16px; background: var(--g-surface-2); }
-.g-callout h3 { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
-.g-callout p, .g-callout li { margin: 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
-.g-callout ul { margin: 8px 0 0; padding-left: 18px; }
-.g-callout code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--g-text); background: var(--g-chip); padding: 1px 5px; border-radius: 4px; }
-.g-input { width: 100%; min-height: 40px; padding: 0 14px; border: 1px solid var(--g-divider); border-radius: 8px; background: var(--g-surface); color: var(--g-text); font: inherit; font-size: 14px; }
-.g-input:focus { outline: 2px solid var(--g-accent); outline-offset: -1px; border-color: transparent; }
-.g-select { appearance: auto; }

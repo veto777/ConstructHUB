@@ -709,7 +709,10 @@ function AppContent() {
     <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
       <div className="flex h-screen w-full">
         <AppSidebar />
-        <div className="flex flex-col flex-1 min-w-0">
+        {/* The Google-style surface for every signed-in platform page (client/src/styles/google.css): Google's font,
+            hairlines and pill shapes with the brand orange as the accent; the Google Business pages nest a
+            <GoogleSurface> for Google's blue. The sidebar and tab bar keep their own look. */}
+        <div className="g-surface flex flex-col flex-1 min-w-0">
           <header className="box-content flex items-center justify-between gap-2 px-4 h-14 pt-[env(safe-area-inset-top)] shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-1.5">

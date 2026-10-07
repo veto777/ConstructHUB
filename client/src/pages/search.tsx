@@ -1,7 +1,6 @@
 import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AppPage, PageHeader, StatusPill, EmptyState } from "@/components/app-ui";
+import { AppPage, StatusPill, EmptyState } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   Search,
   MapPin,
@@ -28,7 +28,6 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
-  Navigation,
   SkipForward,
   Database,
   SlidersHorizontal,
@@ -43,7 +42,6 @@ import {
   Users,
   Eye,
   Building,
-  ExternalLink,
   Globe,
 } from "lucide-react";
 import type { PermitDatabase, County } from "@shared/schema";
@@ -535,14 +533,66 @@ export default function SearchPage() {
 
   return (
     <AppPage width="narrow" testId="page-search">
-      <PageHeader
-        title={<span data-testid="text-page-title">Search permits</span>}
+      {/* Google's search format (owner, 2026-10-07): a quiet header, search-type pills, the rounded search box. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="Search permits"
         description="Search live permit portals by address, name, company or permit number."
+        flush
       />
 
-      <section className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
+      <section className="space-y-4" aria-label="Search form">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Search by" data-testid="select-search-type">
+          {searchTypes.map((type) => (
+            <GooglePill
+              key={type.value}
+              icon={type.icon}
+              label={type.label}
+              role="radio"
+              ariaPressed={searchType === type.value}
+              selected={searchType === type.value}
+              onClick={() => setSearchType(type.value)}
+              testId={`button-search-type-${type.value}`}
+            />
+          ))}
+        </div>
+
+        <div className="g-search" role="search">
+          <IconComponent aria-hidden="true" />
+          <input
+            type="search"
+            placeholder={
+              searchType === "address" ? "911, 3520 malland, etc." :
+              searchType === "keyword" ? "siding, roofing, electrical, plumbing..." :
+              "Enter search value..."
+            }
+            aria-label="Search value"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            data-testid="input-search-value"
+          />
+          <GooglePill
+            icon={searchMutation.isPending ? Loader2 : Search}
+            variant="solid"
+            label="Search"
+            onClick={handleSearch}
+            disabled={searchMutation.isPending || !searchValue.trim()}
+            className={searchMutation.isPending ? "[&>svg]:animate-spin" : undefined}
+            testId="button-search"
+          />
+        </div>
+        <p className="g-text-2 text-sm" data-testid="text-scope-count">
+          {scopedDbCount !== null
+            ? `${portalCount(scopedDbCount)} ${scopePlace}`
+            : scopeState !== "all" && databasesLoading
+              ? `Counting searchable portals ${scopePlace}…`
+              : "Searches every live-searchable portal nationwide"}
+        </p>
+
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-muted-foreground">Search area</label>
+          <label className="text-xs font-medium g-text-2">Search area</label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               value={scopeState}
@@ -623,50 +673,10 @@ export default function SearchPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[160px_1fr]">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Search by</label>
-            <Select value={searchType} onValueChange={setSearchType}>
-              <SelectTrigger data-testid="select-search-type" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {searchTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    <span className="flex items-center gap-2">
-                      <type.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      {type.label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Search value</label>
-            <div className="relative">
-              <IconComponent className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder={
-                  searchType === "address" ? "911, 3520 malland, etc." :
-                  searchType === "keyword" ? "siding, roofing, electrical, plumbing..." :
-                  "Enter search value..."
-                }
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-9"
-                data-testid="input-search-value"
-              />
-            </div>
-          </div>
-        </div>
-
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
+          className="flex items-center gap-1.5 text-sm font-medium g-text-2 hover:text-foreground transition-colors w-full"
           data-testid="button-toggle-filters"
         >
           <SlidersHorizontal className="h-3 w-3" />
@@ -680,7 +690,7 @@ export default function SearchPage() {
         </button>
 
         {showFilters && (
-          <div className="space-y-3 pt-1 border-t border-border/40">
+          <div className="space-y-3 pt-3 g-divider">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -742,28 +752,6 @@ export default function SearchPage() {
           </div>
         )}
 
-        <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-muted-foreground" data-testid="text-scope-count">
-            {scopedDbCount !== null
-              ? `${portalCount(scopedDbCount)} ${scopePlace}`
-              : scopeState !== "all" && databasesLoading
-                ? `Counting searchable portals ${scopePlace}…`
-                : "Searches every live-searchable portal nationwide"}
-          </p>
-          <Button
-            onClick={handleSearch}
-            disabled={searchMutation.isPending || !searchValue.trim()}
-            className="w-full sm:w-auto"
-            data-testid="button-search"
-          >
-            {searchMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Search className="h-4 w-4 mr-2" />
-            )}
-            Search
-          </Button>
-        </div>
       </section>
 
       {(searchId || searchMutation.isPending) && (
@@ -855,16 +843,18 @@ export default function SearchPage() {
 
           {rawResults.length > 0 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-base font-semibold" data-testid="text-results-header">
-                  Results
-                </h2>
-                <span className="text-xs text-muted-foreground tabular-nums" data-testid="text-result-count">
-                  {filteredResults.length === rawResults.length
-                    ? `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`
-                    : `${filteredResults.length} of ${rawResults.length}`}
-                </span>
-              </div>
+              <GoogleSectionHeader
+                flush
+                titleTestId="text-results-header"
+                title="Results"
+                actions={(
+                  <span className="g-text-2 text-sm tabular-nums" data-testid="text-result-count">
+                    {filteredResults.length === rawResults.length
+                      ? `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`
+                      : `${filteredResults.length} of ${rawResults.length}`}
+                  </span>
+                )}
+              />
 
               {availableStatuses.length > 0 && (
                 <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
@@ -892,203 +882,166 @@ export default function SearchPage() {
                 </div>
               )}
 
-              <div className="space-y-3">
+              <GoogleList testId="list-results">
                 {filteredResults.length === 0 && activeFilterCount > 0 ? (
                   <EmptyState
                     compact
                     icon={SlidersHorizontal}
                     title="No results match your filters"
-                    action={
-                      <Button variant="outline" size="sm" onClick={clearFilters} className="text-xs" data-testid="button-clear-filters-empty">
-                        Clear filters
-                      </Button>
-                    }
+                    action={<GooglePill label="Clear filters" onClick={clearFilters} testId="button-clear-filters-empty" />}
                   />
                 ) : (
                   filteredResults.map((result: any) => (
-                    <div
+                    <GoogleListRow
                       key={result.id}
-                      className="rounded-xl border bg-card p-4"
-                      data-testid={`card-result-${result.id}`}
+                      testId={`card-result-${result.id}`}
+                      title={result.address || result.permitNumber || "Permit"}
+                      badges={<>
+                        {result.permitType && <span className="g-chip g-chip--sm">{result.permitType}</span>}
+                        <StatusBadge status={result.status} />
+                      </>}
+                      meta={[
+                        result.permitNumber ? <span key="number" data-testid={`text-permit-number-${result.id}`}>{result.permitNumber}</span> : null,
+                        result.issuedDate ? <span key="issued" className="tabular-nums">Issued {result.issuedDate}</span> : null,
+                        result.jurisdiction || result.databaseName || null,
+                      ]}
+                      actions={<>
+                        <GooglePill
+                          icon={Eye}
+                          label={<>
+                            {loadingDetails.has(result.id) && <Loader2 className="inline h-4 w-4 animate-spin mr-1.5" aria-hidden="true" />}
+                            {expandedResults.has(result.id) ? "Hide details" : "View details"}
+                          </>}
+                          onClick={() => toggleDetails(result.id)}
+                          ariaPressed={expandedResults.has(result.id)}
+                          testId={`button-details-${result.id}`}
+                        />
+                        {result.countyId && (
+                          <GooglePill
+                            icon={Building}
+                            label="Property lookup"
+                            href={`/property?countyId=${result.countyId}`}
+                            external
+                            testId={`button-property-lookup-${result.id}`}
+                          />
+                        )}
+                      </>}
                     >
-                      <div className="space-y-2.5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0 space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {result.permitNumber && (
-                                <span className="text-sm font-semibold" data-testid={`text-permit-number-${result.id}`}>{result.permitNumber}</span>
-                              )}
-                              {result.permitType && (
-                                <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{result.permitType}</Badge>
-                              )}
-                              <StatusBadge status={result.status} />
-                            </div>
-                            {result.address && (
-                              <p className="text-sm flex items-center gap-1.5">
-                                <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                {result.address}
-                              </p>
-                            )}
-                            {result.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">{result.description}</p>
-                            )}
-                          </div>
-                          <div className="text-right shrink-0 space-y-1">
-                            {result.issuedDate && (
-                              <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums block">{result.issuedDate}</span>
-                            )}
-                            {result.databaseName && (
-                              <span className="text-[11px] text-muted-foreground whitespace-nowrap block">
-                                {result.jurisdiction || result.databaseName}
-                              </span>
-                            )}
-                          </div>
-                        </div>
+                      {result.description && (
+                        <p className="g-card__line line-clamp-2">{result.description}</p>
+                      )}
 
-                        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
+                      {(result.applicantName || result.contractorName || result.parcelNumber || result.district) && (
+                        <p className="g-card__meta flex flex-wrap items-center gap-x-4 gap-y-1">
                           {result.applicantName && (
                             <span className="flex items-center gap-1">
-                              <User className="h-3 w-3 flex-shrink-0" />
+                              <User className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               {result.applicantName}
                             </span>
                           )}
                           {result.contractorName && (
                             <span className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3 flex-shrink-0" />
+                              <Building2 className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               {result.contractorName}
                             </span>
                           )}
                           {result.parcelNumber && (
                             <span className="flex items-center gap-1">
-                              <Hash className="h-3 w-3 flex-shrink-0" />
+                              <Hash className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               {result.parcelNumber}
                             </span>
                           )}
                           {result.district && (
                             <span className="flex items-center gap-1">
-                              <Globe className="h-3 w-3 flex-shrink-0" />
+                              <Globe className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
                               {result.district}
                             </span>
                           )}
-                        </div>
+                        </p>
+                      )}
 
-                        {(result.expirationDate || result.finalizedDate) && (
-                          <div className="flex items-center gap-x-4 gap-y-1 flex-wrap text-xs text-muted-foreground">
-                            {result.expirationDate && (
-                              <span className="flex items-center gap-1">
-                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                Expires {result.expirationDate}
-                              </span>
-                            )}
-                            {result.finalizedDate && (
-                              <span className="flex items-center gap-1">
-                                <CalendarDays className="h-3 w-3 flex-shrink-0" />
-                                Finalized {result.finalizedDate}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                      {(result.expirationDate || result.finalizedDate) && (
+                        <p className="g-card__meta flex flex-wrap items-center gap-x-4 gap-y-1">
+                          {result.expirationDate && (
+                            <span className="flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                              Expires {result.expirationDate}
+                            </span>
+                          )}
+                          {result.finalizedDate && (
+                            <span className="flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                              Finalized {result.finalizedDate}
+                            </span>
+                          )}
+                        </p>
+                      )}
 
-                        {result.contacts && Array.isArray(result.contacts) && result.contacts.length > 0 && (
-                          <div className="border-t border-border/40 pt-2.5 mt-1">
-                            <p className="text-[11px] font-medium text-muted-foreground flex items-center gap-1 mb-2">
-                              <Users className="h-3 w-3" />
-                              Contacts ({result.contacts.length})
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                              {(result.contacts as any[]).map((contact: any, ci: number) => (
-                                <div key={ci} className="flex items-start gap-2 text-xs px-2.5 py-2 rounded-md bg-muted/40">
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-[10px] text-muted-foreground">{contact.type}</span>
-                                      <span className="font-medium truncate">
-                                        {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
-                                      </span>
-                                    </div>
-                                    {contact.company && (
-                                      <p className="text-muted-foreground mt-0.5 truncate">{contact.company}</p>
-                                    )}
-                                    <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
-                                      {contact.phone && (
-                                        <span className="flex items-center gap-1">
-                                          <Phone className="h-2.5 w-2.5" />
-                                          {contact.phone}
-                                        </span>
-                                      )}
-                                      {contact.email && (
-                                        <span className="flex items-center gap-1">
-                                          <Mail className="h-2.5 w-2.5" />
-                                          {contact.email}
-                                        </span>
-                                      )}
-                                    </div>
+                      {result.contacts && Array.isArray(result.contacts) && result.contacts.length > 0 && (
+                        <div className="mt-3 pt-3 g-divider">
+                          <p className="g-card__meta flex items-center gap-1 mb-2">
+                            <Users className="h-3 w-3" aria-hidden="true" />
+                            Contacts ({result.contacts.length})
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                            {(result.contacts as any[]).map((contact: any, ci: number) => (
+                              <div key={ci} className="flex items-start gap-2 text-xs px-2.5 py-2 rounded-lg bg-muted/40">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-muted-foreground">{contact.type}</span>
+                                    <span className="font-medium truncate">
+                                      {[contact.firstName, contact.lastName].filter(Boolean).join(" ")}
+                                    </span>
                                   </div>
+                                  {contact.company && (
+                                    <p className="text-muted-foreground mt-0.5 truncate">{contact.company}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-0.5 text-muted-foreground">
+                                    {contact.phone && (
+                                      <span className="flex items-center gap-1">
+                                        <Phone className="h-2.5 w-2.5" aria-hidden="true" />
+                                        {contact.phone}
+                                      </span>
+                                    )}
+                                    {contact.email && (
+                                      <span className="flex items-center gap-1">
+                                        <Mail className="h-2.5 w-2.5" aria-hidden="true" />
+                                        {contact.email}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {expandedResults.has(result.id) && (
+                        <div className="mt-3 pt-3 g-divider">
+                          {loadingDetails.has(result.id) ? (
+                            <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                              Fetching permit details...
+                            </div>
+                          ) : permitDetails[result.id] && Object.keys(permitDetails[result.id]).length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                              {Object.entries(permitDetails[result.id]).map(([key, value]) => (
+                                <div key={key} className="flex items-baseline gap-2 text-xs py-1.5 border-b border-dashed border-border/30">
+                                  <span className="font-medium text-muted-foreground min-w-[110px] flex-shrink-0">{key}</span>
+                                  <span className="text-foreground break-all">{String(value || "—")}</span>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => toggleDetails(result.id)}
-                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                            data-testid={`button-details-${result.id}`}
-                          >
-                            {loadingDetails.has(result.id) ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Eye className="h-3 w-3" />
-                            )}
-                            {expandedResults.has(result.id) ? "Hide details" : "View details"}
-                            {expandedResults.has(result.id) ? (
-                              <ChevronUp className="h-3 w-3" />
-                            ) : (
-                              <ChevronDown className="h-3 w-3" />
-                            )}
-                          </button>
-                          {result.countyId && (
-                            <a
-                              href={`/property?countyId=${result.countyId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                              data-testid={`button-property-lookup-${result.id}`}
-                            >
-                              <Building className="h-3 w-3" />
-                              Property lookup
-                              <ExternalLink className="h-2.5 w-2.5 opacity-50" />
-                            </a>
-                          )}
+                          ) : permitDetails[result.id] ? (
+                            <p className="text-xs text-muted-foreground py-2">No additional details available.</p>
+                          ) : null}
                         </div>
-
-                        {expandedResults.has(result.id) && (
-                          <div className="border-t border-border/40 pt-3 mt-1">
-                            {loadingDetails.has(result.id) ? (
-                              <div className="flex items-center gap-2 py-4 justify-center text-sm text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Fetching permit details...
-                              </div>
-                            ) : permitDetails[result.id] && Object.keys(permitDetails[result.id]).length > 0 ? (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-                                {Object.entries(permitDetails[result.id]).map(([key, value]) => (
-                                  <div key={key} className="flex items-baseline gap-2 text-xs py-1.5 border-b border-dashed border-border/30">
-                                    <span className="font-medium text-muted-foreground min-w-[110px] flex-shrink-0">{key}</span>
-                                    <span className="text-foreground break-all">{String(value || "—")}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : permitDetails[result.id] ? (
-                              <p className="text-xs text-muted-foreground py-2">No additional details available.</p>
-                            ) : null}
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                      )}
+                    </GoogleListRow>
                   ))
                 )}
-              </div>
+              </GoogleList>
             </div>
           )}
 
@@ -1099,11 +1052,7 @@ export default function SearchPage() {
                   icon={AlertCircle}
                   title="No portal could be searched"
                   description="The live search didn't reach any portal, so there may be permits it couldn't see. Try again later, or open a portal directly from the Directory."
-                  action={
-                    <Button asChild variant="outline" size="sm">
-                      <Link href="/databases" data-testid="link-browse-directory-failed">Browse the Directory</Link>
-                    </Button>
-                  }
+                  action={<GooglePill label="Browse the Directory" href="/databases" testId="link-browse-directory-failed" />}
                 />
               ) : (
                 <EmptyState
@@ -1125,11 +1074,7 @@ export default function SearchPage() {
             icon={Database}
             title="Nothing to search here yet"
             description={noPortalsMessage}
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link href="/databases" data-testid="link-browse-directory">Browse the Directory</Link>
-              </Button>
-            }
+            action={<GooglePill label="Browse the Directory" href="/databases" testId="link-browse-directory" />}
           />
         </div>
       )}

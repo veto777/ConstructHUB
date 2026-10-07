@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ArrowRight, ChevronDown, ChevronRight, Circle, CircleCheck } from "lucide-react";
+import { ArrowRight, ChevronDown, Circle, CircleCheck } from "lucide-react";
 import type { DashboardChecklistItem } from "@shared/dashboard";
 import { Card } from "@/components/ui/card";
-import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { DashLink, FOCUS_RING } from "./dash-link";
 
 const COLLAPSED_KEY = "constructhub:dashboard:checklist-collapsed";
@@ -25,62 +25,59 @@ export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3">
-            <h2 id="dashboard-checklist-title" className="text-base font-semibold">Getting started</h2>
+            <h2 id="dashboard-checklist-title" className="g-header__title">Getting started</h2>
             <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-checklist-count">{done} of {items.length} done</span>
           </div>
           <Progress value={(done / items.length) * 100} className="mt-2 h-1.5 max-w-md" aria-label={`Getting started: ${done} of ${items.length} steps done`} />
         </div>
-        <Button
-          variant="ghost"
+        <GooglePill
+          variant="quiet"
           size="sm"
-          className="min-h-10 sm:min-h-8 shrink-0"
+          className="shrink-0"
           onClick={toggle}
-          aria-expanded={!collapsed}
-          aria-controls={listId}
-          data-testid="button-checklist-toggle"
-        >
-          {collapsed ? "Show steps" : "Hide"}
-          <ChevronDown className={`ml-1 h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`} aria-hidden="true" />
-        </Button>
+          label={<span className="inline-flex items-center gap-1">{collapsed ? "Show steps" : "Hide"}<ChevronDown className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`} aria-hidden="true" /></span>}
+          testId="button-checklist-toggle"
+        />
       </div>
       {!collapsed && (
-        <ul id={listId} className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <GoogleList as="ul" id={listId} className="mt-2">
           {items.map((item) => {
             const next = item.key === nextKey;
             return (
-            <li key={item.key} data-testid={`checklist-${item.key}`} data-done={item.done ? "true" : "false"} data-next={next ? "true" : undefined}>
-              <DashLink
-                href={item.href}
-                surface={item.surface}
-                className={`group flex h-full items-start gap-3 rounded-lg border p-3 transition-colors ${next ? "border-primary/60 bg-primary/5 hover:bg-primary/10" : "hover:bg-accent"} ${FOCUS_RING}`}
-                data-testid={`link-checklist-${item.key}`}
-              >
-                {item.done ? (
-                  <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-400" aria-hidden="true" />
-                ) : (
-                  <Circle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground/60" aria-hidden="true" />
-                )}
-                <span className="min-w-0 flex-1">
-                  {next && <span className="mb-1 block text-xs font-semibold text-primary" data-testid="badge-checklist-next">Next step</span>}
-                  <span className={`block text-sm font-medium ${item.done ? "text-muted-foreground line-through decoration-muted-foreground/50" : ""}`}>
+              <GoogleListRow
+                key={item.key}
+                as="li"
+                size="md"
+                testId={`checklist-${item.key}`}
+                data-done={item.done ? "true" : "false"}
+                data-next={next ? "true" : undefined}
+                leading={item.done
+                  ? <CircleCheck className="g-open" />
+                  : <Circle className="text-muted-foreground/60" />}
+                title={(
+                  <DashLink
+                    href={item.href}
+                    surface={item.surface}
+                    className={`${item.done ? "text-muted-foreground line-through decoration-muted-foreground/50" : ""} ${FOCUS_RING}`}
+                    data-testid={`link-checklist-${item.key}`}
+                  >
                     {item.label}
                     <span className="sr-only">{item.done ? " (done)" : next ? " (next step)" : " (to do)"}</span>
-                  </span>
-                  {/* A finished step is one line: the open ones are what matter. */}
-                  {!item.done && <span className="mt-0.5 block text-xs text-muted-foreground">{item.description}</span>}
-                  {/* Looks like the page's primary button; the whole row is the link. */}
-                  {next && (
-                    <span className={`${buttonVariants({ size: "sm", variant: "outline" })} mt-3 min-h-9 pointer-events-none`} aria-hidden="true">
-                      Start <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </span>
-                  )}
-                </span>
-                {!item.done && !next && <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
-              </DashLink>
-            </li>
+                  </DashLink>
+                )}
+                badges={next && <span className="g-chip g-chip--sm g-accent normal-case" data-testid="badge-checklist-next">Next step</span>}
+                /* A finished step is one line: the open ones are what matter. */
+                meta={!item.done ? item.description : undefined}
+                /* The page's one solid button: the next step. */
+                actions={next && (
+                  <DashLink href={item.href} surface={item.surface} className="g-pill g-pill--solid g-pill--sm" aria-label={`Start: ${item.label}`}>
+                    <span>Start</span> <ArrowRight aria-hidden="true" />
+                  </DashLink>
+                )}
+              />
             );
           })}
-        </ul>
+        </GoogleList>
       )}
     </Card>
   );

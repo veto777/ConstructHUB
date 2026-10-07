@@ -4,7 +4,6 @@ import { featureIntroPath } from "@shared/feature-pages";
 import { PLANS } from "@shared/plans";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { inNativeApp } from "@/lib/app-shell";
 import { DashLink, FOCUS_RING } from "./dash-link";
@@ -14,8 +13,8 @@ import { formatCount, formatMetricValue, percentOf, toneBar, toneText, DASH } fr
 
 const usedOf = (m: DashboardMetric): number | null => (typeof m.value === "number" ? m.value : null);
 
-/** The metric a tile leads with: label, big tabular number, then the meter or hint. */
-const HERO_SIZE = { lg: "text-2xl", md: "text-2xl", sm: "text-xl" } as const;
+/** The metric a tile leads with: label, a quiet 20px/400 number (Google's weight), then the meter or hint. */
+const HERO_SIZE = { lg: "text-[20px] leading-6", md: "text-[20px] leading-6", sm: "text-base leading-6" } as const;
 
 export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; metric: DashboardMetric; size?: keyof typeof HERO_SIZE }) {
   const value = formatMetricValue(metric);
@@ -24,11 +23,11 @@ export function MetricHero({ tileKey, metric, size = "lg" }: { tileKey: string; 
   const unknown = value === DASH;
   return (
     <div className="min-w-0" data-testid={`metric-${tileKey}-${metric.key}`}>
-      <dt className="text-xs font-medium text-muted-foreground leading-snug">{metric.label}</dt>
+      <dt className="text-xs text-muted-foreground leading-snug">{metric.label}</dt>
       <dd className="mt-1">
-        <span className={`flex items-baseline gap-1.5 font-semibold tabular-nums tracking-tight ${HERO_SIZE[size]} ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
+        <span className={`flex items-baseline gap-1.5 font-normal tabular-nums ${HERO_SIZE[size]} ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
           <span className="truncate">{value}</span>
-          {metric.format === "rating" && !unknown && <Star className="h-5 w-5 self-center fill-amber-400 text-amber-400" aria-hidden="true" />}
+          {metric.format === "rating" && !unknown && <Star className="g-star h-4 w-4 self-center fill-current" aria-hidden="true" />}
           {metric.format === "score" && !unknown && <span className="text-sm font-medium text-muted-foreground">/ 100</span>}
           {hasLimit && (
             <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
@@ -59,7 +58,7 @@ function MetricRow({ tileKey, metric }: { tileKey: string; metric: DashboardMetr
         {metric.label}
         {metric.hint && <span className="block text-xs text-muted-foreground">{metric.hint}</span>}
       </dt>
-      <dd className={`shrink-0 text-sm font-semibold tabular-nums ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
+      <dd className={`shrink-0 text-sm font-medium tabular-nums ${unknown ? "text-muted-foreground" : toneText(metric.tone)}`}>
         {value}
         {metric.limit !== undefined && (
           <span className="font-normal text-muted-foreground"> {metric.limit < 0 ? "· Unlimited" : `of ${formatCount(metric.limit)}`}</span>
@@ -98,8 +97,6 @@ function StatusPill({ tile }: { tile: DashboardTile }) {
   }
 }
 
-const textLink = `inline-flex min-h-10 sm:min-h-8 items-center gap-1 rounded-md text-sm font-medium text-primary hover:underline underline-offset-4 ${FOCUS_RING}`;
-
 export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
   // A tile key newer than this client still renders, with a generic icon.
   const Icon = TILE_ICONS[tile.key] ?? LayoutGrid;
@@ -125,7 +122,7 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
           <Icon className="h-[18px] w-[18px]" />
         </span>
         <div className="min-w-0 flex-1 pt-1.5">
-          <h3 id={titleId} className="text-sm font-semibold leading-tight">{tile.title}</h3>
+          <h3 id={titleId} className="text-base font-normal leading-6">{tile.title}</h3>
         </div>
         <div className="shrink-0 pt-1"><StatusPill tile={tile} /></div>
       </div>
@@ -153,25 +150,18 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
       </div>
 
       {tile.status !== "locked" && (
-        <div className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 ${tile.status === "ok" ? "border-t pt-3" : ""}`}>
-          {tile.status === "empty" ? (
-            // Outline: the one solid button on the page is the checklist's next step.
-            <Button asChild size="sm" variant="outline" className="min-h-10 sm:min-h-8">
-              <DashLink href={cta.href} surface={cta.surface} data-testid={`link-tile-${tile.key}`}>
-                {cta.label} <ArrowRight className="ml-1 h-3.5 w-3.5" aria-hidden="true" />
-              </DashLink>
-            </Button>
-          ) : (
-            <DashLink
-              href={cta.href}
-              surface={cta.surface}
-              className={textLink}
-              data-testid={`link-tile-${tile.key}`}
-              aria-label={cta.label === "Open" ? `Open ${tile.title}` : undefined}
-            >
-              {cta.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </DashLink>
-          )}
+        <div className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${tile.status === "ok" ? "border-t pt-3" : ""}`}>
+          {/* The tile's one action is a Google pill (the local pack's Call / Website); the page's single solid
+              button stays the checklist's next step. */}
+          <DashLink
+            href={cta.href}
+            surface={cta.surface}
+            className="g-pill g-pill--sm"
+            data-testid={`link-tile-${tile.key}`}
+            aria-label={cta.label === "Open" ? `Open ${tile.title}` : undefined}
+          >
+            <span>{cta.label}</span> <ArrowRight aria-hidden="true" />
+          </DashLink>
           {/* Not for sale yet: its intro page says what it will do. */}
           {tile.status === "coming_soon" && intro && intro !== cta.href && (
             <DashLink

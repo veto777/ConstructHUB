@@ -31,7 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppPage, PageHeader, EmptyState, StatusPill } from "@/components/app-ui";
+import { AppPage, EmptyState } from "@/components/app-ui";
+import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
   Clock,
@@ -110,8 +111,8 @@ export default function SchedulesPage() {
     return (
       <AppPage width="narrow">
         <div className="rounded-xl border bg-card p-5" role="alert">
-          <h1 className="text-base font-semibold">Scrape schedules</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="g-header__title">Scrape schedules</h1>
+          <p className="mt-2 g-text-2">
             {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
           </p>
         </div>
@@ -121,16 +122,17 @@ export default function SchedulesPage() {
 
   return (
     <AppPage width="narrow" testId="page-schedules">
-      <PageHeader
-        title={<span data-testid="text-page-title">Scrape schedules</span>}
+      {/* Google's list format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title="Scrape schedules"
         description="Automatic permit refreshes for live-searchable portals. Admins only."
+        flush
         actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button data-testid="button-add-schedule">
-                <Plus className="h-4 w-4 mr-2" />
-                Add schedule
-              </Button>
+              <GooglePill icon={Plus} variant="solid" label="Add schedule" testId="button-add-schedule" />
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -155,71 +157,54 @@ export default function SchedulesPage() {
       {isLoading ? (
         <div className="space-y-2" data-testid="schedules-loading">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border bg-card" />
+            <div key={i} className="h-20 animate-pulse g-divider" />
           ))}
         </div>
       ) : schedules && schedules.length > 0 ? (
-        <div className="rounded-xl border bg-card divide-y">
+        <GoogleList testId="list-schedules">
           {schedules.map((schedule) => (
-            <div
+            <GoogleListRow
               key={schedule.id}
-              className="flex items-center gap-4 px-4 py-3.5"
-              data-testid={`card-schedule-${schedule.id}`}
-            >
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold">{getDatabaseName(schedule.databaseId)}</span>
-                  <span className="text-xs text-muted-foreground capitalize">{schedule.frequency}</span>
-                  {schedule.isActive ? (
-                    <StatusPill tone="success">Active</StatusPill>
-                  ) : (
-                    <StatusPill tone="neutral">Paused</StatusPill>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="capitalize">{schedule.searchType}</span>: "{schedule.searchValue}"
-                  {schedule.lastRunAt && (
-                    <>
-                      <span className="mx-1.5 text-border">·</span>
-                      Last run {new Date(schedule.lastRunAt).toLocaleDateString()}
-                    </>
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              size="md"
+              testId={`card-schedule-${schedule.id}`}
+              title={getDatabaseName(schedule.databaseId)}
+              meta={[
+                schedule.isActive ? <span key="state" className="g-open">Active</span> : <span key="state">Paused</span>,
+                <span key="freq" className="capitalize">{schedule.frequency}</span>,
+                <span key="query"><span className="capitalize">{schedule.searchType}</span>: "{schedule.searchValue}"</span>,
+                schedule.lastRunAt ? `Last run ${new Date(schedule.lastRunAt).toLocaleDateString()}` : null,
+              ]}
+              trailing={<>
                 <Switch
                   checked={schedule.isActive}
                   onCheckedChange={(checked) =>
                     toggleMutation.mutate({ id: schedule.id, isActive: checked })
                   }
+                  aria-label={schedule.isActive ? "Pause schedule" : "Resume schedule"}
                   data-testid={`switch-schedule-${schedule.id}`}
                 />
-                <Button
-                  size="icon"
-                  variant="ghost"
+                <GooglePill
+                  icon={Trash2}
+                  variant="quiet"
+                  size="sm"
+                  className="px-2"
+                  label={<span className="sr-only">Delete schedule</span>}
                   onClick={() => setPendingDelete(schedule)}
                   disabled={deleteMutation.isPending}
-                  aria-label="Delete schedule"
+                  ariaLabel="Delete schedule"
                   title="Delete schedule"
-                  data-testid={`button-delete-schedule-${schedule.id}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              </div>
-            </div>
+                  testId={`button-delete-schedule-${schedule.id}`}
+                />
+              </>}
+            />
           ))}
-        </div>
+        </GoogleList>
       ) : (
         <EmptyState
           icon={Clock}
           title="No schedules yet"
           description="Schedules run automatically on their frequency against portals that support live search."
-          action={
-            <Button variant="outline" onClick={() => setDialogOpen(true)} data-testid="button-empty-add-schedule">
-              <Plus className="h-4 w-4 mr-2" />
-              Add schedule
-            </Button>
-          }
+          action={<GooglePill icon={Plus} label="Add schedule" onClick={() => setDialogOpen(true)} testId="button-empty-add-schedule" />}
         />
       )}
 
