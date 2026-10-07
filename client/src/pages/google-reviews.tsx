@@ -1736,7 +1736,9 @@ function GoogleProfileReviewsTab() {
   const { data: gbp } = useQuery<any>({ queryKey: ["/api/gbp/status"] });
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState("all");
+  // The Locations page's "Reviews" pill arrives with ?location=<id>: start filtered to that business.
+  const [locationParam] = useUrlParam("location");
+  const [locationFilter, setLocationFilter] = useState(locationParam && /^\d+$/.test(locationParam) ? `loc-${locationParam}` : "all");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [responseFilter, setResponseFilter] = useState("all");
   const [expandedReviewId, setExpandedReviewId] = useState<number | null>(null);

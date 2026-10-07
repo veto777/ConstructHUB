@@ -10,6 +10,8 @@ import { useUrlParam } from '@/hooks/use-url-param';
 import { Link } from 'wouter';
 import { inNativeApp } from '@/lib/app-shell';
 import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
+import { fullAddress } from '@/lib/address';
+import { LocationLocalCard, type LatestReview } from '@/components/location-local-card';
 export function useAgencyFilter() {
   const [client,setClient]=useUrlParam('clientId'),[q,setQ]=useUrlParam('q'),[status,setStatus]=useUrlParam('status'),[offset,setOffset]=useUrlParam('offset');
   const params=new URLSearchParams({q:q||'',status:status||'all',offset:offset||'0',...(client?{clientId:client}:{})});
@@ -17,13 +19,7 @@ export function useAgencyFilter() {
     setClient:(v:string)=>{setClient(v||null);setOffset(null);},setQ:(v:string)=>{setQ(v||null);setOffset(null);},setStatus:(v:string)=>{setStatus(v==='all'?null:v);setOffset(null);},setOffset:(v:number)=>setOffset(v?String(v):null)};
 }
 export const selectClass='min-h-10 max-w-full rounded-lg border p-2 bg-background text-sm';
-/** Street line plus city, state and ZIP. New locations store only the street line in `address`; older rows
- *  (and Places text-search adds) hold Google's full formatted address, so don't append the locality twice. */
-export function fullAddress(l:{address?:string|null;city?:string|null;state?:string|null;zipCode?:string|null}):string {
-  const street=l.address?.trim()||'';
-  if(street&&l.city&&l.state&&street.includes(`${l.city}, ${l.state}`))return street;
-  return [street,l.city,[l.state,l.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-}
+export { fullAddress } from '@/lib/address';
 export function Pager({offset,total,onChange}:{offset:number;total:number;onChange:(n:number)=>void}) {
   return <div className="flex flex-wrap gap-2 items-center justify-between text-sm"><Button variant="outline" disabled={!offset} onClick={()=>onChange(Math.max(0,offset-50))}>Previous page</Button><span>{total?offset+1:0}–{Math.min(offset+50,total)} of {total}</span><Button variant="outline" disabled={offset+50>=total} onClick={()=>onChange(offset+50)}>Next page</Button></div>;
 }
@@ -43,6 +39,10 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
   const noPlan=!!ent&&!ent.accessPlan;
   const params=new URLSearchParams({paged:'true',q:f.q,status:f.status,offset:String(f.offset)});
   const {data,error}=useQuery<any>({queryKey:['/api/locations','paged',params.toString()],queryFn:()=>apiRequest('GET','/api/locations?'+params).then(r=>r.json())});
+  // The newest review with text per location, for the card's snippet (one request for the whole page).
+  const {data:recentReviews}=useQuery<{items:any[]}>({queryKey:['/api/google-profile-reviews','paged','snippets'],queryFn:()=>apiRequest('GET','/api/google-profile-reviews?paged=true&offset=0').then(r=>r.json()),enabled:!!data?.items?.length,staleTime:60_000});
+  const latestReviews=new Map<number,LatestReview>();
+  for(const r of recentReviews?.items??[])if(r.locationId&&r.comment&&!latestReviews.has(r.locationId))latestReviews.set(r.locationId,r);
   const agencyPlan=PLANS[planForModule('agencyWorkspace')].name;
   return <Section title="Your locations" contentClassName="space-y-4">
     <Toolbar search={{value:f.q,onChange:f.setQ,placeholder:'Global location search'}} activeFilters={f.status==='all'?0:1} filters={<select className={selectClass} aria-label="Location status" value={f.status} onChange={e=>f.setStatus(e.target.value)}>{Object.entries(statusLabels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select>}/>
@@ -52,7 +52,8 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
       <div className="min-w-0"><p className="font-semibold truncate">{l.businessName}</p><p className="text-sm text-muted-foreground truncate">{fullAddress(l)||'Address not set'} · {l.gbpLocationName?'Linked to Google':'Not linked to Google yet'}</p></div>
       <Button variant="outline" onClick={()=>open(l.id)} data-testid="button-open-single-location">Open your Business Profile</Button>
     </div>;})()}
-    <div className="overflow-auto"><table className={appTable.table}><thead className={appTableCards.thead}><tr><th className="text-left p-2">Location</th><th className="text-left p-2">Address</th><th className="text-left p-2">Google link</th><th className="p-2"><span className="sr-only">Open</span></th></tr></thead><tbody>{data?.items.map((l:any)=><tr key={l.id} className={`${appTable.tr} ${appTableCards.tr}`} data-testid={`own-location-${l.id}`}><td className={`${appTableCards.td} !text-foreground break-words`}><button className="min-h-10 text-left font-medium hover:underline" onClick={()=>open(l.id)}>{l.businessName}</button></td><td className={`${appTableCards.td} !text-foreground break-words`}>{fullAddress(l)||'Not set'}</td><td className={`${appTableCards.td} !text-foreground break-words`}>{l.gbpLocationName?'Linked':'Not linked'}</td><td className={`${appTableCards.td} !text-foreground`}><Button size="sm" variant="outline" onClick={()=>open(l.id)} data-testid={`button-open-location-${l.id}`}>Open</Button></td></tr>)}</tbody></table></div>
+    {/* Each location as a Google local-pack entry (owner, 2026-10-06), from our stored data only. */}
+    <div className="g-surface" data-testid="own-locations-list">{data?.items.map((l:any)=><LocationLocalCard key={l.id} location={l} latestReview={latestReviews.get(l.id)} onOpen={()=>open(l.id)} testId={`own-location-${l.id}`}/>)}</div>
     {data&&!data.items.length&&(f.q||f.status!=='all'
       ? <p className="text-sm text-muted-foreground">No locations match these filters.</p>
       : <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4" data-testid="own-locations-empty">

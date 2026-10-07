@@ -29,9 +29,11 @@ export function highlightText(text: string, highlight?: string | null): ReactNod
  * strip on the right, pill actions underneath. Pass only real data — any prop left out is simply not shown.
  */
 export function GoogleLocalCard({
-  name, onOpen, href, rating, reviewCount, priceRange, category, open, hours, address, statusTitle,
+  name, onOpen, href, rating, reviewCount, priceRange, category, open, hours, address, statusTitle, closedLabel,
   yearsInBusiness, snippet, photos, actions, meta, badges, children, testId, className, nameTestId,
 }: {
+  /** Replaces "Closed" (e.g. "Permanently closed"). */
+  closedLabel?: string;
   name: ReactNode;
   /** Makes the name a button (our detail view) … */
   onOpen?: () => void;
@@ -71,7 +73,7 @@ export function GoogleLocalCard({
       <div className="g-card__body">
         <h3 className="g-card__title">{title}{badges && <span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">{badges}</span>}</h3>
         <GoogleStars rating={rating} count={reviewCount} priceRange={priceRange} category={category} />
-        <GoogleOpenStatus open={open ?? null} hours={hours} address={address} title={statusTitle} />
+        <GoogleOpenStatus open={open ?? null} hours={hours} address={address} title={statusTitle} closedLabel={closedLabel} />
         {yearsInBusiness && <p className="g-card__line">{yearsInBusiness}</p>}
         {meta && <p className="g-card__meta">{meta}</p>}
         {snippet?.text && (
