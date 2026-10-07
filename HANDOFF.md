@@ -2,6 +2,41 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 💳 2026-10-07 — the CRM is a SEPARATE PRODUCT (own plans, own subscription) · checkout-return fix · Google tag · ad doors
+- **Owner decisions (2026-10-07):** two apps, sold separately; nobody is forced to buy both. Platform tiers keep their
+  prices and no longer include the CRM. CRM pricing = half of Housecall Pro (verified on housecallpro.com/pricing):
+  **CRM Basic $39/mo ($348/yr, 1 seat) · Essentials $94/mo ($888/yr, 5) · Max $164/mo ($1,788/yr, 8)**, extra seat
+  $17/mo, 14-day trial. Every purchase must say what the buyer gets AND what they are not getting.
+- **Model:** `shared/crm-plans.ts` (CRM price book; annual is explicit, NOT `ANNUAL_MONTHS`). `PlanLimits.crmSeats` is
+  gone: it became `agencySeats` (Agency team pool); `extra_seat` is Agency-only. Every plan has `notIncluded[]`.
+- **Billing:** `crm_subscriptions` (own table, created at boot) + `server/crm/billing.ts`
+  (`/api/crm/billing/{plans,subscription,checkout,change}`). Same Stripe customer, second subscription marked
+  `metadata.product=crm` on `chub_v1_crmplan_*` / `chub_v1_crmseat_*` prices (created lazily like the others). The
+  platform webhook hands CRM events to `applyCrmSubscription` / `endCrmSubscription` and never writes them to
+  `subscriptions`; platform checkout ignores CRM subscriptions when deciding "already subscribed" / trial.
+- **Gate:** `requireOrg()` answers 402 `crm_plan_required` unless the ORG OWNER has an active CRM plan, is beta, or is
+  platform staff (`server/crm/entitlements.ts`, 30 s cache). `/api/crm/me` carries `crm:{active,…}`; the portal shows
+  `CrmPaywall` (plans; nothing sold inside the iPhone apps). `CRM_REQUIRE_PLAN=0` turns the gate off.
+  Texting = CRM plan's segments + a platform plan's, one monthly pool (`reserveQuotaFor(..., extra)`).
+- **UI:** /pricing has "Not included" on every card, a `#crm` section, and `PurchaseReviewDialog` before any first
+  purchase. CRM Settings shows the CRM subscription + the account's invoices; receipts name CRM lines.
+  Logo and the lower profile chip open the profile in both apps (owner request).
+- **FIXED (prod bug, owner hit it 18:08 ET):** Stripe success/cancel/portal-return URLs used `getBaseUrl()` =
+  `PORTAL_URL` in production, so a buyer landed on `portal.constructhub.us/pricing` (no such page; separate session;
+  another account's CRM). They now use `appReturnBaseUrl(req)` (`server/site-context.ts`). The purchase itself was
+  always recorded on the right account.
+- **Google tag:** `server/google-tag.ts`, runtime env on vb11: `GOOGLE_TAG_IDS`, `GOOGLE_ADS_CONVERSION_{SIGNUP,
+  PURCHASE,CRM}`. Nothing is injected until the ids are set (OWNER TO PROVIDE). Marketing hosts only.
+- **Ad doors:** `server/ads-landing.ts` — `/googleads-features` (= /features), `/googleads-crm` (= /features/crm):
+  Google click id + `k=` key (`ADS_LP_KEYS`, default `ch_feat_2026,ch_crm_2026`), verified-Googlebot exception, bots
+  403 + added to Click Guard `blocked_ips` for `ADS_LP_DOMAIN` (default constructhub.us — a Click Guard site for it
+  must exist for exclusions; hits are logged in `ads_lp_hits` regardless). Visitors are NOT excluded (nationwide).
+- **Not done / owner:** Google tag ids; a Click Guard site for constructhub.us + the Ads script; Cloudflare ASN header
+  (`ADS_LP_ASN_HEADER`) for datacenter detection; a "CRM subscription started" email (receipts and invoices work;
+  the $0 trial start sends nothing); Stripe's own trial-ending reminder should be switched on in the dashboard.
+- Tests: suite at the pre-change baseline (52 pre-existing failures: no DB/server on the tower), +16 new
+  (`server/ads-landing.test.ts`, `server/crm/crm-plans.test.ts`).
+
 ## 📷 2026-10-07 — JobCam phase A live · deploy incident + new deploy rule (READ THIS)
 - **DEPLOY RULE (new, enforced by `script/deploy-vb11.sh`):** production is built ONLY from committed code on `main`
   that type-checks, from the release checkout: `cd ~/ConstructHUB-release && git merge --ff-only <tested commit> &&

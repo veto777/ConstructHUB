@@ -13,6 +13,7 @@ import {
 } from "@shared/crm-plans";
 import type { BillingInterval } from "@shared/plans";
 import { PurchaseReviewDialog, type PurchaseReview } from "@/components/purchase-review";
+import { inNativeApp } from "@/lib/app-shell";
 
 /**
  * The CRM's plans — a separate product from the ConstructHUB platform plans,
@@ -224,6 +225,16 @@ export function CrmPaywall({ isOwner, orgName }: { isOwner: boolean; orgName?: s
     const params = new URLSearchParams(window.location.search);
     if (params.get("crm_canceled")) toast({ title: "Checkout canceled", description: "No charges were made." });
   }, [toast]);
+  // The iPhone apps sell nothing (App Store 3.1.3(f); docs/app/APP-STORE-PLAN.md):
+  // no plan names, no prices, no link to Pricing.
+  if (inNativeApp()) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-16 text-center" data-testid="page-crm-paywall">
+        <h1 className="text-2xl font-semibold">The CRM isn't on this account</h1>
+        <p className="mt-3 text-muted-foreground">Sign in with an account that has the CRM, or ask your account owner.</p>
+      </div>
+    );
+  }
   return (
     <div className="max-w-5xl mx-auto px-4 py-10" data-testid="page-crm-paywall">
       <h1 className="text-2xl sm:text-3xl font-semibold text-center">Choose a CRM plan to open the CRM</h1>

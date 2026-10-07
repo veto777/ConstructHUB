@@ -6,6 +6,7 @@ import { marketingUrl } from "@/lib/site";
 import { InvoicesPanel } from "@/pages/settings/billing/invoices-panel";
 import { useBillingPortal } from "@/pages/settings/billing/use-billing-portal";
 import type { CrmSubscriptionInfo } from "@/components/crm-plans";
+import { inNativeApp } from "@/lib/app-shell";
 
 /**
  * CRM → Settings → "CRM subscription & invoices": the account's CRM plan (its
@@ -18,6 +19,8 @@ export function CrmBillingCard() {
   const { data: sub } = useQuery<CrmSubscriptionInfo>({ queryKey: ["/api/crm/billing/subscription"] });
   const portal = useBillingPortal();
   const included = sub?.access.via === "beta" || sub?.access.via === "admin";
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): no plan, billing or invoice surface there.
+  if (inNativeApp()) return null;
   return (
     <div className="space-y-4" data-testid="section-crm-billing">
       <Card data-testid="card-crm-subscription">
