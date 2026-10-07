@@ -6,7 +6,7 @@ import {
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug, PlayCircle,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -545,6 +545,16 @@ export function AppSidebar() {
                   </div>
                 </SidebarMenuItem>
               ))}
+              {/* Every feature's guide and walkthrough video (owner, 2026-10-07: "a dedicated tutorial section that
+                  has all features and all videos"). */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild data-active={location === "/tutorials"}>
+                  <Link href="/tutorials" data-testid="link-nav-tutorials" className="flex items-center gap-2 w-full">
+                    <PlayCircle className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
+                    <span>Tutorials</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plans, add-ons or services there. */}
               {!inNativeApp() && <CollapsibleNavGroup group={pricingGroup} />}
             </SidebarMenu>

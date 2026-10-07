@@ -1,0 +1,97 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "cloudflare.connections",
+  "title": "Cloudflare: connect an account",
+  "viewport": { "width": 1280, "height": 800 },
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/cloudflare",
+      "caption": "Open Cloudflare from the sidebar",
+      "narration": "This is the Cloudflare page. Before it can show anything, it needs access to a Cloudflare account. Let's connect one.",
+      "holdMs": 800
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-connection-connections\"]",
+      "caption": "Open the Connections tab",
+      "narration": "Open the Connections tab."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"help-button-cloudflare.connections\"]",
+      "caption": "The i button explains this tab",
+      "narration": "Every tab has an i button. It tells you what the tab is for, what it does, how to run it and how it works.",
+      "holdMs": 2500
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Press Escape to close it",
+      "narration": "Press Escape to close it."
+    },
+    {
+      "action": "highlight",
+      "selector": "label:has-text(\"Global API Key\")",
+      "caption": "Your Global API Key is used once and never saved",
+      "narration": "The recommended way uses your Cloudflare login email and your Global API Key. You find the key in Cloudflare, under My Profile, API Tokens, Global API Key, View. ConstructHUB uses it once to create a limited key, and never saves it.",
+      "holdMs": 1500
+    },
+    {
+      "action": "type",
+      "selector": "label:has-text(\"Cloudflare login email\") input",
+      "value": "{{DEMO_CLOUDFLARE_EMAIL}}",
+      "caption": "Enter your Cloudflare login email",
+      "narration": "Enter your Cloudflare login email.",
+      "redact": true
+    },
+    {
+      "action": "type",
+      "selector": "label:has-text(\"Global API Key\") input",
+      "value": "{{DEMO_CLOUDFLARE_GLOBAL_KEY}}",
+      "caption": "Paste the Global API Key",
+      "narration": "Then paste the key.",
+      "redact": true
+    },
+    {
+      "action": "click",
+      "selector": "role=button[name=\"Verify and choose zones\"]",
+      "caption": "Verify and choose zones",
+      "narration": "Choose Verify and choose zones. You may be asked to confirm it's you first. ConstructHUB checks the email and key with Cloudflare and lists your websites, which Cloudflare calls zones."
+    },
+    {
+      "action": "click",
+      "selector": "label:has-text(\"{{DEMO_ZONE_NAME}}\") input[type=\"checkbox\"]",
+      "caption": "Tick the zones to share",
+      "narration": "Tick the zones you want ConstructHUB to work with. It will not be able to touch any other zone."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Permissions: Zone Read, Analytics Read, Zone WAF Edit.",
+      "caption": "The limited key can do three things only",
+      "narration": "The limited key can do three things on those zones: read the zone, read its analytics, and edit its firewall rules. Nothing else.",
+      "holdMs": 1500
+    },
+    {
+      "action": "click",
+      "selector": "role=button[name=\"Create limited key\"]",
+      "caption": "Create limited key",
+      "narration": "Choose Create limited key. Cloudflare creates a key named ConstructHUB with today's date, and the form forgets your Global API Key."
+    },
+    {
+      "action": "scroll",
+      "selector": "role=heading[name=/^Connections/]",
+      "caption": "The account is connected",
+      "narration": "The account now shows in the Connections list, and its sites are being imported in the background.",
+      "holdMs": 1500
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-connection-work-queue\"]",
+      "caption": "Work queue shows the import finishing",
+      "narration": "Open Work queue to watch the import finish. When it says done, your sites are on the Sites tab.",
+      "holdMs": 2000
+    }
+  ]
+}
