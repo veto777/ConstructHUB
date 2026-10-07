@@ -1,6 +1,6 @@
 import { SiteConnectionGuide } from "./site-connection-guide";
-import { AppPage, PageHeader, Section } from "@/components/app-ui";
-import { Button } from "@/components/ui/button";
+import { AppPage, Section } from "@/components/app-ui";
+import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { Redirect } from "wouter";
 const guides = [
   {
@@ -110,19 +110,20 @@ export function GuidesContent() {
   return (
     <section aria-label="Guides walkthroughs">
       <AppPage width="narrow" className="!px-0 !pt-0">
-        <PageHeader title="Guides" description="Choose a tool and follow the steps at your own pace."
-          actions={<Button asChild><a href="#guide-0">Get started</a></Button>} />
+        {/* Google's typography and hairlines (owner, 2026-10-07): the walkthroughs as they were. */}
+        <GoogleSectionHeader as="h1" title="Guides" description="Choose a tool and follow the steps at your own pace." flush
+          actions={<GooglePill variant="solid" href="#guide-0" label="Get started" />} />
         <Section title="Find a guide">
-          <nav aria-label="Guide topics" className="grid gap-1 sm:grid-cols-2">
-            <a href="#guide-connection" className="flex min-h-10 items-center rounded-lg px-2 text-sm hover:bg-muted">Connect your website</a>
-            {guides.map((g, i) => <a key={g.title} href={`#guide-${i}`} className="flex min-h-10 items-center rounded-lg px-2 text-sm hover:bg-muted">{g.title}</a>)}
+          <nav aria-label="Guide topics" className="flex flex-wrap gap-2">
+            <GooglePill size="sm" href="#guide-connection" label="Connect your website" />
+            {guides.map((g, i) => <GooglePill key={g.title} size="sm" href={`#guide-${i}`} label={g.title} />)}
           </nav>
         </Section>
         <div id="guide-connection" className="scroll-mt-6"><SiteConnectionGuide /></div>
         {guides.map((g, i) => (
           <Section key={g.title} id={`guide-${i}`} title={g.title} className="scroll-mt-6"
-            actions={<Button asChild variant="outline" size="sm"><a href={g.href}>Open {g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}</a></Button>}>
-            <ol className="list-decimal space-y-5 pl-5 text-sm leading-7 marker:text-muted-foreground">
+            actions={<GooglePill size="sm" href={g.href} label={`Open ${g.title === "Security" ? "Security & activity" : g.title === "Profile Guard" ? "Locations" : g.title === "AI review replies" ? "Google Reviews" : g.title.startsWith("Posts & Photos") ? "Posts & Photos" : g.title === "Site Scan" ? "Site Scan" : "Social Media"}`} />}>
+            <ol className="list-decimal space-y-5 pl-5 text-sm leading-7 marker:text-muted-foreground g-text">
               {g.steps.map((step) => <li key={step} className="pl-1">{step}</li>)}
             </ol>
           </Section>

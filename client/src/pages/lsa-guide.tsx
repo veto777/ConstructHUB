@@ -2,8 +2,7 @@ import { useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
 import { PublicPageHeader } from "@/components/public-page-chrome";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GooglePill } from "@/components/google";
 import {
   BadgeCheck, Shield, DollarSign, MapPin, Clock, Star,
   CheckCircle, ChevronDown, ChevronUp, ChevronRight, ArrowRight,
@@ -13,7 +12,6 @@ import {
   Camera, PhoneCall, Calendar, Settings2, Ban,
   ImageIcon, Building2, Heart, ShieldCheck,
 } from "lucide-react";
-import { Link } from "wouter";
 
 import verificationImg from "@assets/image_1772143162244.png";
 import settingsImg from "@assets/image_1772143427414.png";
@@ -212,18 +210,17 @@ export default function LsaGuidePage() {
 
           <div className="text-center max-w-3xl mx-auto mb-8">
             <img src={googleAdsLogo} alt="Google Ads" className="h-12 w-12 rounded-lg object-contain mx-auto mb-4" />
-            <div className="inline-flex items-center gap-2 bg-[#34A853]/10 border border-[#34A853]/20 rounded-full px-4 py-1.5 mb-4 animate-in animate-badge-glow" data-testid="badge-lsa">
-              <BadgeCheck className="h-4 w-4 text-[#34A853]" />
-              <span className="text-sm text-[#34A853] font-medium">Google Verified (Local Services Ads)</span>
+            {/* Google's typography and hairlines (owner, 2026-10-07): the content as it was. */}
+            <div className="g-pill g-pill--sm mb-4" data-testid="badge-lsa">
+              <BadgeCheck className="g-open" aria-hidden="true" />
+              <span>Google Verified (Local Services Ads)</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-lsa-title">
+            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-lsa-title">
               Local Services Ads:
               <br />
-              <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
-                The Complete LSA Setup & Optimization Playbook
-              </span>
+              The Complete LSA Setup & Optimization Playbook
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
+            <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto">
               LSA puts your business at the very top of Google — above regular ads and organic results. You only pay when a real customer contacts you. No clicks, no impressions — just leads. This guide covers every trick to staying on top.
             </p>
           </div>
@@ -234,24 +231,22 @@ export default function LsaGuidePage() {
               { label: "Pay Model", value: "Per Lead", sub: "not per click", color: "text-[#34A853]" },
               { label: "Avg CPL", value: "$25-100", sub: "by trade & market", color: "text-[#FBBC05]" },
               { label: "Guide Sections", value: "8", sub: "expert strategies", color: "text-[#4285F4]" },
-            ].map((stat, i) => (
-              <Card key={stat.label} className="bg-card border-border text-center card-hover-glow animate-scale-in" style={{ animationDelay: `${0.3 + i * 0.1}s` }} data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
-                <CardContent className="p-4">
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{stat.sub}</p>
-                </CardContent>
-              </Card>
+            ].map((stat) => (
+              <div key={stat.label} className="g-stat text-center" data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
+                <p className="g-stat__value">{stat.value}</p>
+                <p className="g-stat__label mt-1">{stat.label}</p>
+                <p className="g-stat__hint">{stat.sub}</p>
+              </div>
             ))}
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#34A853]/10 to-[#4285F4]/10 border-[#34A853]/20 animate-in-delay-3" data-testid="card-lsa-overview">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-lsa-overview">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
-                <BadgeCheck className="h-5 w-5 text-[#34A853] flex-shrink-0 mt-0.5" />
+                <BadgeCheck className="h-5 w-5 g-open flex-shrink-0 mt-0.5" aria-hidden="true" />
                 <div>
-                  <h4 className="text-sm font-semibold text-[#34A853] mb-1">LSA Is Better Than Google Ads — Here's Why</h4>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
+                  <h4 className="g-card__title g-card__title--md mb-1">LSA Is Better Than Google Ads — Here's Why</h4>
+                  <p className="g-card__line">
                     With LSA, you don't get charged until someone actually calls you. Unlike Google Ads where you pay for every click (including bots and competitors), LSA only charges for real customer contacts. The Google Verified badge builds instant trust, reviews are front and center, and you appear at the absolute top of search results. But there are tricks to staying on top — and this guide covers all of them.
                   </p>
                 </div>
@@ -259,50 +254,47 @@ export default function LsaGuidePage() {
             </CardContent>
           </Card>
 
-          <div className="max-w-4xl mx-auto space-y-3">
-            {SECTIONS.map((section, i) => (
-              <Card
+          <div className="max-w-4xl mx-auto g-list">
+            {SECTIONS.map((section) => (
+              <article
                 key={section.id}
-                className={`transition-all duration-300 card-hover-lift stagger-item ${openSection === section.id ? ` ${section.borderColor}` : "bg-card border-border"}`}
-                style={{ animationDelay: `${0.4 + i * 0.06}s` }}
+                className="g-card"
                 data-testid={`card-section-${section.id}`}
               >
                 <button
-                  className="w-full text-left p-5 flex items-center gap-4"
+                  type="button"
+                  className="g-card__row items-center w-full text-left"
                   onClick={() => toggleSection(section.id)}
+                  aria-expanded={openSection === section.id}
                   data-testid={`button-toggle-${section.id}`}
                 >
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <span className="text-lg font-bold text-muted-foreground w-7 text-right">{section.number}</span>
-                    <div className={`w-10 h-10 rounded-lg ${section.bg} flex items-center justify-center transition-transform duration-300 ${openSection === section.id ? "scale-110" : ""}`}>
-                      <section.icon className={`h-5 w-5 ${section.color}`} />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h3 className="text-sm sm:text-base font-semibold text-foreground">{section.title}</h3>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{section.description}</p>
-                  </div>
-                  <ChevronRight className={`h-5 w-5 text-muted-foreground transition-all duration-300 flex-shrink-0 ${openSection === section.id ? "rotate-90 text-[#4285F4]" : ""}`} />
+                  <span className="g-text-2 w-7 text-right flex-shrink-0 tabular-nums">{section.number}</span>
+                  <span className="g-card__lead" aria-hidden="true"><section.icon /></span>
+                  <span className="g-card__body">
+                    <span className="g-card__title g-card__title--md block">{section.title}</span>
+                    <span className="g-card__line block line-clamp-2">{section.description}</span>
+                  </span>
+                  <span className="g-card__trailing">
+                    <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform duration-300 ${openSection === section.id ? "rotate-90 g-accent" : ""}`} aria-hidden="true" />
+                  </span>
                 </button>
 
                 {openSection === section.id && (
-                  <div className="px-5 pb-5 space-y-4 border-t border-border pt-4">
+                  <div className="pb-2 space-y-4 pt-4 sm:pl-[68px]">
                     {section.content.map((item, idx) => {
                       switch (item.type) {
                         case "text":
                           return (
-                            <p key={idx} className="text-sm text-muted-foreground leading-relaxed" data-testid={`content-text-${idx}`}>
+                            <p key={idx} className="text-sm g-text-2 leading-relaxed" data-testid={`content-text-${idx}`}>
                               {item.text}
                             </p>
                           );
                         case "warning":
                           return (
-                            <Card key={idx} className="bg-gradient-to-r from-[#FBBC05]/10 to-[#4285F4]/10 border-[#FBBC05]/20" data-testid={`content-warning-${section.id}-${idx}`}>
+                            <Card key={idx} className="shadow-none" data-testid={`content-warning-${section.id}-${idx}`}>
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
-                                  <AlertTriangle className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
+                                  <AlertTriangle className="h-5 w-5 g-star flex-shrink-0 mt-0.5" aria-hidden="true" />
                                   <p className="text-sm text-muted-foreground leading-relaxed">{item.text}</p>
                                 </div>
                               </CardContent>
@@ -310,10 +302,10 @@ export default function LsaGuidePage() {
                           );
                         case "tip":
                           return (
-                            <Card key={idx} className="bg-gradient-to-r from-[#34A853]/5 to-[#4285F4]/5 border-[#34A853]/20" data-testid={`content-tip-${section.id}-${idx}`}>
+                            <Card key={idx} className="shadow-none" data-testid={`content-tip-${section.id}-${idx}`}>
                               <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
-                                  <CheckCircle className="h-5 w-5 text-[#34A853] flex-shrink-0 mt-0.5" />
+                                  <CheckCircle className="h-5 w-5 g-open flex-shrink-0 mt-0.5" aria-hidden="true" />
                                   <p className="text-sm text-muted-foreground leading-relaxed">{item.text}</p>
                                 </div>
                               </CardContent>
@@ -321,7 +313,7 @@ export default function LsaGuidePage() {
                           );
                         case "image":
                           return (
-                            <div key={idx} className="my-4 rounded-xl overflow-hidden border border-border shadow-2xl" data-testid={`content-image-${section.id}-${idx}`}>
+                            <div key={idx} className="my-4 rounded-lg overflow-hidden border border-border" data-testid={`content-image-${section.id}-${idx}`}>
                               <img
                                 src={item.src}
                                 alt={item.caption || "LSA screenshot"}
@@ -343,7 +335,7 @@ export default function LsaGuidePage() {
                             <ul key={idx} className="space-y-2 pl-1" data-testid={`content-list-${section.id}-${idx}`}>
                               {item.items?.map((li, j) => (
                                 <li key={j} className="flex items-start gap-2.5 text-sm text-muted-foreground leading-relaxed" data-testid={`list-item-${section.id}-${idx}-${j}`}>
-                                  <ChevronRight className="h-4 w-4 text-[#4285F4] flex-shrink-0 mt-0.5" />
+                                  <ChevronRight className="h-4 w-4 g-accent flex-shrink-0 mt-0.5" aria-hidden="true" />
                                   <span>{li}</span>
                                 </li>
                               ))}
@@ -355,37 +347,37 @@ export default function LsaGuidePage() {
                     })}
                   </div>
                 )}
-              </Card>
+              </article>
             ))}
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#4285F4]/5 to-transparent border-border" data-testid="card-cost-table">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-cost-table">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#4285F4]/10 flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-[#4285F4]" />
-                </div>
+                <span className="g-card__lead" aria-hidden="true">
+                  <DollarSign />
+                </span>
                 <div>
-                  <CardTitle className="text-foreground text-base">Average Cost Per Lead by Trade</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">Approximate ranges based on national averages. Your cost depends on market and competition.</p>
+                  <CardTitle className="g-card__title g-card__title--md">Average Cost Per Lead by Trade</CardTitle>
+                  <p className="g-card__meta">Approximate ranges based on national averages. Your cost depends on market and competition.</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {INDUSTRY_STATS.map((stat, i) => (
-                  <div key={i} className="bg-card rounded-lg border border-border p-3 text-center card-hover-glow" data-testid={`card-trade-${i}`}>
-                    <stat.icon className="h-5 w-5 text-[#4285F4] mx-auto mb-2" />
-                    <p className="font-bold text-sm text-foreground mb-0.5">{stat.trade}</p>
-                    <p className="text-sm font-bold text-[#34A853]">{stat.costRange}</p>
-                    <p className="text-[10px] text-muted-foreground">avg. {stat.avgCost}/lead</p>
+                  <div key={i} className="g-stat text-center" data-testid={`card-trade-${i}`}>
+                    <stat.icon className="h-5 w-5 text-muted-foreground mx-auto mb-2" aria-hidden="true" />
+                    <p className="g-stat__label">{stat.trade}</p>
+                    <p className="g-stat__value !text-base g-open">{stat.costRange}</p>
+                    <p className="g-stat__hint">avg. {stat.avgCost}/lead</p>
                   </div>
                 ))}
               </div>
-              <Card className="mt-4 bg-gradient-to-r from-[#FBBC05]/10 to-[#4285F4]/10 border-[#FBBC05]/20">
+              <Card className="mt-4 shadow-none">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 g-star flex-shrink-0 mt-0.5" aria-hidden="true" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Costs in major metros (NYC, LA, Chicago) can be 2-3x higher than suburban or rural areas. Seasonal demand also affects pricing — expect higher costs during peak season for your trade.
                     </p>
@@ -395,20 +387,20 @@ export default function LsaGuidePage() {
             </CardContent>
           </Card>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#FBBC05]/5 to-transparent border-border" data-testid="card-lsa-vs-ads">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-lsa-vs-ads">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#FBBC05]/10 flex items-center justify-center">
-                  <Zap className="h-5 w-5 text-[#FBBC05]" />
-                </div>
+                <span className="g-card__lead" aria-hidden="true">
+                  <Zap />
+                </span>
                 <div>
-                  <CardTitle className="text-foreground text-base">LSA vs. Google Ads — Key Differences</CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">Understanding why LSA wins for contractors</p>
+                  <CardTitle className="g-card__title g-card__title--md">LSA vs. Google Ads — Key Differences</CardTitle>
+                  <p className="g-card__meta">Understanding why LSA wins for contractors</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div className="g-list">
                 {[
                   { feature: "Payment Model", lsa: "Pay per lead (call/message)", ads: "Pay per click (including bots)", winner: "lsa" },
                   { feature: "Position", lsa: "Top of search results (#1)", ads: "Below LSA, above organic", winner: "lsa" },
@@ -418,15 +410,15 @@ export default function LsaGuidePage() {
                   { feature: "Ranking Factor", lsa: "Reviews + responsiveness", ads: "Budget + Quality Score", winner: "lsa" },
                   { feature: "Setup Complexity", lsa: "Verification takes 2-5 weeks", ads: "Live in minutes", winner: "ads" },
                 ].map((row, idx) => (
-                  <div key={idx} className="flex items-center gap-3 bg-card rounded-lg p-3 border border-border" data-testid={`comparison-${idx}`}>
-                    <div className="w-28 flex-shrink-0">
-                      <p className="text-xs font-semibold text-foreground">{row.feature}</p>
+                  <div key={idx} className="g-card !py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3" data-testid={`comparison-${idx}`}>
+                    <div className="sm:w-28 flex-shrink-0">
+                      <p className="text-sm font-medium g-text">{row.feature}</p>
                     </div>
                     <div className="flex-1 grid grid-cols-2 gap-2">
-                      <div className={`text-xs px-2 py-1 rounded ${row.winner === "lsa" ? "bg-[#34A853]/10 text-[#34A853]" : "text-muted-foreground"}`}>
+                      <div className={`text-xs px-2 py-1 rounded ${row.winner === "lsa" ? "g-chip g-chip--sm !text-[var(--g-green)] !normal-case !min-h-0" : "g-text-2"}`}>
                         {row.lsa}
                       </div>
-                      <div className={`text-xs px-2 py-1 rounded ${row.winner === "ads" ? "bg-[#4285F4]/10 text-[#4285F4]" : "text-muted-foreground"}`}>
+                      <div className={`text-xs px-2 py-1 rounded ${row.winner === "ads" ? "g-chip g-chip--sm !normal-case !min-h-0" : "g-text-2"}`}>
                         {row.ads}
                       </div>
                     </div>
@@ -436,11 +428,11 @@ export default function LsaGuidePage() {
             </CardContent>
           </Card>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20 card-hover-glow" data-testid="card-bottom-cta">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-bottom-cta">
             <CardContent className="p-6 text-center">
-              <BadgeCheck className="h-8 w-8 text-[#34A853] mx-auto mb-3 animate-float" />
-              <h3 className="text-lg font-bold text-foreground mb-2">Ready to Dominate Local Search?</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-4">
+              <BadgeCheck className="h-8 w-8 g-open mx-auto mb-3" aria-hidden="true" />
+              <h3 className="g-header__title mb-2">Ready to Dominate Local Search?</h3>
+              <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto mb-4">
                 {inNativeApp()
                   ? "LSA is just one piece of the puzzle. Set up Click Guard to protect your Google Ads campaigns from click fraud."
                   : "LSA is just one piece of the puzzle. Learn the complete system for building a profitable contractor business with our Master Class, or set up Click Guard to protect your Google Ads campaigns from click fraud."}
@@ -448,17 +440,9 @@ export default function LsaGuidePage() {
               <div className="flex items-center justify-center gap-3 flex-wrap">
                 {/* Not in the iPhone apps: the Master Class is a paid course (the apps sell nothing). */}
                 {!inNativeApp() && (
-                <Link href="/master-class">
-                  <Button size="lg" className="bg-gradient-to-r from-[#4285F4] to-[#34A853] text-white" data-testid="button-masterclass">
-                    <GraduationCap className="h-4 w-4 mr-2" /> Explore Master Class
-                  </Button>
-                </Link>
+                  <GooglePill icon={GraduationCap} variant="solid" href="/master-class" label="Explore Master Class" testId="button-masterclass" />
                 )}
-                <Link href="/google-ads">
-                  <Button size="lg" variant="outline" data-testid="button-click-guard">
-                    <Shield className="h-4 w-4 mr-2" /> Set Up Click Guard
-                  </Button>
-                </Link>
+                <GooglePill icon={Shield} href="/google-ads" label="Set Up Click Guard" testId="button-click-guard" />
               </div>
             </CardContent>
           </Card>

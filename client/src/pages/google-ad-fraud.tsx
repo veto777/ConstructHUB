@@ -308,18 +308,17 @@ export default function GoogleAdFraudPage() {
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="text-center max-w-3xl mx-auto mb-8">
             <img src={googleAdsLogo} alt="Google Ads" className="h-12 w-12 rounded-lg object-contain mx-auto mb-4" />
-            <div className="inline-flex items-center gap-2 bg-[#FBBC05]/10 border border-[#FBBC05]/20 rounded-full px-4 py-1.5 mb-4 animate-in animate-badge-glow">
-              <Skull className="h-4 w-4 text-[#FBBC05]" />
-              <span className="text-sm text-[#FBBC05] font-medium">Industry Investigation</span>
+            {/* Google's typography and hairlines (owner, 2026-10-07): no gradients or glows, the content as it was. */}
+            <div className="g-pill g-pill--sm mb-4">
+              <Skull aria-hidden="true" />
+              <span>Industry Investigation</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-3 animate-in-delay-1" data-testid="text-fraud-title">
+            <h1 className="g-header__title !text-[28px] !leading-[34px] sm:!text-[32px] sm:!leading-[40px] mb-3" data-testid="text-fraud-title">
               Google Click Fraud:
               <br />
-              <span className="bg-gradient-to-r from-[#4285F4] via-[#34A853] to-[#4285F4] bg-clip-text text-transparent animate-gradient-text">
-                The Billion-Dollar Scam Nobody Talks About
-              </span>
+              The Billion-Dollar Scam Nobody Talks About
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl mx-auto animate-in-delay-2">
+            <p className="g-text-2 text-sm leading-relaxed max-w-2xl mx-auto">
               In contractor Google Ads accounts we have worked on, we used IP tracking, device fingerprinting, and screen recording to review ad traffic. This page shares what we observed and our opinion of it — it is not an independent audit, and your results may differ.
             </p>
           </div>
@@ -331,17 +330,15 @@ export default function GoogleAdFraudPage() {
               { label: "Real Customers", value: "10-25%", sub: "of clicks became leads in our accounts", color: "text-[#FBBC05]", bg: " bg-[#FBBC05]/5 border-[#FBBC05]/20" },
               { label: "Global Ad Fraud", value: "$172B", sub: "projected losses by 2028", color: "text-[#4285F4]", bg: " bg-[#4285F4]/5 border-[#4285F4]/20" },
             ].map((stat, i) => (
-              <Card key={stat.label} className={`${stat.bg} card-hover-glow animate-scale-in`} style={{ animationDelay: `${0.3 + i * 0.1}s` }} data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
-                <CardContent className="p-4 text-center">
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{stat.sub}</p>
-                </CardContent>
-              </Card>
+              <div key={stat.label} className="g-stat text-center" data-testid={`card-stat-${stat.label.toLowerCase().replace(/\s/g, "-")}`}>
+                <p className="g-stat__value">{stat.value}</p>
+                <p className="g-stat__label mt-1">{stat.label}</p>
+                <p className="g-stat__hint">{stat.sub}</p>
+              </div>
             ))}
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#FBBC05]/10 to-[#4285F4]/10 border-[#FBBC05]/20 animate-in-delay-4" data-testid="card-disclaimer">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-disclaimer">
             <CardContent className="p-5">
               <div className="flex items-start gap-3">
                 <Siren className="h-5 w-5 text-[#FBBC05] flex-shrink-0 mt-0.5" />
@@ -399,7 +396,7 @@ export default function GoogleAdFraudPage() {
             ))}
           </div>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#FBBC05]/5 to-transparent border-border" data-testid="card-google-excuses">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-google-excuses">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[#FBBC05]/10 flex items-center justify-center">
@@ -458,7 +455,7 @@ export default function GoogleAdFraudPage() {
             </CardContent>
           </Card>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#4285F4]/5 to-transparent border-[#4285F4]/20" data-testid="card-what-to-do">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-what-to-do">
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[#4285F4]/10 flex items-center justify-center">
@@ -522,7 +519,7 @@ export default function GoogleAdFraudPage() {
                     bg: "bg-[#FBBC05]/10",
                   },
                 ].map((item, idx) => (
-                  <Link key={idx} href={item.href} className="flex items-start gap-3 bg-card rounded-lg p-3 border border-border card-hover-glow stagger-item cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ animationDelay: `${idx * 0.08}s` }} data-testid={`action-${idx}`}>
+                  <Link key={idx} href={item.href} className="flex items-start gap-3 bg-card rounded-lg p-3 border border-border hover:bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={`action-${idx}`}>
                     <div className={`w-8 h-8 rounded-lg ${item.bg} flex items-center justify-center flex-shrink-0`}>
                       <item.icon className={`h-4 w-4 ${item.color}`} />
                     </div>
@@ -537,9 +534,9 @@ export default function GoogleAdFraudPage() {
             </CardContent>
           </Card>
 
-          <Card className="max-w-4xl mx-auto bg-gradient-to-r from-[#4285F4]/10 to-[#34A853]/10 border-[#4285F4]/20 card-hover-glow" data-testid="card-bottom-line-fraud">
+          <Card className="max-w-4xl mx-auto shadow-none" data-testid="card-bottom-line-fraud">
             <CardContent className="p-6 text-center">
-              <Flame className="h-8 w-8 text-[#FBBC05] mx-auto mb-3 animate-float" />
+              <Flame className="h-8 w-8 text-[#FBBC05] mx-auto mb-3" />
               <h3 className="text-lg font-bold text-foreground mb-2">The Bottom Line</h3>
               <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl mx-auto mb-4">
                 Google has created an advertising ecosystem where fraud is profitable, detection is deliberately limited, evidence is hidden from advertisers, and accountability is nonexistent. They're not the referees looking out for fair play — they're the house in a casino that's rigged against you. Until regulation catches up, the only person who will protect your ad budget is you. That's why Click Guard exists.
