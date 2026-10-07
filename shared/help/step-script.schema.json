@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://constructhub.us/schemas/tutorial-step-script.json",
+  "title": "Tutorial step script",
+  "description": "One walkthrough video: the steps a recorder plays against a demo account, with the caption and the narration line for each. Twin of shared/help/step-script.ts (zod).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["helpKey", "title", "viewport", "steps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "helpKey": { "type": "string", "minLength": 1, "maxLength": 80, "description": "A key of HELP_ENTRIES (shared/help/registry.ts)." },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 320, "maximum": 3840 },
+        "height": { "type": "integer", "minimum": 480, "maximum": 2160 }
+      }
+    },
+    "narrator": { "enum": ["janice", "gabe", "sofia", "maya", "marcus", "ethan"], "default": "janice" },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["action", "caption", "narration"],
+        "properties": {
+          "selector": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "action": { "enum": ["goto", "highlight", "hover", "click", "type", "select", "press", "scroll", "wait"] },
+          "url": { "type": "string", "pattern": "^/", "maxLength": 300 },
+          "value": { "type": "string", "maxLength": 500 },
+          "caption": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "narration": { "type": "string", "minLength": 1, "maxLength": 600 },
+          "holdMs": { "type": "integer", "minimum": 0, "maximum": 30000 },
+          "redact": { "type": "boolean" }
+        },
+        "allOf": [
+          { "if": { "properties": { "action": { "const": "goto" } } }, "then": { "required": ["url"] } },
+          { "if": { "properties": { "action": { "enum": ["highlight", "hover", "click", "type", "select", "scroll"] } } }, "then": { "required": ["selector"] } },
+          { "if": { "properties": { "action": { "enum": ["type", "select", "press"] } } }, "then": { "required": ["value"] } }
+        ]
+      }
+    }
+  }
+}
