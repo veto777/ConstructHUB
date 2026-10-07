@@ -7,7 +7,6 @@ import {
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
 import { inNativeApp } from "@/lib/app-shell";
-import { CHLogo } from "@/components/ch-logo";
 import { CrmLogo } from "@/components/crm-logo";
 import { StandingGator } from "@/components/mascot";
 import { CrmCreateMenu } from "@/components/crm-create-menu";
@@ -118,8 +117,8 @@ export function CrmSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="px-4 pt-5 pb-4">
-        <Link href="/" onClick={closeOnPhone} className="flex items-center gap-2.5 cursor-pointer min-w-0" data-testid="link-portal-home">
+      <SidebarHeader className="px-4 pt-5 pb-4 group-data-[collapsible=icon]:px-1 group-data-[collapsible=icon]:pt-4 group-data-[collapsible=icon]:pb-2">
+        <Link href="/" onClick={closeOnPhone} className="flex items-center gap-2.5 cursor-pointer min-w-0 group-data-[collapsible=icon]:justify-center" data-testid="link-portal-home">
           {/* Full brand lockup (mark + CRM badge); collapses to the bare mark. */}
           <div className="flex flex-col min-w-0 group-data-[collapsible=icon]:hidden">
             <CrmLogo height={26} testid="text-crm-brand" />
@@ -135,7 +134,7 @@ export function CrmSidebar() {
               </span>
             )}
           </div>
-          <CHLogo height={22} className="hidden group-data-[collapsible=icon]:inline-flex" />
+          <img src="/chub-logo-trimmed.png" alt="CHUB" className="hidden w-10 max-w-none shrink-0 object-contain group-data-[collapsible=icon]:block" data-testid="img-crm-brand-mark" />
           {/* The mascot stands beside the mark on every ConstructHUB sidebar; gone with the rail. */}
           <StandingGator height={56} className="ml-auto shrink-0 -my-1 group-data-[collapsible=icon]:hidden" />
         </Link>
@@ -147,7 +146,7 @@ export function CrmSidebar() {
             <button
               type="button"
               data-testid="button-create"
-              className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-sidebar-primary text-sidebar-primary-foreground text-[13px] font-semibold shadow-sm hover:opacity-90 transition-opacity"
+              className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:gap-0 bg-sidebar-primary text-sidebar-primary-foreground text-[13px] font-semibold shadow-sm hover:opacity-90 transition-opacity"
             >
               <Plus className="h-4 w-4 shrink-0" strokeWidth={2.2} />
               <span className="group-data-[collapsible=icon]:hidden">Create</span>
@@ -159,13 +158,14 @@ export function CrmSidebar() {
 
       <SidebarSeparator className="mx-0" />
 
-      <SidebarContent>
+      {/* The rail must still scroll on a short or zoomed-in window (the base hides overflow in icon mode, which cut the last items off). */}
+      <SidebarContent className="group-data-[collapsible=icon]:!overflow-y-auto group-data-[collapsible=icon]:!overflow-x-hidden [scrollbar-width:none]">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-sidebar-foreground/40 px-4">
             Workspace
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="px-2 gap-1">
+            <SidebarMenu className="px-2 gap-1 group-data-[collapsible=icon]:px-0">
               {NAV.filter((item) =>
                 (!item.perm || me?.permissions?.[item.perm] === true) &&
                 (!item.platformAdmin || me?.isPlatformAdmin === true),
@@ -178,11 +178,11 @@ export function CrmSidebar() {
                     className="h-9 rounded-lg px-3 data-[active=true]:bg-sidebar-primary data-[active=true]:text-sidebar-primary-foreground data-[active=true]:shadow-sm"
                   >
                     <Link href={item.url} data-testid={item.testid} onClick={closeOnPhone}
-                      className="flex items-center gap-3 w-full">
+                      className="flex items-center gap-3 w-full group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center">
                       <item.icon className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                       <span className="text-[13px] font-medium">{item.title}</span>
                       {item.url === "/crm/inbox" && msgUnread > 0 && (
-                        <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-[18px] text-center font-semibold"
+                        <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] leading-[18px] text-center font-semibold group-data-[collapsible=icon]:hidden"
                           data-testid="badge-messages-unread">
                           {msgUnread > 99 ? "99+" : msgUnread}
                         </span>
@@ -205,13 +205,13 @@ export function CrmSidebar() {
             ConstructHUB
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="px-2 gap-1">
+            <SidebarMenu className="px-2 gap-1 group-data-[collapsible=icon]:px-0">
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="All ConstructHUB tools" className="h-9 rounded-lg px-3">
-                  <a href={marketingUrl("/")} data-testid="link-portal-nav-platform" className="flex items-center gap-3 w-full">
+                  <a href={marketingUrl("/")} data-testid="link-portal-nav-platform" className="flex items-center gap-3 w-full group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center">
                     <LayoutGrid className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                     <span className="text-[13px] font-medium">All ConstructHUB tools</span>
-                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={1.9} aria-hidden="true" />
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" strokeWidth={1.9} aria-hidden="true" />
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -221,7 +221,7 @@ export function CrmSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
         <div className="flex items-center justify-between gap-1 rounded-lg border border-sidebar-border bg-sidebar-accent/40 p-2 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
           <div className="flex items-center gap-2 min-w-0 group-data-[collapsible=icon]:hidden">
             {user?.avatarUrl ? (
