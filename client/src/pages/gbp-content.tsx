@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { GbpConnection } from '@/components/gbp-connection';
 import { useUrlParam } from '@/hooks/use-url-param';
+import { GoogleSurface } from "@/components/google";
 
 type Photo={id:number;name:string;url:string};
 export default function GbpContentPage(){
@@ -20,7 +21,7 @@ export default function GbpContentPage(){
   // A ?location= value can name a deleted or unlinked location (old link, typo);
   // only open the editor for a location that is actually linked to Google.
   const chosen=location?locations.find(l=>String(l.id)===location):undefined;
-  return <AppPage width="narrow"><PageHeader title="Posts & photos" description="Draft, approve and schedule updates for your Google profile." actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
+  return <GoogleSurface page><AppPage className="before:hidden" width="narrow"><PageHeader title="Posts & photos" description="Draft, approve and schedule updates for your Google profile." actions={!chosen?.gbpLocationName?<Button asChild><Link href="/locations?import=gbp">Link a location</Link></Button>:undefined}/>
 {locationsError&&<p role="alert">Unable to load locations. Please reload the page.</p>}
     <Section title="Choose a profile"><label className="block text-sm">Location<select className="block border rounded p-2 w-full bg-background" aria-label="Location" value={chosen?.gbpLocationName?location:''} onChange={e=>setLocation(e.target.value)}><option value="">Choose a linked location</option>{linked.map(l=><option key={l.id} value={l.id}>{l.businessName}</option>)}</select></label></Section>
     {!locationsLoading&&!locationsError&&!linked.length&&<p className="text-sm text-muted-foreground" data-testid="text-no-linked-locations">No locations are linked to Google Business Profile yet. Connect your Google account, then use <strong>Link &amp; sync</strong> in <Link href="/locations" className="text-primary underline">Locations</Link> to link one.</p>}
@@ -32,7 +33,7 @@ export default function GbpContentPage(){
         <p className="font-medium">{chosen?`${chosen.businessName} isn't linked to Google Business Profile.`:'Location not found.'}</p>
         <p className="text-sm text-muted-foreground">{chosen?'Link it to the Google listing it belongs to before publishing posts or photos.':'It may have been deleted, or it belongs to another client workspace.'}</p>
         <div className="flex flex-wrap gap-2">{chosen&&<Button asChild size="sm"><Link href={`/locations?location=${chosen.id}`}>Link it in Locations</Link></Button>}<Button size="sm" variant="outline" onClick={()=>setLocation('')}>Choose another location</Button></div>
-      </div>}<details className="text-sm"><summary className="cursor-pointer py-2 min-h-10">Agency bulk actions</summary><AgencyWorkspace compact/></details></AppPage>;
+      </div>}<details className="text-sm"><summary className="cursor-pointer py-2 min-h-10">Agency bulk actions</summary><AgencyWorkspace compact/></details></AppPage></GoogleSurface>;
 }
 function Editor({location}:{location:string}){
   const base=`/api/gbp/content/${location}`;
