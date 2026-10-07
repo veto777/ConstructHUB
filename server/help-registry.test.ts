@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import { HELP_ENTRIES, HELP_FEATURES, HELP_GROUPS, helpEntry, helpMatches, helpSections, helpSummary, isCrmRoute } from "@shared/help/registry";
 import { parseTutorialScript, STEP_ACTIONS } from "@shared/help/step-script";
+import { TUTORIAL_FILE, VIDEO_MANIFEST, helpVideoFor, tutorialMediaUrl } from "@shared/help/videos";
+import { createHash } from "crypto";
 import { isKnownPath } from "@shared/app-routes";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { VOICE_PERSONAS, VOICE_PERSONA_IDS } from "@shared/voice-personas";
@@ -134,20 +136,47 @@ describe("help registry", () => {
     for (const g of HELP_GROUPS) expect(HELP_FEATURES.some((f) => f.group === g), g).toBe(true);
   });
 
-  it("claims no video that does not exist", () => {
+  it("claims no video that is not in the committed manifest (shared/help/videos.json)", () => {
+    // The manifest is what mux.ts measured: one entry per recorded walkthrough, its three files by
+    // storage key, size and sha256, and the video's length. The registry builds `video` from it.
+    const listed = Object.keys(VIDEO_MANIFEST);
+    for (const key of listed) expect(helpEntry(key), `videos.json lists ${key}, which is not a help entry`).toBeTruthy();
     for (const e of HELP_ENTRIES) {
+      const m = VIDEO_MANIFEST[e.key];
       if (e.video === null) {
+        expect(m, `${e.key} is in videos.json but has no video`).toBeUndefined();
         // With no recording, the text must not point at one.
         const text = [e.title, e.whatItIs, e.whatItDoes, e.howItWorks, ...e.howToUse, ...(e.needs ?? [])].join(" ");
         expect(text, `${e.key} mentions a video it does not have`).not.toMatch(/walkthrough|tutorial video|watch the video/i);
         continue;
       }
-      // A real recording: our own storage under tutorials/, a real length, never a stand-in.
+      // A real recording: listed in the manifest, in our own storage under tutorials/, never a stand-in.
+      expect(m, `${e.key} has a video that videos.json does not list`).toBeTruthy();
+      expect(e.video).toEqual(helpVideoFor(e.key));
       expect(e.video.url, `${e.key} video url`).toMatch(/^(https:\/\/[^\s]+|\/)[^\s]*tutorials\/[^\s]+\.(mp4|webm)$/);
       expect(e.video.url).not.toMatch(/example|placeholder|sample|lorem|youtube|vimeo/i);
-      expect(Number.isInteger(e.video.durationSec) && e.video.durationSec > 0, `${e.key} duration`).toBe(true);
-      if (e.video.poster) expect(e.video.poster).toMatch(/tutorials\/[^\s]+\.(jpg|jpeg|png|webp)$/);
-      if (e.video.captions) expect(e.video.captions).toMatch(/tutorials\/[^\s]+\.vtt$/);
+      expect(Number.isInteger(m.durationSec) && m.durationSec > 0 && m.durationSec < 1800, `${e.key} duration`).toBe(true);
+      expect(e.video.durationSec).toBe(m.durationSec);
+      expect(e.video.url).toBe(tutorialMediaUrl(m.video.key));
+      expect(e.video.poster).toBe(tutorialMediaUrl(m.poster.key));
+      expect(e.video.captions).toBe(tutorialMediaUrl(m.captions.key));
+      for (const [part, ext, minBytes] of [["video", "mp4", 100_000], ["captions", "vtt", 50], ["poster", "jpg", 2_000]] as const) {
+        const f = m[part];
+        // tutorials/<helpKey>.<first 8 of its sha256>.<ext>: content-addressed, so a re-record is a new key.
+        expect(f.sha256, `${e.key} ${part} sha256`).toMatch(/^[0-9a-f]{64}$/);
+        expect(f.key, `${e.key} ${part} key`).toBe(`tutorials/${e.key}.${f.sha256.slice(0, 8)}.${ext}`);
+        expect(f.key.slice("tutorials/".length)).toMatch(TUTORIAL_FILE);
+        expect(Number.isInteger(f.bytes) && f.bytes >= minBytes, `${e.key} ${part} bytes`).toBe(true);
+        // Where the file is at hand (the box that recorded it), it is the file the manifest describes.
+        const local = path.join(ROOT, "tmp/tutorials", f.key.slice("tutorials/".length));
+        if (fs.existsSync(local)) {
+          const data = fs.readFileSync(local);
+          expect(data.length, `${f.key} size on disk`).toBe(f.bytes);
+          expect(createHash("sha256").update(data).digest("hex"), `${f.key} sha256 on disk`).toBe(f.sha256);
+        }
+      }
+      // A walkthrough has a step script: the video is a recording of it, not a file from somewhere else.
+      expect(fs.existsSync(path.join(ROOT, "docs/tutorials/scripts", `${e.key}.json`)), `${e.key} step script`).toBe(true);
     }
     // The UI never shows a play control for a null video: both are gated on `entry.video`.
     const button = read("client/src/components/help-button.tsx");
@@ -225,6 +254,7 @@ describe("tutorial step scripts", () => {
 
   it("every checked-in script parses and belongs to a help entry", () => {
     expect(files).toContain("cloudflare.connections.json");
+    expect(files).toContain("database-directory.json");
     for (const f of files) {
       const { $schema: _schema, ...json } = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
       const script = parseTutorialScript(json);
@@ -250,5 +280,16 @@ describe("tutorial step scripts", () => {
     expect(doc).toContain("Kokoro-82M");
     expect(read("voice/speech.py")).toContain('KOKORO_REPO = "hexgrad/Kokoro-82M"');
     for (const key of ["VOICE_ENGINE_URL", "VOICE_INTERNAL_SECRET", "VOICE_TTS_DEVICE", "/tts/preview"]) expect(doc, key).toContain(key);
+  });
+
+  it("narration fits what the voice engine and the captions can take", () => {
+    for (const f of files) {
+      const { $schema: _schema, ...json } = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+      for (const s of parseTutorialScript(json).steps) {
+        // No markup or stage directions: the line is spoken and shown as a caption exactly as written.
+        expect(s.narration, f).not.toMatch(/[<>{}\[\]]|\s{2,}/);
+        expect(s.narration.trim(), f).toBe(s.narration);
+      }
+    }
   });
 });

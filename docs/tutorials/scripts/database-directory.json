@@ -1,0 +1,105 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "database-directory",
+  "title": "Database Directory",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/databases",
+      "caption": "The Database Directory",
+      "narration": "This is the Database Directory. It lists county and city permit offices in all fifty states and Washington, D.C."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"page-databases\"] div:has(> .g-stat)",
+      "caption": "The totals: jurisdictions, portals on record, through their county",
+      "narration": "The numbers at the top show how many jurisdictions are listed, how many have a permit portal on record, and how many get their permits through their county."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-database-search\"]",
+      "value": "Tampa",
+      "caption": "Search by city, county or state",
+      "narration": "To find a place, type a city, county or state in the search box. Let's look for Tampa."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "caption": "Verified portal: the link is on record and was checked",
+      "narration": "Tampa, Florida says Verified portal. Its official permit portal is on record, and the link has been checked."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid=\"list-databases\"] a:has-text(\"Open portal\")",
+      "caption": "Open portal goes to the city's permit portal",
+      "narration": "Open portal takes you to the city's permit portal, in a new tab."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid=\"list-databases\"] a:has-text(\"Find permit portal\")",
+      "caption": "No portal on record: a web search, never a guessed link",
+      "narration": "Tampa, Kansas has no portal on record. Instead of a guessed link, you get Find permit portal, a web search for that town's permit portal."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-database-search\"]",
+      "value": "Apollo Beach",
+      "caption": "Some towns get their permits from the county",
+      "narration": "Some towns don't issue their own permits. Search for Apollo Beach."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Permits issued by Hillsborough County\")",
+      "caption": "Permits issued by Hillsborough County",
+      "narration": "Its row says permits are issued by Hillsborough County, and gives you a button for the county's permit portal."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid^=\"link-county-source-\"]",
+      "caption": "The source link shows where that comes from",
+      "narration": "The Source link opens the official page that information comes from."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid=\"list-databases\"] a:has-text(\"Property lookup\")",
+      "caption": "Property lookup opens Property Records for the same county",
+      "narration": "Property lookup opens Property Records, filtered to the same county."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-clear-filters\"]",
+      "caption": "Clear filters to browse",
+      "narration": "Choose Clear filters to browse instead."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-filter-county\"]",
+      "caption": "Counties or Cities",
+      "narration": "Counties shows only counties, and Cities shows only cities and towns."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-state-filter\"]",
+      "value": "Florida",
+      "caption": "Filter by state",
+      "narration": "Pick a state to narrow the list. We'll choose Florida."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-county-filter\"]",
+      "caption": "Then by county",
+      "narration": "A second menu then lets you choose a single county."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-database-directory\"]",
+      "caption": "Menu: Permits & Databases, Database Directory",
+      "narration": "You'll find the Database Directory in the menu, under Permits and Databases. It's free to browse."
+    }
+  ]
+}

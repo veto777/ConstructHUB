@@ -1,0 +1,20 @@
+{
+  "database-directory": {
+    "durationSec": 89,
+    "video": {
+      "key": "tutorials/database-directory.0b38aee8.mp4",
+      "bytes": 4691616,
+      "sha256": "0b38aee8a0a66f3ece523d3dbecda7e5e68bc818c20030fb68e1ac0b77ab09f6"
+    },
+    "captions": {
+      "key": "tutorials/database-directory.a4842865.vtt",
+      "bytes": 2182,
+      "sha256": "a48428655d0f6a22b3c806060bb68a71412633b586adac6186c591ad94e6eb82"
+    },
+    "poster": {
+      "key": "tutorials/database-directory.94295667.jpg",
+      "bytes": 87262,
+      "sha256": "94295667af0fbe98d67a9f99a4db7f76b598522de296ce255849e9d4659d56e8"
+    }
+  }
+}

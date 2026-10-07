@@ -67,15 +67,23 @@ export function HelpParts({ entry, className, testId }: { entry: HelpEntry; clas
 /** mm:ss for a video's length. */
 export const formatDuration = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, "0")}`;
 
-/** The HTML5 player: controls, captions when the video has them, no autoplay, nothing stored. */
+const VIDEO_TYPES: Record<string, string> = { mp4: "video/mp4", webm: "video/webm" };
+
+/**
+ * The HTML5 player: controls, no autoplay, nothing stored. When the video has captions they are its
+ * default text track — shown from the first frame (a walkthrough is often watched with the sound
+ * off) and switchable from the player's own captions button.
+ */
 export function HelpVideoPlayer({ video, title, className, testId }: { video: HelpVideo; title: string; className?: string; testId?: string }) {
   return (
     <video
       className={cn("aspect-video w-full rounded-lg bg-black", className)}
       controls playsInline preload="metadata" poster={video.poster}
       aria-label={`Walkthrough video: ${title}`} data-testid={testId}
+      // Some browsers load a default track but leave it hidden: turn the captions on once it is there.
+      onLoadedMetadata={(e) => { const track = e.currentTarget.textTracks[0]; if (video.captions && track && track.mode === "disabled") track.mode = "showing"; }}
     >
-      <source src={video.url} />
+      <source src={video.url} type={VIDEO_TYPES[video.url.slice(video.url.lastIndexOf(".") + 1)]} />
       {video.captions && <track kind="captions" src={video.captions} srcLang="en" label="English" default />}
       Your browser cannot play this video. <a href={video.url}>Download it</a> instead.
     </video>

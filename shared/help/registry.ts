@@ -6,12 +6,15 @@
  *
  * Every sentence was written from the code or from text the product already ships and tests
  * (server/data/hub-knowledge.md, shared/feature-pages, client/src/lib/info-content.ts). Plan names
- * come from the price book (shared/plans.ts), never typed here. `video` is null on every entry:
- * no walkthrough has been recorded yet (docs/tutorials/VIDEO-PIPELINE.md says how they will be).
+ * come from the price book (shared/plans.ts), never typed here. `video` is never typed here either:
+ * it is built from the manifest of recorded walkthroughs (./videos.json, written by
+ * scripts/tutorials/mux.ts — docs/tutorials/VIDEO-PIPELINE.md), and is null for every entry that
+ * has no recording.
  */
 import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from "../plans";
 import { CALL_ASSISTANT_PLANS, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
 import type { HelpEntry, HelpGroup } from "./types";
+import { helpVideoFor } from "./videos";
 
 export { HELP_GROUPS } from "./types";
 export type { HelpEntry, HelpGroup, HelpVideo } from "./types";
@@ -825,8 +828,8 @@ const entries: Draft[] = [
   },
 ];
 
-/** Every entry, with `video: null` — no walkthrough exists yet. */
-export const HELP_ENTRIES: readonly HelpEntry[] = entries.map((e) => ({ ...e, video: null }));
+/** Every entry. `video` is the recorded walkthrough listed for its key in ./videos.json, else null. */
+export const HELP_ENTRIES: readonly HelpEntry[] = entries.map((e) => ({ ...e, video: helpVideoFor(e.key) }));
 
 const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
 export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key);

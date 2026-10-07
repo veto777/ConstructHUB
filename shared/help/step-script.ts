@@ -4,7 +4,7 @@
  * One script per help entry: a recorder (Playwright, `recordVideo`) plays the steps against a demo
  * account, moving a visible cursor and drawing a highlight ring on each target; the same file feeds
  * the narration (one line per step) and the captions (.vtt). Nothing here records anything — this
- * is the contract the recorder and the scripts share. The JSON Schema twin is step-script.schema.json.
+ * is the contract the tools (scripts/tutorials/) and the scripts share. The JSON Schema twin is step-script.schema.json.
  */
 import { z } from "zod";
 
@@ -30,9 +30,9 @@ export const tutorialStepSchema = z.object({
   url: z.string().regex(/^\//).max(300).optional(),
   /** type / select / press. */
   value: z.string().max(500).optional(),
-  /** The on-screen caption for this step (also the .vtt cue text). */
+  /** A short label for this step (the recorder's log and timings.json). */
   caption: z.string().min(1).max(160),
-  /** The sentence the narrator says over this step. */
+  /** What the narrator says over this step; it is also the captions track (captions.vtt). */
   narration: z.string().min(1).max(600),
   /** Extra time to stay on the step after the action, in ms (the recorder also waits for the narration). */
   holdMs: z.number().int().min(0).max(30_000).optional(),
