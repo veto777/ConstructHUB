@@ -22,6 +22,7 @@ import { ACCESS_GRANTS_DDL } from "../server/access-grants-schema";
 import { OPS_ISSUES_DDL } from "../server/ops/schema";
 import { SEO_SCHEMA_DDL } from "../server/seo/schema";
 import { JOBCAM_DDL } from "../server/jobcam/schema";
+import { YOUTUBE_DDL } from "../server/youtube/schema";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -78,6 +79,8 @@ const STATEMENTS = [
   // jobcam_share_links / jobcam_org_usage + the reserved phase B–D tables
   // (server/jobcam/schema.ts; boot runs these too via ensureCrmSchema).
   ...JOBCAM_DDL,
+  // The company YouTube channel connection, one row (server/youtube/schema.ts; boot runs these too).
+  ...YOUTUBE_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

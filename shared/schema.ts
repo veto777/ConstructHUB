@@ -3198,3 +3198,31 @@ export const jobcamChecklistFields = pgTable("jobcam_checklist_fields", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ── Company YouTube channel (server/youtube/*, /admin/youtube) ──────────────
+// Created idempotently by server/youtube/schema.ts YOUTUBE_DDL (boot and the
+// migration script). At most ONE row (id = 1, CHECK id = 1 in the DDL): the
+// site-level connection the tutorial uploader uses. Tokens are AES-256-GCM
+// encrypted (server/gbp/token-crypto.ts) and never returned by a route.
+export const youtubeConnection = pgTable("youtube_connection", {
+  id: integer("id").primaryKey().default(1),
+  channelId: text("channel_id"),
+  channelTitle: text("channel_title"),
+  /** Encrypted. NULL = not connected (the row may still hold the last error). */
+  refreshToken: text("refresh_token"),
+  /** Encrypted. */
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  /** The scopes Google actually granted. */
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  connectedBy: integer("connected_by"),
+  connectedByEmail: text("connected_by_email"),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
+  /** Google refused the refresh token (invalid_grant): an admin must connect again. */
+  needsReconnect: boolean("needs_reconnect").notNull().default(false),
+  lastErrorCode: text("last_error_code"),
+  /** Scrubbed (server/ops/scrub.ts). */
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
