@@ -2,6 +2,44 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🧯 2026-10-07 (night) — all open issues fixed; Report an issue; issue desk runs the deployed code (deployed 2215501)
+- **Why the bell was full:** the issue desk had written EIGHT fix branches (`issue/1,30,321,322,332,344,422,432`) since
+  10-02 and none was ever merged — "fix ready" was a dead end. Shipped the two real fixes by cherry-pick and closed
+  everything. **A "fix ready" issue still needs a person or session to merge + deploy it; nothing does that yet.**
+- **HOVER:** root cause = `HOVER token refresh failed: 400` on every attempt since 2026-08-11 (the sign-in made 08-01
+  is dead). Code: failed orgs back off to the cadence and keep the real reason (issue/332); a 400/401 refresh sets
+  `needsReconnect`, the scheduler skips the org, no ops issue is filed, and the CRM Integrations card shows
+  "HOVER sign-in expired … Reconnect HOVER" (`hoverConnNeedsReconnect`, server/crm/hover.ts). **Owner action: click
+  Reconnect HOVER on portal → Integrations.** (HOVER support must still enable measurement-file API access.)
+- **GBP sync:** an unverified listing's missing performance stats no longer fail the job (issue/422).
+- **Stale tabs after a deploy:** a missing `/assets/*` file answers 404 text/plain no-store on every host (it used to
+  answer the SPA's HTML); all lazy pages go through `client/src/lib/lazy-page.tsx` → `stale-build.ts`: a newer build =
+  "Updating to the latest version…" + ONE reload (10-min sessionStorage guard), otherwise an honest message. Hashed
+  bundles are immutable, HTML is no-cache.
+- **/property search** threw on every keystroke (handler read `e.target.value` from a string) — fixed + a test.
+- **Issue fingerprints are stable across builds** (`server/ops/fingerprint.ts`; they used to include minified stack
+  frames, so every deploy filed a new issue). Boot runs `server/ops/merge.ts` (idempotent; prod 35 rows → 5; by hand
+  `scripts/merge-ops-issues.ts [--dry-run]`, read-only preview). User reports are never re-keyed or folded.
+  The bell rings only when something changes for an issue (`ops_issues.notified_sig`); a run with nothing new is silent.
+  All five remaining issues were marked `fixed` with `setIssueStatusByAdmin` after their fixes deployed — a recurrence
+  reopens them, which is the regression alarm.
+- **Report an issue (owner request):** footer links Help (`/tutorials`) + Report an issue on the platform, the CRM and
+  public pages; page `/report-issue` + `/crm/report-issue`; `POST /api/issues/report`, `GET /api/issues/mine`;
+  each report is its own `ops_issues` row (`source='user'`). Desk order: a user's blocker, then other user reports,
+  then captured failures; up to 4 extra user-report runs past the daily cap (`ISSUE_DESK_USER_REPORT_EXTRA_RUNS`).
+  **Signed-out reports are held in `triage` until an admin releases them** (anonymous text must not steer the desk);
+  a signed-out blocker still rings the bell once. The desk prompt fences report text as data and may not commit
+  changes to auth/billing/permissions/secrets/deploy/data deletion on the strength of a report. Replies are shown on
+  the page, NOT emailed. Screenshots go to R2 `issue-reports/`.
+- **Issue desk now runs from `~/ConstructHUB-release`** (unit `constructhub-issue-desk.service`, backup `.bak-*`):
+  it had been executing `run.sh`/`prompt.md` from the shared working copy on a stale feature branch. Its `.env` stays
+  at `~/ConstructHUB/ops/issue-desk/.env` (`ISSUE_DESK_ENV_FILE`). First run from there: OK (daily cap 6/6 reached).
+- **Connect walkthroughs:** Cloudflare and Search Console Connections tabs carry numbered, click-by-click steps
+  (`client/src/pages/site-connect-steps.tsx`), incl. where the Global API Key is in Cloudflare and what happens to it.
+- **First tutorial video exists** (Database Directory, 89 s, Janice voice): vb11
+  `~/ConstructHUB-seo/analysis/video-out/database-directory/walkthrough.mp4`; tooling `scripts/tutorials/*` on branch
+  `tutorial-video-1` (not merged yet: player wiring + R2 upload in progress).
+
 ## 🔎 2026-10-07 — SEO: Site Explorer + SEO data credit (4x markup, plan allowance, prepaid packs)
 - **Data source is live:** DataForSEO account `support@constructhub.us` created by the owner 2026-10-07, `DATAFORSEO_LOGIN` /
   `DATAFORSEO_PASSWORD` set on vb11, $51 balance. `/seo` no longer shows "being switched on".
