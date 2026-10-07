@@ -6,7 +6,7 @@
  * while the server reports configured:false, and the plan gate.
  *
  * White-label: nothing here names the data vendor or a price. Platform admins
- * get one extra card ("Data source") with the real state from `status.admin`.
+ * see the "Data source" card on /admin (Platform admin), fed by `status.admin`; the SEO pages themselves are vendor-free.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
@@ -92,7 +92,6 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
             <SitePicker site={site} onSite={onSite} sites={sites} />
             <UsageLine status={status} />
             {status.data && !status.data.configured && <NotReadyNotice />}
-            {status.data?.admin && <DataSourceCard admin={status.data.admin} />}
             {children}
           </>
         )}
@@ -135,8 +134,9 @@ export function NotReadyNotice() {
 
 const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
 
-/** Platform admins only: the vendor, this month's wholesale spend against the internal cap, the env names. */
-function DataSourceCard({ admin }: { admin: NonNullable<SeoStatus["admin"]> }) {
+/** Platform admins only — rendered on /admin (never on the customer-facing SEO pages): the vendor, this month's
+ * wholesale spend against the internal cap, the env names. */
+export function DataSourceCard({ admin }: { admin: NonNullable<SeoStatus["admin"]> }) {
   const pct = admin.capUsd > 0 ? Math.min(100, Math.round((admin.spentUsd / admin.capUsd) * 100)) : 100;
   return (
     <div className="g-callout mb-5" data-testid="seo-admin-data-source">

@@ -20,6 +20,7 @@ import {
   InitialAvatar, SectionTitle, crmTable, roleTone, statusTone,
 } from "@/components/crm-ui";
 import { GoogleSectionHeader, GoogleStat } from "@/components/google";
+import { DataSourceCard, type SeoStatus } from "@/pages/seo/shell";
 import { InfoTip } from "@/components/info-tip";
 
 /**
@@ -120,6 +121,7 @@ export default function CrmAdminPage() {
   const [copied, setCopied] = useState(false);
 
   const { data: me, isLoading: meLoading, isError: meError } = useQuery<any>({ queryKey: ["/api/crm/me"] });
+  const { data: seoStatus } = useQuery<SeoStatus>({ queryKey: ["/api/seo/status"], enabled: !!me?.isPlatformAdmin });
   const isAdmin = me?.isPlatformAdmin === true;
 
   // The /admin login wall — the passphrase second factor (enforced when the
@@ -663,6 +665,13 @@ export default function CrmAdminPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* ── SEO data source (vendor + wholesale spend; customers never see this) ── */}
+      <div className="space-y-3" data-testid="section-admin-seo">
+        <SectionTitle icon={Search} title="SEO data source"
+          description="The rank tracker, keyword research and backlinks run on a wholesale data API. Customers see plan units only; this is the real state and spend." />
+        {seoStatus?.admin ? <DataSourceCard admin={seoStatus.admin} /> : <p className="g-text-2 text-[13px]">Loading…</p>}
+      </div>
 
       {/* ── Visitor analytics (consent-gated first-party tracking) ────────── */}
       <div className="space-y-3" data-testid="section-admin-analytics">
