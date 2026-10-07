@@ -1,8 +1,15 @@
 /**
- * Monthly DataForSEO spend cap. SEO_MONTHLY_BUDGET_USD (default 25) is the
- * most the platform spends at DataForSEO in one calendar month (UTC), summed
- * over every account: it is one DataForSEO balance. Spend is recorded per
- * paying account per month in seo_api_usage (cost + request count).
+ * Monthly DataForSEO spend cap — INTERNAL. SEO_MONTHLY_BUDGET_USD (default
+ * 100) is the most the platform spends at DataForSEO in one calendar month
+ * (UTC), summed over every account: it is one DataForSEO balance. Spend is
+ * recorded per paying account per month in seo_api_usage (cost + request
+ * count) and every cost line is logged ("[seo] cost …").
+ *
+ * Customers never see the vendor, the dollars or the env variable: their
+ * allowance is in plan units (shared/plans.ts SEO_PLAN_LIMITS, enforced in
+ * server/seo/routes.ts). This cap is the safety net behind those limits; when
+ * it trips the customer-facing message is a neutral "paused for the month"
+ * (SeoBudgetError.message) and the detail goes to the log / the admin card.
  *
  * Reserve-then-settle: a call reserves its estimated upper bound (pricing.ts)
  * under an advisory lock, runs, then settles to what DataForSEO reported on the
@@ -10,7 +17,7 @@
  */
 import { pool } from "../db";
 
-export const DEFAULT_MONTHLY_BUDGET_USD = 25;
+export const DEFAULT_MONTHLY_BUDGET_USD = 100;
 const LOCK_KEY = 7191;
 
 export function monthlyBudgetUsd(env: NodeJS.ProcessEnv = process.env): number {
@@ -22,7 +29,11 @@ export const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
 export type BudgetDecision =
   | { ok: true; remainingUsd: number }
-  | { ok: false; remainingUsd: number; message: string };
+  | { ok: false; remainingUsd: number; message: string; detail: string };
+
+/** What a customer reads when the internal cap trips: no vendor, no dollars, no env names. */
+export const BUDGET_PAUSED_MESSAGE =
+  "SEO checks are paused for the rest of the month — the monthly data allowance for rank tracking is used up. It comes back on the 1st.";
 
 /** The one rule: a call may run only when the whole estimate fits under the cap. Pure, for tests. */
 export function budgetDecision(spentUsd: number, estimateUsd: number, capUsd: number): BudgetDecision {
@@ -31,14 +42,16 @@ export function budgetDecision(spentUsd: number, estimateUsd: number, capUsd: nu
   return {
     ok: false,
     remainingUsd: remaining,
-    message: `This needs about ${usd(estimateUsd)} of DataForSEO data and ${usd(remaining)} of the ${usd(capUsd)} monthly SEO data budget is left. ` +
-      `The budget resets on the 1st (UTC); raise SEO_MONTHLY_BUDGET_USD on the server to allow more.`,
+    message: BUDGET_PAUSED_MESSAGE,
+    detail: `This needs about ${usd(estimateUsd)} of DataForSEO data and ${usd(remaining)} of the ${usd(capUsd)} monthly cap is left. ` +
+      `The cap resets on the 1st (UTC); raise SEO_MONTHLY_BUDGET_USD on the server to allow more.`,
   };
 }
 
 export class SeoBudgetError extends Error {
   readonly code = "seo_budget";
-  constructor(message: string, readonly remainingUsd: number, readonly estimateUsd: number) {
+  /** `message` is customer-safe; `detail` carries the dollars for the log and the admin card. */
+  constructor(message: string, readonly remainingUsd: number, readonly estimateUsd: number, readonly detail = message) {
     super(message);
     this.name = "SeoBudgetError";
   }
@@ -59,7 +72,8 @@ export async function reserveBudget(userId: number, estimateUsd: number): Promis
     const decision = budgetDecision(Number(row?.spent ?? 0), estimateUsd, cap);
     if (!decision.ok) {
       await client.query("ROLLBACK");
-      throw new SeoBudgetError(decision.message, decision.remainingUsd, estimateUsd);
+      console.warn(`[seo] cost refused user=${userId} month=${month} ${decision.detail}`);
+      throw new SeoBudgetError(decision.message, decision.remainingUsd, estimateUsd, decision.detail);
     }
     await client.query(
       `INSERT INTO seo_api_usage(user_id,month,cost_usd,requests) VALUES($1,$2,$3,1)
@@ -75,8 +89,9 @@ export async function reserveBudget(userId: number, estimateUsd: number): Promis
   }
 }
 
-/** Replace the reservation with what DataForSEO actually charged (`cost` on the task). */
+/** Replace the reservation with what DataForSEO actually charged (`cost` on the task). Every settlement is one log line. */
 export async function settleBudget(r: BudgetReservation, actualUsd: number): Promise<void> {
+  console.info(`[seo] cost user=${r.userId} month=${r.month} estimate=${usd(r.estimateUsd)} actual=${usd(actualUsd)}`);
   const delta = round6(actualUsd - r.estimateUsd);
   if (delta === 0) return;
   await pool.query(
@@ -112,6 +127,14 @@ export type BudgetStatus = {
   accountUsd: number;
   accountRequests: number;
 };
+
+/** Wholesale spend this month per account (admin view: /api/seo/admin/usage). */
+export async function monthlySpendByAccount(month = monthKey()): Promise<{ userId: number; email: string | null; costUsd: number; requests: number }[]> {
+  const { rows } = await pool.query(
+    `SELECT u.user_id, us.email, u.cost_usd::float8 AS cost_usd, u.requests
+       FROM seo_api_usage u LEFT JOIN users us ON us.id=u.user_id WHERE u.month=$1 ORDER BY u.cost_usd DESC, u.user_id`, [month]);
+  return rows.map((r: any) => ({ userId: r.user_id, email: r.email ?? null, costUsd: round6(Number(r.cost_usd)), requests: Number(r.requests) }));
+}
 
 export async function budgetStatus(userId: number): Promise<BudgetStatus> {
   const month = monthKey();

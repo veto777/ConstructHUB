@@ -20,7 +20,7 @@ import { recordFailure } from "../ops/issues";
 import { reserveBudget, settleBudget, withBudget, SeoBudgetError } from "./budget";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, type DeviceSet } from "./pricing";
-import { seoIncluded } from "./plan";
+import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
 
 const TICK_MS = 60_000;
 const LOCK_KEY = 7192;
@@ -59,7 +59,9 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
       return true;
     }
     if (!isConfigured()) {
-      await finishRun(run.id, "failed", "DataForSEO is not connected (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD).");
+      // The customer sees the neutral note; the env detail is the log's.
+      console.warn(`[seo] run ${run.id} skipped: data source not configured (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD)`);
+      await finishRun(run.id, "failed", SEO_NOT_READY_MESSAGE);
       return true;
     }
     const devices = devicesOf(site.devices);
@@ -69,7 +71,7 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     try {
       reservation = await reserveBudget(run.user_id, estimate.usd);
     } catch (e) {
-      if (e instanceof SeoBudgetError) { await finishRun(run.id, "failed", e.message); return true; }
+      if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", e.message); return true; }
       throw e;
     }
     const posted: PostedRankTask[] = [];
@@ -85,6 +87,7 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
         firstError ??= e?.message ?? String(e);
         costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
         console.warn(`[seo] run ${run.id} task_post chunk ${i / MAX_TASKS_PER_POST} failed: ${firstError}`);
+        firstError = "Some checks were not accepted by the search data service.";
       }
     }
     await settleBudget(reservation, costUsd);
@@ -94,7 +97,7 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     }
     await pool.query(
       "UPDATE seo_rank_runs SET tasks=$2, total=$3, cost_usd=$4, error=$5, lease_until=NULL WHERE id=$1",
-      [run.id, JSON.stringify(posted), inputs.length, costUsd, posted.length < inputs.length ? `${inputs.length - posted.length} of ${inputs.length} checks were not accepted by DataForSEO${firstError ? `: ${firstError}` : ""}` : null]);
+      [run.id, JSON.stringify(posted), inputs.length, costUsd, posted.length < inputs.length ? `${inputs.length - posted.length} of ${inputs.length} checks were not accepted by the search data service` : null]);
     await pool.query("UPDATE seo_sites SET last_rank_check_at=now() WHERE id=$1", [site.id]);
   } catch (e: any) {
     await finishRun(run.id, "failed", e?.message ?? String(e));
@@ -133,7 +136,7 @@ export async function collectRunningRuns(): Promise<void> {
           const t = chunk[j], r = settled[j];
           if (r.status === "rejected") { pending.push(t); continue; }
           if (r.value.status === "pending") { pending.push(t); continue; }
-          if (r.value.status === "failed") { failures.push(`${t.keyword} (${t.device}): ${r.value.message}`); continue; }
+          if (r.value.status === "failed") { console.warn(`[seo] run ${run.id} check failed ${t.keyword} (${t.device}): ${r.value.message}`); failures.push(`${t.keyword} (${t.device})`); continue; }
           const res = r.value.result;
           await pool.query(
             `INSERT INTO seo_rank_checks(keyword_id,site_id,run_id,checked_on,device,position,url,serp_features)
@@ -145,7 +148,7 @@ export async function collectRunningRuns(): Promise<void> {
       }
       const remaining = [...pending, ...rest];
       const expired = run.started_at && Date.now() - new Date(run.started_at).getTime() > RUN_WINDOW_MS;
-      const errorNote = [run.error, failures.length ? `${failures.length} check(s) failed at DataForSEO: ${failures[0]}` : null,
+      const errorNote = [run.error, failures.length ? `${failures.length} check(s) failed: ${failures[0]}` : null,
         expired && remaining.length ? `${remaining.length} check(s) never came back from the queue` : null].filter(Boolean).join(" · ") || null;
       if (!remaining.length || expired) {
         await pool.query(

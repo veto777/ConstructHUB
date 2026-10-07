@@ -1,22 +1,32 @@
 /**
- * /api/seo/* — the SEO toolset's API. Session auth through the platform's
+ * /api/seo/* — ConstructHUB SEO's API. Session auth through the platform's
  * getDevUser (an agency member acts as the workspace owner), plan-gated like
- * Site Scan (server/seo/plan.ts), every charged DataForSEO call reserved
- * against the monthly budget (server/seo/budget.ts). Without DataForSEO
- * credentials every endpoint still answers, with `configured: false`, and the
- * UI shows the "Connect DataForSEO" card.
+ * Site Scan (server/seo/plan.ts).
+ *
+ * White-label: the customer buys plan units — tracked keywords (a standing
+ * count), keyword searches and backlink refreshes per month (shared/plans.ts
+ * SEO_PLAN_LIMITS) — enforced here with the platform's 402/403 bodies. The
+ * data vendor (DataForSEO), its prices and the internal dollar cap
+ * (server/seo/budget.ts) never appear in a customer response: the status
+ * payload carries plan units only, and the vendor state goes to platform
+ * admins alone (`admin` on /api/seo/status, GET /api/seo/admin/usage).
+ * Without vendor credentials every endpoint still answers with
+ * `configured: false`; sites and keywords save, checks wait for the source.
  */
 import type { Express } from "express";
 import { z } from "zod";
 import { pool } from "../db";
-import { requirePlan } from "../entitlements";
-import { budgetStatus, withBudget, SeoBudgetError, usd } from "./budget";
+import { isPlatformAdmin } from "../admin";
+import { requirePlan, sendLimitReached, raiseHint, plural, type Entitlements } from "../entitlements";
+import { monthlyUsage, reserveQuotaFor, refundReservation, resetsAt } from "../growth-quotas";
+import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey } from "./budget";
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
-import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, projectMonthlyRankTrackingUsd, PRICE_SHEET } from "./pricing";
-import { enqueueRankRun, postQueuedRun, snapshotBacklinks, BACKLINK_ROWS, type SiteRow } from "./jobs";
-import { seoAllowanceTest, SEO_FEATURE } from "./plan";
+import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd } from "./pricing";
+import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "./jobs";
+import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
+import { PLANS } from "@shared/plans";
 
 const SUGGESTION_LIMIT = 50;
 const GAP_LIMIT = 100;
@@ -43,25 +53,60 @@ const researchInput = z.object({
 const competitorInput = z.object({ competitor: z.string().min(3).max(253) }).strict();
 const id = z.coerce.number().int().positive();
 
+/** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
+function vendorErrorMessage(e: DataForSeoError): string {
+  switch (e.code) {
+    case "not_configured": return SEO_NOT_READY_MESSAGE;
+    case "rate_limited": return "The search data service is busy — try again in a minute.";
+    case "invalid": return "That request couldn't be run — check the keyword or domain and try again.";
+    case "task_failed": return "That check didn't complete — try again in a few minutes.";
+    default: return "The search data service didn't answer — try again in a few minutes.";
+  }
+}
+
 export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => any) {
-  const route = (method: "get" | "post" | "delete", path: string, fn: (req: any, res: any, user: number) => Promise<any>) =>
+  const route = (method: "get" | "post" | "delete", path: string, fn: (req: any, res: any, user: number, ent: Entitlements) => Promise<any>) =>
     app[method](path, async (req, res, next) => {
       try {
         const u = auth(req, res);
         if (!u) return;
         const ent = await requirePlan(res, u.id, SEO_FEATURE, seoAllowanceTest);
         if (!ent) return;
-        await fn(req, res, u.id);
+        await fn(req, res, u.id, ent);
       } catch (e: any) {
         if (e instanceof z.ZodError) return void res.status(400).json({ message: "Invalid input", issues: e.issues.slice(0, 3) });
-        if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message, remainingUsd: e.remainingUsd, estimateUsd: e.estimateUsd });
+        // The internal cap tripped: a neutral "paused" to the customer; the dollars are already in the log.
+        if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message });
         if (e instanceof DataForSeoError) {
           const status = e.code === "not_configured" ? 503 : e.code === "auth" ? 502 : e.code === "rate_limited" ? 429 : e.code === "invalid" || e.code === "task_failed" ? 400 : 502;
-          return void res.status(status).json({ code: `dataforseo_${e.code}`, message: e.message });
+          console.warn(`[seo] vendor error ${e.code} on ${req.method} ${req.path}: ${e.message}`);
+          return void res.status(status).json({ code: `seo_source_${e.code}`, message: vendorErrorMessage(e) });
         }
         next(e);
       }
     });
+
+  const notReady = (res: any) => res.status(503).json({ configured: false, code: "seo_not_ready", message: SEO_NOT_READY_MESSAGE });
+
+  /** This account's plan units: keywords tracked (standing) and the two monthly meters. */
+  const planUsage = async (user: number, ent: Entitlements) => {
+    const [{ rows: [k] }, usage] = await Promise.all([
+      pool.query("SELECT count(*)::int n FROM seo_keywords WHERE user_id=$1", [user]),
+      monthlyUsage(user, ent),
+    ]);
+    return {
+      keywords: { used: Number(k?.n ?? 0), limit: ent.allowances?.seoKeywords ?? 0 },
+      research: usage.seoResearch ?? { used: 0, limit: 0 },
+      backlinkRefreshes: usage.seoBacklinkRefreshes ?? { used: 0, limit: 0 },
+    };
+  };
+
+  /** Take one unit of a monthly SEO meter or answer the platform's 402/403; the reservation is returned for a refund. */
+  const takeUnit = async (res: any, user: number, feature: "seoResearch" | "seoBacklinkRefreshes") => {
+    const r = await reserveQuotaFor(user, feature);
+    if (!r.ok) { res.status(r.status).json(r.body); return null; }
+    return r.reservation;
+  };
 
   const ownedSite = async (user: number, siteId: unknown): Promise<SiteRow> => {
     const { rows: [site] } = await pool.query("SELECT * FROM seo_sites WHERE id=$1 AND user_id=$2", [id.parse(siteId), user]);
@@ -69,11 +114,32 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     return site;
   };
 
-  // Status: connection, budget, the price sheet the connect card quotes.
-  route("get", "/api/seo/status", async (_req, res, user) => {
-    const budget = await budgetStatus(user);
+  // Status: is the data source live, and this account's plan units. Platform
+  // admins also get the real state of the source (vendor spend vs the cap).
+  route("get", "/api/seo/status", async (req, res, user, ent) => {
+    const usage = await planUsage(user, ent);
     res.setHeader("Cache-Control", "no-store");
-    res.json({ configured: isConfigured(), budget, prices: PRICE_SHEET });
+    const body: Record<string, unknown> = { configured: isConfigured(), usage, resetsAt: resetsAt() };
+    if (isPlatformAdmin(req.user)) {
+      const budget = await budgetStatus(user);
+      body.admin = { vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
+    }
+    res.json(body);
+  });
+
+  // Admin only: wholesale cost this month per account, the total and the cap.
+  app.get("/api/seo/admin/usage", async (req, res, next) => {
+    try {
+      const u = auth(req, res);
+      if (!u) return;
+      if (!isPlatformAdmin(req.user)) return void res.status(403).json({ message: "Platform admin access required" });
+      const month = typeof req.query.month === "string" && /^\d{4}-\d{2}$/.test(req.query.month) ? req.query.month : monthKey();
+      const accounts = await monthlySpendByAccount(month);
+      const totalUsd = Math.round(accounts.reduce((a, b) => a + b.costUsd, 0) * 1e6) / 1e6;
+      const capUsd = monthlyBudgetUsd();
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, month, capUsd, totalUsd, remainingUsd: Math.max(0, Math.round((capUsd - totalUsd) * 1e6) / 1e6), accounts });
+    } catch (e) { next(e); }
   });
 
   route("get", "/api/seo/sites", async (_req, res, user) => {
@@ -112,7 +178,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features FROM (
            SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
            FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
-      pool.query("SELECT id, trigger, status, total, checked, cost_usd::float8 AS cost_usd, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
+      pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
       searchConsoleSummary(user, site.domain),
     ]);
     const latest = new Map<string, any>(), previous = new Map<string, any>();
@@ -145,16 +211,30 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     res.json({
       site: siteView({ ...site, keyword_count: keywords.length }), devices, summary, rows, runs, searchConsole: gsc,
-      nextCheck: { serps: estimate.serps, estimateUsd: estimate.usd, monthlyUsd: projectMonthlyRankTrackingUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth) },
+      nextCheck: { serps: estimate.serps, nextAt: site.next_rank_check_at ?? null },
     });
   });
 
-  route("post", "/api/seo/sites/:id/keywords", async (req, res, user) => {
+  route("post", "/api/seo/sites/:id/keywords", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const input = keywordsInput.parse(req.body);
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
     const unique = [...new Set(input.keywords.map((k) => k.toLowerCase().replace(/\s+/g, " ").trim()).filter(Boolean))];
     if (n + unique.length > MAX_KEYWORDS_PER_SITE) return res.status(403).json({ message: `Up to ${MAX_KEYWORDS_PER_SITE} keywords per site.` });
+    // Plan limit: tracked keywords across the account (keywords already on this site are not re-added, so count only the new ones).
+    const { rows: existing } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1 AND keyword=ANY($2::text[])", [site.id, unique]);
+    const adding = unique.length - existing.length;
+    const { rows: [{ total }] } = await pool.query("SELECT count(*)::int total FROM seo_keywords WHERE user_id=$1", [user]);
+    const limit = ent.allowances?.seoKeywords ?? 0;
+    if (adding > 0 && !keywordsFit(ent.allowances, Number(total), adding)) {
+      const raise = raiseHint(ent, "seoKeywords", ["tracked keyword"]);
+      const plan = PLANS[ent.accessPlan!].name;
+      const left = Math.max(0, limit - Number(total));
+      return sendLimitReached(res, {
+        feature: "seoKeywords", limit, used: Number(total), upgradePlan: raise.upgradePlan, addon: raise.addon,
+        message: `${left === 0 ? `You're tracking all ${plural(limit, "keyword")} your ${plan} plan includes.` : `This adds ${plural(adding, "keyword")}, and ${left} of the ${plural(limit, "tracked keyword")} your ${plan} plan includes ${left === 1 ? "is" : "are"} free.`} Remove keywords you no longer need, or ${raise.text ? raise.text.replace(/^To raise it, /, "") : "move to a bigger plan."}`,
+      });
+    }
     const volumes = new Map((input.volumes ?? []).map((v) => [v.keyword.toLowerCase(), v]));
     let added = 0;
     for (const keyword of unique) {
@@ -177,9 +257,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Search volume for keywords that have none yet (Google Ads data, one task per 1,000 keywords).
   route("post", "/api/seo/sites/:id/keywords/volumes", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    if (!isConfigured()) return res.status(503).json({ configured: false, message: "Connect DataForSEO first." });
+    if (!isConfigured()) return notReady(res);
     const { rows } = await pool.query("SELECT id, keyword FROM seo_keywords WHERE site_id=$1 AND (volume_checked_at IS NULL OR volume_checked_at<now()-interval '30 days') ORDER BY id LIMIT 1000", [site.id]);
-    if (!rows.length) return res.json({ updated: 0, costUsd: 0 });
+    if (!rows.length) return res.json({ updated: 0 });
     const out = await withBudget(user, estimateAdsVolumeUsd(rows.length), () => adsSearchVolume({ keywords: rows.map((r: any) => r.keyword), locationCode: site.location_code, languageCode: site.language_code }));
     const byKeyword = new Map(out.data.map((v) => [v.keyword.toLowerCase(), v]));
     let updated = 0;
@@ -189,69 +269,92 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       await pool.query("UPDATE seo_keywords SET search_volume=$2, cpc=$3, volume_checked_at=now() WHERE id=$1", [r.id, v.searchVolume, v.cpc]);
       updated++;
     }
-    res.json({ updated, costUsd: out.costUsd });
+    res.json({ updated });
   });
 
-  // Run now: a rank check on the standard queue (results arrive over the next minutes).
+  // Run now: a rank check queued at the source (results arrive over the next minutes).
   route("post", "/api/seo/sites/:id/rank-check", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    if (!isConfigured()) return res.status(503).json({ configured: false, message: "Connect DataForSEO first." });
+    if (!isConfigured()) return notReady(res);
     const { rows: keywords } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1", [site.id]);
     if (!keywords.length) return res.status(400).json({ message: "Add keywords first." });
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     const budget = await budgetStatus(user);
-    if (estimate.usd > budget.remainingUsd)
-      return res.status(402).json({ code: "seo_budget", message: `This check needs about ${usd(estimate.usd)} and ${usd(budget.remainingUsd)} of the ${usd(budget.capUsd)} monthly SEO data budget is left.`, remainingUsd: budget.remainingUsd, estimateUsd: estimate.usd });
+    if (estimate.usd > budget.remainingUsd) {
+      console.warn(`[seo] cost refused user=${user} rank-check site=${site.id} estimate=$${estimate.usd} remaining=$${budget.remainingUsd} cap=$${budget.capUsd}`);
+      return res.status(402).json({ code: "seo_budget", message: "SEO checks are paused for the rest of the month — the monthly data allowance for rank tracking is used up. It comes back on the 1st." });
+    }
     const run = await enqueueRankRun(site, "manual");
     if (!run.reused) void postQueuedRun(run.id).catch((e) => console.error("[seo] run-now post failed", e?.message ?? e));
-    res.status(202).json({ runId: run.id, reused: run.reused, serps: estimate.serps, estimateUsd: estimate.usd });
+    res.status(202).json({ runId: run.id, reused: run.reused, serps: estimate.serps });
   });
 
   route("get", "/api/seo/sites/:id/runs", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    const { rows } = await pool.query("SELECT id, trigger, status, total, checked, cost_usd::float8 AS cost_usd, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 20", [site.id]);
+    const { rows } = await pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 20", [site.id]);
     res.json(rows);
   });
 
-  // Keyword research: seed → suggestions with volume / CPC / difficulty (Labs, up to 50 rows).
-  route("post", "/api/seo/keywords/research", async (req, res, user) => {
+  // Keyword research: seed → suggestions with volume / CPC / difficulty (up to 50 rows). One keyword search of the plan.
+  route("post", "/api/seo/keywords/research", async (req, res, user, ent) => {
     const input = researchInput.parse(req.body);
-    if (!isConfigured()) return res.status(503).json({ configured: false, message: "Connect DataForSEO first." });
-    const out = await withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }));
-    res.json({ seed: input.seed, items: out.data, costUsd: out.costUsd });
+    if (!isConfigured()) return notReady(res);
+    const unit = await takeUnit(res, user, "seoResearch");
+    if (!unit) return;
+    try {
+      const out = await withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }));
+      res.json({ seed: input.seed, items: out.data, usage: await planUsage(user, ent) });
+    } catch (e) {
+      await refundReservation(unit, 1).catch(() => {});
+      throw e;
+    }
   });
 
   // Backlinks: the latest snapshot, and "Refresh now".
   route("get", "/api/seo/sites/:id/backlinks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const { rows } = await pool.query(
-      "SELECT id, taken_on::text AS taken_on, summary, backlinks, cost_usd::float8 AS cost_usd FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [site.id]);
+      "SELECT id, taken_on::text AS taken_on, summary, backlinks FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [site.id]);
     const [latest, previous] = rows;
     res.json({
       site: siteView(site), configured: isConfigured(),
-      snapshot: latest ? { id: latest.id, takenOn: latest.taken_on, summary: latest.summary, backlinks: latest.backlinks, costUsd: latest.cost_usd } : null,
+      snapshot: latest ? { id: latest.id, takenOn: latest.taken_on, summary: latest.summary, backlinks: latest.backlinks } : null,
       previous: previous ? { takenOn: previous.taken_on, summary: previous.summary } : null,
-      refreshEstimateUsd: estimateBacklinkSnapshotUsd(BACKLINK_ROWS),
       nextSnapshotAt: site.next_backlinks_at,
     });
   });
 
-  route("post", "/api/seo/sites/:id/backlinks/refresh", async (req, res, user) => {
+  // "Refresh now": one backlink refresh of the plan (the automatic monthly snapshot is on top).
+  route("post", "/api/seo/sites/:id/backlinks/refresh", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
-    if (!isConfigured()) return res.status(503).json({ configured: false, message: "Connect DataForSEO first." });
-    const snap = await snapshotBacklinks(site);
-    res.status(201).json(snap);
+    if (!isConfigured()) return notReady(res);
+    const unit = await takeUnit(res, user, "seoBacklinkRefreshes");
+    if (!unit) return;
+    try {
+      const snap = await snapshotBacklinks(site);
+      res.status(201).json({ id: snap.id, takenOn: snap.takenOn, usage: await planUsage(user, ent) });
+    } catch (e) {
+      await refundReservation(unit, 1).catch(() => {});
+      throw e;
+    }
   });
 
-  // Competitors: keywords a competitor ranks for that this site does not (Labs domain_intersection).
-  route("post", "/api/seo/sites/:id/competitors", async (req, res, user) => {
+  // Competitors: keywords a competitor ranks for that this site does not. One keyword search of the plan.
+  route("post", "/api/seo/sites/:id/competitors", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const competitor = normalizeDomain(competitorInput.parse(req.body).competitor);
     if (!competitor) return res.status(400).json({ message: "Enter the competitor's domain like example.com" });
     if (competitor === site.domain) return res.status(400).json({ message: "That is your own site." });
-    if (!isConfigured()) return res.status(503).json({ configured: false, message: "Connect DataForSEO first." });
-    const out = await withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }));
-    res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, costUsd: out.costUsd });
+    if (!isConfigured()) return notReady(res);
+    const unit = await takeUnit(res, user, "seoResearch");
+    if (!unit) return;
+    try {
+      const out = await withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }));
+      res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, usage: await planUsage(user, ent) });
+    } catch (e) {
+      await refundReservation(unit, 1).catch(() => {});
+      throw e;
+    }
   });
 }
 

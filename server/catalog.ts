@@ -30,6 +30,15 @@ export const DFY_CATALOG: Record<string, CatalogItem> = {
   dfy_bundle:          { name: "Complete Business Build",                               priceCents: 2999900 },
 };
 
+// TODO(owner): ConstructHUB SEO add-on. The SEO tools (rank tracker, keyword
+// research, backlinks, competitor gap) are included with every plan under the
+// allowances in shared/plans.ts SEO_PLAN_LIMITS; a paid "SEO" add-on that
+// raises those allowances (more tracked keywords / searches / refreshes) would
+// be an ADDONS entry in shared/plans.ts with `grants: { seoKeywords, seoResearch,
+// seoBacklinkRefreshes }` plus its Stripe price (server/billing). Retail price
+// is the owner's call — NOT set here; wholesale cost is cents per check
+// (server/seo/pricing.ts), so the margin is whatever the owner picks.
+
 // Master Class complete bundle (type: "course_bundle"). Individual modules
 // (type: "course_module") are priced from the masterClassModules table by id.
 export const COURSE_BUNDLE: CatalogItem = {

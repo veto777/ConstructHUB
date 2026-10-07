@@ -48,6 +48,30 @@ export type PlanLimits = {
   apiUnitsPerMonth: number;
   /** Public API requests per minute, per key. */
   apiRatePerMinute: number;
+  /**
+   * ConstructHUB SEO (rank tracker, keyword research, backlinks): tracked
+   * keywords across the account's sites (a standing count), keyword-research /
+   * competitor-gap searches per calendar month, and manual backlink refreshes
+   * per month (the automatic monthly snapshot is included on top). Numbers in
+   * SEO_PLAN_LIMITS below.
+   */
+  seoKeywords: number;
+  seoResearch: number;
+  seoBacklinkRefreshes: number;
+};
+
+/**
+ * ConstructHUB SEO allowances per plan — the ONE place these numbers live.
+ * Defaults scale with the tiers' Site Scan counts; OWNER TO CONFIRM (set
+ * 2026-10-07 without a price decision; the retail price of an SEO add-on is
+ * the owner's call, see server/catalog.ts). A plan whose Site Scans are 0 and
+ * not per-location has no SEO tools at all (server/seo/plan.ts).
+ */
+export const SEO_PLAN_LIMITS: Record<PlanKey, Pick<PlanLimits, "seoKeywords" | "seoResearch" | "seoBacklinkRefreshes">> = {
+  starter: { seoKeywords: 50, seoResearch: 25, seoBacklinkRefreshes: 1 },      // owner to confirm
+  pro: { seoKeywords: 200, seoResearch: 100, seoBacklinkRefreshes: 4 },        // owner to confirm
+  growth: { seoKeywords: 1000, seoResearch: 500, seoBacklinkRefreshes: 12 },   // owner to confirm
+  agency: { seoKeywords: 1000, seoResearch: 500, seoBacklinkRefreshes: 12 },   // owner to confirm (same as Growth; per-location bands later if wanted)
 };
 
 /** The numeric limits (the ones an add-on can raise). */
@@ -100,6 +124,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       protectedSites: 0, siteScans: 2, siteScansPerLocation: 0, permitSearches: 100, crmSeats: 1,
       teamTextSegments: 0, clientTexting: "none", autoPublishAiReplies: false, reviewTemplates: 5,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60,
+      ...SEO_PLAN_LIMITS.starter,
     },
     modules: NO_MODULES,
   },
@@ -123,6 +148,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       protectedSites: 1, siteScans: 5, siteScansPerLocation: 0, permitSearches: 500, crmSeats: 3,
       teamTextSegments: 500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 10_000, apiRatePerMinute: 60,
+      ...SEO_PLAN_LIMITS.pro,
     },
     modules: NO_MODULES,
   },
@@ -146,6 +172,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       protectedSites: 3, siteScans: 15, siteScansPerLocation: 0, permitSearches: 5000, crmSeats: 10,
       teamTextSegments: 1500, clientTexting: "included", autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 50_000, apiRatePerMinute: 60,
+      ...SEO_PLAN_LIMITS.growth,
     },
     modules: NO_MODULES,
   },
@@ -169,6 +196,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       protectedSites: 10, siteScans: 0, siteScansPerLocation: 1, permitSearches: 5000, crmSeats: 10,
       teamTextSegments: 1500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 50,
       apiUnitsPerMonth: 250_000, apiRatePerMinute: 60,
+      ...SEO_PLAN_LIMITS.agency,
     },
     modules: { agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true },
   },
