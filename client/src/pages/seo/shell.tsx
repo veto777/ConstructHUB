@@ -19,15 +19,22 @@ import { planRequiredFrom } from "@/components/plan-required";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PLANS } from "@shared/plans";
+import { inNativeApp } from "@/lib/app-shell";
 
 export const api = async (method: string, url: string, body?: unknown) => (await apiRequest(method, url, body)).json();
 
 /** One plan unit: used of limit (-1 = unlimited, 0 = not in the plan). */
 export type Unit = { used: number; limit: number };
-export type SeoUsage = { keywords: Unit; research: Unit; backlinkRefreshes: Unit };
+export type SeoUsage = { keywords: Unit };
+/** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
+export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
+export type SeoPrices = { explorerReport: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;
+  credits: SeoCreditsInfo;
+  prices: SeoPrices;
+  packs: number[];
   resetsAt: string;
   /** Platform admins only: the real state of the data source. */
   admin?: {
@@ -46,6 +53,14 @@ export const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso.le
 export const fmtUnit = (u: Unit | undefined) => !u ? "—" : u.limit < 0 ? `${fmtNum(u.used)} · unlimited` : `${fmtNum(u.used)} of ${fmtNum(u.limit)}`;
 /** Units left this month (Infinity when unlimited). */
 export const unitsLeft = (u: Unit | undefined) => !u ? 0 : u.limit < 0 ? Infinity : Math.max(0, u.limit - u.used);
+
+/** Cents as dollars: "$1.04". */
+export const money = (cents: number | null | undefined) => cents == null ? "—" : `$${(cents / 100).toFixed(2)}`;
+/** "about $1.04" for a price shown before a lookup runs. */
+export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => status?.prices ? `about ${money(status.prices[key])}` : "";
+/** Enough credit for this lookup? (true while the status is loading, so buttons are not disabled for nothing) */
+export const canAfford = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
+  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= status.prices[key];
 
 export const useSeoStatus = () => useQuery<SeoStatus>({ queryKey: ["/api/seo/status"] });
 export const useSeoSites = () => useQuery<SeoSite[]>({ queryKey: ["/api/seo/sites"] });
@@ -113,16 +128,64 @@ function PlanGate({ requiredPlan, message }: { requiredPlan: keyof typeof PLANS;
   );
 }
 
-/** This account's plan units, in the plan's own words. */
+/** SEO data credit: this month's allowance, purchased credit, and the way to add more. */
 function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
-  const u = status.data?.usage;
-  if (!u) return null;
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const u = status.data?.usage, c = status.data?.credits;
+  // Back from Stripe: say what happened once, then drop the flag.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get("credits");
+    if (!flag) return;
+    if (flag === "success") { toast({ title: "Credit added", description: "It can take a few seconds to show in your balance." }); window.setTimeout(() => void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }), 3000); }
+    else if (flag === "canceled") toast({ title: "Checkout canceled", description: "No charges were made." });
+    else if (flag === "add") setAdding(true);
+    params.delete("credits");
+    const qs = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }, [toast, qc]);
+  const buy = useMutation({
+    mutationFn: (cents: number) => api("POST", "/api/seo/credits/checkout", { cents }),
+    onSuccess: (data: { url?: string }) => { if (data?.url) window.location.href = data.url; },
+    onError: (e) => toast({ title: "Couldn't start checkout", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  if (!u || !c) return null;
+  // The iPhone apps sell nothing (App Store 3.1.3(f)): the balance shows, the way to buy more does not.
+  const unlimited = c.includedCents === -1, canBuy = !unlimited && !inNativeApp();
+  const left = Math.max(0, c.includedCents - c.includedUsedCents);
   return (
-    <p className="g-text-2 mb-4 text-[13px]" data-testid="seo-usage-line">
-      Tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b>
-      {" · "}keyword searches this month <b className="g-text font-medium">{fmtUnit(u.research)}</b>
-      {" · "}backlink refreshes this month <b className="g-text font-medium">{fmtUnit(u.backlinkRefreshes)}</b>
-    </p>
+    <div className="mb-4" data-testid="seo-usage-line">
+      <p className="g-text-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
+        <span data-testid="text-seo-balance">
+          SEO data this month{" "}
+          <b className="g-text font-medium">{unlimited ? "unlimited" : `${money(left)} left of ${money(c.includedCents)} included`}</b>
+          {!unlimited && <> · purchased credit <b className="g-text font-medium">{money(c.walletCents)}</b></>}
+          {" · "}tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b>
+        </span>
+        {canBuy && !adding && <button type="button" className="g-pill g-pill--sm ml-1" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
+      </p>
+      {!unlimited && c.availableCents === 0 && !adding && (
+        <p className="mt-1 text-[13px]" style={{ color: "var(--g-red)" }} role="status" data-testid="text-seo-out-of-credit">
+          You've used this month's SEO data. {canBuy ? "Add credit to keep running lookups, or wait for the 1st." : "It comes back on the 1st."}
+        </p>
+      )}
+      {adding && canBuy && (
+        <div className="g-callout mt-2" data-testid="panel-add-credit">
+          <h3>Add SEO data credit</h3>
+          <p>Prepaid, used only after this month's included allowance, and it doesn't expire. Paid by card through Stripe; a receipt is emailed.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(status.data?.packs ?? []).map((cents) => (
+              <Button key={cents} variant="outline" disabled={buy.isPending} onClick={() => buy.mutate(cents)} data-testid={`button-buy-credit-${cents}`}>
+                {buy.isPending && buy.variables === cents ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Add {money(cents).replace(".00", "")}
+              </Button>
+            ))}
+            <button type="button" className="g-pill" onClick={() => setAdding(false)}>Not now</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

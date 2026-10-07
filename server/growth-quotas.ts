@@ -16,7 +16,7 @@ import {
 } from "./entitlements";
 import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
-export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts" | "seoResearch" | "seoBacklinkRefreshes";
+export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts";
 
 type Meter = {
   /** Upgrade prompt subject: "<what> is included with the Starter plan". */
@@ -43,11 +43,7 @@ export const METERS: Record<MeteredFeature, Meter> = {
   // texting-number add-on is a carrier number, not segments (shared/plans.ts),
   // so nothing raises this but the plan.
   texts: { what: "Texting", unit: ["text segment"], limit: "teamTextSegments" },
-  // ConstructHUB SEO (server/seo): keyword-research and competitor-gap searches,
-  // and manual backlink refreshes, per month (shared/plans.ts SEO_PLAN_LIMITS).
-  // Tracked keywords are a standing count, checked in server/seo/routes.ts.
-  seoResearch: { what: "Keyword research", unit: ["keyword search", "keyword searches"], limit: "seoResearch" },
-  seoBacklinkRefreshes: { what: "Backlink refresh", unit: ["backlink refresh", "backlink refreshes"], limit: "seoBacklinkRefreshes" },
+  // ConstructHUB SEO is not metered here: it is charged as SEO data credit (server/seo/credits.ts).
 };
 
 /** Ranking-grid credits a grid costs (one per 25 grid points), from the price book so the client shows the same number. */

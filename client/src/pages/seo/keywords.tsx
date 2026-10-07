@@ -5,7 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtNum, fmtUnit, kd, SeoShell, unitsLeft, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Idea = { keyword: string; searchVolume: number | null; cpc: number | null; difficulty: number | null; competition: number | null; intent: string | null };
 type Research = { seed: string; items: Idea[] };
@@ -34,7 +34,6 @@ export default function SeoKeywordsPage() {
     onError: (e) => toast({ title: "Couldn't fetch volumes", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const configured = !!status.data?.configured;
-  const searchesLeft = unitsLeft(status.data?.usage.research);
   const items = research.data?.items ?? [];
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   return (
@@ -42,7 +41,7 @@ export default function SeoKeywordsPage() {
       actions={site && <button type="button" className="g-pill" disabled={!configured || volumes.isPending} onClick={() => volumes.mutate()} data-testid="button-fetch-volumes" title="Google search volume for tracked keywords that have none yet">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get volumes for tracked keywords</button>}>
       <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (seed.trim()) research.mutate(); }} data-testid="form-research">
         <input className="g-input" placeholder="e.g. roof repair" value={seed} onChange={(e) => setSeed(e.target.value)} data-testid="input-seed" />
-        <Button type="submit" className="sm:w-auto" disabled={!configured || !seed.trim() || research.isPending} data-testid="button-research" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
+        <Button type="submit" className="sm:w-auto" disabled={!configured || !seed.trim() || research.isPending || !canAfford(status.data, "keywordResearch")} data-testid="button-research" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {research.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find keywords
         </Button>
       </form>
@@ -50,13 +49,13 @@ export default function SeoKeywordsPage() {
         <Empty testId="seo-research-empty">
           <h3>What people search for</h3>
           <p>Each search returns up to 50 related keywords with Google search volume (United States), average cost per click, keyword difficulty (0–100) and intent. Tick the ones worth ranking for and track them on {site ? site.domain : "a site"}.</p>
-          {status.data && <p className="mt-2">Keyword searches this month: {fmtUnit(status.data.usage.research)}{Number.isFinite(searchesLeft) ? ` · ${fmtNum(searchesLeft)} left` : ""}.</p>}
+          {status.data && <p className="mt-2" data-testid="text-research-price">Each search costs {priceOf(status.data, "keywordResearch")} of your SEO data.</p>}
         </Empty>
       )}
       {research.data && (
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] g-text-2">
-            <span data-testid="text-research-meta">{items.length} suggestions for "{research.data.seed}"{status.data ? ` · searches this month ${fmtUnit(status.data.usage.research)}` : ""}</span>
+            <span data-testid="text-research-meta">{items.length} suggestions for "{research.data.seed}"</span>
             {site && picked.size > 0 && <Button size="sm" disabled={track.isPending} onClick={() => track.mutate(items.filter((i) => picked.has(i.keyword)))} data-testid="button-track-selected">{track.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Track ${picked.size} on ${site.domain}`}</Button>}
           </div>
           {items.length === 0 ? <Empty>No suggestions came back for that seed. Try a shorter or more common phrase.</Empty> : (

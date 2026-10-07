@@ -2,7 +2,7 @@
  * /seo/explorer — Site Explorer: type any domain and get its authority and
  * backlink profile, organic and paid search footprint, six months of history,
  * top keywords and pages, organic competitors, referring domains and anchors.
- * One report is one keyword search of the plan; a saved report is free to
+ * One report is charged to the account's SEO data credit; a saved report is free to
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -12,7 +12,7 @@ import { ExternalLink, Loader2, Plus, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, kd, SeoShell, unitsLeft, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Footprint = {
   keywords: number; traffic: number; trafficValue: number;
@@ -130,7 +130,7 @@ export default function SeoExplorerPage() {
   const open = (d: string) => { setReport(null); setDomain(d); setInput(d); window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(d)}`); };
   const submit = (refresh = false) => { const d = input.trim(); if (d) { if (!refresh) setReport(null); analyse.mutate({ domain: d, refresh }); } };
   const configured = !!status.data?.configured;
-  const searchesLeft = unitsLeft(status.data?.usage.research);
+  const affordable = canAfford(status.data, "explorerReport");
   const tracked = !!report && (sites.data ?? []).some((s) => s.domain === report.domain);
   const busy = analyse.isPending || (saved.isLoading && !!domain && !report);
   const notFoundYet = !!domain && !report && saved.isError && !analyse.isPending;
@@ -160,7 +160,7 @@ export default function SeoExplorerPage() {
         {site && site.domain !== input.trim() && <button type="button" className="g-pill" onClick={() => { setInput(site.domain); open(site.domain); }} data-testid="button-explorer-my-site">My site: {site.domain}</button>}
       </form>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-explorer-cost">
-        A new report uses one keyword search ({Number.isFinite(searchesLeft) ? `${fmtNum(searchesLeft)} left this month` : "unlimited"}). Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.
+        A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
       </p>
 
       {!report && !busy && (recent.data?.items.length ?? 0) > 0 && (

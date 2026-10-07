@@ -25,6 +25,8 @@ import {
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
 import { CRM_PLANS, CRM_PLAN_KEYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
+import { SEO_CREDIT_PACKS } from "@shared/seo-credits";
+import { SEO_PLAN_LIMITS } from "@shared/plans";
 
 export const KNOWLEDGE_FILE = "hub-knowledge.md";
 /** Characters of knowledge one model call may carry (keeps TruthCoder prefill fast). */
@@ -231,5 +233,8 @@ export function priceBookCents(): Set<number> {
     cents.add(plan.monthlyCents); cents.add(plan.annualCents); cents.add(Math.round(plan.annualCents / 12));
   }
   cents.add(CRM_EXTRA_SEAT_MONTHLY_CENTS); cents.add(CRM_EXTRA_SEAT_ANNUAL_CENTS);
+  // SEO data: each plan's monthly allowance and the prepaid credit packs (shared/seo-credits.ts).
+  for (const key of PLAN_KEYS) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
+  for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
   return cents;
 }

@@ -23,11 +23,26 @@ import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthl
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
-import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd } from "./pricing";
+import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd } from "./pricing";
+import { creditStatus, outOfCreditMessage } from "./credits";
+import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "./jobs";
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
-import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, REPORT_TTL_DAYS } from "./explorer";
+import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
+
+/**
+ * What each lookup costs the customer, in cents (wholesale estimate x SEO_MARKUP).
+ * Shown before they run it; the charge itself is settled to the real cost.
+ */
+export const SEO_PRICES = {
+  explorerReport: retailCents(EXPLORER_TYPICAL_USD),
+  keywordResearch: retailCents(estimateLabsUsd(50)),
+  competitorGap: retailCents(estimateLabsUsd(100)),
+  backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** Per 100 rank checks (one keyword on one device is one check, top 10). */
+  rankChecksPer100: retailCents(estimateRankCheckUsd(Array.from({ length: 100 }, (_, i) => `k${i}`), "desktop", 10).usd),
+};
 
 const SUGGESTION_LIMIT = 50;
 const GAP_LIMIT = 100;
@@ -84,7 +99,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       } catch (e: any) {
         if (e instanceof z.ZodError) return void res.status(400).json({ message: "Invalid input", issues: e.issues.slice(0, 3) });
         // The internal cap tripped: a neutral "paused" to the customer; the dollars are already in the log.
-        if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message });
+        if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message, ...(e.code === "seo_credits" ? { packs: SEO_CREDIT_PACKS } : {}) });
         if (e instanceof DataForSeoError) {
           const status = e.code === "not_configured" ? 503 : e.code === "auth" ? 502 : e.code === "rate_limited" ? 429 : e.code === "invalid" || e.code === "task_failed" ? 400 : 502;
           console.warn(`[seo] vendor error ${e.code} on ${req.method} ${req.path}: ${e.message}`);
@@ -102,18 +117,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       pool.query("SELECT count(*)::int n FROM seo_keywords WHERE user_id=$1", [user]),
       monthlyUsage(user, ent),
     ]);
-    return {
-      keywords: { used: Number(k?.n ?? 0), limit: ent.allowances?.seoKeywords ?? 0 },
-      research: usage.seoResearch ?? { used: 0, limit: 0 },
-      backlinkRefreshes: usage.seoBacklinkRefreshes ?? { used: 0, limit: 0 },
-    };
-  };
-
-  /** Take one unit of a monthly SEO meter or answer the platform's 402/403; the reservation is returned for a refund. */
-  const takeUnit = async (res: any, user: number, feature: "seoResearch" | "seoBacklinkRefreshes") => {
-    const r = await reserveQuotaFor(user, feature);
-    if (!r.ok) { res.status(r.status).json(r.body); return null; }
-    return r.reservation;
+    void usage;
+    return { keywords: { used: Number(k?.n ?? 0), limit: ent.allowances?.seoKeywords ?? 0 } };
   };
 
   const ownedSite = async (user: number, siteId: unknown): Promise<SiteRow> => {
@@ -127,7 +132,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/status", async (req, res, user, ent) => {
     const usage = await planUsage(user, ent);
     res.setHeader("Cache-Control", "no-store");
-    const body: Record<string, unknown> = { configured: isConfigured(), usage, resetsAt: resetsAt() };
+    // The customer's SEO data credit and what each lookup costs them (shared/seo-credits.ts).
+    const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
+    const body: Record<string, unknown> = { configured: isConfigured(), usage, credits, prices: SEO_PRICES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
       body.admin = { vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
@@ -281,7 +288,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   });
 
   // Run now: a rank check queued at the source (results arrive over the next minutes).
-  route("post", "/api/seo/sites/:id/rank-check", async (req, res, user) => {
+  route("post", "/api/seo/sites/:id/rank-check", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
     const { rows: keywords } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1", [site.id]);
@@ -291,6 +298,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (estimate.usd > budget.remainingUsd) {
       console.warn(`[seo] cost refused user=${user} rank-check site=${site.id} estimate=$${estimate.usd} remaining=$${budget.remainingUsd} cap=$${budget.capUsd}`);
       return res.status(402).json({ code: "seo_budget", message: "SEO checks are paused for the rest of the month — the monthly data allowance for rank tracking is used up. It comes back on the 1st." });
+    }
+    // The customer's own credit: say so now rather than failing the run a moment later.
+    const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
+    const need = retailCents(estimate.usd);
+    if (credits.availableCents !== -1 && need > credits.availableCents) {
+      return res.status(402).json({ code: "seo_credits", message: outOfCreditMessage(need, credits.availableCents), packs: SEO_CREDIT_PACKS });
     }
     const run = await enqueueRankRun(site, "manual");
     if (!run.reused) void postQueuedRun(run.id).catch((e) => console.error("[seo] run-now post failed", e?.message ?? e));
@@ -307,15 +320,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/keywords/research", async (req, res, user, ent) => {
     const input = researchInput.parse(req.body);
     if (!isConfigured()) return notReady(res);
-    const unit = await takeUnit(res, user, "seoResearch");
-    if (!unit) return;
-    try {
-      const out = await withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }));
-      res.json({ seed: input.seed, items: out.data, usage: await planUsage(user, ent) });
-    } catch (e) {
-      await refundReservation(unit, 1).catch(() => {});
-      throw e;
-    }
+    const out = await withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }));
+    res.json({ seed: input.seed, items: out.data, usage: await planUsage(user, ent) });
   });
 
   // Backlinks: the latest snapshot, and "Refresh now".
@@ -336,15 +342,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/sites/:id/backlinks/refresh", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
-    const unit = await takeUnit(res, user, "seoBacklinkRefreshes");
-    if (!unit) return;
-    try {
-      const snap = await snapshotBacklinks(site);
-      res.status(201).json({ id: snap.id, takenOn: snap.takenOn, usage: await planUsage(user, ent) });
-    } catch (e) {
-      await refundReservation(unit, 1).catch(() => {});
-      throw e;
-    }
+    const snap = await snapshotBacklinks(site);
+    res.status(201).json({ id: snap.id, takenOn: snap.takenOn, usage: await planUsage(user, ent) });
   });
 
   // ── Site Explorer: any domain, one report ──────────────────────────────────
@@ -374,16 +373,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       if (saved?.fresh) return res.json({ report: saved.report, fresh: true, reused: true, usage: await planUsage(user, ent) });
     }
     if (!isConfigured()) return notReady(res);
-    const unit = await takeUnit(res, user, "seoResearch");
-    if (!unit) return;
-    try {
-      const out = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
-      await saveReport(user, out.data, out.costUsd);
-      res.status(201).json({ report: out.data, fresh: true, reused: false, usage: await planUsage(user, ent) });
-    } catch (e) {
-      await refundReservation(unit, 1).catch(() => {});
-      throw e;
-    }
+    const out = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
+    await saveReport(user, out.data, out.costUsd);
+    res.status(201).json({ report: out.data, fresh: true, reused: false, usage: await planUsage(user, ent) });
   });
 
   // Competitors: keywords a competitor ranks for that this site does not. One keyword search of the plan.
@@ -393,15 +385,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!competitor) return res.status(400).json({ message: "Enter the competitor's domain like example.com" });
     if (competitor === site.domain) return res.status(400).json({ message: "That is your own site." });
     if (!isConfigured()) return notReady(res);
-    const unit = await takeUnit(res, user, "seoResearch");
-    if (!unit) return;
-    try {
-      const out = await withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }));
-      res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, usage: await planUsage(user, ent) });
-    } catch (e) {
-      await refundReservation(unit, 1).catch(() => {});
-      throw e;
-    }
+    const out = await withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }));
+    res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, usage: await planUsage(user, ent) });
   });
 }
 

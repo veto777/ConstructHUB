@@ -57,30 +57,32 @@ export type PlanLimits = {
   /** Public API requests per minute, per key. */
   apiRatePerMinute: number;
   /**
-   * ConstructHUB SEO (rank tracker, keyword research, backlinks): tracked
-   * keywords across the account's sites (a standing count), keyword-research /
-   * competitor-gap searches per calendar month, and manual backlink refreshes
-   * per month (the automatic monthly snapshot is included on top). Numbers in
-   * SEO_PLAN_LIMITS below.
+   * ConstructHUB SEO (site explorer, rank tracker, keyword research,
+   * backlinks): tracked keywords across the account's sites (a standing
+   * count), and the monthly SEO data allowance in cents AT THE CUSTOMER'S
+   * PRICE (shared/seo-credits.ts: every lookup costs SEO_MARKUP x wholesale;
+   * more is bought as prepaid credit). Numbers in SEO_PLAN_LIMITS below.
    */
   seoKeywords: number;
-  seoResearch: number;
-  seoBacklinkRefreshes: number;
+  seoCreditCents: number;
 };
 
 /**
  * ConstructHUB SEO allowances per plan — the ONE place these numbers live.
- * Defaults scale with the tiers' Site Scan counts; OWNER TO CONFIRM (set
- * 2026-10-07 without a price decision; the retail price of an SEO add-on is
- * the owner's call, see server/catalog.ts). A plan whose Site Scans are 0 and
- * not per-location has no SEO tools at all (server/seo/plan.ts).
+ * seoCreditCents is the owner's decision of 2026-10-07: $10 of SEO data a month
+ * at the customer's price on Starter, twice that on Pro, four times on Growth
+ * and Agency; anything beyond is prepaid credit (shared/seo-credits.ts).
+ * seoKeywords (tracked keywords) is still OWNER TO CONFIRM. A plan whose Site
+ * Scans are 0 and not per-location has no SEO tools at all (server/seo/plan.ts).
  */
-export const SEO_PLAN_LIMITS: Record<PlanKey, Pick<PlanLimits, "seoKeywords" | "seoResearch" | "seoBacklinkRefreshes">> = {
-  starter: { seoKeywords: 50, seoResearch: 25, seoBacklinkRefreshes: 1 },      // owner to confirm
-  pro: { seoKeywords: 200, seoResearch: 100, seoBacklinkRefreshes: 4 },        // owner to confirm
-  growth: { seoKeywords: 1000, seoResearch: 500, seoBacklinkRefreshes: 12 },   // owner to confirm
-  agency: { seoKeywords: 1000, seoResearch: 500, seoBacklinkRefreshes: 12 },   // owner to confirm (same as Growth; per-location bands later if wanted)
+export const SEO_PLAN_LIMITS: Record<PlanKey, Pick<PlanLimits, "seoKeywords" | "seoCreditCents">> = {
+  starter: { seoKeywords: 50, seoCreditCents: 1000 },
+  pro: { seoKeywords: 200, seoCreditCents: 2000 },
+  growth: { seoKeywords: 1000, seoCreditCents: 4000 },
+  agency: { seoKeywords: 1000, seoCreditCents: 4000 },
 };
+/** The plan bullet for the SEO data allowance: "SEO data: $10 / month included". */
+export const seoDataBullet = (plan: PlanKey) => `SEO data: $${SEO_PLAN_LIMITS[plan].seoCreditCents / 100} / month included`;
 
 /** The numeric limits (the ones an add-on can raise). */
 export type CountLimitKey = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
@@ -130,6 +132,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "5 ranking-grid credits / month",
       "2 Site Scans / month",
       "100 permit searches / month",
+      seoDataBullet("starter"),
       "Email support",
     ],
       notIncluded: [
@@ -160,6 +163,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "15 ranking-grid credits / month",
       "5 Site Scans / month",
       "500 permit searches / month",
+      seoDataBullet("pro"),
       "Team text alerts — 500 segments / month",
       "Client texting with your own SignalWire number (or the texting add-on)",
       "Priority email support",
@@ -190,6 +194,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "30 ranking-grid credits / month",
       "15 Site Scans / month",
       "5,000 permit searches / month",
+      seoDataBullet("growth"),
       "Team text alerts — 1,500 segments / month",
       "1 client-texting number included",
       "Priority support + onboarding call",
@@ -221,6 +226,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "Click Guard + IP Tracker + VPN Shield — 10 websites",
       "20 Competitor Intel scans / month",
       "2 ranking-grid credits and 1 Site Scan per location / month",
+      seoDataBullet("agency"),
       "Priority support + onboarding",
     ],
       notIncluded: [

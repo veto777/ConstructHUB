@@ -3,26 +3,24 @@ import { PLANS, PLAN_KEYS, SEO_PLAN_LIMITS, UNLIMITED } from "@shared/plans";
 import { keywordsFit, seoAllowanceTest, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 
 describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — owner to confirm)", () => {
-  it("every plan carries the three SEO limits from the one table", () => {
+  it("every plan carries the SEO limits from the one table", () => {
     for (const key of PLAN_KEYS) {
       const l = PLANS[key].limits;
       expect(l.seoKeywords).toBe(SEO_PLAN_LIMITS[key].seoKeywords);
-      expect(l.seoResearch).toBe(SEO_PLAN_LIMITS[key].seoResearch);
-      expect(l.seoBacklinkRefreshes).toBe(SEO_PLAN_LIMITS[key].seoBacklinkRefreshes);
+      expect(l.seoCreditCents).toBe(SEO_PLAN_LIMITS[key].seoCreditCents);
     }
   });
-  it("the defaults: Starter 50 / 25 / 1, Pro 200 / 100 / 4, Growth and Agency 1,000 / 500 / 12", () => {
-    expect(SEO_PLAN_LIMITS.starter).toEqual({ seoKeywords: 50, seoResearch: 25, seoBacklinkRefreshes: 1 });
-    expect(SEO_PLAN_LIMITS.pro).toEqual({ seoKeywords: 200, seoResearch: 100, seoBacklinkRefreshes: 4 });
-    expect(SEO_PLAN_LIMITS.growth).toEqual({ seoKeywords: 1000, seoResearch: 500, seoBacklinkRefreshes: 12 });
+  it("tracked keywords 50 / 200 / 1,000 / 1,000 and SEO data $10 / $20 / $40 / $40 a month", () => {
+    expect(SEO_PLAN_LIMITS.starter).toEqual({ seoKeywords: 50, seoCreditCents: 1000 });
+    expect(SEO_PLAN_LIMITS.pro).toEqual({ seoKeywords: 200, seoCreditCents: 2000 });
+    expect(SEO_PLAN_LIMITS.growth).toEqual({ seoKeywords: 1000, seoCreditCents: 4000 });
     expect(SEO_PLAN_LIMITS.agency).toEqual(SEO_PLAN_LIMITS.growth);
   });
   it("never shrink going up the ladder (so raiseHint always finds a bigger plan below the top)", () => {
     for (let i = 1; i < PLAN_KEYS.length; i++) {
       const lower = PLANS[PLAN_KEYS[i - 1]].limits, upper = PLANS[PLAN_KEYS[i]].limits;
       expect(upper.seoKeywords).toBeGreaterThanOrEqual(lower.seoKeywords);
-      expect(upper.seoResearch).toBeGreaterThanOrEqual(lower.seoResearch);
-      expect(upper.seoBacklinkRefreshes).toBeGreaterThanOrEqual(lower.seoBacklinkRefreshes);
+      expect(upper.seoCreditCents).toBeGreaterThanOrEqual(lower.seoCreditCents);
     }
   });
   it("every plan that includes the SEO tools has a keyword allowance, and vice versa", () => {

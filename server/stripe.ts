@@ -5,6 +5,8 @@ import { subscriptions, masterClassModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { appReturnBaseUrl } from "./site-context";
+import { SEO_CREDIT_PACKS, isSeoCreditPack, creditUsd } from "@shared/seo-credits";
+import { fulfilSeoCredits } from "./seo/credits";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sendTalkToSales } from "./catalog";
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
@@ -207,6 +209,8 @@ async function recentAuthOk(req: Request, res: Response): Promise<boolean> {
  * payment status itself). An unpaid completion writes neither.
  */
 async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: number): Promise<void> {
+  // A prepaid SEO data credit pack (POST /api/seo/credits/checkout): credited once per session.
+  await fulfilSeoCredits(session, userId);
   const result = await fulfilOneTimePurchase(session, userId);
   if (!result.fulfilled && result.reason === "unpaid") {
     console.log(`[billing] checkout ${session.id} (user ${userId}) completed ${session.payment_status}: nothing granted until Stripe reports it paid.`);
@@ -447,6 +451,36 @@ export function registerStripeRoutes(app: Express) {
         return_url: `${appReturnBaseUrl(req)}/pricing`,
       });
 
+      res.json({ url: session.url });
+    } catch (err: any) {
+      sendStripeError(res, err);
+    }
+  });
+
+  // SEO data credit: a prepaid pack (shared/seo-credits.ts). A one-time payment; the
+  // webhook adds the credit (server/seo/credits.ts fulfilSeoCredits), never this route.
+  app.post("/api/seo/credits/checkout", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const cents = Number(req.body?.cents);
+      if (!isSeoCreditPack(cents)) {
+        return res.status(400).json({ message: `Choose a credit pack: ${SEO_CREDIT_PACKS.map(creditUsd).join(", ")}.` });
+      }
+      await billingSchemaReady();
+      const customerId = await getOrCreateCustomer(user.id, user.email);
+      const base = appReturnBaseUrl(req);
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: "payment",
+        line_items: [{
+          quantity: 1,
+          price_data: { currency: "usd", unit_amount: cents, product_data: { name: `ConstructHUB SEO data credit — ${creditUsd(cents)}` } },
+        }],
+        success_url: `${base}/seo?credits=success`,
+        cancel_url: `${base}/seo?credits=canceled`,
+        metadata: { userId: String(user.id), type: "seo_credits", cents: String(cents) },
+      });
       res.json({ url: session.url });
     } catch (err: any) {
       sendStripeError(res, err);
