@@ -10,13 +10,16 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AppPage, PageHeader, Section, Notice } from "@/components/app-ui";
+import { AppPage, Notice } from "@/components/app-ui";
+import { GoogleAiOverview, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { Download, Search, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useUrlParam } from "@/hooks/use-url-param";
 const api = async (method: string, url: string, body?: unknown) =>
   (await apiRequest(method, url, body)).json();
+// Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
-  "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
+  "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
 const categoryLabel: Record<string, string> = {
   overall: "Overall",
   local: "Local",
@@ -70,7 +73,7 @@ function PageSpeedDetails({ psi }: { psi: any[] }) {
       </summary>
       <div className="mt-2 space-y-3 text-sm">
         {psi.map((p: any, i: number) => (
-          <div key={i} className="space-y-1 rounded-xl border p-3">
+          <div key={i} className="space-y-1 border-b py-3 last:border-b-0">
             <p className="break-all font-medium">
               {p.strategy === "desktop"
                 ? "Desktop"
@@ -181,11 +184,14 @@ export function ScanReport({
   draft,
   summary = false,
   onDone,
+  surface = false,
 }: {
   report: any;
   draft?: string;
   summary?: boolean;
   onDone?: (keys: string[], done: boolean) => void;
+  /** Inside the signed-in Google surface: the AI draft takes the AI-Overview block (the public pages have no surface tokens). */
+  surface?: boolean;
 }) {
   if (!report) return null;
   return (
@@ -201,11 +207,11 @@ export function ScanReport({
           overall: report.scores.overall,
           ...report.scores.categories,
         }).map(([name, value]) => (
-          <div key={name} className="rounded-xl border bg-card p-3.5 sm:p-4">
-            <div className="text-xs font-medium text-muted-foreground">
+          <div key={name} className="rounded-lg border bg-card px-4 py-3">
+            <div className="text-xs text-muted-foreground">
               {labelFor(name)}
             </div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">
+            <div className="mt-1 text-xl font-normal leading-6 tabular-nums">
               {value === null ? "N/A" : String(value)}
             </div>
           </div>
@@ -231,7 +237,7 @@ export function ScanReport({
         </details>
       )}
       {report.scores.categories.performance === null && (
-        <div role="note" className="rounded-xl border p-3 text-sm">
+        <div role="note" className="rounded-lg border p-4 text-sm">
           <strong>Why Performance is N/A</strong>
           {report.psi?.map((p: any, i: number) => (
             <p key={i} className="mt-1 text-muted-foreground">
@@ -258,10 +264,10 @@ export function ScanReport({
       {["technical", "performance", "local", "content", "ai-readiness"].map(
         (category) => (
           <section key={category}>
-            <h2 className="mb-3 text-base font-semibold">
+            <h2 className="border-b pb-2 text-xl font-normal leading-6">
               {labelFor(category)}
             </h2>
-            <div className="space-y-3">
+            <div className="divide-y">
               {report.findings
                 .filter((f: any) => f.category === category)
                 .sort(
@@ -286,9 +292,9 @@ export function ScanReport({
                 .map((f: any) => (
                   <article
                     key={f.id}
-                    className="space-y-2 rounded-xl border bg-card p-4"
+                    className="space-y-2 py-4"
                   >
-                    <h3 className="text-base font-semibold">
+                    <h3 className="text-base font-medium leading-6">
                       <span
                         className={
                           toneClass[
@@ -346,7 +352,7 @@ export function ScanReport({
                   </article>
                 ))}
               {!report.findings.some((f: any) => f.category === category) && (
-                <p className="text-sm text-muted-foreground">
+                <p className="py-3 text-sm text-muted-foreground">
                   {summary
                     ? "Verify your email to see all findings in this category."
                     : category === "performance" &&
@@ -371,19 +377,32 @@ export function ScanReport({
       )}
       {report.psi?.length > 0 && <PageSpeedDetails psi={report.psi} />}
       {report.jsonLdDraft && (
-        <Section
-          title="GBP JSON-LD draft"
-          description="Review for accuracy before publishing. Unknown values are omitted."
-        >
-          <Copy text={JSON.stringify(report.jsonLdDraft, null, 2)} />
+        <section>
+          <div className="border-b pb-3">
+            <h2 className="text-xl font-normal leading-6">GBP JSON-LD draft</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Review for accuracy before publishing. Unknown values are omitted.</p>
+          </div>
+          <div className="mt-3"><Copy text={JSON.stringify(report.jsonLdDraft, null, 2)} /></div>
           <pre className="mt-3 whitespace-pre-wrap break-all text-xs">
             {JSON.stringify(report.jsonLdDraft, null, 2)}
           </pre>
-        </Section>
+        </section>
       )}
-      {draft && (
-        <Section>
-          <h2 className="text-base font-semibold" role="heading" aria-level={2}>
+      {draft && surface ? (
+        /* Our own AI-generated plan, in the AI-Overview block (never a claim of Google's). */
+        <GoogleAiOverview
+          label="AI fix plan — draft"
+          footnote="Review every claim before publishing. This has not been applied to your website."
+          actions={<Copy text={draft} />}
+          testId="ai-fix-plan"
+        >
+          <pre className="whitespace-pre-wrap break-all font-sans text-base leading-7">
+            {draft}
+          </pre>
+        </GoogleAiOverview>
+      ) : draft ? (
+        <section className="rounded-lg border p-4">
+          <h2 className="text-base font-medium" role="heading" aria-level={2}>
             AI fix plan — draft
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -394,8 +413,8 @@ export function ScanReport({
           <pre className="mt-3 whitespace-pre-wrap break-all font-sans text-sm">
             {draft}
           </pre>
-        </Section>
-      )}
+        </section>
+      ) : null}
       <p className="text-sm text-muted-foreground">
         {report.coverage?.notes?.join(" ")}
       </p>
@@ -524,66 +543,67 @@ export default function SiteScanPage() {
     });
   return (
     <AppPage testId="page-site-scan">
-      <PageHeader
+      {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, Google's search box, hairline rows, pills. */}
+      <GoogleSectionHeader
+        as="h1"
         title="Site Scan"
         description="Find website issues, compare your Google Business Profile, and draft your next fixes."
+        flush
       />
       <AgencyWorkspace compact />
-      <Section
-        title="Start a scan"
-        description="Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes."
-      >
+      <section>
+        <GoogleSectionHeader
+          title="Start a scan"
+          description="Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes."
+        />
         <div className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:max-w-xs">
-              <span className="text-muted-foreground">
-                Search client locations
-              </span>
-              <Input
+            <div className="g-search min-w-0 flex-1 sm:max-w-xs" role="search">
+              <Search aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search client locations"
+                placeholder="Search client locations"
                 value={locationQ}
                 onChange={(e) => {
                   setLocationQ(e.target.value);
                   setLocationOffset(0);
                 }}
               />
-            </label>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <GooglePill
                 size="sm"
                 disabled={!locationOffset}
                 onClick={() =>
                   setLocationOffset(Math.max(0, locationOffset - PAGE_SIZE))
                 }
-              >
-                Previous locations
-              </Button>
-              <span className="text-sm tabular-nums text-muted-foreground">
+                label="Previous locations"
+              />
+              <span className="text-sm tabular-nums g-text-2">
                 {data?.locationTotal
                   ? `${locationOffset + 1}–${Math.min(locationOffset + PAGE_SIZE, data.locationTotal)} of ${data.locationTotal}`
                   : "No Business Profile-linked locations"}
               </span>
-              <Button
-                variant="outline"
+              <GooglePill
                 size="sm"
                 disabled={
                   locationOffset + PAGE_SIZE >= (data?.locationTotal || 0)
                 }
                 onClick={() => setLocationOffset(locationOffset + PAGE_SIZE)}
-              >
-                Next locations
-              </Button>
+                label="Next locations"
+              />
             </div>
           </div>
-          <details className="rounded-xl border px-4 py-3">
+          <details className="g-card border-t">
             <summary className="cursor-pointer text-sm font-medium">
               Bulk scan client sites ({checked.length} selected)
             </summary>
             <div className="space-y-3 pt-3">
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
+                <GooglePill
                   size="sm"
+                  label="Select this page"
                   onClick={() =>
                     setChecked([
                       ...new Set([
@@ -594,16 +614,13 @@ export default function SiteScanPage() {
                       ]),
                     ])
                   }
-                >
-                  Select this page
-                </Button>
-                <Button
-                  variant="ghost"
+                />
+                <GooglePill
+                  variant="quiet"
                   size="sm"
                   onClick={() => setChecked([])}
-                >
-                  Clear selection
-                </Button>
+                  label="Clear selection"
+                />
               </div>
               {data?.locations.map((l: any) => (
                 <label key={l.id} className="block text-sm">
@@ -621,8 +638,8 @@ export default function SiteScanPage() {
                   {l.business_name} — {l.website || "No website"}
                 </label>
               ))}
-              <Button
-                variant="outline"
+              <GooglePill
+                label="Queue selected sites"
                 disabled={busy || !checked.length || !!limitsError}
                 onClick={() =>
                   action(async () => {
@@ -635,9 +652,7 @@ export default function SiteScanPage() {
                     setSelected(r.jobs[0].id);
                   })
                 }
-              >
-                Queue selected sites
-              </Button>
+              />
               <p className="text-xs text-muted-foreground">
                 Up to 1,000 sites per day. Each selected location needs a
                 synced GBP website. Work runs in the background with shared
@@ -647,7 +662,7 @@ export default function SiteScanPage() {
           </details>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">Linked GBP location</span>
+              <span className="g-text-2">Linked GBP location</span>
               <select
                 className={`${selectClass} block`}
                 value={locationId}
@@ -668,7 +683,7 @@ export default function SiteScanPage() {
               </select>
             </label>
             <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">Website URL</span>
+              <span className="g-text-2">Website URL</span>
               <Input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -676,7 +691,7 @@ export default function SiteScanPage() {
               />
             </label>
             <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">Page cap</span>
+              <span className="g-text-2">Page cap</span>
               <Input
                 type="number"
                 min={1}
@@ -687,7 +702,7 @@ export default function SiteScanPage() {
               />
             </label>
             <label className="block space-y-1.5 text-sm">
-              <span className="text-muted-foreground">
+              <span className="g-text-2">
                 PageSpeed pages (mobile + desktop)
               </span>
               <Input
@@ -701,10 +716,12 @@ export default function SiteScanPage() {
             </label>
           </div>
           {limitsError && (
-            <p className="text-sm text-red-600">{limitsError}</p>
+            <p className="text-sm g-closed">{limitsError}</p>
           )}
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
+            <GooglePill
+              variant="solid"
+              icon={Search}
               disabled={busy || !url || !!limitsError}
               className="w-full sm:w-auto"
               onClick={() =>
@@ -719,13 +736,14 @@ export default function SiteScanPage() {
                   setShare("");
                 })
               }
-            >
-              Start scan
-            </Button>
-            <Button
-              variant="outline"
+              label="Start scan"
+            />
+            <GooglePill
               className="w-full sm:w-auto"
               disabled={busy || !url || !!limitsError}
+              label={data?.schedules.some((s: any) => s.url === canonicalUrl(url))
+                ? "Disable monthly rescan"
+                : "Enable monthly rescan"}
               onClick={() =>
                 scheduleFor(
                   url,
@@ -739,66 +757,57 @@ export default function SiteScanPage() {
                   },
                 )
               }
-            >
-              {data?.schedules.some((s: any) => s.url === canonicalUrl(url))
-                ? "Disable monthly rescan"
-                : "Enable monthly rescan"}
-            </Button>
+            />
           </div>
-          <div className="space-y-2 border-t pt-4">
-            <h2 className="text-sm font-semibold">
+          <div className="space-y-2 g-divider pt-4">
+            <h2 className="g-card__title g-card__title--md">
               Monthly rescans ({data?.schedules?.length ?? 0} of 10)
             </h2>
             {!data?.schedules?.length ? (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm g-text-2">
                 No monthly rescans. Enter a website URL above and choose
                 Enable monthly rescan.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <GoogleList as="ul" testId="list-scan-schedules">
                 {data.schedules.map((s: any) => (
-                  <li
+                  <GoogleListRow
+                    as="li"
                     key={s.url}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5 text-sm"
-                  >
-                    <span className="min-w-0 break-all">
-                      {s.url} · up to {s.page_cap} pages · next run{" "}
-                      {new Date(s.next_at).toLocaleDateString()}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Disable schedule for ${s.url}`}
-                      disabled={busy}
-                      // Agency members may only change a schedule through its business;
-                      // the owner disables by URL, which also covers a deleted business.
-                      onClick={() =>
-                        scheduleFor(
-                          s.url,
-                          false,
-                          delegated && s.location_id
-                            ? { locationId: s.location_id }
-                            : {},
-                        )
-                      }
-                    >
-                      Disable
-                    </Button>
-                  </li>
+                    size="md"
+                    title={s.url}
+                    meta={[`Up to ${s.page_cap} pages`, `Next run ${new Date(s.next_at).toLocaleDateString()}`]}
+                    trailing={
+                      <GooglePill
+                        size="sm"
+                        ariaLabel={`Disable schedule for ${s.url}`}
+                        disabled={busy}
+                        // Agency members may only change a schedule through its business;
+                        // the owner disables by URL, which also covers a deleted business.
+                        onClick={() =>
+                          scheduleFor(
+                            s.url,
+                            false,
+                            delegated && s.location_id
+                              ? { locationId: s.location_id }
+                              : {},
+                          )
+                        }
+                        label="Disable"
+                      />
+                    }
+                  />
                 ))}
-              </ul>
+              </GoogleList>
             )}
           </div>
         </div>
-      </Section>
+      </section>
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
-      <Section
-        title="History & score trend"
-        flush
-        testId="section-scan-history"
-      >
-        <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+      <section data-testid="section-scan-history">
+        <GoogleSectionHeader title="History & score trend" count={data?.total || 0} />
+        <div className="space-y-3">
           {listError && (
             <Notice tone="danger">
               Could not load scan history:{" "}
@@ -806,16 +815,19 @@ export default function SiteScanPage() {
             </Notice>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Input
-              aria-label="Search history"
-              placeholder="Search history"
-              value={historyQ}
-              onChange={(e) => {
-                setHistoryQ(e.target.value);
-                setHistoryOffset(0);
-              }}
-              className="h-10 sm:w-56"
-            />
+            <div className="g-search w-full sm:w-72" role="search">
+              <Search aria-hidden="true" />
+              <input
+                type="search"
+                aria-label="Search history"
+                placeholder="Search history"
+                value={historyQ}
+                onChange={(e) => {
+                  setHistoryQ(e.target.value);
+                  setHistoryOffset(0);
+                }}
+              />
+            </div>
             <select
               aria-label="Status"
               className={selectClass}
@@ -832,30 +844,26 @@ export default function SiteScanPage() {
               ))}
             </select>
             {/* Each button is disabled when it would not change the list, so neither looks dead. */}
-            <Button
-              variant="outline"
+            <GooglePill
               size="sm"
               disabled={!locationId || clientFilter === locationId}
               onClick={() => {
                 setClientFilter(locationId);
                 setHistoryOffset(0);
               }}
-            >
-              History for selected client
-            </Button>
-            <Button
-              variant="outline"
+              label="History for selected client"
+            />
+            <GooglePill
               size="sm"
               disabled={!clientFilter}
               onClick={() => {
                 setClientFilter("");
                 setHistoryOffset(0);
               }}
-            >
-              All clients
-            </Button>
+              label="All clients"
+            />
           </div>
-          <p className="text-sm text-muted-foreground" aria-live="polite">
+          <p className="text-sm g-text-2" aria-live="polite">
             {clientFilter
               ? `Showing scans for ${
                   data?.locations?.find(
@@ -869,64 +877,63 @@ export default function SiteScanPage() {
                   : "Showing scans for all clients. Per-client history is available for Business Profile-linked locations."}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
+            <GooglePill
               size="sm"
               disabled={!historyOffset}
               onClick={() =>
                 setHistoryOffset(Math.max(0, historyOffset - PAGE_SIZE))
               }
-            >
-              Previous scans
-            </Button>
-            <span className="text-sm tabular-nums text-muted-foreground">
+              label="Previous scans"
+            />
+            <span className="text-sm tabular-nums g-text-2">
               {data?.total || 0} scans
             </span>
-            <Button
-              variant="outline"
+            <GooglePill
               size="sm"
               disabled={historyOffset + PAGE_SIZE >= (data?.total || 0)}
               onClick={() => setHistoryOffset(historyOffset + PAGE_SIZE)}
-            >
-              Next scans
-            </Button>
+              label="Next scans"
+            />
           </div>
-          <div className="flex flex-wrap gap-2">
-            {data?.jobs.map((j: any, index: number) => (
-              <Button
-                variant={selected === j.id ? "default" : "outline"}
-                className="h-auto max-w-full whitespace-normal break-all text-left"
-                key={j.id}
-                onClick={() => {
-                  setSelected(j.id);
-                  setShare("");
-                }}
-              >
-                {new Date(j.created_at).toLocaleDateString()} · {j.url} ·{" "}
-                {j.scores?.overall ?? j.status}
-                {(() => {
-                  const old = data.jobs
-                    .slice(index + 1)
-                    .find(
-                      (p: any) =>
-                        p.url === j.url && typeof p.scores?.overall === "number",
-                    );
-                  const delta =
-                    old && typeof j.scores?.overall === "number"
-                      ? j.scores.overall - old.scores.overall
-                      : null;
-                  return delta === null
-                    ? ""
-                    : ` (${delta > 0 ? "+" : ""}${delta} since prior scan)`;
-                })()}
-              </Button>
-            ))}
-            {data?.jobs.length === 0 && (
-              <p className="text-sm text-muted-foreground">No scans yet.</p>
-            )}
-          </div>
+          {data?.jobs.length > 0 && (
+            <GoogleList testId="list-scan-history">
+              {data.jobs.map((j: any, index: number) => {
+                const old = data.jobs
+                  .slice(index + 1)
+                  .find(
+                    (p: any) =>
+                      p.url === j.url && typeof p.scores?.overall === "number",
+                  );
+                const delta =
+                  old && typeof j.scores?.overall === "number"
+                    ? j.scores.overall - old.scores.overall
+                    : null;
+                return (
+                  <GoogleListRow
+                    key={j.id}
+                    size="md"
+                    className={selected === j.id ? "bg-[color:var(--g-hover)] -mx-4 px-4 sm:mx-0 sm:px-0" : undefined}
+                    aria-current={selected === j.id ? "true" : undefined}
+                    title={j.url}
+                    onOpen={() => {
+                      setSelected(j.id);
+                      setShare("");
+                    }}
+                    meta={[
+                      new Date(j.created_at).toLocaleDateString(),
+                      typeof j.scores?.overall === "number" ? <span key="score" className="g-text">Overall {j.scores.overall}</span> : j.status,
+                      delta === null ? null : <span key="delta" className={delta > 0 ? "g-open" : delta < 0 ? "g-closed" : undefined}>{delta > 0 ? "+" : ""}{delta} since prior scan</span>,
+                    ]}
+                  />
+                );
+              })}
+            </GoogleList>
+          )}
+          {data?.jobs.length === 0 && (
+            <p className="text-sm g-text-2">No scans yet.</p>
+          )}
         </div>
-      </Section>
+      </section>
       {selected && jobError && (
         <Notice tone="danger">
           {/^(400|404):/.test((jobError as any).message)
@@ -936,14 +943,15 @@ export default function SiteScanPage() {
       )}
       {job && (
         <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="min-w-0 text-xl font-semibold break-all">
-              {job.url}
-            </h2>
-            <Button
-              variant="outline"
+          <GoogleSectionHeader
+            title={job.url}
+            description={<span role="status">{job.status} · {job.pages} of {pageCount(job.pageCap)} checked</span>}
+            flush
+            actions={<GooglePill
+              icon={Trash2}
+              variant="danger"
               size="sm"
-              className="text-red-600"
+              label="Delete scan"
               disabled={busy}
               onClick={() => {
                 const id = job.id;
@@ -965,36 +973,29 @@ export default function SiteScanPage() {
                   setNotice("Scan deleted.");
                 });
               }}
-            >
-              Delete scan
-            </Button>
-          </div>
-          <p role="status" className="text-sm text-muted-foreground">
-            {job.status} · {job.pages} of {pageCount(job.pageCap)} checked
-          </p>
+            />}
+          />
           {job.error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-sm g-closed">
               {job.error}
             </p>
           )}
           {job.report && (
             <>
               <div className="flex flex-wrap gap-2">
-                <Button
+                <GooglePill
+                  variant="solid"
                   disabled={busy}
                   onClick={() =>
                     action(async () => {
                       await api("POST", `/api/sitescan/jobs/${selected}/plan`);
                     })
                   }
-                >
-                  {busy ? "Working…" : "Generate AI fix plan"}
-                </Button>
-                <Button variant="outline" asChild>
-                  <a href={`/api/sitescan/jobs/${selected}/pdf`}>Export PDF</a>
-                </Button>
-                <Button
-                  variant="outline"
+                  label={busy ? "Working…" : "Generate AI fix plan"}
+                />
+                <GooglePill icon={Download} href={`/api/sitescan/jobs/${selected}/pdf`} label="Export PDF" />
+                <GooglePill
+                  label={job.shareEnabled ? "Replace share link" : "Create share link"}
                   disabled={busy}
                   onClick={() => {
                     // Only a hash is stored, so a new link always replaces the old one.
@@ -1013,12 +1014,10 @@ export default function SiteScanPage() {
                       setShare(window.location.origin + r.path);
                     });
                   }}
-                >
-                  {job.shareEnabled ? "Replace share link" : "Create share link"}
-                </Button>
+                />
                 {job.shareEnabled && (
-                  <Button
-                    variant="ghost"
+                  <GooglePill
+                    variant="quiet"
                     onClick={() =>
                       action(async () => {
                         await api(
@@ -1028,40 +1027,39 @@ export default function SiteScanPage() {
                         setShare("");
                       })
                     }
-                  >
-                    Revoke share link
-                  </Button>
+                    label="Revoke share link"
+                  />
                 )}
               </div>
               {share ? (
                 <div className="space-y-1">
                   <p className="break-all text-sm">
                     Read-only link (30 days):{" "}
-                    <a href={share} className="text-primary underline">
+                    <a href={share} className="g-link">
                       {share}
                     </a>
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
                     <Copy key={share} text={share} label="Copy link" />
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm g-text-2">
                       Copy this link now; it is shown only once.
                     </span>
                   </div>
                 </div>
               ) : (
                 job.shareEnabled && (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm g-text-2">
                     A share link is active. For security it is shown only when
                     created; use Replace share link to get a new one (the old
                     link stops working).
                   </p>
                 )
               )}
-              <Section title="Follow up" flush testId="section-scan-followup">
-                <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
+              <section data-testid="section-scan-followup">
+                <GoogleSectionHeader title="Follow up" />
+                <div className="space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
+                    <GooglePill
                       disabled={busy}
                       onClick={() =>
                         action(async () => {
@@ -1073,13 +1071,12 @@ export default function SiteScanPage() {
                           setFilters(initialReportFilters);
                         })
                       }
-                    >
-                      Rescan / retry PageSpeed
-                    </Button>
+                      label="Rescan / retry PageSpeed"
+                    />
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                     <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:max-w-xs">
-                      <span className="text-muted-foreground">
+                      <span className="g-text-2">
                         Send to my web person — email
                       </span>
                       <Input
@@ -1088,8 +1085,8 @@ export default function SiteScanPage() {
                         onChange={(e) => setEmail(e.target.value)}
                       />
                     </label>
-                    <Button
-                      variant="outline"
+                    <GooglePill
+                      label="Send prioritized checklist"
                       disabled={busy || !email}
                       className="w-full sm:w-auto"
                       onClick={() =>
@@ -1106,27 +1103,25 @@ export default function SiteScanPage() {
                           );
                         })
                       }
-                    >
-                      Send prioritized checklist
-                    </Button>
+                    />
                   </div>
                   {mailResult && (
                     <p role="status" className="text-sm">
                       {mailResult}
                     </p>
                   )}
-                  <details className="rounded-xl border px-4 py-3">
+                  <details className="g-card border-t">
                     <summary className="cursor-pointer text-sm font-medium">
                       White-label PDF branding
                     </summary>
                     {delegated ? (
-                      <p className="py-2 text-sm text-muted-foreground">
+                      <p className="py-2 text-sm g-text-2">
                         PDF branding is managed by the workspace owner.
                       </p>
                     ) : (
                       <div className="space-y-3 pt-3">
                         <label className="block space-y-1.5 text-sm">
-                          <span className="text-muted-foreground">
+                          <span className="g-text-2">
                             Agency name
                           </span>
                           <Input
@@ -1138,7 +1133,7 @@ export default function SiteScanPage() {
                           />
                         </label>
                         <label className="block space-y-1.5 text-sm">
-                          <span className="text-muted-foreground">
+                          <span className="g-text-2">
                             Agency logo (PNG/JPEG, up to 200 KB)
                           </span>
                           <Input
@@ -1165,8 +1160,7 @@ export default function SiteScanPage() {
                               alt="Logo for PDF exports"
                               className="max-h-12 max-w-[160px] rounded-md border"
                             />
-                            <Button
-                              variant="outline"
+                            <GooglePill
                               size="sm"
                               disabled={busy}
                               onClick={() => {
@@ -1175,14 +1169,13 @@ export default function SiteScanPage() {
                                   "Logo removed from the form. Save PDF branding to apply it.",
                                 );
                               }}
-                            >
-                              Remove logo
-                            </Button>
+                              label="Remove logo"
+                            />
                           </div>
                         )}
                         <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="outline"
+                          <GooglePill
+                            label="Save PDF branding"
                             disabled={busy || !agencyName.trim()}
                             onClick={() =>
                               action(async () => {
@@ -1205,12 +1198,11 @@ export default function SiteScanPage() {
                                 );
                               })
                             }
-                          >
-                            Save PDF branding
-                          </Button>
+                          />
                           {brand?.name && (
-                            <Button
-                              variant="ghost"
+                            <GooglePill
+                              variant="quiet"
+                              label="Remove branding"
                               disabled={busy}
                               onClick={() => {
                                 if (
@@ -1231,9 +1223,7 @@ export default function SiteScanPage() {
                                   );
                                 });
                               }}
-                            >
-                              Remove branding
-                            </Button>
+                            />
                           )}
                         </div>
                         {brandNotice && (
@@ -1241,7 +1231,7 @@ export default function SiteScanPage() {
                             {brandNotice}
                           </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs g-text-2">
                           Branding is applied on the next PDF download. No
                           remote logo URL is fetched.
                         </p>
@@ -1249,7 +1239,7 @@ export default function SiteScanPage() {
                     )}
                   </details>
                 </div>
-              </Section>
+              </section>
               <ReportFilters
                 filters={filters}
                 setFilters={setFilters}
@@ -1261,6 +1251,7 @@ export default function SiteScanPage() {
               <ScanReport
                 report={job.report}
                 draft={job.aiDraft}
+                surface
                 onDone={(keys, done) => {
                   void action(async () => {
                     await api("POST", `/api/sitescan/jobs/${selected}/fixes`, {
