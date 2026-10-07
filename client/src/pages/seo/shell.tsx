@@ -58,7 +58,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
   const [location] = useLocation();
   const gate = planRequiredFrom(status.error) ?? planRequiredFrom(sites.error);
   return (
-    <GoogleSurface page className="g-accent-orange" testId="seo-surface">
+    <GoogleSurface page accent="brand" testId="seo-surface">
       <AppPage className="before:hidden [&_button]:min-h-10">
         <div className="g-header flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
@@ -107,7 +107,7 @@ function BudgetLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
   );
 }
 
-/** Shown while DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD are not set on the server. Prices are the server's price sheet (vendor pages, 2026-10-06). */
+/** Shown while the DataForSEO credentials (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD, server env) are not set. Prices are the server's price sheet (vendor pages, 2026-10-06). */
 export function ConnectCard({ status }: { status: SeoStatus }) {
   const p = status.prices;
   return (
@@ -115,8 +115,8 @@ export function ConnectCard({ status }: { status: SeoStatus }) {
       <h3>Connect DataForSEO to start</h3>
       <p>
         Rank checks, keyword research, backlinks and competitor gaps come from DataForSEO, pay-as-you-go: no plan, no monthly fee, a one-time
-        minimum top-up of ${p.minimumDepositUsd} that never expires. Open an account at dataforseo.com, then set <code>DATAFORSEO_LOGIN</code> and{" "}
-        <code>DATAFORSEO_PASSWORD</code> on the server and restart. Spend is capped by <code>SEO_MONTHLY_BUDGET_USD</code> (currently {fmtUsd(status.budget.capUsd)} a month).
+        minimum top-up of ${p.minimumDepositUsd} that never expires. DataForSEO is not connected yet — your ConstructHUB administrator connects it
+        in the server settings. Spend is capped at {fmtUsd(status.budget.capUsd)} a month.
       </p>
       <ul>
         {p.lines.map((l) => <li key={l.what}><b className="g-text font-medium">{l.what}:</b> {l.price}</li>)}
