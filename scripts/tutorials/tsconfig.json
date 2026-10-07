@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["./*.ts"],
+  "exclude": [],
+  "compilerOptions": { "incremental": false, "tsBuildInfoFile": null, "baseUrl": "../.." }
+}
