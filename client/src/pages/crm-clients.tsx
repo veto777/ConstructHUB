@@ -1,3 +1,4 @@
+import { HelpButton } from "@/components/help-button";
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
@@ -182,6 +183,7 @@ export default function CrmClientsPage() {
         icon={Users}
         title="Clients"
         infoKey="clients"
+        help={<HelpButton k="crm-clients" videoOnly />}
         subtitle="Every client gets their own portal the moment you create them."
         actions={canManage || canExport ? (
           <>

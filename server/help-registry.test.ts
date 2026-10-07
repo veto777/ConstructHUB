@@ -5,6 +5,8 @@ import { HELP_ENTRIES, HELP_FEATURES, HELP_GROUPS, helpEntry, helpMatches, helpS
 import { parseTutorialScript, STEP_ACTIONS } from "@shared/help/step-script";
 import { TUTORIAL_FILE, VIDEO_MANIFEST, helpVideoFor, tutorialMediaUrl } from "@shared/help/videos";
 import { createHash } from "crypto";
+import { indexes } from "../scripts/tutorials/gen-index";
+import { HELP_GROUPS as GROUPS } from "@shared/help/types";
 import { isKnownPath } from "@shared/app-routes";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { VOICE_PERSONAS, VOICE_PERSONA_IDS } from "@shared/voice-personas";
@@ -136,22 +138,31 @@ describe("help registry", () => {
     for (const g of HELP_GROUPS) expect(HELP_FEATURES.some((f) => f.group === g), g).toBe(true);
   });
 
-  it("claims no video that is not in the committed manifest (shared/help/videos.json)", () => {
-    // The manifest is what mux.ts measured: one entry per recorded walkthrough, its three files by
-    // storage key, size and sha256, and the video's length. The registry builds `video` from it.
+  it("claims no video without a manifest file whose objects were really uploaded (shared/help/videos/<key>.json)", () => {
+    // One manifest file per recorded walkthrough: what mux.ts measured (its three files by storage key,
+    // size and sha256, and the video's length) and what R2 answered when upload.ts put them there. The
+    // registry builds `video` from it.
     const listed = Object.keys(VIDEO_MANIFEST);
-    for (const key of listed) expect(helpEntry(key), `videos.json lists ${key}, which is not a help entry`).toBeTruthy();
+    const dir = path.join(ROOT, "shared/help/videos");
+    const onDisk = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
+    expect(listed.slice().sort(), "shared/help/videos/index.ts is stale — npx tsx scripts/tutorials/gen-index.ts").toEqual(onDisk);
+    for (const key of onDisk) expect(JSON.parse(fs.readFileSync(path.join(dir, `${key}.json`), "utf8")).helpKey, `${key}.json helpKey`).toBe(key);
+    for (const key of listed) expect(helpEntry(key), `videos/${key}.json exists, but ${key} is not a help entry`).toBeTruthy();
     for (const e of HELP_ENTRIES) {
       const m = VIDEO_MANIFEST[e.key];
       if (e.video === null) {
-        expect(m, `${e.key} is in videos.json but has no video`).toBeUndefined();
+        expect(m, `${e.key} has a manifest but no video`).toBeUndefined();
         // With no recording, the text must not point at one.
         const text = [e.title, e.whatItIs, e.whatItDoes, e.howItWorks, ...e.howToUse, ...(e.needs ?? [])].join(" ");
         expect(text, `${e.key} mentions a video it does not have`).not.toMatch(/walkthrough|tutorial video|watch the video/i);
         continue;
       }
       // A real recording: listed in the manifest, in our own storage under tutorials/, never a stand-in.
-      expect(m, `${e.key} has a video that videos.json does not list`).toBeTruthy();
+      expect(m, `${e.key} has a video with no manifest file`).toBeTruthy();
+      // Really uploaded: upload.ts writes the manifest only after R2 answered a HEAD for each object,
+      // and records when, and the ETag R2 gave (the object's MD5 for a single-part put).
+      expect(Number.isFinite(Date.parse(m.uploaded?.at)), `${e.key} has no upload proof — run scripts/tutorials/upload.ts`).toBe(true);
+      for (const part of ["video", "captions", "poster"] as const) expect(m.uploaded[part], `${e.key} ${part} ETag`).toMatch(/^[0-9a-f]{32}(-\d+)?$/);
       expect(e.video).toEqual(helpVideoFor(e.key));
       expect(e.video.url, `${e.key} video url`).toMatch(/^(https:\/\/[^\s]+|\/)[^\s]*tutorials\/[^\s]+\.(mp4|webm)$/);
       expect(e.video.url).not.toMatch(/example|placeholder|sample|lorem|youtube|vimeo/i);
@@ -173,6 +184,7 @@ describe("help registry", () => {
           const data = fs.readFileSync(local);
           expect(data.length, `${f.key} size on disk`).toBe(f.bytes);
           expect(createHash("sha256").update(data).digest("hex"), `${f.key} sha256 on disk`).toBe(f.sha256);
+          if (/^[0-9a-f]{32}$/.test(m.uploaded[part])) expect(createHash("md5").update(data).digest("hex"), `${f.key}: the object in R2 is not this file`).toBe(m.uploaded[part]);
         }
       }
       // A walkthrough has a step script: the video is a recording of it, not a file from somewhere else.
@@ -189,8 +201,30 @@ describe("help registry", () => {
     expect(fs.existsSync(path.join(ROOT, "client/public/tutorials"))).toBe(false);
   });
 
+  it("help entries that live one per file are collected, named after their key and filed under their group", () => {
+    const dir = path.join(ROOT, "shared/help/entries");
+    for (const [file, content] of indexes()) expect(fs.readFileSync(file, "utf8"), `${path.relative(ROOT, file)} is stale — npx tsx scripts/tutorials/gen-index.ts`).toBe(content);
+    const groupDir = (g: string) => g.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const dirs = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    for (const d of dirs) {
+      expect(GROUPS.map(groupDir), `entries/${d} is not a help group`).toContain(d);
+      for (const f of fs.readdirSync(path.join(dir, d))) {
+        expect(f, `entries/${d}/${f}`).toMatch(/^[a-z0-9-]+(\.[a-z0-9-]+)?\.ts$/);
+        const e = helpEntry(f.slice(0, -3));
+        expect(e, `entries/${d}/${f} is not collected (its key must be its file name)`).toBeTruthy();
+        expect(groupDir(e!.group), `${e!.key} is filed under the wrong group`).toBe(d);
+        // A CRM entry added this way is one walkthrough's worth: its key says so.
+        if (d === "crm") expect(e!.key, f).toMatch(/^crm-[a-z0-9-]+$/);
+      }
+    }
+    expect(helpEntry("crm-create-estimate")?.route).toBe("/crm/estimates/new");
+    expect(read(".gitattributes")).toContain("shared/help/videos/index.ts merge=union");
+    expect(read(".gitattributes")).toContain("shared/help/entries/index.ts merge=union");
+  });
+
   it("types no plan name: plan requirements come from the plan model", () => {
-    const src = read("shared/help/registry.ts");
+    const entryFiles = [...walk(path.join(ROOT, "shared/help/entries"))].filter((f) => !f.endsWith("index.ts"));
+    const src = [read("shared/help/registry.ts"), ...entryFiles.map((f) => fs.readFileSync(f, "utf8"))].join("\n");
     const names = PLAN_KEYS.map((k) => PLANS[k].name).join("|");
     expect(src).not.toMatch(new RegExp(`\\b(${names}) plans?\\b`));
     expect(src).not.toMatch(/\$\d/);
@@ -264,6 +298,28 @@ describe("tutorial step scripts", () => {
       // A script never carries a real credential: typed secrets are {{PLACEHOLDERS}} filled at record time, and blurred.
       for (const s of script.steps.filter((x) => x.action === "type" && /key|token|password|email/i.test(x.selector ?? "")))
         { expect(s.value, f).toMatch(/^\{\{[A-Z_]+\}\}$/); expect(s.redact, f).toBe(true); }
+    }
+  });
+
+  it("a walkthrough made on the production line follows the house style", () => {
+    // Every script but the two written before the line existed.
+    for (const f of files.filter((x) => !["database-directory.json", "cloudflare.connections.json"].includes(x))) {
+      const { $schema: _schema, ...json } = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
+      const script = parseTutorialScript(json);
+      // 1024×576 at 1.875 = a 1920×1080 master with the page a quarter larger than on a 1280 screen.
+      expect([script.viewport.width, script.viewport.height, script.zoom], f).toEqual([1024, 576, 1.875]);
+      expect(script.youtube, `${f} youtube block`).toBeTruthy();
+      expect(script.thumbnail, `${f} thumbnail block`).toBeTruthy();
+      expect(script.steps.filter((s, i) => i === 0 || s.chapter).length, `${f} chapters`).toBeGreaterThanOrEqual(3);
+      const said = [script.title, script.youtube!.title, script.youtube!.description, ...script.youtube!.tags, ...script.steps.map((s) => s.narration)].join(" ");
+      // Nothing about how the video was made, and no price: prices live in the plan model, not in a recording.
+      expect(said, f).not.toMatch(/higgsfield|kokoro|playwright|ffmpeg|\bAI voice\b/i);
+      expect(script.steps.map((s) => s.narration).join(" "), `${f} narrates a price`).not.toMatch(/\$\s?\d/);
+      // Demo identities only: typed emails are example.com, typed phones are 555-01xx.
+      for (const s of script.steps.filter((x) => x.action === "type" && x.value)) {
+        for (const email of s.value!.match(/[\w.+-]+@[\w.-]+/g) ?? []) expect(email, f).toMatch(/@(?:[\w-]+\.)*example\.com$/);
+        for (const phone of s.value!.match(/\(?\d{3}\)?[ -.]?\d{3}[ -.]?\d{4}/g) ?? []) expect(phone, f).toMatch(/555[ -.]?01\d\d$/);
+      }
     }
   });
 

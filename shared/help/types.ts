@@ -18,7 +18,7 @@ export const HELP_GROUPS = [
 ] as const;
 export type HelpGroup = (typeof HELP_GROUPS)[number];
 
-/** A recorded walkthrough. Only ever built from the manifest of real files (./videos.json; R2, `tutorials/` prefix). */
+/** A recorded walkthrough. Only ever built from the manifest of real files (./videos/<helpKey>.json; R2, `tutorials/` prefix). */
 export type HelpVideo = {
   /** Absolute https URL, or a root-relative path served by the app. */
   url: string;
@@ -51,3 +51,6 @@ export type HelpEntry = {
   /** null until the walkthrough is recorded. */
   video: HelpVideo | null;
 };
+
+/** An entry as it is written: everything but `video`, which the registry fills from the manifest. */
+export type HelpDraft = Omit<HelpEntry, "video">;

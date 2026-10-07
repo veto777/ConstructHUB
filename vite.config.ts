@@ -5,7 +5,8 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   // Worktrees share node_modules; dependency caches must stay lane-local.
-  cacheDir: path.resolve(import.meta.dirname, ".cache/vite"),
+  // VITE_CACHE_DIR: several dev servers of ONE working copy (the tutorial recording slots) each need their own.
+  cacheDir: process.env.VITE_CACHE_DIR ? path.resolve(process.env.VITE_CACHE_DIR) : path.resolve(import.meta.dirname, ".cache/vite"),
   plugins: [
     react(),
     runtimeErrorOverlay(),

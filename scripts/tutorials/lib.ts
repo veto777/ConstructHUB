@@ -12,10 +12,20 @@ import { parseTutorialScript, type TutorialScript } from "../../shared/help/step
 import { helpEntry } from "../../shared/help/registry";
 
 export const ROOT = path.resolve(import.meta.dirname, "../..");
-/** The committed list of every published video file (key, bytes, sha256) and each video's measured length. */
-export const MANIFEST_PATH = path.join(ROOT, "shared/help/videos.json");
 /** Where the dev server reads tutorial media when R2 is not configured (server/tutorials/media.ts). */
 export const LOCAL_STORE = process.env.TUTORIALS_LOCAL_DIR || path.join(ROOT, "tmp", "tutorials");
+/**
+ * Shared by every producer on this box, whatever its working copy: the two global locks, the
+ * narration cache and the per-slot app logs.
+ */
+export const WORK_DIR = process.env.TUTORIAL_WORK_DIR || "/tmp/claude-1000/constructhub-tutorials";
+fs.mkdirSync(WORK_DIR, { recursive: true });
+/** The voice engine answers LIVE customer calls: one TTS request at a time across ALL producers. */
+export const TTS_LOCK = path.join(WORK_DIR, "tts.lock");
+/** One ffmpeg at a time across all producers (this box also serves production). */
+export const ENCODE_LOCK = path.join(WORK_DIR, "encode.lock");
+/** Narration clips by hash of persona + text — a re-record, in any slot or working copy, asks the engine for nothing. */
+export const TTS_CACHE = path.join(WORK_DIR, "tts-cache");
 
 export type Args = { _: string[]; flags: Record<string, string | true> };
 /** `--name value`, `--name=value` and bare `--flag`; everything else is positional. */
@@ -57,6 +67,17 @@ export const outDir = (a: Args, helpKey: string): string => {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 };
+
+/** KEY=value lines of an env file — only the keys asked for. Values are returned, never logged. */
+export function readEnvFile(file: string, keys: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const m = /^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+    if (!m || !keys.includes(m[1])) continue;
+    out[m[1]] = m[2].replace(/^(['"])(.*)\1$/, "$2");
+  }
+  return out;
+}
 
 export const sha256 = (data: Buffer | string): string => createHash("sha256").update(data).digest("hex");
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -172,6 +193,8 @@ export type NarrationIndex = { helpKey: string; persona: string; sampleRate: num
 export type StepTiming = { index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number };
 export type Timings = {
   helpKey: string; viewport: { width: number; height: number }; base: string; recordedAt: string;
+  /** Device scale factor, and the capture's size in pixels (viewport × zoom). */
+  zoom: number; video: { width: number; height: number };
   /** When the two black sync frames were shown (mux.ts finds them in the video to tie the two clocks together). */
   syncStartMs: number;
   syncEndMs: number;
@@ -181,15 +204,33 @@ export type Timings = {
   steps: StepTiming[];
 };
 
-/** Run a program to completion; ffmpeg is always niced because this box also serves production. */
-export function run(cmd: string, args: string[], opts: { nice?: boolean; quiet?: boolean } = {}): Promise<{ stdout: string; stderr: string }> {
-  const [bin, argv] = opts.nice ? ["nice", ["-n", "10", cmd, ...args]] : [cmd, args];
+/**
+ * Hold an exclusive `flock` on a file while `fn` runs. The lock belongs to a small child process
+ * (`flock … cat`) and is released when its stdin closes — so it is released even if this process dies.
+ */
+export async function withLock<T>(file: string, fn: () => Promise<T>, opts: { wait?: boolean } = {}): Promise<T> {
+  const child = spawn("flock", [...(opts.wait === false ? ["-n"] : []), "-x", file, "sh", "-c", "echo locked; cat >/dev/null"], { stdio: ["pipe", "pipe", "inherit"] });
+  await new Promise<void>((resolve, reject) => {
+    child.once("error", reject);
+    child.stdout.once("data", () => resolve());
+    child.once("exit", (c) => reject(new Error(opts.wait === false ? `${path.basename(file)} is held by another process` : `flock on ${file} exited ${c}`)));
+  });
+  try { return await fn(); } finally { child.stdin.end(); await new Promise((r) => child.once("exit", r)); }
+}
+
+/**
+ * Run a program to completion. `nice` is for ffmpeg: this box also serves production, so every
+ * ffmpeg runs under the global encode lock (one at a time across all producers) at nice 10 — and
+ * every caller passes `-threads 4`.
+ */
+export function run(cmd: string, args: string[], opts: { nice?: boolean; quiet?: boolean; env?: NodeJS.ProcessEnv; cwd?: string } = {}): Promise<{ stdout: string; stderr: string }> {
+  const [bin, argv] = opts.nice ? ["flock", ["-x", ENCODE_LOCK, "nice", "-n", "10", cmd, ...args]] : [cmd, args];
   return new Promise((resolve, reject) => {
-    const child = spawn(bin, argv, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(bin, argv, { stdio: ["ignore", "pipe", "pipe"], env: opts.env, cwd: opts.cwd });
     let stdout = "", stderr = "";
     child.stdout.on("data", (d) => { stdout += d; });
     child.stderr.on("data", (d) => { stderr += d; });
     child.on("error", reject);
-    child.on("close", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`${cmd} exited ${code}\n${stderr.slice(-2000)}`)));
+    child.on("close", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`${cmd} exited ${code}\n${(stderr || stdout).slice(-2000)}`)));
   });
 }

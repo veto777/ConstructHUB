@@ -42,6 +42,7 @@ export function CrmPageHeader({
   subtitle,
   actions,
   infoKey,
+  help,
 }: {
   icon?: LucideIcon;
   title: React.ReactNode;
@@ -49,6 +50,8 @@ export function CrmPageHeader({
   actions?: React.ReactNode;
   /** Mounts a ⓘ help dialog (lib/info-content.ts) beside the title. */
   infoKey?: string;
+  /** Sits after the ⓘ: the page’s walkthrough button (a video-only HelpButton). */
+  help?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -62,6 +65,7 @@ export function CrmPageHeader({
           <div className="flex items-center gap-1">
             <h1 className="text-2xl font-semibold tracking-tight leading-tight">{title}</h1>
             {infoKey && <InfoTip k={infoKey} />}
+            {help}
           </div>
           {subtitle && <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>}
         </div>
@@ -374,6 +378,8 @@ export function SectionTitle({
   actions?: React.ReactNode;
   /** Mounts a ⓘ help dialog (lib/info-content.ts) beside the title. */
   infoKey?: string;
+  /** Sits after the ⓘ: the page’s walkthrough button (a video-only HelpButton). */
+  help?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">

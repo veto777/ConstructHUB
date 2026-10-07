@@ -1,9 +1,9 @@
 /**
  * Walkthrough recorder — stage 1 of docs/tutorials/VIDEO-PIPELINE.md.
  *
- *   tsx scripts/tutorials/record.ts docs/tutorials/scripts/<helpKey>.json [--base http://127.0.0.1:8168]
+ *   tsx scripts/tutorials/record.ts docs/tutorials/scripts/<helpKey>.json [--base http://portal.constructhub.us:8181]
  *        [--out analysis/video-out/<helpKey>] [--pad 450] [--lead 150] [--label "Demo Account"]
- *        [--shots] [--no-narration]
+ *        [--company "Aspire Interiors"] [--shots] [--no-narration] [--dry]
  *
  * Plays the step script in headless Chromium with Playwright's `recordVideo`, and writes
  *   raw.webm      the screen capture (with a pre-roll that mux.ts cuts off)
@@ -33,7 +33,7 @@ function overlay() {
   const w = window as any;
   if (w.__tut) return;
   const css = `
-    #__tut{position:fixed;inset:0;pointer-events:none;z-index:2147483647;--tut-accent:Highlight;font-family:inherit}
+    #__tut{position:fixed;inset:0;pointer-events:none;z-index:2147483647;--tut-accent:hsl(25 95% 53%);font-family:inherit}
     #__tut *{box-sizing:border-box}
     #__tut .cur{position:absolute;left:0;top:0;width:26px;height:26px;margin:-3px 0 0 -5px;will-change:transform;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
     #__tut .ring{position:absolute;left:0;top:0;border:3px solid var(--tut-accent);border-radius:12px;opacity:0;
@@ -52,6 +52,9 @@ function overlay() {
     .__tut-blur{filter:blur(7px)!important}
     /* The assistant launcher and its welcome bubble are not part of any feature being taught. */
     [data-testid="hub-launcher"],[data-testid="hub-welcome-bubble"],[data-testid="hub-panel"]{display:none!important}
+    /* …nor is the unread count on the CRM's bell. */
+    [data-testid="badge-notifications-unread"]{display:none!important}
+    #__tut.shot .cur{display:none}
   `;
   const root = document.createElement("div");
   root.id = "__tut";
@@ -65,11 +68,8 @@ function overlay() {
   const place = () => { cur.style.transform = `translate(${pos.x}px,${pos.y}px)`; };
   place();
   let target: Element | null = null, pad = 6;
-  const accent = () => {
-    const from = (target && target.closest(".g-surface")) || document.querySelector(".g-surface") || document.documentElement;
-    const v = getComputedStyle(from).getPropertyValue("--g-accent").trim();
-    if (v) root.style.setProperty("--tut-accent", v);
-  };
+  // One ring colour everywhere — the brand orange — so it reads the same on the blue and on the dark surfaces.
+  const accent = () => {};
   const frame = () => {
     if (target && target.isConnected) {
       const r = target.getBoundingClientRect();
@@ -100,8 +100,18 @@ function overlay() {
     blur(el: Element) { el.classList.add("__tut-blur"); },
     /** A full black frame: the mark mux.ts looks for to line the video's clock up with the recorder's. */
     sync(on: boolean) { mount(); (root.querySelector(".sync") as HTMLElement).classList.toggle("on", on); },
+    /** For the thumbnail's screenshot: the cursor off, and where the ring is (CSS px), or null. */
+    shot(on: boolean) {
+      root.classList.toggle("shot", on);
+      if (!target || !target.isConnected) return null;
+      const r = target.getBoundingClientRect();
+      return { x: r.left, y: r.top, width: r.width, height: r.height };
+    },
   };
 }
+
+/** The strip at the bottom of the page (CSS px) that captions cover: ~17% of the height. */
+export const CAPTION_SAFE = (height: number) => Math.round(height * 0.17);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
@@ -136,10 +146,12 @@ class Player {
   /** Bring the target on screen and return the point to aim at (inside it, never over its far edge). */
   private async aim(target: Locator): Promise<{ x: number; y: number }> {
     await target.waitFor({ state: "visible", timeout: 20_000 });
-    await target.evaluate((el) => {
+    // The bottom of the frame belongs to the captions (the player draws them there, and so does YouTube):
+    // a target that sits in it is brought up to the middle of the page first.
+    await target.evaluate((el, safe) => {
       const r = el.getBoundingClientRect();
-      if (r.top < 70 || r.bottom > innerHeight - 50) el.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+      if (r.top < 70 || r.bottom > innerHeight - safe) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, CAPTION_SAFE(this.viewport.height));
     // Wait for a smooth scroll (or a list that is still settling) to stop moving the target.
     let last = await target.boundingBox();
     for (let i = 0; i < 20; i++) {
@@ -149,6 +161,8 @@ class Player {
       last = box;
     }
     if (!last) throw new Error("target has no box");
+    if (last.y + last.height > this.viewport.height - CAPTION_SAFE(this.viewport.height) + 4)
+      console.warn(`  ! “${String(target)}” stays in the caption area at the bottom (it cannot scroll up) — check the frame`);
     const wide = last.width > 320;
     return {
       x: Math.round(last.x + (wide ? Math.min(last.width * 0.3, 220) : last.width / 2)),
@@ -158,7 +172,11 @@ class Player {
 
   async play(step: TutorialStep, base: string) {
     const page = this.page;
-    const fill = (v: string) => v.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, name: string) => {
+    // {{DATE}}, {{DATE+2}}, {{DATE-1}}: a day relative to today (yyyy-mm-dd, the workspace's time zone) — the
+    // demo data moves with the calendar, so a script never names a fixed date. Anything else is an env value.
+    const fill = (v: string) => v.replace(/\{\{DATE([+-]\d+)?\}\}/g, (_m, n?: string) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + Number(n ?? 0) * 86400000)),
+    ).replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, name: string) => {
       const value = process.env[name];
       if (value === undefined) throw new Error(`The script needs ${name} in the environment`);
       return value;
@@ -170,6 +188,7 @@ class Player {
       return;
     }
     if (step.action === "wait") return;
+    if (step.action === "back") { await this.ring(null); await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page); return; }
     if (step.action === "press") { await page.keyboard.press(step.value!); return; }
 
     const target = page.locator(fill(step.selector!)).first();
@@ -184,11 +203,19 @@ class Player {
       case "click":
         await sleep(350);
         await page.mouse.down(); await sleep(70); await page.mouse.up();
+        // The click has done its job; a ring left behind would sit on whatever the click put there (a dialog, a new page).
+        setTimeout(() => { void this.ring(null); }, 900);
         break;
       case "type":
         await sleep(250);
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         // Typing replaces what the field holds, the way a person selects it all and types over it.
+        // A date or time field has no text to type over: its value is set whole ("2026-10-09", "13:30").
+        if (await target.evaluate((el) => el instanceof HTMLInputElement && ["date", "time", "datetime-local", "month"].includes(el.type))) {
+          await sleep(300);
+          await target.fill(fill(step.value!));
+          break;
+        }
         await page.keyboard.press("ControlOrMeta+a");
         await sleep(150);
         await page.keyboard.type(fill(step.value!), { delay: 85 });
@@ -245,18 +272,25 @@ async function settle(page: Page) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["shots", "no-narration"]);
+  const args = parseArgs(process.argv.slice(2), ["shots", "no-narration", "dry"]);
   if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/record.ts <script.json> [--base URL] [--out DIR]");
   const { script } = loadScript(args._[0]);
   const dir = outDir(args, script.helpKey);
   const base = flagStr(args, "base", process.env.TUTORIAL_BASE_URL ?? "http://127.0.0.1:8168")!;
   const pad = flagNum(args, "pad", 450), lead = flagNum(args, "lead", 150);
-  const label = flagStr(args, "label", "Demo Account")!;
+  const label = flagStr(args, "label", "Demo Account")!, company = flagStr(args, "company", "Aspire Interiors")!;
+  // --dry: no video and no waiting — play the steps as fast as they go and keep a screenshot of each
+  // (steps/NN.png). It is how a script is tried out before a voice or an encoder is spent on it.
+  const dry = !!args.flags.dry;
+  if (dry) { args.flags.shots = true; args.flags["no-narration"] = true; }
+  const zoom = script.zoom ?? 1;
+  const even = (n: number) => Math.round(n / 2) * 2;
+  const video = { width: even(script.viewport.width * zoom), height: even(script.viewport.height * zoom) };
 
   let clipMs: number[];
   if (args.flags["no-narration"]) {
     clipMs = script.steps.map((s) => Math.round(s.narration.length * 62));
-    console.warn("! --no-narration: step lengths are ESTIMATES. Do not ship this recording.");
+    if (!dry) console.warn("! --no-narration: step lengths are ESTIMATES. Do not ship this recording.");
   } else {
     const file = path.join(dir, "narration.json");
     if (!fs.existsSync(file)) throw new Error(`${file} is missing — run narrate.ts first (or pass --no-narration for a dry run)`);
@@ -273,10 +307,11 @@ async function main() {
   const shotsDir = path.join(dir, "steps");
   if (args.flags.shots) { fs.rmSync(shotsDir, { recursive: true, force: true }); fs.mkdirSync(shotsDir, { recursive: true }); }
 
-  const browser = await chromium.launch({ headless: true });
+  // The CRM renders only on its own host name; the name is pointed at this machine for this browser only.
+  const browser = await chromium.launch({ headless: true, args: ["--host-resolver-rules=MAP portal.constructhub.us 127.0.0.1, MAP client.constructhub.us 127.0.0.1", "--force-color-profile=srgb"] });
   const context = await browser.newContext({
-    viewport: script.viewport, deviceScaleFactor: 1, locale: "en-US", timezoneId: "America/New_York",
-    recordVideo: { dir: videoDir, size: script.viewport },
+    viewport: script.viewport, deviceScaleFactor: zoom, locale: "en-US", timezoneId: "America/New_York",
+    ...(dry ? {} : { recordVideo: { dir: videoDir, size: video } }),
   });
   const origin = new URL(base);
   await context.addCookies([{ name: "ch_consent", value: "denied", domain: origin.hostname, path: "/" }]);
@@ -284,15 +319,22 @@ async function main() {
   await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
   await context.addInitScript(overlay);
   await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
+  // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
+  // sees") opens it in this one instead; the script comes back with a `back` step.
+  await context.addInitScript(() => { window.open = ((url?: string | URL) => { if (url) location.assign(String(url)); return null; }) as typeof window.open; });
   // Presentation only: the account label a viewer sees. The session, the plan and the data are untouched.
   await context.route("**/api/auth/me", async (route) => {
-    const response = await route.fetch();
+    // route.fetch() runs in Node, which knows nothing of the browser's host mapping: the request is sent
+    // to this machine by address. (Left alone it would go to the real portal host on the internet.)
+    const local = new URL(route.request().url());
+    local.hostname = "127.0.0.1";
+    const response = await route.fetch({ url: local.toString() });
     let body: any = null;
     try { body = await response.json(); } catch { /* not JSON */ }
     if (!body || typeof body !== "object") return route.fulfill({ response });
     return route.fulfill({
       response,
-      json: { ...body, displayName: label, email: "demo@example.com", avatarUrl: null, companyName: "Demo Company", companyLogoUrl: null, isPlatformAdmin: false },
+      json: { ...body, displayName: label, email: "demo@example.com", avatarUrl: null, companyName: company, companyLogoUrl: null, isPlatformAdmin: false },
     });
   });
 
@@ -331,9 +373,29 @@ async function main() {
     const startMs = now();
     if (!(i === 0 && step.action === "goto")) await player.play(step, base);
     const narrationStartMs = startMs + lead;
-    const until = Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
+    if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+    const until = dry ? now() + 350 : Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
     await sleep(until - now());
+    if (script.thumbnail?.step === i) {
+      // The thumbnail's screenshot: this frame, full resolution, the cursor off, and where its ring is.
+      const ring = await page.evaluate(() => (window as any).__tut.shot(true));
+      await page.screenshot({ path: path.join(dir, "thumb-shot.png") });
+      await page.evaluate(() => (window as any).__tut.shot(false));
+      fs.writeFileSync(path.join(dir, "thumb-shot.json"), JSON.stringify({ step: i, zoom, viewport: script.viewport, ring }, null, 2) + "\n");
+    }
     if (args.flags.shots) await page.screenshot({ path: path.join(shotsDir, `${String(i).padStart(2, "0")}.png`) });
+    // A dry run also lists what can be pointed at on this screen: every visible data-testid, with its tag and text.
+    if (dry) fs.writeFileSync(path.join(shotsDir, `${String(i).padStart(2, "0")}.txt`), await page.evaluate(() => {
+      const rows: string[] = [];
+      for (const el of Array.from(document.querySelectorAll("[data-testid]"))) {
+        if (el.closest("#__tut")) continue;
+        const r = el.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2) continue;
+        const on = r.bottom > 0 && r.top < innerHeight ? " " : "↓";
+        rows.push(`${on} ${el.getAttribute("data-testid")}  <${el.tagName.toLowerCase()}>  ${(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60)}`);
+      }
+      return `${location.pathname}${location.search}\n${rows.join("\n")}\n`;
+    }));
     const endMs = now();
     steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs });
     console.log(`  step ${String(i).padStart(2)} ${step.action.padEnd(9)} ${(startMs / 1000).toFixed(2)}s → ${(endMs / 1000).toFixed(2)}s  ${step.caption}`);
@@ -342,14 +404,15 @@ async function main() {
   const endMs = now();
   await player.ring(null);
   const syncEndMs = await flash();
-  const video = page.video();
+  const capture = page.video();
   await context.close();
   await browser.close();
+  if (dry) { console.log(`dry run: ${script.steps.length} steps played, screenshots → ${shotsDir}`); return; }
   const raw = path.join(dir, "raw.webm");
-  fs.renameSync(await video!.path(), raw);
+  fs.renameSync(await capture!.path(), raw);
   fs.rmSync(videoDir, { recursive: true, force: true });
 
-  const timings: Timings = { helpKey: script.helpKey, viewport: script.viewport, base, recordedAt: new Date().toISOString(), syncStartMs, syncEndMs, trimStartMs, endMs, steps };
+  const timings: Timings = { helpKey: script.helpKey, viewport: script.viewport, zoom, video, base, recordedAt: new Date().toISOString(), syncStartMs, syncEndMs, trimStartMs, endMs, steps };
   fs.writeFileSync(path.join(dir, "timings.json"), JSON.stringify(timings, null, 2) + "\n");
   console.log(`raw.webm ${(fs.statSync(raw).size / 1e6).toFixed(1)} MB · ${((endMs - trimStartMs) / 1000).toFixed(1)} s of walkthrough → ${dir}`);
 }

@@ -101,5 +101,11 @@
       "caption": "Menu: Permits & Databases, Database Directory",
       "narration": "You'll find the Database Directory in the menu, under Permits and Databases. It's free to browse."
     }
-  ]
+  ],
+  "thumbnail": {
+    "headline": "Find any permit office",
+    "accent": "permit",
+    "kicker": "ConstructHUB Tutorial",
+    "step": 3
+  }
 }

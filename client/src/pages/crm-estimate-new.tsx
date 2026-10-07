@@ -1,3 +1,4 @@
+import { HelpButton } from "@/components/help-button";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
@@ -486,6 +487,7 @@ export default function CrmEstimateNewPage() {
           <div className="flex items-center gap-1">
             <h1 className="text-xl font-semibold tracking-tight leading-tight">New estimate</h1>
             <InfoTip k="estimate-new" />
+            <HelpButton k="crm-create-estimate" videoOnly />
           </div>
           <div className="text-xs text-muted-foreground" data-testid="text-step">
             Step {step} of 3 — {step === 1 ? "pick the client" : step === 2 ? "add the work" : "review & send"}

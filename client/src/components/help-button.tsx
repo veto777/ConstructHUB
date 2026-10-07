@@ -131,10 +131,15 @@ function PanelBody({ entry, onWatch, footer }: { entry: HelpEntry; onWatch: () =
   );
 }
 
-export function HelpButton({ k, className, tutorialsLink = true }: {
+export function HelpButton({ k, className, tutorialsLink = true, videoOnly = false }: {
   /** A key of the help registry. */
   k: string;
   className?: string;
+  /**
+   * Only the walkthrough: a "Watch" button that plays the entry's video, and nothing at all while the
+   * entry has none. For CRM pages, which already carry their own "i" (InfoTip) beside the title.
+   */
+  videoOnly?: boolean;
   /** Show "All tutorials" in the panel (off on the Tutorials page itself). */
   tutorialsLink?: boolean;
 }) {
@@ -159,6 +164,20 @@ export function HelpButton({ k, className, tutorialsLink = true }: {
   }, [open, k]);
 
   if (!entry) return null;
+  if (videoOnly) {
+    if (!entry.video) return null;
+    return (
+      <span className="inline-flex items-center align-middle">
+        <button type="button" aria-label={`Watch the walkthrough: ${entry.title}`}
+          className={cn("ml-1 inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 px-2.5 text-xs font-medium text-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
+          onClick={(e) => { e.stopPropagation(); setWatching(true); }} data-testid={`help-play-${k}`}>
+          <PlayCircle className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />
+          Watch
+        </button>
+        <HelpVideoDialog entry={entry} open={watching} onOpenChange={setWatching} />
+      </span>
+    );
+  }
 
   const trigger = (
     <button

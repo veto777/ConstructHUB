@@ -11,7 +11,7 @@
  *     bucket is reachable through it;
  *   · the Content-Type comes from the extension, never from the stored object.
  * The name carries the file's content hash, so the response is immutable for a year: a re-recorded
- * video has a new name (shared/help/videos.json).
+ * video has a new name (shared/help/videos/<helpKey>.json).
  */
 import fs from "fs";
 import path from "path";

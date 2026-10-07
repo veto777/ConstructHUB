@@ -9,20 +9,24 @@
  *   POST ${VOICE_ENGINE_URL}/tts/preview   Authorization: Bearer ${VOICE_INTERNAL_SECRET}
  *   {"personaId":"janice","text":"…"}      → 24 kHz mono WAV, at most 400 characters a call
  *
- * Both values come from the environment and are never printed. THE SAME ENGINE ANSWERS LIVE CUSTOMER
- * PHONE CALLS, so this tool is deliberately slow: one request at a time, a pause between requests,
- * every piece cached by the hash of its text (a re-run only asks for lines that changed), and a
- * failed request is retried a few times with a long wait rather than hammered.
+ * Both values come from the environment, or are read (read-only, at run time) from the live env file;
+ * they are never printed. THE SAME ENGINE ANSWERS LIVE CUSTOMER PHONE CALLS, so every request is made
+ * under one machine-wide `flock` (tts.lock): exactly one at a time across ALL producers, with a pause
+ * after each. Every piece is cached by the hash of its voice and text in a cache all producers share
+ * (a re-record, in any slot, asks for nothing), and a failed request is retried a few times with a
+ * long wait rather than hammered.
  *
  * Writes narration/<NN>.wav (16-bit PCM, the silence around each line trimmed) and narration.json (each clip's measured length), which
  * record.ts uses to hold every step for as long as its line takes to say.
  */
 import fs from "fs";
 import path from "path";
-import { decodeWav, encodeWav, loadScript, outDir, parseArgs, pcmMs, sha256, sleep, splitNarration, trimSilence, type NarrationIndex, type Pcm } from "./lib";
+import { TTS_CACHE, TTS_LOCK, decodeWav, encodeWav, loadScript, outDir, parseArgs, pcmMs, readEnvFile, sha256, sleep, splitNarration, trimSilence, withLock, type NarrationIndex, type Pcm } from "./lib";
 
 const MAX_CHARS = 400;        // the engine's limit for /tts/preview
-const BETWEEN_CALLS_MS = 1500; // breathing room for the engine between two requests
+const BETWEEN_CALLS_MS = 250;  // breathing room for the engine after every request — held INSIDE the global lock
+/** Where the engine's address and bearer are kept. Read at run time, read-only; never printed, never committed. */
+const VOICE_ENV_FILE = process.env.TUTORIAL_VOICE_ENV || "/home/voiceban/ConstructHUB-live/.env";
 const RETRY_WAITS_MS = [8000, 20000, 45000];
 const SENTENCE_GAP_MS = 220;   // silence between two pieces of one long line
 
@@ -54,21 +58,31 @@ async function main() {
   if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/narrate.ts <script.json> [--out DIR]");
   const { script } = loadScript(args._[0]);
   const dir = outDir(args, script.helpKey);
-  const clipsDir = path.join(dir, "narration"), cacheDir = path.join(clipsDir, "cache");
+  const clipsDir = path.join(dir, "narration"), cacheDir = TTS_CACHE;
+  fs.mkdirSync(clipsDir, { recursive: true });
   fs.mkdirSync(cacheDir, { recursive: true });
 
-  const engine = process.env.VOICE_ENGINE_URL, secret = process.env.VOICE_INTERNAL_SECRET;
+  let engine = process.env.VOICE_ENGINE_URL, secret = process.env.VOICE_INTERNAL_SECRET;
+  if ((!engine || !secret) && fs.existsSync(VOICE_ENV_FILE)) {
+    const env = readEnvFile(VOICE_ENV_FILE, ["VOICE_ENGINE_URL", "VOICE_INTERNAL_SECRET"]);
+    engine ||= env.VOICE_ENGINE_URL; secret ||= env.VOICE_INTERNAL_SECRET;
+  }
   let called = 0, cached = 0;
   const piece = async (text: string): Promise<Pcm> => {
     const file = path.join(cacheDir, `${sha256(`${script.narrator}\n${text}`).slice(0, 32)}.wav`);
     if (fs.existsSync(file)) { cached++; return trimSilence(decodeWav(fs.readFileSync(file))); }
-    if (!engine || !secret) throw new Error("Set VOICE_ENGINE_URL and VOICE_INTERNAL_SECRET (see the header of this file)");
-    if (called > 0) await sleep(BETWEEN_CALLS_MS);
-    const wav = await synthesize(engine, secret, script.narrator, text);
-    called++;
-    const tmp = `${file}.part`;
-    fs.writeFileSync(tmp, wav); fs.renameSync(tmp, file);
-    return trimSilence(decodeWav(wav));
+    if (!engine || !secret) throw new Error(`VOICE_ENGINE_URL and VOICE_INTERNAL_SECRET are not set and not in ${VOICE_ENV_FILE}`);
+    // ONE request at a time across every producer on this box: the same engine is answering customers' calls.
+    return withLock(TTS_LOCK, async () => {
+      // Another producer may have asked for this very line while we waited for the lock.
+      if (fs.existsSync(file)) { cached++; return trimSilence(decodeWav(fs.readFileSync(file))); }
+      const wav = await synthesize(engine!, secret!, script.narrator, text);
+      called++;
+      const tmp = `${file}.${process.pid}.part`;
+      fs.writeFileSync(tmp, wav); fs.renameSync(tmp, file);
+      await sleep(BETWEEN_CALLS_MS);
+      return trimSilence(decodeWav(wav));
+    });
   };
 
   const index: NarrationIndex = { helpKey: script.helpKey, persona: script.narrator, sampleRate: 0, clips: [] };

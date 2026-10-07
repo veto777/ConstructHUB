@@ -1,3 +1,4 @@
+import { HelpButton } from "@/components/help-button";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
@@ -244,6 +245,7 @@ export default function CrmSchedulePage() {
         icon={CalendarDays}
         title="Schedule"
         infoKey="schedule"
+        help={<HelpButton k="crm-schedule" videoOnly />}
         subtitle="Scroll the calendar, click a day to book, click a visit to move it."
         actions={
           <div className="flex flex-wrap items-center gap-2">

@@ -7,13 +7,14 @@
  * Every sentence was written from the code or from text the product already ships and tests
  * (server/data/hub-knowledge.md, shared/feature-pages, client/src/lib/info-content.ts). Plan names
  * come from the price book (shared/plans.ts), never typed here. `video` is never typed here either:
- * it is built from the manifest of recorded walkthroughs (./videos.json, written by
- * scripts/tutorials/mux.ts — docs/tutorials/VIDEO-PIPELINE.md), and is null for every entry that
+ * it is built from the manifest of recorded walkthroughs (./videos/<key>.json, written by
+ * scripts/tutorials/upload.ts — docs/tutorials/VIDEO-PIPELINE.md), and is null for every entry that
  * has no recording.
  */
 import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from "../plans";
 import { CALL_ASSISTANT_PLANS, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
-import type { HelpEntry, HelpGroup } from "./types";
+import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
+import * as moreEntries from "./entries/index";
 import { helpVideoFor } from "./videos";
 
 export { HELP_GROUPS } from "./types";
@@ -26,7 +27,7 @@ const EDGE = moduleNeed("cloudflareSearchConsole");
 const IDENTITY = "Sensitive buttons ask you to confirm it’s you first (password, authenticator code or an emailed code).";
 const PROTECTED = `Included with the ${PROTECTED_SITE_PLANS} plans; the number of protected websites depends on the plan.`;
 
-type Draft = Omit<HelpEntry, "video">;
+type Draft = HelpDraft;
 const entries: Draft[] = [
   /* ══ Tools → Cloudflare ═══════════════════════════════════════════════════════════════════════ */
   {
@@ -843,8 +844,16 @@ const entries: Draft[] = [
   },
 ];
 
-/** Every entry. `video` is the recorded walkthrough listed for its key in ./videos.json, else null. */
-export const HELP_ENTRIES: readonly HelpEntry[] = entries.map((e) => ({ ...e, video: helpVideoFor(e.key) }));
+/**
+ * Entries added after this file was written live ONE PER FILE under ./entries/<group>/<key>.ts and are
+ * collected through the generated ./entries/index.ts — so several people can add help entries (one
+ * per walkthrough video, say) without ever editing the same file. They follow the entries above, in
+ * key order.
+ */
+const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => a.key.localeCompare(b.key));
+
+/** Every entry. `video` is the recorded walkthrough of its manifest file (./videos/<key>.json), else null. */
+export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map((e) => ({ ...e, video: helpVideoFor(e.key) }));
 
 const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
 export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key);
