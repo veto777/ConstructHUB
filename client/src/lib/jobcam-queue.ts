@@ -12,7 +12,7 @@
  * part goes through the API proxy URL instead. XHR is used for the PUTs so
  * progress is real, not guessed.
  */
-import { jobcamFetch } from "./jobcam-api";
+import { jobcamFetch, jobcamErrorBody, isStorageFullError } from "./jobcam-api";
 
 export type QueueStatus = "queued" | "uploading" | "processing" | "done" | "failed";
 
@@ -44,6 +44,8 @@ export type QueueItem = {
   partsDone: number[];
   attempts: number;
   error: string | null;
+  /** Why it failed, when the server said so: "storage_full" (no room — retrying won't help) or "no_plan". */
+  errorCode?: "storage_full" | "no_plan" | null;
   updatedAt: number;
 };
 
@@ -98,6 +100,13 @@ async function refresh() {
   emit();
 }
 
+/** Told when the server refuses an upload for storage or plan, so the meter can refresh at once. */
+const refusalListeners = new Set<(code: "storage_full" | "no_plan") => void>();
+export function onUploadRefused(listener: (code: "storage_full" | "no_plan") => void): () => void {
+  refusalListeners.add(listener);
+  return () => { refusalListeners.delete(listener); };
+}
+
 export function subscribeQueue(listener: () => void): () => void {
   listeners.add(listener);
   if (cache.length === 0) void refresh();
@@ -133,7 +142,9 @@ export async function enqueueUpload(file: Blob, args: {
 export async function retryUpload(id: string): Promise<void> {
   const it = cache.find((x) => x.id === id);
   if (!it) return;
-  await putItem({ ...it, status: "queued", attempts: 0, error: null, updatedAt: Date.now() });
+  // A refused upload (storage full) left nothing on the server: start it over.
+  const fresh = it.errorCode ? { uploadId: null, mediaId: null, partsDone: [] as number[] } : {};
+  await putItem({ ...it, ...fresh, status: "queued", attempts: 0, error: null, errorCode: null, updatedAt: Date.now() });
   await refresh();
   void startQueue();
 }
@@ -280,10 +291,28 @@ async function uploadOne(item: QueueItem): Promise<void> {
     await finish(it, media.id);
   } catch (e: any) {
     const msg = String(e?.message || e);
-    // A refused file (415/413/402/404) will never succeed — park it as failed at once.
-    const fatal = /^(400|402|404|413|415):/.test(msg);
+    const info = jobcamErrorBody(e);
+    // The server's own sentence when it sent one, never the raw JSON.
+    const text = typeof info?.body?.message === "string" ? info.body.message : msg.replace(/^\d{3}:\s*/, "");
+    // Storage full (403 limit_reached) and "JobCam isn't on this plan" (402)
+    // are answers, not hiccups: park the item at once and never retry on our
+    // own. Every other queued item would get the same answer, so they are
+    // parked with it instead of each asking the server in turn.
+    const storageFull = isStorageFullError(e);
+    const noPlan = info?.status === 402;
+    const errorCode = storageFull ? "storage_full" as const : noPlan ? "no_plan" as const : null;
+    // A refused file (415/413/404) will never succeed either.
+    const fatal = !!errorCode || /^(400|402|404|413|415):/.test(msg);
     const failed = fatal || it.attempts >= MAX_ATTEMPTS;
-    await putItem({ ...it, status: failed ? "failed" : "queued", error: msg.replace(/^\d{3}:\s*/, "").slice(0, 300), updatedAt: Date.now() });
+    await putItem({ ...it, status: failed ? "failed" : "queued", error: text.slice(0, 300), errorCode, updatedAt: Date.now() });
+    if (errorCode) {
+      for (const other of cache) {
+        if (other.id !== it.id && other.status === "queued" && !other.uploadId) {
+          await putItem({ ...other, status: "failed", error: text.slice(0, 300), errorCode, updatedAt: Date.now() });
+        }
+      }
+      for (const l of refusalListeners) l(errorCode);
+    }
     if (!failed) await new Promise((r) => setTimeout(r, Math.min(60_000, 1000 * 2 ** it.attempts)));
   }
 }

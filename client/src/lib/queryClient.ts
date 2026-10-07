@@ -52,7 +52,7 @@ export function apiErrorMessage(err: any, fallback = "Something went wrong — p
       // Inside the iPhone apps a plan answer reads neutrally — the apps sell
       // nothing (owner, 2026-10-04): no plan names, prices, upgrade wording.
       if (inNativeApp()) {
-        if (parsed.code === "plan_required") return "That isn't on this account.";
+        if (parsed.code === "plan_required" || parsed.code === "crm_plan_required") return "That isn't on this account.";
         if (parsed.code === "limit_reached") return "That limit is reached on this account.";
         if (parsed.code === "payment_failed") return "That payment didn't go through.";
       }

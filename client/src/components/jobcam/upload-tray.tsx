@@ -16,6 +16,7 @@ export function UploadTray({ dark = false, compact = false }: { dark?: boolean; 
   const processing = items.filter((i) => i.status === "processing").length;
   const failed = items.filter((i) => i.status === "failed").length;
   const done = items.filter((i) => i.status === "done").length;
+  const storageFull = items.some((i) => i.status === "failed" && i.errorCode === "storage_full");
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   return (
     <section data-testid="jobcam-upload-tray"
@@ -23,12 +24,17 @@ export function UploadTray({ dark = false, compact = false }: { dark?: boolean; 
       <header className="flex items-center gap-2 px-3 py-2">
         <Upload className="h-4 w-4 shrink-0 opacity-70" />
         <span className="font-medium">
-          {offline ? `${waiting} waiting for a connection` : waiting ? `${waiting} uploading` : processing ? `${processing} processing` : failed ? `${failed} failed` : `${done} uploaded`}
+          {offline ? `${waiting} waiting for a connection` : waiting ? `${waiting} uploading` : storageFull ? `Storage full — ${failed} not uploaded` : processing ? `${processing} processing` : failed ? `${failed} failed` : `${done} uploaded`}
         </span>
         {done > 0 && (
           <button type="button" onClick={() => void clearFinished()} className="ml-auto text-xs opacity-70 hover:opacity-100" data-testid="jobcam-tray-clear">Clear done</button>
         )}
       </header>
+      {storageFull && (
+        <p className={cn("px-3 pb-2 text-xs", dark ? "text-amber-300" : "text-destructive")} role="alert" data-testid="jobcam-tray-storage-full">
+          These are kept on this device. Free up space or get more storage, then tap retry.
+        </p>
+      )}
       {!compact && (
         <ul className="max-h-48 overflow-y-auto divide-y divide-border/40 border-t border-border/40">
           {items.slice().reverse().slice(0, 30).map((it) => (
@@ -41,7 +47,7 @@ export function UploadTray({ dark = false, compact = false }: { dark?: boolean; 
                   <span className="truncate">{it.fileName}</span>
                   <span className="opacity-60 text-xs shrink-0">{formatBytes(it.bytes)}</span>
                 </div>
-                {it.status === "failed" && it.error && <div className="text-xs text-destructive truncate">{it.error}</div>}
+                {it.status === "failed" && it.error && <div className={cn("text-xs text-destructive", it.errorCode ? "whitespace-normal" : "truncate")}>{it.error}</div>}
                 {(it.status === "uploading" || it.status === "queued") && (
                   <div className="mt-1 h-1 rounded-full bg-current/15 overflow-hidden"><div className="h-full bg-primary transition-[width]" style={{ width: `${Math.round(it.progress * 100)}%` }} /></div>
                 )}

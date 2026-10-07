@@ -21,6 +21,21 @@
  *
  * Money is in cents.
  */
+import { JOBCAM_INCLUDED_GB } from "./jobcam-storage";
+
+/**
+ * JobCam (job photos & video) on the CRM — owner, 2026-10-07: "this JobCam is
+ * an upgrade and does not come with the basic or pro membership but this is
+ * part of the upper tier plan" and "if they want to upgrade the upgrade will
+ * cost $39 a month on basic and essential". So: INCLUDED in CRM Max, a paid
+ * add-on on CRM Basic and CRM Essentials, not available without a CRM plan.
+ * Storage sizes above the included one have no price (shared/jobcam-storage.ts).
+ */
+export const CRM_JOBCAM_ADDON_MONTHLY_CENTS = 3900;
+/** owner gave $39/mo; no annual discount assumed — owner to confirm (12 x $39). */
+export const CRM_JOBCAM_ADDON_ANNUAL_CENTS = 12 * CRM_JOBCAM_ADDON_MONTHLY_CENTS;
+const JOBCAM_FEATURE = `JobCam — job photos & video, ${JOBCAM_INCLUDED_GB} GB included`;
+const JOBCAM_NOT_INCLUDED = `JobCam — job photos & video (add it for $${CRM_JOBCAM_ADDON_MONTHLY_CENTS / 100}/mo, or move up to Max, where it is included)`;
 
 export type CrmPlanKey = "crm_basic" | "crm_essentials" | "crm_max";
 export const CRM_PLAN_KEYS: readonly CrmPlanKey[] = ["crm_basic", "crm_essentials", "crm_max"];
@@ -48,6 +63,10 @@ export type CrmPlanLimits = {
   jobCosting: boolean;
   /** CRM public API (/api/v1) units per calendar month; 0 = not included. */
   apiUnitsPerMonth: number;
+  /** JobCam (job photos & video) comes with the plan. False = buyable as the JobCam add-on. */
+  jobcam: boolean;
+  /** JobCam storage that comes with JobCam, in GB (shared/jobcam-storage.ts). */
+  jobcamStorageGb: number;
 };
 
 export type CrmPlan = {
@@ -96,12 +115,13 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
       "Extra seats (add them for $17/mo each, or move up to Essentials)",
       "Team alert texts and client texting",
       "Change orders and job costing",
+      JOBCAM_NOT_INCLUDED,
       ...PLATFORM_NOT_INCLUDED,
     ],
     limits: {
       seats: 1, clients: -1, documentsPerMonth: -1, teamTextSegments: 0, clientTexting: "none",
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: false,
-      apiUnitsPerMonth: 0,
+      apiUnitsPerMonth: 0, jobcam: false, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
   },
   crm_essentials: {
@@ -118,12 +138,13 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
     ],
     notIncluded: [
       "A client-texting number on our carrier (bring your own, or add one)",
+      JOBCAM_NOT_INCLUDED,
       ...PLATFORM_NOT_INCLUDED,
     ],
     limits: {
       seats: 5, clients: -1, documentsPerMonth: -1, teamTextSegments: 500, clientTexting: "byo_or_addon",
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
-      apiUnitsPerMonth: 10_000,
+      apiUnitsPerMonth: 10_000, jobcam: false, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
   },
   crm_max: {
@@ -134,6 +155,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
       "8 seats",
       "Team alert texts — 1,500 segments / month",
       "1 client-texting number included",
+      JOBCAM_FEATURE,
       "CRM API — 50,000 units / month",
       "Priority support + onboarding call",
     ],
@@ -141,7 +163,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
     limits: {
       seats: 8, clients: -1, documentsPerMonth: -1, teamTextSegments: 1500, clientTexting: "included",
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
-      apiUnitsPerMonth: 50_000,
+      apiUnitsPerMonth: 50_000, jobcam: true, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
   },
 };
@@ -164,4 +186,67 @@ export const crmPlanPriceCents = (plan: CrmPlanKey, interval: "month" | "year") 
 /** The cheapest CRM plan whose limits satisfy `want` — for "upgrade to get X" hints. */
 export function cheapestCrmPlanWhere(want: (limits: CrmPlanLimits) => boolean): CrmPlanKey | null {
   return CRM_PLAN_KEYS.find((k) => want(CRM_PLANS[k].limits)) ?? null;
+}
+
+// ── The JobCam add-on ────────────────────────────────────────────────────────
+
+/** CRM add-ons that are a yes/no line on the CRM subscription (extra seats are a quantity, above). */
+export type CrmAddonKey = "jobcam";
+
+export type CrmAddon = {
+  key: CrmAddonKey;
+  name: string;
+  monthlyCents: number;
+  /** The FULL year price — see CRM_JOBCAM_ADDON_ANNUAL_CENTS. */
+  annualCents: number;
+  /** The plans it can be added to. A plan that already includes the feature is never listed. */
+  availableOn: readonly CrmPlanKey[];
+  blurb: string;
+};
+
+export const CRM_ADDONS: Record<CrmAddonKey, CrmAddon> = {
+  jobcam: {
+    key: "jobcam", name: "JobCam",
+    monthlyCents: CRM_JOBCAM_ADDON_MONTHLY_CENTS,
+    annualCents: CRM_JOBCAM_ADDON_ANNUAL_CENTS,
+    availableOn: CRM_PLAN_KEYS.filter((k) => !CRM_PLANS[k].limits.jobcam),
+    blurb: `Job-site photos and video filed to each project, with share links for clients. ${JOBCAM_INCLUDED_GB} GB of storage included.`,
+  },
+};
+
+export const crmAddonPriceCents = (addon: CrmAddonKey, interval: "month" | "year") =>
+  interval === "year" ? CRM_ADDONS[addon].annualCents : CRM_ADDONS[addon].monthlyCents;
+
+/** May this plan buy the add-on? Never without a plan, never where the plan already includes it. */
+export const crmAddonAvailableOn = (addon: CrmAddonKey, plan: CrmPlanKey | null | undefined): boolean =>
+  !!plan && CRM_ADDONS[addon].availableOn.includes(plan);
+
+/** JobCam on this CRM plan: included by the plan, or bought as the add-on. */
+export const crmPlanHasJobcam = (plan: CrmPlanKey | null | undefined, jobcamAddon: boolean): boolean =>
+  !!plan && (CRM_PLANS[plan].limits.jobcam || (jobcamAddon && crmAddonAvailableOn("jobcam", plan)));
+
+/**
+ * What a workspace WITHOUT JobCam is offered, from the price book — the data
+ * behind the upgrade card (client/src/components/jobcam/upgrade-card.tsx).
+ *   - no CRM plan: nothing to add JobCam to — the standard CRM plan prompt;
+ *   - Basic / Essentials: add JobCam (the add-on), or move to the plan that includes it.
+ */
+export type JobcamOffer =
+  | { kind: "crm_plan_required" }
+  | {
+      kind: "upgrade";
+      plan: CrmPlanKey;
+      interval: "month" | "year";
+      addon: { key: CrmAddonKey; name: string; cents: number } | null;
+      includedIn: { plan: CrmPlanKey; name: string; cents: number } | null;
+    };
+
+export function jobcamOffer(plan: CrmPlanKey | null | undefined, interval: "month" | "year" = "month"): JobcamOffer {
+  if (!plan) return { kind: "crm_plan_required" };
+  const top = cheapestCrmPlanWhere((l) => l.jobcam);
+  return {
+    kind: "upgrade", plan, interval,
+    addon: crmAddonAvailableOn("jobcam", plan) ? { key: "jobcam", name: CRM_ADDONS.jobcam.name, cents: crmAddonPriceCents("jobcam", interval) } : null,
+    includedIn: top && top !== plan ? { plan: top, name: CRM_PLANS[top].name, cents: crmPlanPriceCents(top, interval) } : null,
+  };
 }

@@ -6,7 +6,9 @@ import { GooglePill, GoogleSectionHeader } from "@/components/google";
 import { EmptyState } from "@/components/crm-ui";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { jobcamError, jobcamFetch, type JobcamMediaItem } from "@/lib/jobcam-api";
+import { jobcamError, jobcamFetch, JOBCAM_USAGE_KEY, type JobcamMediaItem } from "@/lib/jobcam-api";
+import { StorageMeter, useJobcamStorage } from "./storage-meter";
+import { JobcamUpgradeCard, useJobcamAccess } from "./upgrade-card";
 import { MediaGrid } from "./media-grid";
 import { Lightbox } from "./lightbox";
 import { TagPicker } from "./tag-picker";
@@ -38,6 +40,8 @@ export function feedUrl(f: FeedFilters, scope: { projectId?: string; customerId?
 export const FEED_KEY_PREFIX = "/api/crm/jobcam/media";
 export function invalidateFeeds() {
   queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith(FEED_KEY_PREFIX) });
+  // Whatever changed the feed (an upload landed, something was deleted) changed the storage meter too.
+  queryClient.invalidateQueries({ queryKey: [JOBCAM_USAGE_KEY] });
 }
 
 /**
@@ -46,7 +50,15 @@ export function invalidateFeeds() {
  * star/tag/show-or-hide-for-the-client/delete; the lightbox. `projectId` scopes it to one job,
  * `customerId` to one client's jobs, neither = the company-wide Recent feed.
  */
-export function JobcamFeed({ projectId, customerId, compact = false, title, description, actions, canManage = false, memberId, onShare }: {
+export function JobcamFeed(props: Parameters<typeof JobcamFeedInner>[0]) {
+  // No JobCam on the CRM plan: the place stays, the upgrade card stands in for the feed and the camera.
+  const access = useJobcamAccess();
+  if (access.loading) return <div className="py-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+  if (!access.entitled) return <JobcamUpgradeCard />;
+  return <JobcamFeedInner {...props} />;
+}
+
+function JobcamFeedInner({ projectId, customerId, compact = false, title, description, actions, canManage = false, memberId, onShare }: {
   projectId?: string;
   customerId?: string;
   /** A short strip (no filters, first page only) for the project tab / client page. */
@@ -102,6 +114,12 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
   const canEdit = (m: JobcamMediaItem) => canManage || (!!memberId && m.uploader?.id === memberId);
   const active = filters.tags.length > 0 || filters.starred || !!filters.kind || !!filters.q || !!filters.from || !!filters.to;
   const captureHref = `/crm/jobcam/capture${projectId ? `?project=${projectId}` : ""}`;
+  // At the storage limit the camera and upload actions say so instead of opening.
+  const storage = useJobcamStorage();
+  const storageFull = storage.data?.full === true;
+  const cameraPill = (testId: string) => storageFull
+    ? <GooglePill size="sm" variant="grey" icon={Camera} label="Storage full" disabled title="JobCam storage is full" testId={`${testId}-full`} />
+    : <GooglePill size="sm" variant="solid" icon={Camera} label="Open camera" href={captureHref} testId={testId} />;
 
   return (
     <section className="g-surface space-y-3" data-testid={`jobcam-feed${projectId ? "-project" : customerId ? "-customer" : "-recent"}`}>
@@ -115,7 +133,7 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
                 <GooglePill size="sm" icon={selecting ? X : CheckSquare} label={selecting ? "Done" : "Select"} selected={selecting} onClick={() => { setSelecting(!selecting); setSelected(new Set()); }} testId="jobcam-select-toggle" />
               </>
             )}
-            <GooglePill size="sm" variant="solid" icon={Camera} label="Open camera" href={captureHref} testId="jobcam-open-camera" />
+            {cameraPill("jobcam-open-camera")}
           </>} />
       )}
 
@@ -141,6 +159,8 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
         </div>
       )}
 
+      {(!compact || storageFull) && <StorageMeter />}
+
       {queue.some((q) => q.status !== "done") && <UploadTray />}
 
       {selecting && selected.size > 0 && (
@@ -164,8 +184,8 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
         <p className="text-sm text-destructive" role="alert">Couldn't load the feed. {jobcamError(feed.error)}</p>
       ) : !items.length ? (
         <EmptyState compact icon={Camera} title={active ? "Nothing matches those filters" : "No photos or videos yet"}
-          description={active ? "Clear a filter or widen the dates." : "Open the camera — every shot lands in this job with its time and location."}
-          action={!active ? <Link href={captureHref}><GooglePill variant="solid" icon={Camera} label="Open camera" testId="jobcam-empty-camera" /></Link> : undefined} />
+          description={active ? "Clear a filter or widen the dates." : storageFull ? "Storage is full — free up space or request more to add photos and video." : "Open the camera — every shot lands in this job with its time and location."}
+          action={!active && !storageFull ? <Link href={captureHref}><GooglePill variant="solid" icon={Camera} label="Open camera" testId="jobcam-empty-camera" /></Link> : undefined} />
       ) : (
         <>
           <MediaGrid items={items} view={compact ? "grid" : view} selectable={selecting} selected={selected} onToggle={toggle} onOpen={setOpen} showProject={!projectId} dense={compact} />

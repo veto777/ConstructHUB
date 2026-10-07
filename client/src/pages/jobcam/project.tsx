@@ -22,7 +22,8 @@ export default function JobcamProjectPage() {
   const [share, setShare] = useState<{ open: boolean; mediaIds: string[] }>({ open: false, mediaIds: [] });
   useEffect(() => { bootJobcamQueue(); }, []);
   useEffect(() => { if (project?.name) document.title = `JobCam · ${project.name}`; }, [project?.name]);
-  const canManage = me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true;
+  // Sharing needs JobCam on the plan too (the feed below shows the upgrade card without it).
+  const canManage = (me?.permissions?.manageJobs === true || me?.permissions?.manageCustomers === true) && me?.crm?.jobcam !== false;
 
   if (!id) return null;
   if (isLoading) return <div className="flex justify-center p-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;

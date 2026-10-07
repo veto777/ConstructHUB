@@ -3078,7 +3078,23 @@ export const jobcamOrgUsage = pgTable("jobcam_org_usage", {
   mediaCount: integer("media_count").notNull().default(0),
   photoCount: integer("photo_count").notNull().default(0),
   videoCount: integer("video_count").notNull().default(0),
+  // The org's storage size in GB — one of JOBCAM_STORAGE_TIERS_GB (shared/jobcam-storage.ts).
+  storageTierGb: integer("storage_tier_gb").notNull().default(5),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// "Request more storage" from a workspace at its limit: sizes above the included
+// one have no price yet, so a platform admin answers these by hand (/admin).
+export const jobcamStorageRequests = pgTable("jobcam_storage_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull(),
+  memberId: varchar("member_id"),
+  tierGb: integer("tier_gb").notNull(),            // the size they were on when they asked
+  usedBytes: bigint("used_bytes", { mode: "number" }).notNull().default(0),
+  status: text("status").notNull().default("open"), // open | resolved | dismissed
+  resolvedBy: text("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // ── Reserved for later phases (created empty in phase A) ────────────────────
