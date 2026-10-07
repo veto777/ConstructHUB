@@ -593,6 +593,20 @@ const entries: Draft[] = [
     needs: ["A Blotato subscription of your own — bought from Blotato, not billed by ConstructHUB.", "At least one Location to post for."],
   },
   {
+    key: "social-youtube", group: "Tools", route: "/social-media", title: "Social Media → YouTube",
+    whatItIs: "A direct connection between your ConstructHUB account and your own YouTube channel, so you can publish videos to it from the Social Media page.",
+    whatItDoes: "Connects one YouTube channel per account, shows you which channel was connected, and uploads the video files you choose to it with the title, description, tags and privacy setting you enter. It cannot edit or delete videos, read comments or statistics, or reach anything else in your Google account.",
+    howToUse: [
+      "Open Social Media, find the YouTube section and choose “Connect YouTube”. Pick the Google account and channel, and allow the two permissions Google lists.",
+      "Check the channel name shown is the one you meant. If it is not, choose “Connect a different channel”.",
+      "Choose “Publish a video”, pick the file and wait for it to finish arriving.",
+      "Enter the title, description and tags, choose who can see it, answer whether it is made for kids, and tick the box confirming YouTube’s Community Guidelines and your rights to the video.",
+      "Choose “Publish to YouTube” and follow the video in the list: Queued, Uploading, On YouTube — processing, then Published with a link, or Failed with the reason. To stop using it, choose Disconnect.",
+    ],
+    howItWorks: "ConstructHUB asks Google for two permissions only: upload videos, and see the channel. The sign-in Google returns is stored encrypted and is never shown. Your file is held by ConstructHUB until YouTube has it, and for at most 24 hours; a background worker then sends it to YouTube in pieces. YouTube decides the final privacy setting — the list shows what YouTube actually set. Each account can send a limited number of videos a day, and all ConstructHUB customers share one daily allowance from Google; when either is used up the page says so and you can try again the next day (the day resets at midnight Pacific time). Disconnect cancels the sign-in at Google and deletes the channel details, the sign-in and the list of videos you sent; videos already on YouTube stay on your channel.",
+    needs: ["A YouTube channel on the Google account you connect.", "Videos longer than 15 minutes need a channel verified with YouTube (youtube.com/verify)."],
+  },
+  {
     key: "site-scan", group: "Tools", route: "/site-scan", title: "Site Scan",
     whatItIs: "A check-up of your website that tells you what to fix, in priority order.",
     whatItDoes: "Checks technical and content issues (broken links, redirects, HTTPS, titles, headings, image text), Google PageSpeed measurements on sampled pages, how the site’s details compare with your Google Business Profile, and readiness for AI search. Each finding explains its impact and the fix steps.",

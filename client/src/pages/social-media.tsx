@@ -18,6 +18,7 @@ import {
 } from "@shared/social";
 import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { SocialYoutube } from "@/components/social-youtube";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
@@ -75,6 +76,9 @@ export default function SocialMediaPage() {
         {tab === "guides" && <GuidesContent />}
         {!business && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
       </>}
+      {/* The YouTube channel belongs to the account, not to one business: it is shown with the business's other
+          connection (inside the workbench) and here whenever no single business is open. */}
+      {!(business && valid && business !== "all") && <SocialYoutube />}
     </AppPage>
   );
 }
@@ -327,6 +331,8 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
           </div>
         </section>
       )}
+
+      {!all && <SocialYoutube businessId={businessId} />}
 
       {!all && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults || []} />}
 

@@ -173,8 +173,8 @@ export default function TermsOfUsePage() {
             </ul>
             <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-youtube-terms">YouTube API Services</h3>
             <p>
-              ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel. By using features of ConstructHUB that rely on YouTube, you agree to be bound by the{" "}
-              <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-youtube-terms">YouTube Terms of Service</a>. How we handle YouTube data is described in our Privacy Policy.
+              ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel, and to let you connect your own YouTube channel and upload videos you choose to it. By connecting a YouTube channel, or using any other feature of ConstructHUB that relies on YouTube, you agree to be bound by the{" "}
+              <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-youtube-terms">YouTube Terms of Service</a>. You are responsible for the videos you upload: each must comply with YouTube's Community Guidelines, and you must own it or have permission to publish everything in it. How we handle YouTube data is described in our Privacy Policy.
             </p>
           </section>
 

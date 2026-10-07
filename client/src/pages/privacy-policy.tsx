@@ -193,10 +193,13 @@ export default function PrivacyPolicyPage() {
 
           <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-youtube-api">4.3 YouTube API Services</h3>
           <p className="mb-3">
-            ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel and to read that channel's statistics. This applies only to the ConstructHUB company channel, which a ConstructHUB administrator connects. ConstructHUB does not ask customers to connect a YouTube account to ConstructHUB through YouTube API Services.
+            ConstructHUB uses YouTube API Services in two ways. First, to publish its own tutorial videos to its own YouTube channel and to read that channel's statistics; a ConstructHUB administrator connects that channel. Second, customers may connect their own YouTube channel to ConstructHUB, in Social Media, so that they can upload videos they choose to that channel.
           </p>
           <p className="mb-3">
-            For that channel we store the channel ID and title, the permissions that were granted, who connected it and when, and the access grant itself (an access token and a refresh token), which is stored encrypted. Video and statistics data for our own videos is read from YouTube when it is needed and is not kept in our database.
+            For the company channel we store the channel ID and title, the permissions that were granted, who connected it and when, and the access grant itself (an access token and a refresh token), which is stored encrypted. Video and statistics data for our own videos is read from YouTube when it is needed and is not kept in our database.
+          </p>
+          <p className="mb-3" data-testid="text-youtube-customer-data">
+            For a channel you connect we ask Google for two permissions only: to upload videos and to see the channel. We store the channel ID, title and picture address, the permissions that were granted, when it was connected, and the access grant itself (an access token and a refresh token), which is stored encrypted. We also keep a record of each video you send from ConstructHUB: its file name, title, description, tags, privacy setting, your made-for-kids answer, when you confirmed YouTube's Community Guidelines and your rights to the video, the YouTube video ID and the upload status. The video file is held only until YouTube has received it and is deleted from our storage within 24 hours. We use this access only to upload the videos you choose, and to show you which channel is connected and the status of those uploads; we do not read your other videos, your comments or your statistics.
           </p>
           <p className="mb-3">
             YouTube is a Google service; the{" "}
@@ -204,8 +207,8 @@ export default function PrivacyPolicyPage() {
             applies to it.
           </p>
           <p>
-            Access can be revoked at any time: an administrator can choose Disconnect on the YouTube channel page in ConstructHUB, which asks Google to cancel the grant and deletes it from our systems, or the grant can be removed on Google's{" "}
-            <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-security-permissions">security settings page</a>. Stored YouTube data is deleted when the channel is disconnected, and on request to{" "}
+            Access can be revoked at any time: you can choose Disconnect in the YouTube section of Social Media (an administrator does the same on the company channel page), which asks Google to cancel the grant and deletes it from our systems, or the grant can be removed on Google's{" "}
+            <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-security-permissions">security settings page</a>. Stored YouTube data (the channel details, the access grant and the upload records) is deleted when the channel is disconnected or your ConstructHUB account is deleted, and on request to{" "}
             <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>{" "}
             within 30 days.
           </p>
