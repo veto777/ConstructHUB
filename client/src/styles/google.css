@@ -100,6 +100,31 @@
   --destructive-foreground: 225 6% 13%;
 }
 
+/* The theme's derived borders are computed where they are declared (:root), so re-derive them here from the Google primary. */
+.g-surface, .dark .g-surface {
+  --primary-border: hsl(var(--primary));
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --secondary-border: hsl(var(--secondary));
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --muted-border: hsl(var(--muted));
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --accent-border: hsl(var(--accent));
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+  --destructive-border: hsl(var(--destructive));
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
+}
+
+/* The app's orange accent (section markers, icon chips, stat dots) reads as Google blue inside the surface. */
+.g-surface .bg-orange-500 { background-color: var(--g-blue); }
+.g-surface .bg-orange-100 { background-color: #e8f0fe; }
+.g-surface .text-orange-600, .g-surface .text-orange-700 { color: var(--g-blue); }
+.g-surface .border-orange-200\/80 { border-color: var(--g-divider); }
+.g-surface .from-orange-50 { --tw-gradient-from: #f6fafe var(--tw-gradient-from-position); --tw-gradient-to: rgb(246 250 254 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+.dark .g-surface .dark\:bg-orange-500\/15 { background-color: rgb(138 180 248 / 0.15); }
+.dark .g-surface .dark\:text-orange-400, .dark .g-surface .dark\:text-orange-300 { color: var(--g-blue); }
+.dark .g-surface .dark\:border-orange-500\/25 { border-color: var(--g-divider); }
+.dark .g-surface .dark\:from-orange-500\/\[0\.09\] { --tw-gradient-from: rgb(138 180 248 / 0.09) var(--tw-gradient-from-position); --tw-gradient-to: rgb(138 180 248 / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+
 /* Google never uses heavy display weights: titles are 400–500, same family. */
 .g-surface h1, .g-surface h2, .g-surface h3, .g-surface h4,
 .g-surface .font-bold, .g-surface .font-semibold, .g-surface .font-display {
@@ -191,13 +216,13 @@
 
 /* ── Local-pack card ───────────────────────────────────────────────────── */
 .g-card {
-  display: flex;
-  gap: 12px;
+  display: block;
   padding: 16px 0;
   border-bottom: 1px solid var(--g-divider);
   color: var(--g-text);
 }
 .g-card:last-child { border-bottom: 0; }
+.g-card__row { display: flex; gap: 12px; align-items: flex-start; }
 .g-card__body { flex: 1 1 auto; min-width: 0; }
 .g-card__title {
   margin: 0;
@@ -234,14 +259,14 @@
   display: flex;
   gap: 4px;
   flex: none;
-  width: 132px;
-  height: 100px;
+  width: 108px;
+  height: 84px;
   overflow: hidden;
   border-radius: 8px;
 }
-.g-card__photos a, .g-card__photos span { display: block; flex: 1 0 128px; height: 100%; }
+.g-card__photos a, .g-card__photos span { display: block; flex: 1 0 108px; height: 100%; }
 .g-card__photos img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 8px; }
-.g-card__photos--two a, .g-card__photos--two span { flex-basis: 64px; }
+.g-card__photos--two a, .g-card__photos--two span { flex-basis: 52px; }
 @media (min-width: 640px) {
   .g-card__photos { width: 200px; height: 120px; }
   .g-card__photos a, .g-card__photos span { flex-basis: 196px; }
@@ -321,6 +346,9 @@
 .g-header { padding: 0 0 12px; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; }
 .g-header__title { margin: 0; font-size: 20px; line-height: 24px; font-weight: 400; color: var(--g-text); }
 .g-header__sub { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
+
+/* A surface inside a surface (a card list inside a surfaced page) inherits the parent's background. */
+.g-surface .g-surface { background: transparent; }
 
 /* No horizontal scroll on phones: long names/addresses wrap, pills wrap. */
 .g-surface { overflow-wrap: anywhere; }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Navigation, Globe, MessageSquare, Store } from "lucide-react";
 import { GoogleLocalCard, GooglePill, openNowFromHours } from "@/components/google";
@@ -42,12 +43,14 @@ export function directionsUrl(l: LocationCardRow): string | null {
  * closed status, years from the opening date, photos from the synced media, the latest review's text.
  * Anything we don't have is omitted.
  */
-export function LocationLocalCard({ location: l, latestReview, onOpen, testId, withPhotos = true }: {
+export function LocationLocalCard({ location: l, latestReview, onOpen, testId, withPhotos = true, meta }: {
   location: LocationCardRow;
   latestReview?: LatestReview;
   onOpen: () => void;
   testId?: string;
   withPhotos?: boolean;
+  /** Replaces the default source line (e.g. the agency's client name + Google link state). */
+  meta?: ReactNode;
 }) {
   const linked = !!l.gbpLocationName;
   const { data: media } = useQuery<{ items: { thumbnail_url?: string | null; google_url?: string | null; description?: string | null }[] }>({
@@ -88,7 +91,7 @@ export function LocationLocalCard({ location: l, latestReview, onOpen, testId, w
       statusTitle={statusTitle}
       closedLabel={closedLabel}
       yearsInBusiness={yearsInBusiness(l.openingDate)}
-      meta={linked ? "Synced from your Google Business Profile" : "Not linked to Google yet"}
+      meta={meta ?? (linked ? "Synced from your Google Business Profile" : "Not linked to Google yet")}
       snippet={snippet ? { text: snippet.length > 160 ? `${snippet.slice(0, 160).trim()}…` : snippet, avatarSrc: latestReview?.reviewerPhotoUrl } : null}
       photos={photos}
       actions={<>

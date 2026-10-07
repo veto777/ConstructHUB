@@ -70,6 +70,7 @@ export function GoogleLocalCard({
     : <span data-testid={nameTestId}>{name}</span>;
   return (
     <article className={cn("g-card", className)} data-testid={testId}>
+      <div className="g-card__row">
       <div className="g-card__body">
         <h3 className="g-card__title">{title}{badges && <span className="ml-2 inline-flex flex-wrap items-center gap-1 align-middle">{badges}</span>}</h3>
         <GoogleStars rating={rating} count={reviewCount} priceRange={priceRange} category={category} />
@@ -83,7 +84,6 @@ export function GoogleLocalCard({
           </div>
         )}
         {children}
-        {actions && <div className="g-card__actions">{actions}</div>}
       </div>
       {pics.length > 0 && (
         <div className={cn("g-card__photos", pics.length > 1 && "g-card__photos--two")} aria-hidden={pics.every((p) => !p.alt) || undefined}>
@@ -92,6 +92,8 @@ export function GoogleLocalCard({
             : <span key={i}><img src={p.src} alt={p.alt ?? ""} loading="lazy" referrerPolicy="no-referrer" /></span>)}
         </div>
       )}
+      </div>
+      {actions && <div className="g-card__actions">{actions}</div>}
     </article>
   );
 }
