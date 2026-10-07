@@ -345,9 +345,9 @@ describe("page copy outside /pricing", () => {
     expect(read("client/src/pages/home.tsx")).not.toContain("/individual-pricing");
   });
 
-  it("the Terms are dated September 30, 2026 and list plans from the price book", () => {
+  it("the Terms are dated October 7, 2026 and list plans from the price book", () => {
     const src = read("client/src/pages/terms-of-use.tsx");
-    expect(src).toContain('const LAST_UPDATED = "September 30, 2026"');
+    expect(src).toContain('const LAST_UPDATED = "October 7, 2026"');
     expect(src).toContain("PLAN_KEYS.map");
     expect(src).toContain("Object.values(ADDONS)");
     expect(src).not.toMatch(/Individual Tool Pricing/);

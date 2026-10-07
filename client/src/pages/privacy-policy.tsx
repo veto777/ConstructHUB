@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
       pageTestId="page-privacy-policy"
       title="Privacy Policy"
       titleTestId="heading-privacy-policy"
-      date="Effective Date: September 30, 2026 · Last updated: October 5, 2026"
+      date="Effective Date: September 30, 2026 · Last updated: October 7, 2026"
       dateTestId="text-effective-date"
       footer={copyrightNotice()}
     >
@@ -189,6 +189,25 @@ export default function PrivacyPolicyPage() {
             You can revoke ConstructHUB's access to your Google account at any time through your{" "}
             <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-permissions">Google Account permissions page</a>, or by contacting us at{" "}
             <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>. Upon revocation or disconnection, we stop accessing your Google Business Profile data and delete the reviews, performance metrics and sync records we retrieved from Google. Business locations you imported remain in your ConstructHUB account, where you can edit or delete them.
+          </p>
+
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-youtube-api">4.3 YouTube API Services</h3>
+          <p className="mb-3">
+            ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel and to read that channel's statistics. This applies only to the ConstructHUB company channel, which a ConstructHUB administrator connects. ConstructHUB does not ask customers to connect a YouTube account to ConstructHUB through YouTube API Services.
+          </p>
+          <p className="mb-3">
+            For that channel we store the channel ID and title, the permissions that were granted, who connected it and when, and the access grant itself (an access token and a refresh token), which is stored encrypted. Video and statistics data for our own videos is read from YouTube when it is needed and is not kept in our database.
+          </p>
+          <p className="mb-3">
+            YouTube is a Google service; the{" "}
+            <a href="http://www.google.com/policies/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-privacy-policy">Google Privacy Policy</a>{" "}
+            applies to it.
+          </p>
+          <p>
+            Access can be revoked at any time: an administrator can choose Disconnect on the YouTube channel page in ConstructHUB, which asks Google to cancel the grant and deletes it from our systems, or the grant can be removed on Google's{" "}
+            <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-security-permissions">security settings page</a>. Stored YouTube data is deleted when the channel is disconnected, and on request to{" "}
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>{" "}
+            within 30 days.
           </p>
         </section>
 
