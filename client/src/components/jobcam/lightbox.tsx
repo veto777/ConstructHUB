@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ChevronLeft, ChevronRight, Download, Loader2, MapPin, Star, Trash2, X, User, Clock, FolderOpen, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Eye, EyeOff, Loader2, MapPin, Star, Trash2, X, User, Clock, FolderOpen, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { GooglePill } from "@/components/google";
@@ -14,8 +14,10 @@ import { cn } from "@/lib/utils";
  * Full-screen viewer: swipe (touch) / arrows / keys, video playback with the
  * transcode when the original can't play in browsers, and the details every
  * shot carries — capture time, uploader, a GPS pin link, tags, project.
- * Star / tag / caption / delete act through the API; `readOnly` (share pages,
- * the client portal) shows the details only and hides what the viewer can't do.
+ * Star / tag / caption / delete act through the API, and so does "Show to
+ * client" — the switch that decides whether the homeowner's portal lists this
+ * shot (off until someone turns it on). `readOnly` (share pages, the client
+ * portal) shows the details only and hides what the viewer can't do.
  */
 export function Lightbox({ items, index, onIndex, onClose, readOnly = false, canEdit, onChanged, onDeleted, showDetails = true }: {
   items: JobcamMediaItem[];
@@ -133,6 +135,31 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
           <div className="text-white/50 text-[12px]">
             {m.fileName} · {formatBytes(m.bytes)}{m.width && m.height ? ` · ${m.width}×${m.height}` : ""}{m.durationS ? ` · ${formatDuration(m.durationS)}` : ""}
           </div>
+          {!readOnly && (() => {
+            const on = m.clientVisible === true;
+            const Icon = on ? Eye : EyeOff;
+            const tone = on ? "border-emerald-400/70 bg-emerald-500/20 text-emerald-200" : "border-white/30 bg-black/40 text-white/80";
+            const label = on ? "Visible to client" : "Hidden from client";
+            // Whoever may retag the shot may decide the homeowner sees it; everyone else just reads the state.
+            return editable ? (
+              <button type="button" role="switch" aria-checked={on} disabled={patch.isPending}
+                onClick={() => patch.mutate({ clientVisible: !on })}
+                className={cn("flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left", tone)} data-testid="jobcam-lightbox-client-visible">
+                <Icon className="h-5 w-5 shrink-0" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium leading-5">{label}</span>
+                  <span className="block text-[12px] leading-4 opacity-80">{on ? "Shows in the homeowner's portal. Tap to hide it." : "Only your team sees this. Tap to show it in the homeowner's portal."}</span>
+                </span>
+                <span aria-hidden className={cn("relative h-6 w-10 shrink-0 rounded-full transition-colors", on ? "bg-emerald-500" : "bg-white/25")}>
+                  <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all", on ? "left-[18px]" : "left-0.5")} />
+                </span>
+              </button>
+            ) : (
+              <div className={cn("inline-flex items-center gap-2 rounded-full border px-3 py-1", tone)} data-testid="jobcam-lightbox-client-visible-state">
+                <Icon className="h-4 w-4" /> {label}
+              </div>
+            );
+          })()}
           {editable ? (
             <div className="flex flex-wrap items-center gap-2">
               <TagPicker value={m.tags} onChange={(tags) => patch.mutate({ tags })} dark testId="jobcam-lightbox-tags" />

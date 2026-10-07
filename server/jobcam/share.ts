@@ -7,8 +7,10 @@
  *   - Public /api/jc/:token: a branded gallery (fixed set) or live timeline,
  *     optional password (signed cookie once entered), expiry, revocation and
  *     a view counter. Every file read is gated by the same access check.
- *   - Client portal /api/client/jobcam: the homeowner's projects' JobCam feed,
- *     read-only, scoped to the session's customer ids like every portal read.
+ *   - Client portal /api/client/jobcam: the shots a team member switched on for
+ *     the client (client_visible) from the homeowner's projects — read-only,
+ *     scoped to the session's customer ids like every portal read. Share links
+ *     are their own explicit act of sharing and do not consult that flag.
  */
 import type { Express } from "express";
 import { z } from "zod";
@@ -26,7 +28,7 @@ import { logActivity } from "../crm/activity";
 import { messageNoteBody } from "../crm/messages";
 import { canManageJobcam, visibleProject } from "./access";
 import { requireJobcamPlan } from "./plan";
-import { presentMedia, projectSummary, membersMap, streamVariant, queryFeed, parseFeedParams, feedCursor } from "./routes";
+import { presentMedia, projectSummary, membersMap, streamVariant, queryFeed, parseFeedParams, feedCursor, portalMediaWhere } from "./routes";
 import { expiryFromPreset, hashSharePassword, looksLikeShareToken, newShareToken, safeEqual, shareAccess, shareLinkState, shareSecret, signShareSession, verifySharePassword } from "./share-auth";
 
 type GetUser = (req: any, res: any) => any;
@@ -299,7 +301,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const members = s.showDetails ? await membersMap(s.orgId, true) : new Map();
     res.setHeader("Cache-Control", "no-store");
     res.json({
-      media: page.map((m) => presentMedia(m, shareBase(s.token), { showDetails: s.showDetails, uploader: m.uploaderMemberId ? members.get(m.uploaderMemberId) ?? null : null })),
+      media: page.map((m) => presentMedia(m, shareBase(s.token), { guest: true, showDetails: s.showDetails, uploader: m.uploaderMemberId ? members.get(m.uploaderMemberId) ?? null : null })),
       nextCursor: rows.length > page.length ? feedCursor(page[page.length - 1]) : null,
     });
   });
@@ -317,7 +319,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     await streamVariant(req, res, m, variant, req.query.download === "1", 300);
   });
 
-  // ── Client portal: read-only feed of the homeowner's projects ────────────
+  // ── Client portal: read-only feed of what the team chose to show the homeowner ──
 
   app.get("/api/client/jobcam", async (req: any, res) => {
     const client = await requireClient(req, res); if (!client) return;
@@ -329,12 +331,13 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
     const orgIds = [...new Set(projects.map((pr) => pr.orgId))];
     const pages = await Promise.all(orgIds.map((orgId) => queryFeed({
       orgId, projectIds: projects.filter((pr) => pr.orgId === orgId).map((pr) => pr.id), tags: p.tags, tagMode: p.tagMode, kind: p.kind,
+      clientVisibleOnly: true,
       limit: Math.min(p.limit, 120) + 1, before: p.before,
     })));
     const rows = pages.flat().sort((a, b) => (b.capturedAt ?? b.uploadedAt ?? new Date()).getTime() - (a.capturedAt ?? a.uploadedAt ?? new Date()).getTime());
     const page = rows.slice(0, Math.min(p.limit, 120));
     res.json({
-      media: page.map((m) => presentMedia(m, "/api/client/jobcam", { project: byId.has(m.projectId) ? projectSummary(byId.get(m.projectId)!) : null, showDetails: true })),
+      media: page.map((m) => presentMedia(m, "/api/client/jobcam", { guest: true, project: byId.has(m.projectId) ? projectSummary(byId.get(m.projectId)!) : null, showDetails: true })),
       nextCursor: rows.length > page.length ? feedCursor(page[page.length - 1]) : null,
     });
   });
@@ -342,8 +345,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
   app.get("/api/client/jobcam/:id/file/:variant", async (req: any, res) => {
     const client = await requireClient(req, res); if (!client) return;
     if (!client.customerIds.length) return res.status(404).json({ message: "Not found" });
-    const [m] = await db.select().from(jobcamMedia)
-      .where(and(eq(jobcamMedia.id, req.params.id), inArray(jobcamMedia.customerId, client.customerIds), isNull(jobcamMedia.deletedAt), eq(jobcamMedia.status, "ready"))).limit(1);
+    const [m] = await db.select().from(jobcamMedia).where(portalMediaWhere(client.customerIds, String(req.params.id))).limit(1);
     if (!m) return res.status(404).json({ message: "Not found" });
     await streamVariant(req, res, m, String(req.params.variant), req.query.download === "1");
   });

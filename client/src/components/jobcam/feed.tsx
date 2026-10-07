@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Camera, CheckSquare, Grid3X3, Image as ImageIcon, Loader2, Rows3, Search, Star, Video, X, Trash2, Tag as TagIcon, Share2, CalendarDays } from "lucide-react";
+import { Camera, CheckSquare, Grid3X3, Image as ImageIcon, Loader2, Rows3, Search, Star, Video, X, Trash2, Tag as TagIcon, Share2, CalendarDays, Eye, EyeOff } from "lucide-react";
 import { GooglePill, GoogleSectionHeader } from "@/components/google";
 import { EmptyState } from "@/components/crm-ui";
 import { useToast } from "@/hooks/use-toast";
@@ -43,7 +43,7 @@ export function invalidateFeeds() {
 /**
  * The feed: grid or day-grouped timeline, newest first; tag filters (AND/OR),
  * starred, photos/videos, date range, free-text search; bulk select with
- * star/tag/delete; the lightbox. `projectId` scopes it to one job,
+ * star/tag/show-or-hide-for-the-client/delete; the lightbox. `projectId` scopes it to one job,
  * `customerId` to one client's jobs, neither = the company-wide Recent feed.
  */
 export function JobcamFeed({ projectId, customerId, compact = false, title, description, actions, canManage = false, memberId, onShare }: {
@@ -93,7 +93,7 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
     onSuccess: (r, v) => {
       invalidateFeeds();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/jobcam/tags"] });
-      toast({ title: `${r.changed} ${v.action === "delete" ? "deleted" : "updated"}`, description: r.skipped ? `${r.skipped} skipped — not yours to change.` : undefined });
+      toast({ title: `${r.changed} ${v.action === "delete" ? "deleted" : v.action === "client_show" ? "now visible to the client" : v.action === "client_hide" ? "hidden from the client" : "updated"}`, description: r.skipped ? `${r.skipped} skipped — not yours to change.` : undefined });
       if (v.action === "delete") { setSelected(new Set()); setSelecting(false); }
     },
     onError: (e) => toast({ title: "Bulk action failed", description: jobcamError(e), variant: "destructive" }),
@@ -149,6 +149,8 @@ export function JobcamFeed({ projectId, customerId, compact = false, title, desc
           <GooglePill size="sm" icon={Star} label="Star" onClick={() => bulk.mutate({ ids: [...selected], action: "star" })} testId="jobcam-bulk-star" />
           <GooglePill size="sm" icon={Star} label="Unstar" onClick={() => bulk.mutate({ ids: [...selected], action: "unstar" })} testId="jobcam-bulk-unstar" />
           <BulkTag onApply={(tags, remove) => bulk.mutate({ ids: [...selected], action: remove ? "untag" : "tag", tags })} />
+          <GooglePill size="sm" icon={Eye} label="Show to client" onClick={() => bulk.mutate({ ids: [...selected], action: "client_show" })} testId="jobcam-bulk-client-show" />
+          <GooglePill size="sm" icon={EyeOff} label="Hide from client" onClick={() => bulk.mutate({ ids: [...selected], action: "client_hide" })} testId="jobcam-bulk-client-hide" />
           {onShare && <GooglePill size="sm" icon={Share2} label="Share these" onClick={() => onShare([...selected])} testId="jobcam-bulk-share" />}
           <GooglePill size="sm" variant="danger" icon={Trash2} label="Delete" onClick={() => { if (window.confirm(`Delete ${selected.size} item(s)?`)) bulk.mutate({ ids: [...selected], action: "delete" }); }} testId="jobcam-bulk-delete" />
           <button type="button" onClick={() => setSelected(new Set(items.map((m) => m.id)))} className="ml-auto text-xs text-primary" data-testid="jobcam-bulk-all">Select all loaded</button>

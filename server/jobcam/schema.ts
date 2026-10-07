@@ -42,12 +42,15 @@ export const JOBCAM_DDL: readonly string[] = [
      caption_source text,
      tags text[],
      starred boolean NOT NULL DEFAULT false,
+     client_visible boolean NOT NULL DEFAULT false,
      sha256 text,
      exif jsonb,
      deleted_at timestamp,
      created_at timestamp DEFAULT now(),
      updated_at timestamp DEFAULT now()
    )`,
+  // Nothing reaches the homeowner's portal unless a team member chose to show it.
+  `ALTER TABLE jobcam_media ADD COLUMN IF NOT EXISTS client_visible boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS jobcam_media_project_idx ON jobcam_media (project_id, captured_at DESC)`,
   `CREATE INDEX IF NOT EXISTS jobcam_media_org_idx ON jobcam_media (org_id, captured_at DESC)`,
   `CREATE INDEX IF NOT EXISTS jobcam_media_customer_idx ON jobcam_media (customer_id)`,

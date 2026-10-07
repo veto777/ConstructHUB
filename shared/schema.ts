@@ -3004,6 +3004,9 @@ export const jobcamMedia = pgTable("jobcam_media", {
   captionSource: text("caption_source"),      // user | voice | ai (later phases)
   tags: text("tags").array(),                 // tag NAMES (jobcam_tags is the org's list)
   starred: boolean("starred").notNull().default(false),
+  // The homeowner portal lists ONLY rows a team member switched on ("Show to
+  // client"). Off by default: crews photograph problems too.
+  clientVisible: boolean("client_visible").notNull().default(false),
   sha256: text("sha256"),
   exif: jsonb("exif"),
   deletedAt: timestamp("deleted_at"),

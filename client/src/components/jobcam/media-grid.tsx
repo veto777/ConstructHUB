@@ -1,11 +1,13 @@
-import { Check, Play, Star, AlertCircle, Loader2 } from "lucide-react";
+import { Check, Eye, Play, Star, AlertCircle, Loader2 } from "lucide-react";
 import { formatDuration, groupByDay, timeLabel, type JobcamMediaItem } from "@/lib/jobcam-api";
 import { cn } from "@/lib/utils";
 
 /**
  * The tiles: a square grid, or the same tiles grouped by day (newest first)
  * with a day header — Google-style hairlines, no card chrome. Every tile shows
- * the capture time; cross-project feeds also name the project.
+ * the capture time; cross-project feeds also name the project. Corners:
+ * top-left select, top-right client-visible eye + star, bottom row duration
+ * (left) and tag chip (right) in ONE flex row so they can never overlap.
  */
 export function MediaGrid({ items, view, selectable = false, selected, onToggle, onOpen, showProject = false, dense = false }: {
   items: JobcamMediaItem[];
@@ -26,7 +28,7 @@ export function MediaGrid({ items, view, selectable = false, selected, onToggle,
         onClick={() => (selectable ? onToggle?.(m.id) : onOpen(i))}
         className={cn("group relative aspect-square overflow-hidden rounded-lg bg-muted text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
           isSel && "ring-2 ring-primary")}
-        aria-pressed={selectable ? isSel : undefined} aria-label={`${m.kind} ${timeLabel(m.capturedAt)}${m.project && showProject ? ` · ${m.project.name}` : ""}`}>
+        aria-pressed={selectable ? isSel : undefined} aria-label={`${m.kind} ${timeLabel(m.capturedAt)}${m.project && showProject ? ` · ${m.project.name}` : ""}${m.clientVisible ? " · visible to client" : ""}`}>
         {m.urls.thumb ? (
           <img src={m.urls.thumb} alt="" loading="lazy" decoding="async" className={cn("h-full w-full object-cover transition-transform", !selectable && "group-hover:scale-[1.03]", isSel && "opacity-80")} />
         ) : (
@@ -34,14 +36,25 @@ export function MediaGrid({ items, view, selectable = false, selected, onToggle,
             {m.status === "failed" ? <AlertCircle className="h-5 w-5 text-destructive" /> : <Loader2 className="h-5 w-5 animate-spin" />}
           </div>
         )}
-        {m.kind === "video" && (
-          <span className="absolute left-1.5 bottom-1.5 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium text-white">
-            <Play className="h-3 w-3 fill-current" /> {formatDuration(m.durationS) || "video"}
+        <span className="absolute right-1.5 top-1.5 flex items-center gap-1">
+          {m.clientVisible && (
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow" title="Visible to client" aria-label="Visible to client" data-testid={`jobcam-tile-client-visible-${m.id}`}>
+              <Eye className="h-3 w-3" />
+            </span>
+          )}
+          {m.starred && <Star className="h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow" />}
+        </span>
+        {m.status === "ready" && (
+          <span className="absolute inset-x-1.5 bottom-1.5 flex items-end gap-1">
+            {m.kind === "video" && (
+              <span className="shrink-0 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] font-medium leading-4 text-white">
+                <Play className="h-3 w-3 fill-current" /> {formatDuration(m.durationS) || "video"}
+              </span>
+            )}
+            {m.tags.length > 0 && !dense && (
+              <span className="ml-auto min-w-0 truncate rounded bg-black/60 px-1.5 py-0.5 text-[10px] leading-4 text-white">{m.tags.length === 1 ? m.tags[0] : `${m.tags.length} tags`}</span>
+            )}
           </span>
-        )}
-        {m.starred && <Star className="absolute right-1.5 top-1.5 h-4 w-4 fill-yellow-400 text-yellow-400 drop-shadow" />}
-        {m.tags.length > 0 && !dense && (
-          <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{m.tags.length === 1 ? m.tags[0] : `${m.tags.length} tags`}</span>
         )}
         {selectable && (
           <span className={cn("absolute left-1.5 top-1.5 h-6 w-6 rounded-full border-2 flex items-center justify-center", isSel ? "bg-primary border-primary text-primary-foreground" : "border-white bg-black/30")}>

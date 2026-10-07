@@ -21,6 +21,8 @@ export type JobcamMediaItem = {
   capturedAt: string;
   uploadedAt: string;
   starred: boolean;
+  /** Team surfaces only: the homeowner's portal shows this shot. Absent on share links and in the portal. */
+  clientVisible?: boolean;
   tags: string[];
   caption: string | null;
   stamp: { time?: boolean; gps?: boolean; project?: boolean; logo?: boolean } | null;

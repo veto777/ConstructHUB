@@ -12,9 +12,9 @@
  *   Media
  *     GET    /api/crm/jobcam/media                      feed/search (project, customer, tags AND/OR, starred, q, dates, uploader)
  *     GET    /api/crm/jobcam/media/:id
- *     PATCH  /api/crm/jobcam/media/:id                  star / tags / caption / stamp
+ *     PATCH  /api/crm/jobcam/media/:id                  star / tags / caption / stamp / clientVisible
  *     DELETE /api/crm/jobcam/media/:id                  soft delete
- *     POST   /api/crm/jobcam/media/bulk                 star|unstar|tag|untag|delete
+ *     POST   /api/crm/jobcam/media/bulk                 star|unstar|tag|untag|client_show|client_hide|delete
  *     GET    /api/crm/jobcam/media/:id/file/:variant    thumb|display|poster|video|original (Range-aware)
  *   Tags, projects, usage
  *     GET/POST /api/crm/jobcam/tags · DELETE /api/crm/jobcam/tags/:id
@@ -58,7 +58,7 @@ export type PresentedMedia = ReturnType<typeof presentMedia>;
 export function presentMedia(
   m: JobcamMedia,
   base: string,
-  extra: { project?: { id: string; name: string; number: string | null; address: string | null } | null; uploader?: { id: string; name: string } | null; showDetails?: boolean } = {},
+  extra: { project?: { id: string; name: string; number: string | null; address: string | null } | null; uploader?: { id: string; name: string } | null; showDetails?: boolean; guest?: boolean } = {},
 ) {
   const details = extra.showDetails !== false;
   const lat = m.exifLat ?? m.deviceLat ?? null;
@@ -80,6 +80,8 @@ export function presentMedia(
     capturedAt: m.capturedAt ?? m.uploadedAt,
     uploadedAt: m.uploadedAt,
     starred: m.starred,
+    // Team-only: whether the homeowner's portal shows this. Guests (share links, the portal) never get the flag.
+    ...(extra.guest ? {} : { clientVisible: m.clientVisible }),
     tags: m.tags ?? [],
     caption: m.caption,
     stamp: m.stamp ?? null,
@@ -180,6 +182,8 @@ export type FeedQuery = {
   uploaderId?: string | null;
   mediaIds?: string[] | null;
   readyOnly?: boolean;
+  /** The homeowner portal: only what a team member chose to show. */
+  clientVisibleOnly?: boolean;
   limit?: number;
   /** Cursor: items strictly older than this (capturedAt, id). */
   before?: { at: Date; id: string } | null;
@@ -191,12 +195,16 @@ export function textArray(values: readonly string[]): SQL {
   return sql`ARRAY[${sql.join(values.map((v) => sql`${v}`), sql`, `)}]::text[]`;
 }
 
-export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
-  const at = sql`coalesce(${jobcamMedia.capturedAt}, ${jobcamMedia.uploadedAt})`;
+const feedAt = sql`coalesce(${jobcamMedia.capturedAt}, ${jobcamMedia.uploadedAt})`;
+
+/** The feed's WHERE; null = the filter can match nothing (an empty id list). */
+export function feedWhere(f: FeedQuery): SQL[] | null {
+  const at = feedAt;
   const where: SQL[] = [eq(jobcamMedia.orgId, f.orgId), isNull(jobcamMedia.deletedAt)];
   if (f.readyOnly !== false) where.push(eq(jobcamMedia.status, "ready"));
+  if (f.clientVisibleOnly) where.push(eq(jobcamMedia.clientVisible, true));
   if (f.projectIds) {
-    if (!f.projectIds.length) return [];
+    if (!f.projectIds.length) return null;
     where.push(inArray(jobcamMedia.projectId, f.projectIds));
   }
   if (f.customerId) where.push(eq(jobcamMedia.customerId, f.customerId));
@@ -204,7 +212,7 @@ export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
   if (f.starred) where.push(eq(jobcamMedia.starred, true));
   if (f.uploaderId) where.push(eq(jobcamMedia.uploaderMemberId, f.uploaderId));
   if (f.mediaIds) {
-    if (!f.mediaIds.length) return [];
+    if (!f.mediaIds.length) return null;
     where.push(inArray(jobcamMedia.id, f.mediaIds));
   }
   if (f.from) where.push(gte(at, f.from) as SQL);
@@ -229,8 +237,26 @@ export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
       sql`exists (select 1 from crm_members mm where mm.id = ${jobcamMedia.uploaderMemberId} and (mm.display_name ilike ${pat} or mm.email ilike ${pat}))`,
     )!);
   }
+  return where;
+}
+
+export async function queryFeed(f: FeedQuery): Promise<JobcamMedia[]> {
+  const where = feedWhere(f);
+  if (!where) return [];
   const limit = Math.min(Math.max(1, f.limit ?? 100), 500);
-  return db.select().from(jobcamMedia).where(and(...where)).orderBy(desc(at), desc(jobcamMedia.id)).limit(limit);
+  return db.select().from(jobcamMedia).where(and(...where)).orderBy(desc(feedAt), desc(jobcamMedia.id)).limit(limit);
+}
+
+/**
+ * The one row a homeowner's portal session may open by id: theirs, ready, not
+ * deleted and switched on for the client. A hidden shot is a 404 even when its
+ * id is known.
+ */
+export function portalMediaWhere(customerIds: string[], id: string): SQL {
+  return and(
+    eq(jobcamMedia.id, id), inArray(jobcamMedia.customerId, customerIds), isNull(jobcamMedia.deletedAt),
+    eq(jobcamMedia.status, "ready"), eq(jobcamMedia.clientVisible, true),
+  )!;
 }
 
 export function parseFeedParams(q: Record<string, any>) {
@@ -606,6 +632,7 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
 
   const patchBody = z.object({
     starred: z.boolean().optional(),
+    clientVisible: z.boolean().optional(),
     tags: z.array(z.string().max(TAG_MAX)).max(30).optional(),
     caption: z.string().trim().max(2000).nullable().optional(),
     stamp: z.object({ time: z.boolean().optional(), gps: z.boolean().optional(), project: z.boolean().optional(), logo: z.boolean().optional() }).nullable().optional(),
@@ -618,12 +645,14 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     const parsed = patchBody.safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid change", issues: parsed.error.issues });
     const b = parsed.data;
-    // Starring is personal-ish but org-visible; captions/tags on someone else's shot need manage rights.
-    if ((b.tags !== undefined || b.caption !== undefined || b.stamp !== undefined) && !canTouch(ctx, m)) {
+    // Starring is personal-ish but org-visible; captions/tags on someone else's shot — and what the
+    // homeowner gets to see — need the uploader or manage rights.
+    if ((b.tags !== undefined || b.caption !== undefined || b.stamp !== undefined || b.clientVisible !== undefined) && !canTouch(ctx, m)) {
       return res.status(403).json({ message: "Only the uploader or a manager can change this" });
     }
     const set: Partial<JobcamMedia> = { updatedAt: new Date() };
     if (b.starred !== undefined) set.starred = b.starred;
+    if (b.clientVisible !== undefined) set.clientVisible = b.clientVisible;
     if (b.tags !== undefined) {
       set.tags = normalizeTags(b.tags);
       for (const t of set.tags) await db.insert(jobcamTags).values({ orgId: ctx.org.id, name: t, createdByMemberId: ctx.member.id }).onConflictDoNothing();
@@ -631,6 +660,9 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     if (b.caption !== undefined) { set.caption = b.caption || null; set.captionSource = b.caption ? "user" : null; }
     if (b.stamp !== undefined) set.stamp = b.stamp;
     const [row] = await db.update(jobcamMedia).set(set).where(eq(jobcamMedia.id, m.id)).returning();
+    if (b.clientVisible !== undefined && b.clientVisible !== m.clientVisible) {
+      logActivity(ctx, b.clientVisible ? "jobcam.media.shown_to_client" : "jobcam.media.hidden_from_client", { entityType: "jobcam_media", entityId: m.id, customerId: m.customerId, meta: { kind: m.kind, projectId: m.projectId } });
+    }
     res.json(presentMedia(row, base));
   });
 
@@ -674,7 +706,7 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     const ctx = await ctxFor(req, res); if (!ctx) return;
     const parsed = z.object({
       ids: z.array(z.string().max(64)).min(1).max(500),
-      action: z.enum(["star", "unstar", "tag", "untag", "delete"]),
+      action: z.enum(["star", "unstar", "tag", "untag", "client_show", "client_hide", "delete"]),
       tags: z.array(z.string().max(TAG_MAX)).max(30).optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid bulk action" });
@@ -701,6 +733,9 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
         for (const t of tags) {
           await db.update(jobcamMedia).set({ tags: sql`array_remove(${jobcamMedia.tags}, ${t})`, updatedAt: new Date() }).where(inArray(jobcamMedia.id, tIds));
         }
+        n = tIds.length;
+      } else if (action === "client_show" || action === "client_hide") {
+        await db.update(jobcamMedia).set({ clientVisible: action === "client_show", updatedAt: new Date() }).where(inArray(jobcamMedia.id, tIds));
         n = tIds.length;
       } else if (action === "delete") {
         n = await softDelete(ctx, touchable);
