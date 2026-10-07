@@ -4,6 +4,7 @@ import path from "path";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
 } from "@shared/plans";
+import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
@@ -62,7 +63,7 @@ describe("plan copy helpers", () => {
     expect(STARTING_MONTHLY_CENTS).toBe(PLANS.starter.monthlyCents);
     expect(AGENCY_ONLY_MODULES).toEqual(["Agency workspace", "Google Ads & LSA manager", "Cloudflare + Search Console", "Domains + Gmail alerts"]);
     expect(COMPETITOR_INTEL_PLANS).toBe("Pro, Growth and Agency");
-    expect(CRM_SEATS_LINE).toBe(PLAN_KEYS.map((k) => `${PLANS[k].name} ${PLANS[k].limits.crmSeats}`).join(", ").replace(/, ([^,]*)$/, " and $1"));
+    expect(CRM_SEATS_LINE).toBe(CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.seats}`).join(", ").replace(/, ([^,]*)$/, " and $1"));
   });
 
   it("describes every paid Agency location band", () => {

@@ -233,7 +233,7 @@ describe("subscription started", () => {
     expect(mail.subject).toBe("Your ConstructHUB Pro trial has started");
     expect(mail.html).toContain("Pro — billed monthly");
     expect(mail.html).toContain("$109.00 / month"); // 7900 + 2 × 1500
-    expect(mail.html).toContain("Extra seat × 2");
+    expect(mail.html).toContain("Extra agency seat × 2");
     expect(mail.text).toContain("Trial ends: January 1, 2030");
     expect(mail.text).toContain("First charge: $109.00 on January 1, 2030");
     expect(mail.html).toContain("will not be charged until the trial ends");
@@ -274,7 +274,7 @@ describe("receipt for a paid invoice", () => {
     const mail = last();
     expect(mail.subject).toBe("Receipt CHUB-0001 — $124.00 paid to ConstructHUB");
     expect(mail.html).toContain("ConstructHUB Pro plan (monthly)");
-    expect(mail.html).toContain("Extra seat (monthly)");
+    expect(mail.html).toContain("Extra agency seat (monthly)");
     expect(mail.html).toContain("× 2");
     expect(mail.html).toContain("Legacy item &lt;b&gt;x&lt;/b&gt;");
     expect(mail.html).not.toContain("<b>x</b>");
@@ -383,7 +383,7 @@ describe("plan / add-on changed (from customer.subscription.updated)", () => {
     const mail = last();
     expect(mail.subject).toBe("Your ConstructHUB subscription changed — now Growth, monthly");
     expect(mail.text).toContain("- Plan: Pro → Growth");
-    expect(mail.text).toContain("- Extra seat: 1 → 3");
+    expect(mail.text).toContain("- Extra agency seat: 1 → 3");
     expect(mail.text).toContain("- Competitor scan pack: added");
     expect(mail.text).toContain("New price: $283.00 / month"); // 19900 + 3 × 1500 + 3900
     expect(mail.text).toContain("Charged today (prorated): $120.00");
@@ -418,15 +418,15 @@ describe("plan / add-on changed (from customer.subscription.updated)", () => {
     expect(describeChanges((swapped as any).previousItems, after)).toEqual(["Plan: Pro → Growth"]);
     await handleBillingEmailEvent(swapped, { baseUrl: BASE });
     expect(last().text).toContain("- Plan: Pro → Growth");
-    expect(last().text).not.toContain("Extra seat: added");
+    expect(last().text).not.toContain("Extra agency seat: added");
     // Quantity change on the second item only.
     const [requantified] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, { items: { data: [{}, { quantity: 1 }] }, quantity: 1 }, "evt_qty"), { userId: USER });
-    expect(describeChanges((requantified as any).previousItems, after)).toEqual(["Extra seat: 1 → 3"]);
+    expect(describeChanges((requantified as any).previousItems, after)).toEqual(["Extra agency seat: 1 → 3"]);
     // An added item: Stripe gives the full previous list (shorter), used as is.
     const added = { items: { data: [item("si_plan", GROWTH_M)], total_count: 1 } };
     expect(previousItemsFrom(added, after)).toHaveLength(1);
     const [withSeats] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.updated", sub, added, "evt_add"), { userId: USER });
-    expect(describeChanges((withSeats as any).previousItems, after)).toEqual(["Extra seat: added × 3"]);
+    expect(describeChanges((withSeats as any).previousItems, after)).toEqual(["Extra agency seat: added × 3"]);
     // A diff that cannot be rebuilt (shorter and partial) still emails, generically.
     expect(previousItemsFrom({ items: { data: [{ quantity: 1 }] } }, after)).toBeNull();
   });
@@ -435,7 +435,7 @@ describe("plan / add-on changed (from customer.subscription.updated)", () => {
       [item("a", AGENCY_Y), item("b", LOC_Y, 5), item("c", price("price_seat_y", { kind: "addon", key: "extra_seat" }, "year", 15000), 2)],
       [item("a", price("price_agency_m", { kind: "plan", key: "agency" }, "month", PLANS.agency.monthlyCents)), item("b", price("price_loc_m", { kind: "agency_locations" }, "month", null), 40)],
     );
-    expect(changes).toEqual(["Billing: yearly → monthly", "Extra seat: removed", "Locations: 15 → 50"]);
+    expect(changes).toEqual(["Billing: yearly → monthly", "Extra agency seat: removed", "Locations: 15 → 50"]);
   });
   it("explains proration on the next receipt when the proration invoice is unknown", async () => {
     const sub = subscription([item("si_plan", GROWTH_M)]);

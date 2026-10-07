@@ -8,6 +8,7 @@
  * Pure: no DB, no request, no model.
  */
 import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, CALL_ASSISTANT_TIERS, type PlanKey } from "@shared/plans";
+import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import { hubLinkFor } from "@shared/hub-links";
 import { CALL_ASSISTANT_INTRO } from "@shared/plan-copy";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
@@ -72,9 +73,12 @@ const TENANT_CLAIM = /\b(uses?|using|used|rel(y|ies) on|(is|are) on|signed up|cu
 
 // O10
 const PLAN_NAMES = PLAN_KEYS.map((k) => PLANS[k].name);
+// The CRM is sold on its own plans ("the CRM plan", "CRM Essentials"), so its
+// names are sold names too (shared/crm-plans.ts).
+const CRM_PLAN_WORDS = ["CRM", ...CRM_PLAN_KEYS.flatMap((k) => CRM_PLANS[k].name.split(" "))];
 const PLAN_WORD_OK = new Set([
   // The AI Call Assistant's tiers ("the Solo tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
-  ...PLAN_NAMES, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
+  ...PLAN_NAMES, ...CRM_PLAN_WORDS, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
   "Yearly", "Pricing", "A", "An", "One", "Our", "My", "Their", "Current", "New", "Same", "Right", "Cheapest", "Higher",
   "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Blotato", "Google", "Stripe",
   "ConstructHUB", "ConstructHub", "Change", "Choose", "Switch", "Pick", "Select", "Compare", "Upgrade", "Downgrade", "Cancel",
@@ -246,7 +250,7 @@ const BOUND_AFTER = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:for|on) (?:t
 /** "Starter and Pro are both $29/month": one price for several plans is always wrong (no two plans cost the same). */
 const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,25}\b(both|all)\b|\b(are|cost|costs|run|priced at) (both|all)\b/i;
 /** The sentence is about an add-on, a location band, the texting setup fee or reinstatement. */
-const ADDON_CUE = /\b(add-?ons?|addon|extra (locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number)\b/i;
+const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number)\b/i;
 /** Add-on, band and service amounts (never a plan's own price), including the Call Assistant's launch price. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
   const cents = new Set<number>([GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);

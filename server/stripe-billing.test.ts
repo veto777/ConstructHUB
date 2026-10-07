@@ -256,21 +256,21 @@ describe("POST /api/stripe/create-checkout", () => {
 
   it("add-ons ride the plan as recurring items; the texting number's setup fee is one-time", async () => {
     mocks.rows.push([customerRow()]);
-    const res = await request("/api/stripe/create-checkout", { plan: "pro", addons: { extra_seat: 2, texting_number: 1, protected_site: 1, competitor_pack: 0 } });
+    const res = await request("/api/stripe/create-checkout", { plan: "pro", addons: { competitor_pack: 2, texting_number: 1, protected_site: 1 } });
     expect(res.code).toBe(200);
     const lines = lineItems().map((l) => ({ ...l, p: priceOf(l.price) }));
     expect(lines.map((l) => [l.p.metadata.chub_kind, l.p.metadata.chub_key, l.quantity])).toEqual([
       ["plan", "pro", 1],
-      ["addon", "extra_seat", 2],
       ["addon", "protected_site", 1],
       ["addon", "texting_number", 1],
       ["setup", "texting_number", 1],
+      ["addon", "competitor_pack", 2],
     ]);
-    expect(lines[1].p).toMatchObject({ unit_amount: ADDONS.extra_seat.monthlyCents, recurring: { interval: "month" } });
-    const setup = lines[4].p;
+    expect(lines[4].p).toMatchObject({ unit_amount: ADDONS.competitor_pack.monthlyCents, recurring: { interval: "month" } });
+    const setup = lines[3].p;
     expect(setup.unit_amount).toBe(ADDONS.texting_number.setupCents);
     expect(setup.recurring).toBeUndefined();
-    expect(JSON.parse(mocks.checkout.mock.calls[0][0].metadata.addons)).toEqual({ extra_seat: 2, texting_number: 1, protected_site: 1 });
+    expect(JSON.parse(mocks.checkout.mock.calls[0][0].metadata.addons)).toEqual({ competitor_pack: 2, texting_number: 1, protected_site: 1 });
   });
 
   it.each([
@@ -572,16 +572,16 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     // Drop the texting item so adding it is new.
     sub.items.data = sub.items.data.filter((i: any) => i.id !== "si_text");
     mocks.rows.push([liveRow()]);
-    const res = await request("/api/stripe/addons", { addons: { extra_seat: 2, texting_number: 1 } });
+    const res = await request("/api/stripe/addons", { addons: { competitor_pack: 2, texting_number: 1 } });
     expect(res.code).toBe(200);
     const params = mocks.update.mock.calls[0][1];
     expect(params.items).toEqual([
-      { price: "price_chub_v1_addon_extra_seat_month_1500", quantity: 2 },
       { price: "price_chub_v1_addon_texting_number_month_2900", quantity: 1 },
+      { price: "price_chub_v1_addon_competitor_pack_month_3900", quantity: 2 },
     ]);
     expect(params.add_invoice_items).toEqual([{ price: "price_chub_v1_setup_texting_number_2900", quantity: 1 }]);
     expect(mocks.checkout).not.toHaveBeenCalled();
-    expect(mocks.updates[0].addons).toEqual({ extra_seat: 2, texting_number: 1 });
+    expect(mocks.updates[0].addons).toEqual({ competitor_pack: 2, texting_number: 1 });
   });
 
   it("add-ons: 0 removes one; unavailable ones and legacy plans are refused", async () => {
@@ -703,10 +703,10 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
   it("add-ons: one add-on as { addon, quantity } (the Settings card's body) works like { addons }", async () => {
     await seedProSubscription();
     mocks.rows.push([liveRow()]);
-    const res = await request("/api/stripe/addons", { addon: "extra_seat", quantity: 2 });
+    const res = await request("/api/stripe/addons", { addon: "competitor_pack", quantity: 2 });
     expect(res.code).toBe(200);
-    expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: "price_chub_v1_addon_extra_seat_month_1500", quantity: 2 }]);
-    expect(mocks.updates[0].addons).toEqual({ extra_seat: 2, texting_number: 1 });
+    expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: "price_chub_v1_addon_competitor_pack_month_3900", quantity: 2 }]);
+    expect(mocks.updates[0].addons).toEqual({ competitor_pack: 2, texting_number: 1 });
 
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/addons", { addon: "texting_number", quantity: 0 })).code).toBe(200);
@@ -766,7 +766,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     await seedProSubscription();
     mocks.current.cancel_at_period_end = true;
     mocks.rows.push([liveRow()]);
-    const res = await request("/api/stripe/change-plan", { plan: "pro", addons: { extra_seat: 1 } });
+    const res = await request("/api/stripe/change-plan", { plan: "pro", addons: { competitor_pack: 1 } });
     expect(res.code).toBe(200);
     // The mocked update returns a fresh subscription (not set to cancel); the fixture carries no start_date.
     expect(cancellationWrites()).toEqual([[5, false, null, null]]);

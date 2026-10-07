@@ -105,7 +105,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
   it("covers every usage cap the owner named", () => {
     expect(USAGE_CAPS).toEqual(expect.arrayContaining([
       "locations", "gridCredits", "competitorScans", "protectedSites", "siteScans", "permitSearches",
-      "crmSeats", "teamTextSegments", "reviewTemplates", "apiUnitsPerMonth",
+      "agencySeats", "teamTextSegments", "reviewTemplates", "apiUnitsPerMonth",
     ]));
   });
 
@@ -153,13 +153,15 @@ describe("add-ons", () => {
     for (const key of Object.keys(ADDONS) as (keyof typeof ADDONS)[]) expect(ADDON_GRANTS[key]).toBe(ADDONS[key].grants);
     expect(ADDONS.competitor_pack.description).toContain(`${ADDONS.competitor_pack.grants.competitorScans} more`);
     expect(ADDONS.extra_location.grants).toEqual({ locations: 1 });
-    expect(ADDONS.extra_seat.grants).toEqual({ crmSeats: 1 });
+    expect(ADDONS.extra_seat.grants).toEqual({ agencySeats: 1 });
     expect(ADDONS.protected_site.grants).toEqual({ protectedSites: 1 });
     expect(ADDONS.texting_number.grants).toEqual({});
   });
 
   it("applies only the add-ons the plan sells", () => {
-    expect(allowancesFor("pro", { protected_site: 2, extra_seat: 1, competitor_pack: 1 })).toMatchObject({ protectedSites: 3, crmSeats: 4, competitorScans: 12 });
+    // Extra seat is an AGENCY add-on now (the CRM sells its own seats), so Pro ignores it.
+    expect(allowancesFor("pro", { protected_site: 2, extra_seat: 1, competitor_pack: 1 })).toMatchObject({ protectedSites: 3, agencySeats: 0, competitorScans: 12 });
+    expect(allowancesFor("agency", { extra_seat: 2 })).toMatchObject({ agencySeats: PLANS.agency.limits.agencySeats + 2 });
     // Starter can't buy protected sites or competitor packs.
     expect(allowancesFor("starter", { protected_site: 2, competitor_pack: 3 })).toMatchObject({ protectedSites: 0, competitorScans: 0 });
     expect(allowancesFor("growth", { extra_location: 2 }).locations).toBe(5);
@@ -172,7 +174,7 @@ describe("add-ons", () => {
   it("reads purchased add-ons from the subscription row", async () => {
     mocks.row = customer("growth", { addons: { competitor_pack: 2, extra_seat: 3 } });
     const ent = await getEntitlements(7);
-    expect(ent.allowances).toMatchObject({ competitorScans: 28, crmSeats: 13 });
+    expect(ent.allowances).toMatchObject({ competitorScans: 28, agencySeats: 0 });
     expect(ent.limits?.competitorScans).toBe(8);
   });
 });

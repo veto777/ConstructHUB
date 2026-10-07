@@ -31,7 +31,7 @@ describe("pricing display: money", () => {
   });
 
   it("add-ons are listed per plan and by plan name", () => {
-    expect(addonsForPlan("starter").map((a) => a.key)).toEqual(["extra_location", "extra_seat"]);
+    expect(addonsForPlan("starter").map((a) => a.key)).toEqual(["extra_location"]);
     expect(addonsForPlan("growth").map((a) => a.key)).not.toContain("texting_number");
     expect(addonsForPlan("agency").map((a) => a.key)).not.toContain("extra_location");
     expect(addonPlanNames(ADDONS.texting_number)).toBe("Pro, Agency");
@@ -94,7 +94,8 @@ describe("pricing display: comparison table", () => {
 
   it("is generated from limits", () => {
     expect(byKey.protectedSites.cells).toEqual({ starter: false, pro: "1 website", growth: "3 websites", agency: "10 websites" });
-    expect(byKey.crmSeats.cells).toEqual({ starter: "1", pro: "3", growth: "10", agency: "10" });
+    // The CRM is a separate product, so it has no row in the platform comparison table.
+    expect(byKey.crmSeats).toBeUndefined();
     expect(byKey.competitorScans.cells.starter).toBe(false);
     expect(byKey.grid.cells.agency).toBe("2 per location / mo");
     expect(byKey.clientTexting.cells).toEqual({
