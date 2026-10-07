@@ -2,6 +2,24 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🔵 2026-10-07 — Google blue is the accent on the platform AND the CRM; Stripe catalog provisioned; JobCam started
+- Owner: "the orange is too obnoxious" / "the brand is blue and orange": `--g-accent` and the `.app-theme` / `.crm-theme`
+  primaries are Google blue (#1a73e8, dark #8ab4f8); orange remains the brand mark (logo, mascot, sidebar badges, warning
+  pills). Deployed (merge 7ce0b70). The SEO vendor card moved to /admin ("SEO data source").
+- **Stripe (read-only audit 2026-10-07):** account acct_1TzcYU9yWcdekSaP charges+payouts enabled, card/ACH/transfers
+  active, no requirements due; both webhooks enabled. The live account had ZERO products/prices/customers/subscriptions
+  ever — prices are created lazily by lookup key. Pre-created all 31 recurring prices with the app's own
+  `resolvePriceId` (plans ×2, add-ons ×2 + texting setup, Call Assistant tiers, agency location tiers). Still never
+  exercised with real money: owner should buy Starter monthly once, confirm, cancel; refund. Not sellable online by
+  design: Master Class modules ($1,500–2,000) and bundle ($2,499) + DFY services are above the $1,000 sales-only rule;
+  SEO has no retail price yet; JobCam not built.
+- **JobCam** (CompanyCam clone, owner 2026-10-07): spec in the run folder `JOBCAM-SPEC.md` (CompanyCam 2026 tiers
+  Core $63 / Crew $119–129 / Scale $199–249; their gaps: no video annotation, no revocable links, permanent stamps).
+  Phase A (capture, R2 multipart, ffmpeg worker, feed/timeline/tags/search, share links, client portal) building on
+  vb11 worktree `~/ConstructHUB-jobcam` branch `jobcam`. Later: annotations, AI notes → editable report → PDF/email/SMS
+  (STT pluggable; OpenAI gpt-4o-mini-transcribe ≈ $0.015 per 5-min video — needs a real OpenAI key, prod AI base URL is
+  the local TruthCode API), checklists/comments/map/offline.
+
 ## 🎨 2026-10-06/07 — Google format platform-wide (orange accent) + our own SEO tool (deployed, merge 0acc82d)
 - Owner: "Let's use this same format and update the other pages and maybe keep the orange. This format will sell better since
   Google has proven it." Every signed-in platform page now sits on `.g-surface` (App.tsx layout; CRM portal untouched):
