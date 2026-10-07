@@ -101,7 +101,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
 
   // Standing counts come from the lists each gate counts; a list that can't load leaves the count "not reported".
   const domains = useQuery<unknown[]>({ queryKey: ["/api/click-guard/domains"], enabled: !!allowances && allowances.protectedSites !== 0 });
-  const seo = useOptionalQuery<{ configured: boolean; budget: { capUsd: number; spentUsd: number; accountUsd: number; accountRequests: number } }>("/api/seo/status", !!allowances);
+  // ConstructHUB SEO: tracked keywords are a standing count the SEO status reports; the two monthly meters come with the entitlements.
+  const seo = useOptionalQuery<{ configured: boolean; usage: { keywords: UsageMeter } }>("/api/seo/status", !!allowances && allowances.seoKeywords !== 0);
   const crmMe = useQuery<{ seats?: { used: number; limit: number } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
@@ -212,14 +213,17 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           hint: isAgency ? `${formatCount(allowances.siteScansPerLocation)} per location each month.` : undefined,
         }, unl),
         meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }, unl),
-        // SEO tools (rank tracker, keyword research, backlinks): DataForSEO data under the
-        // server's monthly cap, shared by every account (GET /api/seo/status; absent without the plan).
-        ...(seo.data ? [{
-          key: "seoData", label: "SEO data (DataForSEO)",
-          included: `$${seo.data.budget.capUsd.toFixed(2)} of data / mo, all accounts${seo.data.configured ? "" : " — not connected yet"}`,
-          used: null, monthly: true,
-          hint: `$${seo.data.budget.spentUsd.toFixed(2)} used this month across the platform · ${formatCount(seo.data.budget.accountRequests)} request${seo.data.budget.accountRequests === 1 ? "" : "s"} by this account ($${seo.data.budget.accountUsd.toFixed(2)}).`,
-        } satisfies LimitRow] : []),
+        // ConstructHUB SEO (rank tracker, keyword research, backlinks): plan units from shared/plans.ts SEO_PLAN_LIMITS.
+        {
+          key: "seoKeywords", label: "SEO: tracked keywords",
+          included: countText(allowances.seoKeywords, unl),
+          excluded: allowances.seoKeywords === 0,
+          used: allowances.seoKeywords === 0 ? null : seo.data ? Math.max(0, seo.data.usage.keywords.used) : undefined,
+          ceiling: allowances.seoKeywords > 0 ? allowances.seoKeywords : undefined,
+          hint: seo.data && !seo.data.configured ? "Rank tracking is being switched on for your account — check back shortly." : "Checked on Google every week.",
+        },
+        meterRow("seoResearch", "SEO: keyword searches", usage.seoResearch, allowances.seoResearch, { hint: "Keyword research and competitor-gap searches." }, unl),
+        meterRow("seoBacklinkRefreshes", "SEO: backlink refreshes", usage.seoBacklinkRefreshes, allowances.seoBacklinkRefreshes, { hint: "On-demand refreshes; the monthly snapshot is included." }, unl),
       ],
     },
     {

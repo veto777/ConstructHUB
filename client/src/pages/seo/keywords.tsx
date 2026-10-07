@@ -5,10 +5,10 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtNum, fmtUsd, kd, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtNum, fmtUnit, kd, SeoShell, unitsLeft, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Idea = { keyword: string; searchVolume: number | null; cpc: number | null; difficulty: number | null; competition: number | null; intent: string | null };
-type Research = { seed: string; items: Idea[]; costUsd: number };
+type Research = { seed: string; items: Idea[] };
 
 export default function SeoKeywordsPage() {
   const status = useSeoStatus();
@@ -25,31 +25,38 @@ export default function SeoKeywordsPage() {
   });
   const track = useMutation({
     mutationFn: (keywords: Idea[]) => api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: keywords.map((k) => k.keyword), volumes: keywords.map((k) => ({ keyword: k.keyword, searchVolume: k.searchVolume, cpc: k.cpc, difficulty: k.difficulty })) }),
-    onSuccess: (r: { added: number }) => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked for ${site!.domain}` }); },
+    onSuccess: (r: { added: number }) => { setPicked(new Set()); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked for ${site!.domain}` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const volumes = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/keywords/volumes`),
-    onSuccess: (r: { updated: number; costUsd: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Search volume updated for ${r.updated} keyword${r.updated === 1 ? "" : "s"}`, description: `${fmtUsd(r.costUsd)} of DataForSEO data.` }); },
+    onSuccess: (r: { updated: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Search volume updated for ${r.updated} keyword${r.updated === 1 ? "" : "s"}` }); },
     onError: (e) => toast({ title: "Couldn't fetch volumes", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const configured = !!status.data?.configured;
+  const searchesLeft = unitsLeft(status.data?.usage.research);
   const items = research.data?.items ?? [];
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   return (
     <SeoShell title="Keyword research" description="Start from one keyword and get up to 50 related searches with monthly volume, cost per click and difficulty." site={site} onSite={onSite} sites={sites} status={status}
-      actions={site && <button type="button" className="g-pill" disabled={!configured || volumes.isPending} onClick={() => volumes.mutate()} data-testid="button-fetch-volumes" title="Google Ads search volume for tracked keywords that have none yet (one request per 1,000 keywords)">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get volumes for tracked keywords · ≈ $0.09</button>}>
+      actions={site && <button type="button" className="g-pill" disabled={!configured || volumes.isPending} onClick={() => volumes.mutate()} data-testid="button-fetch-volumes" title="Google search volume for tracked keywords that have none yet">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get volumes for tracked keywords</button>}>
       <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (seed.trim()) research.mutate(); }} data-testid="form-research">
         <input className="g-input" placeholder="e.g. roof repair" value={seed} onChange={(e) => setSeed(e.target.value)} data-testid="input-seed" />
-        <Button type="submit" className="sm:w-auto" disabled={!configured || !seed.trim() || research.isPending} data-testid="button-research" title={!configured ? "Connect DataForSEO first" : undefined}>
-          {research.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find keywords · ≈ $0.018
+        <Button type="submit" className="sm:w-auto" disabled={!configured || !seed.trim() || research.isPending} data-testid="button-research" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
+          {research.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find keywords
         </Button>
       </form>
-      {!research.data && <Empty testId="seo-research-empty"><h3>What people search for</h3><p>Each search is one DataForSEO Labs request: $0.012 plus $0.00012 per keyword returned (50 → about $0.018). Results show Google search volume (United States), average CPC, keyword difficulty (0–100) and intent. Tick the ones worth ranking for and track them on {site ? site.domain : "a site"}.</p></Empty>}
+      {!research.data && (
+        <Empty testId="seo-research-empty">
+          <h3>What people search for</h3>
+          <p>Each search returns up to 50 related keywords with Google search volume (United States), average cost per click, keyword difficulty (0–100) and intent. Tick the ones worth ranking for and track them on {site ? site.domain : "a site"}.</p>
+          {status.data && <p className="mt-2">Keyword searches this month: {fmtUnit(status.data.usage.research)}{Number.isFinite(searchesLeft) ? ` · ${fmtNum(searchesLeft)} left` : ""}.</p>}
+        </Empty>
+      )}
       {research.data && (
         <>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px] g-text-2">
-            <span data-testid="text-research-meta">{items.length} suggestions for "{research.data.seed}" · {fmtUsd(research.data.costUsd)}</span>
+            <span data-testid="text-research-meta">{items.length} suggestions for "{research.data.seed}"{status.data ? ` · searches this month ${fmtUnit(status.data.usage.research)}` : ""}</span>
             {site && picked.size > 0 && <Button size="sm" disabled={track.isPending} onClick={() => track.mutate(items.filter((i) => picked.has(i.keyword)))} data-testid="button-track-selected">{track.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Track ${picked.size} on ${site.domain}`}</Button>}
           </div>
           {items.length === 0 ? <Empty>No suggestions came back for that seed. Try a shorter or more common phrase.</Empty> : (

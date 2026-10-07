@@ -1,8 +1,12 @@
 /**
- * Shared frame for the SEO pages (/seo, /seo/keywords, /seo/backlinks,
- * /seo/competitors): Google surface with the orange accent, the site picker,
- * the tab strip, this month's DataForSEO budget line, the "Connect DataForSEO"
- * card when the server has no credentials, and the plan gate.
+ * Shared frame for the ConstructHUB SEO pages (/seo, /seo/keywords,
+ * /seo/backlinks, /seo/competitors): Google surface with the brand accent,
+ * the tab strip, the site picker, this account's plan units (tracked keywords,
+ * keyword searches, backlink refreshes), a quiet "being switched on" notice
+ * while the server reports configured:false, and the plan gate.
+ *
+ * White-label: nothing here names the data vendor or a price. Platform admins
+ * get one extra card ("Data source") with the real state from `status.admin`.
  */
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
@@ -18,19 +22,30 @@ import { PLANS } from "@shared/plans";
 
 export const api = async (method: string, url: string, body?: unknown) => (await apiRequest(method, url, body)).json();
 
+/** One plan unit: used of limit (-1 = unlimited, 0 = not in the plan). */
+export type Unit = { used: number; limit: number };
+export type SeoUsage = { keywords: Unit; research: Unit; backlinkRefreshes: Unit };
 export type SeoStatus = {
   configured: boolean;
-  budget: { month: string; capUsd: number; spentUsd: number; remainingUsd: number; accountUsd: number; accountRequests: number };
-  prices: { fetchedOn: string; minimumDepositUsd: number; lines: { what: string; price: string; source: string }[]; example: string };
+  usage: SeoUsage;
+  resetsAt: string;
+  /** Platform admins only: the real state of the data source. */
+  admin?: {
+    vendor: string; configured: boolean; env: readonly string[];
+    month: string; capUsd: number; spentUsd: number; remainingUsd: number; accountUsd: number; accountRequests: number;
+  };
 };
 export type SeoSite = {
   id: number; domain: string; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
   keywordCount: number; nextRankCheckAt: string | null; lastRankCheckAt: string | null; nextBacklinksAt: string | null; lastBacklinksAt: string | null;
 };
 
-export const fmtUsd = (n: number | null | undefined) => n == null ? "—" : n > 0 && n < 0.1 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
 export const fmtNum = (n: number | null | undefined) => n == null ? "—" : Math.round(n).toLocaleString("en-US");
 export const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+/** "12 of 50" / "12 · unlimited". */
+export const fmtUnit = (u: Unit | undefined) => !u ? "—" : u.limit < 0 ? `${fmtNum(u.used)} · unlimited` : `${fmtNum(u.used)} of ${fmtNum(u.limit)}`;
+/** Units left this month (Infinity when unlimited). */
+export const unitsLeft = (u: Unit | undefined) => !u ? 0 : u.limit < 0 ? Infinity : Math.max(0, u.limit - u.used);
 
 export const useSeoStatus = () => useQuery<SeoStatus>({ queryKey: ["/api/seo/status"] });
 export const useSeoSites = () => useQuery<SeoSite[]>({ queryKey: ["/api/seo/sites"] });
@@ -75,8 +90,9 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}</Link>)}
             </nav>
             <SitePicker site={site} onSite={onSite} sites={sites} />
-            <BudgetLine status={status} />
-            {status.data && !status.data.configured && <ConnectCard status={status.data} />}
+            <UsageLine status={status} />
+            {status.data && !status.data.configured && <NotReadyNotice />}
+            {status.data?.admin && <DataSourceCard admin={status.data.admin} />}
             {children}
           </>
         )}
@@ -88,41 +104,49 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
 function PlanGate({ requiredPlan, message }: { requiredPlan: keyof typeof PLANS; message: string }) {
   return (
     <div className="g-callout" data-testid="seo-plan-gate">
-      <h3>SEO tools are included with the {PLANS[requiredPlan].name} plan</h3>
+      <h3>ConstructHUB SEO is included with the {PLANS[requiredPlan].name} plan</h3>
       <p>{message}</p>
       <div className="mt-3"><Link href="/pricing" className="g-pill g-pill--solid">See {PLANS[requiredPlan].name}</Link></div>
     </div>
   );
 }
 
-function BudgetLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
-  const b = status.data?.budget;
-  if (!b) return null;
-  const pct = b.capUsd > 0 ? Math.min(100, Math.round((b.spentUsd / b.capUsd) * 100)) : 100;
+/** This account's plan units, in the plan's own words. */
+function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
+  const u = status.data?.usage;
+  if (!u) return null;
   return (
-    <p className="g-text-2 mb-4 text-[13px]" data-testid="seo-budget-line">
-      SEO data this month: <b className="g-text font-medium">{fmtUsd(b.spentUsd)}</b> of {fmtUsd(b.capUsd)} ({pct}%) · {status.data?.configured ? "DataForSEO connected" : "DataForSEO not connected"}
-      {b.accountRequests > 0 && <> · {b.accountRequests.toLocaleString("en-US")} request{b.accountRequests === 1 ? "" : "s"} by this account ({fmtUsd(b.accountUsd)})</>}
+    <p className="g-text-2 mb-4 text-[13px]" data-testid="seo-usage-line">
+      Tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b>
+      {" · "}keyword searches this month <b className="g-text font-medium">{fmtUnit(u.research)}</b>
+      {" · "}backlink refreshes this month <b className="g-text font-medium">{fmtUnit(u.backlinkRefreshes)}</b>
     </p>
   );
 }
 
-/** Shown while the DataForSEO credentials (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD, server env) are not set. Prices are the server's price sheet (vendor pages, 2026-10-06). */
-export function ConnectCard({ status }: { status: SeoStatus }) {
-  const p = status.prices;
+/** Shown while the server reports configured:false. Sites and keywords still save; checks run once the source is live. */
+export function NotReadyNotice() {
   return (
-    <div className="g-callout mb-5" data-testid="seo-connect-card">
-      <h3>Connect DataForSEO to start</h3>
+    <p className="g-text-2 mb-4 text-[13px]" role="status" data-testid="seo-not-ready">
+      Rank tracking is being switched on for your account — check back shortly. You can add sites and keywords now; the first check runs as soon as it's on.
+    </p>
+  );
+}
+
+const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
+
+/** Platform admins only: the vendor, this month's wholesale spend against the internal cap, the env names. */
+function DataSourceCard({ admin }: { admin: NonNullable<SeoStatus["admin"]> }) {
+  const pct = admin.capUsd > 0 ? Math.min(100, Math.round((admin.spentUsd / admin.capUsd) * 100)) : 100;
+  return (
+    <div className="g-callout mb-5" data-testid="seo-admin-data-source">
+      <h3>Data source <span className="g-text-2 text-[12px] font-normal">· platform admins only</span></h3>
       <p>
-        Rank checks, keyword research, backlinks and competitor gaps come from DataForSEO, pay-as-you-go: no plan, no monthly fee, a one-time
-        minimum top-up of ${p.minimumDepositUsd} that never expires. DataForSEO is not connected yet — your ConstructHUB administrator connects it
-        in the server settings. Spend is capped at {fmtUsd(status.budget.capUsd)} a month.
+        {admin.vendor}: <b className="g-text font-medium">{admin.configured ? "connected" : "not connected"}</b>
+        {" · "}wholesale spend {admin.month}: <b className="g-text font-medium">{fmtUsd(admin.spentUsd)}</b> of the {fmtUsd(admin.capUsd)} internal cap ({pct}%)
+        {admin.accountRequests > 0 && <> · this account {admin.accountRequests.toLocaleString("en-US")} request{admin.accountRequests === 1 ? "" : "s"} ({fmtUsd(admin.accountUsd)})</>}
       </p>
-      <ul>
-        {p.lines.map((l) => <li key={l.what}><b className="g-text font-medium">{l.what}:</b> {l.price}</li>)}
-      </ul>
-      <p className="mt-2">{p.example}</p>
-      <p className="mt-1 text-[12px]">Prices from DataForSEO's pricing pages on {p.fetchedOn}.</p>
+      <p className="mt-1 text-[12px]">Server env: {admin.env.map((e, i) => <span key={e}>{i > 0 && ", "}<code>{e}</code></span>)}. Per-account spend: <code>GET /api/seo/admin/usage</code>.</p>
     </div>
   );
 }
@@ -147,10 +171,10 @@ function SitePicker({ site, onSite, sites }: { site: SeoSite | null; onSite: (id
 }
 
 const DEPTHS = [
-  { depth: 10, label: "Top 10 ($0.0006 per check)" },
-  { depth: 20, label: "Top 20 ($0.0012 per check)" },
-  { depth: 50, label: "Top 50 ($0.003 per check)" },
-  { depth: 100, label: "Top 100 ($0.006 per check)" },
+  { depth: 10, label: "Top 10" },
+  { depth: 20, label: "Top 20" },
+  { depth: 50, label: "Top 50" },
+  { depth: 100, label: "Top 100" },
 ];
 
 function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {

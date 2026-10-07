@@ -1,4 +1,4 @@
-/** /seo — rank tracker overview: tiles, the positions table with movement, Search Console if connected, recent runs. */
+/** /seo — rank tracker overview: tiles, the positions table with movement, Search Console if connected, recent checks. */
 import { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,17 +6,20 @@ import { Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, fmtUsd, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
+import { api, Empty, fmtDate, fmtNum, fmtUnit, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 
 type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[] } | null;
 type Overview = {
   site: SeoSite; devices: ("desktop" | "mobile")[];
   summary: { tracked: number; checked: number; top3: number; top10: number; averagePosition: number | null; improved: number; declined: number; lastCheckedOn: string | null };
   rows: { id: number; keyword: string; tags: string[]; searchVolume: number | null; cpc: number | null; difficulty: number | null; positions: Record<string, Position> }[];
-  runs: { id: string; trigger: string; status: string; total: number; checked: number; cost_usd: number; error: string | null; created_at: string; finished_at: string | null }[];
+  runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; created_at: string; finished_at: string | null }[];
   searchConsole: { property: string; clicks: number; impressions: number; position: number | null; previousClicks: number; previousImpressions: number } | null;
-  nextCheck: { serps: number; estimateUsd: number; monthlyUsd: number };
+  nextCheck: { serps: number; nextAt: string | null };
 };
+
+const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
+const RUN_TRIGGER: Record<string, string> = { weekly: "weekly check", manual: "run now" };
 
 export default function SeoOverviewPage() {
   const status = useSeoStatus();
@@ -31,7 +34,7 @@ export default function SeoOverviewPage() {
   const invalidate = () => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/overview`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); };
   const runNow = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/rank-check`),
-    onSuccess: (r: { serps: number; estimateUsd: number; reused: boolean }) => { invalidate(); toast({ title: r.reused ? "A check is already running" : "Rank check started", description: r.reused ? "Results arrive over the next few minutes." : `${r.serps} SERPs queued at DataForSEO (about ${fmtUsd(r.estimateUsd)}). Results arrive over the next few minutes.` }); },
+    onSuccess: (r: { serps: number; reused: boolean }) => { invalidate(); toast({ title: r.reused ? "A check is already running" : "Rank check started", description: r.reused ? "Results arrive over the next few minutes." : `${r.serps} search result page${r.serps === 1 ? "" : "s"} queued. Results arrive over the next few minutes.` }); },
     onError: (e) => toast({ title: "Couldn't start the check", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const remove = useMutation({
@@ -44,11 +47,11 @@ export default function SeoOverviewPage() {
   const running = o?.runs.some((r) => r.status === "queued" || r.status === "running");
   return (
     <SeoShell
-      title="SEO" description="Where your site ranks on Google, checked every week on DataForSEO's standard queue." site={site} onSite={onSite} sites={sites} status={status}
+      title="SEO" description="Where your site ranks on Google, checked every week." site={site} onSite={onSite} sites={sites} status={status}
       actions={site && (
-        <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Connect DataForSEO first" : undefined}>
+        <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {runNow.isPending || running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-          {running ? "Checking…" : o?.nextCheck.serps ? `Run check now · ${o.nextCheck.serps} SERPs ≈ ${fmtUsd(o.nextCheck.estimateUsd)}` : "Run check now"}
+          {running ? "Checking…" : "Run check now"}
         </Button>
       )}
     >
@@ -68,8 +71,8 @@ export default function SeoOverviewPage() {
             ) : (
               <Tile label="Search Console" value="—" hint={<Link href="/search-console" className="g-link">Connect the property for clicks and impressions</Link>} testId="tile-gsc-missing" />
             )}
-            <Tile label="Weekly check" value={fmtUsd(o.nextCheck.estimateUsd)} hint={`${o.nextCheck.serps} SERPs · about ${fmtUsd(o.nextCheck.monthlyUsd)} a month`} testId="tile-estimate" />
-            {status.data && <Tile label="Budget used this month" value={fmtUsd(status.data.budget.spentUsd)} hint={`of ${fmtUsd(status.data.budget.capUsd)}`} testId="tile-budget" />}
+            <Tile label="Next weekly check" value={configured ? fmtDate(o.nextCheck.nextAt) : "—"} hint={configured ? `${fmtNum(o.nextCheck.serps)} result page${o.nextCheck.serps === 1 ? "" : "s"} per check` : "Being switched on"} testId="tile-next-check" />
+            {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.length === 0 ? (
@@ -98,7 +101,7 @@ export default function SeoOverviewPage() {
             <section className="mt-6">
               <h2 className="g-text mb-2 text-[16px] font-medium">Recent checks</h2>
               <ul className="g-text-2 space-y-1 text-[13px]" data-testid="list-runs">
-                {o.runs.map((r) => <li key={r.id}>{fmtDate(r.created_at)} · {r.trigger} · {r.status}{r.total ? ` · ${r.checked}/${r.total} checks` : ""} · {fmtUsd(r.cost_usd)}{r.error ? <span className="g-closed"> · {r.error}</span> : null}</li>)}
+                {o.runs.map((r) => <li key={r.id}>{fmtDate(r.created_at)} · {RUN_TRIGGER[r.trigger] ?? r.trigger} · {RUN_STATUS[r.status] ?? r.status}{r.total ? ` · ${r.checked}/${r.total} checks` : ""}{r.error ? <span className="g-closed"> · {r.error}</span> : null}</li>)}
               </ul>
             </section>
           )}

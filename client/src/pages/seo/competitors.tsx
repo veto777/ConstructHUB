@@ -1,14 +1,14 @@
-/** /seo/competitors — keyword gap: what a competitor ranks for that this site does not (Labs domain_intersection). */
+/** /seo/competitors — keyword gap: what a competitor ranks for that this site does not. */
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtNum, fmtUsd, kd, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtNum, fmtUnit, kd, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Gap = { keyword: string; searchVolume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competitorPosition: number | null; competitorUrl: string | null; etv: number | null };
-type Result = { competitor: string; ours: string; items: Gap[]; totalCount: number | null; costUsd: number };
+type Result = { competitor: string; ours: string; items: Gap[]; totalCount: number | null };
 
 export default function SeoCompetitorsPage() {
   const status = useSeoStatus();
@@ -24,7 +24,7 @@ export default function SeoCompetitorsPage() {
   });
   const track = useMutation({
     mutationFn: (g: Gap) => api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: [g.keyword], tags: [gap.data?.competitor ?? "competitor"], volumes: [{ keyword: g.keyword, searchVolume: g.searchVolume, cpc: g.cpc, difficulty: g.difficulty }] }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); toast({ title: `Tracking it on ${site!.domain}` }); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Tracking it on ${site!.domain}` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const configured = !!status.data?.configured;
@@ -35,16 +35,16 @@ export default function SeoCompetitorsPage() {
       {site && (
         <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (competitor.trim()) gap.mutate(); }} data-testid="form-competitor">
           <input className="g-input" placeholder="competitor.com" value={competitor} onChange={(e) => setCompetitor(e.target.value)} data-testid="input-competitor" />
-          <Button type="submit" className="sm:w-auto" disabled={!configured || !competitor.trim() || gap.isPending} data-testid="button-find-gaps" title={!configured ? "Connect DataForSEO first" : undefined}>
-            {gap.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find the gap · ≈ $0.024
+          <Button type="submit" className="sm:w-auto" disabled={!configured || !competitor.trim() || gap.isPending} data-testid="button-find-gaps" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
+            {gap.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find the gap
           </Button>
         </form>
       )}
-      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One DataForSEO Labs request ($0.012 + $0.00012 per keyword, up to 100 → about $0.024) returns the keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after.</p></Empty>}
+      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison (it counts as one keyword search) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after.{status.data ? ` Keyword searches this month: ${fmtUnit(status.data.usage.research)}.` : ""}</p></Empty>}
       {r && (
         <>
-          <p className="g-text-2 mb-2 text-[13px]" data-testid="text-gap-meta">{r.totalCount != null ? `${fmtNum(r.totalCount)} keywords` : `${r.items.length} keywords`} {r.competitor} ranks for that {r.ours} doesn't · showing {r.items.length} · {fmtUsd(r.costUsd)}</p>
-          {r.items.length === 0 ? <Empty>No gap found — the index has no organic rankings for {r.competitor} that {r.ours} lacks.</Empty> : (
+          <p className="g-text-2 mb-2 text-[13px]" data-testid="text-gap-meta">{r.totalCount != null ? `${fmtNum(r.totalCount)} keywords` : `${r.items.length} keywords`} {r.competitor} ranks for that {r.ours} doesn't · showing {r.items.length}</p>
+          {r.items.length === 0 ? <Empty>No gap found — no organic rankings for {r.competitor} that {r.ours} lacks.</Empty> : (
             <table className="g-table" data-testid="table-gap">
               <thead><tr><th>Keyword</th><th className="num">Their position</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th><th>Their page</th><th aria-label="Track" /></tr></thead>
               <tbody>
