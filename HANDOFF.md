@@ -2,6 +2,42 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 📷 2026-10-07 — JobCam phase A live · deploy incident + new deploy rule (READ THIS)
+- **DEPLOY RULE (new, enforced by `script/deploy-vb11.sh`):** production is built ONLY from committed code on `main`
+  that type-checks, from the release checkout: `cd ~/ConstructHUB-release && git merge --ff-only <tested commit> &&
+  script/deploy-vb11.sh`. Never `git merge` or deploy in `~/ConstructHUB`: it is a shared working copy that a live
+  session may have on another branch with uncommitted edits. The script now aborts unless the branch is `main` and
+  the tree is clean, and runs `npm run check` itself (`DEPLOY_ALLOW_UNSAFE=1` overrides; write down why).
+- **Incident (12:52–12:56 ET):** at 12:49 another live session created and checked out `crm-split` in `~/ConstructHUB`
+  and began uncommitted edits to `shared/plans.ts` (CRM as a separate product; `crmSeats` → `agencySeats`,
+  `notIncluded`, new `shared/crm-plans.ts`). A deploy run from that directory at 12:52 (a) fast-forwarded `crm-split`
+  to `79015a5` (it now contains JobCam, i.e. it is main) and (b) built the dirty tree: the type check FAILED
+  (`plan-copy.ts: crmSeats does not exist`) but the failure was masked by a pipe, and the build shipped. That build
+  served production for about 90 seconds (prerender 47/48), handled one routine CRM request, no billing/plan
+  request, no errors logged. Fixed by rebuilding from a clean checkout of `79015a5` (48/48, boot verified). The other
+  session's working tree and uncommitted files were not modified. `main` fast-forwarded to `79015a5`.
+- **JobCam phase A** (owner: a CompanyCam clone, "JobCam"): `server/jobcam/*`, pages `/crm/jobcam`,
+  `/crm/projects/:id/jobcam`, capture screen, public share page `/jc/:token` (portal host). Capture photo/video from
+  the phone, resumable multipart uploads (IndexedDB queue), in-process media worker (sharp/ffmpeg: display, thumb,
+  poster, HEVC→720p H.264, EXIF/QuickTime GPS + time), feed, day timeline, tags (anyone can create), starred,
+  cross-project search, lightbox, soft delete, gallery/timeline share links (password, expiry, revocable, view count)
+  by email/SMS, storage meter. **Homeowner portal shows ONLY media a team member marked "Show to client"**
+  (`jobcam_media.client_visible`, default false, enforced in SQL). Spec + CompanyCam research: run folder
+  `JOBCAM-SPEC.md`. Tables `jobcam_*` are created at boot (phase B–D tables exist empty).
+  Verified: dev end-to-end on local storage (114 API checks + Playwright), 49 unit/integration tests, and every R2
+  call against the real bucket under a throwaway `jobcam-probe` prefix (direct presigned part PUT, server part,
+  complete at exact size, 206 ranged read, put/download/delete). Bug found there and fixed: presigned part URLs
+  must sign `UNSIGNED-PAYLOAD` (R2 answered 403 SignatureDoesNotMatch).
+  NOT verified: a real SMS send of a share link; HEIC→JPEG with a real iPhone file; a real phone upload on prod.
+  Bucket CORS is not set, so browsers cannot PUT parts straight to R2 yet: the client falls back to the API proxy
+  (works; slower for big videos). Owner decisions: storage limit per plan (`limitBytes` null = unlimited), caps
+  (25 MB photo, 1 GB / 10 min video). Next phases: annotations incl. time-coded video markup, AI voice/video notes →
+  editable report → PDF/email/SMS (needs a speech-to-text key), checklists.
+- **First real checkout** happened 2026-10-07 12:36 ET (before the incident, unaffected): Pro monthly, trialing, on
+  the correct `chub_v1_plan_pro_month_7900` price; a local `subscriptions` row should exist for that user (verify).
+- Also today: collapsed CRM sidebar fixed (root cause: `ui/sidebar.tsx` used Tailwind 4 `x!` syntax on a Tailwind 3
+  build, so the collapsed-state overrides never applied); sidebar stays brand orange, page content is Google blue.
+
 ## 🔵 2026-10-07 — Google blue is the accent on the platform AND the CRM; Stripe catalog provisioned; JobCam started
 - Owner: "the orange is too obnoxious" / "the brand is blue and orange": `--g-accent` and the `.app-theme` / `.crm-theme`
   primaries are Google blue (#1a73e8, dark #8ab4f8); orange remains the brand mark (logo, mascot, sidebar badges, warning

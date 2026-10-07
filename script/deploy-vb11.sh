@@ -30,8 +30,26 @@ echo "== preflight =="
 "${SSH[@]}" "test -f $APP_DIR/.env && test -d $APP_DIR/node_modules" \
   || { echo "ABORT: $HOST:$APP_DIR is not the live tree (.env/node_modules missing)" >&2; exit 1; }
 
-echo "== build =="
+echo "== source guard =="
+# 2026-10-07: a deploy run from the shared working copy shipped another session's UNCOMMITTED, type-failing
+# edits to production for about 90 seconds (that checkout had been switched to a feature branch minutes
+# earlier). Production is only ever built from committed code on main that type-checks. Deploy from the
+# release checkout, never from a directory someone is editing:
+#   cd ~/ConstructHUB-release && git merge --ff-only <tested commit> && script/deploy-vb11.sh
+# DEPLOY_ALLOW_UNSAFE=1 skips the branch and clean-tree checks (say why in HANDOFF.md if you use it).
 cd "$ROOT"
+if [ "${DEPLOY_ALLOW_UNSAFE:-}" != "1" ]; then
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  [ "$branch" = "main" ] || { echo "ABORT: on branch '$branch', not main: production is built from main only" >&2; exit 1; }
+  dirty="$(git status --porcelain --untracked-files=no)"
+  [ -z "$dirty" ] || { echo "ABORT: uncommitted changes in $ROOT; commit them or deploy from ~/ConstructHUB-release:" >&2; echo "$dirty" | head -10 >&2; exit 1; }
+fi
+echo "building $(git rev-parse --short HEAD) on $(git rev-parse --abbrev-ref HEAD)"
+
+echo "== type check =="
+npm run check
+
+echo "== build =="
 npm run build
 
 echo "== rsync dist/ =="
