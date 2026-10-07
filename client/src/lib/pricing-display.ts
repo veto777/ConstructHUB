@@ -125,7 +125,7 @@ export const creditsLabel = (n: number) => `${n.toLocaleString("en-US")} credit$
 /** One monthly meter as the server reports it: limit -1 = unlimited (fair use), 0 = not in the plan. */
 export type UsageMeter = { used: number; limit: number };
 
-export type UsageKey = "searches" | "rankings" | "siteScans" | "competitorScans" | "texts" | "seoResearch" | "seoBacklinkRefreshes";
+export type UsageKey = "searches" | "rankings" | "siteScans" | "competitorScans" | "texts";
 
 /** GET /api/entitlements — the fields the client reads. */
 export type EntitlementsInfo = {

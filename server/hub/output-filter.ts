@@ -19,6 +19,8 @@ import {
 import { promptInstructionText, NOT_SURE_LINE, REDIRECT_LINE, CANARY } from "./prompt";
 import { knowledgeBook, dollarAmounts, type KnowledgeBook } from "./knowledge";
 import { cleanAiText, REASONING_LEAK, RESIDUAL_MARKUP } from "../ai-output";
+import { SEO_CREDIT_PACKS } from "@shared/seo-credits";
+import { SEO_PLAN_LIMITS } from "@shared/plans";
 
 export type OCode = "O1" | "O2" | "O4" | "O6" | "O7" | "O8" | "O9" | "O10" | "O11" | "O12" | "O13" | "O14" | "O15" | "O16" | "O17" | "O18";
 export type ModelOutput = { content?: string | null; finishReason?: string | null; toolCalls?: unknown; functionCall?: unknown };
@@ -250,7 +252,7 @@ const BOUND_AFTER = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:for|on) (?:t
 /** "Starter and Pro are both $29/month": one price for several plans is always wrong (no two plans cost the same). */
 const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,25}\b(both|all)\b|\b(are|cost|costs|run|priced at) (both|all)\b/i;
 /** The sentence is about an add-on, a location band, the texting setup fee or reinstatement. */
-const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number)\b/i;
+const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number|seo data|data credit)\b/i;
 /** Add-on, band and service amounts (never a plan's own price), including the Call Assistant's launch price. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
   const cents = new Set<number>([GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);
@@ -260,6 +262,9 @@ const ADDON_CENTS: ReadonlySet<number> = (() => {
     for (const c of dollarAmounts(addon.description)) cents.add(c);
   }
   for (const band of AGENCY_LOCATION_BANDS) if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * ANNUAL_MONTHS); }
+  // SEO data: the monthly allowance each plan includes and the prepaid credit packs.
+  for (const key of PLAN_KEYS) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
+  for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
   return cents;
 })();
 

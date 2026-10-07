@@ -16,6 +16,21 @@
  * task (`cost`), or gives the reservation back when nothing was charged.
  */
 import { pool } from "../db";
+import { retailCents } from "@shared/seo-credits";
+import { reserveCredits, settleCredits, SeoCreditShort, type CreditReservation } from "./credits";
+
+/**
+ * Swappable for tests. `allowanceCents` is the account's monthly SEO data
+ * allowance at the customer's price (shared/plans.ts seoCreditCents; -1 =
+ * unlimited for platform staff; 0 without a plan).
+ */
+export const budgetDeps = {
+  allowanceCents: async (userId: number): Promise<number> => {
+    const { getEntitlements } = await import("../entitlements");
+    return (await getEntitlements(userId)).allowances?.seoCreditCents ?? 0;
+  },
+  reserveCredits, settleCredits,
+};
 
 export const DEFAULT_MONTHLY_BUDGET_USD = 100;
 const LOCK_KEY = 7191;
@@ -49,15 +64,18 @@ export function budgetDecision(spentUsd: number, estimateUsd: number, capUsd: nu
 }
 
 export class SeoBudgetError extends Error {
-  readonly code = "seo_budget";
-  /** `message` is customer-safe; `detail` carries the dollars for the log and the admin card. */
-  constructor(message: string, readonly remainingUsd: number, readonly estimateUsd: number, readonly detail = message) {
+  /**
+   * `message` is customer-safe; `detail` carries the dollars for the log and the admin card.
+   * `code` is "seo_budget" (the platform's internal cap) or "seo_credits" (this
+   * customer's own allowance and purchased credit are used up).
+   */
+  constructor(message: string, readonly remainingUsd: number, readonly estimateUsd: number, readonly detail = message, readonly code: "seo_budget" | "seo_credits" = "seo_budget") {
     super(message);
     this.name = "SeoBudgetError";
   }
 }
 
-export type BudgetReservation = { userId: number; month: string; estimateUsd: number };
+export type BudgetReservation = { userId: number; month: string; estimateUsd: number; credit: CreditReservation | null };
 
 /** Reserve `estimateUsd` for this account, or throw SeoBudgetError. */
 export async function reserveBudget(userId: number, estimateUsd: number): Promise<BudgetReservation> {
@@ -80,18 +98,34 @@ export async function reserveBudget(userId: number, estimateUsd: number): Promis
        ON CONFLICT(user_id,month) DO UPDATE SET cost_usd=seo_api_usage.cost_usd+EXCLUDED.cost_usd, requests=seo_api_usage.requests+1, updated_at=now()`,
       [userId, month, estimateUsd]);
     await client.query("COMMIT");
-    return { userId, month, estimateUsd };
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
   } finally {
     client.release();
   }
+  // The customer's side of the same call: the estimate at the customer's price,
+  // from this month's allowance and then purchased credit (server/seo/credits.ts).
+  const reservation: BudgetReservation = { userId, month, estimateUsd, credit: null };
+  try {
+    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd));
+  } catch (e) {
+    // Nothing will run: give the wholesale reservation back before refusing.
+    await pool.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd-$3), requests=greatest(0,requests-1), updated_at=now() WHERE user_id=$1 AND month=$2", [userId, month, estimateUsd]).catch(() => {});
+    if (e instanceof SeoCreditShort) {
+      console.warn(`[seo] credit refused user=${userId} month=${month} need=${e.needCents}c available=${e.availableCents}c`);
+      throw new SeoBudgetError(e.message, 0, estimateUsd, e.message, "seo_credits");
+    }
+    throw e;
+  }
+  return reservation;
 }
 
 /** Replace the reservation with what DataForSEO actually charged (`cost` on the task). Every settlement is one log line. */
 export async function settleBudget(r: BudgetReservation, actualUsd: number): Promise<void> {
-  console.info(`[seo] cost user=${r.userId} month=${r.month} estimate=${usd(r.estimateUsd)} actual=${usd(actualUsd)}`);
+  console.info(`[seo] cost user=${r.userId} month=${r.month} estimate=${usd(r.estimateUsd)} actual=${usd(actualUsd)} charged=${retailCents(actualUsd)}c`);
+  // The customer is charged for what the call really cost, at their price.
+  await budgetDeps.settleCredits(r.credit, retailCents(actualUsd)).catch((e: any) => console.error(`[seo] credit settle failed user=${r.userId}: ${e?.message ?? e}`));
   const delta = round6(actualUsd - r.estimateUsd);
   if (delta === 0) return;
   await pool.query(

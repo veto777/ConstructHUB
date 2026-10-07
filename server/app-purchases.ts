@@ -17,6 +17,10 @@ export const APP_NO_PURCHASE_ROUTES = [
   "/api/contracts/:token/checkout",
   "/api/crm/voice/numbers",
   "/api/beta-codes/redeem",
+  // The CRM's own subscription (server/crm/billing.ts) and prepaid SEO data credit (server/stripe.ts).
+  "/api/crm/billing/checkout",
+  "/api/crm/billing/change",
+  "/api/seo/credits/checkout",
 ] as const;
 
 export const nativePurchaseGuard: RequestHandler = (req, res, next) => {

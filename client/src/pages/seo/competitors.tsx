@@ -5,7 +5,7 @@ import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtNum, fmtUnit, kd, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Gap = { keyword: string; searchVolume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competitorPosition: number | null; competitorUrl: string | null; etv: number | null };
 type Result = { competitor: string; ours: string; items: Gap[]; totalCount: number | null };
@@ -35,12 +35,12 @@ export default function SeoCompetitorsPage() {
       {site && (
         <form className="mb-4 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (competitor.trim()) gap.mutate(); }} data-testid="form-competitor">
           <input className="g-input" placeholder="competitor.com" value={competitor} onChange={(e) => setCompetitor(e.target.value)} data-testid="input-competitor" />
-          <Button type="submit" className="sm:w-auto" disabled={!configured || !competitor.trim() || gap.isPending} data-testid="button-find-gaps" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
+          <Button type="submit" className="sm:w-auto" disabled={!configured || !competitor.trim() || gap.isPending || !canAfford(status.data, "competitorGap")} data-testid="button-find-gaps" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
             {gap.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />} Find the gap
           </Button>
         </form>
       )}
-      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison (it counts as one keyword search) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after.{status.data ? ` Keyword searches this month: ${fmtUnit(status.data.usage.research)}.` : ""}</p></Empty>}
+      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison ({priceOf(status.data, "competitorGap")} of your SEO data) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after.</p></Empty>}
       {r && (
         <>
           <p className="g-text-2 mb-2 text-[13px]" data-testid="text-gap-meta">{r.totalCount != null ? `${fmtNum(r.totalCount)} keywords` : `${r.items.length} keywords`} {r.competitor} ranks for that {r.ours} doesn't · showing {r.items.length}</p>

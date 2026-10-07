@@ -1,5 +1,6 @@
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
+import { CREDIT_SCHEMA_DDL } from "./credits";
 
 /**
  * SEO toolset tables (rank tracker, keyword research, backlinks, competitor
@@ -96,6 +97,8 @@ export const SEO_SCHEMA_DDL = [
   )`,
   // Site Explorer: saved domain reports (server/seo/explorer.ts).
   ...EXPLORER_SCHEMA_DDL,
+  // The customer's SEO data credit (server/seo/credits.ts).
+  ...CREDIT_SCHEMA_DDL,
 ];
 
 export async function ensureSeoSchema() {

@@ -2,6 +2,30 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🔎 2026-10-07 — SEO: Site Explorer + SEO data credit (4x markup, plan allowance, prepaid packs)
+- **Data source is live:** DataForSEO account `support@constructhub.us` created by the owner 2026-10-07, `DATAFORSEO_LOGIN` /
+  `DATAFORSEO_PASSWORD` set on vb11, $51 balance. `/seo` no longer shows "being switched on".
+- **Site Explorer** `/seo/explorer` (`server/seo/explorer.ts`, table `seo_domain_reports`): any domain → authority, backlink
+  profile, organic/paid footprint, 6-month history, top keywords/pages, competitors, referring domains, anchors. Eight
+  vendor calls ≈ $0.26 wholesale; a saved report is free to reopen for 7 days. Design reference: the owner's Ahrefs
+  screenshots; request shapes from OpenSEO (MIT, cloned at `~/vendor-src/open-seo`). Parsers are tested on real responses.
+- **Owner decisions (2026-10-07) — SEO is sold as data credit, like Ahrefs:** every lookup costs the customer
+  **4x wholesale** (`shared/seo-credits.ts` `SEO_MARKUP`); each plan includes a monthly allowance at the customer's price
+  (`seoCreditCents`: **Starter $10, Pro $20, Growth $40, Agency $40**; resets on the 1st, no rollover); beyond it the
+  customer buys **prepaid packs of $25 / $50 / $100** (spent after the allowance, never expire). The old plan units
+  `seoResearch` / `seoBacklinkRefreshes` are GONE; `seoKeywords` (tracked keywords) stays and is still owner-to-confirm.
+- **How it charges:** every vendor call already went through `server/seo/budget.ts` reserve→settle, so the customer charge
+  lives there (`server/seo/credits.ts`: tables `seo_credit_usage`, `seo_credit_wallets`, `seo_credit_purchases`). Routes and
+  jobs charge nothing themselves; weekly rank runs and monthly backlink snapshots draw the same credit and fail with the
+  customer message when it is used up (`SeoBudgetError.code === "seo_credits"`, HTTP 402 with `packs`).
+  Packs: `POST /api/seo/credits/checkout` (one-time Stripe payment) → webhook `fulfilSeoCredits` (once per session; amount
+  must equal a pack). Platform staff are unlimited. `/api/seo/status` carries `credits`, `prices`, `packs`.
+- **In-app purchase guard:** `/api/seo/credits/checkout` AND the CRM's `/api/crm/billing/{checkout,change}` (missed when the
+  CRM split shipped) are now in `APP_NO_PURCHASE_ROUTES`; the inventory test also scans `server/crm/billing.ts`.
+- **Still to do (agreed order):** backlinks full depth → keyword research full depth → rank tracking (configs, local/maps,
+  history) → AI visibility → reports; then the Ahrefs-style projects dashboard and Site Audit overview. The internal
+  wholesale cap `SEO_MONTHLY_BUDGET_USD` (default 100) still applies on top of customer credit — raise it as usage grows.
+  Not verified in a browser by the building session (no browser on vb11).
 ## 📷 2026-10-07 (evening) — JobCam plans + storage, fast boot, Cloudflare/Search Console worker ON (deployed 1f4a0ea)
 - **JobCam is a CRM feature only** (owner: attached to a jobsite; not a platform tool). Included in **CRM Max**; a
   **$39/mo add-on on CRM Basic and CRM Essentials** (`CRM_ADDONS.jobcam` in shared/crm-plans.ts; annual = 12 × $39 =

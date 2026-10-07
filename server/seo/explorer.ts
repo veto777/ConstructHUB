@@ -25,6 +25,8 @@ import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
 export const REPORT_TTL_DAYS = 7;
 /** What one fresh report is reserved at before it runs (settled to the real cost after). */
 export const EXPLORER_ESTIMATE_USD = 0.3;
+/** What a report usually costs (measured 2026-10-07), for the price shown before it runs. */
+export const EXPLORER_TYPICAL_USD = 0.26;
 const KEYWORD_ROWS = 100, PAGE_ROWS = 20, COMPETITOR_ROWS = 10, LINK_ROWS = 20;
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);

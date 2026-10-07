@@ -30,10 +30,10 @@ it("keeps reads and homeowner physical-service payments available",async()=>{
   }
 });
 it("guards the complete current checkout inventory and installs before auth/routes",()=>{
-  const files=['server/stripe.ts','server/routes.ts','server/voice/numbers.ts'];
+  const files=['server/stripe.ts','server/routes.ts','server/voice/numbers.ts','server/crm/billing.ts'];
   const routes=files.flatMap(f=>Array.from(readFileSync(f,'utf8').matchAll(/app\.post\("([^"]+)"/g),m=>m[1]));
   for(const route of APP_NO_PURCHASE_ROUTES) expect(routes).toContain(route);
-  const selling=routes.filter(r=>/checkout|\/stripe\/(change-plan|addons|create-portal)$|\/beta-codes\/redeem$|\/crm\/voice\/numbers$/.test(r));
+  const selling=routes.filter(r=>/checkout|\/stripe\/(change-plan|addons|create-portal)$|\/beta-codes\/redeem$|\/crm\/voice\/numbers$|\/crm\/billing\/change$/.test(r));
   expect([...selling].sort()).toEqual([...APP_NO_PURCHASE_ROUTES].sort());
   const entry=readFileSync('server/index.ts','utf8');
   expect(entry.indexOf('registerAppPurchaseGuard(app)')).toBeLessThan(entry.indexOf('await setupAuth(app)'));
