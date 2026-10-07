@@ -51,6 +51,8 @@ import { registerCrmBackupRoutes } from "./backups";
 import { registerCrmNotificationRoutes } from "./notify";
 import { registerCrmStatsRoutes } from "./stats";
 import { registerCrmInboxRoutes } from "./inbox";
+import { registerJobcamRoutes } from "../jobcam/routes";
+import { resumeJobcamProcessing } from "../jobcam/processor";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
 import { getBaseUrl, generateAccountId } from "../auth";
@@ -397,6 +399,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   registerCrmNotificationRoutes(app, getDevUser);
   registerCrmStatsRoutes(app, getDevUser);
   registerCrmInboxRoutes(app, getDevUser);
+  // JobCam: job-site photos/video — uploads, feeds, tags, share links, the
+  // client-portal feed and the org storage meter (server/jobcam/*).
+  registerJobcamRoutes(app, getDevUser);
+  resumeJobcamProcessing().catch((e: any) => console.error("[jobcam] resume failed:", e?.message || e));
 
   // ── Identity ──────────────────────────────────────────────────────────────
 
