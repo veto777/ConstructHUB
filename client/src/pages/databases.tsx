@@ -37,6 +37,7 @@ import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat,
 import { apiRequest } from "@/lib/queryClient";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { useToast } from "@/hooks/use-toast";
+import { HelpButton } from "@/components/help-button";
 import type { County, PermitDatabase } from "@shared/schema";
 import { useEffect } from "react";
 
@@ -189,6 +190,7 @@ export default function DatabasesPage() {
         as="h1"
         titleTestId="text-page-title"
         title="Database directory"
+        titleAfter={<HelpButton k="database-directory" />}
         description="Browse US counties and cities for permit offices — official portals where they are on record."
         flush
       />

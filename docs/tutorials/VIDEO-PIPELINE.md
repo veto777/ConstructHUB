@@ -1,37 +1,62 @@
 # Walkthrough videos — production pipeline
 
-Status: **plan only. No video, audio, poster or caption file exists yet**, and nothing in this
-document has been run. Every `video` in the help registry is `null`, so the product shows
-"Video walkthrough coming soon" inside each "i" panel and a "Video coming soon" badge on
-`/tutorials`, and no play button anywhere. Keep it that way until a real recording is uploaded:
-never point `video` at a placeholder, a sample clip or someone else's video
-(`server/help-registry.test.ts` → "claims no video that does not exist").
+Status: **the pipeline is built and the first walkthrough exists** — Database Directory
+(`database-directory`, recorded 2026-10-07). Every other entry has no video: the product shows
+"Video walkthrough coming soon" inside its "i" panel and a "Video coming soon" badge on
+`/tutorials`, and no play button. Keep it that way for an entry until its real recording is
+uploaded: a video exists for the app only when it is listed in the manifest
+`shared/help/videos.json` (written by `mux.ts --publish`, never by hand), and
+`server/help-registry.test.ts` refuses anything else — never a placeholder, a sample clip or
+someone else's video.
+
+## Make a video (the whole run)
+
+```bash
+S=docs/tutorials/scripts/<helpKey>.json          # the step script; its name is its help key
+# dev server on :8168 against the DEV database (CLAUDE.md), then:
+set -a; . <(grep -E '^(VOICE_ENGINE_URL|VOICE_INTERNAL_SECRET)=' <env file>); set +a
+npx tsx scripts/tutorials/narrate.ts $S          # 1. Janice clips, one per step  → narration/*.wav, narration.json
+npx tsx scripts/tutorials/record.ts  $S          # 2. Playwright capture, each step held for its clip → raw.webm, timings.json
+npx tsx scripts/tutorials/mux.ts     $S --publish # 3. walkthrough.mp4 + captions.vtt + poster.jpg; manifest + local store
+npx tsx scripts/tutorials/check.ts   $S          # 4. measurements, and frames/ to LOOK at
+set -a; . <(grep -E '^R2_' <production env file>); set +a
+npx tsx scripts/tutorials/upload.ts <helpKey>    # 5. create-only put of the manifest's three keys
+```
+
+Everything lands in `analysis/video-out/<helpKey>/` (git-ignored). Narrate first: the recorder
+holds each step for the measured length of its line. Change a line → `narrate.ts` again (only the
+changed line is requested; clips are cached by text hash) → record → mux. The step script, the
+manifest and nothing else are committed; then build and deploy as in `HANDOFF.md`, **after** the
+upload (the manifest makes the player appear, so the files must already be in R2).
 
 Owner request (2026-10-07): *"use the same janice voice and use higgsfield and create walk through
 tutorial videos to explain to users how to use it. Use highlights or mouse movements and get people
 dialed in. Have this next to the info and do a dedicated tutorial section that has all features and
 all videos."*
 
-## What already exists (built, tested)
+## What exists (built, tested)
 
 | Piece | Where |
 | --- | --- |
-| The help registry — one entry per feature and per Cloudflare / Search Console section, each with a `video` slot | `shared/help/registry.ts` (types: `shared/help/types.ts`) |
-| The "i" button + panel + video player (`<HelpButton k="…" />`) | `client/src/components/help-button.tsx` |
+| The help registry — one entry per feature and per Cloudflare / Search Console section; `video` is built from the manifest | `shared/help/registry.ts` (types: `shared/help/types.ts`) |
+| The manifest of recorded videos (key, bytes, sha256 of each file; `durationSec`) and the key shape | `shared/help/videos.json`, `shared/help/videos.ts` |
+| The "i" button + panel + video player with its captions track (`<HelpButton k="…" />`) | `client/src/components/help-button.tsx` |
 | The Tutorials page | `client/src/pages/tutorials.tsx` → `/tutorials` |
+| The media route: public, immutable, HTTP Range (206), `tutorials/` keys only | `server/tutorials/media.ts` → `GET /api/tutorials/media/:file` |
 | Step-script type (zod) and its JSON Schema twin | `shared/help/step-script.ts`, `shared/help/step-script.schema.json` |
-| One complete example script (Cloudflare → Connections) | `docs/tutorials/scripts/cloudflare.connections.json` |
-| Tests that keep all of it honest | `server/help-registry.test.ts` |
+| Step scripts | `docs/tutorials/scripts/database-directory.json` (recorded), `cloudflare.connections.json` (example, not recorded) |
+| The tools | `scripts/tutorials/narrate.ts`, `record.ts`, `mux.ts`, `check.ts`, `upload.ts` (`lib.ts` is shared; `npx tsc -p scripts/tutorials/tsconfig.json` type-checks them) |
+| Tests that keep all of it honest | `server/help-registry.test.ts`, `server/tutorials/media.test.ts` |
 
-What does **not** exist yet: the recorder, the narration renderer, the mux script, any upload
-tooling, and a demo account with demo connections. Those are the work below.
+What does **not** exist yet: a demo account with demo Cloudflare / Google connections (owner
+inputs, below), any Higgsfield integration, and the other videos.
 
 ## The five stages
 
 ```
-step script (JSON) ──▶ 1. record ──▶ raw.webm + timings.json
+step script (JSON) ──▶ 2. narrate ──▶ narration/NN.wav + narration.json   (RUN FIRST)
         │
-        ├──────────▶ 2. narrate ──▶ narration.wav (one clip per step, Janice's voice)
+        ├──────────▶ 1. record ──▶ raw.webm + timings.json   (each step held for its clip)
         │
         ├──────────▶ 3. (optional) Higgsfield intro / outro / avatar segment
         │
@@ -49,26 +74,40 @@ suite refuses a script whose `helpKey` is not in the registry.
 Playwright is already a dev dependency (`@playwright/test`, `playwright` in `package.json`; the
 e2e suite lives in `e2e/`).
 
-- **Recorder to write:** `scripts/tutorials/record.ts`. It loads a script with
+- **Recorder:** `scripts/tutorials/record.ts`. It loads a script with
   `parseTutorialScript` (`shared/help/step-script.ts`), opens a browser context with
   `recordVideo: { dir, size: script.viewport }` and `viewport: script.viewport`, and plays the
   steps in order.
 - **Cursor overlay and highlight rings:** Playwright's video does not show the mouse pointer. The
-  recorder injects (`context.addInitScript`) a small overlay: an absolutely-positioned cursor
-  element that follows `mousemove`, and a ring element the recorder positions over the target's
-  `boundingBox()` before each action. Move with `page.mouse.move(x, y, { steps: 25 })` so the
-  pointer glides instead of jumping; show the ring ~400 ms before a click and fade it after. The
-  overlay must use the surface accent (`--g-accent`), not a hard-coded colour, and must be
-  injected by the recorder only — it never ships in the app.
+  recorder injects (`context.addInitScript`) a small overlay: a cursor element that follows
+  `mousemove`, a ripple on every click, and a ring that tracks its target element frame by frame
+  (so it stays on it while the page scrolls or the list reloads). The pointer is moved in small
+  eased steps along a slightly bowed path so it glides instead of jumping. The ring takes the
+  surface accent (`--g-accent`), not a hard-coded colour, and the overlay is injected by the
+  recorder only — it never ships in the app.
 - **Per-step behaviour** (`action` in the script): `goto` · `highlight` (ring, no click) · `hover` ·
   `click` · `type` · `select` · `press` · `scroll` · `wait`. `selector` is a Playwright selector
   (`[data-testid="…"]`, `role=button[name="…"]`, `label:has-text("…") input`, `text=…`).
-  `caption` is drawn as a lower-third by the overlay and becomes the `.vtt` cue; `narration` is
-  what the voice says; `holdMs` adds dwell time; `redact: true` blurs the target (CSS
-  `filter: blur()`) for keys, emails and client names.
-- **Timing:** the recorder writes `timings.json` — for every step, the video time at which it
-  started. Record *after* the narration clips exist (stage 2) so each step can wait
-  `max(clip length, action time) + holdMs`; then picture and voice line up without editing.
+  `narration` is what the voice says, and it is also the captions track (`captions.vtt`);
+  `caption` is the step's short label (the recorder's log and `timings.json`; it is not drawn on
+  the video, because the player already shows the captions track there); `holdMs` adds dwell
+  time; `redact: true` blurs the target (CSS `filter: blur()`) for keys, emails and client names.
+- **Timing:** the recorder writes `timings.json` — for every step, when it started and ended and
+  when its narration starts. It records *after* the narration clips exist (stage 2) and holds each
+  step for `max(clip length + pad, action time) + holdMs`, so picture and voice line up without
+  editing. The video's clock starts a variable few hundred ms after the recorder's, so the recorder
+  shows a black "sync" frame before the first step and after the last; `mux.ts` finds both, uses
+  them to place the audio, and refuses a capture whose two ends disagree by more than 120 ms.
+- **What is kept out of a public video** (in the recording context only — the database is never
+  written): cookie `ch_consent=denied` (no cookie banner), the assistant bubble and its "Welcome
+  aboard" popup hidden, and the signed-in account presented as "Demo Account" with a customer's
+  menu and no unread notifications (the `/api/auth/me` and `/api/notifications` responses are
+  relabelled / emptied on their way to the page). Everything else on screen is the product running
+  against the dev database.
+- **Link addresses:** hovering a link that leaves the site shows its real address bottom-left, the
+  way a desktop browser's status bar does. `select` works on native `<select>`s and on the app's
+  custom listboxes (it opens the list, wheels to the option and clicks it). `type` replaces what
+  the field holds.
 - **Demo account:** run against the DEV database only (`constructhub_dev` on `127.0.0.1:5432`;
   never the production port) on a dev server started as in `CLAUDE.md`, signed in as a demo user
   whose plan includes the feature (Cloudflare and Search Console need the plan that includes the
@@ -101,12 +140,15 @@ What the code says about that voice (read, not assumed):
 | Device | env `VOICE_TTS_DEVICE` (default `cuda`; `cpu` works) | `voice/config.py` |
 | Existing offline renderer to model on | `voice/render_samples.py` (renders each persona's sample line to `client/public/persona-samples/<id>.mp3` with ffmpeg) | `voice/render_samples.py` |
 
-- **Renderer to write:** `scripts/tutorials/narrate.ts` (calls the engine) or
-  `voice/render_tutorial.py` (imports `speech.TTS` directly, like `render_samples.py`). For each
-  step it sends `{ personaId: script.narrator, text: step.narration }` and saves
-  `narration/<index>.wav`, then writes each clip's length to `narration.json` for the recorder.
-- `/tts/preview` takes at most 400 characters. The step schema allows 600 for `narration`; split a
-  longer line on sentence ends and join the clips, or keep lines under 400.
+- **Renderer:** `scripts/tutorials/narrate.ts`. For each step it sends
+  `{ personaId: script.narrator, text: step.narration }` to `/tts/preview`, trims the ~0.3 s / ~0.5 s
+  of silence the engine leaves around a line, saves `narration/<NN>.wav` and writes each clip's
+  measured length to `narration.json` for the recorder.
+- `/tts/preview` takes at most 400 characters. A longer line is split on sentence ends and the
+  pieces are joined.
+- **The engine also answers live customer phone calls.** The tool calls it strictly one request at
+  a time with a pause between requests, caches every piece by the hash of its text
+  (`narration/cache/`), and retries a failed request slowly (8 s, 20 s, 45 s) instead of hammering.
 - `narrator` defaults to `"janice"`; the schema accepts the other five persona ids only so a
   script can be re-voiced without a code change.
 - Kokoro runs on the tower GPU for the live engine and is shared with phone calls. Render
@@ -132,60 +174,49 @@ parts a screen capture cannot make: a short intro and outro card, or an avatar s
 
 ### 4. Mux, captions and poster (ffmpeg)
 
-`ffmpeg` is the tool (already required on the voice box by `render_samples.py`). Script to write:
-`scripts/tutorials/mux.ts`.
+`scripts/tutorials/mux.ts` (ffmpeg, always niced and thread-limited — the recording box may also
+serve production):
 
-1. **Audio track:** place each `narration/<index>.wav` at its step's start time from
-   `timings.json` (ffmpeg `adelay` + `amix`, or build one WAV in code) → `narration.wav`.
-2. **Video:** transcode Playwright's `.webm` to H.264 + AAC MP4 with the narration, e.g.
-   `ffmpeg -i raw.webm -i narration.wav -c:v libx264 -pix_fmt yuv420p -crf 20 -preset slow -c:a aac -b:a 128k -movflags +faststart walkthrough.mp4`.
-   `+faststart` matters: the player uses `preload="metadata"`.
-3. **Intro/outro** (only if stage 3 produced them): concat with the same codec settings.
-4. **Captions:** write `captions.vtt` from the script — one cue per step, start = the step's time
-   in `timings.json`, end = the next step's start, text = `caption`. (A second, fuller track can
-   use `narration` as the cue text; the player takes one `captions` URL today.)
-5. **Poster:** one frame as `poster.jpg`, e.g. `ffmpeg -ss 2 -i walkthrough.mp4 -frames:v 1 -q:v 3 poster.jpg`.
-6. **Length:** read it with `ffprobe -v error -show_entries format=duration -of csv=p=0 walkthrough.mp4`
-   and round to whole seconds — that is `durationSec`. Never type a duration by hand.
+1. **Audio track:** each `narration/<NN>.wav` laid at its step's narration time (built in code),
+   peak-normalised to −3 dBFS → `narration.wav`.
+2. **Video:** a ~2 s title card (plain `drawtext`: the entry's title and "ConstructHUB
+   walkthrough" — no generated intro), then the capture cut to the first loaded page: H.264
+   `yuv420p`, 30 fps, CRF 23, AAC, `-movflags +faststart` (the player uses `preload="metadata"`).
+3. **Captions:** `captions.vtt` from the narration, a sentence at a time, each cue timed inside
+   its clip.
+4. **Poster:** `poster.jpg`, the end of a step (`--poster-step`, default 1) — a frame of the
+   walkthrough itself.
+5. **Length:** read with `ffprobe` and rounded to whole seconds — `durationSec`. Never typed.
+6. **`--publish`:** copies the three files to the dev server's local store (`tmp/tutorials/`) under
+   their content-hashed names and writes the entry in `shared/help/videos.json`.
 
-Watch the finished file end to end before uploading: the cursor visible, rings on the right
-elements, nothing unredacted, narration matching what is on screen.
+Then `scripts/tutorials/check.ts`: codecs, moov-before-mdat, audio level (not clipped, not near
+silence), captions spanning every clip — and `frames/` with the title card, the end of every step
+and the last frame. **Open the frames**: the cursor visible, rings on the right elements, no
+banner or popup, nothing unredacted, no half-loaded page. Re-record if anything is off.
 
 ### 5. Upload to R2 and switch the video on
 
-R2 is already the app's object store (`server/r2.ts`; env `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`,
-`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`).
+R2 is the app's object store in production (env `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`); a dev box without `R2_ENDPOINT` reads `tmp/tutorials/`.
 
-- **Keys:** `tutorials/<helpKey>/walkthrough.mp4`, `tutorials/<helpKey>/captions.vtt`,
-  `tutorials/<helpKey>/poster.jpg`. Upload with `putToR2Key(key, body, contentType)` (fixed keys;
-  a re-upload overwrites) with content types `video/mp4`, `text/vtt`, `image/jpeg`.
-- **Serving:** `GET /api/files/:folder/:subfolder/:filename` (`server/routes.ts`) already serves
-  any three-part key publicly with a long cache, so the files are reachable at
-  `/api/files/tutorials/<helpKey>/walkthrough.mp4`. Two things to fix **before** the first video
-  goes live:
-  1. That route does not pass the `Range` header on (`getFromR2` accepts `{ range }`, the route
-     does not use it). Safari and iOS need byte ranges to play and seek MP4 — add Range/206
-     support to the route (or serve `tutorials/` from a public R2 domain) and test on an iPhone.
-  2. It sends `Cache-Control: … immutable` for a year. A re-recorded video must therefore get a
-     new key (e.g. `walkthrough-v2.mp4`), not overwrite the old one.
-- **Registry:** set the entry's `video` in `shared/help/registry.ts` (today
-  `HELP_ENTRIES` maps every entry to `video: null`; add a per-key map of real videos beside it):
-
-  ```ts
-  video: {
-    url: "/api/files/tutorials/cloudflare.connections/walkthrough.mp4",
-    durationSec: 94,            // from ffprobe, not typed from memory
-    poster: "/api/files/tutorials/cloudflare.connections/poster.jpg",
-    captions: "/api/files/tutorials/cloudflare.connections/captions.vtt",
-  }
-  ```
-
-  (The numbers above show the shape only; no such file exists.) The test suite then requires the
-  URL to sit under `tutorials/`, end in `.mp4`/`.webm`, and carry a whole-second duration. With
-  `video` set, the play button appears beside the "i", the panel offers "Watch the walkthrough",
-  and the Tutorials card shows the player.
-- Build, `rsync` and restart as in `HANDOFF.md`. Check `/tutorials` and the feature's "i" panel on
-  a desktop and a phone.
+- **Keys:** `tutorials/<helpKey>.<hash8>.mp4`, `.vtt`, `.jpg`, where `<hash8>` is the first 8 hex
+  digits of that file's sha256. A re-recorded video therefore has a new address and never fights
+  the year-long `immutable` cache on the old one. The old objects are left in the bucket.
+- **Upload:** `scripts/tutorials/upload.ts <helpKey>` — verifies each local file against the
+  manifest (bytes, sha256), then puts it with `If-None-Match: *`. Create-only: an existing key is
+  never overwritten and nothing is ever deleted. `--check` only HEADs the three keys.
+- **Serving:** `GET /api/tutorials/media/<helpKey>.<hash8>.<ext>` (`server/tutorials/media.ts`):
+  public, `Cache-Control: public, max-age=31536000, immutable`, `Accept-Ranges: bytes`, and `206`
+  for a `Range` request — Safari and iOS will not play or seek an MP4 without byte ranges, which is
+  why this is not `/api/files/…` (that route does not forward `Range`). It serves only names of
+  that exact shape under the fixed `tutorials/` prefix, with the content type taken from the
+  extension.
+- **Registry:** nothing to type. `shared/help/registry.ts` builds `video` (url, measured
+  `durationSec`, poster, captions) from the manifest; the play button, "Watch the walkthrough" and
+  the Tutorials player appear for that key.
+- Upload, then build, `rsync` and restart as in `HANDOFF.md`. Check `/tutorials` and the feature's
+  "i" panel on a desktop and on an iPhone (not yet done for the first video — see below).
 
 ## Step scripts
 
@@ -202,13 +233,14 @@ Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse w
 | `steps[].selector` | Playwright selector of the target (not for `goto`, `wait`, `press`). |
 | `steps[].url` | `goto` only: a root-relative path. |
 | `steps[].value` | `type` / `select` / `press`. Secrets are `{{PLACEHOLDERS}}`. |
-| `steps[].caption` | On-screen caption and `.vtt` cue, ≤ 160 characters. |
-| `steps[].narration` | What the voice says over the step. |
+| `steps[].caption` | The step's short label, ≤ 160 characters (logs and `timings.json`). |
+| `steps[].narration` | What the voice says over the step — and the captions track. |
 | `steps[].holdMs` | Extra dwell time after the action. |
 | `steps[].redact` | Blur the target in the recording. |
 
-Writing rules: one idea per step; the narration says only what the registry entry says (it is the
-verified text — do not add claims the "i" panel does not make); plain words; no step that changes
+Writing rules: one idea per step; every narrated sentence is true of the product as it runs — it
+says what the registry entry says (the verified text) or what is on the screen at that moment, and
+names real rows chosen from the dev database, never invented ones; plain words; no step that changes
 something irreversible on a real account.
 
 ### Example — Cloudflare → Connections
@@ -242,12 +274,13 @@ permissions line, the "Connections" list heading and `tab-connection-work-queue`
 }
 ```
 
-## Order of work for the next session
+## What is next
 
-1. Owner inputs: a demo Cloudflare account with one zone, a demo Google account with one Search
-   Console property, and (only if the Higgsfield stage is wanted) a Higgsfield account/API key.
-2. Write `narrate` → `record` → `mux` (stages 2, 1, 4) and run them on
-   `cloudflare.connections.json`. Review the file.
-3. Add Range support to `/api/files` (stage 5), upload, set `video` for that one key, deploy,
-   check on a phone.
-4. Write the remaining scripts — one per registry entry, Cloudflare and Search Console first.
+1. Deploy this branch (the upload for `database-directory` is done) and play the video on a real
+   iPhone — Range/206 is implemented and tested, but only desktop Chromium has played it so far.
+2. Listen to the narration once by ear: the tools measure level and timing, not pronunciation.
+3. Owner inputs for the connected features: a demo Cloudflare account with one zone, a demo Google
+   account with one Search Console property, and (only if the Higgsfield stage is wanted) a
+   Higgsfield account / API key.
+4. Write the remaining scripts — one per registry entry. Features that need no outside account
+   (Search Permits, Property Records, Search History) can be recorded now.

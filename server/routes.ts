@@ -27,6 +27,7 @@ import path from "path";
 import fs from "fs";
 import archiver from "archiver";
 import { z } from "zod";
+import { registerTutorialMediaRoutes } from "./tutorials/media";
 import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor";
 import { registerStripeRoutes } from "./stripe";
 import { registerTrackingRoutes } from "./tracking-script";
@@ -6144,6 +6145,9 @@ function main() {
   setTimeout(processReminders, 30 * 1000);
   setInterval(processScheduledReviews, 2 * 60 * 1000);
   setTimeout(processScheduledReviews, 45 * 1000);
+
+  // Walkthrough videos (help registry): public, immutable, Range-aware — see server/tutorials/media.ts.
+  registerTutorialMediaRoutes(app);
 
   app.get("/api/files/:folder/:subfolder/:filename", async (req, res) => {
     try {
