@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MoreHorizontal, AlarmClock, ArrowRight, Check, CircleCheck, RotateCcw, TriangleAlert, X } from "lucide-react";
+import { MoreHorizontal, AlarmClock, Check, CircleCheck, RotateCcw, TriangleAlert, X } from "lucide-react";
 import type { DashboardAttentionItem } from "@shared/dashboard";
 import { dashboardItemSnoozeOnly, snoozeUntil, type DashboardClearedItem } from "@shared/dashboard-prefs";
 import { Card } from "@/components/ui/card";
@@ -8,8 +8,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ToastAction } from "@/components/ui/toast";
+import { GoogleList, GoogleListRow } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import { DashLink, FOCUS_RING } from "./dash-link";
 import { formatCount, formatMetricValue, toneText } from "./format";
 import { useDismissItems, useRestoreItems } from "./use-dashboard-prefs";
@@ -174,7 +174,7 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
     <Card className="p-4 sm:p-5" role="region" aria-labelledby="dashboard-needs-title" data-testid="card-dashboard-needs" data-count={items.length} data-cleared={cleared.length}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <div className="flex items-baseline gap-2">
-          <h2 id="dashboard-needs-title" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-none">Needs you today</h2>
+          <h2 id="dashboard-needs-title" ref={headingRef} tabIndex={-1} className="g-header__title outline-none">Needs you today</h2>
           <span className="text-sm text-muted-foreground tabular-nums">{items.length}</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-x-3">
@@ -192,35 +192,30 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
           )}
         </div>
       </div>
-      <ul className="mt-3 divide-y">
+      <GoogleList as="ul" className="mt-1">
         {items.map((item) => {
           const name = `${item.label} (${item.source})`;
           return (
-            <li
+            <GoogleListRow
               key={item.key}
-              className="group/item flex items-center transition-colors hover:bg-accent/60"
-              data-testid={`needs-${item.key}`}
+              as="li"
+              size="md"
+              testId={`needs-${item.key}`}
               data-tone={item.tone}
-            >
-              <DashLink
-                ref={(el: HTMLAnchorElement | null) => { if (el) linkRefs.current.set(item.key, el); else linkRefs.current.delete(item.key); }}
-                href={item.href}
-                surface={item.surface}
-                className={cn("group flex min-w-0 flex-1 items-start gap-3 rounded-l-lg p-3", FOCUS_RING)}
-                data-testid={`link-needs-${item.key}`}
-              >
-                <TriangleAlert className={`mt-0.5 h-4 w-4 shrink-0 ${toneText(item.tone)}`} aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-xs text-muted-foreground">{item.source}</span>
-                  <span className="mt-0.5 flex flex-wrap items-baseline gap-x-2">
-                    <span className={`text-sm font-semibold tabular-nums leading-tight ${toneText(item.tone)}`}>{amount(item)}</span>
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </span>
-                  {item.hint && <span className="mt-0.5 block text-xs text-muted-foreground">{item.hint}</span>}
-                </span>
-                <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-              </DashLink>
-              <span className="flex shrink-0 items-center">
+              leading={<TriangleAlert className={toneText(item.tone)} />}
+              title={(
+                <DashLink
+                  ref={(el: HTMLAnchorElement | null) => { if (el) linkRefs.current.set(item.key, el); else linkRefs.current.delete(item.key); }}
+                  href={item.href}
+                  surface={item.surface}
+                  className={FOCUS_RING}
+                  data-testid={`link-needs-${item.key}`}
+                >
+                  <span className={`tabular-nums ${toneText(item.tone)}`}>{amount(item)}</span> {item.label}
+                </DashLink>
+              )}
+              meta={[item.source, item.hint]}
+              trailing={<>
                 {/* Clearing a task is one tap (owner, 2026-10-02: "lets make a way to clear these tasks"); snoozing sits in ⋯. */}
                 {!dashboardItemSnoozeOnly(item.key) && (
                   <Button
@@ -258,11 +253,11 @@ export function NeedsToday({ items, cleared }: { items: DashboardAttentionItem[]
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              </span>
-            </li>
+              </>}
+            />
           );
         })}
-      </ul>
+      </GoogleList>
       {clearedList}
       {live}
     </Card>

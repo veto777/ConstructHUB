@@ -48,11 +48,11 @@ export function CrmSnapshotCard({ tile, leads, schedule }: { tile: DashboardTile
     <Card className="p-4 sm:p-5" data-testid="card-dashboard-crm" data-status={tile.status} aria-labelledby="dashboard-crm-title" role="region">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary" aria-hidden="true">
+          <span className="g-card__lead" aria-hidden="true">
             <KanbanSquare className="h-[18px] w-[18px]" />
           </span>
           <div className="min-w-0">
-            <h2 id="dashboard-crm-title" className="text-base font-semibold leading-tight">{CRM_NAME}</h2>
+            <h2 id="dashboard-crm-title" className="g-header__title">{CRM_NAME}</h2>
             <p className="mt-0.5 text-sm text-muted-foreground">
               {/* The iPhone apps sell nothing (App Store 3.1.3(f)): the CRM comes with the account, not "your plan". */}
               {isEmpty ? (inNativeApp() ? "Your CRM is included with your account." : "Your CRM is included with your plan.") : tile.description}
