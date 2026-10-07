@@ -20,7 +20,7 @@ checks it, and the catalog price never goes into a content file.
 | Grow | `gbp`, `reviews`, `profileGuard`, `rankingGrid`, `gbpContent`, `social`, `siteScan`, `media` |
 | Protect | `clickGuard`, `ipTracker`, `vpnShield`, `cloudflare`, `searchConsole`, `domains`, `mailAlerts` |
 | Win jobs | `permits`, `property`, `competitors`, `adsManager`, `lsaLeads` |
-| Run the business | `crm`, `crmSchedule`, `crmLeads`, `texting`, `agency` (the AI Call Assistant keeps its own `/call-assistant` page) |
+| Run the business | `crm`, `crmSchedule`, `crmLeads`, `texting`, `jobcam`, `agency` (the AI Call Assistant keeps its own `/call-assistant` page) |
 | Learn | `masterClass`, `guides`, `reinstatement` |
 | The platform | `gabe`, `customerApi` |
 
@@ -82,6 +82,7 @@ a content file. Pick how the feature is **sold** and the template prices it from
 | no plan check at all | `{ kind: "account" }` |
 | a one-time service in the price book | `{ kind: "service", service }` |
 | quoted by a sales rep (at or above the sales threshold) | `{ kind: "sales", topic }` |
+| a CRM add-on (`CRM_ADDONS` in `shared/crm-plans.ts`: included in some CRM plans, an add-on on the rest) | `{ kind: "crmAddon", addon }` |
 
 An `allowance` names a numeric key of `PlanLimits` (`limit`), an optional per-location key for Agency
 (`perLocation`), a plural `unit` and `period` (`"month"` or `"count"`). The page then lists it plan by plan.
