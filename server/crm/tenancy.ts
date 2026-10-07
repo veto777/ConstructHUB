@@ -19,6 +19,8 @@ import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
 import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
 import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse, type Entitlements } from "../entitlements";
+import { getCrmEntitlements } from "./entitlements";
+import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
 
 export type OrgContext = {
   org: typeof crmOrgs.$inferSelect;
@@ -248,33 +250,40 @@ export async function getOwnerSeatUsage(
       canAdd: true,
       message: "Beta accounts have unlimited CRM seats.",
       upgradePlan: null as PlanKey | null,
+      upgradeCrmPlan: null as CrmPlanKey | null,
       addon: null as AddonKey | null,
     };
   }
 
-  // CRM seats come with every paid plan (crmSeats, plus Extra seat add-ons);
-  // the org owner's plan applies. Without a plan the owner keeps their own seat.
-  const limit = ent.allowances?.crmSeats ?? 1;         // -1 means unlimited
-  const planName = ent.accessPlan ? PLANS[ent.accessPlan].name : "current";
+  // The CRM is a SEPARATE PRODUCT (shared/crm-plans.ts): its seats come from
+  // the account's own CRM subscription, never from a ConstructHUB platform
+  // plan. On Agency the agency team draws from the platform plan's agencySeats,
+  // and both pools are counted together because seatHolders() returns the two
+  // teams as one set.
+  const crm = await getCrmEntitlements(ownerUserId);
+  const agencySeats = withAgencyTeam ? (ent.allowances?.agencySeats ?? 0) : 0;
+  const limit = crm.seats < 0 ? -1 : crm.seats + agencySeats;
+  const planName = crm.plan ? CRM_PLANS[crm.plan].name : withAgencyTeam && ent.accessPlan ? PLANS[ent.accessPlan].name : "none";
   const canAddSeat = limit < 0 || used < limit;
   const [one, many] = withAgencyTeam ? ["seat", "seats"] : ["CRM seat", "CRM seats"];
-  const shared = withAgencyTeam ? " for the CRM and agency team together" : "";
-  let message = `Your ${planName} plan includes ${limit < 0 ? `unlimited ${many}` : plural(limit, one, many)}${shared} and ${inUse(used)}.`;
+  let message = `Your ${planName} plan includes ${limit < 0 ? `unlimited ${many}` : plural(limit, one, many)} and ${inUse(used)}.`;
   let upgradePlan: PlanKey | null = null;
+  let upgradeCrmPlan: CrmPlanKey | null = null;
   let addon: AddonKey | null = null;
-  if (!ent.accessPlan) {
-    const starter = cheapestPlanWhere((l) => l.crmSeats > 1);
-    upgradePlan = starter;
-    message += ` The CRM is included with every paid plan${starter ? `, and ${PLANS[starter].name} includes ${plural(PLANS[starter].limits.crmSeats, "seat")}` : ""}. Choose a plan in Pricing to add your team.`;
+  if (!crm.plan) {
+    upgradeCrmPlan = cheapestCrmPlanWhere(() => true);
+    const cheapest = upgradeCrmPlan ? CRM_PLANS[upgradeCrmPlan] : null;
+    message = `The ConstructHUB CRM is a separate subscription from your platform plan${cheapest ? `, from $${(cheapest.monthlyCents / 100).toFixed(0)}/mo` : ""}. Choose a CRM plan to open the CRM and add your team.`;
   } else if (!canAddSeat) {
-    const raise = raiseHint(ent, "crmSeats", ["seat"], "extra_seat");
-    upgradePlan = raise.upgradePlan;
-    addon = raise.addon;
-    if (raise.text) message += ` ${raise.text}`;
+    upgradeCrmPlan = cheapestCrmPlanWhere((l) => l.seats > limit);
+    const next = upgradeCrmPlan ? CRM_PLANS[upgradeCrmPlan] : null;
+    message += next
+      ? ` ${next.name} includes ${plural(next.limits.seats, "seat")}, or add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`
+      : ` Add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`;
   }
 
   return {
-    plan: ent.accessPlan ?? "none",
+    plan: crm.plan ?? ent.accessPlan ?? "none",
     planName,
     limit,
     used,
@@ -283,6 +292,7 @@ export async function getOwnerSeatUsage(
     canAdd: alreadySeated || canAddSeat,
     message,
     upgradePlan,
+    upgradeCrmPlan,
     addon,
   };
 }

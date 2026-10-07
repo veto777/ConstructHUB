@@ -8,6 +8,9 @@
  *   - Agency workspace, Google Ads/LSA manager, Cloudflare + Search Console and
  *     Domains + Gmail alerts are Agency-only.
  *   - Single features are bought as add-ons, not standalone tools.
+ *   - 2026-10-07: the CRM is a SEPARATE PRODUCT (shared/crm-plans.ts). No
+ *     platform plan grants CRM seats, and no CRM plan grants platform tools.
+ *     Every plan states what it does NOT include, shown at checkout.
  *   - Anything priced at $1,000 or more is "Talk to a sales rep", never a price.
  * Money is in cents.
  */
@@ -32,7 +35,12 @@ export type PlanLimits = {
   siteScans: number;
   siteScansPerLocation: number;
   permitSearches: number;
-  crmSeats: number;
+  /**
+   * Agency workspace team seats (owner / admin / manager / viewer).
+   * NOT CRM seats: the CRM is a separate product and its seats come from
+   * the account's CRM plan (shared/crm-plans.ts, `CrmPlanLimits.seats`).
+   */
+  agencySeats: number;
   /** Team alert texts (shared number), segments per month. */
   teamTextSegments: number;
   /** "none" | bring-your-own SignalWire or the texting add-on | one number included. */
@@ -99,6 +107,12 @@ export type Plan = {
   tagline: string;
   /** Marketing bullets, in display order. Must match `limits`/`modules`. */
   features: string[];
+  /**
+   * What this plan does NOT include, shown at checkout verbatim before the
+   * buyer pays (owner order 2026-10-07). The CRM leads every list: it is a
+   * separate product and no platform plan grants it.
+   */
+  notIncluded: string[];
   limits: PlanLimits;
   modules: PlanModules;
 };
@@ -116,12 +130,19 @@ export const PLANS: Record<PlanKey, Plan> = {
       "5 ranking-grid credits / month",
       "2 Site Scans / month",
       "100 permit searches / month",
-      "CRM: estimates, invoices, payments — 1 seat",
       "Email support",
     ],
+      notIncluded: [
+        "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        "Click Guard, IP Tracker and VPN Shield (Pro and up)",
+        "Competitor Intel scans (Pro and up)",
+        "Automatic AI review replies — Starter drafts them for you to approve",
+        "Client texting",
+        "Agency workspace, Google Ads & LSA manager, Cloudflare + Search Console (Agency only)",
+      ],
     limits: {
       locations: 1, guardCadenceMinutes: 15, gridCredits: 5, gridCreditsPerLocation: 0, competitorScans: 0,
-      protectedSites: 0, siteScans: 2, siteScansPerLocation: 0, permitSearches: 100, crmSeats: 1,
+      protectedSites: 0, siteScans: 2, siteScansPerLocation: 0, permitSearches: 100, agencySeats: 0,
       teamTextSegments: 0, clientTexting: "none", autoPublishAiReplies: false, reviewTemplates: 5,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60,
       ...SEO_PLAN_LIMITS.starter,
@@ -139,13 +160,19 @@ export const PLANS: Record<PlanKey, Plan> = {
       "15 ranking-grid credits / month",
       "5 Site Scans / month",
       "500 permit searches / month",
-      "CRM — 3 seats, team text alerts (500 / month)",
+      "Team text alerts — 500 segments / month",
       "Client texting with your own SignalWire number (or the texting add-on)",
       "Priority email support",
     ],
+      notIncluded: [
+        "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        "More than 1 Google Business Profile location (Growth and up)",
+        "A client-texting number on our carrier (bring your own, or add one)",
+        "Agency workspace, Google Ads & LSA manager, Cloudflare + Search Console (Agency only)",
+      ],
     limits: {
       locations: 1, guardCadenceMinutes: 15, gridCredits: 15, gridCreditsPerLocation: 0, competitorScans: 2,
-      protectedSites: 1, siteScans: 5, siteScansPerLocation: 0, permitSearches: 500, crmSeats: 3,
+      protectedSites: 1, siteScans: 5, siteScansPerLocation: 0, permitSearches: 500, agencySeats: 0,
       teamTextSegments: 500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 10_000, apiRatePerMinute: 60,
       ...SEO_PLAN_LIMITS.pro,
@@ -163,13 +190,18 @@ export const PLANS: Record<PlanKey, Plan> = {
       "30 ranking-grid credits / month",
       "15 Site Scans / month",
       "5,000 permit searches / month",
-      "CRM — 10 seats, team text alerts (1,500 / month)",
+      "Team text alerts — 1,500 segments / month",
       "1 client-texting number included",
       "Priority support + onboarding call",
     ],
+      notIncluded: [
+        "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        "Agency workspace and client workspaces (Agency only)",
+        "Google Ads & LSA manager, Cloudflare + Search Console, Domains + Gmail alerts (Agency only)",
+      ],
     limits: {
       locations: 3, guardCadenceMinutes: 15, gridCredits: 30, gridCreditsPerLocation: 0, competitorScans: 8,
-      protectedSites: 3, siteScans: 15, siteScansPerLocation: 0, permitSearches: 5000, crmSeats: 10,
+      protectedSites: 3, siteScans: 15, siteScansPerLocation: 0, permitSearches: 5000, agencySeats: 0,
       teamTextSegments: 1500, clientTexting: "included", autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 50_000, apiRatePerMinute: 60,
       ...SEO_PLAN_LIMITS.growth,
@@ -182,7 +214,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     features: [
       "10 client locations included, then per-location pricing",
       "Agency workspace: client workspaces, bulk actions, email onboarding",
-      "Team roles — owner, admin, manager, viewer (10 seats, shared with the CRM team)",
+      "Team roles — owner, admin, manager, viewer (10 agency seats)",
       "Google Ads & LSA manager (manager account, IP exclusions)",
       "Cloudflare + Google Search Console",
       "Domains + Gmail alert forwarding",
@@ -191,9 +223,13 @@ export const PLANS: Record<PlanKey, Plan> = {
       "2 ranking-grid credits and 1 Site Scan per location / month",
       "Priority support + onboarding",
     ],
+      notIncluded: [
+        "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        "A client-texting number on our carrier (bring your own, or add one)",
+      ],
     limits: {
       locations: 10, guardCadenceMinutes: 30, gridCredits: 0, gridCreditsPerLocation: 2, competitorScans: 20,
-      protectedSites: 10, siteScans: 0, siteScansPerLocation: 1, permitSearches: 5000, crmSeats: 10,
+      protectedSites: 10, siteScans: 0, siteScansPerLocation: 1, permitSearches: 5000, agencySeats: 10,
       teamTextSegments: 1500, clientTexting: "byo_or_addon", autoPublishAiReplies: true, reviewTemplates: 50,
       apiUnitsPerMonth: 250_000, apiRatePerMinute: 60,
       ...SEO_PLAN_LIMITS.agency,
@@ -358,7 +394,7 @@ function callAssistantTierAddon(key: CallAssistantTierKey): Addon {
 
 export const ADDONS: Record<AddonKey, Addon> = {
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location (10+ locations: Agency).", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "pro", "growth"], grants: { locations: 1 } },
-  extra_seat: { key: "extra_seat", name: "Extra seat", description: "One more CRM or agency team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "pro", "growth", "agency"], grants: { crmSeats: 1 } },
+  extra_seat: { key: "extra_seat", name: "Extra agency seat", description: "One more agency team seat. CRM seats are sold with the CRM (shared/crm-plans.ts).", monthlyCents: 1500, annualCents: 15000, availableOn: ["agency"], grants: { agencySeats: 1 } },
   protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },

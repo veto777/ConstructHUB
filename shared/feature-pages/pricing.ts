@@ -9,6 +9,7 @@ import {
   ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
   type AddonModuleKey, type CountLimitKey, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "../plans";
+import { CRM_PLANS, CRM_PLAN_KEYS } from "../crm-plans";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, joinNames, plansWhere, priceOrSalesRep } from "../plan-copy";
 import type { FeatureAllowance, FeaturePricing } from "./types";
 
@@ -154,9 +155,16 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
  * Plans without the allowance are left out.
  */
 export function allowanceLine(a: FeatureAllowance): string {
+  // The CRM is its own product: its seats come from the CRM price book.
+  if (a.limit === "crmPlanSeats") {
+    const seats = CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.seats}`);
+    return `${a.unit}: ${joinNames(seats)}`;
+  }
+  // Hoisted: the narrowing above does not survive into the callback below.
+  const limitKey = a.limit;
   const parts = PLAN_KEYS.flatMap((key) => {
     const plan = PLANS[key];
-    const flat = plan.limits[a.limit] as number;
+    const flat = plan.limits[limitKey] as number;
     const per = a.perLocation ? (plan.limits[a.perLocation] as number) : 0;
     const value = flat < 0 ? "unlimited (fair use)" : flat > 0 ? flat.toLocaleString("en-US") : per > 0 ? `${per.toLocaleString("en-US")} per location` : null;
     return value ? [`${plan.name} ${value}`] : [];
@@ -194,6 +202,11 @@ export function featurePlanGap(spec: FeaturePricing, ent: FeatureEntitlementsInp
       return ent.modules[spec.module] ? null : upgrade(plansWhere((plan) => plan.modules[spec.module]));
     case "allowance": {
       const a = spec.allowance, l = ent.allowances;
+      // The CRM is a separate subscription: a platform plan never satisfies it,
+      // and no platform upgrade would, so point at the CRM price book instead.
+      if (a.limit === "crmPlanSeats") {
+        return { label: "See CRM plans", href: "/pricing#crm", note: "The CRM is a separate subscription from your platform plan." };
+      }
       const has = !!l && ((l[a.limit] as number) !== 0 || (!!a.perLocation && (l[a.perLocation] as number) > 0));
       return has ? null : upgrade(plansWhere((plan) => allowanceValue(plan, a) !== null));
     }

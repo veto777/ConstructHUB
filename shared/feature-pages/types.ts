@@ -35,7 +35,11 @@ export type FeatureIcon = (typeof FEATURE_ICONS)[number];
  * allowance used when the flat one is 0 (siteScansPerLocation, …).
  */
 export type FeatureAllowance = {
-  limit: CountLimitKey;
+  /**
+   * A platform plan limit, or "crmPlanSeats" for the CRM product's seats
+   * (the CRM is sold separately — shared/crm-plans.ts).
+   */
+  limit: CountLimitKey | "crmPlanSeats";
   perLocation?: CountLimitKey;
   /** What one unit is, plural: "Site Scans", "websites", "team alert texts". */
   unit: string;

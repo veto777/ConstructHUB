@@ -1,6 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { ADDONS, PLANS } from "../plans";
+import { CRM_EXTRA_SEAT_MONTHLY_CENTS } from "../crm-plans";
 
 /**
  * ConstructHub CRM — the whole portal (clients, estimates, invoices, payments,
@@ -8,7 +9,7 @@ import { ADDONS, PLANS } from "../plans";
  *
  * Every claim below is backed by the code in `sources`:
  *   - workspace made on first open, named from the account's company: server/crm/tenancy.ts ensureOrgForUser
- *   - seats: shared/plans.ts limits.crmSeats + the Extra seat add-on; shared with the agency team on Agency
+ *   - seats: shared/crm-plans.ts CrmPlanLimits.seats + the CRM Extra seat add-on (the CRM is a separate product)
  *     (server/crm/tenancy.ts getOwnerSeatUsage)
  *   - roles and per-seat permissions, price-blind field crews: shared/schema.ts CRM_ROLES / CRM_ROLE_DEFAULTS
  *   - the three-step phone estimate builder: client/src/pages/crm-estimate-new.tsx
@@ -32,7 +33,7 @@ import { ADDONS, PLANS } from "../plans";
  * Numbers that live in the price book are read from it (allowanceLine, PLANS, ADDONS), never typed.
  */
 
-const SEATS: FeatureAllowance = { limit: "crmSeats", unit: "CRM seats", period: "count" };
+const SEATS: FeatureAllowance = { limit: "crmPlanSeats", unit: "CRM seats", period: "count" };
 
 const page: FeaturePage = {
   key: "crm",
@@ -147,7 +148,7 @@ const page: FeaturePage = {
   pricing: {
     kind: "plan",
     allowance: SEATS,
-    note: "Every plan includes the CRM; your plan sets how many people can use it, and extra seats are an add-on.",
+    note: "The CRM is a separate subscription from the ConstructHUB platform plans. Your CRM plan sets how many people can use it, and extra seats are an add-on.",
   },
   faqs: [
     {
@@ -156,7 +157,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it, and how many people can use it?",
-      a: `Every plan includes the CRM. ${allowanceLine(SEATS)}. Need one more person? Add the ${ADDONS.extra_seat.name} add-on. On the ${PLANS.agency.name} plan, the seats are shared with your agency team.`,
+      a: `The CRM is its own subscription, separate from the ConstructHUB platform plans. ${allowanceLine(SEATS)}. Need one more person? Extra CRM seats are $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo each.`,
     },
     {
       q: "Can I bring my data from my old system?",

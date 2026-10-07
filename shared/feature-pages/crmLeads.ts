@@ -25,7 +25,7 @@ import { allowanceLine } from "./pricing";
  *   - call leads filed into the CRM by the AI Call Assistant (an add-on not yet on sale): server/voice/leads.ts
  */
 
-const SEATS: FeatureAllowance = { limit: "crmSeats", unit: "CRM seats", period: "count" };
+const SEATS: FeatureAllowance = { limit: "crmPlanSeats", unit: "CRM seats", period: "count" };
 
 const page: FeaturePage = {
   key: "crmLeads",
@@ -115,7 +115,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it?",
-      a: `Every plan, as part of ConstructHub CRM. How many people can work leads is your CRM seats: ${allowanceLine(SEATS)}.`,
+      a: `It is part of ConstructHub CRM, which is its own subscription — separate from the ConstructHUB platform plans. How many people can work leads is your CRM seats: ${allowanceLine(SEATS)}.`,
     },
     {
       q: "Does it pull in leads from Google, ads or phone calls?",

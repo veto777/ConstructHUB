@@ -136,7 +136,7 @@ const page: FeaturePage = {
     },
     {
       q: "How many locations and team seats are included?",
-      a: `The ${AGENCY.name} plan includes ${AGENCY.limits.locations} client locations and ${AGENCY.limits.crmSeats} seats, shared between your agency team and your CRM team. More locations are priced per location up to ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, then quoted by a sales rep; more seats are the ${ADDONS.extra_seat.name} add-on.`,
+      a: `The ${AGENCY.name} plan includes ${AGENCY.limits.locations} client locations and ${AGENCY.limits.agencySeats} agency team seats. More locations are priced per location up to ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, then quoted by a sales rep; more seats are the ${ADDONS.extra_seat.name} add-on.`,
     },
     {
       q: "Do my clients have to share a password or connect anything?",

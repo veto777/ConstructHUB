@@ -211,7 +211,6 @@ export function comparisonSections(): CompareSection[] {
       title: "Permits & CRM",
       rows: [
         row("permitSearches", "Permit searches", (p) => countOrNone(p.limits.permitSearches, perMonth)),
-        row("crmSeats", "CRM seats (estimates, invoices, payments)", (p) => n(p.limits.crmSeats)),
         row("teamText", "Team text alerts", (p) => countOrNone(p.limits.teamTextSegments, perMonth)),
         row("clientTexting", "Two-way client texting", (p) =>
           p.limits.clientTexting === "none" ? false

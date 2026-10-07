@@ -117,7 +117,6 @@ function usageFor(plan: PlanKey | null, scenario: DashboardFixtureScenario): Das
     { key: "texts", label: "Texts", used: full ? 214 : 0, limit: l.teamTextSegments, period: "monthly", href: "/settings?tab=billing" },
     { key: "locations", label: "Locations", used: full ? 2 : 0, limit: l.locations, period: "count", href: "/locations" },
     { key: "protectedSites", label: "Protected websites", used: full ? 1 : 0, limit: l.protectedSites, period: "count", href: "/google-ads" },
-    { key: "crmSeats", label: "CRM seats", used: full ? 4 : 1, limit: l.crmSeats, period: "count", href: "/crm/team?tab=team", surface: "portal" },
   ];
   return rows.filter((r) => r.limit !== 0);
 }

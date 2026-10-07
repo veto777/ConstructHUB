@@ -17,6 +17,7 @@
  * script uses the statements with its own pg pool.
  */
 export const BILLING_SUBSCRIPTION_DDL: readonly string[] = [
+  `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS product text NOT NULL DEFAULT 'platform'`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_interval text`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS addons jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS agency_locations integer`,
@@ -27,7 +28,7 @@ export const BILLING_SUBSCRIPTION_DDL: readonly string[] = [
   `ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS start_date timestamp`,
 ];
 
-export const BILLING_COLUMNS: readonly string[] = ["billing_interval", "addons", "agency_locations", "cancel_at_period_end", "cancel_at", "start_date"];
+export const BILLING_COLUMNS: readonly string[] = ["product", "billing_interval", "addons", "agency_locations", "cancel_at_period_end", "cancel_at", "start_date"];
 
 /**
  * The account billing ledger (server/billing/ledger.ts): processed Stripe

@@ -230,15 +230,6 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
       title: "Permits & CRM",
       rows: [
         meterRow("permitSearches", "Permit searches", usage.searches, allowances.permitSearches, {}, unl),
-        {
-          key: "crmSeats",
-          label: "CRM seats (estimates, invoices, payments)",
-          included: countText(allowances.crmSeats, unl),
-          used: crmMe.data?.seats ? crmMe.data.seats.used : undefined,
-          ceiling: allowances.crmSeats > 0 ? allowances.crmSeats : undefined,
-          hint: isAgency ? "One pool for the CRM and the agency team." : undefined,
-          addon: "extra_seat",
-        },
         meterRow("teamTextSegments", "Team text alerts", usage.texts, allowances.teamTextSegments, {
           hint: allowances.teamTextSegments === 0 ? undefined : "Every text the workspace sends counts, by segment: 160 characters, or 70 with emoji or special characters.",
         }, unl),
@@ -483,7 +474,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
 export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
   "locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies",
   "protectedSites", "siteScans", "competitorScans",
-  "permitSearches", "crmSeats", "teamTextSegments", "clientTexting",
+  "permitSearches", "teamTextSegments", "clientTexting",
   "callAssistantMinutes", "callAssistantNumbers",
   "apiUnitsPerMonth", "apiRatePerMinute",
 ];

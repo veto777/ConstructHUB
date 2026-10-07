@@ -20,7 +20,7 @@ import { allowanceLine } from "./pricing";
  * Numbers that live in the price book are read from it (allowanceLine), never typed.
  */
 
-const SEATS: FeatureAllowance = { limit: "crmSeats", unit: "CRM seats", period: "count" };
+const SEATS: FeatureAllowance = { limit: "crmPlanSeats", unit: "CRM seats", period: "count" };
 
 const page: FeaturePage = {
   key: "crmSchedule",
@@ -109,7 +109,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it?",
-      a: `Every plan, as part of ConstructHub CRM. How many people can use it is your CRM seats: ${allowanceLine(SEATS)}.`,
+      a: `It is part of ConstructHub CRM, which is its own subscription — separate from the ConstructHUB platform plans. How many people can use it is your CRM seats: ${allowanceLine(SEATS)}.`,
     },
     {
       q: "Who can book and move visits?",

@@ -10,6 +10,7 @@ import {
   CALL_ASSISTANT_OVERAGE_RATES, callAssistantTier,
   type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey,
 } from "./plans";
+import { CRM_PLANS, CRM_PLAN_KEYS } from "./crm-plans";
 
 /** "Talk to a sales rep" — the label for anything at or above SALES_THRESHOLD_CENTS. */
 export const SALES_REP_LABEL = "Talk to a sales rep";
@@ -61,8 +62,8 @@ export function planPriceLine(key: PlanKey): string {
   return `${formatUsd(plan.monthlyCents)}/month or ${formatUsd(plan.annualCents)}/year`;
 }
 
-/** "Starter 1, Pro 3, Growth 10 and Agency 10". */
-export const CRM_SEATS_LINE = joinNames(PLAN_KEYS.map((key) => `${PLANS[key].name} ${PLANS[key].limits.crmSeats}`));
+/** "CRM Basic 1, CRM Essentials 5 and CRM Max 8" — the CRM is its own product. */
+export const CRM_SEATS_LINE = joinNames(CRM_PLAN_KEYS.map((key) => `${CRM_PLANS[key].name} ${CRM_PLANS[key].limits.seats}`));
 
 /** Module names that only the Agency plan includes, in display order. */
 export const AGENCY_ONLY_MODULES: string[] = (Object.keys(MODULE_NAMES) as ModuleKey[])
