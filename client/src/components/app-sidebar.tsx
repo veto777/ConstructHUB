@@ -297,6 +297,8 @@ const pricingGroup: NavGroup = {
     { title: "Add-ons", url: "/pricing#add-ons", icon: PlusCircle },
     // Every feature's intro page, for any signed-in account deciding what to add.
     { title: "All features", url: "/features", icon: LayoutGrid },
+    // JobCam lives in the CRM only (owner, 2026-10-07): the platform just says it exists, on its feature page.
+    { title: "JobCam", url: "/features/jobcam", icon: Camera, badge: "new" as BadgeType, testId: "link-nav-pricing-jobcam" },
     { title: "Master Class", url: "/features/master-class", icon: BookOpen, testId: "link-nav-pricing-master-class" },
     // The done-for-you SEO packages section of the pricing page.
     { title: "SEO Services", url: "/pricing#services", icon: Rocket },

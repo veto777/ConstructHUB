@@ -13,8 +13,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
-  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { JOBCAM_INCLUDED_GB, JOBCAM_STORAGE_TIERS_GB, formatJobcamTier } from "@shared/jobcam-storage";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard,
   InitialAvatar, SectionTitle, crmTable, roleTone, statusTone,
@@ -109,6 +111,115 @@ function PlanPill({ plan, beta }: { plan: { plan: string; status: string }; beta
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────────
+
+type JobcamStorageOrg = {
+  id: string; name: string; ownerEmail: string | null; mediaCount: number;
+  usedBytes: number; tierGb: number; limitBytes: number; label: string; warn: boolean; full: boolean; overLimit: boolean;
+  request: { id: string; requestedAt: string; tierGb: number } | null;
+};
+
+/**
+ * JobCam storage per org: used / size, a size select, and the "Request more
+ * storage" notes workspaces send. Sizes above the included one have no price
+ * yet, so this select is the only way an org gets one.
+ */
+function JobcamStorageAdminCard({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const [showAll, setShowAll] = useState(false);
+  const { data, isError } = useQuery<{ tiersGb: number[]; orgs: JobcamStorageOrg[] }>({ queryKey: ["/api/admin/jobcam/storage"], enabled });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["/api/admin/jobcam/storage"] });
+  const setTier = useMutation({
+    mutationFn: async (v: { orgId: string; tierGb: number }) => (await apiRequest("POST", "/api/admin/jobcam/storage-tier", v)).json(),
+    onSuccess: (r: { tierGb: number; previousGb: number; overLimit: boolean }) => {
+      refresh();
+      toast({
+        title: `Storage set to ${formatJobcamTier(r.tierGb)}`,
+        description: r.overLimit ? "This org already stores more than that: nothing is deleted, but its new uploads are blocked until it is under the limit." : `Was ${formatJobcamTier(r.previousGb)}.`,
+      });
+    },
+    onError: (e: any) => { refresh(); toast({ title: "Couldn't change the size", description: apiErrorMessage(e), variant: "destructive" }); },
+  });
+  const dismiss = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("POST", `/api/admin/jobcam/storage-requests/${id}/dismiss`)).json(),
+    onSuccess: () => { refresh(); toast({ title: "Request dismissed" }); },
+    onError: (e: any) => toast({ title: "Couldn't dismiss", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const orgs = data?.orgs ?? [];
+  const requests = orgs.filter((o) => o.request).length;
+  // Orgs that have never used JobCam and sit on the included size are noise until asked for.
+  const active = orgs.filter((o) => o.request || o.usedBytes > 0 || o.tierGb !== JOBCAM_INCLUDED_GB);
+  const shown = showAll ? orgs : active;
+  return (
+    <Card data-testid="card-jobcam-storage" id="card-jobcam-storage" className="scroll-mt-6">
+      <CardContent className="p-4 sm:p-5 space-y-4">
+        <SectionTitle icon={HardDrive} title="JobCam storage"
+          description={`Every org gets ${formatJobcamTier(JOBCAM_INCLUDED_GB)}. Larger sizes are not priced yet, so they are set here.${requests ? ` ${requests} open request${requests === 1 ? "" : "s"}.` : ""}`} />
+        <p className="text-xs text-muted-foreground" data-testid="text-jobcam-storage-lowering">
+          Setting a size below what an org already stores is allowed: nothing is deleted, but its new uploads are blocked until it is under the limit.
+        </p>
+        {isError ? (
+          <p className="text-sm text-destructive">Couldn't load JobCam storage — refresh to try again.</p>
+        ) : !shown.length ? (
+          <p className="text-sm text-muted-foreground">No org has used JobCam yet.</p>
+        ) : (
+          <div className={crmTable.wrapper}>
+            <table className={crmTable.table} data-testid="table-jobcam-storage">
+              <thead className={crmTable.thead}>
+                <tr>
+                  <th className={crmTable.th}>Org</th>
+                  <th className={crmTable.th}>Used</th>
+                  <th className={crmTable.th}>Size</th>
+                  <th className={crmTable.th}>Request</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((o) => (
+                  <tr key={o.id} className={crmTable.tr} data-testid={`row-jobcam-storage-${o.id}`}>
+                    <td className={crmTable.td}>
+                      <span className="font-medium">{o.name}</span>
+                      <div className="text-xs text-muted-foreground">{o.ownerEmail ?? "—"}</div>
+                    </td>
+                    <td className={crmTable.td}>
+                      <span className={`tabular-nums ${o.full ? "text-destructive font-medium" : ""}`} data-testid={`text-jobcam-storage-used-${o.id}`}>{o.label}</span>
+                      <div className="text-xs text-muted-foreground">
+                        {o.mediaCount.toLocaleString("en-US")} item{o.mediaCount === 1 ? "" : "s"}{o.overLimit ? " · over the limit, uploads blocked" : o.full ? " · full" : o.warn ? " · almost full" : ""}
+                      </div>
+                    </td>
+                    <td className={crmTable.td}>
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                        value={o.tierGb}
+                        disabled={setTier.isPending}
+                        aria-label={`Storage size for ${o.name}`}
+                        data-testid={`select-jobcam-tier-${o.id}`}
+                        onChange={(e) => setTier.mutate({ orgId: o.id, tierGb: Number(e.target.value) })}
+                      >
+                        {(data?.tiersGb ?? JOBCAM_STORAGE_TIERS_GB).map((t) => <option key={t} value={t}>{formatJobcamTier(t)}</option>)}
+                      </select>
+                    </td>
+                    <td className={crmTable.td}>
+                      {o.request ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" data-testid={`badge-jobcam-request-${o.id}`}>Asked {day(o.request.requestedAt)}</Badge>
+                          <Button size="sm" variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate(o.request!.id)} data-testid={`button-jobcam-request-dismiss-${o.id}`}>Dismiss</Button>
+                        </div>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {orgs.length > active.length && (
+          <Button size="sm" variant="outline" onClick={() => setShowAll((v) => !v)} data-testid="button-jobcam-storage-all">
+            {showAll ? "Only orgs using JobCam" : `Show all ${orgs.length} orgs`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CrmAdminPage() {
   const { toast } = useToast();
@@ -457,6 +568,9 @@ export default function CrmAdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── JobCam storage ───────────────────────────────────────────────── */}
+      <JobcamStorageAdminCard enabled={isAdmin && gateOpen} />
 
       {/* ── Beta invites ─────────────────────────────────────────────────── */}
       <Card data-testid="card-beta-invites">

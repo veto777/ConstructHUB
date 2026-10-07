@@ -27,6 +27,10 @@ export type CrmSubscriptionInfo = {
   status: string;
   interval: BillingInterval | null;
   extraSeats: number;
+  /** The JobCam add-on is on this subscription (CRM Basic / Essentials). */
+  jobcamAddon?: boolean;
+  /** JobCam is usable on this subscription: included by the plan or added. */
+  jobcam?: boolean;
   seats: number;
   currentPeriodEnd: string | null;
   trialEndsAt: string | null;

@@ -16,7 +16,7 @@
 import { pool } from "../db";
 import { ACCESS_STATUSES } from "../../shared/plans";
 import {
-  CRM_PLANS, isCrmPlanKey, CRM_EXTRA_SEAT_MONTHLY_CENTS,
+  CRM_PLANS, isCrmPlanKey, CRM_EXTRA_SEAT_MONTHLY_CENTS, crmAddonAvailableOn, crmPlanHasJobcam,
   type CrmPlanKey, type CrmPlanLimits,
 } from "../../shared/crm-plans";
 import { isPlatformAdminEmail } from "../admin";
@@ -40,6 +40,8 @@ export const CRM_SUBSCRIPTION_DDL: readonly string[] = [
      updated_at timestamp NOT NULL DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS crm_subscriptions_stripe_sub_idx ON crm_subscriptions (stripe_subscription_id)`,
+  // The JobCam add-on (shared/crm-plans.ts CRM_ADDONS.jobcam): a yes/no line on the CRM subscription.
+  `ALTER TABLE crm_subscriptions ADD COLUMN IF NOT EXISTS jobcam_addon boolean NOT NULL DEFAULT false`,
 ];
 
 let schemaReady: Promise<void> | null = null;
@@ -63,6 +65,7 @@ export type CrmSubscriptionRow = {
   status: string;
   billing_interval: string | null;
   extra_seats: number;
+  jobcam_addon: boolean;
   current_period_end: Date | null;
   trial_end: Date | null;
   cancel_at_period_end: boolean | null;
@@ -75,6 +78,10 @@ export type CrmEntitlements = {
   /** Seats included by the plan plus Extra seats. 0 without a CRM plan; -1 = unlimited. */
   seats: number;
   extraSeats: number;
+  /** The subscription carries the JobCam add-on (only counted on a plan that sells it). */
+  jobcamAddon: boolean;
+  /** JobCam is usable: the plan includes it, the add-on is on, or the account is beta / staff. */
+  jobcam: boolean;
   status: string | null;
   /** True when the CRM is usable right now. */
   active: boolean;
@@ -85,7 +92,7 @@ export type CrmEntitlements = {
 };
 
 export const NO_CRM: CrmEntitlements = {
-  plan: null, limits: null, seats: 0, extraSeats: 0, status: null, active: false, via: null,
+  plan: null, limits: null, seats: 0, extraSeats: 0, jobcamAddon: false, jobcam: false, status: null, active: false, via: null,
   trialEndsAt: null, currentPeriodEnd: null,
 };
 
@@ -116,17 +123,25 @@ export async function getCrmEntitlements(userId: number | null | undefined, opts
 async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
   await crmBillingSchemaReady();
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.trial_end, s.current_period_end
+    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.jobcam_addon, s.trial_end, s.current_period_end
        FROM users u LEFT JOIN crm_subscriptions s ON s.user_id = u.id
       WHERE u.id = $1`, [userId]);
   if (!row) return NO_CRM;
+  return crmEntitlementsFromRow(row, isPlatformAdminEmail(row.email));
+}
+
+/** The entitlements one users ⟕ crm_subscriptions row gives. Pure — crm-plans.test.ts checks it. */
+export function crmEntitlementsFromRow(
+  row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
+  isAdmin: boolean,
+): CrmEntitlements {
   // ConstructHUB staff and beta accounts use the CRM without a subscription.
   const top = CRM_PLANS.crm_max;
-  if (isPlatformAdminEmail(row.email)) {
-    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, status: row.status ?? null, active: true, via: "admin" };
+  if (isAdmin) {
+    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "admin" };
   }
   if (row.beta_at) {
-    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, status: row.status ?? null, active: true, via: "beta" };
+    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "beta" };
   }
   const status: string | null = row.status ?? null;
   const live = !!status && (ACCESS_STATUSES as readonly string[]).includes(status);
@@ -135,8 +150,10 @@ async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
   if (!plan) return { ...NO_CRM, status };
   const limits = CRM_PLANS[plan].limits;
   const extraSeats = Math.max(0, Number(row.extra_seats) || 0);
+  // The add-on only counts on a plan that sells it; a plan that includes JobCam needs none.
+  const jobcamAddon = row.jobcam_addon === true && crmAddonAvailableOn("jobcam", plan);
   return {
-    plan, limits, extraSeats, status, active: true, via: "plan",
+    plan, limits, extraSeats, jobcamAddon, jobcam: crmPlanHasJobcam(plan, jobcamAddon), status, active: true, via: "plan",
     seats: limits.seats < 0 ? limits.seats : limits.seats + extraSeats,
     trialEndsAt: status === "trialing" && row.trial_end ? new Date(row.trial_end) : null,
     currentPeriodEnd: row.current_period_end ? new Date(row.current_period_end) : null,

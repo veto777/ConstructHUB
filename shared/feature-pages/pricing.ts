@@ -9,7 +9,7 @@ import {
   ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
   type AddonModuleKey, type CountLimitKey, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "../plans";
-import { CRM_PLANS, CRM_PLAN_KEYS } from "../crm-plans";
+import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS } from "../crm-plans";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, joinNames, plansWhere, priceOrSalesRep } from "../plan-copy";
 import type { FeatureAllowance, FeaturePricing } from "./types";
 
@@ -123,6 +123,23 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
         plans: [], comingSoon: addon.preview === true, link: { label: "See add-ons", href: "/pricing#add-ons" }, note,
       };
     }
+    case "crmAddon": {
+      // Sold on the CRM subscription, not a platform plan: the rows are the CRM's plans.
+      const addon = CRM_ADDONS[spec.addon];
+      const includedIn = CRM_PLAN_KEYS.filter((k) => !addon.availableOn.includes(k));
+      const names = (keys: readonly (typeof CRM_PLAN_KEYS)[number][]) => joinNames(keys.map((k) => CRM_PLANS[k].name));
+      return {
+        headline: includedIn.length ? `Included in ${names(includedIn)}` : "CRM add-on",
+        price: formatUsd(addon.monthlyCents), per: PER_MONTH,
+        priceNote: `${addon.name} add-on: ${formatUsd(addon.monthlyCents)}/mo or ${formatUsd(addon.annualCents)}/yr, added to ${names(addon.availableOn)}.${includedIn.length ? ` ${names(includedIn)} includes it at no extra charge.` : ""}`,
+        rows: CRM_PLAN_KEYS.map((key) => ({
+          label: CRM_PLANS[key].name,
+          value: addon.availableOn.includes(key) ? "Available as an add-on" : "Included",
+          included: true,
+        })),
+        plans: [], comingSoon: false, link: { label: "See CRM plans", href: "/pricing#crm" }, note,
+      };
+    }
     case "account":
       return {
         headline: "Free with an account",
@@ -210,6 +227,8 @@ export function featurePlanGap(spec: FeaturePricing, ent: FeatureEntitlementsInp
       const has = !!l && ((l[a.limit] as number) !== 0 || (!!a.perLocation && (l[a.perLocation] as number) > 0));
       return has ? null : upgrade(plansWhere((plan) => allowanceValue(plan, a) !== null));
     }
+    // "crmAddon" (JobCam) falls through to null: it hangs off the CRM subscription, which this check can't
+    // see, so the page keeps "Open <feature>" and the CRM shows its own upgrade card to a workspace without it.
     case "addon": {
       const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === spec.addon);
       if (!module || ent.addonModules?.[module]) return null;

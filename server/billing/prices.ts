@@ -22,7 +22,8 @@ import {
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import {
-  CRM_PLANS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS, crmPlanPriceCents, isCrmPlanKey, type CrmPlanKey,
+  CRM_PLANS, CRM_ADDONS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS, crmPlanPriceCents, crmAddonPriceCents, isCrmPlanKey,
+  type CrmPlanKey, type CrmAddonKey,
 } from "@shared/crm-plans";
 
 const PREFIX = "chub_v1";
@@ -34,7 +35,9 @@ export type PriceRole =
   | { kind: "setup"; key: AddonKey }
   // The CRM is a separate product with its own subscription (server/crm/billing.ts).
   | { kind: "crm_plan"; key: CrmPlanKey; interval: BillingInterval }
-  | { kind: "crm_seat"; interval: BillingInterval };
+  | { kind: "crm_seat"; interval: BillingInterval }
+  // A yes/no add-on on the CRM subscription (shared/crm-plans.ts CRM_ADDONS).
+  | { kind: "crm_addon"; key: CrmAddonKey; interval: BillingInterval };
 
 export type PriceSpec = {
   lookupKey: string;
@@ -153,6 +156,21 @@ export function crmSeatPriceSpec(interval: BillingInterval): PriceSpec {
   };
 }
 
+/** A CRM add-on (JobCam), one line on a CRM subscription. Annual is its own explicit price. */
+export function crmAddonPriceSpec(addon: CrmAddonKey, interval: BillingInterval): PriceSpec {
+  const cents = crmAddonPriceCents(addon, interval);
+  return {
+    lookupKey: `${PREFIX}_crmaddon_${addon}_${interval}_${cents}`,
+    role: { kind: "crm_addon", key: addon, interval },
+    params: {
+      currency: "usd",
+      unit_amount: cents,
+      recurring: { interval },
+      product_data: { name: `ConstructHUB CRM — ${CRM_ADDONS[addon].name} add-on` },
+    },
+  };
+}
+
 export function agencyLocationsPriceSpec(interval: BillingInterval): PriceSpec {
   const tiers = agencyLocationTiers(interval);
   const signature = tiers.map((t) => `${t.up_to}x${t.unit_amount}`).join("-");
@@ -223,6 +241,9 @@ export function roleOfPrice(price: Stripe.Price | null | undefined): PriceRole |
       return isCrmPlanKey(meta.chub_key) && isBillingInterval(interval) ? { kind: "crm_plan", key: meta.chub_key, interval } : null;
     case "crm_seat":
       return isBillingInterval(interval) ? { kind: "crm_seat", interval } : null;
+    case "crm_addon":
+      return typeof meta.chub_key === "string" && meta.chub_key in CRM_ADDONS && isBillingInterval(interval)
+        ? { kind: "crm_addon", key: meta.chub_key as CrmAddonKey, interval } : null;
     default:
       return null;
   }

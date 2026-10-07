@@ -114,6 +114,25 @@ export const JOBCAM_DDL: readonly string[] = [
      video_count integer NOT NULL DEFAULT 0,
      updated_at timestamp DEFAULT now()
    )`,
+  // Storage size per org, in GB (shared/jobcam-storage.ts: 5 included; 10/100/500/1000/2000 set by a platform admin).
+  `ALTER TABLE jobcam_org_usage ADD COLUMN IF NOT EXISTS storage_tier_gb integer NOT NULL DEFAULT 5`,
+  // The storage check sums an org's in-flight uploads on every open.
+  `CREATE INDEX IF NOT EXISTS jobcam_uploads_org_open_idx ON jobcam_uploads (org_id) WHERE status = 'open'`,
+
+  // "Request more storage": larger sizes have no price yet — a platform admin answers by hand.
+  `CREATE TABLE IF NOT EXISTS jobcam_storage_requests (
+     id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+     org_id varchar NOT NULL,
+     member_id varchar,
+     tier_gb integer NOT NULL,
+     used_bytes bigint NOT NULL DEFAULT 0,
+     status text NOT NULL DEFAULT 'open',
+     resolved_by text,
+     resolved_at timestamp,
+     created_at timestamp DEFAULT now()
+   )`,
+  // One open request per org: asking twice is the same request.
+  `CREATE UNIQUE INDEX IF NOT EXISTS jobcam_storage_requests_open_idx ON jobcam_storage_requests (org_id) WHERE status = 'open'`,
 
   // ── Reserved for phases B–D (created empty now) ───────────────────────────
   `CREATE TABLE IF NOT EXISTS jobcam_annotations (

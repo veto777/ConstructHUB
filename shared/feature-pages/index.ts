@@ -39,6 +39,7 @@ import crm from "./crm";
 import crmSchedule from "./crmSchedule";
 import crmLeads from "./crmLeads";
 import texting from "./texting";
+import jobcam from "./jobcam";
 import agency from "./agency";
 import masterClass from "./masterClass";
 import guides from "./guides";
@@ -71,7 +72,7 @@ export const FEATURE_PAGES: readonly FeaturePage[] = [
   // Win jobs
   permits, property, competitors, adsManager, lsaLeads,
   // Run the business
-  crm, crmSchedule, crmLeads, texting, agency,
+  crm, crmSchedule, crmLeads, texting, jobcam, agency,
   // Learn
   masterClass, guides, reinstatement,
   // The platform

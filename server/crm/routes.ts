@@ -53,6 +53,8 @@ import { registerCrmStatsRoutes } from "./stats";
 import { registerCrmInboxRoutes } from "./inbox";
 import { registerJobcamRoutes } from "../jobcam/routes";
 import { registerJobcamShareRoutes } from "../jobcam/share";
+import { registerJobcamAdminRoutes } from "../jobcam/admin";
+import { jobcamEntitled } from "../jobcam/plan";
 import { resumeJobcamProcessing, startJobcamSweeper } from "../jobcam/processor";
 import { logActivity, recordActivity, registerCrmActivityRoutes } from "./activity";
 import { isPlatformAdminEmail } from "../admin";
@@ -405,6 +407,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
   // client-portal feed and the org storage meter (server/jobcam/*).
   registerJobcamRoutes(app, getDevUser);
   registerJobcamShareRoutes(app, getDevUser);
+  registerJobcamAdminRoutes(app, getDevUser);
   resumeJobcamProcessing().catch((e: any) => console.error("[jobcam] resume failed:", e?.message || e));
   startJobcamSweeper();
 
@@ -423,6 +426,7 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     // The CRM is its own subscription (the org owner's). The app shows the CRM
     // plans instead of the workspace when it is not active.
     const crmEnt = await getCrmEntitlements(ctx.org.ownerUserId);
+    const jobcam = await jobcamEntitled(ctx.org.ownerUserId);
 
     // Best-effort activity stamp; never fail the request over it.
     db.update(crmMembers)
@@ -449,6 +453,9 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         status: crmEnt.status,
         trialEndsAt: crmEnt.trialEndsAt,
         isOwner: ctx.org.ownerUserId === user.id,
+        // JobCam: CRM Max includes it; Basic / Essentials with the add-on; staff and beta always (jobcam/plan.ts).
+        jobcam: jobcam.entitled,
+        jobcamVia: jobcam.via,
       },
       roles: CRM_ROLES,
       permissionKeys: CRM_PERMISSIONS,

@@ -2,6 +2,29 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 📷 2026-10-07 — JobCam: storage sizes, CRM-plan gate, $39/mo add-on (branch `jobcam-storage`, NOT deployed)
+- **Owner decisions (2026-10-07):** storage "5 gigs and then 10, 100, 500, 1000, 2000"; JobCam "is part of the upper tier
+  plan" = INCLUDED in CRM Max; "the upgrade will cost $39 a month on basic and essential" = the JobCam add-on on CRM Basic
+  and CRM Essentials; JobCam is a CRM feature only (the platform only has its feature page, `/features/jobcam`).
+- **Storage:** `shared/jobcam-storage.ts` (sizes, 1 GB = 1024³, formatting, the 403 body). `jobcam_org_usage.storage_tier_gb`
+  (default 5). Enforced in `server/jobcam/routes.ts` at upload OPEN (used + open uploads + still-processing media + this
+  file, under a row lock on the org's usage row: `withJobcamStorageRoom`) and again at COMPLETE (refusal aborts the
+  multipart, deletes the object and the rows). Refusal = 403 `limit_reached`, `feature: "jobcamStorage"`.
+  **Larger sizes have NO price**: only a platform admin sets one (`POST /api/admin/jobcam/storage-tier`, /admin →
+  "JobCam storage", written to `admin_audit_log`); customers press "Request more storage" (`jobcam_storage_requests`,
+  listed in the same admin card — nothing emails the admin yet).
+- **Plan gate:** ONE function, `jobcamEntitled(ownerUserId)` / pure `jobcamAccessFrom` in `server/jobcam/plan.ts`
+  (`via: plan | addon | admin | beta`). Every member route answers 402 `crm_plan_required` (`feature: "jobcam"`) without
+  it; `/jc/:token` share pages and the client portal stay open, and revoking/deleting a share link stays possible.
+  `/api/crm/me` carries `crm.jobcam`; the client shows `JobcamUpgradeCard` instead of the feed/camera.
+- **Add-on:** `CRM_ADDONS.jobcam` in `shared/crm-plans.ts` ($39/mo; yearly = 12 × $39 = $468, NO discount assumed — owner
+  to confirm). Stripe price `chub_v1_crmaddon_jobcam_{month|year}_{cents}` is created lazily like every other price
+  (`crmAddonPriceSpec`); it is one more item on the CRM subscription (`crm_subscriptions.jobcam_addon`), added/removed
+  through `POST /api/crm/billing/change { jobcam }` with the same proration as extra seats. Moving to CRM Max drops the line.
+- **Deploy notes:** new columns/tables are created at boot (idempotent). Orgs whose owner is not staff/beta and has no
+  CRM Max / add-on lose JobCam on deploy — check production before shipping. With `CRM_REQUIRE_PLAN=0` an org without a
+  CRM plan still has no JobCam.
+
 ## 💳 2026-10-07 — the CRM is a SEPARATE PRODUCT (own plans, own subscription) · checkout-return fix · Google tag · ad doors
 - **Owner decisions (2026-10-07):** two apps, sold separately; nobody is forced to buy both. Platform tiers keep their
   prices and no longer include the CRM. CRM pricing = half of Housecall Pro (verified on housecallpro.com/pricing):

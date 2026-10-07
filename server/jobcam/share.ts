@@ -76,12 +76,15 @@ export function presentShare(s: JobcamShareLink, baseUrl: string) {
 }
 
 export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): void {
-  const ctxFor = async (req: any, res: any): Promise<OrgContext | null> => {
+  const ctxFor = async (req: any, res: any, opts: { plan?: boolean } = {}): Promise<OrgContext | null> => {
     const user = getDevUser(req, res);
     if (!user) return null;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return null;
     if (!canManageJobcam(ctx)) { res.status(403).json({ message: "Requires permission: manageJobs" }); return null; }
+    // Revoking or deleting a link stays possible without JobCam on the plan: a
+    // workspace that downgraded must still be able to switch off what it sent.
+    if (opts.plan !== false && !(await requireJobcamPlan(res, ctx))) return null;
     return ctx;
   };
 
@@ -98,7 +101,6 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
 
   app.post("/api/crm/projects/:projectId/jobcam/shares", async (req: any, res) => {
     const ctx = await ctxFor(req, res); if (!ctx) return;
-    if (!(await requireJobcamPlan(res, ctx))) return;
     const project = await visibleProject(ctx, req.params.projectId);
     if (!project) return res.status(404).json({ message: "Project not found" });
     const parsed = z.object({
@@ -145,7 +147,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
   };
 
   app.post("/api/crm/jobcam/shares/:id/revoke", async (req: any, res) => {
-    const ctx = await ctxFor(req, res); if (!ctx) return;
+    const ctx = await ctxFor(req, res, { plan: false }); if (!ctx) return;
     const s = await shareFor(ctx, req.params.id);
     if (!s) return res.status(404).json({ message: "Share link not found" });
     const [row] = await db.update(jobcamShareLinks).set({ revokedAt: s.revokedAt ?? new Date() }).where(eq(jobcamShareLinks.id, s.id)).returning();
@@ -154,7 +156,7 @@ export function registerJobcamShareRoutes(app: Express, getDevUser: GetUser): vo
   });
 
   app.delete("/api/crm/jobcam/shares/:id", async (req: any, res) => {
-    const ctx = await ctxFor(req, res); if (!ctx) return;
+    const ctx = await ctxFor(req, res, { plan: false }); if (!ctx) return;
     const s = await shareFor(ctx, req.params.id);
     if (!s) return res.status(404).json({ message: "Share link not found" });
     await db.delete(jobcamShareLinks).where(eq(jobcamShareLinks.id, s.id));
