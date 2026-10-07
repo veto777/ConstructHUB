@@ -1,0 +1,700 @@
+{
+ "domain": "alpineexteriorsfl.com",
+ "overview": {
+  "se_type": "google",
+  "location_code": 2840,
+  "language_code": "en",
+  "metrics": {
+   "organic": {
+    "pos_1": 0,
+    "pos_2_3": 0,
+    "pos_4_10": 1,
+    "pos_11_20": 6,
+    "pos_21_30": 5,
+    "pos_31_40": 5,
+    "pos_41_50": 4,
+    "pos_51_60": 4,
+    "pos_61_70": 2,
+    "pos_71_80": 10,
+    "pos_81_90": 4,
+    "pos_91_100": 7,
+    "etv": 7.363419389934279,
+    "count": 48,
+    "estimated_paid_traffic_cost": 116.51389562804252,
+    "is_new": 32,
+    "is_up": 10,
+    "is_down": 6,
+    "is_lost": 47,
+    "clickstream_etv": null,
+    "clickstream_gender_distribution": null,
+    "clickstream_age_distribution": null
+   },
+   "paid": {
+    "pos_1": 0,
+    "pos_2_3": 0,
+    "pos_4_10": 0,
+    "pos_11_20": 0,
+    "pos_21_30": 0,
+    "pos_31_40": 0,
+    "pos_41_50": 0,
+    "pos_51_60": 0,
+    "pos_61_70": 0,
+    "pos_71_80": 0,
+    "pos_81_90": 0,
+    "pos_91_100": 0,
+    "etv": 0,
+    "count": 0,
+    "estimated_paid_traffic_cost": 0,
+    "is_new": 0,
+    "is_up": 0,
+    "is_down": 0,
+    "is_lost": 0,
+    "clickstream_etv": null,
+    "clickstream_gender_distribution": null,
+    "clickstream_age_distribution": null
+   }
+  }
+ },
+ "summary": {
+  "target": "alpineexteriorsfl.com",
+  "rank": 370,
+  "backlinks": 30827,
+  "backlinks_spam_score": 28,
+  "broken_backlinks": 30960,
+  "referring_domains": 2407,
+  "referring_domains_nofollow": 21,
+  "referring_ips": 1736,
+  "first_seen": "2023-09-05 08:50:12 +00:00",
+  "referring_links_tld": {
+   "com": 28271,
+   "us": 1652,
+   "net": 132,
+   "website": 116,
+   "store": 102,
+   "shop": 101,
+   "space": 97,
+   "online": 94,
+   "site": 91,
+   "org": 47
+  }
+ },
+ "history": [
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 9,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 1,
+     "pos_11_20": 4,
+     "pos_21_30": 5,
+     "pos_31_40": 8,
+     "pos_41_50": 8,
+     "pos_51_60": 5,
+     "pos_61_70": 3,
+     "pos_71_80": 12,
+     "pos_81_90": 5,
+     "pos_91_100": 6,
+     "etv": 14.094930410850793,
+     "count": 57,
+     "estimated_paid_traffic_cost": 359.2880963124335,
+     "is_new": 38,
+     "is_up": 5,
+     "is_down": 14,
+     "is_lost": 50,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 8,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 4,
+     "pos_11_20": 8,
+     "pos_21_30": 3,
+     "pos_31_40": 7,
+     "pos_41_50": 8,
+     "pos_51_60": 5,
+     "pos_61_70": 5,
+     "pos_71_80": 8,
+     "pos_81_90": 8,
+     "pos_91_100": 4,
+     "etv": 17.00591672467999,
+     "count": 60,
+     "estimated_paid_traffic_cost": 531.1030105352402,
+     "is_new": 38,
+     "is_up": 8,
+     "is_down": 14,
+     "is_lost": 39,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 7,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 7,
+     "pos_11_20": 10,
+     "pos_21_30": 6,
+     "pos_31_40": 6,
+     "pos_41_50": 11,
+     "pos_51_60": 9,
+     "pos_61_70": 9,
+     "pos_71_80": 6,
+     "pos_81_90": 5,
+     "pos_91_100": 6,
+     "etv": 31.66615249965788,
+     "count": 75,
+     "estimated_paid_traffic_cost": 929.4976433074113,
+     "is_new": 49,
+     "is_up": 18,
+     "is_down": 8,
+     "is_lost": 39,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 6,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 11,
+     "pos_11_20": 10,
+     "pos_21_30": 7,
+     "pos_31_40": 9,
+     "pos_41_50": 10,
+     "pos_51_60": 11,
+     "pos_61_70": 8,
+     "pos_71_80": 6,
+     "pos_81_90": 2,
+     "pos_91_100": 3,
+     "etv": 12.7888669517962,
+     "count": 77,
+     "estimated_paid_traffic_cost": 340.5400936967176,
+     "is_new": 42,
+     "is_up": 25,
+     "is_down": 10,
+     "is_lost": 38,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 5,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 7,
+     "pos_11_20": 16,
+     "pos_21_30": 9,
+     "pos_31_40": 15,
+     "pos_41_50": 9,
+     "pos_51_60": 11,
+     "pos_61_70": 10,
+     "pos_71_80": 4,
+     "pos_81_90": 3,
+     "pos_91_100": 2,
+     "etv": 6.932835157619249,
+     "count": 86,
+     "estimated_paid_traffic_cost": 152.82178354541892,
+     "is_new": 57,
+     "is_up": 18,
+     "is_down": 11,
+     "is_lost": 21,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "se_type": "google",
+   "year": 2026,
+   "month": 4,
+   "metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 6,
+     "pos_11_20": 18,
+     "pos_21_30": 7,
+     "pos_31_40": 15,
+     "pos_41_50": 8,
+     "pos_51_60": 9,
+     "pos_61_70": 8,
+     "pos_71_80": 5,
+     "pos_81_90": 2,
+     "pos_91_100": 2,
+     "etv": 7.036093124271913,
+     "count": 80,
+     "estimated_paid_traffic_cost": 130.09900404194534,
+     "is_new": 49,
+     "is_up": 22,
+     "is_down": 9,
+     "is_lost": 22,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  }
+ ],
+ "keywords": {
+  "items": [
+   {
+    "keyword_data": {
+     "keyword": "alpine exteriors",
+     "keyword_info": {
+      "search_volume": 880,
+      "cpc": 19.479999542236328,
+      "competition": 0.36000001430511475
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 33
+     },
+     "search_intent_info": {
+      "main_intent": "commercial"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 13,
+      "rank_absolute": 17,
+      "url": "https://alpineexteriorsfl.com/",
+      "etv": 3.8730711936950684,
+      "estimated_paid_traffic_cost": 75.44742584228516
+     }
+    }
+   },
+   {
+    "keyword_data": {
+     "keyword": "alpine siding",
+     "keyword_info": {
+      "search_volume": 70,
+      "cpc": 1.5199999809265137,
+      "competition": 0.23999999463558197
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 71
+     },
+     "search_intent_info": {
+      "main_intent": "transactional"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 4,
+      "rank_absolute": 7,
+      "url": "https://alpineexteriorsfl.com/",
+      "etv": 1.192568302154541,
+      "estimated_paid_traffic_cost": 1.8127038478851318
+     }
+    }
+   },
+   {
+    "keyword_data": {
+     "keyword": "osprey exteriors",
+     "keyword_info": {
+      "search_volume": 50,
+      "cpc": null,
+      "competition": 0.14000000059604645
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 0
+     },
+     "search_intent_info": {
+      "main_intent": "navigational"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 12,
+      "rank_absolute": 17,
+      "url": "https://alpineexteriorsfl.com/fl/osprey/siding-contractor",
+      "etv": 0.48890337347984314,
+      "estimated_paid_traffic_cost": null
+     }
+    }
+   },
+   {
+    "keyword_data": {
+     "keyword": "alpine exteriors utah",
+     "keyword_info": {
+      "search_volume": 880,
+      "cpc": 19.479999542236328,
+      "competition": 0.36000001430511475
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 39
+     },
+     "search_intent_info": {
+      "main_intent": "navigational"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 42,
+      "rank_absolute": 47,
+      "url": "https://alpineexteriorsfl.com/",
+      "etv": 0.3822731673717499,
+      "estimated_paid_traffic_cost": 7.446681022644043
+     }
+    }
+   },
+   {
+    "keyword_data": {
+     "keyword": "seminole siding",
+     "keyword_info": {
+      "search_volume": 70,
+      "cpc": 9.729999542236328,
+      "competition": 0.009999999776482582
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 0
+     },
+     "search_intent_info": {
+      "main_intent": "informational"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 26,
+      "rank_absolute": 30,
+      "url": "https://alpineexteriorsfl.com/fl/seminole/siding-contractor",
+      "etv": 0.1896282583475113,
+      "estimated_paid_traffic_cost": 1.8450829982757568
+     }
+    }
+   },
+   {
+    "keyword_data": {
+     "keyword": "james hardie plant city",
+     "keyword_info": {
+      "search_volume": 390,
+      "cpc": 8.210000038146973,
+      "competition": 0.10000000149011612
+     },
+     "keyword_properties": {
+      "keyword_difficulty": 0
+     },
+     "search_intent_info": {
+      "main_intent": "informational"
+     }
+    },
+    "ranked_serp_element": {
+     "serp_item": {
+      "type": "organic",
+      "rank_group": 52,
+      "rank_absolute": 60,
+      "url": "https://alpineexteriorsfl.com/fl/plant-city/siding-contractor",
+      "etv": 0.13797959685325623,
+      "estimated_paid_traffic_cost": 1.1328125
+     }
+    }
+   }
+  ],
+  "total": 48
+ },
+ "pages": {
+  "items": [
+   {
+    "page_address": "https://alpineexteriorsfl.com/",
+    "metrics": {
+     "organic": {
+      "pos_1": 0,
+      "pos_2_3": 0,
+      "pos_4_10": 1,
+      "pos_11_20": 4,
+      "pos_21_30": 4,
+      "pos_31_40": 2,
+      "pos_41_50": 3,
+      "pos_51_60": 2,
+      "pos_61_70": 2,
+      "pos_71_80": 3,
+      "pos_81_90": 0,
+      "pos_91_100": 1,
+      "etv": 6.068271935218945,
+      "count": 22,
+      "estimated_paid_traffic_cost": 101.36585772037506,
+      "is_new": 10,
+      "is_up": 8,
+      "is_down": 4,
+      "is_lost": 0,
+      "clickstream_etv": null,
+      "clickstream_gender_distribution": null,
+      "clickstream_age_distribution": null
+     }
+    }
+   },
+   {
+    "page_address": "https://alpineexteriorsfl.com/fl/gulfport/deck-contractor",
+    "metrics": {
+     "organic": {
+      "pos_1": 0,
+      "pos_2_3": 0,
+      "pos_4_10": 0,
+      "pos_11_20": 0,
+      "pos_21_30": 0,
+      "pos_31_40": 0,
+      "pos_41_50": 0,
+      "pos_51_60": 0,
+      "pos_61_70": 0,
+      "pos_71_80": 2,
+      "pos_81_90": 1,
+      "pos_91_100": 2,
+      "etv": 0.0718210933264345,
+      "count": 5,
+      "estimated_paid_traffic_cost": 1.0394895300269127,
+      "is_new": 4,
+      "is_up": 0,
+      "is_down": 1,
+      "is_lost": 0,
+      "clickstream_etv": null,
+      "clickstream_gender_distribution": null,
+      "clickstream_age_distribution": null
+     }
+    }
+   },
+   {
+    "page_address": "https://alpineexteriorsfl.com/fl/palm-harbor/siding-companies",
+    "metrics": {
+     "organic": {
+      "pos_1": 0,
+      "pos_2_3": 0,
+      "pos_4_10": 0,
+      "pos_11_20": 0,
+      "pos_21_30": 0,
+      "pos_31_40": 0,
+      "pos_41_50": 0,
+      "pos_51_60": 0,
+      "pos_61_70": 0,
+      "pos_71_80": 1,
+      "pos_81_90": 1,
+      "pos_91_100": 2,
+      "etv": 0.05999952647835016,
+      "count": 4,
+      "estimated_paid_traffic_cost": 1.2185718528926373,
+      "is_new": 4,
+      "is_up": 0,
+      "is_down": 0,
+      "is_lost": 0,
+      "clickstream_etv": null,
+      "clickstream_gender_distribution": null,
+      "clickstream_age_distribution": null
+     }
+    }
+   }
+  ],
+  "total": 15
+ },
+ "competitors": [
+  {
+   "domain": "alpineexteriorsfl.com",
+   "avg_position": 55.854166666666664,
+   "intersections": 48,
+   "full_domain_metrics": {
+    "organic": {
+     "pos_1": 0,
+     "pos_2_3": 0,
+     "pos_4_10": 1,
+     "pos_11_20": 6,
+     "pos_21_30": 5,
+     "pos_31_40": 5,
+     "pos_41_50": 4,
+     "pos_51_60": 4,
+     "pos_61_70": 2,
+     "pos_71_80": 10,
+     "pos_81_90": 4,
+     "pos_91_100": 7,
+     "etv": 7.363419389934279,
+     "count": 48,
+     "estimated_paid_traffic_cost": 116.51389562804252,
+     "is_new": 32,
+     "is_up": 10,
+     "is_down": 6,
+     "is_lost": 47,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "domain": "houzz.com",
+   "avg_position": 13.41025641025641,
+   "intersections": 39,
+   "full_domain_metrics": {
+    "organic": {
+     "pos_1": 20655,
+     "pos_2_3": 122005,
+     "pos_4_10": 570148,
+     "pos_11_20": 383157,
+     "pos_21_30": 175362,
+     "pos_31_40": 96172,
+     "pos_41_50": 55992,
+     "pos_51_60": 30898,
+     "pos_61_70": 15239,
+     "pos_71_80": 7051,
+     "pos_81_90": 3662,
+     "pos_91_100": 1793,
+     "etv": 1553609.3673961188,
+     "count": 1482134,
+     "estimated_paid_traffic_cost": 5664036.834502331,
+     "is_new": 623992,
+     "is_up": 379081,
+     "is_down": 353023,
+     "is_lost": 764954,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "domain": "bbb.org",
+   "avg_position": 24.416666666666668,
+   "intersections": 36,
+   "full_domain_metrics": {
+    "organic": {
+     "pos_1": 30427,
+     "pos_2_3": 159279,
+     "pos_4_10": 1205457,
+     "pos_11_20": 1293547,
+     "pos_21_30": 755225,
+     "pos_31_40": 484079,
+     "pos_41_50": 315091,
+     "pos_51_60": 202118,
+     "pos_61_70": 115092,
+     "pos_71_80": 54642,
+     "pos_81_90": 21298,
+     "pos_91_100": 7537,
+     "etv": 7770552.4788774075,
+     "count": 4643792,
+     "estimated_paid_traffic_cost": 45804686.96179337,
+     "is_new": 2221709,
+     "is_up": 1069816,
+     "is_down": 1016137,
+     "is_lost": 2057134,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  },
+  {
+   "domain": "homeadvisor.com",
+   "avg_position": 41.58620689655172,
+   "intersections": 29,
+   "full_domain_metrics": {
+    "organic": {
+     "pos_1": 1590,
+     "pos_2_3": 9740,
+     "pos_4_10": 100976,
+     "pos_11_20": 165031,
+     "pos_21_30": 113532,
+     "pos_31_40": 87777,
+     "pos_41_50": 64310,
+     "pos_51_60": 41014,
+     "pos_61_70": 21410,
+     "pos_71_80": 9670,
+     "pos_81_90": 4137,
+     "pos_91_100": 1863,
+     "etv": 311841.66200035793,
+     "count": 621050,
+     "estimated_paid_traffic_cost": 3611120.1122715296,
+     "is_new": 343115,
+     "is_up": 122216,
+     "is_down": 129926,
+     "is_lost": 362533,
+     "clickstream_etv": null,
+     "clickstream_gender_distribution": null,
+     "clickstream_age_distribution": null
+    }
+   }
+  }
+ ],
+ "referringDomains": [
+  {
+   "domain": "odumazza.com",
+   "rank": 365,
+   "backlinks": 25858,
+   "first_seen": "2025-09-25 04:23:45 +00:00",
+   "backlinks_spam_score": 29,
+   "referring_pages": 25858,
+   "referring_pages_nofollow": 0
+  },
+  {
+   "domain": "birchadvisory.us",
+   "rank": 140,
+   "backlinks": 134,
+   "first_seen": "2026-09-19 12:03:49 +00:00",
+   "backlinks_spam_score": 16,
+   "referring_pages": 133,
+   "referring_pages_nofollow": 0
+  },
+  {
+   "domain": "folkaccess.us",
+   "rank": 130,
+   "backlinks": 78,
+   "first_seen": "2026-08-29 14:11:51 +00:00",
+   "backlinks_spam_score": 12,
+   "referring_pages": 77,
+   "referring_pages_nofollow": 0
+  }
+ ],
+ "anchors": [
+  {
+   "anchor": "https://alpineexteriorsfl.com/",
+   "rank": 366,
+   "backlinks": 27091,
+   "referring_domains": 521,
+   "first_seen": "2025-09-24 17:03:07 +00:00"
+  },
+  {
+   "anchor": "siding contractors tampa",
+   "rank": 225,
+   "backlinks": 829,
+   "referring_domains": 318,
+   "first_seen": "2025-12-18 03:06:44 +00:00"
+  },
+  {
+   "anchor": "Siding company Sarasota",
+   "rank": 215,
+   "backlinks": 681,
+   "referring_domains": 302,
+   "first_seen": "2025-12-18 05:25:18 +00:00"
+  }
+ ]
+}

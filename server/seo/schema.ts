@@ -1,4 +1,5 @@
 import { pool } from "../db";
+import { EXPLORER_SCHEMA_DDL } from "./explorer";
 
 /**
  * SEO toolset tables (rank tracker, keyword research, backlinks, competitor
@@ -93,6 +94,8 @@ export const SEO_SCHEMA_DDL = [
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, month)
   )`,
+  // Site Explorer: saved domain reports (server/seo/explorer.ts).
+  ...EXPLORER_SCHEMA_DDL,
 ];
 
 export async function ensureSeoSchema() {

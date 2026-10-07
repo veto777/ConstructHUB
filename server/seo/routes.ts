@@ -26,6 +26,7 @@ import {
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd } from "./pricing";
 import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "./jobs";
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
+import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
 
 const SUGGESTION_LIMIT = 50;
@@ -51,6 +52,13 @@ const researchInput = z.object({
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
 }).strict();
 const competitorInput = z.object({ competitor: z.string().min(3).max(253) }).strict();
+const explorerInput = z.object({
+  domain: z.string().min(3).max(253),
+  locationCode: z.number().int().positive().default(2840),
+  languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  /** Buy a new report even when a saved one is still inside the free window. */
+  refresh: z.boolean().default(false),
+}).strict();
 const id = z.coerce.number().int().positive();
 
 /** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
@@ -333,6 +341,45 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     try {
       const snap = await snapshotBacklinks(site);
       res.status(201).json({ id: snap.id, takenOn: snap.takenOn, usage: await planUsage(user, ent) });
+    } catch (e) {
+      await refundReservation(unit, 1).catch(() => {});
+      throw e;
+    }
+  });
+
+  // ── Site Explorer: any domain, one report ──────────────────────────────────
+  // Domains this account has looked up, with their headline numbers.
+  route("get", "/api/seo/explorer/recent", async (_req, res, user) => {
+    res.json({ items: await recentReports(user), freeForDays: REPORT_TTL_DAYS });
+  });
+
+  // The saved report for a domain (never a vendor call, never a plan unit). 404 when there is none yet.
+  route("get", "/api/seo/explorer", async (req, res, user) => {
+    const domain = normalizeDomain(String(req.query.domain ?? ""));
+    if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
+    const locationCode = Number(req.query.locationCode) > 0 ? Math.floor(Number(req.query.locationCode)) : 2840;
+    const saved = await latestReport(user, domain, locationCode);
+    if (!saved) return res.status(404).json({ code: "no_report", message: "No report for that domain yet." });
+    res.json({ report: saved.report, fresh: saved.fresh, configured: isConfigured() });
+  });
+
+  // Analyse a domain. A saved report inside the free window is returned as is; otherwise
+  // (or with refresh) one keyword search of the plan buys a new one.
+  route("post", "/api/seo/explorer", async (req, res, user, ent) => {
+    const input = explorerInput.parse(req.body);
+    const domain = normalizeDomain(input.domain);
+    if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
+    if (!input.refresh) {
+      const saved = await latestReport(user, domain, input.locationCode);
+      if (saved?.fresh) return res.json({ report: saved.report, fresh: true, reused: true, usage: await planUsage(user, ent) });
+    }
+    if (!isConfigured()) return notReady(res);
+    const unit = await takeUnit(res, user, "seoResearch");
+    if (!unit) return;
+    try {
+      const out = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
+      await saveReport(user, out.data, out.costUsd);
+      res.status(201).json({ report: out.data, fresh: true, reused: false, usage: await planUsage(user, ent) });
     } catch (e) {
       await refundReservation(unit, 1).catch(() => {});
       throw e;

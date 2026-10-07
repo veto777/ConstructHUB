@@ -88,6 +88,7 @@ import { pageMetaFor } from "@shared/route-meta";
 const AdminFeaturePagesPage = lazy(() => import("@/pages/admin-feature-pages"));
 const SeoOverviewPage = lazy(() => import("@/pages/seo"));
 const SeoKeywordsPage = lazy(() => import("@/pages/seo/keywords"));
+const SeoExplorerPage = lazy(() => import("@/pages/seo/explorer"));
 const SeoBacklinksPage = lazy(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazy(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazy(() => import("@/pages/admin-access"));
@@ -205,6 +206,7 @@ function DashboardRouter() {
       <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
       <Route path="/seo" component={SeoOverviewPage} />
+      <Route path="/seo/explorer" component={SeoExplorerPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
@@ -397,7 +399,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/keywords": "Keyword research", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/explorer": "Site explorer", "/seo/keywords": "Keyword research", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",

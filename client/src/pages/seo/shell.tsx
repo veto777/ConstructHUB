@@ -1,5 +1,5 @@
 /**
- * Shared frame for the ConstructHUB SEO pages (/seo, /seo/keywords,
+ * Shared frame for the ConstructHUB SEO pages (/seo, /seo/explorer, /seo/keywords,
  * /seo/backlinks, /seo/competitors): Google surface with the brand accent,
  * the tab strip, the site picker, this account's plan units (tracked keywords,
  * keyword searches, backlink refreshes), a quiet "being switched on" notice
@@ -61,13 +61,16 @@ export function useSelectedSite(sites: SeoSite[] | undefined): [SeoSite | null, 
 
 const TABS = [
   { href: "/seo", label: "Rank tracker" },
+  { href: "/seo/explorer", label: "Site explorer" },
   { href: "/seo/keywords", label: "Keywords" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
 ];
 
-export function SeoShell({ title, description, actions, children, site, onSite, sites, status }: {
+export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
+  /** false on pages that are not about one tracked site (Site explorer takes any domain). */
+  picker?: boolean;
   site: SeoSite | null; onSite: (id: number) => void; sites: ReturnType<typeof useSeoSites>; status: ReturnType<typeof useSeoStatus>;
 }) {
   const [location] = useLocation();
@@ -89,7 +92,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
             <nav className="g-tabs" aria-label="SEO sections">
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}</Link>)}
             </nav>
-            <SitePicker site={site} onSite={onSite} sites={sites} />
+            {picker && <SitePicker site={site} onSite={onSite} sites={sites} />}
             <UsageLine status={status} />
             {status.data && !status.data.configured && <NotReadyNotice />}
             {children}
