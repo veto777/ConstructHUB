@@ -26,6 +26,57 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
   history) → AI visibility → reports; then the Ahrefs-style projects dashboard and Site Audit overview. The internal
   wholesale cap `SEO_MONTHLY_BUDGET_USD` (default 100) still applies on top of customer credit — raise it as usage grows.
   Not verified in a browser by the building session (no browser on vb11).
+## 📷 2026-10-07 (evening) — JobCam plans + storage, fast boot, Cloudflare/Search Console worker ON (deployed 1f4a0ea)
+- **JobCam is a CRM feature only** (owner: attached to a jobsite; not a platform tool). Included in **CRM Max**; a
+  **$39/mo add-on on CRM Basic and CRM Essentials** (`CRM_ADDONS.jobcam` in shared/crm-plans.ts; annual = 12 × $39 =
+  $468, NO discount assumed — owner to confirm). Gate: `jobcamEntitled()` in server/jobcam/plan.ts (plan | addon |
+  admin | beta); every member route answers 402 `crm_plan_required`; share links already sent and the homeowner
+  portal keep working after a downgrade. Upgrade card → PurchaseReviewDialog → `POST /api/crm/billing/change`
+  (owner only, prorated, lazy Stripe price `chub_v1_crmaddon_jobcam_*`). NOT yet exercised with real money: the add-on
+  purchase/removal and its webhook path — watch the first one. Marketing: `/features/jobcam` (49 prerendered pages
+  now) linked under Pricing & Plans; no Tools entry by owner's choice.
+- **JobCam storage tiers** (owner: 5 GB included, then 10 / 100 / 500 / 1,000 / 2,000 GB): `shared/jobcam-storage.ts`,
+  `jobcam_org_usage.storage_tier_gb`; upload open refused 403 `limit_reached` (stored + in-flight + new file, row
+  lock), re-check at complete with cleanup. Tiers have NO prices yet: only a platform admin changes a tier
+  (/admin "JobCam storage", `POST /api/admin/jobcam/storage-tier`); customers get the meter, an 80% note, "Storage
+  full — next size" and "Request more storage" (requests show in that admin card only; no email).
+- **Boot is fast when nothing changed:** `seed_state` remembers the permit-portals file hash + directory row count;
+  an unchanged pair skips the 13k row-by-row apply (80 s → 0.1 s on dev). `FORCE_PORTAL_SEED=1` forces it. Every
+  restart used to be an ~80 s outage (Cloudflare 502) — the owner hit one while testing.
+- **Gateway errors are no longer printed raw** (client/src/lib/queryClient.ts): 502–504/52x or an HTML body reads
+  "ConstructHUB is restarting or briefly unavailable."
+- **Cloudflare + Search Console:** `EDGE_SEARCH_WORKER_ENABLED=true` set on vb11 (it was missing, so nothing queued
+  ever ran; backup `.env.bak-*-pre-edgeworker`). Owner registered `https://constructhub.us/api/gsc/callback` and
+  `/api/mail-alerts/oauth/callback` on the Google OAuth client (Google propagation took ~10 min). Cloudflare has no
+  third-party "allow access" sign-in: Connections tab = Global API Key → we mint a limited token; or a pasted scoped
+  token; the ops-only agency-membership path needs `CLOUDFLARE_AGENCY_*` (unset). No real connect has been run yet;
+  the `webmasters` scope is a Google "sensitive" scope (unverified app warning / 100-user cap until verified).
+- **In progress (branch `help-tutorials`, vb11 `~/ConstructHUB-seo`):** "i" info buttons on Cloudflare and Search
+  Console written from the code, a walkthrough-video slot beside them, a `/tutorials` section for every feature, and
+  `docs/tutorials/VIDEO-PIPELINE.md` (Playwright capture + Janice voice + Higgsfield; needs a Higgsfield key).
+
+## 📷 2026-10-07 — JobCam: storage sizes, CRM-plan gate, $39/mo add-on (branch `jobcam-storage`, NOT deployed)
+- **Owner decisions (2026-10-07):** storage "5 gigs and then 10, 100, 500, 1000, 2000"; JobCam "is part of the upper tier
+  plan" = INCLUDED in CRM Max; "the upgrade will cost $39 a month on basic and essential" = the JobCam add-on on CRM Basic
+  and CRM Essentials; JobCam is a CRM feature only (the platform only has its feature page, `/features/jobcam`).
+- **Storage:** `shared/jobcam-storage.ts` (sizes, 1 GB = 1024³, formatting, the 403 body). `jobcam_org_usage.storage_tier_gb`
+  (default 5). Enforced in `server/jobcam/routes.ts` at upload OPEN (used + open uploads + still-processing media + this
+  file, under a row lock on the org's usage row: `withJobcamStorageRoom`) and again at COMPLETE (refusal aborts the
+  multipart, deletes the object and the rows). Refusal = 403 `limit_reached`, `feature: "jobcamStorage"`.
+  **Larger sizes have NO price**: only a platform admin sets one (`POST /api/admin/jobcam/storage-tier`, /admin →
+  "JobCam storage", written to `admin_audit_log`); customers press "Request more storage" (`jobcam_storage_requests`,
+  listed in the same admin card — nothing emails the admin yet).
+- **Plan gate:** ONE function, `jobcamEntitled(ownerUserId)` / pure `jobcamAccessFrom` in `server/jobcam/plan.ts`
+  (`via: plan | addon | admin | beta`). Every member route answers 402 `crm_plan_required` (`feature: "jobcam"`) without
+  it; `/jc/:token` share pages and the client portal stay open, and revoking/deleting a share link stays possible.
+  `/api/crm/me` carries `crm.jobcam`; the client shows `JobcamUpgradeCard` instead of the feed/camera.
+- **Add-on:** `CRM_ADDONS.jobcam` in `shared/crm-plans.ts` ($39/mo; yearly = 12 × $39 = $468, NO discount assumed — owner
+  to confirm). Stripe price `chub_v1_crmaddon_jobcam_{month|year}_{cents}` is created lazily like every other price
+  (`crmAddonPriceSpec`); it is one more item on the CRM subscription (`crm_subscriptions.jobcam_addon`), added/removed
+  through `POST /api/crm/billing/change { jobcam }` with the same proration as extra seats. Moving to CRM Max drops the line.
+- **Deploy notes:** new columns/tables are created at boot (idempotent). Orgs whose owner is not staff/beta and has no
+  CRM Max / add-on lose JobCam on deploy — check production before shipping. With `CRM_REQUIRE_PLAN=0` an org without a
+  CRM plan still has no JobCam.
 
 ## 💳 2026-10-07 — the CRM is a SEPARATE PRODUCT (own plans, own subscription) · checkout-return fix · Google tag · ad doors
 - **Owner decisions (2026-10-07):** two apps, sold separately; nobody is forced to buy both. Platform tiers keep their

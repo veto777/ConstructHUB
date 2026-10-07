@@ -19,7 +19,12 @@
  *   Tags, projects, usage
  *     GET/POST /api/crm/jobcam/tags · DELETE /api/crm/jobcam/tags/:id
  *     GET    /api/crm/jobcam/projects?lat&lng           visible projects, nearest first when the phone says where it is
- *     GET    /api/crm/jobcam/usage                      the org's storage meter
+ *     GET    /api/crm/jobcam/usage                      the org's storage meter (used, size, next size)
+ *     POST   /api/crm/jobcam/storage-request            "Request more storage" (answered by a platform admin)
+ *
+ * Every route here needs JobCam on the org owner's CRM plan (plan.ts): CRM Max,
+ * or the JobCam add-on on Basic / Essentials. Without it the answer is the 402
+ * crm_plan_required body and the client shows the upgrade card.
  */
 import type { Express } from "express";
 import express from "express";
@@ -40,7 +45,10 @@ import {
   type MultipartHandle,
 } from "./storage";
 import { enqueueMedia } from "./processor";
-import { bumpJobcamUsage, getJobcamUsage } from "./usage";
+import {
+  bumpJobcamUsage, getJobcamUsage, getJobcamStorage, jobcamStorageSnapshot, jobcamStorageRefusal, withJobcamStorageRoom,
+  requestJobcamStorage, openJobcamStorageRequest,
+} from "./usage";
 import { canManageJobcam, visibleProject, visibleProjectIds, projectsById } from "./access";
 import { requireJobcamPlan } from "./plan";
 import { normalizeTagFilter, normalizeTags } from "./filters";
@@ -290,7 +298,11 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
   const ctxFor = async (req: any, res: any): Promise<OrgContext | null> => {
     const user = getDevUser(req, res);
     if (!user) return null;
-    return requireOrg(req, res, user.id);
+    const ctx = await requireOrg(req, res, user.id);
+    if (!ctx) return null;
+    // Reads and writes alike: no JobCam on the plan, no JobCam.
+    if (!(await requireJobcamPlan(res, ctx))) return null;
+    return ctx;
   };
   const base = "/api/crm/jobcam/media";
 
@@ -417,7 +429,6 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
 
   app.post("/api/crm/jobcam/uploads", async (req: any, res) => {
     const ctx = await ctxFor(req, res); if (!ctx) return;
-    if (!(await requireJobcamPlan(res, ctx))) return;
     const parsed = uploadBody.safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid upload", issues: parsed.error.issues });
     const b = parsed.data;
@@ -430,30 +441,51 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     const mediaId = crypto.randomUUID();
     const key = mediaKey(ctx.org.id, mediaId, `original.${verdict.ext}`);
     const capturedAt = b.capturedAt ? new Date(b.capturedAt) : null;
-    const [media] = await db.insert(jobcamMedia).values({
-      id: mediaId, orgId: ctx.org.id, projectId: project.id, customerId: project.customerId,
-      uploaderMemberId: ctx.member.id, kind: verdict.kind, status: "uploading",
-      fileName: b.fileName?.slice(0, 200) || null, mime: b.mime.toLowerCase().split(";")[0], bytes: b.bytes,
-      r2KeyOriginal: key, width: b.width ?? null, height: b.height ?? null, durationS: b.durationS ?? null,
-      capturedAt: capturedAt && Number.isFinite(capturedAt.getTime()) ? capturedAt : null,
-      deviceLat: b.deviceLat ?? null, deviceLng: b.deviceLng ?? null, gpsAccuracyM: b.gpsAccuracyM ?? null,
-      tags: normalizeTags(b.tags ?? []), caption: b.caption || null, captionSource: b.caption ? "user" : null,
-      stamp: b.stamp ?? null,
-    }).returning();
     const uploadId = crypto.randomUUID();
+    // Storage: refuse to open when what is stored + what is already on its way
+    // + this file would pass the org's size. The check and both rows are one
+    // transaction under the org's storage lock, so two uploads opened together
+    // cannot both squeeze past — the second one counts the first one's bytes.
+    const room = await withJobcamStorageRoom(ctx.org.id, b.bytes, async (tx) => {
+      const [media] = await tx.insert(jobcamMedia).values({
+        id: mediaId, orgId: ctx.org.id, projectId: project.id, customerId: project.customerId,
+        uploaderMemberId: ctx.member.id, kind: verdict.kind, status: "uploading",
+        fileName: b.fileName?.slice(0, 200) || null, mime: b.mime.toLowerCase().split(";")[0], bytes: b.bytes,
+        r2KeyOriginal: key, width: b.width ?? null, height: b.height ?? null, durationS: b.durationS ?? null,
+        capturedAt: capturedAt && Number.isFinite(capturedAt.getTime()) ? capturedAt : null,
+        deviceLat: b.deviceLat ?? null, deviceLng: b.deviceLng ?? null, gpsAccuracyM: b.gpsAccuracyM ?? null,
+        tags: normalizeTags(b.tags ?? []), caption: b.caption || null, captionSource: b.caption ? "user" : null,
+        stamp: b.stamp ?? null,
+      }).returning();
+      // The reservation: an open upload of b.bytes (the storage handle is filled in below).
+      await tx.insert(jobcamUploads).values({
+        id: uploadId, orgId: ctx.org.id, mediaId, memberId: ctx.member.id, storageMode: storageMode(), storageUploadId: null,
+        key, partSize: plan.partSize, partsTotal: plan.partsTotal, partsDone: {}, bytes: b.bytes, status: "open",
+        expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
+      });
+      return media;
+    });
+    if (!room.ok) return res.status(403).json(room.refusal);
+    const media = room.value;
+    const dropReservation = async () => {
+      await db.delete(jobcamUploads).where(eq(jobcamUploads.id, uploadId));
+      await db.delete(jobcamMedia).where(eq(jobcamMedia.id, mediaId));
+    };
     let handle: MultipartHandle;
     try {
       handle = await createMultipart(key, media.mime, uploadId);
     } catch (e: any) {
-      await db.delete(jobcamMedia).where(eq(jobcamMedia.id, mediaId));
+      await dropReservation();
       console.error("[jobcam] createMultipart failed:", e?.message || e);
       return res.status(502).json({ message: `Storage refused the upload: ${String(e?.message || e).slice(0, 200)}` });
     }
-    const [upload] = await db.insert(jobcamUploads).values({
-      id: uploadId, orgId: ctx.org.id, mediaId, memberId: ctx.member.id, storageMode: handle.mode, storageUploadId: handle.storageUploadId,
-      key, partSize: plan.partSize, partsTotal: plan.partsTotal, partsDone: {}, bytes: b.bytes, status: "open",
-      expiresAt: new Date(Date.now() + 24 * 3600 * 1000),
-    }).returning();
+    const [upload] = await db.update(jobcamUploads).set({ storageMode: handle.mode, storageUploadId: handle.storageUploadId, updatedAt: new Date() })
+      .where(eq(jobcamUploads.id, uploadId)).returning();
+    if (!upload) {
+      await abortMultipart(handle, uploadId).catch(() => {});
+      await dropReservation();
+      return res.status(409).json({ message: "This upload was cancelled" });
+    }
     // Any member who can see a project may add to it; the tag list grows with capture.
     for (const t of media.tags ?? []) {
       await db.insert(jobcamTags).values({ orgId: ctx.org.id, name: t, createdByMemberId: ctx.member.id }).onConflictDoNothing();
@@ -543,6 +575,19 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
       return res.status(409).json({ message: "Some parts are missing", missing: missingParts(done, u.partsTotal) });
     }
     if (uploadExpired(u.createdAt)) return res.status(409).json({ message: "This upload expired — send the file again." });
+    // Storage is checked again here: the size may have been lowered, or the
+    // meter recounted, since the upload was opened. A refused upload leaves
+    // nothing behind — no multipart, no object, no rows.
+    const refuseForStorage = async (refusal: NonNullable<ReturnType<typeof jobcamStorageRefusal>>) => {
+      await abortMultipart(handleOf(u), u.id).catch(() => {});
+      await deleteObject(u.key).catch(() => {});
+      await db.update(jobcamUploads).set({ status: "aborted", updatedAt: new Date() }).where(eq(jobcamUploads.id, u.id));
+      await db.delete(jobcamMedia).where(and(eq(jobcamMedia.id, m.id), eq(jobcamMedia.status, "uploading")));
+      return res.status(403).json(refusal);
+    };
+    // Before storage assembles the parts (cheap to stop here: the parts are simply dropped)…
+    const early = jobcamStorageRefusal(await jobcamStorageSnapshot(ctx.org.id, { excludeUploadId: u.id }), u.bytes);
+    if (early) return refuseForStorage(early);
     try {
       await completeMultipart(handleOf(u), u.id, completedParts(done, u.partsTotal));
     } catch (e: any) {
@@ -565,12 +610,20 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
     }
     const next = nextMediaStatus(m.status as any, "complete");
     if (!next) return res.status(409).json({ message: `Media is already ${m.status}` });
-    // Only one request wins the open → completed move (a double tap must not log or queue twice).
-    const [won] = await db.update(jobcamUploads).set({ status: "completed", updatedAt: new Date() })
-      .where(and(eq(jobcamUploads.id, u.id), eq(jobcamUploads.status, "open"))).returning({ id: jobcamUploads.id });
-    if (!won) return res.json(presentMedia(m, base));
-    const [updated] = await db.update(jobcamMedia).set({ status: next, uploadedAt: new Date(), updatedAt: new Date() })
-      .where(eq(jobcamMedia.id, m.id)).returning();
+    // …and for real on the stored size, under the org's storage lock, in the
+    // same transaction as the open → completed move. Only one request wins that
+    // move (a double tap must not log or queue twice).
+    const moved = await withJobcamStorageRoom(ctx.org.id, size, async (tx) => {
+      const [won] = await tx.update(jobcamUploads).set({ status: "completed", updatedAt: new Date() })
+        .where(and(eq(jobcamUploads.id, u.id), eq(jobcamUploads.status, "open"))).returning({ id: jobcamUploads.id });
+      if (!won) return null;
+      const [row] = await tx.update(jobcamMedia).set({ status: next, uploadedAt: new Date(), updatedAt: new Date() })
+        .where(eq(jobcamMedia.id, m.id)).returning();
+      return row;
+    }, { excludeUploadId: u.id });
+    if (!moved.ok) return refuseForStorage(moved.refusal);
+    const updated = moved.value;
+    if (!updated) return res.json(presentMedia(m, base));
     enqueueMedia(m.id);
     logActivity(ctx, "jobcam.media.added", { entityType: "jobcam_media", entityId: m.id, customerId: m.customerId, meta: { kind: m.kind, projectId: m.projectId } });
     res.json(presentMedia(updated, base));
@@ -755,8 +808,19 @@ export function registerJobcamRoutes(app: Express, getDevUser: GetUser): void {
 
   app.get("/api/crm/jobcam/usage", async (req: any, res) => {
     const ctx = await ctxFor(req, res); if (!ctx) return;
-    const u = await getJobcamUsage(ctx.org.id);
-    res.json({ ...u, limitBytes: null, mode: storageMode() });
+    const [u, storage, request] = await Promise.all([
+      getJobcamUsage(ctx.org.id), getJobcamStorage(ctx.org.id), openJobcamStorageRequest(ctx.org.id),
+    ]);
+    res.json({ ...u, ...storage, storageRequest: request ? { requestedAt: request.createdAt } : null, mode: storageMode() });
+  });
+
+  // "Request more storage": larger sizes are not for sale yet, so this is a
+  // note to ConstructHUB (the Platform admin page lists it) — not a purchase.
+  app.post("/api/crm/jobcam/storage-request", async (req: any, res) => {
+    const ctx = await ctxFor(req, res); if (!ctx) return;
+    const r = await requestJobcamStorage(ctx.org.id, ctx.member.id);
+    if (!r.existed) logActivity(ctx, "jobcam.storage.requested", { entityType: "jobcam_storage", entityId: r.id });
+    res.status(r.existed ? 200 : 201).json({ ok: true, requestedAt: r.createdAt, existed: r.existed });
   });
 }
 

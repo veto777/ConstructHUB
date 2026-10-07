@@ -116,3 +116,30 @@ export function groupByDay<T extends { capturedAt: string }>(items: T[]): { key:
   }
   return out;
 }
+
+/** GET /api/crm/jobcam/usage — the org's storage meter (server/jobcam/usage.ts, shared/jobcam-storage.ts). */
+export type JobcamUsageInfo = {
+  bytes: number; mediaCount: number; photoCount: number; videoCount: number;
+  tierGb: number; limitBytes: number; pendingBytes: number; nextTierGb: number | null;
+  warn: boolean; full: boolean; label: string;
+  storageRequest: { requestedAt: string } | null;
+  mode: "r2" | "local";
+};
+export const JOBCAM_USAGE_KEY = "/api/crm/jobcam/usage";
+
+/** The JSON body of a jobcamFetch / apiRequest error ("403: {json}"), or null. */
+export function jobcamErrorBody(e: unknown): { status: number; body: Record<string, any> | null } | null {
+  const raw = typeof (e as any)?.message === "string" ? (e as any).message as string : String(e ?? "");
+  const m = /^(\d{3}):\s*([\s\S]*)$/.exec(raw);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[2]);
+    return { status: Number(m[1]), body: parsed && typeof parsed === "object" ? parsed : null };
+  } catch { return { status: Number(m[1]), body: null }; }
+}
+
+/** The server refused for storage (403 limit_reached, feature jobcamStorage). */
+export const isStorageFullError = (e: unknown): boolean => {
+  const info = jobcamErrorBody(e);
+  return info?.status === 403 && info.body?.code === "limit_reached" && info.body?.feature === "jobcamStorage";
+};

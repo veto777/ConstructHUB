@@ -30,6 +30,9 @@ import { TagPicker } from "@/components/jobcam/tag-picker";
 import { UploadTray } from "@/components/jobcam/upload-tray";
 import { useJobcamQueue } from "@/components/jobcam/use-queue";
 import { cn } from "@/lib/utils";
+import { JobcamUpgradeCard, useJobcamAccess } from "@/components/jobcam/upgrade-card";
+import { StorageFullNotice, useJobcamStorage } from "@/components/jobcam/storage-meter";
+import { formatJobcamUsage } from "@shared/jobcam-storage";
 
 type Mode = "photo" | "video";
 type Position = { lat: number; lng: number; accuracy: number; at: number } | null;
@@ -42,7 +45,7 @@ const readJson = <T,>(store: Storage, key: string, fallback: T): T => {
   try { const raw = store.getItem(key); return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
 };
 
-export default function JobcamCapturePage() {
+function CaptureCamera() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const { toast } = useToast();
@@ -374,4 +377,44 @@ function probeDuration(file: File): Promise<number | null> {
     setTimeout(() => done(null), 8000);
     v.src = url;
   });
+}
+
+/**
+ * The camera only opens for a workspace that has JobCam and room to store a
+ * shot. Otherwise the same full-screen surface says why: the upgrade card (no
+ * JobCam on the CRM plan) or "Storage full" with the next size and the request
+ * button. A device that already holds unsent shots keeps them either way.
+ */
+export default function JobcamCapturePage() {
+  const [, navigate] = useLocation();
+  const access = useJobcamAccess();
+  const storage = useJobcamStorage(!access.loading && access.entitled);
+  const shell = (children: React.ReactNode, testId: string) => (
+    <div className="g-surface fixed inset-0 z-[60] flex flex-col bg-black text-white" data-testid={testId}>
+      <header className="flex items-center gap-2 px-3 pt-[calc(env(safe-area-inset-top)+8px)] pb-2">
+        <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : navigate("/crm/jobcam"))}
+          className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10" aria-label="Close camera" data-testid="jobcam-close"><X className="h-5 w-5" /></button>
+        <span className="text-sm font-medium">JobCam</span>
+      </header>
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+16px)] flex flex-col justify-center gap-4">{children}</div>
+    </div>
+  );
+  if (access.loading || (access.entitled && storage.isLoading)) {
+    return shell(<div className="flex justify-center"><Loader2 className="h-6 w-6 animate-spin opacity-60" /></div>, "jobcam-capture-loading");
+  }
+  if (!access.entitled) return shell(<div className="g-surface rounded-2xl bg-background text-foreground"><JobcamUpgradeCard /></div>, "jobcam-capture-upgrade");
+  if (storage.data?.full) {
+    return shell(
+      <>
+        <div className="rounded-2xl border border-white/15 bg-white/5 p-5 space-y-3">
+          <div className="flex items-center gap-2 text-sm"><Camera className="h-5 w-5 opacity-70" /><span className="tabular-nums" data-testid="jobcam-capture-storage-label">{formatJobcamUsage(storage.data.bytes, storage.data.tierGb)} used</span></div>
+          <div className="h-1.5 rounded-full bg-white/15 overflow-hidden"><div className="h-full w-full rounded-full bg-red-500" /></div>
+          <StorageFullNotice usage={storage.data} dark />
+        </div>
+        <UploadTray dark />
+      </>,
+      "jobcam-capture-storage-full",
+    );
+  }
+  return <CaptureCamera />;
 }

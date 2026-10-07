@@ -1,5 +1,6 @@
 import { preserveNewerGovernmentCheck } from "./government-seed-status";
-import { db } from "./db";
+import { db, pool } from "./db";
+import { createHash } from "crypto";
 import { permitDatabases, counties } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { readFileSync } from "fs";
@@ -10,17 +11,46 @@ import { join } from "path";
 // confirmed permit-specific). Applied on top of the city permit rows.
 export interface PermitPortal { jurisdiction: string; url: string | null; platform: string | null; linkStatus?: string; lastVerifiedAt?: string | null; }
 
+/**
+ * Boot applies the portal file to the directory. That is ~13,000 row-by-row updates in one transaction (about 70
+ * seconds on production), and the port only opens afterwards — so every restart was a 70-second outage for a file
+ * that had not changed. The file's hash and the directory's row count are remembered in `seed_state`; when both are
+ * the same as the last successful apply, the sync is skipped. A new file, new directory rows (added cities need
+ * their portals), a fresh database or FORCE_PORTAL_SEED=1 run it as before.
+ */
+const SEED_KEY = "permit-portals";
+async function portalSeedState(): Promise<{ hash: string | null; rows: number }> {
+  await pool.query(`CREATE TABLE IF NOT EXISTS seed_state (
+    key text PRIMARY KEY, hash text NOT NULL, row_count integer NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
+  const { rows: [prev] } = await pool.query("SELECT hash, row_count FROM seed_state WHERE key=$1", [SEED_KEY]);
+  const { rows: [now] } = await pool.query("SELECT count(*)::int AS n FROM permit_databases");
+  return { hash: prev && prev.row_count === now.n ? prev.hash : null, rows: now.n };
+}
+
 export async function seedPermitPortals() {
   let portals: PermitPortal[];
+  let hash: string;
   try {
     const filePath = join(import.meta.dirname || __dirname, "data", "permit-portals.json");
-    portals = JSON.parse(readFileSync(filePath, "utf8"));
+    const raw = readFileSync(filePath, "utf8");
+    portals = JSON.parse(raw);
+    hash = createHash("sha256").update(raw).digest("hex");
   } catch (e: any) {
     console.warn(`permit-portals.json not found (${e?.message}); skipping permit-portal enrichment.`);
     return;
   }
 
+  if (process.env.FORCE_PORTAL_SEED !== "1") {
+    const state = await portalSeedState();
+    if (state.hash === hash) {
+      console.log(`Permit portals: file and directory unchanged since the last apply (${portals.length} entries, ${state.rows} rows); skipped.`);
+      return;
+    }
+  }
   await syncPermitPortals(portals);
+  // Recorded only after a successful apply, with the row count the apply left behind.
+  await pool.query(`INSERT INTO seed_state(key, hash, row_count) VALUES($1, $2, (SELECT count(*)::int FROM permit_databases))
+    ON CONFLICT (key) DO UPDATE SET hash=EXCLUDED.hash, row_count=EXCLUDED.row_count, applied_at=now()`, [SEED_KEY, hash]);
 }
 
 export async function syncPermitPortals(portals: PermitPortal[]) {

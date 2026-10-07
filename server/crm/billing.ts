@@ -4,7 +4,7 @@
  *   GET  /api/crm/billing/plans         the CRM price book (public)
  *   GET  /api/crm/billing/subscription  this account's CRM subscription
  *   POST /api/crm/billing/checkout      start one (Stripe Checkout, 14-day trial once)
- *   POST /api/crm/billing/change        change plan / interval / extra seats in place
+ *   POST /api/crm/billing/change        change plan / interval / extra seats / the JobCam add-on in place
  *
  * One account, one Stripe customer, up to two subscriptions: the platform plan
  * (server/stripe.ts, table `subscriptions`) and the CRM plan (here, table
@@ -18,11 +18,11 @@ import { pool } from "../db";
 import { stripe } from "../billing/client";
 import { BillingRequestError } from "../billing/order";
 import { LIVE_STATUSES, subscriptionPeriodEnd, withBillingLock } from "../billing/sync";
-import { crmPlanPriceSpec, crmSeatPriceSpec, resolvePriceId, roleOfPrice } from "../billing/prices";
+import { crmPlanPriceSpec, crmSeatPriceSpec, crmAddonPriceSpec, resolvePriceId, roleOfPrice } from "../billing/prices";
 import { appReturnBaseUrl, portalReturnBaseUrl } from "../site-context";
 import {
   CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS,
-  CRM_EXTRA_SEAT_MAX, isCrmPlanKey, type CrmPlanKey,
+  CRM_EXTRA_SEAT_MAX, CRM_ADDONS, crmAddonAvailableOn, crmPlanHasJobcam, isCrmPlanKey, type CrmPlanKey,
 } from "@shared/crm-plans";
 import type { BillingInterval } from "@shared/plans";
 import {
@@ -42,9 +42,18 @@ export function isCrmSubscription(sub: Pick<Stripe.Subscription, "metadata" | "i
 export const isCrmCheckoutSession = (session: Pick<Stripe.Checkout.Session, "metadata"> | null | undefined) =>
   session?.metadata?.type === CRM_CHECKOUT_TYPE;
 
-type CrmOrder = { plan: CrmPlanKey; interval: BillingInterval; extraSeats: number };
+export type CrmOrder = { plan: CrmPlanKey; interval: BillingInterval; extraSeats: number; jobcam: boolean };
 
-function parseCrmOrder(body: any, fallback?: Partial<CrmOrder>): CrmOrder {
+/**
+ * The order a request asks for. `fallback` is the current subscription on a
+ * change, so a body that names one thing leaves the rest as it is.
+ *
+ * The JobCam add-on ($39/mo, shared/crm-plans.ts) is sold on the plans that do
+ * not include JobCam. Asking for it on a plan that includes it is refused; a
+ * subscription that already carries it and moves to such a plan simply drops
+ * the line (the plan now covers it — the buyer must not pay twice).
+ */
+export function parseCrmOrder(body: any, fallback?: Partial<CrmOrder>): CrmOrder {
   const plan = body?.plan ?? fallback?.plan;
   if (!isCrmPlanKey(plan)) {
     throw new BillingRequestError(400, `Choose a CRM plan: ${CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].name).join(", ")}.`, "unknown_plan");
@@ -60,19 +69,29 @@ function parseCrmOrder(body: any, fallback?: Partial<CrmOrder>): CrmOrder {
   if (rawSeats > CRM_EXTRA_SEAT_MAX) {
     throw new BillingRequestError(409, `For more than ${CRM_EXTRA_SEAT_MAX} extra seats, talk to a sales rep.`, "talk_to_sales");
   }
-  return { plan, interval: rawInterval, extraSeats: rawSeats };
+  const asked = body?.jobcam;
+  if (asked !== undefined && typeof asked !== "boolean") {
+    throw new BillingRequestError(400, "The JobCam add-on is either on or off.", "bad_addon");
+  }
+  if (asked === true && !crmAddonAvailableOn("jobcam", plan)) {
+    throw new BillingRequestError(400, `JobCam is already included in ${CRM_PLANS[plan].name} — there is nothing to add.`, "addon_included");
+  }
+  const jobcam = (asked ?? fallback?.jobcam ?? false) && crmAddonAvailableOn("jobcam", plan);
+  return { plan, interval: rawInterval, extraSeats: rawSeats, jobcam };
 }
 
 /** What a CRM Stripe subscription says: plan, interval, extra seats and the items that carry them. */
 export function describeCrmSubscription(sub: Stripe.Subscription) {
   let plan: CrmPlanKey | null = null, interval: BillingInterval | null = null, extraSeats = 0;
   let planItem: Stripe.SubscriptionItem | null = null, seatItem: Stripe.SubscriptionItem | null = null;
+  let jobcamItem: Stripe.SubscriptionItem | null = null;
   for (const item of sub.items?.data ?? []) {
     const role = roleOfPrice(item.price);
     if (role?.kind === "crm_plan" && !planItem) { plan = role.key; interval = role.interval; planItem = item; }
     else if (role?.kind === "crm_seat" && !seatItem) { seatItem = item; extraSeats = item.quantity ?? 0; }
+    else if (role?.kind === "crm_addon" && role.key === "jobcam" && !jobcamItem) { jobcamItem = item; }
   }
-  return { plan, interval, extraSeats, planItem, seatItem };
+  return { plan, interval, extraSeats, jobcam: !!jobcamItem, planItem, seatItem, jobcamItem };
 }
 
 /**
@@ -112,8 +131,8 @@ export async function applyCrmSubscription(sub: Stripe.Subscription, hintUserId?
   await pool.query(
     `INSERT INTO crm_subscriptions
        (user_id, stripe_customer_id, stripe_subscription_id, stripe_price_id, plan, status, billing_interval,
-        extra_seats, current_period_end, trial_end, cancel_at_period_end, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+        extra_seats, current_period_end, trial_end, cancel_at_period_end, jobcam_addon, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, now())
      ON CONFLICT (user_id) DO UPDATE SET
        stripe_customer_id = EXCLUDED.stripe_customer_id,
        stripe_subscription_id = EXCLUDED.stripe_subscription_id,
@@ -125,12 +144,14 @@ export async function applyCrmSubscription(sub: Stripe.Subscription, hintUserId?
        current_period_end = EXCLUDED.current_period_end,
        trial_end = EXCLUDED.trial_end,
        cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+       jobcam_addon = EXCLUDED.jobcam_addon,
        updated_at = now()`,
     [
       userId, customerId, sub.id, shape.planItem?.price.id ?? null,
       ended ? null : shape.plan, sub.status, shape.interval,
       ended ? 0 : shape.extraSeats, subscriptionPeriodEnd(sub), trialEnd,
       Boolean(sub.cancel_at_period_end || sub.cancel_at),
+      !ended && shape.jobcam,
     ],
   );
   forgetCrmEntitlements(userId);
@@ -141,7 +162,7 @@ export async function applyCrmSubscription(sub: Stripe.Subscription, hintUserId?
 export async function endCrmSubscription(sub: Stripe.Subscription): Promise<number | null> {
   await crmBillingSchemaReady();
   const { rows: [row] } = await pool.query(
-    `UPDATE crm_subscriptions SET status = 'canceled', plan = NULL, extra_seats = 0, cancel_at_period_end = NULL, updated_at = now()
+    `UPDATE crm_subscriptions SET status = 'canceled', plan = NULL, extra_seats = 0, jobcam_addon = false, cancel_at_period_end = NULL, updated_at = now()
       WHERE stripe_subscription_id = $1 RETURNING user_id`, [sub.id]);
   forgetCrmEntitlements(row?.user_id);
   return row?.user_id ?? null;
@@ -156,6 +177,9 @@ function summary(row: CrmSubscriptionRow | undefined) {
     interval: row?.billing_interval ?? null,
     extraSeats: row?.extra_seats ?? 0,
     seats: plan ? CRM_PLANS[plan].limits.seats + (row?.extra_seats ?? 0) : 0,
+    jobcamAddon: !!plan && row?.jobcam_addon === true && crmAddonAvailableOn("jobcam", plan),
+    /** JobCam on this subscription: included by the plan or bought as the add-on. */
+    jobcam: crmPlanHasJobcam(plan, row?.jobcam_addon === true),
     currentPeriodEnd: row?.current_period_end ?? null,
     trialEndsAt: row?.status === "trialing" ? row?.trial_end ?? null : null,
     cancelAtPeriodEnd: Boolean(row?.cancel_at_period_end),
@@ -169,6 +193,7 @@ export function crmPriceBook() {
     currency: "usd",
     plans: CRM_PLAN_KEYS.map((key) => CRM_PLANS[key]),
     extraSeat: { monthlyCents: CRM_EXTRA_SEAT_MONTHLY_CENTS, annualCents: CRM_EXTRA_SEAT_ANNUAL_CENTS, max: CRM_EXTRA_SEAT_MAX },
+    addons: Object.values(CRM_ADDONS),
     trialDays: CRM_TRIAL_DAYS,
   };
 }
@@ -181,20 +206,66 @@ export type CrmBillingDeps = {
   recentAuthOk: (req: Request, res: Response) => Promise<boolean>;
 };
 
-async function lineItemsFor(order: CrmOrder) {
+export async function lineItemsFor(order: CrmOrder) {
   const items: { price: string; quantity: number }[] = [
     { price: await resolvePriceId(stripe, crmPlanPriceSpec(order.plan, order.interval)), quantity: 1 },
   ];
   if (order.extraSeats > 0) {
     items.push({ price: await resolvePriceId(stripe, crmSeatPriceSpec(order.interval)), quantity: order.extraSeats });
   }
+  if (order.jobcam) {
+    items.push({ price: await resolvePriceId(stripe, crmAddonPriceSpec("jobcam", order.interval)), quantity: 1 });
+  }
   return items;
 }
 
 const orderMetadata = (userId: number, order: CrmOrder) => ({
   userId: String(userId), type: CRM_CHECKOUT_TYPE, product: CRM_PRODUCT,
-  plan: order.plan, interval: order.interval, extraSeats: String(order.extraSeats),
+  plan: order.plan, interval: order.interval, extraSeats: String(order.extraSeats), jobcam: order.jobcam ? "1" : "0",
 });
+
+type CrmCurrent = ReturnType<typeof describeCrmSubscription>;
+
+/**
+ * The subscription-item edits that turn `current` into `order`: plan, extra
+ * seats and the JobCam add-on, each added, re-priced (an interval change moves
+ * every line to the other interval's price) or removed. Stripe is reached only
+ * through `priceId`, so billing-jobcam.test.ts drives it with a double.
+ */
+export async function crmChangeItems(
+  current: Pick<CrmCurrent, "planItem" | "seatItem" | "jobcamItem" | "extraSeats">,
+  order: CrmOrder,
+  priceId: (spec: ReturnType<typeof crmPlanPriceSpec>) => Promise<string>,
+): Promise<Stripe.SubscriptionUpdateParams.Item[]> {
+  const items: Stripe.SubscriptionUpdateParams.Item[] = [];
+  const planPrice = await priceId(crmPlanPriceSpec(order.plan, order.interval));
+  if (current.planItem) {
+    if (current.planItem.price.id !== planPrice) items.push({ id: current.planItem.id, price: planPrice, quantity: 1 });
+  } else {
+    items.push({ price: planPrice, quantity: 1 });
+  }
+  if (current.seatItem) {
+    if (order.extraSeats === 0) items.push({ id: current.seatItem.id, deleted: true });
+    else {
+      const seatPrice = await priceId(crmSeatPriceSpec(order.interval));
+      if (current.seatItem.price.id !== seatPrice || current.extraSeats !== order.extraSeats) {
+        items.push({ id: current.seatItem.id, price: seatPrice, quantity: order.extraSeats });
+      }
+    }
+  } else if (order.extraSeats > 0) {
+    items.push({ price: await priceId(crmSeatPriceSpec(order.interval)), quantity: order.extraSeats });
+  }
+  if (current.jobcamItem) {
+    if (!order.jobcam) items.push({ id: current.jobcamItem.id, deleted: true });
+    else {
+      const jobcamPrice = await priceId(crmAddonPriceSpec("jobcam", order.interval));
+      if (current.jobcamItem.price.id !== jobcamPrice) items.push({ id: current.jobcamItem.id, price: jobcamPrice, quantity: 1 });
+    }
+  } else if (order.jobcam) {
+    items.push({ price: await priceId(crmAddonPriceSpec("jobcam", order.interval)), quantity: 1 });
+  }
+  return items;
+}
 
 export function registerCrmBillingRoutes(app: Express, deps: CrmBillingDeps) {
   void crmBillingSchemaReady();
@@ -290,28 +361,13 @@ export function registerCrmBillingRoutes(app: Express, deps: CrmBillingDeps) {
         }
         const current = describeCrmSubscription(sub);
         const order = parseCrmOrder(req.body ?? {}, {
-          plan: current.plan ?? undefined, interval: current.interval ?? undefined, extraSeats: current.extraSeats,
+          plan: current.plan ?? undefined, interval: current.interval ?? undefined, extraSeats: current.extraSeats, jobcam: current.jobcam,
         });
-        if (current.plan === order.plan && current.interval === order.interval && current.extraSeats === order.extraSeats) {
+        if (current.plan === order.plan && current.interval === order.interval && current.extraSeats === order.extraSeats && current.jobcam === order.jobcam) {
           return { changed: false, subscription: summary(row) };
         }
 
-        const items: Stripe.SubscriptionUpdateParams.Item[] = [];
-        const planPrice = await resolvePriceId(stripe, crmPlanPriceSpec(order.plan, order.interval));
-        if (current.planItem) {
-          if (current.planItem.price.id !== planPrice) items.push({ id: current.planItem.id, price: planPrice, quantity: 1 });
-        } else {
-          items.push({ price: planPrice, quantity: 1 });
-        }
-        const seatPrice = await resolvePriceId(stripe, crmSeatPriceSpec(order.interval));
-        if (current.seatItem) {
-          if (order.extraSeats === 0) items.push({ id: current.seatItem.id, deleted: true });
-          else if (current.seatItem.price.id !== seatPrice || current.extraSeats !== order.extraSeats) {
-            items.push({ id: current.seatItem.id, price: seatPrice, quantity: order.extraSeats });
-          }
-        } else if (order.extraSeats > 0) {
-          items.push({ price: seatPrice, quantity: order.extraSeats });
-        }
+        const items = await crmChangeItems(current, order, (spec) => resolvePriceId(stripe, spec));
 
         const updated = await stripe.subscriptions.update(sub.id, {
           items,

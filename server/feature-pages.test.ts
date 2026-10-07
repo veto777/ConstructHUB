@@ -31,7 +31,7 @@ const EXPECTED_KEYS = [
   "gbp", "reviews", "profileGuard", "rankingGrid", "gbpContent", "social", "siteScan", "media",
   "clickGuard", "ipTracker", "vpnShield", "cloudflare", "searchConsole", "domains", "mailAlerts",
   "permits", "property", "competitors", "adsManager", "lsaLeads",
-  "crm", "crmSchedule", "crmLeads", "texting", "agency",
+  "crm", "crmSchedule", "crmLeads", "texting", "jobcam", "agency",
   "masterClass", "guides", "reinstatement",
   "gabe", "customerApi",
 ];
@@ -82,7 +82,7 @@ describe("feature page registry", () => {
     for (const entry of FEATURE_CATALOGUE) expect(groups).toContain(entry.group);
     // The catalogue keeps the dashboard's order: the Call Assistant sits between texting and the agency workspace.
     const run = FEATURE_CATALOGUE.filter((e) => e.group === "run").map((e) => e.key);
-    expect(run).toEqual(["crm", "crmSchedule", "crmLeads", "texting", "callAssistant", "agency"]);
+    expect(run).toEqual(["crm", "crmSchedule", "crmLeads", "texting", "jobcam", "callAssistant", "agency"]);
   });
 
   it("links every feature to an in-app route that exists in App.tsx", () => {

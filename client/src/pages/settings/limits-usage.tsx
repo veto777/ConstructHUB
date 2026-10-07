@@ -17,6 +17,7 @@ import {
 import { LoadingCard, formatCount, useOptionalQuery } from "./shared";
 import { useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
+import { formatJobcamTier, formatJobcamUsage } from "@shared/jobcam-storage";
 
 /**
  * Workspace → Limits & usage: every limit in the price book (shared/plans.ts
@@ -39,6 +40,8 @@ type LimitRow = {
   excluded?: boolean;
   /** The count this account has used; `null` = not counted for this limit, `undefined` = not reported by the server. */
   used?: number | null;
+  /** The "Used" cell when a plain count doesn't say it (JobCam storage reads "4.2 of 5 GB"). */
+  usedText?: string;
   /** The finite ceiling the bar measures against (omit for unlimited / not a count). */
   ceiling?: number;
   /** "/ mo" counts reset monthly; the rest are standing counts. */
@@ -103,7 +106,10 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const domains = useQuery<unknown[]>({ queryKey: ["/api/click-guard/domains"], enabled: !!allowances && allowances.protectedSites !== 0 });
   // ConstructHUB SEO: tracked keywords are a standing count the SEO status reports; the two monthly meters come with the entitlements.
   const seo = useOptionalQuery<{ configured: boolean; usage: { keywords: UsageMeter }; credits?: { includedUsedCents: number; walletCents: number } }>("/api/seo/status", !!allowances && allowances.seoKeywords !== 0);
-  const crmMe = useQuery<{ seats?: { used: number; limit: number } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
+  const crmMe = useQuery<{ seats?: { used: number; limit: number }; crm?: { jobcam?: boolean } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
+  // JobCam storage (the CRM's job photos & video): the same numbers as the meter in JobCam.
+  const jobcam = useOptionalQuery<{ bytes: number; tierGb: number; limitBytes: number; nextTierGb: number | null; full: boolean }>(
+    "/api/crm/jobcam/usage", !!allowances && crmMe.data?.crm?.jobcam === true);
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
   // Call Assistant add-on (numbers+billing lane): only where the plan can buy it.
@@ -253,6 +259,25 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           used: null,
           addon: allowances.clientTexting === "none" ? undefined : "texting_number",
         },
+        // JobCam belongs to the CRM subscription, not this plan; larger storage sizes are requested, not bought.
+        crmMe.data?.crm?.jobcam === true ? {
+          key: "jobcamStorage",
+          label: "JobCam storage",
+          included: jobcam.data ? formatJobcamTier(jobcam.data.tierGb) : "—",
+          used: jobcam.data ? jobcam.data.bytes : undefined,
+          usedText: jobcam.data ? formatJobcamUsage(jobcam.data.bytes, jobcam.data.tierGb) : undefined,
+          ceiling: jobcam.data?.limitBytes,
+          hint: jobcam.data?.full
+            ? `Storage is full: new photos and videos wait until you delete some or get more.${jobcam.data.nextTierGb ? ` Next size: ${formatJobcamTier(jobcam.data.nextTierGb)} — request it in JobCam.` : ""}`
+            : "Job photos, videos and their previews. Need more? Request it in JobCam when you're near the limit.",
+        } : {
+          key: "jobcamStorage",
+          label: "JobCam storage",
+          included: "Not included",
+          excluded: true,
+          used: null,
+          hint: "JobCam is part of the ConstructHUB CRM subscription, not this plan.",
+        },
       ],
     },
   ];
@@ -387,6 +412,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
               const pct = row.ceiling && typeof row.used === "number" ? Math.min(100, Math.round((row.used / row.ceiling) * 100)) : null;
               const usedText = row.used === null ? "—"
                 : row.used === undefined ? "Not reported"
+                : row.usedText ? row.usedText
                 : row.ceiling ? `${formatCount(row.used)} of ${formatCount(row.ceiling)}`
                 : `${formatCount(row.used)} used`;
               return (
@@ -479,10 +505,10 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
 }
 
 /** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field, the Call Assistant pair on plans that sell it, and the API pair when present). */
-export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
+export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "jobcamStorage" | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
   "locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies",
   "protectedSites", "siteScans", "competitorScans",
-  "permitSearches", "teamTextSegments", "clientTexting",
+  "permitSearches", "teamTextSegments", "clientTexting", "jobcamStorage",
   "callAssistantMinutes", "callAssistantNumbers",
   "apiUnitsPerMonth", "apiRatePerMinute",
 ];

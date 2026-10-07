@@ -10,6 +10,7 @@
  * customer data.
  */
 import type { AddonKey, CountLimitKey, ModuleKey } from "../plans";
+import type { CrmAddonKey } from "../crm-plans";
 import type { DashboardGroupKey, DashboardSurface } from "../dashboard";
 
 /** The dashboard's five groups, plus the platform pieces that have no tile (Gabe, the API). */
@@ -62,6 +63,11 @@ export type FeaturePricing = (
   | { kind: "module"; module: ModuleKey; allowance?: FeatureAllowance }
   /** An add-on bought on top of a plan (ADDONS[addon]); `preview` add-ons show "Coming soon". */
   | { kind: "addon"; addon: AddonKey }
+  /**
+   * A CRM feature sold on the CRM subscription (shared/crm-plans.ts CRM_ADDONS): included in the CRM plan(s)
+   * whose limits carry it, an add-on on the others. Priced from the CRM price book, never a platform plan.
+   */
+  | { kind: "crmAddon"; addon: CrmAddonKey }
   /** No plan check in the code: any signed-in account can use it. */
   | { kind: "account" }
   /** A one-time service with its price in the price book. */
