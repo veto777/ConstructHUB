@@ -525,3 +525,54 @@ a.g-stat:hover { background: var(--g-surface-2); }
 
 /* No horizontal scroll on phones: long names/addresses wrap, pills wrap. */
 .g-surface { overflow-wrap: anywhere; }
+
+/* ── SEO pages (rank tracker, keywords, backlinks, competitors) ────────────
+   Restored from the SEO branch (372f69d) after a merge dropped them. They read the surface's accent
+   (brand orange; <GoogleSurface accent="brand">), never a colour of their own. */
+
+/* Results-style table that becomes a card list on phones (td[data-label] prints the column name). */
+.g-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+.g-table th { text-align: left; font-weight: 500; color: var(--g-text-2); font-size: 12px; line-height: 16px; padding: 8px 12px; border-bottom: 1px solid var(--g-divider); white-space: nowrap; }
+.g-table td { padding: 10px 12px; border-bottom: 1px solid var(--g-divider); vertical-align: top; color: var(--g-text); }
+.g-table tr:last-child td { border-bottom: 0; }
+.g-table tbody tr:hover td { background: var(--g-hover); }
+.g-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-table th:first-child, .g-table td:first-child { padding-left: 0; }
+.g-table th:last-child, .g-table td:last-child { padding-right: 0; }
+@media (max-width: 639px) {
+  .g-table thead { display: none; }
+  .g-table, .g-table tbody, .g-table tr { display: block; }
+  .g-table tr { padding: 12px 0; border-bottom: 1px solid var(--g-divider); }
+  .g-table td { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border: 0; }
+  .g-table td::before { content: attr(data-label); color: var(--g-text-2); font-size: 12px; flex: none; }
+  .g-table td:first-child { display: block; font-weight: 500; }
+  .g-table td:first-child::before { content: none; }
+  .g-table .num { text-align: right; }
+}
+/* Movement arrows: glyph + number, never colour alone. */
+.g-move { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; }
+.g-move--up { color: var(--g-green); }
+.g-move--down { color: var(--g-red); }
+.g-move--flat { color: var(--g-text-2); }
+/* Stat tiles (Google card: white, 1px divider, 8px radius). */
+.g-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 640px) { .g-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.g-tile { border: 1px solid var(--g-divider); border-radius: 8px; padding: 12px 16px; background: var(--g-surface); min-width: 0; }
+.g-tile__label { font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+.g-tile__value { margin-top: 4px; font-size: 24px; line-height: 32px; font-weight: 400; color: var(--g-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.g-tile__hint { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
+/* Tab strip under the header (Google's underline tabs). */
+.g-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; scrollbar-width: none; }
+.g-tabs a { flex: none; padding: 10px 12px; color: var(--g-text-2); font-size: 14px; font-weight: 500; text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.g-tabs a:hover { color: var(--g-text); background: var(--g-hover); border-radius: 8px 8px 0 0; }
+.g-tabs a[aria-current="page"] { color: var(--g-accent-ink); border-bottom-color: var(--g-accent); }
+/* Notice / empty card. */
+.g-callout { border: 1px solid var(--g-divider); border-radius: 8px; padding: 16px; background: var(--g-surface-2); }
+.g-callout h3 { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
+.g-callout p, .g-callout li { margin: 0; font-size: 14px; line-height: 20px; color: var(--g-text-2); }
+.g-callout ul { margin: 8px 0 0; padding-left: 18px; }
+.g-callout code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; color: var(--g-text); background: var(--g-chip); padding: 1px 5px; border-radius: 4px; }
+/* Plain inputs / selects on the surface. */
+.g-input { width: 100%; min-height: 40px; padding: 0 14px; border: 1px solid var(--g-divider); border-radius: 8px; background: var(--g-surface); color: var(--g-text); font: inherit; font-size: 14px; }
+.g-input:focus { outline: 2px solid var(--g-accent); outline-offset: -1px; border-color: transparent; }
+.g-select { appearance: auto; }
