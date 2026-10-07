@@ -7,6 +7,7 @@ import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
 import SocialMediaPage from "@/pages/social-media";
 import GuidesPage from "@/pages/guides";
+import TutorialsPage from "@/pages/tutorials";
 import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { lazy, Suspense, useEffect, type ComponentType } from "react";
@@ -203,6 +204,7 @@ function DashboardRouter() {
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/social-media" component={SocialMediaPage} />
       <Route path="/guides" component={GuidesPage} />
+      <Route path="/tutorials" component={TutorialsPage} />
       <Route path="/cloudflare" component={CloudflarePage} />
       <Route path="/search-console" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
@@ -370,7 +372,7 @@ function PublicRouter() {
 /** Dashboard routes that need an account (everything else here is public). */
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
-  "/social-media", "/guides", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
+  "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
   "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/admin/feature-pages", "/admin/access", "/admin/issues",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
@@ -400,7 +402,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
-  "/guides": "Guides", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
+  "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
   "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",

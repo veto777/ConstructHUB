@@ -17,7 +17,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   // Signed-out and signed-in pages (PublicRouter, DashboardRouter).
   "/landing", "/auth", "/search", "/databases", "/property", "/schedules", "/history", "/photos", "/media-library",
   "/gmb-monitor", "/google-profile", "/ranking-grid", "/competitors", "/competitors-landing", "/agency", "/locations", "/domains",
-  "/mail-alerts", "/gbp-content", "/social-media", "/guides", "/cloudflare", "/search-console", "/seo", "/seo/rank-tracker", "/seo/explorer", "/seo/keywords", "/seo/backlinks", "/seo/competitors", "/site-scan",
+  "/mail-alerts", "/gbp-content", "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/seo/rank-tracker", "/seo/explorer", "/seo/keywords", "/seo/backlinks", "/seo/competitors", "/site-scan",
   "/free-site-scan", "/site-scan/report/*", "/master-class", "/master-class-landing", "/google-ads", "/ads-manager",
   "/google-ads-landing", "/permits-landing", "/google-ads-guide/:section", "/lsa-leads", "/lsa-account-manager",
   "/ip-tracker", "/crm-app", "/admin", "/admin/feature-pages", "/admin/access", "/admin/issues",

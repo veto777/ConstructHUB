@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, KanbanSquare, BookOpen, CreditCard, Building2,
   Settings, LogOut, ShieldCheck, FileText, ReceiptText, Blocks, Plus, ChevronDown, Inbox, Phone, LayoutGrid, ArrowUpRight,
   CalendarDays,
-  Camera, type LucideIcon,
+  Camera, PlayCircle, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
@@ -214,6 +214,16 @@ export function CrmSidebar() {
                   <a href={marketingUrl("/")} data-testid="link-portal-nav-platform" className="flex items-center gap-3 w-full group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center">
                     <LayoutGrid className="h-4 w-4 shrink-0" strokeWidth={1.9} />
                     <span className="text-[13px] font-medium">All ConstructHUB tools</span>
+                    <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" strokeWidth={1.9} aria-hidden="true" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {/* Link only: the Tutorials page (every feature's guide and walkthrough video, CRM included) is a platform page. */}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Tutorials" className="h-9 rounded-lg px-3">
+                  <a href={marketingUrl("/tutorials#group-crm")} data-testid="link-portal-nav-tutorials" className="flex items-center gap-3 w-full group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:justify-center">
+                    <PlayCircle className="h-4 w-4 shrink-0" strokeWidth={1.9} />
+                    <span className="text-[13px] font-medium">Tutorials</span>
                     <ArrowUpRight className="ml-auto h-3.5 w-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" strokeWidth={1.9} aria-hidden="true" />
                   </a>
                 </SidebarMenuButton>

@@ -9,6 +9,8 @@ import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { Search } from "lucide-react";
+import { HelpButton } from "@/components/help-button";
+import { CloudflareConnectSteps, CloudflareTokenSteps, SearchConsoleConnectSteps } from "./site-connect-steps";
 import {
   PlanRequired,
   planRequiredFrom,
@@ -38,25 +40,44 @@ function Field({
  * e2e reaches tabs by role "button" (e.g. getByRole("button", { name: "Work queue" })).
  */
 function TabStrip({ tabs, active, onChange }: {
-  tabs: string[];
+  tabs: { tab: string; helpKey: string }[];
   active: string;
   onChange: (t: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {tabs.map((t) => (
-        <GooglePill
-          key={t}
-          label={t}
-          selected={t === active}
-          ariaPressed={t === active}
-          onClick={() => onChange(t)}
-          testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
-        />
+    <div className="flex flex-wrap gap-x-3 gap-y-2">
+      {tabs.map(({ tab: t, helpKey }) => (
+        // Each view with its "i" (what it's for, what it does, how to run it, how it works).
+        <span key={t} className="inline-flex items-center gap-1">
+          <GooglePill
+            label={t}
+            selected={t === active}
+            ariaPressed={t === active}
+            onClick={() => onChange(t)}
+            testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
+          />
+          <HelpButton k={helpKey} />
+        </span>
       ))}
     </div>
   );
 }
+/** The views of each page with their help-registry key (shared/help/registry.ts). */
+const CLOUDFLARE_TABS = [
+  { tab: "Sites", helpKey: "cloudflare.sites" },
+  { tab: "Connections", helpKey: "cloudflare.connections" },
+  { tab: "Onboarding", helpKey: "cloudflare.onboarding" },
+  { tab: "Work queue", helpKey: "cloudflare.work-queue" },
+  { tab: "Edge audit", helpKey: "cloudflare.edge-audit" },
+  { tab: "Guide", helpKey: "cloudflare.guide" },
+];
+const SEARCH_CONSOLE_TABS = [
+  { tab: "Sites", helpKey: "search-console.sites" },
+  { tab: "Connections", helpKey: "search-console.connections" },
+  { tab: "Onboarding", helpKey: "search-console.onboarding" },
+  { tab: "Work queue", helpKey: "search-console.work-queue" },
+  { tab: "Guide", helpKey: "search-console.guide" },
+];
 function DataList({
   url,
   title,
@@ -158,6 +179,10 @@ function MetricRows({ asset }: { asset: any }) {
     [end, E] = useState(new Date().toISOString().slice(0, 10));
   return (
     <div className="space-y-4">
+      <p className="flex items-center gap-1.5 text-sm g-text-2">
+        About this data: search analytics <HelpButton k="search-console.analytics" />
+        <span aria-hidden="true">·</span> sitemaps and index checks <HelpButton k="search-console.sitemaps-indexing" />
+      </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <label className="block space-y-1.5 text-sm">
           <span className="g-text-2">Breakdown</span>
@@ -373,6 +398,7 @@ export default function SiteConnections({
     <GoogleSectionHeader
       as="h1"
       title={cf ? "Cloudflare protection" : "Google Search Console"}
+      titleAfter={cf ? <HelpButton k="cloudflare" /> : <HelpButton k="search-console" />}
       description={
         cf
           ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
@@ -381,14 +407,7 @@ export default function SiteConnections({
       flush
     />
   );
-  const TABS = [
-    "Sites",
-    "Connections",
-    "Onboarding",
-    "Work queue",
-    ...(cf ? ["Edge audit"] : []),
-    "Guide",
-  ];
+  const TABS = cf ? CLOUDFLARE_TABS : SEARCH_CONSOLE_TABS;
   if (planGate)
     return (
       <AppPage testId={`page-site-connections-${provider}`}>
@@ -415,6 +434,22 @@ export default function SiteConnections({
           Google consent failed. Reconnect and grant Search Console access.
         </Notice>
       )}
+      {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
+      {config.data && !(config.data.total > 0) && tab !== "Connections" && (
+        <div className="g-callout mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="connect-first-prompt">
+          <p className="text-[14px] leading-5 g-text">
+            {cf ? "Start here: connect your Cloudflare account." : "Start here: connect Google Search Console."}{" "}
+            <span className="g-text-2">It takes about two minutes and the steps are spelled out.</span>
+          </p>
+          <GooglePill
+            variant="solid"
+            className="w-full sm:w-auto"
+            label="Show me how"
+            onClick={() => T("Connections")}
+            testId="button-connect-first"
+          />
+        </div>
+      )}
       <TabStrip tabs={TABS} active={tab} onChange={T} />
       {tab === "Guide" && <SiteConnectionGuide />}
       {tab === "Connections" && (
@@ -428,6 +463,12 @@ export default function SiteConnections({
                   : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
               }
             />
+            {/* Click-by-click: most people have never fetched a key from Cloudflare (owner, 2026-10-07). */}
+            <div className="mb-4">
+              {cf
+                ? <CloudflareConnectSteps open={!(config.data?.total > 0)} />
+                : <SearchConsoleConnectSteps open={!(config.data?.total > 0)} />}
+            </div>
             {cf ? (
               <div className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-2">
@@ -529,12 +570,7 @@ export default function SiteConnections({
                     Fallback: paste a scoped API token
                   </summary>
                   <div className="mt-3 space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Cloudflare → My Profile → API Tokens → Create Token →
-                      Custom token. Add the zone permissions listed above,
-                      choose Include → Specific zone for each client site, then
-                      Continue to summary → Create Token.
-                    </p>
+                    <CloudflareTokenSteps />
                     <Field
                       label="Scoped API token"
                       type="password"
@@ -697,6 +733,7 @@ export default function SiteConnections({
           <div className="flex flex-wrap items-end gap-3">
             {!cf && (
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                <span className="order-last self-start sm:self-end sm:pb-3"><HelpButton k="search-console.sync-range" /></span>
                 <Field
                   label="Sync from (up to 16 months)"
                   type="date"
@@ -812,9 +849,17 @@ export default function SiteConnections({
                   ))}
                 </GoogleList>
               ) : (
-                <p className="py-6 text-sm g-text-2">
-                  No connected sites. Open Connections to get started.
-                </p>
+                <div className="py-6 space-y-3">
+                  <p className="text-sm g-text-2">
+                    No connected sites yet. Connect {cf ? "your Cloudflare account" : "Google Search Console"} first — the steps are on the Connections tab.
+                  </p>
+                  <GooglePill
+                    variant="solid"
+                    label={cf ? "Connect Cloudflare — show me how" : "Connect Search Console — show me how"}
+                    onClick={() => T("Connections")}
+                    testId="button-open-connect-steps"
+                  />
+                </div>
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous sites" />
@@ -829,6 +874,7 @@ export default function SiteConnections({
             <section>
               <GoogleSectionHeader
                 title="Preview edge protection for selected zones"
+                titleAfter={<HelpButton k="cloudflare.protection" />}
                 description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
               />
               <div className="space-y-3">
@@ -929,6 +975,7 @@ export default function SiteConnections({
             <section>
               <GoogleSectionHeader
                 title="Bulk sitemap submission or inspection"
+                titleAfter={<HelpButton k="search-console.sitemaps-indexing" />}
                 description="One property ID and URL per line, separated by a comma. URLs must belong to the property."
               />
               <div className="space-y-3">
