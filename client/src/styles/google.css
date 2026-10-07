@@ -177,6 +177,8 @@
   letter-spacing: 0;
 }
 .g-surface h1 { font-size: 22px; line-height: 28px; font-weight: 400; }
+/* Titles in the kit itself are Google's 400 (the heading rule above would make them 500). */
+.g-surface .g-card__title, .g-surface .g-header__title, .g-surface .g-ai__label { font-weight: 400; }
 @media (min-width: 640px) { .g-surface h1 { font-size: 24px; line-height: 32px; } }
 
 /* Google's focus ring: 2px accent outline, 2px off the edge. */
