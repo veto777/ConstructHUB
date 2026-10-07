@@ -2519,7 +2519,7 @@ export const opsIssues = pgTable("ops_issues", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   /** sha256(source + key), 32 hex: the same failure again is the same row. */
   fingerprint: text("fingerprint").notNull().unique(),
-  /** server | job | client | call_assistant | health */
+  /** server | job | client | call_assistant | health | user */
   source: text("source").notNull(),
   /** info | warning | error | critical (a repeat keeps the worst) */
   severity: text("severity").notNull().default("error"),
@@ -2541,6 +2541,12 @@ export const opsIssues = pgTable("ops_issues", {
   /** The timeline: reported / claimed / inspected / fixed / … (last 50). */
   history: jsonb("history").$type<{ at: string; event: string; by?: string }[]>().notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  /** User reports (source "user", /report-issue): the account that sent it (null signed out) and where to answer. */
+  reporterUserId: integer("reporter_user_id"),
+  reporterEmail: text("reporter_email"),
+  /** The plain-language answer the reporter reads under "Your reports" (the issue desk or an admin writes it). */
+  publicReply: text("public_reply"),
+  publicReplyAt: timestamp("public_reply_at", { withTimezone: true }),
 });
 export type OpsIssueRecord = typeof opsIssues.$inferSelect;
 

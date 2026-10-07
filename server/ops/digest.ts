@@ -92,3 +92,36 @@ export async function sendRunDigest(
   }
   return { title, emailed, notified, admins: admins.length };
 }
+
+// ── A user's blocker report: the bell rings now, not at the next run ─────────
+
+export const USER_REPORT_BELL_KIND = "ops.user_report";
+
+/**
+ * "I can't use the site" from /report-issue: one bell notification per report
+ * and platform admin, at once (the run digest above only speaks after Claude
+ * looked). Deduped on the report's number, so nothing — a retry, a later run —
+ * rings twice for the same report. The body carries the scrubbed title only.
+ * Never throws: the report is already stored when this runs.
+ */
+export async function notifyAdminsOfBlockerReport(issue: Pick<OpsIssue, "id" | "title">, q: Queryable): Promise<number> {
+  let notified = 0;
+  try {
+    const marker = `Report #${issue.id}`;
+    for (const admin of await platformAdminUsers(q)) {
+      try {
+        const { rowCount } = await q.query(
+          `INSERT INTO user_notifications (user_id, kind, title, body, link, severity)
+           SELECT $1, $2, $3, $4, '/admin/issues', 'warning'
+            WHERE NOT EXISTS (SELECT 1 FROM user_notifications WHERE user_id = $1 AND kind = $2 AND body LIKE $5)`,
+          [admin.id, USER_REPORT_BELL_KIND, "A user can’t use the site", `${issue.title}\n${marker}`, `%\n${marker}`]);
+        if (rowCount) notified++;
+      } catch (e) {
+        console.warn(`[issues] blocker bell for admin ${admin.id} failed: ${(e as Error)?.message ?? e}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`[issues] blocker bell failed: ${(e as Error)?.message ?? e}`);
+  }
+  return notified;
+}
