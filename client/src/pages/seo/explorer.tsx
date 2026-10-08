@@ -16,11 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
+import { OpportunitiesView } from "./opportunities";
 import { MarketPicker, useMarket } from "./market";
 import { findMarket, marketKey, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
 
-type GapKey = "contentGap" | "linkIntersect";
+type GapKey = "contentGap" | "linkIntersect" | "opportunities";
 type ViewKey = ReportKey | GapKey | "overview";
 
 type Footprint = {
@@ -100,7 +101,7 @@ function AuthorityRing({ value }: { value: number | null }) {
 
 /** The left menu, grouped the way Site Explorer groups its reports. */
 const MENU: { group: string; items: [ViewKey, string][] }[] = [
-  { group: "", items: [["overview", "Overview"]] },
+  { group: "", items: [["overview", "Overview"], ["opportunities", "Opportunities"]] },
   { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["referringIps", "Referring IPs"], ["linkCompetitors", "Sites with similar links"], ["linkIntersect", "Link intersect"], ["bestByLinks", "Best pages by links"]] },
   { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["subdomains", "Subdomains"], ["contentGap", "Content gap"]] },
   { group: "Paid search", items: [["paidKeywords", "Paid keywords"], ["ads", "Ads"]] },
@@ -256,7 +257,9 @@ export default function SeoExplorerPage() {
           {view !== "overview" ? (
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
-              {view === "contentGap" || view === "linkIntersect" ? (
+              {view === "opportunities" ? (
+                <OpportunitiesView key={`${report.domain}:${marketKey(market)}`} domain={report.domain} status={status.data} market={market} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
+              ) : view === "contentGap" || view === "linkIntersect" ? (
                 <GapView market={market} kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : (<>
