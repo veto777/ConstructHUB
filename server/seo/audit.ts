@@ -189,24 +189,39 @@ const CRAWLED_SQL = `CASE WHEN jsonb_typeof(state->'pages')='array' THEN jsonb_a
  * the dashboard, Site audit, its comparisons and the client report). Anything else is "could not be read", never a
  * clean crawl and never replaced by an older one.
  */
-export const WELL_FORMED_SQL = `-- Everything the score rests on, as a finished crawl writes it (server/sitescan): a report with a list of
+export const WELL_FORMED_SQL = `-- (Every list is unpacked only when it IS a list: SQL may test the conditions in any order, so a malformed value can
+ -- never make the test itself fail — it just fails the test.)
+ -- Everything the score rests on, as a finished crawl writes it (server/sitescan): a report with a list of
               -- findings (each one an object) and, if any, a list of errors; pages each with an address and a numeric
               -- status. An empty list is a real empty list; anything else is "could not be read", never a clean crawl.
               (jsonb_typeof(report)='object' AND jsonb_typeof(report->'findings')='array'
                -- each finding: an object with a text severity, and its pages (if any) a list of addresses
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object'
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(report->'findings')='array' THEN report->'findings' ELSE '[]'::jsonb END) f WHERE jsonb_typeof(f)<>'object'
                      OR (f->>'severity') IS DISTINCT FROM 'critical' AND (f->>'severity') IS DISTINCT FROM 'warning' AND (f->>'severity') IS DISTINCT FROM 'info'
                      OR jsonb_typeof(f->'id') IS DISTINCT FROM 'string'
-                     OR jsonb_typeof(f->'urls') IS DISTINCT FROM 'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(f->'urls') u WHERE jsonb_typeof(u)<>'string'))
+                     OR jsonb_typeof(f->'urls') IS DISTINCT FROM 'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(f->'urls')='array' THEN f->'urls' ELSE '[]'::jsonb END) u WHERE jsonb_typeof(u)<>'string'))
                -- each error (a page that could not be fetched counts against the score): an object with an address
                AND (report->'errors' IS NULL OR (jsonb_typeof(report->'errors')='array'
-                     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'errors') e WHERE jsonb_typeof(e)<>'object' OR jsonb_typeof(e->'url') IS DISTINCT FROM 'string'
+                     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(report->'errors')='array' THEN report->'errors' ELSE '[]'::jsonb END) e WHERE jsonb_typeof(e)<>'object' OR jsonb_typeof(e->'url') IS DISTINCT FROM 'string'
                      -- a failed fetch (counts against the score) or one of the crawler's own exclusions; anything else is not known
                      -- (exact exclusion texts; a message that is there must be text — a JSON null is not "no message")
                      OR NOT coalesce(NOT (e ? 'message') OR (jsonb_typeof(e->'message')='string' AND (e->>'message' ~ '^Request failed'
                          OR e->>'message' IN ('Non-HTML response excluded from page checks.', 'Redirect leaves the selected origin; destination excluded from audit.'))), false))))
                AND jsonb_typeof(state->'pages')='array'
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR CASE WHEN jsonb_typeof(p->'status')='number' THEN (p->>'status')::numeric NOT BETWEEN 100 AND 599 OR (p->>'status')::numeric <> trunc((p->>'status')::numeric) ELSE true END))`;
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR CASE WHEN jsonb_typeof(p->'status')='number' THEN (p->>'status')::numeric NOT BETWEEN 100 AND 999 OR (p->>'status')::numeric <> trunc((p->>'status')::numeric) ELSE true END))`;
+/**
+ * The site's newest finished crawl, whatever was saved in it: its id, its row version (changes with any update of the
+ * row — the key for anything worked out from it) and whether it can be read. Views that read "the newest crawl" use
+ * this, so a broken newest crawl is said, never quietly replaced by an older one. null = no finished crawl.
+ */
+export async function newestCrawl(user: number, domain: string, db: { query: typeof pool.query } = pool): Promise<{ id: string; v: string; readable: boolean; at: string | null } | null> {
+  const { rows: [j] } = await db.query(
+    `SELECT id::text AS id, xmin::text AS v, ${WELL_FORMED_SQL} AS readable, completed_at FROM sitescan_jobs
+      WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC, id LIMIT 1`, [user, bare(domain)]);
+  return j ? { id: j.id, v: j.v, readable: !!j.readable, at: j.completed_at ? new Date(j.completed_at).toISOString() : null } : null;
+}
+/** What a view reading the newest crawl answers when that crawl cannot be read. */
+export type UnreadableCrawl = { unreadable: true; jobId: string; scannedAt: string | null };
 /** A finished crawl that can be read (the one evidence test, everywhere a crawl is read). */
 export const DONE_SQL = `status='completed' AND ${WELL_FORMED_SQL}`;
 
@@ -305,7 +320,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
 /** How many crawls of a site the dashboard's health trend shows. */
 export const HEALTH_TREND = 6;
 /** The version of the health worked out per crawl (seo_crawl_health.v): a new formula works every crawl out again. */
-const HEALTH_V = 4; // 4: exact exclusions, finding ids and page lists, real HTTP statuses (audit #47) — kept scores are worked out again
+const HEALTH_V = 5; // 5: any three-digit status a server can send (audit #48) — kept scores are worked out again
 /**
  * One crawl's health. `readable` false = the stored crawl could not be read (its score is not known — never zero).
  * `pages` = the pages the score is out of; `errorPages` = the distinct ones with an error.
@@ -386,7 +401,9 @@ export const EVIDENCE_MAX_CRAWLS = 60;
 export async function auditEvidence(user: number, domain: string, crawlIds: string[]): Promise<AuditEvidence> {
   const d = bare(domain);
   const [{ rows: [latest] }, { rows: [newest] }] = await Promise.all([
-    pool.query(`SELECT id::text AS id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, d]),
+    // The newest finished crawl only, and only if it can be read: a broken newest crawl is no evidence at all (never an
+    // older crawl's verdicts in its place) — the plan then says its tasks were not checked.
+    newestCrawl(user, d).then((n) => (n?.readable ? pool.query(`SELECT id::text AS id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2`, [n.id, user]) : { rows: [] as any[] })),
     pool.query(`SELECT status, created_at FROM sitescan_jobs WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
   ]);
   const wanted = [...new Set(crawlIds)].filter((id) => typeof id === "string" && id && id !== latest?.id);

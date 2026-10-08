@@ -25,10 +25,13 @@ export function LinkOpportunitiesView({ site, crawlId }: { site: SeoSite; /** Th
     queryFn: async ({ queryKey, signal }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const [shown, setShown] = useState(50);
-  const d = q.data;
+  // The newest crawl could not be read: said (the server never answers with an older crawl instead).
+  const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
+  const d = unreadable ? null : q.data;
   const byTarget = useMemo(() => { const m = new Map<string, number>(); for (const i of d?.items ?? []) m.set(i.to, (m.get(i.to) ?? 0) + 1); return m; }, [d]);
   if (q.isLoading) return <p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't work out the internal links</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
+  if (unreadable) return <Empty testId="link-opps-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty>;
   if (!d) return <Empty testId="link-opps-no-crawl"><h3>No crawl yet</h3><p>Run a crawl first; this view is worked out from the pages it reads.</p></Empty>;
   // A task is the link itself — from this page to that one — whichever keyword found it. Both addresses are kept whole,
   // so a suggestion whose addresses are too long to keep is not offered for the plan (the row says why).

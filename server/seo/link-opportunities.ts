@@ -12,7 +12,7 @@
  */
 import { createHash } from "node:crypto";
 import { pool } from "../db";
-import { auditDomainKey, DONE_SQL } from "./audit";
+import { auditDomainKey, newestCrawl, type UnreadableCrawl } from "./audit";
 import { linksMeasurable, sameUrlKey, type RawPage } from "./audit-pages";
 
 export const LINK_OPP_MAX = 200, LINK_OPP_PER_TARGET = 10;
@@ -179,10 +179,11 @@ type Result = LinkOpportunities & { jobId: string; scannedAt: string | null; che
 /** Worked out once per crawl and exact set of rank-check facts used (hashed), the last few looked at. */
 const worked = new Map<string, Result>();
 /** null = no finished crawl of the site yet. */
-export async function linkOpportunities(userId: number, site: { id: number; domain: string }): Promise<Result | null> {
-  const { rows: [newest] } = await pool.query(
-    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(site.domain)]);
+export async function linkOpportunities(userId: number, site: { id: number; domain: string }): Promise<Result | UnreadableCrawl | null> {
+  // The newest finished crawl, whatever it is (a broken one is said); worked-out results are kept by its row version.
+  const newest = await newestCrawl(userId, site.domain);
   if (!newest) return null;
+  if (!newest.readable) return { unreadable: true, jobId: newest.id, scannedAt: newest.at };
   // Each tracked keyword's NEWEST check day (within 35 days) — and on that day the device where the site ranked better.
   // A keyword that did not rank in its newest check is not looked for, however it ranked before.
   const { rows: targets } = await pool.query(
@@ -193,7 +194,7 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
         AND c.checked_on = (SELECT max(c2.checked_on) FROM seo_rank_checks c2 WHERE c2.keyword_id=c.keyword_id AND c2.site_id=$1)
       ORDER BY c.keyword_id, (c.position IS NULL OR c.url IS NULL), c.position ASC, c.device`, [site.id, userId]);
   const checkedOn = targets.map((t: any) => String(t.checkedOn)).sort().pop() ?? null;
-  const cacheKey = `${userId}:${newest.id}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
+  const cacheKey = `${userId}:${newest.id}:${newest.v}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
   const kept = worked.get(cacheKey);
   if (kept) return kept;
   const { rows: [job] } = await pool.query(`SELECT id, completed_at, ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, userId]);
@@ -218,7 +219,9 @@ export async function linkResolverFor(userId: number, domain: string, db: { quer
   // crawl table at all is simply no crawl.
   const { rows: [t] } = await db.query("SELECT to_regclass('sitescan_jobs') IS NOT NULL AS ok");
   if (!t?.ok) return aliasesOf([]);
-  const { rows: [job] } = await db.query(
-    `SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(domain)]);
+  // The newest finished crawl only: a broken one gives no aliases (an older crawl's would be out of date).
+  const newest = await newestCrawl(userId, domain, db);
+  if (!newest?.readable) return aliasesOf([]);
+  const { rows: [job] } = await db.query(`SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2`, [newest.id, userId]);
   return aliasesOf((job?.pages ?? []) as OppPage[]);
 }

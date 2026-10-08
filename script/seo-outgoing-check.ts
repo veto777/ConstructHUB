@@ -21,6 +21,11 @@ const H = "https://outgo.example";
   ok(out && out.linkedDomains.find((d) => d.domain === "supplier.example")!.examples[0].anchor === "Our supplier", "link text comes from the crawl's evidence");
   ok(out && out.broken.length === 1 && out.broken[0].status === 404 && out.checkedAddresses === 1 && out.uncheckedLinks === 1, "the checked link that answered 404 is listed; the unchecked one is counted apart");
   ok((await siteOutgoingLinks(3, site)) === null, "an account with no crawl of it gets nothing");
+  // A newer crawl of the account's own site saved in a broken form: said, never the older crawl in its place.
+  await job(1, [page("/", ["https://other.example/"])], [], 0);
+  await pool.query("UPDATE sitescan_jobs SET report='[]'::jsonb WHERE user_id=1 AND url LIKE 'https://outgo.example%' AND completed_at > now() - interval '30 minutes'");
+  const broken = await siteOutgoingLinks(1, site);
+  ok(broken && "unreadable" in broken, `a broken newest crawl is said: ${JSON.stringify(broken).slice(0, 80)}`);
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`outgoing checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

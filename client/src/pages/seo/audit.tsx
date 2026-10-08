@@ -32,7 +32,7 @@ type Audit = {
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
-type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number; unreadable?: boolean }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -117,7 +117,9 @@ export default function SeoAuditPage() {
   const issues = (a?.issues ?? []).filter((i) => (severity === "all" || i.severity === severity) && (category === "all" || i.category === category));
   const categories = [...new Set((a?.issues ?? []).map((i) => i.category))];
   const total = a ? a.crawled + a.statuses.failed : 0;
-  const trend = (d?.history ?? []).filter((h) => h.health !== null);
+  // Every crawl stays on the chart: one with no score (or that could not be read) is a gap, never bridged by a line.
+  const trend = d?.history ?? [];
+  const scored = trend.filter((h) => h.health !== null);
   const cmp = a?.comparedWith ?? null;
   const before = cmp?.chosen && cmp.at ? `the crawl of ${fmtDate(cmp.at)}` : "the crawl before";
   // Every finished crawl, newest first; the ones older than the crawl shown can be compared with.
@@ -214,9 +216,9 @@ export default function SeoAuditPage() {
             </section>
           </div>
 
-          {(trend.length > 1 || a.scores) && (
+          {(scored.length > 1 || a.scores) && (
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
-              {trend.length > 1 && (
+              {scored.length > 1 && (
                 <section className="rounded-lg border p-4 lg:col-span-2" style={card} data-testid="audit-trend">
                   <h2 className="g-text mb-2 text-[16px] font-medium">Health score over time</h2>
                   <div className="h-44">
@@ -226,14 +228,17 @@ export default function SeoAuditPage() {
                         <XAxis dataKey="at" tickFormatter={(v) => fmtDate(String(v))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
                         <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={32} />
                         <Tooltip labelFormatter={(v) => fmtDate(String(v))} formatter={(v: number) => [v, "Health score"]} contentStyle={tooltipStyle} />
-                        <Line type="monotone" dataKey="health" stroke="var(--g-green)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                        <Line type="monotone" dataKey="health" stroke="var(--g-green)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <details className="mt-2 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">Every crawl, as a list</summary>
+                    <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h) => <li key={h.jobId}>{fmtDate(h.at)}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
+                  </details>
                 </section>
               )}
               {a.scores && (
-                <section className={`rounded-lg border p-4 ${trend.length > 1 ? "" : "lg:col-span-3"}`} style={card} data-testid="audit-scores">
+                <section className={`rounded-lg border p-4 ${scored.length > 1 ? "" : "lg:col-span-3"}`} style={card} data-testid="audit-scores">
                   <h2 className="g-text mb-2 text-[16px] font-medium">By area</h2>
                   <ul className="space-y-2 text-[13px]">
                     {Object.entries(a.scores.categories).map(([k, v]) => (

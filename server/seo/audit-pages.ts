@@ -6,7 +6,7 @@
  * (sitescan_jobs.state); free.
  */
 import { pool } from "../db";
-import { groupFindings, auditDomainKey, DONE_SQL } from "./audit";
+import { groupFindings, newestCrawl, type UnreadableCrawl } from "./audit";
 
 export type RawPage = {
   url: string; status: number; redirects: number; title: string | null; description: string | null; h1: string[]; links: string[];
@@ -148,18 +148,19 @@ type PagesResult = { jobId: string; scannedAt: string | null; summary: PagesSumm
 /** A finished crawl never changes, so its page table is worked out once and kept (the last few crawls looked at). */
 const worked = new Map<string, PagesResult>();
 
-export async function auditPages(user: number, domain: string): Promise<PagesResult | null> {
-  // Which crawl first (cheap), then its pages only when they are not already worked out.
-  const { rows: [newest] } = await pool.query(
-    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, auditDomainKey(domain)]);
+export async function auditPages(user: number, domain: string): Promise<PagesResult | UnreadableCrawl | null> {
+  // Which crawl first (cheap), then its pages only when they are not already worked out. The newest finished crawl,
+  // whatever it is: one that cannot be read is said (never an older one in its place). Kept by the crawl's row version.
+  const newest = await newestCrawl(user, domain);
   if (!newest) return null;
-  const kept = worked.get(`${user}:${newest.id}`);
+  if (!newest.readable) return { unreadable: true, jobId: newest.id, scannedAt: newest.at };
+  const kept = worked.get(`${user}:${newest.id}:${newest.v}`);
   if (kept) return kept;
   const { rows: [job] } = await pool.query(`SELECT id, completed_at, report->'findings' AS findings, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, user]);
   if (!job) return null;
   const rows = pageRows((job.pages as RawPage[]).slice(0, PAGE_CAP), Array.isArray(job.findings) ? job.findings : []);
   const result = { jobId: job.id, scannedAt: job.completed_at, summary: pagesSummary(rows), pages: rows };
-  worked.set(`${user}:${job.id}`, result);
+  worked.set(`${user}:${newest.id}:${newest.v}`, result);
   if (worked.size > 20) worked.delete(worked.keys().next().value as string);
   return result;
 }

@@ -8,7 +8,7 @@ import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
+import { Empty, fmtDate, fmtNum, Tile, type SeoSite } from "./shell";
 
 type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number | null;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
@@ -44,7 +44,9 @@ export function AuditPages({ site, issueTitles, crawlId }: { site: SeoSite; issu
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "path", dir: 1 });
   const [open, setOpen] = useState<string | null>(null);
   const [shown, setShown] = useState(100);
-  const d = q.data;
+  // The newest crawl could not be read: said (the server never answers with an older crawl instead).
+  const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
+  const d = unreadable ? null : q.data;
   const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
   const rows = useMemo(() => {
     if (!d) return [];
@@ -62,6 +64,7 @@ export function AuditPages({ site, issueTitles, crawlId }: { site: SeoSite; issu
   };
   if (q.isLoading) return <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the crawled pages…</p>;
   if (q.isError) return <div className="g-callout" role="alert" data-testid="audit-pages-error"><h3>Couldn't load the pages</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
+  if (unreadable) return <Empty testId="audit-pages-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty>;
   if (!d || d.pages.length === 0) return <Empty testId="audit-pages-empty"><h3>No pages to show</h3><p>The crawl did not save any pages for {site.domain}. Run a new crawl.</p></Empty>;
   const s = d.summary, measured = s.linksMeasured !== false;
   return (

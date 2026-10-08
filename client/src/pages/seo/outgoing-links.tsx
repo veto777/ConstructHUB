@@ -36,7 +36,10 @@ export function OutgoingLinksView({ site, crawlId }: { site: SeoSite; /** The ne
   const [shown, setShown] = useState(50);
   if (q.isLoading) return <p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't read the outgoing links</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
-  const d = q.data;
+  // The newest crawl could not be read: said (the server never answers with an older crawl instead).
+  const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
+  const d = unreadable ? null : q.data;
+  if (unreadable) return <Empty testId="outgoing-unreadable"><h3>The newest crawl could not be read</h3><p>The crawl that finished {fmtDate(unreadable.scannedAt)} was not saved in a form we can read, so nothing is shown from it (and no older crawl in its place). Run a new crawl.</p></Empty>;
   if (!d) return <Empty testId="outgoing-no-crawl"><h3>No crawl yet</h3><p>Run a crawl first; this view is read from the pages it saves.</p></Empty>;
   const task = (b: Broken): PlanTask => ({
     kind: "page", title: `Fix or remove the link to ${b.to.replace(/^https?:\/\/(www\.)?/, "")} (${b.status === null ? "no answer" : `answered ${b.status}`}) on ${b.fromCount} page${b.fromCount === 1 ? "" : "s"}`.slice(0, 200),

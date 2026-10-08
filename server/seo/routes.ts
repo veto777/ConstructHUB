@@ -1393,7 +1393,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/render", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const crawl = await auditPages(user, site.domain).catch(() => null);
-    const crawled = (crawl?.pages ?? []).filter((p) => p.status === 200 && !p.redirected).sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99)).map((p) => p.url);
+    const crawled = (crawl && "pages" in crawl ? crawl.pages : []).filter((p) => p.status === 200 && !p.redirected).sort((a, b) => (a.depth ?? 99) - (b.depth ?? 99)).map((p) => p.url);
     res.json({ latest: await latestRender(user, site.id), suggestions: renderSuggestions([`https://${site.domain}/`, ...crawled], site.domain), max: RENDER_MAX_PAGES });
   });
   // The check takes about half a minute (a browser visit per page), so it runs in the background and the page asks for it.

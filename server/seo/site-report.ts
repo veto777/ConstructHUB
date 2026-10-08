@@ -378,13 +378,16 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
         k.byTag.forEach((t, idx) => {
           const label = `${idx + 1}. ${t.tag}`;
           doc.font("Helvetica").fontSize(9);
-          if (doc.widthOfString(pdfSafe(label)) > tcols[1] - 6) cut.push(`${idx + 1}. ${t.tag}`);
+          // A name with characters the PDF font cannot show is flagged too (the report page shows it as written).
+          const unshown = pdfSafe(t.tag) !== t.tag.normalize("NFC").replace(/\u2212/g, "-");
+          if (unshown) cut.push(`${idx + 1}. ${t.tag} (has characters this PDF cannot show - see the report page)`);
+          else if (doc.widthOfString(pdfSafe(label)) > tcols[1] - 6) cut.push(`${idx + 1}. ${t.tag}`);
           const mark = t.visibility === null ? "" : ` ${t.weighted ? "v" : "o"}${r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted ? (t.changeWeighted ? "/v" : "/o") : ""}`;
           trow([label, n(t.keywords), r.comparedWith ? `${n(t.compared)} / ${n(t.newSince)}` : "-", `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
             t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""}${mark}`]);
         });
         line("Visibility index weighting: v = by search volume, o = each keyword counted once (some keywords have no volume); a second letter after \"/\" is the change's own weighting when it differs.", soft);
-        if (cut.length) line(`Tag names cut to fit, in full: ${cut.join("; ")}.`, soft);
+        if (cut.length) line(`Tag names cut to fit or not fully shown, in full: ${cut.join("; ")}.`, soft);
         if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
         line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (\"In both\"); (-) means none was in both, (0) a measured no change. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first.`, soft);
       }
