@@ -13,13 +13,13 @@ export { default as e_crm_client_quick_actions } from "./crm/crm-client-quick-ac
 export { default as e_crm_company_settings } from "./crm/crm-company-settings";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_create_menu } from "./crm/crm-create-menu";
+export { default as e_crm_deposit_link } from "./crm/crm-deposit-link";
 export { default as e_crm_document_defaults } from "./crm/crm-document-defaults";
 export { default as e_crm_estimate_approved } from "./crm/crm-estimate-approved";
+export { default as e_crm_estimate_client_options } from "./crm/crm-estimate-client-options";
 export { default as e_crm_estimate_discounts } from "./crm/crm-estimate-discounts";
 export { default as e_crm_estimate_edit } from "./crm/crm-estimate-edit";
 export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
-export { default as e_crm_deposit_link } from "./crm/crm-deposit-link";
-export { default as e_crm_estimate_client_options } from "./crm/crm-estimate-client-options";
 export { default as e_crm_estimate_quick } from "./crm/crm-estimate-quick";
 export { default as e_crm_estimate_tracking } from "./crm/crm-estimate-tracking";
 export { default as e_crm_follow_ups } from "./crm/crm-follow-ups";
@@ -28,9 +28,9 @@ export { default as e_crm_invoice_client_view } from "./crm/crm-invoice-client-v
 export { default as e_crm_invoice_create } from "./crm/crm-invoice-create";
 export { default as e_crm_invoice_receipt } from "./crm/crm-invoice-receipt";
 export { default as e_crm_jobcam_project } from "./crm/crm-jobcam-project";
+export { default as e_crm_jobcam_share_link } from "./crm/crm-jobcam-share-link";
 export { default as e_crm_jobcam_share } from "./crm/crm-jobcam-share";
 export { default as e_crm_jobcam_timeline } from "./crm/crm-jobcam-timeline";
-export { default as e_crm_jobcam_share_link } from "./crm/crm-jobcam-share-link";
 export { default as e_crm_jobcam_upload } from "./crm/crm-jobcam-upload";
 export { default as e_crm_lead_new } from "./crm/crm-lead-new";
 export { default as e_crm_message_send } from "./crm/crm-message-send";
