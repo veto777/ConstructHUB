@@ -93,6 +93,8 @@ export function namedBusinesses(markdown: string): string[] {
     const name = plainText(m[1]).replace(/[:：]\s*$/, "").trim();
     // Not a name: a line of details ("Open now · Siding contractor · 4.9"), a sentence, a label.
     if (!name || name.length > 80 || /[·•]|\d\.\d|\(\d+ reviews?\)|^open now|^closed/i.test(name) || name.split(/\s+/).length > 9 || /^(key benefits?|pros|cons|note|summary|overview|tips?|services?|why|how)\b/i.test(name)) continue;
+    // A licence or reference number set in bold ("SIDINV787PJ") is not a business.
+    if (/\d/.test(name) && !/[a-z]/.test(name)) continue;
     const key = normalizeBusinessName(name);
     if (!key || seen.has(key)) continue;
     seen.add(key); out.push(name);

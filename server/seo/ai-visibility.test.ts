@@ -13,7 +13,7 @@ describe("reading an answer", () => {
     expect(plainText("**[Topside Roofing](https://x.com/?utm=1)**  \n_161 E Horton Rd_ [1] ![img](http://i/x.png)")).toBe("Topside Roofing\n161 E Horton Rd");
   });
   it("finds the businesses named and skips lines of details", () => {
-    expect(namedBusinesses("**[Topside Roofing & Siding](https://t.com)**\n**Open now · Roofing contractor · 4.6 (116 reviews)**\n**Alpine Exteriors | Siding, Roofing & Windows:**\n**Key Benefits**\n**Topside Roofing & Siding**"))
+    expect(namedBusinesses("**[Topside Roofing & Siding](https://t.com)**\n**Open now · Roofing contractor · 4.6 (116 reviews)**\n**Alpine Exteriors | Siding, Roofing & Windows:**\n**Key Benefits**\n**SIDINV787PJ**\n**Topside Roofing & Siding**"))
       .toEqual(["Topside Roofing & Siding", "Alpine Exteriors | Siding, Roofing & Windows"]);
   });
   it("named, used as a source, and where in the list", () => {
