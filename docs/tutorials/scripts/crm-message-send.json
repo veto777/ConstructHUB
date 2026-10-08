@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-message-send",
+  "title": "Send a client an email or text",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "chapter": "Start a message",
+      "narration": "You can send a client a quick message from any page of the CRM. Here is how."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create\"]",
+      "caption": "Create",
+      "narration": "Choose Create, at the top of the menu.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"create-item-message\"]",
+      "caption": "Message",
+      "narration": "Then choose Message.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-message-client-search\"]",
+      "value": "Ferrante",
+      "caption": "Search",
+      "chapter": "Pick the client and write",
+      "narration": "Search for the client. We'll type Ferrante.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"pick-client-demo-client-ferrante\"]",
+      "caption": "Pick the client",
+      "narration": "Pick Rosa and Stefan Ferrante.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"channel-email\"]",
+      "caption": "Email",
+      "narration": "Email is already selected."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-texting-off-hint\"]",
+      "caption": "Text",
+      "narration": "Text stays grey until texting is turned on, under Settings, SMS."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-message-body\"]",
+      "value": "Hi Rosa, we are confirmed for the parlor floor measure. See you then.",
+      "caption": "Message",
+      "narration": "Write your message.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send-message\"]",
+      "caption": "Send email",
+      "narration": "Choose Send email.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Clients",
+      "chapter": "Where it is kept",
+      "narration": "The message is saved with the client. Open Clients to see it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Ferrante",
+      "caption": "Search",
+      "narration": "Search for Ferrante again.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Rosa & Stefan Ferrante\") a",
+      "caption": "Open the client",
+      "narration": "Open their page.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"timeline-entry-msg-\"]",
+      "caption": "Activity",
+      "narration": "Under Activity, the email is at the top of the timeline."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-create\"]",
+      "caption": "Menu: Create",
+      "narration": "Create is at the top of the menu, on every CRM page."
+    }
+  ],
+  "youtube": {
+    "title": "How to send a client a quick email | ConstructHUB CRM",
+    "description": "A short walkthrough of quick messages in the ConstructHUB CRM. You will choose Create, then Message, pick a client, write an email and send it, and find it on the client's activity timeline. It also shows where texting is turned on.",
+    "tags": [
+      "email clients",
+      "client communication",
+      "contractor email",
+      "customer messages",
+      "client management",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Message any client",
+    "accent": "client",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
