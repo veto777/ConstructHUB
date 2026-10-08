@@ -56,6 +56,37 @@ export const emailFixture = defineProviderFixture<EmailFixture>({
     },
     count: async (input) => ({ count: forAddress(String(input.to || "")).length }),
     /**
+     * The client asks for their sign-in link, the way the page does it for them — the product's own
+     * request route, called on this machine — and the link from the email it sends comes back.
+     *   { to }                              the client portal's sign-in (POST /api/client/auth/request-link)
+     *   { to, invoice: "INV-1999" }         the email check in front of a document (POST /api/public/verify-access);
+     *   { to, estimate: "E-2000" }          the link returns the client to that document
+     * Use it to start a homeowner's session already signed in, when signing in is not what the video is about.
+     */
+    signIn: async (input, { orgId }) => {
+      requireTutorialFixtures("a client sign-in link");
+      const to = String(input.to || "").toLowerCase();
+      if (!to.endsWith("example.com")) throw new Error("`to` must be an example.com address");
+      const { pool } = await import("../../../db");
+      // Addressed as the browser would: documents live on the CRM host, the portal on the client host.
+      const call = (path: string, host: string, body: unknown) => fetch(`http://127.0.0.1:${process.env.PORT}${path}`, {
+        method: "POST", headers: { "content-type": "application/json", "x-forwarded-host": host }, body: JSON.stringify(body) });
+      const before = kept.length;
+      let r: Response;
+      if (input.invoice || input.estimate) {
+        const table = input.invoice ? "crm_invoices" : "crm_estimates";
+        const { rows: [doc] } = await pool.query(`select public_token from ${table} where org_id = $1 and number = $2`, [orgId, String(input.invoice || input.estimate)]);
+        if (!doc) throw new Error(`no document ${input.invoice || input.estimate}`);
+        r = await call("/api/public/verify-access", "portal.constructhub.us", { docType: input.invoice ? "invoice" : "estimate", token: doc.public_token, email: to });
+      } else r = await call("/api/client/auth/request-link", "client.constructhub.us", { email: to });
+      if (!r.ok) throw new Error(`the sign-in request answered ${r.status}`);
+      const mail = kept.slice(before).reverse().find((k) => k.to.includes(to));
+      const url = mail?.links.find((l) => l.includes("/api/client/auth/verify"));
+      if (!url) throw new Error(`no sign-in link was emailed to ${to} — is that the address on the client (or the one the document was sent to)?`);
+      const u = new URL(url);
+      return { url, path: `${u.pathname}${u.search}` };
+    },
+    /**
      * { estimate?: "E-2000", invoice?: "INV-1999", minutesAgo?: 90, visits?: 1, seconds?: 150 }
      * The same rows the public page writes on a real open (server/crm/portal.ts), dated in the past.
      */

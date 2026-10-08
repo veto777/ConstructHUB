@@ -240,6 +240,13 @@ export const stripeFixture = defineProviderFixture<StripeFixture>({
   adapter,
   routes,
   actions: {
+    /** Where the newest open checkout is: the link the contractor just copied, for the client's browser to open. */
+    checkout: async () => {
+      const open = [...sessions.values()].filter((s) => s.status === "open").pop();
+      if (!open) throw new Error("no checkout is open");
+      const u = new URL(open.url);
+      return { url: open.url, path: `${u.pathname}${u.search}`, amountCents: open.amount };
+    },
     /** Pay the newest open checkout without showing the stand-in page. { method: "card" | "ach" } */
     pay: async (input) => {
       const open = [...sessions.values()].filter((s) => s.status === "open").pop();

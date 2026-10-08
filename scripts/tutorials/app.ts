@@ -128,13 +128,13 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
 
 /**
  * For operating a flow by hand before writing its script:
- *   tsx scripts/tutorials/app.ts up <slot>     fresh database + app; prints where to browse
+ *   tsx scripts/tutorials/app.ts up <slot> [--no-fixtures] [--no-warm]   fresh database + app; prints where to browse
  *   tsx scripts/tutorials/app.ts down <slot>   stop the app (by its listening pid) and drop the database
  */
 async function main() {
   const [cmd, n] = process.argv.slice(2);
   const slot = Number(n);
-  if (!["up", "down"].includes(cmd ?? "") || !isSlot(slot)) throw new Error(`Usage: tsx scripts/tutorials/app.ts <up|down> <slot 1-${SLOT_MAX}> [--no-fixtures]`);
+  if (!["up", "down"].includes(cmd ?? "") || !isSlot(slot)) throw new Error(`Usage: tsx scripts/tutorials/app.ts <up|down> <slot 1-${SLOT_MAX}> [--no-fixtures] [--no-warm]`);
   const noFixtures = process.argv.includes("--no-fixtures");
   const { fresh, drop, seedDemo, seedFixtures } = await import("./db");
   const database = `constructhub_tut_slot${slot}`;
@@ -144,7 +144,8 @@ async function main() {
   await seedDemo(database);
   if (!noFixtures) await seedFixtures(database);
   const app = await startApp({ slot, database, fixtures: !noFixtures });
-  await warmApp(app.port);
+  // --no-warm: for dry runs only (pages compile on first use, which a dry run does not mind).
+  if (!process.argv.includes("--no-warm")) await warmApp(app.port);
   console.log(`slot ${slot}: http://portal.constructhub.us:${app.port}/crm  (Chromium: --host-resolver-rules="MAP portal.constructhub.us 127.0.0.1") · pid ${app.pid} · log ${app.log}`);
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().then(() => process.exit(0), (e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

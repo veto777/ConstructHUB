@@ -20,6 +20,11 @@ export const STEP_ACTIONS = [
   "scroll",     // scroll the target into view
   "wait",       // hold on the current frame for `holdMs` (narration only)
   "back",       // the browser's Back button (after a link that opened what would be a new tab)
+  "upload",     // choose `files` (demo files in scripts/tutorials/assets/) in the file input or file chooser behind the target
+  "drag",       // press on the target, carry it to `to`, let go (a card to another column)
+  "session",    // switch to another person's browser: `session` = "owner" | "client" | "member:<Name>"
+  "fixture",    // call a tutorial fixture helper (recording slots only): `fixture` = "<provider>.<action>", `input`
+  "wait-for",   // wait until `selector` or `text` is on screen (or gone: `state: "hidden"`), up to `timeoutMs`
 ] as const;
 export type StepAction = (typeof STEP_ACTIONS)[number];
 
@@ -41,10 +46,47 @@ export const tutorialStepSchema = z.object({
   redact: z.boolean().optional(),
   /** Starts a YouTube chapter with this name (the first step always starts one, at 0:00). */
   chapter: z.string().min(2).max(60).optional(),
+  /** upload: demo files to choose, by their path under scripts/tutorials/assets/ ("photos/site-02.jpg"). Never a file from anywhere else. */
+  files: z.array(z.string().regex(/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*\.[a-z0-9]+$/).max(120)).min(1).max(12).optional(),
+  /** drag: the selector of where to drop. */
+  to: z.string().min(1).max(300).optional(),
+  /**
+   * session: whose browser the camera shows from here on. "owner" — the demo owner (where every video
+   * starts); "client" — the homeowner, signed out, on the client portal's own host; "member:<Display
+   * Name>" — one of the demo company's team members, really signed in as them. Each has its own cookies.
+   * With `url`, the session opens that path first; with `fixture` (+ `input`), the address that helper
+   * hands over — the link in the client's email, a checkout link.
+   */
+  session: z.string().regex(/^(owner|client|member:[A-Za-z][A-Za-z .'&-]{1,60})$/).optional(),
+  /** fixture: the helper to call, "<provider>.<action>" (docs/tutorials/FIXTURES.md lists them). */
+  fixture: z.string().regex(/^[a-z][a-z-]*\.[a-z][a-zA-Z]*$/).max(60).optional(),
+  /** fixture: what the helper takes. Strings may use {{DATE}} and {{PLACEHOLDERS}} like `value`. */
+  input: z.record(z.string(), z.union([z.string().max(500), z.number(), z.boolean()])).optional(),
+  /** fixture: open the address the helper answers with (an emailed link) in the current session. */
+  open: z.boolean().optional(),
+  /** wait-for: text to wait for, instead of (or as well as) `selector`. */
+  text: z.string().min(1).max(200).optional(),
+  /** wait-for: "visible" (default) or "hidden". */
+  state: z.enum(["visible", "hidden"]).optional(),
+  /** wait-for: how long to wait, in ms (default 15000). */
+  timeoutMs: z.number().int().min(100).max(120_000).optional(),
 }).superRefine((s, ctx) => {
   if (s.action === "goto" && !s.url) ctx.addIssue({ code: "custom", message: "goto needs url", path: ["url"] });
-  if (!["goto", "wait", "press", "back"].includes(s.action) && !s.selector) ctx.addIssue({ code: "custom", message: `${s.action} needs selector`, path: ["selector"] });
+  if (!["goto", "wait", "press", "back", "session", "fixture", "wait-for"].includes(s.action) && !s.selector) ctx.addIssue({ code: "custom", message: `${s.action} needs selector`, path: ["selector"] });
   if (["type", "select", "press"].includes(s.action) && s.value === undefined) ctx.addIssue({ code: "custom", message: `${s.action} needs value`, path: ["value"] });
+  if (s.action === "upload" && !s.files) ctx.addIssue({ code: "custom", message: "upload needs files", path: ["files"] });
+  if (s.action === "drag" && !s.to) ctx.addIssue({ code: "custom", message: "drag needs to", path: ["to"] });
+  if (s.action === "session" && !s.session) ctx.addIssue({ code: "custom", message: "session needs session", path: ["session"] });
+  if (s.action === "fixture" && !s.fixture) ctx.addIssue({ code: "custom", message: "fixture needs fixture", path: ["fixture"] });
+  if (s.action === "wait-for" && !s.selector && !s.text) ctx.addIssue({ code: "custom", message: "wait-for needs selector or text", path: ["selector"] });
+  // A field that belongs to another action is a typo, not a hint: refuse it.
+  const only = (field: "files" | "to" | "session" | "fixture" | "input" | "open" | "text" | "state" | "timeoutMs", actions: string[]) => {
+    if (s[field] !== undefined && !actions.includes(s.action)) ctx.addIssue({ code: "custom", message: `${field} is only for ${actions.join(" / ")}`, path: [field] });
+  };
+  only("files", ["upload"]); only("to", ["drag"]); only("session", ["session"]); only("fixture", ["fixture", "session"]); only("input", ["fixture", "session"]); only("open", ["fixture"]);
+  only("text", ["wait-for"]); only("state", ["wait-for"]); only("timeoutMs", ["wait-for"]);
+  if (s.url !== undefined && !["goto", "session"].includes(s.action)) ctx.addIssue({ code: "custom", message: "url is only for goto / session", path: ["url"] });
+  if (s.action === "session" && s.url !== undefined && s.fixture !== undefined) ctx.addIssue({ code: "custom", message: "a session opens at url or at a fixture's address, not both", path: ["fixture"] });
 });
 export type TutorialStep = z.infer<typeof tutorialStepSchema>;
 

@@ -21,13 +21,28 @@
  *     responses of /api/auth/me and /api/notifications are relabelled / emptied on their way to the
  *     page — the database is never written to).
  * Everything else on screen is the product as it runs against the dev database.
+ *
+ * MORE THAN ONE PERSON. A `session` step switches the camera to another person's browser — the
+ * homeowner on the client portal's host, or a team member really signed in as themselves — each a
+ * separate browser context with its own cookies and its own cursor. Only the session on camera is
+ * filmed. `upload` chooses demo files from scripts/tutorials/assets/ (never anything else), `drag`
+ * carries a card with the pointer, `fixture` calls a tutorial fixture helper of the slot app
+ * (docs/tutorials/FIXTURES.md — recording slots only), `wait-for` waits for something to appear.
+ *
+ * A page that loads whole (a link to a new document, Back, a redirect through checkout) is not
+ * filmed while it is blank: the capture HOLDS the last frame of the page before it until the new
+ * one has drawn. A target that sits in the caption strip inside a dialog that cannot scroll is
+ * brought up by moving the dialog itself, before the ring is drawn.
  */
 import fs from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import { chromium, type Locator, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type CDPSession, type Locator, type Page } from "playwright";
 import type { TutorialStep } from "../../shared/help/step-script";
-import { flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type NarrationIndex, type StepTiming, type Timings } from "./lib";
+import { ROOT, flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type NarrationIndex, type StepTiming, type Timings } from "./lib";
+
+/** The only place an `upload` step may take files from: generated demo files (gen-assets.ts). */
+export const ASSETS_DIR = path.join(ROOT, "scripts", "tutorials", "assets");
 
 /** Injected into every document of the recording context. Plain JS: it runs in the page. */
 function overlay() {
@@ -58,6 +73,8 @@ function overlay() {
     /* …nor is the unread count on the CRM's bell. */
     [data-testid="badge-notifications-unread"]{display:none!important}
     #__tut.shot .cur{display:none}
+    #__tut .ghost{position:absolute;left:0;top:0;opacity:.88;border-radius:10px;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,.28);will-change:transform;rotate:2deg}
+    #__tut .ghost>*{margin:0!important;width:100%!important;height:100%!important}
   `;
   const root = document.createElement("div");
   root.id = "__tut";
@@ -90,6 +107,33 @@ function overlay() {
     // Only for a link that leaves the site: where it goes is the point of hovering it.
     if (a && /^https?:/.test(a.href) && a.origin !== location.origin) { url.textContent = a.href; url.classList.add("on"); } else url.classList.remove("on");
   }, true);
+  // A native drag sends no mousemove: the pointer is followed from the drag events, and the thing
+  // being carried is drawn (a headless browser has no drag image of its own).
+  let ghost: HTMLElement | null = null, grab = { x: 0, y: 0 };
+  const carry = () => { if (ghost) ghost.style.transform = `translate(${pos.x - grab.x}px,${pos.y - grab.y}px)`; };
+  addEventListener("dragstart", (e) => {
+    const el = e.target as HTMLElement | null;
+    if (!el || !el.getBoundingClientRect) return;
+    const r = el.getBoundingClientRect();
+    grab = { x: pos.x - r.left, y: pos.y - r.top };
+    ghost = document.createElement("div");
+    ghost.className = "ghost"; ghost.style.width = `${r.width}px`; ghost.style.height = `${r.height}px`;
+    const copy = el.cloneNode(true) as HTMLElement; copy.removeAttribute("data-testid"); copy.querySelectorAll("[data-testid]").forEach((n) => n.removeAttribute("data-testid"));
+    ghost.appendChild(copy); root.appendChild(ghost); carry();
+    target = null; ring.classList.remove("on");
+  }, true);
+  for (const type of ["dragover", "drag"]) addEventListener(type, (e) => {
+    const d = e as DragEvent;
+    if (!d.clientX && !d.clientY) return; // the last `drag` of a gesture reports 0,0
+    pos = { x: d.clientX, y: d.clientY }; place(); carry();
+    try { sessionStorage.setItem("__tut_xy", JSON.stringify(pos)); } catch { /* storage off */ }
+  }, true);
+  for (const type of ["dragend", "drop"]) addEventListener(type, () => { ghost?.remove(); ghost = null; }, true);
+  // One tab is filmed: a link that would open a new one opens here instead (the script comes back with `back`).
+  addEventListener("click", (e) => {
+    const a = (e.target as Element | null)?.closest?.("a[target]") as HTMLAnchorElement | null;
+    if (a && a.target && a.target !== "_self") a.target = "_self";
+  }, true);
   addEventListener("mousedown", () => {
     const rip = document.createElement("div");
     rip.className = "rip"; rip.style.left = `${pos.x}px`; rip.style.top = `${pos.y}px`;
@@ -100,8 +144,9 @@ function overlay() {
   // moment; it lifts when the app has drawn something of its own (or after six seconds, whatever).
   const veil = root.querySelector(".veil") as HTMLElement;
   const veilFrom = Date.now();
+  let veilGone = false;
   const lift = () => {
-    if (document.querySelector("[data-testid]:not(#__tut *)") || Date.now() - veilFrom > 6000 || location.protocol === "about:") { veil.classList.add("off"); setTimeout(() => veil.remove(), 250); return; }
+    if (document.querySelector("[data-testid]:not(#__tut *)") || Date.now() - veilFrom > 6000 || location.protocol === "about:") { veil.classList.add("off"); setTimeout(() => { veil.remove(); veilGone = true; }, 250); return; }
     requestAnimationFrame(lift);
   };
   requestAnimationFrame(lift);
@@ -111,6 +156,10 @@ function overlay() {
   w.__tut = {
     ring(el: Element | null, padding = 6) { mount(); target = el; pad = padding; accent(); ring.classList.toggle("on", !!el); },
     has() { return !!(target && target.isConnected); },
+    /** True once the app has drawn (the veil is gone): a page that loaded whole may be filmed again. */
+    drawn() { return veilGone; },
+    /** Make the compositor produce a frame (the screencast only sends one when something changed). */
+    nudge() { mount(); cur.style.opacity = cur.style.opacity === "0.999" ? "1" : "0.999"; },
     blur(el: Element) { el.classList.add("__tut-blur"); },
     /** A full black frame: the mark mux.ts looks for to line the video's clock up with the recorder's. */
     sync(on: boolean) { mount(); (root.querySelector(".sync") as HTMLElement).classList.toggle("on", on); },
@@ -135,13 +184,35 @@ function jpegSize(b: Buffer): { width: number; height: number } | null {
   return null;
 }
 
+/**
+ * {{DATE}}, {{DATE+2}}, {{DATE-1}}: a day relative to today (yyyy-mm-dd, the workspace's time zone) — the
+ * demo data moves with the calendar, so a script never names a fixed date. Anything else is an env value.
+ */
+export const fill = (v: string) => v.replace(/\{\{DATE([+-]\d+)?\}\}/g, (_m, n?: string) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + Number(n ?? 0) * 86400000)),
+).replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, name: string) => {
+  const value = process.env[name];
+  if (value === undefined) throw new Error(`The script needs ${name} in the environment`);
+  return value;
+});
+
+/** The demo files of an `upload` step, as absolute paths — refused unless they are inside the assets folder and exist. */
+export function assetFiles(names: string[]): string[] {
+  return names.map((name) => {
+    const file = path.resolve(ASSETS_DIR, name);
+    if (!file.startsWith(ASSETS_DIR + path.sep)) throw new Error(`upload: ${name} is outside scripts/tutorials/assets/`);
+    if (!fs.existsSync(file)) throw new Error(`upload: scripts/tutorials/assets/${name} does not exist (npx tsx scripts/tutorials/gen-assets.ts makes the demo files)`);
+    return file;
+  });
+}
+
 /** The strip at the bottom of the page (CSS px) that captions cover: ~17% of the height. */
 export const CAPTION_SAFE = (height: number) => Math.round(height * 0.17);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 class Player {
-  private pos: { x: number; y: number };
+  pos: { x: number; y: number };
   constructor(private page: Page, private viewport: { width: number; height: number }) {
     this.pos = { x: Math.round(viewport.width * 0.93), y: Math.round(viewport.height * 0.55) };
   }
@@ -198,6 +269,28 @@ class Player {
       last = box;
     }
     if (!last) throw new Error("target has no box");
+    // Still in the caption strip: it is inside something that does not scroll — a dialog's row of
+    // buttons, a bar fixed to the bottom. Move that whole thing up, just enough, before any ring is drawn.
+    const safe = CAPTION_SAFE(this.viewport.height);
+    if (last.y + last.height > this.viewport.height - safe) {
+      const lifted = await target.evaluate((el, strip) => {
+        const over = el.getBoundingClientRect().bottom - (innerHeight - strip - 10);
+        if (over <= 0) return 0;
+        let host = el.closest('[role="dialog"],[role="alertdialog"]') as HTMLElement | null;
+        for (let n = el.parentElement; !host && n; n = n.parentElement) if (getComputedStyle(n).position === "fixed") host = n as HTMLElement;
+        if (!host) return 0;
+        const lift = Math.min(over, Math.max(0, host.getBoundingClientRect().top - 8));
+        if (lift < 1) return 0;
+        const total = Number(host.dataset.tutLift || 0) + lift;
+        host.dataset.tutLift = String(total);
+        // The `translate` property adds to whatever transform positions or animates the element (a centred
+        // dialog, a sheet anchored to the bottom), so it works for both without touching their own styles.
+        host.style.transition = `${host.style.transition ? `${host.style.transition}, ` : ""}translate .25s ease`;
+        host.style.translate = `0 ${-total}px`;
+        return lift;
+      }, safe);
+      if (lifted) { await sleep(380); last = (await target.boundingBox()) ?? last; }
+    }
     const wide = last.width > 320;
     const point = {
       x: Math.round(last.x + (wide ? Math.min(last.width * 0.3, 220) : last.width / 2)),
@@ -211,15 +304,6 @@ class Player {
 
   async play(step: TutorialStep, base: string) {
     const page = this.page;
-    // {{DATE}}, {{DATE+2}}, {{DATE-1}}: a day relative to today (yyyy-mm-dd, the workspace's time zone) — the
-    // demo data moves with the calendar, so a script never names a fixed date. Anything else is an env value.
-    const fill = (v: string) => v.replace(/\{\{DATE([+-]\d+)?\}\}/g, (_m, n?: string) =>
-      new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(Date.now() + Number(n ?? 0) * 86400000)),
-    ).replace(/\{\{([A-Z0-9_]+)\}\}/g, (_m, name: string) => {
-      const value = process.env[name];
-      if (value === undefined) throw new Error(`The script needs ${name} in the environment`);
-      return value;
-    });
     if (step.action === "goto") {
       await this.ring(null);
       await page.goto(new URL(step.url!, base).toString(), { waitUntil: "domcontentloaded" });
@@ -231,6 +315,47 @@ class Player {
     if (step.action === "press") { await page.keyboard.press(step.value!); return; }
 
     const target = page.locator(fill(step.selector!)).first();
+    if (step.action === "upload") {
+      const files = assetFiles(step.files!);
+      // The file input itself (usually hidden): nothing to point at — the files are simply chosen.
+      if (await target.evaluate((el) => el instanceof HTMLInputElement && el.type === "file").catch(() => false)) { await target.setInputFiles(files); return; }
+      // A button or a drop area: click it the way a person does and answer the file chooser it opens.
+      const point = await this.aim(target);
+      await this.ring(target);
+      await this.glide(point);
+      await sleep(350);
+      const chooser = page.waitForEvent("filechooser", { timeout: 6000 });
+      chooser.catch(() => {});
+      await page.mouse.down(); await sleep(70); await page.mouse.up();
+      const opened = await chooser.catch(() => null);
+      if (!opened) throw new Error(`upload: clicking ${step.selector} opened no file chooser — point the step at the input[type=file] itself (the dry run lists them)`);
+      await opened.setFiles(files);
+      setTimeout(() => { void this.ring(null); }, 450);
+      return;
+    }
+    if (step.action === "drag") {
+      const dest = page.locator(fill(step.to!)).first();
+      const from = await this.aim(target);
+      await this.ring(target);
+      await this.glide(from);
+      await sleep(350);
+      await page.mouse.down();
+      await sleep(260);
+      // A first small move starts the drag; then the card is carried over, held a beat and dropped.
+      await page.mouse.move(from.x + 6, from.y + 4); await sleep(60);
+      await page.mouse.move(from.x + 14, from.y + 9); await sleep(120);
+      this.pos = { x: from.x + 14, y: from.y + 9 };
+      await dest.waitFor({ state: "visible", timeout: 20_000 });
+      const box = await dest.boundingBox();
+      if (!box) throw new Error(`drag: ${step.to} has no box`);
+      const to = { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + Math.min(box.height / 2, 110)) };
+      await this.glide(to);
+      await page.mouse.move(to.x + 2, to.y + 2);
+      await sleep(320);
+      await page.mouse.up();
+      await sleep(300);
+      return;
+    }
     const point = await this.aim(target);
     if (step.redact) await target.evaluate((el) => (window as any).__tut?.blur(el));
     if (step.action === "scroll") { await this.ring(target); return; }
@@ -316,6 +441,9 @@ async function settle(page: Page) {
   await sleep(500);
 }
 
+/** One person's browser: its own cookies, its own cursor. Only the session on camera is filmed. */
+type Session = { name: string; base: string; context: BrowserContext; page: Page; player: Player; cdp: CDPSession | null };
+
 async function main() {
   const args = parseArgs(process.argv.slice(2), ["shots", "no-narration", "dry"]);
   if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/record.ts <script.json> [--base URL] [--out DIR]");
@@ -331,6 +459,10 @@ async function main() {
   const zoom = script.zoom ?? 1;
   const even = (n: number) => Math.round(n / 2) * 2;
   const video = { width: even(script.viewport.width * zoom), height: even(script.viewport.height * zoom) };
+  // The slot app's port: where the other hosts of the same app are, and where its fixture helpers answer.
+  const port = flagStr(args, "port", new URL(base).port || "80")!;
+  const sessionBase = (name: string) => name === "client" ? `http://client.constructhub.us:${port}` : name === "owner" ? base : `http://portal.constructhub.us:${port}`;
+  for (const step of script.steps) if (step.action === "upload") assetFiles(step.files!); // fail before anything is filmed
 
   let clipMs: number[];
   if (args.flags["no-narration"]) {
@@ -355,90 +487,182 @@ async function main() {
   // the page out correctly, but Chromium's screencast (and Playwright's recordVideo) then films it at
   // CSS size — 1024×576 — and the "1080p" would be an upscale. With --force-device-scale-factor and a
   // window of the CSS size, the surface itself is 1920×1080 and so is every captured frame.
-  const browser = await chromium.launch({ headless: true, args: [
+  const browser: Browser = await chromium.launch({ headless: true, args: [
     "--host-resolver-rules=MAP portal.constructhub.us 127.0.0.1, MAP client.constructhub.us 127.0.0.1", "--force-color-profile=srgb",
     `--force-device-scale-factor=${zoom}`, `--window-size=${script.viewport.width},${script.viewport.height}`, "--hide-scrollbars",
   ] });
-  const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
-  const origin = new URL(base);
-  await context.addCookies([{ name: "ch_consent", value: "denied", domain: origin.hostname, path: "/" }]);
-  // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
-  await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
-  await context.addInitScript(overlay);
-  await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
-  // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
-  // sees") opens it in this one instead; the script comes back with a `back` step.
-  await context.addInitScript(() => { window.open = ((url?: string | URL) => { if (url) location.assign(String(url)); return null; }) as typeof window.open; });
-  // Presentation only: the account label a viewer sees. The session, the plan and the data are untouched.
-  await context.route("**/api/auth/me", async (route) => {
-    // route.fetch() runs in Node, which knows nothing of the browser's host mapping: the request is sent
-    // to this machine by address. (Left alone it would go to the real portal host on the internet.)
-    const local = new URL(route.request().url());
-    local.hostname = "127.0.0.1";
-    const response = await route.fetch({ url: local.toString() });
-    let body: any = null;
-    try { body = await response.json(); } catch { /* not JSON */ }
-    if (!body || typeof body !== "object") return route.fulfill({ response });
-    return route.fulfill({
-      response,
-      json: { ...body, displayName: label, email: "demo@example.com", avatarUrl: null, companyName: company, companyLogoUrl: null, isPlatformAdmin: false },
-    });
-  });
 
-  // …and its notification bell: the dev account's unread alerts are not part of any feature being taught.
-  await context.route("**/api/notifications", (route) =>
-    route.request().method() === "GET" ? route.fulfill({ json: { unread: 0, notifications: [] } }) : route.fallback());
-
-  const page = await context.newPage();
-  {
-    const got = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio }));
-    if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
-      throw new Error(`the browser window is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
-  }
   // THE CAPTURE. Frames are taken straight from Chromium's screencast, at device pixels (1920×1080 —
   // see the launch flags above), and written as they arrive: JPEG frames copied (not re-encoded) into raw.mkv,
   // each stamped with the time it arrived. mux.ts makes the constant-rate H.264 from that.
+  // Every session has its own screencast; only the frames of the session ON CAMERA are written, and
+  // none while `held` — a frame that is not written is, in the video, the previous frame held.
   const raw = path.join(dir, "raw.mkv");
-  let capture: { stop: () => Promise<number>; frames: () => number } | null = null;
-  if (!dry) {
-    const cdp = await context.newCDPSession(page);
-    const writer = spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-use_wallclock_as_timestamps", "1", "-c:v", "mjpeg", "-i", "-", "-c", "copy", raw], { stdio: ["pipe", "ignore", "inherit"] });
-    let frames = 0, badFrames = 0;
-    writer.stdin.on("error", () => { /* the writer stopped; its exit code says why */ });
-    cdp.on("Page.screencastFrame", (e) => {
-      frames++;
-      const jpeg = Buffer.from(e.data, "base64");
-      // Every frame must be the full size: one of another size would end the picture in the encode.
-      const size = jpegSize(jpeg);
-      if (!size || size.width !== video.width || size.height !== video.height) { badFrames++; cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {}); return; }
-      writer.stdin.write(jpeg);
-      cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {});
+  let current: Session | null = null;
+  let held = 0, frames = 0, badFrames = 0;
+  const writer = dry ? null : spawn("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-use_wallclock_as_timestamps", "1", "-c:v", "mjpeg", "-i", "-", "-c", "copy", raw], { stdio: ["pipe", "ignore", "inherit"] });
+  writer?.stdin.on("error", () => { /* the writer stopped; its exit code says why */ });
+  const nudge = (s: Session | null) => s?.page.evaluate(() => (window as any).__tut?.nudge()).catch(() => {});
+  /** Stop filming until `until` resolves (at most `maxMs`), then make sure a fresh frame arrives. */
+  const hold = async (until: () => Promise<unknown>, maxMs = 9000) => {
+    held++;
+    try { await Promise.race([until(), sleep(maxMs)]); } catch { /* the page went away mid-wait: film what there is */ }
+    finally { held--; if (!held) { await nudge(current); } }
+  };
+  /** The page on camera has drawn: its overlay is in and the veil of a whole-page load is gone. */
+  const drawn = async (page: Page) => {
+    for (let i = 0; i < 90; i++) {
+      const ok = await page.evaluate(() => document.readyState !== "loading" && !!(window as any).__tut?.drawn()).catch(() => false);
+      if (ok) return;
+      await sleep(100);
+    }
+  };
+
+  const sessions = new Map<string, Session>();
+  async function openSession(name: string): Promise<Session> {
+    const origin = new URL(sessionBase(name));
+    const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
+    // No cookie banner, on any of the app's hosts this person may land on (a checkout returns to the CRM host).
+    await context.addCookies([...new Set([origin.hostname, "portal.constructhub.us", "client.constructhub.us"])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
+    // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
+    await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
+    await context.addInitScript(overlay);
+    await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
+    // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
+    // sees") opens it in this one instead; the script comes back with a `back` step.
+    await context.addInitScript(() => { window.open = ((url?: string | URL) => { if (url) location.assign(String(url)); return null; }) as typeof window.open; });
+    if (name === "owner") {
+      // Presentation only: the account label a viewer sees. The session, the plan and the data are untouched.
+      // (A team member's session is NOT relabelled: it shows who that person really is in the demo workspace.)
+      await context.route("**/api/auth/me", async (route) => {
+        // route.fetch() runs in Node, which knows nothing of the browser's host mapping: the request is sent
+        // to this machine by address. (Left alone it would go to the real portal host on the internet.)
+        const local = new URL(route.request().url());
+        local.hostname = "127.0.0.1";
+        const response = await route.fetch({ url: local.toString() });
+        let body: any = null;
+        try { body = await response.json(); } catch { /* not JSON */ }
+        if (!body || typeof body !== "object") return route.fulfill({ response });
+        return route.fulfill({
+          response,
+          json: { ...body, displayName: label, email: "demo@example.com", avatarUrl: null, companyName: company, companyLogoUrl: null, isPlatformAdmin: false },
+        });
+      });
+    }
+    // …and the notification bell: unread alerts are not part of any feature being taught.
+    await context.route("**/api/notifications", (route) =>
+      route.request().method() === "GET" ? route.fulfill({ json: { unread: 0, notifications: [] } }) : route.fallback());
+
+    const page = await context.newPage();
+    const got = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio }));
+    if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
+      throw new Error(`the browser window of "${name}" is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
+    page.on("pageerror", (e) => console.warn(`  page error (${name}): ${e.message}`));
+    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport), cdp: null };
+    // A page that loads whole is blank, then plain text, then the app: none of that is filmed. The
+    // moment the main frame asks for a new document, the capture holds what is on screen until the
+    // new page has drawn.
+    page.on("request", (request) => {
+      if (current !== session || !request.isNavigationRequest() || request.frame() !== page.mainFrame()) return;
+      // …that is: until the new document has replaced this one (a redirect asks again and holds again), and then drawn.
+      void hold(async () => { await page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 8000 }).catch(() => {}); await drawn(page); });
     });
-    // EVERY compositor frame (none arrive while nothing on the page moves). Skipping frames is not an
-    // option: a change that happens in one frame — a sync mark, a dialog closing — would be missed and
-    // the picture would stay stale until something else moved.
-    await cdp.send("Page.startScreencast", { format: "jpeg", quality: 93, maxWidth: video.width, maxHeight: video.height, everyNthFrame: 1 });
-    capture = {
-      frames: () => frames,
-      stop: async () => {
-        await cdp.send("Page.stopScreencast").catch(() => {});
-        await sleep(300);
-        writer.stdin.end();
-        const code = await new Promise<number>((r) => writer.on("close", (c) => r(c ?? 1)));
-        if (code !== 0) throw new Error(`the capture writer exited ${code}`);
-        if (badFrames > 3) throw new Error(`${badFrames} captured frames were not ${video.width}x${video.height} — the capture is not at device pixels`);
-        return frames;
-      },
-    };
+    if (writer) {
+      const cdp = await context.newCDPSession(page);
+      session.cdp = cdp;
+      cdp.on("Page.screencastFrame", (e) => {
+        cdp.send("Page.screencastFrameAck", { sessionId: e.sessionId }).catch(() => {});
+        if (current !== session || held) return;
+        frames++;
+        const jpeg = Buffer.from(e.data, "base64");
+        // Every frame must be the full size: one of another size would end the picture in the encode.
+        const size = jpegSize(jpeg);
+        if (!size || size.width !== video.width || size.height !== video.height) { badFrames++; return; }
+        writer.stdin.write(jpeg);
+      });
+      // EVERY compositor frame (none arrive while nothing on the page moves). Skipping frames is not an
+      // option: a change that happens in one frame — a sync mark, a dialog closing — would be missed and
+      // the picture would stay stale until something else moved.
+      await cdp.send("Page.startScreencast", { format: "jpeg", quality: 93, maxWidth: video.width, maxHeight: video.height, everyNthFrame: 1 });
+    }
+    sessions.set(name, session);
+    return session;
   }
+  /** Put another person's browser on camera; the first time, open it (signed in as that person). */
+  async function switchTo(name: string, url?: string, handed?: Record<string, any>): Promise<void> {
+    await hold(async () => {
+      await current?.player.ring(null);
+      let session = sessions.get(name);
+      const fresh = !session;
+      if (!session) session = await openSession(name);
+      current = session;
+      const member = /^member:(.+)$/.exec(name);
+      const signIn = fresh && member ? `/__tutorial/auth/as?member=${encodeURIComponent(member[1])}&next=%2Fcrm` : null;
+      if (signIn) await session.page.goto(new URL(signIn, session.base).toString(), { waitUntil: "domcontentloaded" });
+      const first = handed ? addressOf(handed, session) : url ?? (fresh ? (name === "client" ? "/" : name === "owner" ? null : "/crm") : null);
+      if (first && !(signIn && first === "/crm")) await session.page.goto(new URL(first, session.base).toString(), { waitUntil: "domcontentloaded" });
+      if (first || signIn) { await settle(session.page); await drawn(session.page); }
+    }, 60_000);
+  }
+  /** A tutorial fixture helper of the slot app. Node-side, by address: the host names exist only inside the browser. */
+  async function fixture(name: string, input: Record<string, unknown>): Promise<Record<string, any>> {
+    const filled = Object.fromEntries(Object.entries(input).map(([k, v]) => [k, typeof v === "string" ? fill(v) : v]));
+    const r = await fetch(`http://127.0.0.1:${port}/__tutorial/action/${name}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(filled), signal: AbortSignal.timeout(30_000) });
+    const body = await r.json().catch(() => ({})) as Record<string, any>;
+    if (r.status === 404 && !body.message) throw new Error(`fixture ${name}: the app on :${port} has no tutorial fixtures (it was started without them, or it is not a recording slot)`);
+    if (!r.ok) throw new Error(`fixture ${name}: ${body.message ?? r.status}`);
+    return body;
+  }
+  /**
+   * Where a fixture's address opens: at the very address when it is on one of this slot's own hosts
+   * (a document link lives on the CRM host, the portal's sign-in on the client host — cookies are per
+   * host, as in production); otherwise its path, on the session's own host.
+   */
+  const addressOf = (result: Record<string, any>, session: Session): string => {
+    if (typeof result.url === "string") {
+      try { const u = new URL(result.url); if (u.port === port && /^(portal|client)\.constructhub\.us$/.test(u.hostname)) return u.toString(); } catch { /* not an address */ }
+    }
+    if (typeof result.path !== "string") throw new Error("the fixture answered nothing to open (no path)");
+    return new URL(result.path, session.base).toString();
+  };
+  async function play(step: TutorialStep): Promise<void> {
+    const session = current!;
+    if (step.action === "session") {
+      // …opened at an address a fixture helper hands over (the link in an email, a checkout link), or at `url`.
+      if (!step.fixture) return switchTo(step.session!, step.url);
+      const result = await fixture(step.fixture, step.input ?? {});
+      return switchTo(step.session!, undefined, result);
+    }
+    if (step.action === "fixture") {
+      const result = await fixture(step.fixture!, step.input ?? {});
+      if (step.open) {
+        await session.player.ring(null);
+        // The emailed address, opened in THIS person's browser.
+        await session.page.goto(addressOf(result, session), { waitUntil: "domcontentloaded" });
+        await settle(session.page);
+      }
+      return;
+    }
+    if (step.action === "wait-for") {
+      const timeout = step.timeoutMs ?? 15_000, state = step.state ?? "visible";
+      if (step.selector) await session.page.locator(fill(step.selector)).first().waitFor({ state, timeout });
+      if (step.text) await session.page.getByText(fill(step.text)).first().waitFor({ state, timeout });
+      return;
+    }
+    return session.player.play(step, session.base);
+  }
+
   const t0 = Date.now();
   const now = () => Date.now() - t0;
-  page.on("pageerror", (e) => console.warn(`  page error: ${e.message}`));
+  await openSession("owner");
+  current = sessions.get("owner")!;
+  const firstPage = current.page;
 
   // The video's clock starts when Chromium delivers its first frame — some hundreds of ms after this
   // one, and later still on a cold start. Two black "sync" frames at known times let mux.ts measure
   // the difference: this one in the pre-roll, and one after the last step (both are cut from the video).
-  const flash = async (): Promise<number> => {
+  const flash = async (page: Page): Promise<number> => {
+    for (let i = 0; held && i < 100; i++) await sleep(100); // never while the capture is holding a frame
     await page.evaluate(() => (window as any).__tut.sync(true));
     const at = now();
     await sleep(600);
@@ -446,25 +670,25 @@ async function main() {
     await sleep(400);
     return at;
   };
-  await page.setContent(`<body style="margin:0;background:#fff"></body>`);
+  await firstPage.setContent(`<body style="margin:0;background:#fff"></body>`);
   // The capture's clock starts with its first frame: wait for one before showing the first sync mark.
-  for (let i = 0; capture && capture.frames() === 0 && i < 100; i++) {
-    await page.evaluate((n) => { document.body.style.background = n % 2 ? "#fff" : "#fefefe"; }, i);
+  for (let i = 0; writer && frames === 0 && i < 100; i++) {
+    await firstPage.evaluate((n) => { document.body.style.background = n % 2 ? "#fff" : "#fefefe"; }, i);
     await sleep(100);
   }
   await sleep(1500);
-  const syncStartMs = await flash();
+  const syncStartMs = await flash(firstPage);
 
-  const player = new Player(page, script.viewport);
   const steps: StepTiming[] = [];
   let trimStartMs = 0;
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
     // The opening page load is pre-roll too: the video starts on a finished page.
-    if (i === 0 && step.action === "goto") { await player.play(step, base); trimStartMs = now(); }
+    if (i === 0 && step.action === "goto") { await play(step); await drawn(current!.page); trimStartMs = now(); }
     else if (i === 0) trimStartMs = now();
     const startMs = now();
-    if (!(i === 0 && step.action === "goto")) await player.play(step, base);
+    if (!(i === 0 && step.action === "goto")) await play(step);
+    const page = current!.page, player = current!.player;
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
     const until = dry ? now() + 350 : Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
@@ -478,17 +702,23 @@ async function main() {
       fs.writeFileSync(path.join(dir, "thumb-shot.json"), JSON.stringify({ step: i, zoom, viewport: script.viewport, ring }, null, 2) + "\n");
     }
     if (args.flags.shots) await page.screenshot({ path: path.join(shotsDir, `${String(i).padStart(2, "0")}.png`) });
-    // A dry run also lists what can be pointed at on this screen: every visible data-testid, with its tag and text.
-    if (dry) fs.writeFileSync(path.join(shotsDir, `${String(i).padStart(2, "0")}.txt`), await page.evaluate(() => {
+    // A dry run also lists what can be pointed at on this screen: every visible data-testid, with its tag and
+    // text; what can be dragged (⇄); and every file input, hidden ones too (⬆) — an `upload` step's target.
+    if (dry) fs.writeFileSync(path.join(shotsDir, `${String(i).padStart(2, "0")}.txt`), `[${current!.name}] ` + await page.evaluate(() => {
       const rows: string[] = [];
       for (const el of Array.from(document.querySelectorAll("[data-testid]"))) {
         if (el.closest("#__tut")) continue;
         const r = el.getBoundingClientRect();
         if (r.width < 2 || r.height < 2) continue;
         const on = r.bottom > 0 && r.top < innerHeight ? " " : "↓";
-        rows.push(`${on} ${el.getAttribute("data-testid")}  <${el.tagName.toLowerCase()}>  ${(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60)}`);
+        const drag = el.getAttribute("draggable") === "true" ? "⇄" : " ";
+        rows.push(`${on}${drag} ${el.getAttribute("data-testid")}  <${el.tagName.toLowerCase()}>  ${(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 60)}`);
       }
-      return `${location.pathname}${location.search}\n${rows.join("\n")}\n`;
+      for (const el of Array.from(document.querySelectorAll('input[type="file"]'))) {
+        const id = el.getAttribute("data-testid");
+        rows.push(`⬆  file input  ${id ? `[data-testid="${id}"]` : el.id ? `#${el.id}` : `input[type="file"]`}  accept=${el.getAttribute("accept") ?? "*"}${(el as HTMLInputElement).multiple ? "  multiple" : ""}`);
+      }
+      return `${location.host}${location.pathname}${location.search}\n${rows.join("\n")}\n`;
     }));
     const endMs = now();
     steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs });
@@ -496,11 +726,18 @@ async function main() {
   }
   await sleep(700);
   const endMs = now();
-  await player.ring(null);
-  const syncEndMs = await flash();
+  await current!.player.ring(null);
+  const syncEndMs = await flash(current!.page);
   await sleep(400);
-  const frames = capture ? await capture.stop() : 0;
-  await context.close();
+  if (writer) {
+    for (const s of sessions.values()) await s.cdp?.send("Page.stopScreencast").catch(() => {});
+    await sleep(300);
+    writer.stdin.end();
+    const code = await new Promise<number>((r) => writer.on("close", (c) => r(c ?? 1)));
+    if (code !== 0) throw new Error(`the capture writer exited ${code}`);
+    if (badFrames > 3) throw new Error(`${badFrames} captured frames were not ${video.width}x${video.height} — the capture is not at device pixels`);
+  }
+  for (const s of sessions.values()) await s.context.close();
   await browser.close();
   if (dry) { console.log(`dry run: ${script.steps.length} steps played, screenshots → ${shotsDir}`); return; }
 
@@ -509,4 +746,5 @@ async function main() {
   console.log(`raw.mkv ${video.width}x${video.height} · ${frames} frames · ${(fs.statSync(raw).size / 1e6).toFixed(1)} MB · ${((endMs - trimStartMs) / 1000).toFixed(1)} s of walkthrough → ${dir}`);
 }
 
-main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
+// Run only when started as a program (the tests import the helpers above).
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
