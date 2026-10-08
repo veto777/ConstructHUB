@@ -145,7 +145,7 @@ Each has the evidence and the **only wording the evidence supports**.
 
 | # | What is true | Evidence | Safe wording |
 | --- | --- | --- | --- |
-| D1 | A permit-office directory and a county property-records directory sit in the same product as the marketing tools. None of the nine job-software competitors' pricing or feature pages fetched for section 3 mentions a permit-office directory or county records (Contractor Foreman lists "permits" as a project record, which is a different thing). | `/databases`, `/property`; section 3 | "ConstructHUB also has something most contractor software doesn't: a directory of permit offices and county property records." — "most", because nine products were checked, not all. |
+| D1 | A permit-office directory and a county property-records directory sit in the same product as the marketing tools. None of the six named competitors' pricing or feature pages fetched for section 3 mentions a permit-office directory or county records. | `/databases`, `/property`; section 3 | "ConstructHUB also has something most contractor software doesn't: a directory of permit offices and county property records." — "most", because a handful of products were checked, not all. |
 | D2 | Portal links are checked, unconfirmed ones are labeled, and a missing one becomes a web search, never an invented address. | `CLAUDE.md` hard rule; `scripts/verify-links.ts`; live /features/permits "Checked links, never guessed"; `linkStatus` in `server/data/permit-portals.json` (10,082 verified · 2,482 unconfirmed · 508 none · 3 dead in the file) | "Every link is checked. If we couldn't confirm one, it says so. If we don't have one, you get a web search — not a guess." |
 | D3 | The two directories open without an account. | live /features/permits ("Not ready to sign up? Browse the Database Directory"), /features/property ("The directory also opens without signing in") | "You can browse the permit directory before you sign up." |
 | D4 | Prices are public, for every plan, with a "Not included" list on every card. | live /pricing; `notIncluded[]` in both price books | "Every plan shows its price and what it does not include." |
@@ -154,6 +154,7 @@ Each has the evidence and the **only wording the evidence supports**.
 | D7 | Job photos live in the same CRM as the estimate, the schedule and the invoice. | JobCam is a CRM feature filed to the project (`/crm/jobcam`) | "Job photos are filed to the same job as the estimate and the invoice." Add honestly: "JobCam is part of the top CRM plan, or an add-on." |
 | D8 | Online payments go to the contractor's own Stripe account and ConstructHUB adds no fee of its own. | help entry `crm-payments`; live /features/crm | "Card and bank payments go straight to your own Stripe account. ConstructHUB adds no fee on top of Stripe's." |
 | D9 | One company covers permit lookup, the Google listing, reviews, a website scan, a CRM and job photos. | sections 1b, 1c | "Permits, your Google listing, reviews, estimates, scheduling, invoices and job photos — from one company." |
+| D10 | SEO lookups (site explorer, keywords, rank tracking, backlinks, site audit, content gap) sit in the same product as the Google listing and permit tools, with an SEO data allowance in every plan. | section 3a; `shared/plans.ts:78-85` | "The SEO a local contractor actually uses, next to your Google listing and your permits." Never "as powerful as", never "our index". **Not usable in a recorded video until the SEO upgrades are finished.** |
 
 **What did NOT survive.**
 
@@ -166,6 +167,8 @@ Each has the evidence and the **only wording the evidence supports**.
   Foreman's is $49/mo with a different feature mix. Only the specific, dated price pairs in section 3
   are provable.
 - "Unlimited photos" — false (5 GB). CompanyCam and Jobber Plus advertise unlimited storage.
+- "An alternative to Ahrefs / Semrush", "our keyword database", "our crawler" — false or misleading: the
+  SEO data is licensed, and both are far larger suites.
 - Customer counts, time saved, revenue gained, "#1", "best", "only", "guaranteed" — nothing in the repo
   substantiates any of them. Forbidden.
 - "Works on iPhone app" — not in the App Store.
@@ -174,49 +177,79 @@ Each has the evidence and the **only wording the evidence supports**.
 
 ## 3. Competitors — their own pages, fetched 2026-10-08
 
-Method: each pricing page was fetched on **2026-10-08**. Where the raw HTML could be downloaded
-directly, the prices below were read from the page text; where the site refused a direct download,
-the page was read through a fetch-and-summarise tool, which is marked **(S)** — treat an (S) figure as
-"reported by the page on that date, re-read by a person before use". "Not on the page" means only
-that: the page fetched does not mention it — the product may still do it.
+**The owner named the five to compare against (2026-10-08): Ahrefs and Semrush for Business tools;
+Jobber, Housecall Pro and Leap for the CRM.** CompanyCam is kept as a sixth for the JobCam angle. The
+owner choosing the names is not sign-off on any claim — see section 4.
 
-| Product | What it is (its own words / page) | Published starting price, and what that tier has | Covers, per its own pages | Does not appear on the pages fetched | Genuine strengths |
+Method: every page was fetched on **2026-10-08**. Prices marked **(D)** were read from the page's own
+text after downloading it directly; prices marked **(S)** came through a fetch-and-summarise tool
+because the site refused a direct download — a person must re-read an (S) figure on the page before it
+is used. "Not on the pages fetched" means only that: the product may still do it.
+
+### 3a. What our own SEO tools are today (so the comparison is honest)
+
+From `server/seo/*`, `client/src/pages/seo/*` and the `seo` help entry. Tabs on `/seo`
+(`client/src/pages/seo/shell.tsx:89-95`): **Dashboard · Site explorer · Keywords explorer · Rank
+tracker · Site audit · Backlinks · Competitors.**
+
+| Tool | What it does today | Source |
+| --- | --- | --- |
+| Site explorer | Any domain: authority, backlink profile, organic and paid search footprint, six months of history, top keywords and pages, competitors, referring domains, anchors. A saved report reopens free for 7 days. | `server/seo/explorer.ts` |
+| Reports | Tables behind the overview: keywords, paid keywords, pages, competitors, backlinks (all / new / lost / broken), referring domains, anchors, best by links. | `server/seo/reports.ts` |
+| Keywords explorer | Matching terms, related terms, questions; one keyword's volume, difficulty, cost per click, intent, monthly trend and top results. | `server/seo/reports.ts` |
+| Content gap / Link intersect | Keywords up to three competitors rank for and you do not; sites that link to the competitors and not to you. | `server/seo/gap.ts` |
+| Rank tracker | Weekly checks of the keywords you choose, desktop and mobile, with history and a visibility estimate. Tracked keywords by plan: 50 / 200 / 1,000 / 1,000 (the number is still "owner to confirm", `shared/plans.ts:75`). | `server/seo/rank-history.ts`, `shared/plans.ts:78-83` |
+| Site audit | Health score and issue list with change since the last crawl, read from the crawls Site Scan runs; uses a Site Scan, not SEO data. | `server/seo/audit.ts` |
+| SEO data credit | Each plan includes a monthly allowance at the customer's price ($10 / $20 / $40 / $40); beyond it, prepaid packs of $25 / $50 / $100 that do not expire. | `shared/plans.ts:78-85`, `shared/seo-credits.ts:19` |
+
+**What must never be said about it.** ConstructHUB does **not** run its own web crawler or keep its own
+index of the web: the search and backlink data is **licensed from a data provider** — the provider is
+never named, and no cost or markup is ever mentioned, in any video, description or comment. Do not say
+"our index", "our crawler", "our database of keywords". Say "SEO data" and "lookups". The only crawling
+we do ourselves is Site Scan reading the customer's own site.
+**Status:** Site Explorer went live 2026-10-07; `HANDOFF.md` lists backlinks depth, keyword depth, rank
+tracking configuration, AI visibility and reports as still to do, and the building session did not
+verify the pages in a browser. In the recording environment the page reads "Rank tracking is being
+switched on" (no data source there). **Nothing about SEO is filmed until the owner says the upgrades
+are finished** — `brand-vs-ahrefs-semrush` is a script only.
+
+### 3b. The five named competitors, and CompanyCam
+
+| Product | What it is | Published starting price and what that tier has | Covers, per its own pages | Not on the pages fetched | Genuine strengths |
 | --- | --- | --- | --- | --- | --- |
-| **CompanyCam** — https://companycam.com/pricing | Job-site photo and video documentation: "Document every job. Never lose proof of work." | **Core $63/month, 1 user**, shown with "Billed Annually" and a "Monthly / Annual save 20%" switch; extra users "$29 each". Crew $129/month (3 users), Scale $199/month (3 users). Month-to-month amounts **not verified** (the page's script also carries $79 and $249, which would be 20% more — not confirmed on screen). Core: "Timestamped photos & videos", "Turn job photos into reports", "Collect payment on-site (US-based companies)", "Personalized price book & invoicing". | Photos / video, reports, checklists (Crew), proposals (Crew: "Create proposals using voice notes and photos"), agreements (Scale: "Send, sign, and store agreements"), invoicing and on-site payment. **Marketing Suite** add-on (figures "99" / "79" shown; unit not verified): "Google review management", "Two-way Google Business Profile sync". | Lead pipeline / CRM, scheduling calendar, permit directory, property records. | Purpose-built camera with years of field use; "Unlimited cloud storage" (features page, (S)); offline capture; LiDAR room measuring (Scale); integrations with other CRMs; native apps in the stores. **Stronger than JobCam on storage, capture features and maturity.** |
-| **Jobber** — https://www.getjobber.com/pricing/ **(S)** (direct download refused, HTTP 403) | Field-service software: quoting, scheduling, invoicing, payments. | **Core: $49/mo with no commitment, $39/mo on a 1-year commitment, $29/mo paid annually; 1 user** (S). Core: online booking and scheduling, quotes, invoicing, online payments, a website. Connect $139 / $119 / $99; Grow from $199 / $169 / $149; Plus from $499 / $439 / $399 (S). | Quotes with online approval, scheduling, invoices, payments, client hub, review requests, "Connects to Google Business Profile", website builder, Marketing Suite "$99/mo" add-on, Receptionist "$29/mo" (features page, (S)). "Store and organize unlimited photos and videos" on Plus (S). | Permit directory, property records. | Very mature product, large integration list ("100+ app integrations"), native apps, three billing options, an entry price **below** ConstructHUB CRM Basic when paid annually. |
-| **Housecall Pro** — https://www.housecallpro.com/pricing/ | Field-service software for home-service pros. Page title: "Housecall Pro Pricing & Plans \| From $59/mo — 14-Day Free Trial". | **Basic: $79/mo monthly, $59/mo "(Billed annually)", "1 user included".** Essentials $189 / $149, "5 users included". Max $329 / $299, 8 users; "$35/mo per additional user" (S). Promotional first-month prices were also showing ("$26 /mo for 1 month"). "All prices are in USD and are exclusive of sales tax". | Scheduling and dispatch, quotes, invoices and payments, online booking, review management, price book, job costing; photo reports (Essentials); customer portal; website and "CSR AI" call answering as add-ons (S). | Permit directory, county property records, Google Business Profile management. | Mature dispatch and routing (route optimisation on Max), GPS tracking, QuickBooks sync, financing, native apps, a large user community. |
-| **Contractor Foreman** — https://contractorforeman.com/pricing/ | Construction management software. Its own claim on the page: "the most affordable project management software for contractors". | **Basic $49 per month, 1 user, billed annually ("then pay $588 annually at renewal"); 30 days free.** Standard $105/mo annual or $139 monthly (3 users); Plus $166 / $199 (8); Pro $221 / $279 (15); Unlimited $332 / $399. Basic is "Available for Annual" only. | Estimates, invoices, online payments, scheduling, client portal, time cards, daily logs, photos, **permits as a project record**, leads/CRM (S for the feature list). | Marketing tools, Google listing, reviews, a permit-office directory. | Very broad construction project management (daily logs, time cards, safety, submittals), unlimited-user tier, long money-back guarantee. Far deeper project management than ConstructHUB. |
-| **Houzz Pro** — https://www.houzz.com/houzz-pro/pricing | Software for design and build firms. | **Design "$99/mo", "1 User"**: 3D floor plans, selections, mood boards, CRM, estimates and proposals, invoices, online payments. Pro "$199/mo" (1 user): takeoffs, bids, change orders, budget, contracts, schedule, daily logs. Teams "Starting at $399/mo", unlimited users. Extra users "$50/user/mo". Advertising "Starting at $499/mo". A free plan is mentioned. Annual prices not shown. | CRM, estimates, invoices, payments, schedule, client dashboard, email marketing and website (Teams), advertising on Houzz. | Permit directory, Google listing tools, reviews on Google. | 3D floor plans, takeoffs, a homeowner marketplace that brings leads. Aimed at designers and remodelers. |
-| **JobNimbus** — https://www.jobnimbus.com/pricing **(S)** | CRM and project management, roofing-led. | **Pricing not public** — "Request pricing" under each plan. Plans: Essentials (up to 3 users), Pro (up to 10), Premium (up to 19), Enterprise. | Contacts, estimates, eSign, invoices, payments, financing, supplier and QuickBooks integrations; a Marketing Bundle add-on. | Permit directory. | Deep roofing workflow and supplier integrations. |
-| **AccuLynx** — https://acculynx.com/pricing/ **(S)** | Roofing business software. | **Pricing not public** — a request form. | CRM, estimates, document automation, AccuPay, crew scheduling, field app (from the page's navigation). | Not verified. | Roofing-specific depth (not verified beyond the navigation). |
-| **ServiceTitan** — https://www.servicetitan.com/pricing **(S)** | Software for larger trades businesses. | **Pricing not public** — "Request Pricing"; priced "per-technician". Plans: Starter, Essentials, The Works. | Dispatching, scheduling, call booking, invoicing, pricebook; estimates and payroll on higher plans. | Not verified. | Built for large multi-truck operations. Not a like-for-like comparison with ConstructHUB. |
-| **Buildertrend** — https://buildertrend.com/pricing/ | — | **Not verified.** The site refused every fetch (HTTP 403) on 2026-10-08. | Not verified. | Not verified. | Not verified. Say nothing about it. |
+| **Ahrefs** — https://ahrefs.com/pricing **(D)**; https://ahrefs.com/big-data **(S)** | A dedicated SEO suite built on its own crawler and index. | **Lite "$ 129 / mo"**: "5 projects", "6 months of historical data", "750 tracked keywords", "100,000 crawl credits", "1,000 credits per user", "1 user included", "Add 2 more users at $40/mo each". Standard "$ 249 / mo" (20 projects, 2,000 tracked keywords, unlimited credits per user). Advanced "$ 449 / mo". Enterprise "$ 1,499 / mo — Annual commitment required". **Starter "$ 29 / mo"** ("See what people search and spy on competitors") and **"Ahrefs Free"** ("Get Ahrefs data on your site and fix what matters"). Annual saving reported as 17% (S). | Dashboard, Site Explorer, Keywords Explorer, Site Audit, Rank Tracker, Brand Radar / AI prompts, Web Analytics, Content Explorer and Batch Analysis (Standard), API and MCP access. | A permit directory, a CRM, Google Business Profile management, review requests. | **Its own index, at a scale we do not have and do not claim**: the page reports "5 M Pages crawled every minute", "493.9 B" pages, "28.7B" keywords across "217 Locations", "16 YR" of history (S). Years of historical data, far higher limits, a free tier for your own site, and a $29 entry plan. For anyone whose job is SEO, Ahrefs is the deeper tool. |
+| **Semrush** — https://www.semrush.com/pricing/ **(D)** | A dedicated SEO and marketing suite with its own databases. | **"SEO" plan: "$ 139" monthly, or "$ 117 . 33 /mo billed annually"** — "For freelancers and small businesses looking to grow their online visibility with SEO"; "5 websites to monitor"; 500 keywords tracked daily (S). Starter "SEO + AI Search" $199 ($165.17 annual); Pro+ $299 ($248.17); Advanced $549 ($455.67). **"Free. $0 /mo For trying out the platform"**: "1 demo project", "10 reports per day". "Additional Users Starting at $ 45 /mo". **Local toolkit pricing: not verified** (https://www.semrush.com/local-business/pricing/ returned no prices to the fetch). | Keyword research, position tracking, site audit, AI search monitoring, content optimisation (Pro+), API (Advanced), reporting add-ons. | A permit directory, a CRM. Local / Google Business Profile tools exist as a separate toolkit — not verified here. | Daily rank tracking (ours is weekly), a very broad toolset beyond SEO, a free tier, deep historical data. Database sizes: not verified (its stats page gave no numbers to the fetch). |
+| **Jobber** — https://www.getjobber.com/pricing/ **(S)**; https://www.getjobber.com/features/ **(S)** (direct download refused, HTTP 403) | Field-service software: quotes, scheduling, invoicing, payments. | **Core: $49/mo with no commitment, $39/mo on a 1-year commitment, $29/mo paid annually; 1 user.** Core: online booking and scheduling, quotes, invoicing, online payments, a website. Connect $139 / $119 / $99 (1 user). Grow from $199 / $169 / $149. Plus from $499 / $439 / $399. | Quotes with online approval ("Customers can approve or request changes to quotes online"), scheduling, invoices, payments, client hub, review requests ("Jobber automatically asks your customers for reviews"), "Connects to Google Business Profile", website builder, Marketing Suite "$99/mo", Receptionist "$29/mo". "Store and organize unlimited photos and videos" on Plus. | A permit directory, county property records. | Very mature; "100+ app integrations"; native apps; three billing options; **an entry price at or below ConstructHUB CRM Basic** ($29 paid annually vs our $348/yr = $29/mo; $49 vs our $39 month to month). Not a like-for-like tier: Jobber Core has a website and online booking that CRM Basic does not. |
+| **Housecall Pro** — https://www.housecallpro.com/pricing/ **(D)**; https://www.housecallpro.com/features/ **(S)** | Field-service software for home-service pros. Page title: "Housecall Pro Pricing & Plans \| From $59/mo — 14-Day Free Trial". | **Basic: "$79 /mo" monthly, "$59 /mo (Billed annually)", "1 user included".** Essentials "$189 /mo" / "$149 /mo", "5 users included". Max "$329 /mo" / "$299 /mo", 8 users; "$35/mo per additional user" (S). A promotion was also showing ("$26 /mo for 1 month"; Max "$99 /mo for 3 months"). "All prices are in USD and are exclusive of sales tax". | Scheduling and dispatch, quotes, invoices and payments, online booking, review management, price book, job costing (S); photo reports (Essentials, S); customer portal; website and "CSR AI" call answering as add-ons (S). | A permit directory, county property records. | Mature dispatch with routes, route optimisation and GPS tracking, QuickBooks sync, financing, native apps, a large community. **Our CRM prices were set at half of these list prices** (`shared/crm-plans.ts:9-15`) with the same seat counts — and with a shorter feature list. |
+| **Leap** — https://leaptodigital.com/pricing/ **(D)**; https://leaptodigital.com/ and /leap-crm/ **(S)**. Confirmed the right company: Leap to Digital, "Leap CRM" and "Leap SalesPro", for roofing, remodeling, windows and doors, siding, kitchen and bath. | A contractor CRM plus an in-home sales and estimating app. | **Leap CRM Essential: "Get Started for $79 /month", "Single-User Only", "Limit 1 User Per Account", "Start Your 14 Day Free Trial".** Team: "Starting at $298 /month", "Includes First User and $99 per/mo per add. user". **SalesPro Premium: "Starting at $750 /month", "Includes 6 Users".** Enterprise: contact sales. | "Lead & Customer Management", "Digital Estimates & Proposals", "Dynamic Contracts", "Digital Signatures", "Invoicing", Leap Pay payments, "Appointment Calendar", "Customer & Subcontractor Portal", "Workflow Automations", "Text Messaging", financing, reporting; "Available on desktop, Android, and iOS devices" (S). Integrations named: ABC Supply, Angi Leads, CompanyCam, EagleView, GreenSky, QuickBooks, QXO, SRS Distribution (S). | Permits, Google Business Profile, reviews, SEO or marketing tools. | A purpose-built in-home sales presentation and contract tool (SalesPro) that ConstructHUB has no equivalent of; supplier and measurement integrations; financing; native Android and iOS apps; a subcontractor portal. Its site says "the majority of the nation's top one hundred contractors already rely on Leap" — their claim, not checked. |
+| **CompanyCam** (JobCam angle) — https://companycam.com/pricing **(D)**; /features **(S)** | Job-site photo and video documentation: "Document every job. Never lose proof of work." | **Core "63 /month", "1 User Included", "Additional Users: $ 29 each", shown with "Billed Annually"** and a "Monthly / Annual save 20%" switch. Crew "129 /month" (3 users); Scale "199 /month" (3 users). Month-to-month amounts **not verified**. Marketing Suite add-on: figures "99" / "79" shown, unit not verified. | Photos and video, reports, checklists, proposals (Crew), agreements (Scale), "Personalized price book & invoicing", "Collect payment on-site (US-based companies)"; Marketing Suite: "Google review management", "Two-way Google Business Profile sync". | A lead pipeline, a scheduling calendar, a permit directory. | "Unlimited cloud storage" (S) against JobCam's 5 GB; offline capture; LiDAR room measuring; integrations with other CRMs (Leap names it); apps in the stores. **Stronger than JobCam on storage, capture and maturity.** |
 
-**Marketing side — what small contractors use for Google listing, reviews and local rank.**
+**Also looked at, one line each (2026-10-08):** Contractor Foreman — Basic "$49 per month", 1 user,
+annual only (D), deep project management. Houzz Pro — Design "$99/mo", "1 User" (D), for design-build
+firms. JobNimbus, AccuLynx, ServiceTitan — pricing not public (S). Buildertrend — not verified (HTTP
+403). BrightLocal from $41/mo, Local Falcon from $24.99/mo, NiceJob from $75/month (all S); Podium and
+Birdeye — pricing not public (S). None of their pages fetched mentions a permit-office directory.
 
-| Product | What it is | Published starting price | Notes |
-| --- | --- | --- | --- |
-| **BrightLocal** — https://www.brightlocal.com/pricing/ **(S)** | Local SEO: rank tracking, geo-grid, citations, Google Business Profile audit, reviews. | Track **$41/mo** for 1 location ($369/yr); Manage $54; Grow $65 (adds review monitoring and collection). Price rises with locations. | Deep, specialised local-SEO tooling. |
-| **Local Falcon** — https://www.localfalcon.com/pricing **(S)** | Geo-grid rank tracking on Google Maps. | Starter **"$24.99 billed monthly"**, 7,500 credits (one credit = one map pin). | A specialist at the thing our Ranking Grid does; far more scans for the money than 5 grid credits. |
-| **NiceJob** — https://get.nicejob.com/pricing **(S)** | Review requests and reputation. | Starter **$75/month**; Pro $125/month; managed website $99/month + $199 setup. | — |
-| **Podium** — https://www.podium.com/pricing **(S)** | Reviews, texting, payments. | **Pricing not public** — "talk to our sales team for details". | — |
-| **Birdeye** — https://birdeye.com/pricing/ **(S)** | Reviews, listings, social. | **Pricing not public** — a form. | — |
+### 3c. What the research means (the honest picture)
 
-**What the research means for us (the honest picture).**
-
-1. The big field-service products already bundle more than they used to: Jobber, Housecall Pro and
-   CompanyCam each sell a marketing add-on, and two sell an AI receptionist. "Nobody else combines
-   CRM and marketing" would be **false**.
-2. What none of the nine job-software pages shows is a **permit-office directory or county property
-   records**. That, and the honesty of the links, is the differentiator that is ours.
-3. On price, three pairs are provable from the pages on 2026-10-08, monthly billing, list price:
-   CRM Basic $39 vs Housecall Pro Basic $79 (both 1 user); CRM Essentials $94 vs Essentials $189
-   (both 5 users); CRM Max $164 vs Max $329 (both 8 users). The tiers were built to mirror Housecall
-   Pro's seat counts (`shared/crm-plans.ts:9-15`) — **but the feature lists are not the same**, and
-   Housecall Pro was running a first-month promotion. Jobber's entry plan is cheaper than ours on
-   annual billing.
-4. JobCam vs CompanyCam is a comparison we lose on depth (storage, capture features, apps) and can
-   only make on "it is inside the CRM, for $39 more".
+1. **SEO.** Ahrefs and Semrush are far larger, dedicated SEO suites with their own crawlers and data.
+   We are not a replacement for either, and must not sound like one. The only honest angle: *a local
+   contractor gets the SEO lookups they actually use — where do I rank, what do people search, who
+   links to my competitor — inside the same product as their Google listing and permit tools, on a
+   plan that starts at $29 a month with $10 of SEO data in it.* Both of them also have a **free tier**,
+   and Ahrefs has a $29 plan; "cheaper than Ahrefs" as a blanket claim is **false**.
+2. **CRM.** Jobber, Housecall Pro and Leap all do leads, estimates with online approval, scheduling,
+   invoices and payments. Jobber and Housecall Pro also sell marketing add-ons and an AI receptionist.
+   "Nobody else combines CRM and marketing" is **false**.
+3. **What none of the six shows on the pages fetched** is a permit-office directory or county property
+   records. That, and the honesty of the links, is the differentiator that is ours.
+4. **Price pairs that are provable on 2026-10-08** (list price, monthly billing, same seat count):
+   CRM Basic $39 vs Housecall Pro Basic $79 (1 user); CRM Essentials $94 vs $189 (5 users); CRM Max
+   $164 vs $329 (8 users). CRM Basic $39 vs Leap CRM Essential $79 (1 user). Against Jobber Core there
+   is **no price advantage** ($39 vs $49 month to month; $348 vs $348 a year). In every pair the
+   feature lists differ, and a pair may only be shown with that said.
+5. **JobCam vs CompanyCam** is a comparison we lose on depth; the only true line is "the camera is
+   inside the CRM, filed to the same job as the estimate and the invoice".
 
 ---
 

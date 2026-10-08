@@ -297,10 +297,10 @@ async function main() {
     { n: 11, client: "Halvorsen-Quist Properties", from: "client", body: "Both units will be empty at the same time, so the floors can be done in one visit.", at: local(-5, 16, 30), read: true },
   ] as Msg[]) await addMsg(m);
 
-  // ── JobCam: six photos on the Kane job. Flat colour cards — obviously not anybody's house. ─────
+  // ── JobCam: six photos on the Kane job and three on the Hadley job. Flat colour cards — obviously not anybody's house. ─────
   for (const [i, t] of [["Before", "#64748b"], ["Progress", "#2563eb"], ["After", "#16a34a"], ["Issue", "#dc2626"]].entries())
     await q(`insert into jobcam_tags (id, org_id, name, color, created_by_member_id) values ($1,$2,$3,$4,$5) on conflict (id) do nothing`, [`demo-tag-${i + 1}`, orgId, t[0], t[1], owner]);
-  type Photo = { n: number; caption: string; colour: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean };
+  type Photo = { n: number; caption: string; colour: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean; job?: [project: string, client: string] };
   const photos: Photo[] = [
     { n: 1, caption: "Living room before — old carpet", colour: "0x8d99ae", tags: ["Before"], by: "Marco Delgado", minutesAgo: 3 * 24 * 60 + 300 },
     { n: 2, caption: "Subfloor checked and levelled", colour: "0xb08968", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 2 * 24 * 60 + 200 },
@@ -308,6 +308,11 @@ async function main() {
     { n: 4, caption: "Scratch on board by the hallway — replacing it", colour: "0x7f5539", tags: ["Issue"], by: "Dee Okafor", minutesAgo: 24 * 60 + 240 },
     { n: 5, caption: "Hallway finished", colour: "0xa47148", tags: ["After"], by: "Marco Delgado", minutesAgo: 24 * 60 + 60, starred: true, client: true },
     { n: 6, caption: "Stair treads dry-fitted", colour: "0x6f4e37", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 90 },
+    // Three on the Hadley job in Austin (the CRM tour follows that job end to end). Older than every Kane
+    // shot and untagged, so the Recent feed still opens on the same six tiles and no tag count moves.
+    { n: 7, caption: "Front room before — old laminate", colour: "0x7d8597", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 200, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 8, caption: "Hallway measured for planks", colour: "0x8a7968", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 185, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 9, caption: "Sample planks against the baseboard", colour: "0xa68a64", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 170, client: true, job: ["P-1997", "Caleb & Nora Hadley"] },
   ];
   const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
   const kane = project("P-2001");
@@ -339,7 +344,7 @@ async function main() {
     await q(`insert into jobcam_media (id, org_id, project_id, customer_id, uploader_member_id, kind, status, file_name, mime, bytes, rendition_bytes,
                r2_key_original, r2_key_display, r2_key_thumb, width, height, captured_at, uploaded_at, caption, caption_source, tags, starred, client_visible, created_at, updated_at)
              values ($1,$2,$3,$4,$5,'photo','ready',$6,'image/jpeg',$7,$8,$9,$10,$11,1600,1200,$12,$12,$13,'user',$14,$15,$16,$12,$12) on conflict (id) do nothing`,
-      [id, orgId, kane, customer("Joe & Mary Kane"), member(p.by), `demo-photo-${p.n}.jpg`, bytes,
+      [id, orgId, p.job ? project(p.job[0]) : kane, customer(p.job ? p.job[1] : "Joe & Mary Kane"), member(p.by), `demo-photo-${p.n}.jpg`, bytes,
         fs.statSync(path.join(dir, files.display)).size + fs.statSync(path.join(dir, files.thumb)).size,
         key(files.original), key(files.display), key(files.thumb), at, p.caption, p.tags, !!p.starred, !!p.client]);
   }
