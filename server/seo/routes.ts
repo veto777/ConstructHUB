@@ -49,6 +49,7 @@ import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-repor
 import { takeBudget } from "../growth-limits";
 import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
 import { listingNamed } from "./dataforseo";
+import { contentInput, fetchContent, CONTENT_ESTIMATE_USD, CONTENT_TYPICAL_USD, type ContentPage } from "./content";
 import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage } from "./batch";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
@@ -68,6 +69,8 @@ export const SEO_PRICES = {
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
   backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** Content explorer: one page of results. */
+  contentSearch: retailCents(CONTENT_TYPICAL_USD),
   /** Batch analysis: a flat part plus so much per 100 websites. */
   batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
   batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD + LABS_ITEM_USD)),
@@ -99,6 +102,7 @@ export const SEO_HOLDS = {
   aiGemini: retailCents(AI_ENGINES.gemini.estimateUsd),
   aiPerplexity: retailCents(AI_ENGINES.perplexity.estimateUsd),
   aiMentions: retailCents(AI_MENTIONS_ESTIMATE_USD),
+  contentSearch: retailCents(CONTENT_ESTIMATE_USD),
 };
 
 /** Report names as the customer sees them (usage history). */
@@ -667,6 +671,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ removed: await removeFromList(user, id.parse(req.params.id), removeInput.parse(req.body).keywords) });
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
+
+  // ── Content explorer: pages across the web about a topic. Saved for a day; `peek` never buys. ──
+  route("post", "/api/seo/content", async (req, res, user) => {
+    const input = contentInput.parse(req.body);
+    const { peek, ...search } = input;
+    const key = cacheKey("content", [cleanKeyword(search.query), search.sort, search.sinceDays ?? 0, search.minAuthority ?? 0, search.kind ?? "", search.exclude ? normalizeDomain(search.exclude) ?? "" : "", search.limit, search.offset]);
+    const saved = await cached<ContentPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (peek) return res.status(404).json({ code: "no_report", message: "Not searched yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<ContentPage>(user, key, "content", CACHE_HOURS, CONTENT_ESTIMATE_USD, () => fetchContent(input), false, `Content explorer — "${search.query}"${search.offset ? ` (results ${search.offset + 1}–${search.offset + search.limit})` : ""}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+  });
 
   // ── Batch analysis: headline numbers for up to 100 websites. Saved for a day; `peek` never buys. ──
   route("post", "/api/seo/batch", async (req, res, user) => {
