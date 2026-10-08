@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import * as cheerio from "cheerio";
 import { brandMatches, detectPlatform, type Platform } from "./guidance";
 import { safeFetch, siteUrl, type PageResponse } from "./http";
@@ -48,14 +49,42 @@ export type Page = {
   redirects: string[];
 };
 /**
- * An address no site has a page at. Asked for once per crawl: a site that answers it with "200 OK" (or sends it to
- * another page that does) is not telling crawlers which of its addresses are missing — see the "soft-404" finding.
+ * Addresses that have no page, asked for once per crawl to see how the site answers for a missing page. They are
+ * made up per crawl (`probeSlug`, kept in the state) so that nobody can special-case one known address, and there is
+ * one at the top of the site and one inside its busiest section — a site can answer differently in different places.
+ * What is learnt is about THOSE addresses; the finding says so.
  */
-export const MISSING_PAGE_PROBE = "page-that-should-not-exist-constructhub-site-scan";
+export const MISSING_PAGE_PREFIX = "not-a-page-";
+/**
+ * How one such address was answered:
+ *  - "not_found": 404 or 410 — the honest answer;
+ *  - "noindex": answered as a page, but marked noindex (the way a client-routed app can say "nothing here" to Google);
+ *  - "ok_as_page": answered 2xx as an ordinary, indexable page;
+ *  - "sent_home": sent on to the site's home page, which answered 2xx;
+ *  - "undetermined": anything that says nothing either way — a sign-in or bot check, another site, a non-HTML answer, a server error.
+ */
+export type MissingPageOutcome =
+  | "not_found"
+  | "noindex"
+  | "ok_as_page"
+  | "sent_home"
+  | "undetermined";
+export type MissingPageProbe = {
+  url: string;
+  status: number;
+  finalUrl: string;
+  outcome: MissingPageOutcome;
+  /** For "undetermined": why, in words. */
+  note?: string;
+};
 export type CrawlState = {
   origin?: string;
-  /** What the site answered for MISSING_PAGE_PROBE: undefined on crawls from before the check; null when it was not asked (robots.txt) or did not answer. */
-  missingPage?: { url: string; status: number; finalUrl: string } | null;
+  /** The made-up part of this crawl's missing-page addresses. */
+  probeSlug?: string;
+  /** How the site answered for addresses that have no page. Undefined on crawls from before the check (not measured). */
+  missingPages?: MissingPageProbe[];
+  /** Why no such address was asked for or answered: robots.txt forbids them all, or none got an answer. */
+  missingPagesNote?: "robots" | "no_answer";
   queue: string[];
   pages: Page[];
   errors: { url: string; message: string }[];
@@ -67,6 +96,51 @@ export type CrawlState = {
   imageChecks?: { url: string; bytes: number; pages: string[] }[];
   linkChecks: { url: string; status: number | null }[];
 };
+/** Pure: what one answer to a missing-page address says. */
+export function classifyMissingPage(
+  r: PageResponse,
+  asked: string,
+): MissingPageProbe {
+  const base = { url: asked, status: r.status, finalUrl: r.url };
+  const unsure = (note: string): MissingPageProbe => ({
+    ...base,
+    outcome: "undetermined",
+    note,
+  });
+  if (r.status === 404 || r.status === 410)
+    return { ...base, outcome: "not_found" };
+  if (r.status < 200 || r.status >= 300)
+    return unsure(`answered ${r.status}`);
+  let from: URL, to: URL;
+  try {
+    from = new URL(asked);
+    to = new URL(r.url);
+  } catch {
+    return unsure("the address it ended on could not be read");
+  }
+  const host = (u: URL) => u.hostname.replace(/^www\./, "").toLowerCase();
+  if (host(to) !== host(from)) return unsure(`sent on to ${to.hostname}`);
+  if (/(^|\/)(log-?in|sign-?in|sso|auth|account|wp-login)/i.test(to.pathname))
+    return unsure("sent on to a sign-in page");
+  const type = String(r.headers?.["content-type"] ?? "");
+  if (type && !/html/i.test(type))
+    return unsure(`answered with ${type.split(";")[0]}, not a page`);
+  if (
+    /cf-chl|challenge-platform|captcha|just a moment|attention required|access denied|verify you are human/i.test(
+      r.body.slice(0, 20000),
+    )
+  )
+    return unsure("answered with what looks like a bot check");
+  // Marked "nothing here" for search engines: in the page, or in the response's own header.
+  if (
+    parsePage(r).noindex ||
+    /noindex|\bnone\b/i.test(String(r.headers?.["x-robots-tag"] ?? ""))
+  )
+    return { ...base, outcome: "noindex" };
+  if (samePage(r.url, asked)) return { ...base, outcome: "ok_as_page" };
+  const home = to.pathname.replace(/\/+$/, "") === "";
+  return { ...base, outcome: home ? "sent_home" : "ok_as_page" };
+}
 export const emptyState = (url: string): CrawlState => ({
   queue: [url],
   pages: [],
@@ -253,22 +327,37 @@ export async function crawl(
         !/<html/i.test(llms.body) &&
         llms.body.trim().length > 0;
     }
-    // One request for a page that cannot exist (robots.txt permitting): how does the site answer for a missing page?
-    state.missingPage = null;
-    const probe = origin + "/" + MISSING_PAGE_PROBE;
-    if (robots.allowed(probe)) {
+    // Addresses that have no page (robots.txt permitting): how does the site answer for a missing page?
+    state.probeSlug ||= randomBytes(5).toString("hex");
+    const sections = new Map<string, number>();
+    for (const u of state.sitemap) {
+      const seg = new URL(u).pathname.split("/")[1];
+      if (seg && new URL(u).pathname.split("/").length > 2)
+        sections.set(seg, (sections.get(seg) ?? 0) + 1);
+    }
+    const busiest = [...sections.entries()]
+      .filter(([, n]) => n >= 3)
+      .sort((x, y) => y[1] - x[1] || (x[0] < y[0] ? -1 : 1))[0]?.[0];
+    const probes = [
+      `${origin}/${MISSING_PAGE_PREFIX}${state.probeSlug}`,
+      ...(busiest
+        ? [`${origin}/${busiest}/${MISSING_PAGE_PREFIX}${state.probeSlug}`]
+        : []),
+    ];
+    state.missingPages = [];
+    let asked = 0;
+    for (const probe of probes) {
+      if (!robots.allowed(probe)) continue;
+      asked++;
       await wait(Math.max(300, robots.delay * 1000));
       const missing = await http(
         probe,
         (u) => new URL(u).origin === origin && robots.allowed(u),
       ).catch(() => null);
-      if (missing)
-        state.missingPage = {
-          url: probe,
-          status: missing.status,
-          finalUrl: missing.url,
-        };
+      if (missing) state.missingPages.push(classifyMissingPage(missing, probe));
     }
+    if (!state.missingPages.length)
+      state.missingPagesNote = asked ? "no_answer" : "robots";
     state.queue = [...new Set([...state.queue, ...state.sitemap])].slice(
       0,
       cap * 5,
@@ -415,21 +504,27 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "Search engines and visitors cannot use these pages.",
     "Restore the page or redirect to a relevant replacement.",
   );
-  // A page that cannot exist was answered as if it did. Said only on a 2xx answer to the probe (after any redirect);
-  // a 404/410, an error, or a probe that was not made says nothing.
-  const missing = state.missingPage;
-  if (missing && missing.status >= 200 && missing.status < 300) {
-    const moved = samePage(missing.finalUrl, missing.url)
-      ? ""
-      : ` after sending the request on to ${missing.finalUrl}`;
+  // Addresses with no page that were answered as ordinary, indexable pages (or sent to the home page). An honest
+  // 404/410, a noindexed "nothing here" page, and anything that proves nothing (sign-in, bot check, error) say nothing.
+  const soft = (state.missingPages ?? []).filter(
+    (m) => m.outcome === "ok_as_page" || m.outcome === "sent_home",
+  );
+  if (soft.length) {
+    const said = soft
+      .map(
+        (m) =>
+          `${m.url} was answered ${m.status} OK${samePage(m.finalUrl, m.url) ? "" : ` after being sent on to ${m.finalUrl}`}`,
+      )
+      .join("; ");
+    const others = (state.missingPages ?? []).filter((m) => !soft.includes(m));
     add(
       "soft-404",
       "technical",
       "warning",
-      'Missing pages answer "OK" instead of "not found"',
-      [missing.url],
-      `We asked for an address that has no page (${missing.url}) and the site answered ${missing.status} OK${moved}. A site that does this gives search engines no way to tell a removed or mistyped address from a real page: they have to guess (Google calls these soft 404s), they keep crawling addresses that lead nowhere, and broken links on the site cannot be found by this scan or by any other crawler — so the broken-link check in this report cannot be relied on for links within the site.`,
-      "Make the server answer 404 (or 410) for addresses that have no page, and keep showing visitors a helpful not-found page with that status. On a site built as a single-page app this is a hosting or server setting, not something the page's own code can do: the server must know which addresses exist. Do not redirect missing addresses to the home page.",
+      "Addresses with no page are answered like real pages",
+      soft.map((m) => m.url),
+      `We asked for ${soft.length + others.length === 1 ? "an address that has" : `${soft.length + others.length} addresses that have`} no page: ${said}, without a "noindex".${others.length ? ` (${others.map((m) => `${m.url}: ${m.outcome === "not_found" ? "correctly answered not found" : m.outcome === "noindex" ? "marked noindex" : (m.note ?? "nothing learnt")}`).join("; ")}.)` : ""} When that happens, search engines have to work out for themselves that nothing is there — Google decides case by case and reports the ones it judges empty as soft 404s — and a link to an address that does not exist looks fine to any check that goes by the status alone, this scan's included. Errors this scan did find are still real. This is what these addresses did; other parts of the site may answer differently.`,
+      'Best: have the server answer 404 (or 410) for addresses that have no page, while still showing visitors a helpful not-found page. Where the server cannot know which addresses exist (a single-page app), Google\'s guidance gives two alternatives: add <meta name="robots" content="noindex"> to the not-found view, or have that view redirect to an address the server does answer with 404. Do not send missing addresses to the home page.',
     );
   }
   add(

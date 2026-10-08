@@ -40,6 +40,20 @@ function facts(t: Task): string {
   return out.join(" · ");
 }
 
+/** Facts the one-line summary above already says, or that only the server uses. */
+const SUMMARISED = new Set(["position", "volume", "authority", "affected", "lastSeen", "linksTo", "crawlId"]);
+const FACT_LABEL: Record<string, string> = {
+  severity: "Severity", crawlAt: "Crawl it came from", examples: "Found on", finding: "What was found", searches: "Searches", moreSearches: "More searches", overlap: "Results shared with the first search",
+  basis: "What it rests on", checked: "Checked", where: "Where", notFound: "Searches your site was not found for", variants: "Possible address variants", checks: "Checks", latest: "Latest check", morePages: "More pages",
+  moreOwnAddresses: "More of your addresses", linkTo: "Link to", words: "Words to link", context: "Where the words appear", crawled: "Crawled", answers: "Answers", questions: "Questions", device: "Device", location: "Place", period: "Period", latestCheck: "Latest check", changes: "Changes",
+};
+/** "page1Seen" → "Page 1 seen"; known names get their own wording. */
+const factLabel = (k: string) => FACT_LABEL[k] ?? k.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/([0-9])([A-Za-z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase()).replace(/ ([A-Z])/g, (_m, c: string) => ` ${c.toLowerCase()}`);
+/** The rest of what a task was saved with — the evidence behind it — for a person to read. */
+function evidence(t: Task): [string, string][] {
+  return Object.entries(t.facts).filter(([k, v]) => !SUMMARISED.has(k) && v !== null && v !== "" && v !== false).map(([k, v]) => [factLabel(k), k === "crawlAt" && typeof v === "string" ? fmtDate(v) : String(v)]);
+}
+
 export default function SeoPlanPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
@@ -132,6 +146,15 @@ export default function SeoPlanPage() {
                         {t.url ? <a href={t.url} className="g-link" target="_blank" rel="noreferrer">{t.url.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="inline h-3 w-3" aria-hidden /></a> : t.target}
                         {(t.url || t.target) && facts(t) ? " · " : ""}{facts(t)}{(t.url || t.target || facts(t)) ? " · " : ""}added {fmtDate(t.createdAt)}
                       </p>
+                      {evidence(t).length > 0 && (
+                        <details className="mt-1 text-[12px]" data-testid={`task-evidence-${t.id}`}>
+                          <summary className="g-link cursor-pointer">What this is based on</summary>
+                          <dl className="mt-1 grid gap-x-4 gap-y-0.5 sm:grid-cols-[max-content_1fr]">
+                            {evidence(t).map(([k, v]) => <div key={k} className="contents"><dt className="g-text-2">{k}</dt><dd className="g-text break-words">{/^https?:\/\/\S+$/.test(v) ? <a href={v} className="g-link break-all" target="_blank" rel="noreferrer">{v}</a> : v}</dd></div>)}
+                          </dl>
+                          <p className="g-text-2 mt-1">As it was when the task was added{t.kind === "audit" ? <> — <Link href="/seo/audit" className="g-link">open Site audit</Link> for the crawl as it is now</> : ""}.</p>
+                        </details>
+                      )}
                       {t.recheck && !t.resolved && <p className="g-text-2 mt-1 text-[12px]" data-testid={`task-recheck-${t.id}`}>{RECHECK[t.recheck]}</p>}
                       {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A crawl made after you added this{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} ran this check again on everything it was found on and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
                       {noteFor === t.id ? (

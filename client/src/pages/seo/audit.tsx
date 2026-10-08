@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { AuditPages } from "./audit-pages";
 import { RenderCheck } from "./render";
+import { LinkOpportunitiesView } from "./link-opportunities";
 
 type Severity = "error" | "warning" | "notice";
 type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; why: string; fix: string; items: string[] };
@@ -93,7 +94,7 @@ export default function SeoAuditPage() {
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [view, setView] = useState<"issues" | "pages" | "rendering">("issues");
+  const [view, setView] = useState<"issues" | "pages" | "links" | "rendering">("issues");
   const start = useMutation({
     // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
     mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
@@ -220,9 +221,10 @@ export default function SeoAuditPage() {
           )}
 
           <nav className="g-tabs" aria-label="Audit views">
-            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
+            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["links", "Internal links"], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
           </nav>
           {view === "pages" && <AuditPages site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "links" && site && <LinkOpportunitiesView site={site} />}
           {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -269,7 +271,7 @@ export default function SeoAuditPage() {
                               {!showAll && i.items.length > 25 && <button type="button" className="g-pill g-pill--sm" onClick={() => setShowAll(true)}>Show all {fmtNum(i.items.length)}</button>}
                               {i.count > i.items.length && <span className="g-text-2 text-[12px]">Showing the first {fmtNum(i.items.length)} of {fmtNum(i.count)}.</span>}
                               <button type="button" className="g-pill g-pill--sm" onClick={() => downloadCsv(`${i.key}-${site.domain}.csv`, [["Issue", "Page or entry"], ...i.items.map((u) => [i.title, u])])}><Download /> Export this list</button>
-                              <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt }, source: `audit:${i.key}` }]} />
+                              <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt, ...(i.items.length ? { examples: i.items.slice(0, 3).join(" , ").slice(0, 300) } : {}), ...(i.why ? { finding: i.why.length > 300 ? `${i.why.slice(0, 297)}…` : i.why } : {}) }, source: `audit:${i.key}` }]} />
                             </div>
                           </td>
                         </tr>

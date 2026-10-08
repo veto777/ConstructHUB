@@ -134,18 +134,20 @@ describe("what counts as broken, and what counts as fixed", () => {
     const s = auditSummary({ findings: [] }, [page("https://x/a"), page("https://x/gone")], before);
     expect([s.fixed.map((f) => f.key), s.notRechecked.map((f) => f.key).sort()]).toEqual([[], ["broken-links", "oversized-images"]]);
   });
-  it("'missing pages answer OK' is fixed only when this crawl asked for the missing page again and was answered", () => {
-    const soft = { id: "soft-404", category: "technical", severity: "warning", title: 'Missing pages answer "OK" instead of "not found"', urls: ["https://x/page-that-should-not-exist-constructhub-site-scan"], why: "", fix: "" };
+  it("'addresses with no page answered like real pages' is fixed only when this crawl asked again and every answer was honest", () => {
+    const soft = { id: "soft-404", category: "technical", severity: "warning", title: "Addresses with no page are answered like real pages", urls: ["https://x/not-a-page-0123456789"], why: "", fix: "" };
     const before = { report: { findings: [soft] }, pages: [page("https://x/")] };
     const now = (coverage?: unknown) => auditSummary({ findings: [], ...(coverage === undefined ? {} : { coverage }) } as any, [page("https://x/")], before);
-    // Asked again and answered "not found": fixed.
-    expect(now({ missingPageProbe: { status: 404, redirected: false } }).fixed.map((f) => f.key)).toEqual(["soft-404"]);
-    // Not asked this time (robots.txt), no answer, a server error, or a crawl that says nothing about it: not re-checked — never "fixed".
-    expect(now({ missingPageProbe: { status: 410, redirected: false } }).fixed.map((f) => f.key)).toEqual(["soft-404"]);
-    for (const c of [{ missingPageProbe: null }, { missingPageProbe: { status: 503, redirected: false } }, {}, undefined])
+    const probe = (...outcomes: string[]) => ({ missingPageProbe: { asked: outcomes.length, outcomes } });
+    // Asked again and answered "not found" — or as a noindexed page, the way a client-routed app can: fixed.
+    expect(now(probe("not_found", "not_found")).fixed.map((f) => f.key)).toEqual(["soft-404"]);
+    expect(now(probe("noindex")).fixed.map((f) => f.key)).toEqual(["soft-404"]);
+    // Not asked (robots.txt, not measured), no answer, or an answer that proves nothing (a sign-in, a bot check, a server
+    // error) — even next to an honest one: not re-checked, never "fixed".
+    for (const c of [{ missingPageProbe: { asked: 0, outcomes: [], reason: "robots" } }, { missingPageProbe: { asked: 0, outcomes: [], reason: "not_measured" } }, probe("undetermined"), probe("not_found", "undetermined"), { missingPageProbe: null }, {}, undefined])
       expect([now(c).fixed.map((f) => f.key), now(c).notRechecked.map((f) => f.key)], JSON.stringify(c)).toEqual([[], ["soft-404"]]);
-    // Still there: listed as an issue with the one address that was asked for.
-    const still = auditSummary({ findings: [soft], coverage: { missingPageProbe: { status: 200, redirected: false } } } as any, [page("https://x/")], before);
+    // Still there: listed as an issue with the address that was asked for.
+    const still = auditSummary({ findings: [soft], coverage: probe("ok_as_page") } as any, [page("https://x/")], before);
     expect(still.issues.find((i) => i.key === "soft-404")).toMatchObject({ count: 1, previous: 1, change: 0, severity: "warning" });
   });
   it("Google-profile checks are 'not re-checked' when this crawl had no profile", () => {

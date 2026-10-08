@@ -134,10 +134,11 @@ export const guides: Record<string, Guide> = {
   ),
   "soft-404": guide(
     "Medium",
-    "A missing address that answers 200 leaves search engines to guess which pages are real; Google reports such pages as soft 404s.",
-    "crawling-indexing/http-network-errors",
-    "Open an address on the site that has no page and look at the status it returns (browser DevTools, Network tab).",
-    "Set the server or host to answer 404 or 410 for addresses that have no page, while still showing visitors a helpful not-found page.",
+    "An address with no page that answers like a real one leaves search engines to judge for themselves; Google reports the ones it judges empty as soft 404s.",
+    "crawling-indexing/javascript/javascript-seo-basics",
+    "Open an address on the site that has no page and look at the status it returns (browser DevTools, Network tab) and at the page's robots meta tag.",
+    "Preferably set the server or host to answer 404 or 410 for addresses that have no page, while still showing visitors a helpful not-found page.",
+    "On a single-page app where the server cannot know: add a noindex robots meta tag to the not-found view, or redirect it to an address the server answers with 404.",
     "Do not redirect missing addresses to the home page; redirect only when a page has moved to a real replacement.",
   ),
   canonical: guide(
@@ -596,9 +597,13 @@ export function fixesFor(
           };
         if (f.id === "soft-404")
           evidence = {
-            asked: state.missingPage?.url,
-            answered: state.missingPage?.status,
-            endedAt: state.missingPage?.finalUrl,
+            asked: (state.missingPages ?? []).map((m) => ({
+              address: m.url,
+              answered: m.status,
+              endedAt: m.finalUrl,
+              read: m.outcome,
+              ...(m.note ? { note: m.note } : {}),
+            })),
           };
         if (f.id === "redirects")
           evidence = { chain: p?.redirects, final: url };
@@ -670,10 +675,14 @@ export function reconcileFixes(
       let checked = !!page;
       if (f.findingId === "fetch" || f.findingId === "status")
         checked = state.pages.some((p) => p.url === f.page && p.status === 200);
-      // Fixed only when the address that has no page was asked for again and answered "not found" (404) or "gone" (410).
+      // Fixed only when addresses with no page were asked for again in this crawl and EVERY one was answered "not found"
+      // (404/410) or as a noindexed page. An answer that proves nothing (sign-in, bot check, error) is not a fix.
       if (f.findingId === "soft-404")
         checked =
-          !!state.missingPage && [404, 410].includes(state.missingPage.status);
+          !!state.missingPages?.length &&
+          state.missingPages.every(
+            (m) => m.outcome === "not_found" || m.outcome === "noindex",
+          );
       if (f.findingId === "broken-links")
         checked =
           !!page &&

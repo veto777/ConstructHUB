@@ -28,7 +28,10 @@ export type SerpGroup = {
   /** The first keyword (highest volume) and the others whose results overlap with it, most shared first. */ members: SerpGroupMember[];
   /** Searches a month across the members that have a figure, and how many have one. */ volume: number | null; measured: number;
   /** The site's own recorded addresses that rank within the group (exact). */ ownPages: string[];
-  /** How many clearly different pages those addresses are (addresses differing only by http/https, "www" or a last slash count once — they MAY be one page; that is not checked). */ ownDistinct: number;
+  /**
+   * How many addresses are left when those differing only by http/https, "www" or a last slash are counted once. It
+   * is a count of addresses, not of pages: two of them may still be one page (a redirect, a canonical) — not checked.
+   */ ownDistinct: number;
   /** Members the site is not found for at all, and members it ranks for without the page having been recorded. */ unranked: number; rankedNoPage: number;
   /** The earliest and latest day among the members' checks. */ from: string | null; to: string | null;
 };

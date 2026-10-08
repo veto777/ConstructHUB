@@ -270,7 +270,9 @@ export async function runDueKeywordSnapshots(): Promise<number> {
   let done = 0;
   for (const site of due) {
     try {
-      if (!(await keywordWatchDeps.entitled(site.user_id))) { await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch", [site.id]); continue; }
+      // Every date this pass writes is written only while the site's date is still the one it leased: a snapshot taken
+      // by hand meanwhile, or a newer pass, has moved it, and then it is theirs.
+      if (!(await keywordWatchDeps.entitled(site.user_id))) { await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch AND next_kw_snapshot_at::text = $2", [site.id, site.lease]); continue; }
       const out = await takeKeywordSnapshot(site, true, site.lease);
       if (!out.reused) done++;
     } catch (e: any) {
@@ -278,7 +280,7 @@ export async function runDueKeywordSnapshots(): Promise<number> {
       if (e instanceof SeoBudgetError) {
         // Out of included data: nothing more is likely today.
         console.warn(`[seo] keyword snapshot for ${site.domain} skipped: ${e.message}`);
-        await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch", [site.id]).catch(() => {});
+        await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch AND next_kw_snapshot_at::text = $2", [site.id, site.lease]).catch(() => {});
       } else void recordFailure("job", "SEO keyword snapshot", e);
     }
   }

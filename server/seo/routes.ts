@@ -50,6 +50,7 @@ import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ES
 import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from "./audit";
 import { auditPages } from "./audit-pages";
+import { linkOpportunities } from "./link-opportunities";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
 import { serpGroups } from "./serp-groups";
@@ -1230,6 +1231,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const run = await getRender(user, site.id, id.parse(req.params.runId));
     if (!run) return res.status(404).json({ message: "That check is no longer there." });
     res.json(run);
+  });
+
+  // Site Audit → Internal links to add: pages that use a ranking keyword's words without linking to the page that ranks. Saved crawl and checks only.
+  route("get", "/api/seo/sites/:id/audit/link-opportunities", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const out = await linkOpportunities(user, site);
+    if (!out) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
+    res.json(out);
   });
 
   // Rank tracker history: one summary per check date for a device, optionally one tag. Saved checks only.

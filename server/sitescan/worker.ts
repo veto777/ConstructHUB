@@ -232,20 +232,31 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       coverage: {
         pageCap: job.page_cap,
         checkedLinks: state.linkChecks.length,
-        // Whether the site was asked for a page that cannot exist, and what it answered (see the "soft-404" finding).
-        missingPageProbe: state.missingPage
-          ? {
-              status: state.missingPage.status,
-              redirected:
-                state.missingPage.finalUrl.replace(/\/+$/, "") !==
-                state.missingPage.url.replace(/\/+$/, ""),
-            }
-          : null,
-        checkedImages: state.imageChecks.length,
+        // How the site answered for addresses that have no page (see the "soft-404" finding): one outcome per
+        // address asked; `asked: 0` with the reason when none was (robots.txt, no answer, or a crawl resumed from
+        // before the check existed — "not_measured").
+        missingPageProbe: {
+          asked: state.missingPages?.length ?? 0,
+          outcomes: (state.missingPages ?? []).map((m) => m.outcome),
+          ...(state.missingPages?.length
+            ? {}
+            : {
+                reason:
+                  state.missingPages === undefined
+                    ? "not_measured"
+                    : (state.missingPagesNote ?? "no_answer"),
+              }),
+        },
         notes: [
           "Scores are heuristic audit indicators, not search rankings.",
           "HTML-only crawl; JavaScript is not executed.",
-          "One request is made for an address that has no page, to see whether the site answers \"not found\".",
+          state.missingPages?.length
+            ? `${state.missingPages.length} address${state.missingPages.length === 1 ? "" : "es"} with no page ${state.missingPages.length === 1 ? "was" : "were"} asked for, to see how the site answers for a missing page.`
+            : state.missingPages === undefined
+              ? "How the site answers for a missing page was not measured in this crawl."
+              : state.missingPagesNote === "robots"
+                ? "How the site answers for a missing page was not checked: robots.txt does not allow it."
+                : "How the site answers for a missing page could not be checked: the requests got no answer.",
           "Links (40) and images (30, 2 MB maximum) are sampled; full page weight comes from PageSpeed. Unknown CDN image sizes are not measured.",
           "NAP and service gaps compare scanned text/headings with the last synced GBP snapshot.",
           "AI drafts must be reviewed before use.",

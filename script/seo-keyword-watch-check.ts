@@ -64,21 +64,34 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   ok(busy instanceof KeywordWatchBusy && calls === 1, `a second one while the first is being taken is refused (${busy?.constructor?.name}, calls ${calls})`);
   open(); gate = null; await slow;
   ok((await site()).kw_snapshot_claim === null && (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n === 1, "the claim is given back, and there is one snapshot for the day");
-  // 5b. A claim that ran out and was taken over: the first owner saves nothing, is charged nothing, and cannot give back the new owner's claim.
+  // 5b. A claim that ran out and was taken over. The two owners are held apart (each waits on its own gate), so what
+  // each one does can be looked at: the first saves nothing, is charged nothing, and leaves the second's claim alone.
   await age(31); calls = 0;
-  gate = new Promise<void>((r) => { open = r; });
-  answer = { keywords: [["fenced", 1]] };
+  const gates: (() => void)[] = [];
+  keywordWatchDeps.request = (async () => { calls++; await new Promise<void>((r) => gates.push(r)); return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.02, result: [{ total_count: 1, items: [row("fenced", 1)] }] }] }; }) as any;
+  const reservations = () => pool.query("SELECT id, customer_usd::float8 AS customer, settled_at IS NOT NULL AS settled FROM seo_reservations WHERE user_id=1 AND label LIKE 'Keyword snapshot%' ORDER BY created_at, id").then((r) => r.rows);
+  const resBefore = (await reservations()).length;
   const stale = takeKeywordSnapshot(await site(), false).then((x) => x, (e) => e);
-  await new Promise((r) => setTimeout(r, 300));
+  while (gates.length < 1) await new Promise((r) => setTimeout(r, 50));
+  const token1 = (await site()).kw_snapshot_claim_token;
   await pool.query("UPDATE seo_sites SET kw_snapshot_claim = now() - interval '11 minutes' WHERE id=$1", [s.id]);
   const successor = takeKeywordSnapshot(await site(), false).then((x) => x, (e) => e);
-  await new Promise((r) => setTimeout(r, 300));
-  const tokenThen = (await site()).kw_snapshot_claim_token;
-  open(); gate = null;
-  const [r1, r2]: any[] = await Promise.all([stale, successor]);
-  const dayRows = (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n;
-  ok(r1 instanceof Error && r1.notSaved === true && !(r2 instanceof Error) && r2.reused === false && dayRows === 1, `the displaced owner saves nothing and the successor's snapshot is the day's one (${r1?.message?.slice(0, 60)} / ${JSON.stringify(r2).slice(0, 60)})`);
-  ok(typeof tokenThen === "string" && (await site()).kw_snapshot_claim === null && (await site()).kw_snapshot_claim_token === null, "each owner gives back only its own claim; none is left behind");
+  while (gates.length < 2) await new Promise((r) => setTimeout(r, 50));
+  const token2 = (await site()).kw_snapshot_claim_token;
+  ok(typeof token1 === "string" && typeof token2 === "string" && token1 !== token2, "the claim that ran out was taken over by a new owner");
+  gates[0]();                                    // the displaced owner's request to the source comes back first
+  const r1: any = await stale;
+  const mid = await site();
+  ok(r1 instanceof Error && r1.notSaved === true && (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n === 0, "the displaced owner saves nothing");
+  ok(mid.kw_snapshot_claim_token === token2 && mid.kw_snapshot_claim !== null, "…and on its way out leaves the new owner's claim in place");
+  const resMid = await reservations();
+  ok(resMid.length === resBefore + 2 && resMid[resBefore].settled && resMid[resBefore].customer === 0, `…and its reservation is settled at nothing for the customer (${JSON.stringify(resMid.slice(resBefore))})`);
+  gates[1]();
+  const r2: any = await successor;
+  const resAfter = await reservations();
+  ok(!(r2 instanceof Error) && r2.reused === false && (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n === 1 && resAfter[resBefore + 1].settled && resAfter[resBefore + 1].customer > 0, "the new owner's snapshot is the day's one, and it is the one charged");
+  ok((await site()).kw_snapshot_claim === null && (await site()).kw_snapshot_claim_token === null, "when the new owner is done, no claim is left behind");
+  keywordWatchDeps.request = (async () => { calls++; if (gate) await gate; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.02, result: [{ total_count: answer.total === undefined ? answer.keywords.length : answer.total, items: answer.keywords.map(([k, r]) => row(k, r)) }] }] }; }) as any;
   // 5c. The monthly one stands down when its date was moved after it was leased (someone took a snapshot by hand meanwhile).
   await age(31); calls = 0; await pool.query("UPDATE seo_sites SET kw_watch=true, next_kw_snapshot_at = now() + interval '1 month' WHERE id=$1", [s.id]);
   const stood = await takeKeywordSnapshot(await site(), true, "2026-01-01 00:00:00+00");

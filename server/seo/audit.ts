@@ -121,10 +121,11 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     // Checks that only look at a sample of links or images: a page crawled again does not mean the same link or image was
     // looked at again, so their disappearance is never called a fix.
     if (SAMPLED_CHECKS.has(g.key)) return false;
-    // "Missing pages answer OK" is found by one request per crawl for an address that has no page. It was re-checked
-    // only if THIS crawl made that request and the site answered "not found" (404) or "gone" (410). A request that was
-    // not made (robots.txt), got no answer, or met a server error leaves the question open.
-    if (g.key === "soft-404") { const st = (report as { coverage?: { missingPageProbe?: { status?: unknown } | null } }).coverage?.missingPageProbe?.status; return st === 404 || st === 410; }
+    // "Addresses with no page are answered like real pages" is found by asking, in each crawl, for a couple of
+    // addresses that have no page. It was re-checked only if THIS crawl asked and EVERY answer was "not found"
+    // (404/410) or a noindexed page. Not asked (robots.txt), no answer, or an answer that proves nothing (a sign-in, a
+    // bot check, a server error) leaves the question open — it is then "not re-checked", never "fixed".
+    if (g.key === "soft-404") { const o = (report as { coverage?: { missingPageProbe?: { outcomes?: unknown } | null } }).coverage?.missingPageProbe?.outcomes; return Array.isArray(o) && o.length > 0 && o.every((x) => x === "not_found" || x === "noindex"); }
     // A PageSpeed issue is re-checked only when that very page was MEASURED again for the same device (the measurement
     // is optional and can fail or be switched off; then the issue simply stops being listed).
     const speed = g.key.match(/^psi-(mobile|desktop)$/);

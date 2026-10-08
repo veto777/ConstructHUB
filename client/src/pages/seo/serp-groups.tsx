@@ -68,7 +68,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
       </p>
       {d.groups.length === 0 ? <p className="g-text-2 text-[13px]" data-testid="serp-groups-none">No two of these keywords share that many results: their first pages were largely different.</p> : (
         <>
-          {split.length > 0 && <p className="g-text mb-2 text-[13px]" data-testid="text-serp-groups-split">In {fmtNum(split.length)} group{split.length === 1 ? "" : "s"}, clearly different pages of yours rank for searches with overlapping results — worth comparing what those pages are for.</p>}
+          {split.length > 0 && <p className="g-text mb-2 text-[13px]" data-testid="text-serp-groups-split">In {fmtNum(split.length)} group{split.length === 1 ? "" : "s"}, more than one address of yours ranks for searches with overlapping results — worth opening them to see whether they are different pages, and what each is for.</p>}
           <div className="overflow-x-auto">
             <table className="g-table w-full" data-testid="table-serp-groups">
               <thead><tr><th aria-label="Show the keywords" className="w-12" /><th>Group (its first keyword)</th><th className="num">Keywords</th><th className="num">Volume / mo</th><th>Your addresses that rank</th><th><span className="sr-only">Action plan</span></th></tr></thead>
@@ -84,7 +84,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
                       <td className="max-w-[20rem]">
                         {ranked === 0 ? <span className="g-text-2">Your site was not found for any of them</span>
                           : g.ownPages.length === 0 ? <span className="g-text-2">Ranks for {ranked}, page not recorded</span>
-                          : distinct(g) > 1 ? <span style={{ color: "#b06000" }}>{distinct(g)} different pages</span>
+                          : distinct(g) > 1 ? <span><span style={{ color: "#b06000" }}>{distinct(g)} addresses</span><span className="g-text-2 block text-[12px]">{g.ownPages.length > distinct(g) ? `${g.ownPages.length} as recorded; ` : ""}whether they are different pages is not checked (one may redirect to another)</span></span>
                           : g.ownPages.length > 1 ? <span>{g.ownPages.length} addresses that may be one page<span className="g-text-2 block text-[12px]">they differ only by http/https, "www" or a last slash — not checked</span></span>
                           : <span className="block truncate" title={g.ownPages[0]}>{nameOf(g.ownPages[0], site.domain)}</span>}
                         {ranked > 0 && (g.unranked > 0 || (noPage > 0 && g.ownPages.length > 0)) && <span className="g-text-2 block text-[12px]">{[g.unranked > 0 ? `not found for ${g.unranked}` : "", noPage > 0 && g.ownPages.length > 0 ? `page not recorded for ${noPage}` : ""].filter(Boolean).join(" · ")}</span>}
