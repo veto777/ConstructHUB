@@ -627,24 +627,32 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const pin = readPin((site as { grid_pin?: unknown }).grid_pin);
     if (!pin) return res.status(400).json({ message: "Choose your business on Google Maps first." });
     if (!isConfigured()) return notReady(res);
-    const already = await runningScan(user, site.id);
-    if (already) return res.status(200).json({ id: already.id, running: true, reused: true });
-    const points = input.size * input.size;
-    const id = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
+    // One at a time per site — the database's rule, so a second server process cannot start another.
+    const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
+    if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
+    const scanId = started.id, points = input.size * input.size;
     void (async () => {
       try {
-        const o = await withBudget(user, gridEstimateUsd(points), () => fetchGrid({ keyword, size: input.size, spacing: input.spacing, pin, domain: site.domain }),
-          { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` });
-        for (let attempt = 1; ; attempt++) {
-          try { await finishScan(id, o.data as GridScan, o.costUsd); break; }
-          catch (e: any) { if (attempt >= 3) { console.error(`[seo] local grid scan ${id} was paid for but could not be saved: ${e?.message ?? e}`); await failScan(id, "The scan ran but its results could not be saved.").catch(() => {}); break; } await new Promise((r) => setTimeout(r, 500 * attempt)); }
-        }
+        await withBudget(user, gridEstimateUsd(points), async () => {
+          const o = await fetchGrid({ keyword, size: input.size, spacing: input.spacing, pin, domain: site.domain });
+          // Saved BEFORE it is charged: if the results cannot be written, this throws, the lookup counts as failed and
+          // the customer pays nothing. (A crash after the save and before the charge leaves a saved scan and an open
+          // hold, which the reconciler closes at no charge.) So a scan is never paid for and then missing.
+          let saved = false, lastError: unknown = null;
+          for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
+            try { saved = await finishScan(scanId, o.data as GridScan, o.costUsd); if (!saved) break; }
+            catch (e) { lastError = e; await new Promise((r) => setTimeout(r, 500 * attempt)); }
+          }
+          if (!saved) throw Object.assign(new Error(`local grid scan ${scanId} could not be saved: ${(lastError as any)?.message ?? "it is no longer running"}`), { costUsd: o.costUsd, costUnknown: o.costUnknown, notSaved: true });
+          return o;
+        }, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` });
       } catch (e: any) {
-        if (!(e instanceof SeoBudgetError)) console.warn(`[seo] local grid scan ${id} failed: ${e?.message ?? e}`);
-        await failScan(id, e instanceof SeoBudgetError ? e.message : e instanceof DataForSeoError ? vendorErrorMessage(e) : "The scan could not be completed. Try again in a few minutes.").catch(() => {});
+        if (!(e instanceof SeoBudgetError)) console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`);
+        const message = e instanceof SeoBudgetError ? e.message : e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : e instanceof DataForSeoError ? vendorErrorMessage(e) : "The scan could not be completed. Try again in a few minutes.";
+        await failScan(scanId, message).catch(() => {});
       }
     })();
-    res.status(202).json({ id, running: true });
+    res.status(202).json({ id: scanId, running: true });
   }));
   route("get", "/api/seo/sites/:id/grid/:scanId", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
