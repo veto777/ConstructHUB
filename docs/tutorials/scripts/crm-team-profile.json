@@ -1,0 +1,107 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-team-profile",
+  "title": "Your profile",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team",
+      "caption": "Team & Company",
+      "chapter": "My profile",
+      "narration": "Your profile is how you appear to your crew and on the schedule. Let's set it up."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tab-profile\"]",
+      "caption": "My profile tab",
+      "narration": "On Team and Company, the first tab is My profile."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-profile-name\"]",
+      "caption": "Name",
+      "chapter": "Name, title and mobile",
+      "narration": "Name is what your crew sees next to your jobs and visits."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-profile-title\"]",
+      "value": "Owner and estimator",
+      "caption": "Title",
+      "narration": "Title is your job at the company. Type it the way you want it shown."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-profile-phone\"]",
+      "value": "(941) 555-0142",
+      "caption": "Mobile",
+      "narration": "Mobile is your own cell number. We'll type a demo number here."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"badge-my-role\"]",
+      "caption": "Role",
+      "narration": "Role shows what you may do in the CRM. You can't change your own role here."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-profile\"]",
+      "caption": "Save profile",
+      "chapter": "Save your profile",
+      "narration": "When it looks right, choose Save profile."
+    },
+    {
+      "action": "wait",
+      "caption": "Profile saved",
+      "narration": "The CRM says Profile saved, and takes you back to Home.",
+      "holdMs": 300
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-profile\"]",
+      "caption": "Your name opens it",
+      "narration": "To change it later, click your name at the bottom of the menu."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-profile-phone\"]",
+      "caption": "Saved details",
+      "narration": "Your title is saved, and the mobile number is stored with its country code."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Menu: Team & Company",
+      "narration": "You'll also find My profile under Team and Company in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set up your profile | ConstructHUB CRM",
+    "description": "A short walkthrough of My profile in the ConstructHUB CRM. You will set your name, title and mobile number, see your role, and save. Then you will see how to open your profile again from the menu.",
+    "tags": [
+      "crew profile",
+      "team profile",
+      "contractor team",
+      "user profile setup",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Set up your profile",
+    "accent": "profile",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-team-roles",
+  "title": "Roles and permissions",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team?tab=team",
+      "caption": "Team tab",
+      "chapter": "Roles on the Team tab",
+      "narration": "Roles decide what each person on your team can see and do. Here is how to set them."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Roles set the defaults",
+      "caption": "Team members",
+      "narration": "On the Team tab, under Team members, everyone has a role."
+    },
+    {
+      "action": "scroll",
+      "selector": "[data-testid=\"member-demo-member-owen\"]",
+      "caption": "Owen Brooks",
+      "narration": "Owen is a project manager. The switches show what he can do."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"info-tip-role-pm\"]",
+      "caption": "The i beside a role",
+      "chapter": "What a role is for",
+      "narration": "Click the i beside a role to read what it's for."
+    },
+    {
+      "action": "wait",
+      "caption": "Role: Project manager",
+      "narration": "A project manager runs jobs once they're sold. The back office stays with owners and admins.",
+      "holdMs": 300
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "Press Escape to close it."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-role-demo-member-priya\"]",
+      "value": "office",
+      "caption": "Change a role",
+      "chapter": "Change a role or one permission",
+      "narration": "To change a role, pick a new one from the list. We'll make Priya office staff."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-role-demo-member-priya\"]",
+      "caption": "Team member updated",
+      "narration": "The CRM says Team member updated, and her role is now office."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-seeCosts-demo-member-owen\"]",
+      "caption": "One permission",
+      "narration": "You can also change one thing for one person. Let's let Owen see costs and margins."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-role-demo-member-owen\"]",
+      "caption": "Still a project manager",
+      "narration": "The switch is on, and Owen is still a project manager."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"The owner has every permission\")",
+      "caption": "The owner",
+      "narration": "The owner has every permission, and that can't be changed here."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Menu: Team & Company",
+      "narration": "You'll find roles under Team and Company in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set team roles and permissions | ConstructHUB CRM",
+    "description": "A short walkthrough of roles and permissions in the ConstructHUB CRM. You will read what a role is for, change a team member's role, and switch one permission on for one person.",
+    "tags": [
+      "team roles",
+      "user permissions",
+      "crew access",
+      "contractor team",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Who can do what",
+    "accent": "what",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}
