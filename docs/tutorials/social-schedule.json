@@ -15,9 +15,11 @@
       "textLength": 1336,
       "scheduledTime": null,
       "scheduledEastern": "2026-10-07 22:26 EDT (Wednesday) — at once",
-      "status": "in-progress",
+      "status": "published",
       "postSubmissionId": "921a14fb-9f92-481f-9f65-dd3edce60e8c",
-      "createdAt": "2026-10-08T02:26:56.184Z"
+      "createdAt": "2026-10-08T02:26:56.184Z",
+      "checkedAt": "2026-10-08T02:29:58.624Z",
+      "publicUrl": "https://www.instagram.com/reel/DeN2-p-D_D9/"
     },
     {
       "helpKey": "database-directory",
@@ -32,9 +34,11 @@
       "textLength": 1016,
       "scheduledTime": "2026-10-08T02:31:56.000Z",
       "scheduledEastern": "2026-10-07 22:31 EDT (Wednesday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "eb57570e-6cbb-4f09-8a70-43fb29145549",
-      "createdAt": "2026-10-08T02:27:02.529Z"
+      "createdAt": "2026-10-08T02:27:02.529Z",
+      "checkedAt": "2026-10-08T03:05:20.806Z",
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513788256031993858"
     },
     {
       "helpKey": "database-directory",
@@ -49,9 +53,11 @@
       "textLength": 280,
       "scheduledTime": "2026-10-08T02:36:56.000Z",
       "scheduledEastern": "2026-10-07 22:36 EDT (Wednesday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "7b7b05fa-db62-41e9-ac46-5700aadd0be8",
-      "createdAt": "2026-10-08T02:27:09.161Z"
+      "createdAt": "2026-10-08T02:27:09.161Z",
+      "checkedAt": "2026-10-08T03:05:22.229Z",
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694120420856827167"
     },
     {
       "helpKey": "crm-clients",
@@ -66,9 +72,11 @@
       "textLength": 1490,
       "scheduledTime": "2026-10-08T03:05:56.000Z",
       "scheduledEastern": "2026-10-07 23:05 EDT (Wednesday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "1ea5e91c-999d-4510-aae1-509575e88195",
-      "createdAt": "2026-10-08T02:27:15.778Z"
+      "createdAt": "2026-10-08T02:27:15.778Z",
+      "checkedAt": "2026-10-08T03:24:17.401Z",
+      "publicUrl": "https://www.instagram.com/reel/DeN7c8olaSn/"
     },
     {
       "helpKey": "crm-clients",
@@ -83,9 +91,11 @@
       "textLength": 1072,
       "scheduledTime": "2026-10-08T03:14:56.000Z",
       "scheduledEastern": "2026-10-07 23:14 EDT (Wednesday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "91a2d07b-6e04-4867-b1e0-01e9f673892e",
-      "createdAt": "2026-10-08T02:27:22.453Z"
+      "createdAt": "2026-10-08T02:27:22.453Z",
+      "checkedAt": "2026-10-08T03:24:18.817Z",
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513799082642169856"
     },
     {
       "helpKey": "crm-clients",
@@ -100,9 +110,11 @@
       "textLength": 254,
       "scheduledTime": "2026-10-08T03:15:56.000Z",
       "scheduledEastern": "2026-10-07 23:15 EDT (Wednesday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "5dadd16d-2f39-4061-b94e-f5f3515b2e64",
-      "createdAt": "2026-10-08T02:27:29.161Z"
+      "createdAt": "2026-10-08T02:27:29.161Z",
+      "checkedAt": "2026-10-08T03:24:20.240Z",
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694130488935468319"
     },
     {
       "helpKey": "crm-create-estimate",
@@ -119,7 +131,8 @@
       "scheduledEastern": "2026-10-07 23:46 EDT (Wednesday)",
       "status": "scheduled",
       "postSubmissionId": "f43bb5c9-c777-4cda-9400-912a77d184e4",
-      "createdAt": "2026-10-08T02:27:35.770Z"
+      "createdAt": "2026-10-08T02:27:35.770Z",
+      "checkedAt": "2026-10-08T03:24:21.716Z"
     },
     {
       "helpKey": "crm-create-estimate",
@@ -136,7 +149,8 @@
       "scheduledEastern": "2026-10-07 23:58 EDT (Wednesday)",
       "status": "scheduled",
       "postSubmissionId": "164f70a3-f16d-4263-85a1-9e62c6138390",
-      "createdAt": "2026-10-08T02:27:42.534Z"
+      "createdAt": "2026-10-08T02:27:42.534Z",
+      "checkedAt": "2026-10-08T03:24:23.453Z"
     },
     {
       "helpKey": "crm-create-estimate",
@@ -153,7 +167,8 @@
       "scheduledEastern": "2026-10-07 23:59 EDT (Wednesday)",
       "status": "scheduled",
       "postSubmissionId": "d6013962-647f-446f-8a93-9da05987fe50",
-      "createdAt": "2026-10-08T02:27:49.157Z"
+      "createdAt": "2026-10-08T02:27:49.157Z",
+      "checkedAt": "2026-10-08T03:24:24.938Z"
     },
     {
       "helpKey": "crm-schedule",
@@ -170,7 +185,8 @@
       "scheduledEastern": "2026-10-08 00:23 EDT (Thursday)",
       "status": "scheduled",
       "postSubmissionId": "61fe9abb-4728-4f13-957f-365d3d9cbbc5",
-      "createdAt": "2026-10-08T02:27:55.822Z"
+      "createdAt": "2026-10-08T02:27:55.822Z",
+      "checkedAt": "2026-10-08T03:24:26.417Z"
     },
     {
       "helpKey": "crm-schedule",
@@ -187,7 +203,8 @@
       "scheduledEastern": "2026-10-08 00:44 EDT (Thursday)",
       "status": "scheduled",
       "postSubmissionId": "67198fad-8246-4e22-8f0e-ea9cf51f86f8",
-      "createdAt": "2026-10-08T02:28:02.474Z"
+      "createdAt": "2026-10-08T02:28:02.474Z",
+      "checkedAt": "2026-10-08T03:24:28.074Z"
     },
     {
       "helpKey": "crm-schedule",
@@ -204,7 +221,8 @@
       "scheduledEastern": "2026-10-08 00:44 EDT (Thursday)",
       "status": "scheduled",
       "postSubmissionId": "142c9bdc-b23b-4a2a-b874-b9b3e128077a",
-      "createdAt": "2026-10-08T02:28:09.106Z"
+      "createdAt": "2026-10-08T02:28:09.106Z",
+      "checkedAt": "2026-10-08T03:24:29.567Z"
     }
   ]
 }
