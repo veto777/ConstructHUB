@@ -150,9 +150,33 @@ npx tsx scripts/tutorials/youtube-schedule.ts   # DRY RUN (default): the table o
 $S --go                                         # upload them: private + publish time, captions, thumbnail, playlist
 $S --reconcile                                  # ask YouTube what really happened; update the ledger
 $S --retry-thumbnails --go                      # set thumbnails that are not "ok" yet
+npx tsx scripts/tutorials/youtube-schedule.ts --print-description crm-schedule     # the text one video gets
+npx tsx scripts/tutorials/youtube-schedule.ts --update-descriptions                 # DRY: new text for what is already up
+$S --update-descriptions --go                   # send it (title, description, tags only)
 npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutorials/youtube-calendar.md
 ```
 
+- **Title, description and tags are built at upload time** by `server/youtube/description.ts` — a
+  producer changes nothing. YouTube allows 5,000 characters in a description (5,000 *bytes* through
+  the API, and no `<` or `>`), so every video gets 4,300–4,900 characters of readable text: the search
+  phrase and the benefit in the opening line ("How to … in ConstructHUB CRM - …", the part that shows
+  above "Show more"), the script's `youtube.description`, who it is for and the link; *In this video*;
+  the chapter list from `youtube.json` (only when it is one YouTube accepts — otherwise *Steps*,
+  without times); *Step by step* (the narration, numbered); *What you need*, *Good to know* and the
+  short version from the help entry; *Why contractors use this* and the *Search terms* line from the
+  hand-written bank for the video's area (`AREAS` in that file — every sentence restates a help
+  entry; add to it only what a help entry says); related tutorials (a link only once a video is
+  public); *About ConstructHUB*; three to five hashtags. Wording that is shared between videos is
+  picked by a hash of the help key, so descriptions are not copies of each other. Sentences in a
+  script or entry that say "best", "#1", "guarantee", "included with", a data vendor's name or the
+  CRM's host name are left out (and reported). A title is kept unless it is over 70 characters; tags
+  are the script's own, then the area's, up to 450 characters.
+  `--print-description <helpKey>` shows what a video would get. `--update-descriptions [helpKey…]`
+  rebuilds the text of videos that are **already** posted or scheduled — dry by default (length and
+  first 200 characters each; `--save DIR` writes them out to read), `--go` sends them
+  (`videos.update`, `part=snippet`: nothing about the video, its schedule or its status changes) and
+  records the text, its length and its sha256 in the ledger. The lint that every script in the repo
+  (and in the sibling worktrees) yields a valid description is `server/youtube/description.test.ts`.
 - **When.** After a batch of videos has been merged to `main` and deployed (so the in-app page the
   description links to shows the video): dry run, read the table, `--go`, `--calendar`, commit the
   ledger and the calendar. `--reconcile` once a day while videos are going out — it exits 2 and
@@ -201,9 +225,10 @@ npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutoria
   on 2026-10-07, so it is not locked today; if that ever changes, `--reconcile` reports the video as
   `LOCKED PRIVATE` once its time has passed.
 
-The library is `server/youtube/schedule.ts` (tests: `server/youtube/schedule.test.ts`); the YouTube
-calls are in `server/youtube/client.ts` (`uploadVideo` with `publishAt`, `updateVideoSchedule`,
-`getVideoStatus`).
+The library is `server/youtube/schedule.ts` (tests: `server/youtube/schedule.test.ts`); the
+description builder is `server/youtube/description.ts` with its file reading in
+`description-sources.ts`; the YouTube calls are in `server/youtube/client.ts` (`uploadVideo` with
+`publishAt`, `updateVideoSchedule`, `updateVideoSnippet`, `getVideoStatus`).
 
 **The thumbnail template** (`scripts/tutorials/brand.ts`, rendered by `thumbnail.ts`): a saturated
 brand-blue field (#1a73e8, brighter and deeper at the edges) with faint rays, an orange shape

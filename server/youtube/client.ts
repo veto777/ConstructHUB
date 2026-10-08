@@ -557,6 +557,37 @@ export async function updateVideoSchedule(videoId: string, publishAt: string, de
   return { videoId, publishAt: typeof d?.status?.publishAt === "string" ? d.status.publishAt : at, privacyStatus: d?.status?.privacyStatus ?? null };
 }
 
+export type SnippetUpdate = { title: string; description: string; tags?: readonly string[] };
+/**
+ * Rewrite the title, description and tags of a video that is already on YouTube (videos.update,
+ * part=snippet — the youtube.force-ssl permission, like every other edit).
+ *
+ * An update of part=snippet REPLACES the part: the title and the category must be sent, and any
+ * other writable field that is left out is erased. So the video's current snippet is read first
+ * (videos.list) and its category and languages go back unchanged beside the new text. Nothing but
+ * the three fields named here changes; the video's status, schedule and file are not touched.
+ */
+export async function updateVideoSnippet(videoId: string, input: SnippetUpdate, deps: Deps): Promise<{ videoId: string; title: string; descriptionLength: number; tags: number }> {
+  if (!idOk(videoId)) throw new YoutubeError("request", "Invalid video id", 400);
+  const title = input.title.trim(), description = input.description;
+  if (!title || title.length > 100 || /[<>]/.test(title)) throw new YoutubeError("request", "A title is 1 to 100 characters, without < or >", 400);
+  if (Buffer.byteLength(description, "utf8") > 5000 || description.length > 5000 || /[<>]/.test(description))
+    throw new YoutubeError("request", "A description is at most 5,000 characters, without < or >", 400);
+  const tags = (input.tags ?? []).map((t) => t.trim()).filter(Boolean);
+  if (tags.reduce((n, t) => n + t.length + (/\s/.test(t) ? 2 : 0), 0) + Math.max(0, tags.length - 1) > 500) throw new YoutubeError("request", "Tags are at most 500 characters in all", 400);
+  await requireManageScope(deps, "Editing a video's description");
+  const { d: cur } = await call(deps, `${API}/videos?part=snippet&id=${encodeURIComponent(videoId)}`);
+  const s = (Array.isArray(cur?.items) ? cur.items : [])[0]?.snippet;
+  if (!s) throw new YoutubeError("request", "YouTube does not list this video", 404);
+  if (!s.categoryId) throw new YoutubeError("request", "YouTube answered no category for this video; nothing was changed", 502);
+  const snippet: Record<string, unknown> = { title, description, categoryId: String(s.categoryId), tags };
+  for (const k of ["defaultLanguage", "defaultAudioLanguage"] as const) if (typeof s[k] === "string") snippet[k] = s[k];
+  const { d } = await call(deps, `${API}/videos?part=snippet`, {
+    method: "PUT", headers: { "Content-Type": "application/json; charset=UTF-8" }, body: JSON.stringify({ id: videoId, snippet }),
+  });
+  return { videoId, title: typeof d?.snippet?.title === "string" ? d.snippet.title : title, descriptionLength: typeof d?.snippet?.description === "string" ? d.snippet.description.length : description.length, tags: Array.isArray(d?.snippet?.tags) ? d.snippet.tags.length : tags.length };
+}
+
 /** "Range: bytes=0-N" on a 308 says N+1 bytes are stored; no Range header means none are. */
 function nextOffset(r: Response): number {
   const m = /bytes=0-(\d+)/.exec(r.headers.get("range") ?? "");

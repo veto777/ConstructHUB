@@ -10,7 +10,7 @@ import {
   DEFAULT_YOUTUBE_CHANNEL_ID, UPLOAD_CHUNK_BYTES, YT_ANALYTICS_SCOPE, YT_FORCE_SSL_SCOPE, YT_READONLY_SCOPE, YT_UPLOAD_SCOPE, YoutubeError,
   addToPlaylist, analyticsUrl, captionRequest, completeConnect, consentUrl, expectedChannelId, getChannelAnalytics, getYoutubeAccessToken,
   newPendingState, oauthErrorCode, requestedScopes, revokeToken, setThumbnail, stateMatches, uploadCaption, uploadSessionRequest, uploadVideo,
-  PUBLISH_AT_MIN_LEAD_MS, getVideoStatus, normalizePublishAt, updateVideoSchedule,
+  PUBLISH_AT_MIN_LEAD_MS, getVideoStatus, normalizePublishAt, updateVideoSchedule, updateVideoSnippet,
   type Deps, type YoutubeGrant,
 } from "./client";
 
@@ -378,6 +378,39 @@ describe("scheduled publishing", () => {
     expect(pub.calls).toHaveLength(1);
     const gone = mockFetch([{ json: { items: [] } }]);
     await expect(updateVideoSchedule("vid_12345", "2026-10-10T16:00:00Z", deps(gone.http, manage().store))).rejects.toMatchObject({ status: 404 });
+    expect(gone.calls).toHaveLength(1);
+  });
+});
+
+describe("rewriting a video's title, description and tags", () => {
+  const manage = () => memoryStore({ scopes: [YT_UPLOAD_SCOPE, YT_READONLY_SCOPE, YT_FORCE_SSL_SCOPE] });
+  it("reads the snippet first and sends the category and languages back with the new text", async () => {
+    const { http, calls } = mockFetch([
+      { json: { items: [{ snippet: { title: "Old", description: "old text", categoryId: "28", defaultLanguage: "en", defaultAudioLanguage: "en", tags: ["old"], channelId: "UCx", thumbnails: {} } }] } },
+      { json: { id: "vid_12345", snippet: { title: "New title", description: "New text", tags: ["one", "two words"] } } },
+    ]);
+    const out = await updateVideoSnippet("vid_12345", { title: " New title ", description: "New text", tags: ["one", "two words"] }, deps(http, manage().store));
+    expect(out).toEqual({ videoId: "vid_12345", title: "New title", descriptionLength: 8, tags: 2 });
+    expect(calls[0]).toMatchObject({ method: "GET", url: "https://www.googleapis.com/youtube/v3/videos?part=snippet&id=vid_12345" });
+    expect(calls[1]).toMatchObject({ method: "PUT", url: "https://www.googleapis.com/youtube/v3/videos?part=snippet" });
+    expect(JSON.parse(calls[1].body)).toEqual({
+      id: "vid_12345",
+      snippet: { title: "New title", description: "New text", categoryId: "28", tags: ["one", "two words"], defaultLanguage: "en", defaultAudioLanguage: "en" },
+    });
+  });
+
+  it("refuses — before any write — without the manage scope, over YouTube's limits, with angle brackets, or for a video YouTube does not list", async () => {
+    const none = mockFetch([]);
+    const ok = { title: "T", description: "D" };
+    await expect(updateVideoSnippet("vid_12345", ok, deps(none.http, memoryStore().store))).rejects.toMatchObject({ code: "missing_scope" });
+    await expect(updateVideoSnippet("vid_12345", { ...ok, description: "x".repeat(5001) }, deps(none.http, manage().store))).rejects.toThrow(/5,000/);
+    await expect(updateVideoSnippet("vid_12345", { ...ok, description: "é".repeat(2501) }, deps(none.http, manage().store))).rejects.toThrow(/5,000/); // 5,002 bytes
+    await expect(updateVideoSnippet("vid_12345", { ...ok, description: "a <b> c" }, deps(none.http, manage().store))).rejects.toThrow(/without/);
+    await expect(updateVideoSnippet("vid_12345", { ...ok, title: "x".repeat(101) }, deps(none.http, manage().store))).rejects.toThrow(/100/);
+    await expect(updateVideoSnippet("vid_12345", { ...ok, tags: Array.from({ length: 60 }, (_, i) => `tag number ${i}`) }, deps(none.http, manage().store))).rejects.toThrow(/500/);
+    expect(none.calls).toHaveLength(0);
+    const gone = mockFetch([{ json: { items: [] } }]);
+    await expect(updateVideoSnippet("vid_12345", ok, deps(gone.http, manage().store))).rejects.toMatchObject({ status: 404 });
     expect(gone.calls).toHaveLength(1);
   });
 });

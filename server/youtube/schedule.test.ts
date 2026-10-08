@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { DEFAULT_YOUTUBE_CHANNEL_ID, YT_FORCE_SSL_SCOPE, YT_READONLY_SCOPE, YT_UPLOAD_SCOPE, type Deps, type YoutubeGrant } from "./client";
 import {
   MIN_GAP_MINUTES, ROTATION, SLOT_POOLS, addDays, calendarMarkdown, easternLabel, findCandidates, interleave, planSchedule, readLedger, readOrder,
-  reconcile, retryThumbnails, runUploads, timesForDate, trackOf, writeLedger, zoneTime, zonedToUtc, type Ledger, type LedgerEntry, type Track,
+  reconcile, retryThumbnails, runUploads, timesForDate, trackOf, updateDescriptions, writeLedger, zoneTime, zonedToUtc, type Describe, type Ledger, type LedgerEntry, type Track,
 } from "./schedule";
 
 /** Wednesday 2026-10-07, 20:30 Eastern — already Thursday the 8th in UTC, which is what the host clock shows. */
@@ -449,6 +449,69 @@ describe("uploading", () => {
     expect(fs.existsSync(ledgerFile) ? readLedger(ledgerFile).videos : []).toEqual([]);
     writeLedger(ledgerFile, { ...ledgerOf(), channelId: "UCsomeoneelse000000000000" });
     await expect(runUploads({ ledgerFile, planned: plan().planned, deps: fakeYoutube().deps })).rejects.toThrow(/ledger is for channel/);
+  });
+});
+
+describe("the built description", () => {
+  const describe_: Describe = (helpKey) => (helpKey === "crm-none" ? null : { title: `Built ${helpKey}`, description: `Long description of ${helpKey}`, tags: ["one", "two words"] });
+
+  it("is what an upload sends, and the ledger keeps the text, its length, its hash and the tags", async () => {
+    produce("crm-a");
+    const yt = fakeYoutube();
+    const res = await runUploads({ ledgerFile, planned: plan().planned, deps: yt.deps, describe: describe_ });
+    expect(res.stopped).toBeNull();
+    expect(yt.uploads()[0].snippet).toMatchObject({ title: "Built crm-a", description: "Long description of crm-a", tags: ["one", "two words"] });
+    expect(readLedger(ledgerFile).videos[0]).toMatchObject({
+      helpKey: "crm-a", title: "Built crm-a", description: "Long description of crm-a", descriptionLength: 25,
+      descriptionSha256: sha("Long description of crm-a"), tags: ["one", "two words"],
+    });
+  });
+
+  it("does not upload a video whose description cannot be built", async () => {
+    produce("crm-none");
+    const yt = fakeYoutube();
+    const res = await runUploads({ ledgerFile, planned: plan().planned, deps: yt.deps, describe: describe_ });
+    expect(res.stopped).toMatch(/no step script/);
+    expect(yt.uploads()).toHaveLength(0);
+    expect(fs.existsSync(ledgerFile)).toBe(false);
+  });
+
+  it("--update-descriptions: dry sends nothing; --go rewrites the snippet (category kept) and the ledger; the same text again is left alone", async () => {
+    const at = "2026-10-08T00:08:51Z";
+    writeLedger(ledgerFile, ledgerOf(published("crm-a", "vid_aaaaa", at), published("crm-b", "vid_bbbbb", at), published("crm-none", "vid_ccccc", at)));
+    const yt = fakeYoutube((c) => {
+      if (c.method === "GET" && c.url.includes("/videos?part=snippet&id=")) return { json: { items: [{ snippet: { title: "old", categoryId: "28", defaultLanguage: "en" } }] } };
+      if (c.method === "PUT" && c.url.endsWith("/videos?part=snippet")) return { json: JSON.parse(c.body) };
+      return undefined;
+    });
+    const dry = await updateDescriptions({ ledgerFile, describe: describe_, go: false });
+    expect(dry.map((r) => [r.helpKey, r.result])).toEqual([["crm-a", "would update"], ["crm-b", "would update"], ["crm-none", "no source: no step script or narration for this key in the checkouts"]]);
+    expect(dry[0]).toMatchObject({ title: "Built crm-a", oldTitle: "crm-a", length: 25, first: "Long description of crm-a", tags: 2 });
+    expect(yt.calls).toHaveLength(0);
+    expect(readLedger(ledgerFile).videos[0].description).toBeUndefined();
+
+    const done = await updateDescriptions({ ledgerFile, keys: ["crm-a"], describe: describe_, deps: yt.deps, go: true });
+    expect(done.map((r) => [r.helpKey, r.result])).toEqual([["crm-a", "updated"]]);
+    const puts = yt.calls.filter((c) => c.method === "PUT");
+    expect(puts).toHaveLength(1);
+    expect(JSON.parse(puts[0].body)).toEqual({ id: "vid_aaaaa", snippet: { title: "Built crm-a", description: "Long description of crm-a", categoryId: "28", tags: ["one", "two words"], defaultLanguage: "en" } });
+    expect(yt.calls.every((c) => c.method === "GET" || c.method === "PUT")).toBe(true); // nothing uploaded, nothing deleted
+    const a = readLedger(ledgerFile).videos.find((e) => e.helpKey === "crm-a")!;
+    expect(a).toMatchObject({ title: "Built crm-a", status: "published", publishAt: "2026-10-08T00:08:51Z", descriptionLength: 25, descriptionSha256: sha("Long description of crm-a"), descriptionUpdatedAt: new Date(NOW).toISOString() });
+    expect(readLedger(ledgerFile).videos.find((e) => e.helpKey === "crm-b")!.description).toBeUndefined();
+
+    const again = await updateDescriptions({ ledgerFile, keys: ["crm-a"], describe: describe_, deps: yt.deps, go: true });
+    expect(again[0].result).toBe("unchanged");
+    expect(yt.calls.filter((c) => c.method === "PUT")).toHaveLength(1);
+    await expect(updateDescriptions({ ledgerFile, keys: ["crm-zzz"], describe: describe_, go: false })).rejects.toThrow(/Not posted/);
+  });
+
+  it("records a refused rewrite and leaves the ledger as it was", async () => {
+    writeLedger(ledgerFile, ledgerOf(published("crm-a", "vid_aaaaa", "2026-10-08T00:08:51Z")));
+    const yt = fakeYoutube((c) => (c.url.includes("/videos?part=snippet") ? { status: 403, json: { error: { errors: [{ reason: "forbidden" }] } } } : undefined));
+    const rows = await updateDescriptions({ ledgerFile, describe: describe_, deps: yt.deps, go: true });
+    expect(rows[0].result).toMatch(/^failed: /);
+    expect(readLedger(ledgerFile).videos[0].descriptionSha256).toBeUndefined();
   });
 });
 

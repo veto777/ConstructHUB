@@ -66,7 +66,7 @@ export const tutorialScriptSchema = z.object({
   youtube: z.object({
     /** Task first: "How to create and send an estimate | ConstructHUB CRM". */
     title: z.string().min(10).max(70),
-    /** Two or three true sentences; chapters and links are added by the tool. */
+    /** Two or three true sentences: the opening of the YouTube description. The rest (steps, chapters, links, search terms) is built at upload time by server/youtube/description.ts. */
     description: z.string().min(40).max(600),
     tags: z.array(z.string().min(2).max(40)).min(3).max(12),
     playlist: z.string().min(3).max(100).default("ConstructHUB CRM tutorials"),

@@ -7,6 +7,16 @@
  *   … --retry-thumbnails [--go]      set the thumbnail of every posted video that still lacks one
  *   … --reconcile [--dry]            ask YouTube what each posted video's real state is; update the ledger
  *   … --calendar                     write docs/tutorials/youtube-calendar.md
+ *   … --print-description KEY        print the title, description and tags KEY would be uploaded with
+ *   … --update-descriptions [KEY…] [--save DIR] [--go]
+ *                                    rewrite title, description and tags of videos that are ALREADY posted or
+ *                                    scheduled (all of them, or the keys named). Dry by default: prints each
+ *                                    one's length and first 200 characters; --save DIR writes <DIR>/<KEY>.txt
+ *                                    to read; --go sends them (videos.update, part=snippet) and updates the ledger.
+ *
+ * Every upload's title, description and tags come from the description builder
+ * (server/youtube/description.ts): 4,300–4,900 characters built from the step script, the help entry
+ * and the area's keyword bank — youtube.json's short description is only its opening summary.
  *
  * Three videos per calendar day (America/New_York) — one morning, one midday, one late — at times
  * that change from day to day, the three taken from different areas of the product where possible.
@@ -43,18 +53,24 @@ import fs from "fs";
 import path from "path";
 import {
   DEFAULT_CATEGORY, DEFAULT_MAX_UPLOADS, DEFAULT_PER_DAY, calendarMarkdown, trackOf, type Track, easternLabel, findCandidates, planSchedule, readLedger, readOrder, reconcile, retryThumbnails,
-  runUploads, textTable, zoneTime, type Plan,
+  runUploads, textTable, updateDescriptions, zoneTime, type Candidate, type Describe, type Plan,
 } from "../../server/youtube/schedule";
+import { TITLE_MAX, YT_DESCRIPTION_LIMIT, YT_TAGS_LIMIT, tagsCost } from "../../server/youtube/description";
+import { describeVideo, siblingWorktrees, type DescribeContext } from "../../server/youtube/description-sources";
+import { helpEntry } from "../../shared/help/registry";
 import type { Deps } from "../../server/youtube/client";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 const BOOLEANS = ["go", "dry", "retry-thumbnails", "reconcile", "calendar", "include-unmerged", "help"];
-const VALUES = ["out-dir", "start", "per-day", "order", "max", "replace", "category", "ledger", "manifest-dir"];
+const VALUES = ["out-dir", "start", "per-day", "order", "max", "replace", "category", "ledger", "manifest-dir", "print-description", "save"];
+/** Takes any number of help keys after it (none = every video in the ledger). */
+const LISTS = ["update-descriptions"];
 
 function parse(argv: string[]): { flags: Set<string>; values: Record<string, string[]> } {
   const flags = new Set<string>(), values: Record<string, string[]> = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (LISTS.includes(a.slice(2))) { flags.add(a.slice(2)); const list = (values[a.slice(2)] ??= []); while (argv[i + 1] !== undefined && !argv[i + 1].startsWith("--")) list.push(argv[++i]); continue; }
     if (!a.startsWith("--")) throw new Error(`Unexpected argument "${a}" (see the header of scripts/tutorials/youtube-schedule.ts)`);
     const eq = a.indexOf("="), name = a.slice(2, eq > 0 ? eq : undefined);
     if (BOOLEANS.includes(name) && eq < 0) { flags.add(name); continue; }
@@ -79,6 +95,16 @@ async function youtube(): Promise<{ deps: Deps; close: () => Promise<void> }> {
   const { pgYoutubeStore } = await import("../../server/youtube/store");
   const { pool } = await import("../../server/db");
   return { deps: { store: pgYoutubeStore(pool) }, close: () => pool.end() };
+}
+
+/** The description builder over this checkout, its sibling worktrees and the out-dirs: reads files only. */
+function describer(ledgerFile: string, orderFile: string, outDirs: string[]) {
+  const ctx = (): DescribeContext => ({
+    root: ROOT, worktrees: siblingWorktrees(ROOT), outDirs, tracks: readOrder(orderFile),
+    ledger: readLedger(ledgerFile).videos, entryOf: (k) => helpEntry(k),
+  });
+  const full = (helpKey: string, c?: Candidate) => describeVideo(helpKey, ctx(), c ? { dir: c.dir, meta: c.meta } : {});
+  return { full, describe: (async (helpKey, c) => full(helpKey, c)) as Describe };
 }
 
 function printPlan(plan: Plan, max: number, ledgerCount: number, tracks: Track[]) {
@@ -110,6 +136,40 @@ async function main() {
   const go = flags.has("go");
   if (go && flags.has("dry")) throw new Error("--go and --dry together make no sense");
   if (go && flags.has("include-unmerged")) throw new Error("--include-unmerged is for looking only: a video is uploaded after its manifest is merged");
+
+  if (one("print-description")) {
+    const d = await describer(ledgerFile, orderFile, outDirs).full(one("print-description")!);
+    if (!d) throw new Error(`${one("print-description")}: no step script or narration in the checkouts to build a description from`);
+    console.log(`TITLE (${d.title.length} of ${TITLE_MAX}): ${d.title}\n\nDESCRIPTION (${d.length} characters, ${d.bytes} bytes of YouTube's ${YT_DESCRIPTION_LIMIT}; area ${d.area}; chapters ${d.chapters ? "yes" : "no"})\n${"-".repeat(72)}\n${d.description}\n${"-".repeat(72)}\n\nTAGS (${d.tags.length}, ${tagsCost(d.tags)} of ${YT_TAGS_LIMIT} characters): ${d.tags.join(", ")}`);
+    for (const n of d.notes) console.log(`! ${n}`);
+    console.log(`\nBuilt from: ${d.scriptFile ?? "the narration in the production folder"}${d.input.entry ? "" : " — NO help entry found for this key"}${d.outDir ? ` · ${d.outDir}` : ""}`);
+    return;
+  }
+
+  if (flags.has("update-descriptions")) {
+    const keys = values["update-descriptions"] ?? [];
+    const yt = go ? await youtube() : null;
+    try {
+      const rows = await updateDescriptions({ ledgerFile, keys, describe: describer(ledgerFile, orderFile, outDirs).describe, deps: yt?.deps, go });
+      for (const r of rows) {
+        console.log(`${r.helpKey}  ${r.videoId}  ${r.result}`);
+        if (!r.description) continue;
+        console.log(`  title       ${r.title}${r.title !== r.oldTitle ? `   (was: ${r.oldTitle})` : ""}`);
+        console.log(`  description ${r.length} characters, ${r.bytes} bytes (limit ${YT_DESCRIPTION_LIMIT}) · ${r.tags} tags`);
+        console.log(`  starts      ${r.first}\n`);
+      }
+      const dir = one("save");
+      if (dir) {
+        fs.mkdirSync(path.resolve(dir), { recursive: true });
+        for (const r of rows) if (r.description) fs.writeFileSync(path.join(path.resolve(dir), `${r.helpKey}.txt`), r.description + "\n");
+        console.log(`Wrote ${rows.filter((r) => r.description).length} description(s) to ${path.resolve(dir)}`);
+      }
+      const failed = rows.filter((r) => r.result.startsWith("failed") || r.result.startsWith("no source"));
+      if (failed.length) { console.log(`!!!! ${failed.length} not done: ${failed.map((r) => `${r.helpKey} (${r.result})`).join("; ")}`); process.exitCode = 2; }
+      console.log(go ? `\nLedger: ${ledgerFile} — commit it.` : "\nDRY RUN: nothing was sent to YouTube and the ledger was not touched. Add --go (and the --env-file) to apply.");
+    } finally { await yt?.close(); }
+    return;
+  }
 
   if (flags.has("reconcile")) {
     const yt = await youtube();
@@ -167,7 +227,7 @@ async function main() {
   if (!plan.planned.length) return;
   const yt = await youtube();
   try {
-    const res = await runUploads({ ledgerFile, planned: plan.planned, deps: yt.deps, max, category, log: (l) => console.log(l) });
+    const res = await runUploads({ ledgerFile, planned: plan.planned, deps: yt.deps, max, category, log: (l) => console.log(l), describe: describer(ledgerFile, orderFile, outDirs).describe });
     console.log(`\nUploaded ${res.uploaded.length}: ${res.uploaded.map((u) => `${u.helpKey} ${u.videoId} (${zoneTime(u.publishAt).date})`).join(", ") || "none"}`);
     for (const d of res.deleteByHand)
       console.log(`!!!! DELETE BY HAND in YouTube Studio: ${d.url} (old ${d.helpKey})${d.stillScheduledFor ? ` — it is STILL SCHEDULED for ${easternLabel(d.stillScheduledFor)} and will go public beside the new one unless it is deleted first` : ""}`);

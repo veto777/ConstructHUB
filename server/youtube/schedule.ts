@@ -21,7 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
-  PUBLISH_AT_MIN_LEAD_MS, YoutubeError, addToPlaylist, getVideoStatus, setThumbnail, uploadCaption, uploadVideo,
+  PUBLISH_AT_MIN_LEAD_MS, YoutubeError, addToPlaylist, getVideoStatus, setThumbnail, updateVideoSnippet, uploadCaption, uploadVideo,
   type Deps, type VideoStatus,
 } from "./client";
 
@@ -160,6 +160,17 @@ export type LedgerEntry = {
   captions: StepResult;
   thumbnail: StepResult;
   playlist: StepResult;
+  /**
+   * The description that was sent to YouTube (built by ./description.ts), its length in characters,
+   * its sha256 and the tags that went with it. Absent on a video posted before the builder existed
+   * and not yet rewritten with --update-descriptions.
+   */
+  description?: string;
+  descriptionLength?: number;
+  descriptionSha256?: string;
+  tags?: string[];
+  /** When --update-descriptions last rewrote the title, description and tags on YouTube. */
+  descriptionUpdatedAt?: string;
   note?: string;
   /** Earlier uploads of this key that `--replace` superseded. They are still on YouTube until someone deletes them by hand. */
   replaced?: { videoId: string; url: string; sha256: string | null; replacedAt: string }[];
@@ -423,6 +434,15 @@ async function trySetThumbnail(videoId: string, jpg: string | null, deps: Deps):
   }
 }
 
+/** What YouTube shows for a video besides the picture: built by ./description.ts (see ./description-sources.ts). */
+export type VideoText = { title: string; description: string; tags: string[] };
+/** `candidate` is the production being uploaded; it is absent when an already posted video is described again. */
+export type Describe = (helpKey: string, candidate?: Candidate) => Promise<VideoText | null> | VideoText | null;
+const textFields = (t: VideoText) => ({
+  description: t.description, descriptionLength: t.description.length,
+  descriptionSha256: createHash("sha256").update(t.description).digest("hex"), tags: [...t.tags],
+});
+
 export type RunResult = {
   uploaded: { helpKey: string; videoId: string; publishAt: string }[];
   /** Why the run ended before the plan did (quota, a failed upload, --max). Null when it did everything. */
@@ -446,6 +466,11 @@ export type RunResult = {
 export async function runUploads(o: {
   ledgerFile: string; planned: readonly Planned[]; deps: Deps; max?: number; category?: string;
   log?: (line: string) => void; tz?: string;
+  /**
+   * The title, description and tags to send (the CLI passes the description builder, so every
+   * upload gets the long description). Without it, youtube.json's own are sent as they are.
+   */
+  describe?: Describe;
 }): Promise<RunResult> {
   const log = o.log ?? (() => undefined), tz = o.tz ?? SCHEDULE_TZ, max = o.max ?? DEFAULT_MAX_UPLOADS;
   const now = () => new Date((o.deps.now ?? Date.now)());
@@ -465,12 +490,18 @@ export async function runUploads(o: {
     if (sha256File(c.mp4) !== c.sha256) { out.stopped = `${p.helpKey}: ${c.mp4} changed while the run was going`; break; }
     if (Date.parse(p.publishAt) < now().getTime() + PUBLISH_AT_MIN_LEAD_MS) { out.stopped = `${p.helpKey}: its time (${easternLabel(p.publishAt, tz)}) is too close now — run again for a new plan`; break; }
 
-    log(`  ↑ ${p.helpKey} → ${easternLabel(p.publishAt, tz)}`);
+    let text: VideoText | null = null;
+    if (o.describe) {
+      try { text = await o.describe(p.helpKey, c); } catch (e) { out.stopped = `${p.helpKey}: its description could not be built — ${why(e)}`; break; }
+      if (!text) { out.stopped = `${p.helpKey}: no step script or narration to build its description from`; break; }
+    }
+    const title = text?.title ?? c.title;
+    log(`  ↑ ${p.helpKey} → ${easternLabel(p.publishAt, tz)}${text ? ` · description ${text.description.length} characters` : ""}`);
     let up;
     try {
       up = await uploadVideo({
-        filePath: c.mp4, title: c.title, description: typeof m.description === "string" ? m.description : "",
-        tags: Array.isArray(m.tags) ? m.tags.map(String) : undefined,
+        filePath: c.mp4, title, description: text?.description ?? (typeof m.description === "string" ? m.description : ""),
+        tags: text?.tags ?? (Array.isArray(m.tags) ? m.tags.map(String) : undefined),
         categoryId: String(o.category ?? m.categoryId ?? DEFAULT_CATEGORY),
         madeForKids: false, defaultLanguage: typeof m.defaultLanguage === "string" ? m.defaultLanguage : "en",
         privacyStatus: "private", publishAt: p.publishAt,
@@ -479,7 +510,7 @@ export async function runUploads(o: {
       if (!prior?.videoId && !stopsTheRun(e)) {
         // No video id came back, so the key stays postable: the next run plans it again.
         const failed: LedgerEntry = {
-          helpKey: p.helpKey, title: c.title, videoId: null, url: null, status: "failed", publishAt: null, publishAtEastern: null,
+          helpKey: p.helpKey, title, videoId: null, url: null, status: "failed", publishAt: null, publishAtEastern: null,
           uploadedAt: null, sha256: c.sha256, captions: "pending", thumbnail: "pending", playlist: "pending",
           note: `upload failed ${now().toISOString()}: ${why(e)} — check YouTube Studio for a stray upload before running again`,
         };
@@ -491,9 +522,10 @@ export async function runUploads(o: {
     }
 
     const entry: LedgerEntry = {
-      helpKey: p.helpKey, title: c.title, videoId: up.videoId, url: watchUrl(up.videoId), status: "scheduled",
+      helpKey: p.helpKey, title, videoId: up.videoId, url: watchUrl(up.videoId), status: "scheduled",
       publishAt: p.publishAt, publishAtEastern: easternLabel(p.publishAt, tz), uploadedAt: now().toISOString(), sha256: c.sha256,
       captions: "pending", thumbnail: "pending", playlist: "pending",
+      ...(text ? textFields(text) : {}),
     };
     const notes: string[] = [];
     if (up.privacyStatus !== "private") notes.push(`YouTube answered privacy "${up.privacyStatus}" for a scheduled upload`);
@@ -561,6 +593,55 @@ export async function retryThumbnails(o: { ledgerFile: string; outDirs: readonly
     writeLedger(o.ledgerFile, ledger);
     out.push({ helpKey: e.helpKey, videoId: e.videoId, file, result: t.result });
     if (stopsTheRun(t.error)) break;
+  }
+  return out;
+}
+
+/* ── Rewriting the text of videos that are already up ─────────────────────── */
+
+export type DescriptionUpdate = {
+  helpKey: string; videoId: string; title: string; oldTitle: string;
+  /** Characters and UTF-8 bytes of the new description, and how it starts. */
+  length: number; bytes: number; first: string; tags: number;
+  description: string;
+  /** "would update" (dry run) · "updated" · "unchanged" (the ledger already has this very text) · "no source: …" · "failed: …" */
+  result: string;
+};
+/**
+ * Build the title, description and tags again for videos that are already posted or scheduled and
+ * — with `go` — send them (videos.update, part=snippet; the video itself, its schedule and its
+ * status are not touched). `keys` narrows it; without keys it is every video in the ledger.
+ * A video whose ledger entry already holds this exact text and title is left alone.
+ * Dry by default: with `go` false nothing is sent and the ledger is not written.
+ */
+export async function updateDescriptions(o: { ledgerFile: string; keys?: readonly string[]; describe: Describe; deps?: Deps; go: boolean }): Promise<DescriptionUpdate[]> {
+  const ledger = readLedger(o.ledgerFile);
+  const unknown = (o.keys ?? []).filter((k) => !ledger.videos.some((e) => e.helpKey === k && e.videoId));
+  if (unknown.length) throw new Error(`Not posted (no video id in the ledger): ${unknown.join(", ")}`);
+  if (o.go && !o.deps) throw new Error("updateDescriptions: --go needs the YouTube connection");
+  const out: DescriptionUpdate[] = [];
+  for (const e of ledger.videos) {
+    if (!e.videoId || (o.keys?.length && !o.keys.includes(e.helpKey))) continue;
+    const row = (t: VideoText | null, result: string): DescriptionUpdate => ({
+      helpKey: e.helpKey, videoId: e.videoId!, title: t?.title ?? e.title, oldTitle: e.title, length: t?.description.length ?? 0,
+      bytes: t ? Buffer.byteLength(t.description, "utf8") : 0, first: (t?.description ?? "").slice(0, 200).replace(/\s+/g, " "), tags: t?.tags.length ?? 0,
+      description: t?.description ?? "", result,
+    });
+    let text: VideoText | null;
+    try { text = await o.describe(e.helpKey); } catch (err) { out.push(row(null, `no source: ${why(err)}`)); continue; }
+    if (!text) { out.push(row(null, "no source: no step script or narration for this key in the checkouts")); continue; }
+    const fields = textFields(text);
+    if (e.descriptionSha256 === fields.descriptionSha256 && e.title === text.title && JSON.stringify(e.tags ?? []) === JSON.stringify(fields.tags)) { out.push(row(text, "unchanged")); continue; }
+    if (!o.go) { out.push(row(text, "would update")); continue; }
+    try {
+      await updateVideoSnippet(e.videoId, text, o.deps!);
+      Object.assign(e, { title: text.title, ...fields, descriptionUpdatedAt: new Date((o.deps!.now ?? Date.now)()).toISOString() });
+      writeLedger(o.ledgerFile, ledger);
+      out.push(row(text, "updated"));
+    } catch (err) {
+      out.push(row(text, `failed: ${why(err)}`));
+      if (stopsTheRun(err)) break;
+    }
   }
   return out;
 }
