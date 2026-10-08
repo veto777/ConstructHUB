@@ -188,6 +188,8 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,
   ...TASK_SCHEMA_DDL,
+  // Service-area planner: the services and towns a site used last ({ services: [...], towns: [...] }).
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS planner jsonb`,
   // Last: it changes a rule on seo_alerts, which must exist by now.
   ...GRID_WATCH_DDL,
 ];

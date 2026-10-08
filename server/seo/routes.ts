@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, PLANNER_MAX_CELLS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
@@ -100,6 +101,9 @@ export const SEO_PRICES = {
   bulkPer100: retailCents(100 * LABS_ITEM_USD),
   /** One page of Link intersect (the most it costs, for up to three competitors). Content gap is competitorGap per competitor. */
   linkIntersect: retailCents(gapEstimateUsd("links", GAP_MAX_COMPETITORS, 50)),
+  /** Service-area planner: two lookups — a flat part plus so much per 100 searches in the table. */
+  plannerBase: retailCents(2 * LABS_TASK_USD),
+  plannerPer100: retailCents(2 * 100 * LABS_ITEM_USD),
   /** Opportunities: the most it can cost (500 keywords), and about what a site with 100 keywords costs. */
   opportunitiesMax: retailCents(OPP_ESTIMATE_USD),
   opportunitiesSmall: retailCents(estimateLabsUsd(100)),
@@ -126,6 +130,8 @@ export const SEO_HOLDS = {
   contentSearch: retailCents(CONTENT_ESTIMATE_USD),
   gridLocate: retailCents(gridEstimateUsd(1)),
   gridPer100: retailCents(gridEstimateUsd(100)),
+  plannerBase: retailCents(2 * LABS_TASK_USD),
+  plannerPer100: retailCents(2 * 100 * LABS_ITEM_USD),
   /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
   batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
   batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD * 1.2 + LABS_ITEM_USD)),
@@ -674,6 +680,33 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Service-area planner (Keywords explorer): services x towns for one site ──
+  // The services and towns used last time, so the page opens with them. Spends nothing.
+  route("get", "/api/seo/sites/:id/planner", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const p = (site as { planner?: unknown }).planner as { services?: unknown; towns?: unknown } | null;
+    const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : []);
+    res.json({ saved: p && list(p.services).length && list(p.towns).length ? { services: list(p.services), towns: list(p.towns) } : null });
+  });
+  route("post", "/api/seo/sites/:id/planner", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = plannerInput.parse(req.body);
+    const services = cleanTerms(input.services), towns = cleanTerms(input.towns);
+    if (!services.length || !towns.length) return res.status(400).json({ message: "Enter at least one service and one town." });
+    if (services.length * towns.length > PLANNER_MAX_CELLS) return res.status(400).json({ message: `A table holds up to ${PLANNER_MAX_CELLS} searches — shorten a list.` });
+    if ([...services, ...towns].some(hasOperator)) return res.status(400).json({ message: NO_OPERATORS });
+    const key = cacheKey("planner", [site.domain, site.location_code, site.language_code, services, towns]);
+    const saved = input.refresh ? null : await cached<Planner>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<Planner>(user, key, "planner", CACHE_HOURS, plannerEstimateUsd(services.length * towns.length),
+      () => fetchPlanner({ domain: site.domain, locationCode: site.location_code, languageCode: site.language_code, services, towns }), input.refresh, `Service-area planner — ${site.domain} (${services.length} × ${towns.length})`);
+    // Remembered for next time (not worth failing the request over).
+    await pool.query("UPDATE seo_sites SET planner=$3 WHERE id=$1 AND user_id=$2", [site.id, user, JSON.stringify({ services, towns })]).catch(() => {});
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Action plan: what the customer decided to do about a finding. Spends nothing. ──

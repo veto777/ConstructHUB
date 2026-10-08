@@ -7,6 +7,7 @@
  * The overview is one lookup (free to reopen for a week); each page of an idea
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
+import { ServicePlanner } from "./planner";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,7 +20,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelecte
 import { ReportView, type TableKey } from "./report-table";
 import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
 import { MarketPicker, useMarket } from "./market";
-import { marketKey, type SeoMarket } from "@shared/seo-markets";
+import { findMarket, marketKey, type SeoMarket } from "@shared/seo-markets";
 
 type Overview = {
   missing?: string[];
@@ -56,7 +57,7 @@ export default function SeoKeywordsPage() {
   const [keyword, setKeyword] = useState<string | null>(initial || null);
   const [ideas, setIdeas] = useState<TableKey>("matchingTerms");
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [mode, setMode] = useState<"one" | "bulk" | "lists">(() => { const v = new URLSearchParams(window.location.search).get("view"); return v === "bulk" || v === "lists" ? v : "one"; });
+  const [mode, setMode] = useState<"one" | "bulk" | "lists" | "area">(() => { const v = new URLSearchParams(window.location.search).get("view"); return v === "bulk" || v === "lists" || v === "area" ? v : "one"; });
   /** Keywords handed to the bulk analysis from a list. */
   const [bulkSeed, setBulkSeed] = useState("");
   const [market, setMarket] = useMarket();
@@ -121,9 +122,10 @@ export default function SeoKeywordsPage() {
   return (
     <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranks today, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
       <nav className="g-tabs" aria-label="Keywords explorer views">
-        {([["one", "One keyword"], ["bulk", "Many keywords"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
+        {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
       </nav>
       {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={changeMarket} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} onOpen={(k) => openKeyword(k)} />}
+      {mode === "area" && <ServicePlanner site={site} status={status.data} onTrack={site ? (rows) => track.mutate({ rows, from: findMarket(site.locationCode, site.languageCode) ?? market }) : undefined} />}
       {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows, from) => track.mutate({ rows, from }) : undefined} onOpen={openKeyword} />}
       {mode === "one" && (<>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
