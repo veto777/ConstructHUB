@@ -52,7 +52,7 @@ const usd = (n: number | null | undefined) => n == null ? "—" : `$${Math.round
 /** 12,345 → 12.3K, as the tiles read at a glance; exact numbers stay in the tables. */
 const compact = (n: number | null | undefined) =>
   n == null ? "—" : Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : Math.abs(n) >= 10_000 ? `${(n / 1000).toFixed(1)}K` : Math.round(n).toLocaleString("en-US");
-const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 const stripUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

@@ -42,6 +42,9 @@ import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
+import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
+import { sendSiteReport } from "./site-report-send";
+import { takeBudget } from "../growth-limits";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -621,6 +624,39 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ removed: await removeFromList(user, id.parse(req.params.id), removeInput.parse(req.body).keywords) });
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
+
+  // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
+  const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
+  route("get", "/api/seo/sites/:id/report", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const report = await buildSiteReport(user, site.id);
+    if (!report) return res.status(404).json({ message: "Site not found" });
+    const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null });
+  });
+  route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const report = await buildSiteReport(user, site.id);
+    if (!report) return res.status(404).json({ message: "Site not found" });
+    const pdf = await renderReportPdf(report, await brandOf(user));
+    res.setHeader("Cache-Control", "no-store");
+    res.type("application/pdf").setHeader("Content-Disposition", `attachment; filename="seo-report-${site.domain.replace(/[^a-z0-9.-]/gi, "-")}.pdf"`).send(pdf);
+  });
+  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = scheduleInput.parse(req.body);
+    if (input.frequency !== "off" && !input.recipients.length) return res.status(400).json({ message: "Add at least one email address to send the report to." });
+    res.json(await saveSchedule(user, site.id, input));
+  });
+  // "Send now". Ten sends a day per account: this emails addresses the customer typed.
+  route("post", "/api/seo/sites/:id/report/send", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const { recipients } = scheduleInput.pick({ recipients: true }).parse(req.body);
+    if (!recipients.length) return res.status(400).json({ message: "Add at least one email address." });
+    if (!(await takeBudget(`seo:report:${user}`, 10, 1, 86_400_000))) return res.status(429).json({ message: `You can send a report ${10} times a day. Scheduled reports are not affected.` });
+    res.json(await sendSiteReport(user, site.id, [...new Set(recipients)].slice(0, MAX_RECIPIENTS), `now-${Date.now()}`));
+  });
 
   // Usage history: every lookup with what it cost the customer. Saved rows only.
   route("get", "/api/seo/usage", async (_req, res, user) => {
