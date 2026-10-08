@@ -17,6 +17,8 @@ export type AuditIssue = {
   key: string; title: string; category: string; severity: AuditSeverity;
   /** Pages (or, for a rolled-up issue, entries) affected now and in the previous crawl. */
   count: number; previous: number | null; change: number | null; isNew: boolean;
+  /** Pages it was on before, off the list now but not looked at again: left out of the change (not improvements). */
+  notRechecked?: number;
   why: string; fix: string;
   /** What is affected: page addresses, or one line per entry for a rolled-up issue. */
   items: string[];
@@ -121,17 +123,34 @@ export function healthScore(report: AuditReport, pages: AuditPage[]): number | n
 const ANSWER_CHECKS = new Set(["status", "fetch", "redirects", "https"]);
 export function auditSummary(report: AuditReport, pages: AuditPage[], previous?: { report: AuditReport; pages: AuditPage[] } | null): AuditSummary {
   const now = groupFindings(report.findings), before = previous ? groupFindings(previous.report.findings) : null;
+  const statusNow = new Map(pages.map((p) => [p.url, p.status] as const));
+  /**
+   * Was this page looked at again for this kind of finding? Read from the page itself: it answered 2xx this time.
+   * About the answer: it was asked again — and for "status", answered usably (2xx/3xx). An http address is never
+   * matched to its https twin: that would not prove the http address itself was put right.
+   */
+  const reread = (key: string, u: string) => {
+    const st = statusNow.get(u);
+    if (st === undefined) return false;
+    if (key === "status") return st >= 200 && st < 400;
+    return ANSWER_CHECKS.has(key) || (st >= 200 && st < 300);
+  };
+  const urlOf = (i: string) => i.match(/^https?:\/\/\S+/)?.[0] ?? null;
   const issues: AuditIssue[] = [...now.values()].map((g) => {
-    const prev = before ? before.get(g.key)?.items.length ?? 0 : null;
+    const b = before ? before.get(g.key) : undefined;
+    const prev = before ? b?.items.length ?? 0 : null;
+    // Pages it was on before that are not on the list now but were not looked at again (down, redirected, not
+    // crawled): not counted as improvements — the change is on the pages that could be compared.
+    const stillAt = new Set(g.items.map(urlOf));
+    const unknown = b ? b.items.filter((i) => { const u = urlOf(i); return u !== null && !stillAt.has(u) && !reread(g.key, u); }).length : 0;
     return {
       key: g.key, title: g.title, category: g.category, severity: g.severity, count: g.items.length,
-      previous: prev, change: prev === null ? null : g.items.length - prev, isNew: prev === 0,
+      previous: prev, change: prev === null ? null : g.items.length - (prev - unknown), notRechecked: unknown, isNew: prev === 0,
       why: g.why, fix: g.fix, items: g.items.slice(0, ITEM_CAP),
     };
   }).sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.count - a.count || a.title.localeCompare(b.title));
   // An issue that is gone is "fixed" only if this crawl could have found it again: at least one of its pages was
   // crawled this time, and (for the checks that compare with the Google profile) a profile was attached this time too.
-  const statusNow = new Map(pages.map((p) => [p.url, p.status] as const));
   const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
@@ -166,10 +185,7 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     // issue is "not re-checked", never "fixed". Checks of the answer itself (status, fetch, redirects, https) need only
     // the page to have been asked again.
     const urls = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
-    const answerOnly = ANSWER_CHECKS.has(g.key);
-    // (Pages are saved under their final address: an http address fixed by sending it to https is found as its https twin.)
-    const answerOf = (u: string) => statusNow.get(u) ?? (g.key === "https" ? statusNow.get(u.replace(/^http:/i, "https:")) : undefined);
-    return urls.length === 0 || urls.every((u) => { const st = answerOnly ? answerOf(u) : statusNow.get(u); return st !== undefined && (answerOnly || (st >= 200 && st < 300)); });
+    return urls.length === 0 || urls.every((u) => reread(g.key, u));
   };
   const brief = (g: Group) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length });
   const fixed = gone.filter(recheckable).map(brief), notRechecked = gone.filter((g) => !recheckable(g)).map(brief);
@@ -302,7 +318,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   // older is shown in its place unless the customer picks it.
   const done = recent.filter((j: any) => j.well_formed);
   const newestUnreadable = recent[0] && !recent[0].well_formed ? { jobId: String(recent[0].id), at: recent[0].completed_at ? new Date(recent[0].completed_at).toISOString() : null } : null;
-  const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: r.error, createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
+  const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: crawlFailureWords(r.error), createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
   const newest = open[0];
   // One crawl, only if it is this account's finished crawl of this site (and, when `before` is given, older than it).
   const load = async (id: string, before?: Date) => (await pool.query(
@@ -416,6 +432,17 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   return out;
 }
 export const auditDomainKey = bare;
+/**
+ * A failed crawl's stored error as approved customer words: the crawler's own messages mapped to fixed sentences,
+ * anything else the general one. Stored text never leaves the server as it is. null = no error stored.
+ */
+export function crawlFailureWords(e: unknown): string | null {
+  if (e == null || e === "") return null;
+  const s = String(e);
+  if (/^Scan could not complete\b/.test(s)) return "The crawl could not complete. The site may have been unavailable, blocked the crawl, or the crawl reached a limit. Try again, with fewer pages if it happens again.";
+  if (/^Worker retry limit reached$/.test(s)) return "The crawl stopped after several tries. Run it again.";
+  return "The crawl stopped before it completed.";
+}
 
 /** What the newest finished crawl says about the issues a given earlier crawl found (for the action plan). */
 export type CrawlVerdict = { /** Issues of that crawl the newest one still finds. */ present: Set<string>; /** Gone, and every page they were on was crawled again (with a Google profile attached where the check needs one). */ fixed: Set<string>; /** Gone from the list, but the newest crawl could not have found them again. */ notRechecked: Set<string> };

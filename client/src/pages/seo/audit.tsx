@@ -21,7 +21,7 @@ import { OutgoingLinksView } from "./outgoing-links";
 import { LinkOpportunitiesView } from "./link-opportunities";
 
 type Severity = "error" | "warning" | "notice";
-type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; why: string; fix: string; items: string[] };
+type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; notRechecked?: number; why: string; fix: string; items: string[] };
 type Run = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
 type Audit = {
   jobId: string; scannedAt: string | null; url: string | null; health: number | null; healthChange: number | null;
@@ -43,7 +43,7 @@ const CATEGORY: Record<string, string> = { technical: "Technical", performance: 
 /** An area's name: only from the known list (an area name from the crawl is never looked up as anything else). */
 const catName = (k: unknown) => (typeof k === "string" ? (Object.prototype.hasOwnProperty.call(CATEGORY, k) ? CATEGORY[k] : k) : "Other");
 /** A stored crawl error as a customer sentence: one plain line, at most 200 characters, else the general wording. */
-const crawlError = (e: string | null) => { const s = (e ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim(); return s && s.length <= 200 ? s : "The crawl stopped before it completed."; };
+const crawlError = (e: string | null) => e || "The crawl stopped before it completed.";
 const STATUS = [
   { key: "ok", label: "Working (2xx)", color: "var(--g-green)" },
   { key: "redirected", label: "Redirected (3xx)", color: "var(--g-blue)" },
@@ -70,6 +70,9 @@ function HealthRing({ value }: { value: number | null }) {
 /** Change in affected pages: fewer is better, so a drop is green. */
 function Change({ issue, before }: { issue: Issue; /** The crawl compared with, in words ("the crawl before", "the crawl of Sep 3"). */ before: string }) {
   if (issue.change === null) return <span className="g-text-2">—</span>;
+  // Pages that dropped off the list only because they were not looked at again are not counted as improvements.
+  const extra = (issue.notRechecked ?? 0) > 0 ? <span className="g-text-2 block text-[11px]">{issue.notRechecked} not re-checked</span> : null;
+  if (extra) return <>{issue.change === 0 ? <span className="g-move g-move--flat" aria-label="No change on the pages compared">·</span> : issue.change < 0 ? <span className="g-move g-move--up" aria-label={`${-issue.change} fewer than ${before}, on the pages compared`}>▼{-issue.change}</span> : <span className="g-move g-move--down" aria-label={`${issue.change} more than ${before}, on the pages compared`}>▲{issue.change}</span>}{extra}</>;
   if (issue.isNew) return <span className="g-chip g-chip--sm" style={{ color: "var(--g-red)" }}>New</span>;
   if (issue.change === 0) return <span className="g-move g-move--flat" aria-label="No change">·</span>;
   return issue.change < 0

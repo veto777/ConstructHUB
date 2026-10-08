@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditSummary, groupFindings, healthScore, issueKey, ITEM_CAP, pageChanges, type AuditPage, type AuditReport } from "./audit";
+import { auditSummary, crawlFailureWords, groupFindings, healthScore, issueKey, ITEM_CAP, pageChanges, type AuditPage, type AuditReport } from "./audit";
 
 const page = (url: string, status = 200, redirects = 0): AuditPage => ({ url, status, redirects });
 const finding = (id: string, severity: string, urls: string[], title = id) => ({ id, category: "technical", severity, title, urls, why: "why", fix: "fix" });
@@ -189,5 +189,23 @@ describe("fixed means re-read", () => {
     const now = auditSummary({ findings: [] }, [page("https://a.com/svc", 503), page("https://a.com/old", 200)], before);
     expect(now.fixed.map((f) => f.key)).toEqual(["status"]);
     expect(now.notRechecked.map((f) => f.key)).toEqual(["noindex"]);
+  });
+});
+
+describe("changes rest on pages that were compared", () => {
+  it("nine pages that failed to load are not nine fewer; a 404 now 101 is not fixed; http is never matched to https", () => {
+    const urls = Array.from({ length: 10 }, (_, i) => `https://a.com/s${i}`);
+    const before = { report: { findings: [finding("noindex", "warning", urls), finding("status", "critical", ["https://a.com/old"]), finding("https", "critical", ["http://a.com/x"])] },
+      pages: [...urls.map((u) => page(u)), page("https://a.com/old", 404), page("http://a.com/x")] };
+    const now = auditSummary({ findings: [finding("noindex", "warning", [urls[0]])] }, [page(urls[0]), ...urls.slice(1).map((u) => page(u, 503)), page("https://a.com/old", 101), page("https://a.com/x")], before);
+    const ni = now.issues.find((i) => i.key === "noindex")!;
+    expect([ni.count, ni.previous, ni.change, ni.notRechecked]).toEqual([1, 10, 0, 9]);
+    expect(now.fixed.map((f) => f.key)).toEqual([]);
+    expect(now.notRechecked.map((f) => f.key).sort()).toEqual(["https", "status"]);
+  });
+  it("a failed crawl's stored error leaves the server only as approved words", () => {
+    expect(crawlFailureWords("Worker retry limit reached")).toBe("The crawl stopped after several tries. Run it again.");
+    expect(crawlFailureWords("DataForSEO said 40501 at /v3/on_page")).toBe("The crawl stopped before it completed.");
+    expect(crawlFailureWords(null)).toBeNull();
   });
 });
