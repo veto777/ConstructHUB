@@ -1,0 +1,107 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-document-defaults",
+  "title": "Document defaults",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings#:~:text=Pre%2Dfilled%20on%20every%20new%20document",
+      "caption": "Estimate & invoice defaults",
+      "chapter": "Where the defaults are",
+      "narration": "Document defaults are what every new estimate and invoice starts with."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Pre-filled on every new document",
+      "caption": "Pre-filled",
+      "narration": "They are pre-filled on every new document. You can still edit each one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"textarea-estimate-footer\"]",
+      "caption": "Estimate footer",
+      "chapter": "Footers, terms and warranty",
+      "narration": "Estimate footer is the closing line on your estimates."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"textarea-invoice-footer\"]",
+      "value": "Thank you for your business. We appreciate you.",
+      "caption": "Invoice footer",
+      "narration": "Invoice footer does the same for invoices. Let's write a new one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"textarea-terms\"]",
+      "caption": "Terms & conditions",
+      "narration": "Terms and conditions holds your standard terms."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"textarea-warranty\"]",
+      "caption": "Warranty text",
+      "narration": "Warranty text holds your standard warranty."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-default-deposit\"]",
+      "value": "25",
+      "caption": "Default deposit",
+      "chapter": "Deposit and sales tax",
+      "narration": "Default deposit is the percent you ask for up front. We'll make it twenty-five."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-default-tax\"]",
+      "caption": "Default sales tax",
+      "narration": "Default sales tax is a fallback. It's used when no city or division rate matches."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-defaults\"]",
+      "caption": "Save defaults",
+      "narration": "Choose Save defaults."
+    },
+    {
+      "action": "wait",
+      "caption": "Saved",
+      "narration": "The CRM confirms: Defaults saved.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Menu: Settings",
+      "narration": "You'll find these defaults under Settings in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set estimate and invoice defaults | ConstructHUB CRM",
+    "description": "A short walkthrough of Estimate and invoice defaults in the ConstructHUB CRM settings. You will see the footers, terms and warranty text that pre-fill every new document, change the default deposit, and save.",
+    "tags": [
+      "estimate template",
+      "invoice terms",
+      "default deposit",
+      "warranty text",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Set it once",
+    "accent": "once",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}
