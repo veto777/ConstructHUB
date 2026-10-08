@@ -2,46 +2,127 @@
   "$schema": "../../../shared/help/step-script.schema.json",
   "helpKey": "crm-home",
   "title": "Home",
-  "viewport": { "width": 1024, "height": 576 },
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
   "zoom": 1.875,
   "narrator": "janice",
   "steps": [
-    { "action": "goto", "url": "/crm", "caption": "Home", "chapter": "The four counters",
-      "narration": "This is Home in the ConstructHUB CRM. It shows where your business stands today." },
-    { "action": "highlight", "selector": "[data-testid=\"card-stat-open-estimates\"]", "caption": "Open estimates",
-      "narration": "Open estimates counts the bids you've sent that are still waiting on an answer." },
-    { "action": "highlight", "selector": "[data-testid=\"card-stat-jobs-won\"]", "caption": "Jobs won",
-      "narration": "Jobs won counts your approved estimates, with their total underneath." },
-    { "action": "highlight", "selector": "[data-testid=\"card-stat-unscheduled\"]", "caption": "Unscheduled jobs",
-      "narration": "Unscheduled jobs are the ones sitting in the Approved stage of your pipeline." },
-    { "action": "highlight", "selector": "[data-testid=\"card-stat-open-invoices\"]", "caption": "Open invoices",
-      "narration": "Open invoices shows the invoices you've sent, and what is still owed on them." },
-    { "action": "click", "selector": "[data-testid=\"card-stat-open-invoices\"]", "caption": "Click a number",
-      "narration": "Click any number to jump to that list. This one opens your open invoices." },
-    { "action": "back", "caption": "Back to Home", "narration": "Now back to Home." },
-    { "action": "highlight", "selector": "a[href=\"/crm/clients\"]:has-text(\"in your book\")", "caption": "Clients", "chapter": "Clients, pipeline value and leads",
-      "narration": "The next row starts with how many clients are in your book." },
-    { "action": "highlight", "selector": "a[href=\"/crm/pipeline\"]:has-text(\"Pipeline value\")", "caption": "Pipeline value",
-      "narration": "Pipeline value adds up every open project. Cancelled and paid jobs are left out." },
-    { "action": "highlight", "selector": "a:has-text(\"Leads to follow up\")", "caption": "Leads to follow up",
-      "narration": "Leads to follow up counts the leads still sitting in the first stage." },
-    { "action": "highlight", "selector": "[data-testid=\"section-new-leads\"]", "caption": "Needs attention: new leads", "chapter": "Needs attention and Activity",
-      "narration": "Needs attention is your to-do list. New leads are at the top." },
-    { "action": "highlight", "selector": "[data-testid=\"section-needs-estimate\"]", "caption": "Needs an estimate",
-      "narration": "Needs an estimate lists the leads you haven't sent a bid to yet. Click one to open it." },
-    { "action": "highlight", "selector": "[data-testid=\"card-team-activity\"]", "caption": "Activity",
-      "narration": "Activity shows what your team and your clients have been doing." },
-    { "action": "click", "selector": "[data-testid=\"tab-recent-projects\"]", "caption": "Recent projects",
-      "narration": "Choose Recent projects to see your newest jobs, each with its stage." },
-    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-home\"]", "caption": "Menu: Home",
-      "narration": "You'll find Home at the top of the menu on the left." }
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "chapter": "The four counters",
+      "narration": "This is Home in the ConstructHUB CRM. It shows where your business stands today."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-stat-open-estimates\"]",
+      "caption": "Open estimates",
+      "narration": "Open estimates counts the bids you've sent that are still waiting on an answer."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-stat-jobs-won\"]",
+      "caption": "Jobs won",
+      "narration": "Jobs won counts your approved estimates, with their total underneath."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-stat-unscheduled\"]",
+      "caption": "Unscheduled jobs",
+      "narration": "Unscheduled jobs are the ones sitting in the Approved stage of your pipeline."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-stat-open-invoices\"]",
+      "caption": "Open invoices",
+      "narration": "Open invoices shows the invoices you've sent, and what is still owed on them."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"card-stat-open-invoices\"]",
+      "caption": "Click a number",
+      "narration": "Click any number to jump to that list. This one opens your open invoices."
+    },
+    {
+      "action": "back",
+      "caption": "Back to Home",
+      "narration": "Now back to Home."
+    },
+    {
+      "action": "highlight",
+      "selector": "a[href=\"/crm/clients\"]:has-text(\"in your book\")",
+      "caption": "Clients",
+      "chapter": "Clients, pipeline value and leads",
+      "narration": "The next row starts with how many clients are in your book."
+    },
+    {
+      "action": "highlight",
+      "selector": "a[href=\"/crm/pipeline\"]:has-text(\"Pipeline value\")",
+      "caption": "Pipeline value",
+      "narration": "Pipeline value adds up every open project. Cancelled and paid jobs are left out."
+    },
+    {
+      "action": "highlight",
+      "selector": "a:has-text(\"Leads to follow up\")",
+      "caption": "Leads to follow up",
+      "narration": "Leads to follow up counts the leads still sitting in the first stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-new-leads\"]",
+      "caption": "Needs attention: new leads",
+      "chapter": "Needs attention and Activity",
+      "narration": "Needs attention is your to-do list. New leads are at the top."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-needs-estimate\"]",
+      "caption": "Needs an estimate",
+      "narration": "Needs an estimate lists the leads that don't have an estimate yet. Click one to open it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-team-activity\"]",
+      "caption": "Activity",
+      "narration": "Activity shows what your team and your clients have been doing."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-recent-projects\"]",
+      "caption": "Recent projects",
+      "narration": "Choose Recent projects to see your newest jobs, each with its stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "caption": "Menu: Home",
+      "narration": "You'll find Home at the top of the menu on the left."
+    }
   ],
   "youtube": {
     "title": "How to read the Home dashboard | ConstructHUB CRM",
     "description": "A short walkthrough of Home in the ConstructHUB CRM. You will see what the four counters mean, how to jump from a number to its list, and how Needs attention and Activity show you what to work on today.",
-    "tags": ["contractor CRM", "construction CRM", "CRM dashboard", "contractor software", "ConstructHUB", "ConstructHUB CRM", "CRM tutorial", "sales pipeline", "contractor business"],
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "CRM dashboard",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "sales pipeline",
+      "contractor business"
+    ],
     "playlist": "ConstructHUB CRM tutorials",
     "category": 28
   },
-  "thumbnail": { "headline": "Know your numbers", "accent": "numbers", "kicker": "CRM Tutorial", "step": 1 }
+  "thumbnail": {
+    "headline": "Know your numbers",
+    "accent": "numbers",
+    "kicker": "CRM Tutorial",
+    "step": 1
+  }
 }
