@@ -38,8 +38,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  C4  What else is on the results page (map pack, people also ask, AI overview …).
 - [x] DONE  C5  Matching terms, related terms and questions: filters, sort, paging, CSV, and "track on my site".
 - [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. Seen in a browser 10-08.
-- [ ] TODO  C7  Other countries and languages (US English only today).
-- [ ] TODO  C8  Clicks, traffic potential, parent topic.
+- [x] PART  C7  Country selector on Site Explorer, Keywords Explorer (overview, ideas, many keywords) and Content gap: United States (English / Spanish), Canada (English / French), United Kingdom, Ireland, Australia, New Zealand, South Africa, Mexico - one choice remembered on the device; the server refuses any pair not on the list (shared/seo-markets.ts). Link reports are the same in every country and are not bought twice. Not covered: the other ~85 countries the source has, keyword lists (refresh is US), batch analysis, the dashboard cards (the site's own country).
+- [x] PART  C8  Traffic potential (what the page ranking first earns from search across all its keywords) and parent topic (the keyword that sends that page the most visits; click to open it) on the keyword overview - one more lookup, so the overview is now about $0.20 (was $0.16). Overviews saved earlier say so and offer Refresh. Clicks per search: not available from the source - TODO.
 
 ## D. Rank tracker (`/seo/rank-tracker`, index.tsx)
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
@@ -252,3 +252,4 @@ Also: the report now carries real clicks and impressions from Google Search Cons
 - 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
   a report page) were run in the browser.
 - 10/8 slice 13: referring IPs, similar-link sites, subdomains and ads run in the browser against live data for jameshardie.com (50/50/7/50 rows, 0 page errors). Found by looking: the "Authority" number on two of them was not the site's own - column removed.
+- 10/8 slice 14: keyword overview refreshed live in the browser ("siding contractor": traffic potential and parent topic shown; price line $0.20, hold $0.26); switched to Canada - screen cleared, nothing bought until Look up, then Canadian numbers and results (1,300 searches, klzroofing.com first); Site Explorer followed the same choice and showed no report for Canada until asked. 0 page errors.
