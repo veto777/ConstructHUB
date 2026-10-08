@@ -15,7 +15,7 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Kind = "reviews" | "trade" | "maps" | "social" | "business";
 type Row = { domain: string; name: string; kind: Kind; links: (number | null)[]; uncounted?: boolean[] };
-type Data = { sites: string[]; rows: Row[]; missing: string[]; fetchedAt: string };
+type Data = { sites: string[]; rows: Row[]; missing: string[]; partial?: string[]; fetchedAt: string };
 const KIND: Record<Kind, string> = { reviews: "Review sites", trade: "Trade directories", maps: "Maps and neighbourhoods", business: "Business directories", social: "Social profiles" };
 const ORDER: Kind[] = ["reviews", "trade", "maps", "business", "social"];
 const MAX_RIVALS = 3;
@@ -110,6 +110,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
             </span>
           </div>
           {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-directories-missing">The check for {d.missing.join(", ")} didn't load and was not charged — {d.missing.length === 1 ? "its column shows" : "their columns show"} "?" rather than a guess. Check again to fill it in.</p>}
+          {(d.partial?.length ?? 0) > 0 && <p className="mb-2 text-[13px]" role="status" data-testid="text-directories-partial">For {d.partial!.join(", ")} there were more linking pages than one lookup returns. A directory not among them shows "?" for {d.partial!.length === 1 ? "that site" : "those sites"} — not looked at, rather than "no link".</p>}
           <div className="overflow-x-auto">
             <table className="g-table" data-testid="table-directories">
               <caption className="sr-only">For each directory, how many links it has to each site. A dash means no link was found, which is not the same as having no profile there.</caption>
@@ -122,7 +123,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
                     {rows.map((r) => (
                       <tr key={r.domain} style={isGap(r) ? { background: "rgba(197,34,31,.06)" } : undefined}>
                         <th scope="row" className="text-left font-normal"><a href={`https://${r.domain}`} className="g-link" target="_blank" rel="noreferrer">{r.name}</a>{isGap(r) && <span className="ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium" style={{ background: "#c5221f", color: "#fff" }}>Link to check</span>}</th>
-                        {r.links.map((n, i) => <td key={i} className="num" data-label={d.sites[i]}>{n == null ? <span className="g-text-2"><span aria-hidden>?</span><span className="sr-only">Not checked: this site's lookup didn't load</span></span> : n > 0 ? <span style={{ color: "#188038" }} className="font-medium"><span aria-hidden>✓ </span><span className="g-text-2 font-normal">{r.uncounted?.[i] ? "linked" : `${n} link${n === 1 ? "" : "s"}`}</span></span> : <span className="g-text-2"><span aria-hidden>—</span><span className="sr-only">No link found</span></span>}</td>)}
+                        {r.links.map((n, i) => <td key={i} className="num" data-label={d.sites[i]}>{n == null ? <span className="g-text-2"><span aria-hidden>?</span><span className="sr-only">Not checked for this site</span></span> : n > 0 ? <span style={{ color: "#188038" }} className="font-medium"><span aria-hidden>✓ </span><span className="g-text-2 font-normal">{r.uncounted?.[i] ? "linked" : `${n} link${n === 1 ? "" : "s"}`}</span></span> : <span className="g-text-2"><span aria-hidden>—</span><span className="sr-only">No link found</span></span>}</td>)}
                         {planSiteId != null && <td className="num">{usKnown && r.links[us] === 0 ? <AddToPlan siteId={planSiteId} label="Plan" testId={`button-plan-${r.domain}`} tasks={[planTask(r)]} /> : null}</td>}
                       </tr>
                     ))}

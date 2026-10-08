@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergePageMetrics, buildPageMetrics, cleanUrls, fetchPageMetrics, pageMetricsDeps, pageMetricsEstimateUsd, pageMetricsInput } from "./page-metrics";
+import { mergePageMetrics, retryPlan, planEstimateUsd, buildPageMetrics, cleanUrls, fetchPageMetrics, pageMetricsDeps, pageMetricsEstimateUsd, pageMetricsInput } from "./page-metrics";
 import { buildDirectories, DIRECTORIES, directoriesEstimateUsd, directoriesInput, directoryRequest, fetchDirectories, directoriesDeps } from "./directories";
 import { DataForSeoError } from "./dataforseo";
 
@@ -26,8 +26,18 @@ describe("numbers for a list of pages", () => {
     ]);
     // A second try for the part that had not loaded fills in that part only.
     const first = buildPageMetrics(urls.slice(0, 2), links, null, "t0"), second = buildPageMetrics(urls.slice(0, 2), null, traffic, "t1");
-    expect(mergePageMetrics(first, second)).toEqual({ rows: [{ url: urls[0], linkingSites: 7, traffic: 221, keywords: 497 }, { url: urls[1], linkingSites: 0, traffic: 0, keywords: 0 }], missing: [], fetchedAt: "t0" });
-    expect(pageMetricsEstimateUsd(25, ["traffic"]) + pageMetricsEstimateUsd(25, ["links"])).toBeCloseTo(pageMetricsEstimateUsd(25), 6);
+    const plan = retryPlan(first);
+    expect(plan).toEqual({ links: [], traffic: urls.slice(0, 2) });
+    expect(mergePageMetrics(first, second, plan)).toEqual({ rows: [{ url: urls[0], linkingSites: 7, traffic: 221, keywords: 497 }, { url: urls[1], linkingSites: 0, traffic: 0, keywords: 0 }], missing: [], fetchedAt: "t0" });
+    // A lookup that loaded but left a page out: that page can be asked about again — and a figure that was known is never replaced by an unknown one.
+    const full = buildPageMetrics(urls.slice(0, 3), links, traffic, "t0");
+    expect(retryPlan(full)).toEqual({ links: [urls[2]], traffic: [urls[2]] });
+    const worse = buildPageMetrics(urls.slice(0, 3), [], [], "t1");
+    expect(mergePageMetrics(full, worse, retryPlan(full))).toEqual(full);
+    // A second try that was not made for a lookup leaves that lookup "missing".
+    expect(mergePageMetrics(first, buildPageMetrics(urls.slice(0, 2), null, null, "t1"), { links: [], traffic: urls.slice(0, 2) }).missing).toEqual(["traffic"]);
+    expect(planEstimateUsd({ links: [], traffic: urls }) + planEstimateUsd({ links: urls, traffic: [] })).toBeCloseTo(pageMetricsEstimateUsd(urls.length), 6);
+    expect(planEstimateUsd({ links: [], traffic: [] })).toBe(0);
     const half = buildPageMetrics(urls, null, traffic, "t");
     expect([half.missing, half.rows[0].linkingSites, half.rows[0].traffic]).toEqual([["links"], null, 221]);
     const noTraffic = buildPageMetrics(urls, links, null, "t");
@@ -43,8 +53,10 @@ describe("numbers for a list of pages", () => {
       // Asked for one part only: the other lookup is not made.
       const paths: string[] = [];
       pageMetricsDeps.request = (async (_m: string, path: string) => { paths.push(path); return ok([{ target: "https://a.example/", metrics: { organic: { etv: 5, count: 2 } } }], 0.01); }) as any;
-      const part = await fetchPageMetrics({ urls: ["https://a.example/"], locationCode: 2840, languageCode: "en" }, ["traffic"]);
-      expect([paths.length, part.data.missing, part.data.rows[0].traffic, part.customerUsd]).toEqual([1, ["links"], 5, 0.01]);
+      let asked: unknown = null;
+      pageMetricsDeps.request = (async (_m: string, path: string, body: any) => { paths.push(path); asked = body[0].targets; return ok([{ target: "https://a.example/", metrics: { organic: { etv: 5, count: 2 } } }], 0.01); }) as any;
+      const part = await fetchPageMetrics({ urls: ["https://a.example/", "https://b.example/"], locationCode: 2840, languageCode: "en" }, { links: [], traffic: ["https://a.example/"] });
+      expect([paths.length, asked, part.data.missing, part.data.rows[0].traffic, part.data.rows[1].traffic, part.customerUsd]).toEqual([1, ["https://a.example/"], ["links"], 5, null, 0.01]);
       pageMetricsDeps.request = (async () => { throw new DataForSeoError("timeout", "timed out"); }) as any;
       expect(await fetchPageMetrics({ urls: ["https://a.example/"], locationCode: 2840, languageCode: "en" }).catch((e) => e)).toBeInstanceOf(DataForSeoError);
     } finally { pageMetricsDeps.request = real; }
@@ -77,6 +89,10 @@ describe("directories", () => {
     // A link found without a count is a link, shown without a number; a row that says no links is not one.
     expect(page.rows.find((r) => r.domain === "bbb.org")!.uncounted).toEqual([true, false, false]);
     expect(page.rows.find((r) => r.domain === "yelp.com")!.uncounted).toBeUndefined();
+    // An answer that was cut short: a directory not among its rows was not looked at — unknown, so it can never be a gap.
+    const cut = buildDirectories(["us.example", "rival.example"], [[{ domain: "yelp.com", backlinks: 2 }], [{ domain: "porch.com", backlinks: 4 }]], "t", [true, false]);
+    expect([cut.partial, cut.rows.find((r) => r.domain === "yelp.com")!.links, cut.rows.find((r) => r.domain === "porch.com")!.links]).toEqual([["us.example"], [2, 0], [null, 4]]);
+    expect(page.partial).toBeUndefined();
   });
   it("a site whose lookup fails is not charged; all failing fails", async () => {
     const real = directoriesDeps.request;

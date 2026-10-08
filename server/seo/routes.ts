@@ -15,14 +15,14 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
-import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
+import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
-import { renderInput, renderUrls, renderSuggestions, beginRender, failRender, latestRender, getRender, runRender, renderEstimateUsd, RENDER_MAX_PAGES, RENDER_PLAIN_USD, RENDER_BROWSER_USD } from "./render-check";
+import { renderInput, renderUrl, renderUrls, renderSuggestions, beginRender, failRender, latestRender, getRender, runRender, renderEstimateUsd, RENDER_MAX_PAGES } from "./render-check";
 import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
 import { randomUUID } from "node:crypto";
@@ -51,6 +51,7 @@ import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from "./audit";
 import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
+import { competingPages } from "./competing-pages";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
@@ -117,8 +118,6 @@ export const SEO_PRICES = {
   /** Local grid: finding the business on Google Maps, and so much per 100 points scanned. */
   gridLocate: retailCents(GRID_POINT_USD),
   gridPer100: retailCents(100 * GRID_POINT_USD),
-  /** Rendering check: each page fetched twice (plain and in a browser), per 10 pages. */
-  renderPer10: retailCents(10 * (RENDER_PLAIN_USD + RENDER_BROWSER_USD)),
   /** Per 100 rank checks (one keyword on one device is one check, top 10). */
   rankChecksPer100: retailCents(estimateRankCheckUsd(Array.from({ length: 100 }, (_, i) => `k${i}`), "desktop", 10).usd),
 };
@@ -131,8 +130,7 @@ export const SEO_PRICES = {
 export const SEO_QUOTES = {
   directories: Array.from({ length: DIRECTORIES_MAX_SITES }, (_, i) => retailCents(directoriesEstimateUsd(i + 1))),
   pageMetrics: Array.from({ length: PAGE_METRICS_MAX }, (_, i) => retailCents(pageMetricsEstimateUsd(i + 1))),
-  pageMetricsLinks: Array.from({ length: PAGE_METRICS_MAX }, (_, i) => retailCents(pageMetricsEstimateUsd(i + 1, ["links"]))),
-  pageMetricsTraffic: Array.from({ length: PAGE_METRICS_MAX }, (_, i) => retailCents(pageMetricsEstimateUsd(i + 1, ["traffic"]))),
+  render: Array.from({ length: RENDER_MAX_PAGES }, (_, i) => retailCents(renderEstimateUsd(i + 1))),
 };
 
 /**
@@ -151,7 +149,6 @@ export const SEO_HOLDS = {
   contentSearch: retailCents(CONTENT_ESTIMATE_USD),
   gridLocate: retailCents(gridEstimateUsd(1)),
   gridPer100: retailCents(gridEstimateUsd(100)),
-  renderPer10: retailCents(renderEstimateUsd(10)),
   plannerBase: retailCents(2 * LABS_TASK_USD),
   plannerPer100: retailCents(2 * 100 * LABS_ITEM_USD),
   /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
@@ -711,18 +708,35 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const urls = cleanUrls(input.urls);
     if (!urls.length) return res.status(400).json({ message: "No web pages to look up." });
     const key = cacheKey("page-metrics", [[...urls].sort(), input.locationCode, input.languageCode]);
-    const saved = await cached<PageMetrics>(user, key, CACHE_HOURS);
-    // A saved answer with a part that did not load can be completed: only that part is asked for (and paid for) again.
-    const parts = input.retry && !input.peek && saved && saved.missing.length ? saved.missing : null;
-    if (saved && !parts) return res.json({ page: saved, reused: true });
-    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
-    if (!isConfigured()) return notReady(res);
+    // What a saved answer is still without, and the exact figure set aside to ask for it again (null = nothing to ask for).
+    const retryOf = (p: PageMetrics) => { const plan = retryPlan(p); return plan.links.length || plan.traffic.length ? { cents: retailCents(planEstimateUsd(plan)), links: plan.links.length, traffic: plan.traffic.length } : null; };
     const ask = { urls, locationCode: input.locationCode, languageCode: input.languageCode };
-    const what = parts ? (parts.includes("links") ? "linking sites" : "search visits") : "links and visits";
-    const out = await buyOnce<PageMetrics>(user, key, parts ? "page-metrics-retry" : "page-metrics", CACHE_HOURS, pageMetricsEstimateUsd(urls.length, parts ?? undefined),
-      async () => { const o = await fetchPageMetrics(ask, parts ?? undefined); return parts && saved ? { ...o, data: mergePageMetrics(saved, o.data) } : o; },
-      !!parts, `Content explorer — ${what} for ${urls.length} page${urls.length === 1 ? "" : "s"}${parts ? " (second try)" : ""}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+    if (input.peek) {
+      const saved = await cached<PageMetrics>(user, key, CACHE_HOURS);
+      return saved ? res.json({ page: saved, reused: true, retry: retryOf(saved) }) : res.status(404).json({ code: "no_report", message: "Not run yet." });
+    }
+    // Buying — the first time or a second try — is one at a time per account and list of pages, and each reads the saved
+    // answer again once it is its turn: a request that waited cannot buy what the one before it already brought.
+    await serial(`page-metrics:${user}:${key}`, async () => {
+      const saved = await cached<PageMetrics>(user, key, CACHE_HOURS);
+      if (!input.retry) {
+        if (saved) return res.json({ page: saved, reused: true, retry: retryOf(saved) });
+        if (!isConfigured()) return notReady(res);
+        const out = await buyOnce<PageMetrics>(user, key, "page-metrics", CACHE_HOURS, pageMetricsEstimateUsd(urls.length), () => fetchPageMetrics(ask), false, `Content explorer — links and visits for ${urls.length} page${urls.length === 1 ? "" : "s"}`);
+        return res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved, retry: retryOf(out.data) });
+      }
+      // A second try completes a saved answer. Without one there is nothing to complete, and a second try never turns
+      // into a full purchase at a price that was not on the button.
+      if (!saved) return res.status(409).json({ code: "retry_unavailable", message: "The saved numbers for these pages are no longer there, so there is nothing to complete. Get the numbers again — the price is on the button." });
+      const plan = retryPlan(saved);
+      if (!plan.links.length && !plan.traffic.length) return res.json({ page: saved, reused: true, retry: null });
+      if (!isConfigured()) return notReady(res);
+      const n = new Set([...plan.links, ...plan.traffic]).size;
+      const out = await buyOnce<PageMetrics>(user, key, "page-metrics-retry", CACHE_HOURS, planEstimateUsd(plan),
+        async () => { const o = await fetchPageMetrics(ask, plan); return { ...o, data: mergePageMetrics(saved, o.data, plan) }; },
+        true, `Content explorer — missing figures for ${n} page${n === 1 ? "" : "s"} (second try)`);
+      return res.status(201).json({ page: out.data, reused: false, saved: out.saved, retry: retryOf(out.data) });
+    });
   });
 
   // ── Directories (Site Explorer): which review sites and trade directories link to a site and its competitors ──
@@ -1159,12 +1173,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = renderInput.parse(req.body);
     const urls = renderUrls(input.urls, site.domain);
     if (!urls.length) return res.status(400).json({ message: `Enter full addresses of pages on ${site.domain}.` });
-    if (urls.length < input.urls.length && new Set(input.urls).size > urls.length) return res.status(400).json({ message: `Only pages of ${site.domain} can be checked here. Remove the other addresses.` });
+    // Refused only for an address that cannot be checked — the same page given twice is simply checked once.
+    if (input.urls.some((u) => !renderUrl(u, site.domain))) return res.status(400).json({ message: `Only pages of ${site.domain} can be checked here (web addresses on the standard port, without a sign-in). Remove the other addresses.` });
     if (!isConfigured()) return notReady(res);
     const started = await beginRender(user, site.id, urls);
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const runId = started.id;
-    void runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`)
+    void runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`, site.domain)
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] rendering check ${runId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO rendering check", e); }
         const message = e?.notSaved ? "The check ran but its results could not be saved. You were not charged." : publicFailure(e, "The check could not be completed. Try again in a few minutes.");
@@ -1187,6 +1202,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const device = (q.device && devices.includes(q.device) ? q.device : devices[0]) as "desktop" | "mobile";
     const { rows: tags } = await pool.query("SELECT DISTINCT unnest(tags) AS tag FROM seo_keywords WHERE site_id=$1 ORDER BY 1", [site.id]);
     res.json({ device, devices, tag: q.tag ?? null, tags: tags.map((t: any) => t.tag), days: await rankHistory(site.id, device, q.tag ?? null) });
+  });
+
+  // Tracked keywords for which Google has shown different pages of the site from check to check. Saved checks only.
+  route("get", "/api/seo/sites/:id/rank-competing", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.json(await competingPages(user, site.id));
   });
 
   // One tracked keyword's position at every saved check.

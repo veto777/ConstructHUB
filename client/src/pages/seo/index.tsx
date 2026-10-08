@@ -9,6 +9,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 import { KeywordHistory, RankHistoryPanel } from "./rank-history";
+import { CompetingPages } from "./competing";
 import { LocationPicker, type Place } from "./location-picker";
 import { CompetitorPanel } from "./rank-competitors";
 
@@ -100,6 +101,7 @@ export default function SeoOverviewPage() {
             {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <RankHistoryPanel site={site} />
+          <CompetingPages site={site} />
           <CompetitorPanel site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (

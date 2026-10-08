@@ -10,7 +10,7 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   ok(b.existing && c.existing && b.id === a.id && c.id === a.id, "one running per site");
   ok((await latestRender(1, s.id))?.status === "running", "latest running");
   ok((await getRender(2, s.id, a.id)) === null, "another account cannot read it");
-  const result = { rows: [], summary: { pages: 0, needsJs: 0, same: 0, unknown: 0 }, fetchedAt: new Date().toISOString() };
+  const result = { rows: [], summary: { pages: 0, more: 0, less: 0, same: 0, unknown: 0 }, fetchedAt: new Date().toISOString() };
   ok(await finishRender(a.id, result, 0.01), "saved"); ok(!(await finishRender(a.id, result, 0.01)), "not saved twice");
   ok((await getRender(1, s.id, a.id))?.status === "done", "done");
   const d = await beginRender(1, s.id, ["https://render.example/"]); ok(!d.existing && d.id !== a.id, "next opens");

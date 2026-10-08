@@ -6,6 +6,7 @@
 import { MarketPicker } from "./market";
 import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
+import { clusterKeywords } from "@shared/seo-clusters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,13 +66,31 @@ export function AddToList({ rows, onDone, label = "Add to a list", market = DEFA
   );
 }
 
-function KeywordTable({ rows, picked, toggle, onOpen, onRemove, testId }: { rows: KwRow[]; picked: Set<string>; toggle: (k: string) => void; onOpen?: (k: string) => void; onRemove?: (k: string) => void; testId: string }) {
+function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testId }: { rows: KwRow[]; picked: Set<string>; toggle: (k: string) => void; /** Lets a whole group be selected at once. */ setPicked?: (next: Set<string>) => void; onOpen?: (k: string) => void; onRemove?: (k: string) => void; testId: string }) {
+  const [grouped, setGrouped] = useState(false);
+  // Groups are worked out from the keywords themselves (shared/seo-clusters.ts): free, and only when asked for.
+  const groups = useMemo(() => (grouped ? clusterKeywords(rows) : [{ term: null, rows: [...rows], volume: null }]), [grouped, rows]);
+  const cols = 6 + (onRemove ? 1 : 0);
+  const pickGroup = (list: KwRow[], on: boolean) => { if (!setPicked) return; const n = new Set(picked); for (const r of list) on ? n.add(r.keyword) : n.delete(r.keyword); setPicked(n); };
   return (
     <div className="overflow-x-auto">
+      {rows.length >= 6 && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+          <button type="button" className="g-pill g-pill--sm" aria-pressed={grouped} style={grouped ? { background: "var(--g-hover)" } : undefined} onClick={() => setGrouped(!grouped)} data-testid={`${testId}-group`}>Group by topic</button>
+          {grouped && <span className="g-text-2" data-testid={`${testId}-group-note`}>{groups.filter((g) => g.term !== null).length} topics from the words these keywords share — a guide to which keywords one page could cover, not a promise that Google treats them alike.</span>}
+        </div>
+      )}
       <table className="g-table" data-testid={testId}>
         <thead><tr><th aria-label="Select" /><th>Keyword</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th><th>Intent</th>{onRemove && <th aria-label="Remove" />}</tr></thead>
-        <tbody>
-          {rows.map((r) => (
+        {groups.map((g, gi) => (
+        <tbody key={grouped ? `g:${g.term ?? ""}:${gi}` : "all"}>
+          {grouped && (
+            <tr data-testid={`${testId}-topic`}>
+              <td>{setPicked && <input type="checkbox" aria-label={`Select all ${g.rows.length} keywords ${g.term ? `about ${g.term}` : "without a topic"}`} checked={g.rows.every((r) => picked.has(r.keyword))} onChange={(e) => pickGroup(g.rows, e.target.checked)} />}</td>
+              <th scope="rowgroup" colSpan={cols - 1} className="text-left"><span className="g-text font-medium">{g.term ?? "No shared topic"}</span> <span className="g-text-2 font-normal">· {g.rows.length} keyword{g.rows.length === 1 ? "" : "s"}{g.volume != null ? ` · ${fmtNum(g.volume)} searches a month together` : ""}</span></th>
+            </tr>
+          )}
+          {g.rows.map((r) => (
             <tr key={r.keyword}>
               <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>
               <td>{onOpen ? <button type="button" className="g-link text-left" onClick={() => onOpen(r.keyword)} title="Open this keyword's overview">{r.keyword}</button> : r.keyword}</td>
@@ -83,6 +102,7 @@ function KeywordTable({ rows, picked, toggle, onOpen, onRemove, testId }: { rows
             </tr>
           ))}
         </tbody>
+        ))}
       </table>
     </div>
   );
@@ -153,7 +173,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
                 <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
             </div>
-            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} onOpen={onOpen} testId="table-bulk" /> : <Empty><h3>No numbers for these keywords</h3><p>None of them has enough searches in the United States to be measured.</p></Empty>}
+            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} setPicked={set} onOpen={onOpen} testId="table-bulk" /> : <Empty><h3>No numbers for these keywords</h3><p>None of them has enough searches in the United States to be measured.</p></Empty>}
             {page.notFound.length > 0 && <p className="g-text-2 mt-2 text-[13px]" data-testid="text-bulk-notfound">No numbers for {page.notFound.length} keyword{page.notFound.length === 1 ? "" : "s"} (too few searches to measure): {page.notFound.slice(0, 20).join(", ")}{page.notFound.length > 20 ? "…" : ""}</p>}
           </>
         )}
@@ -168,7 +188,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   const { toast } = useToast();
   const [openId, setOpenId] = useState<number | null>(null);
   const [name, setName] = useState("");
-  const { picked, toggle, clear } = usePicked();
+  const { picked, toggle, clear, set } = usePicked();
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"] });
   const current = openId ?? lists.data?.lists[0]?.id ?? null;
   const items = useQuery<{ list: { id: number; name: string; locationCode?: number; languageCode?: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
@@ -241,7 +261,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
                   </span>
                 </div>
                 {rows.length === 0 ? <Empty testId="list-empty"><h3>This list is empty</h3><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
-                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} onOpen={onOpen ? (k) => onOpen(k, listMarket) : undefined} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
+                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} setPicked={set} onOpen={onOpen ? (k) => onOpen(k, listMarket) : undefined} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
               </>
             )}
           </div>

@@ -142,6 +142,8 @@ export default function SeoAuditPage() {
           <p className="mt-2">It uses one of your plan's monthly Site Scans and no SEO data credit.</p>
         </Empty>
       )}
+      {/* The rendering check does not need a crawl: without one it is offered here, on its own. */}
+      {site && d && !a && <div className="mt-6" data-testid="audit-rendering-alone"><RenderCheck site={site} /></div>}
       {site && a && (
         <>
           <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">

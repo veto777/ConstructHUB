@@ -1,14 +1,13 @@
 /**
- * Rendering check (Site audit): each chosen page is fetched twice — once as plain HTML, the way our own
- * crawler and a simple bot see it, and once in a real browser with JavaScript run, the way Google's
- * renderer sees it — and the two are put side by side: words, links, title, main heading, plus how long
- * the rendered page took. A page whose words or links only exist after JavaScript is one where a crawl
- * of the HTML alone under-reports; that is said per page, with the numbers.
+ * Rendering check (Site audit): each chosen page is fetched twice — once as plain HTML, the way our own crawler and
+ * a simple bot read it, and once in a browser with JavaScript run — and the two visits are put side by side: words,
+ * links, title, main heading, plus how long the browser visit took. What is reported is what these two visits saw.
+ * Neither is Googlebot, and nothing here measures what Google renders or indexes; the page says so.
  * A run takes about half a minute, so it runs in the background and is saved before it is charged.
  */
 import { z } from "zod";
 import { pool } from "../db";
-import { request, assertOk, safeHttpUrl, type DfsTask } from "./dataforseo";
+import { request, assertOk } from "./dataforseo";
 import { withBudget } from "./budget";
 import { publicNote } from "./public-errors";
 
@@ -16,36 +15,44 @@ export const RENDER_MAX_PAGES = 10;
 /** Measured 2026-10-08: plain fetch $0.00015, browser fetch $0.0051. */
 export const RENDER_PLAIN_USD = 0.00015, RENDER_BROWSER_USD = 0.0051;
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
-/** What is held while `pages` pages are checked. The customer pays for the fetches that returned. */
+/** What is held while `pages` pages are checked — and the most the customer can be charged for them. */
 export const renderEstimateUsd = (pages: number) => round6(pages * (RENDER_PLAIN_USD + RENDER_BROWSER_USD) * 1.2);
 export const RENDER_STALE_MINUTES = 8;
 export const renderDeps = { request, retryMs: 2000 };
 
-export const renderInput = z.object({ urls: z.array(z.string().max(2000)).min(1).max(RENDER_MAX_PAGES) }).strict();
-/** The pages to check: web addresses on the site itself (or a sub-domain of it), each once, without fragments. */
-export const renderUrls = (list: readonly string[], domain: string): string[] => renderUrlsAll(list, domain).slice(0, RENDER_MAX_PAGES);
-function renderUrlsAll(list: readonly string[], domain: string): string[] {
-  const site = domain.toLowerCase().replace(/^www\./, ""), out: string[] = [];
-  for (const raw of list) {
-    const safe = safeHttpUrl(raw);
-    if (!safe) continue;
-    let u: URL; try { u = new URL(safe); } catch { continue; }
-    const host = u.hostname.toLowerCase().replace(/^www\./, "");
-    if (host !== site && !host.endsWith(`.${site}`)) continue;
-    u.hash = "";
-    const s = u.toString();
-    if (!out.includes(s)) out.push(s);
-  }
+export const renderInput = z.object({ urls: z.array(z.string().max(500)).min(1).max(RENDER_MAX_PAGES) }).strict();
+const bare = (host: string) => host.toLowerCase().replace(/^www\./, "");
+const onSite = (host: string, domain: string) => { const h = bare(host), site = bare(domain); return h === site || h.endsWith(`.${site}`); };
+/**
+ * One address a check may fetch, or null: plain http(s) on the site itself or a sub-domain of it, on the standard
+ * port, with no user name or password in it and not a bare IP address. The fragment is dropped. The fetch itself is
+ * made by the data source from its own network, never from ours; what it answered is checked again afterwards
+ * (a visit that ended on another site is not compared).
+ */
+export function renderUrl(raw: unknown, domain: string): string | null {
+  if (typeof raw !== "string" || raw.length > 500) return null;
+  let u: URL; try { u = new URL(raw.trim()); } catch { return null; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  if (u.username || u.password || u.port) return null;
+  if (/^[\d.]+$/.test(u.hostname) || u.hostname.includes(":") || !u.hostname.includes(".")) return null;
+  if (!onSite(u.hostname, domain)) return null;
+  u.hash = "";
+  return u.toString();
+}
+function renderUrlsAll(list: readonly unknown[], domain: string): string[] {
+  const out: string[] = [];
+  for (const raw of list) { const s = renderUrl(raw, domain); if (s && !out.includes(s)) out.push(s); }
   return out;
 }
-
+/** The pages to check: each once, at most RENDER_MAX_PAGES. */
+export const renderUrls = (list: readonly unknown[], domain: string): string[] => renderUrlsAll(list, domain).slice(0, RENDER_MAX_PAGES);
 /**
  * Pages to offer, at most twelve: one from each section of the site in turn (the first part of the path), so the
  * offer is not twelve pages built from the same template. The order given (nearest the home page first) is kept within a section.
  */
 export function renderSuggestions(list: readonly string[], domain: string, max = 12): string[] {
   const sections = new Map<string, string[]>();
-  for (const u of renderUrlsAll(list, domain)) { const k = new URL(u).pathname.split("/")[1] ?? ""; (sections.get(k) ?? sections.set(k, []).get(k)!).push(u); }
+  for (const u of renderUrlsAll(list, domain)) { const x = new URL(u), k = `${x.hostname}/${x.pathname.split("/")[1] ?? ""}`; (sections.get(k) ?? sections.set(k, []).get(k)!).push(u); }
   const out: string[] = [], queues = [...sections.values()];
   for (let i = 0; out.length < max && queues.some((q) => q.length > i); i++) for (const q of queues) if (q[i] && out.length < max) out.push(q[i]);
   return out;
@@ -54,14 +61,20 @@ export function renderSuggestions(list: readonly string[], domain: string, max =
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const text = (v: unknown, max = 300): string | null => (typeof v === "string" && v.trim() ? v.trim().replace(/\s+/g, " ").slice(0, max) : null);
 
-export type RenderSide = { status: number | null; words: number | null; internalLinks: number | null; externalLinks: number | null; images: number | null; title: string | null; h1: string | null };
+export type RenderSide = {
+  status: number | null;
+  /** Where the visit ended, when the source says (it can differ from the address asked for). */ finalUrl: string | null;
+  /** false = the answer carried no page measurements at all (so a missing title is "not reported", not "none"). */ measured: boolean;
+  words: number | null; internalLinks: number | null; externalLinks: number | null; images: number | null; title: string | null; h1: string | null;
+};
 /** One fetch, read. null when the fetch returned no page. Pure. */
 export function parseSide(item: any): RenderSide | null {
   if (!item || typeof item !== "object") return null;
-  const m = item.meta ?? {};
+  const m = item.meta && typeof item.meta === "object" ? item.meta : null;
   return {
-    status: num(item.status_code), words: num(m.content?.plain_text_word_count), internalLinks: num(m.internal_links_count), externalLinks: num(m.external_links_count), images: num(m.images_count),
-    title: text(m.title), h1: text(Array.isArray(m.htags?.h1) ? m.htags.h1[0] : null),
+    status: num(item.status_code), finalUrl: text(item.url, 500), measured: !!m && (num(m.content?.plain_text_word_count) !== null || num(m.internal_links_count) !== null),
+    words: num(m?.content?.plain_text_word_count), internalLinks: num(m?.internal_links_count), externalLinks: num(m?.external_links_count), images: num(m?.images_count),
+    title: text(m?.title), h1: text(Array.isArray(m?.htags?.h1) ? m.htags.h1[0] : null),
   };
 }
 /** Problems the rendered fetch reports, in plain words. Only real problems: the source's many neutral facts are left out. */
@@ -72,7 +85,8 @@ export const RENDER_PROBLEMS: Record<string, string> = {
   no_doctype: "No doctype", https_to_http_links: "Links from https to http", has_misspelling: "Spelling mistakes", deprecated_html_tags: "Outdated HTML tags", canonical_to_broken: "Canonical points to a broken page", canonical_to_redirect: "Canonical points to a redirect",
   is_orphan_page: "No links to this page", has_links_to_redirects: "Links to redirects", frame: "Uses frames", flash: "Uses Flash", lorem_ipsum: "Placeholder text left in",
 };
-export type RenderVerdict = "same" | "needs_js" | "unknown";
+/** more = the browser visit saw clearly more than the HTML; less = clearly less; same = both measured and close; unknown = not comparable. */
+export type RenderVerdict = "same" | "more" | "less" | "unknown";
 export type RenderRow = {
   url: string; plain: RenderSide | null; rendered: RenderSide | null;
   /** Milliseconds, from the browser fetch: when the biggest thing on screen was painted, when the page could be used, when it finished loading. */
@@ -80,64 +94,88 @@ export type RenderRow = {
   problems: string[];
   verdict: RenderVerdict; /** In words, with the numbers that led to it. */ why: string;
 };
+const okStatus = (s: RenderSide) => s.status !== null && s.status >= 200 && s.status < 300;
+const said = (s: RenderSide) => (s.status === null ? "answered without a status" : `answered ${s.status}`);
 /**
- * Does the page depend on JavaScript for what a search engine reads? "needs_js" when the rendered page has at least
- * half as many words again (and 100 more), or half as many internal links again (and 10 more), than the plain HTML —
- * or when title or main heading only exist once rendered. Unknown when either fetch is missing. Pure.
+ * What the two visits of one page show. Compared only when BOTH were answered successfully (2xx), ended on the site
+ * and on the same page, and reported their measurements — a blocked visit, an error page or a redirect elsewhere on
+ * one side is "could not be compared", never a finding about JavaScript. "More" / "less": half as many words again
+ * (and at least 100) or half as many own-site links again (and at least 10) one way or the other, or a title or main
+ * heading present on one side only. "Same" needs both words and links measured on both sides. Pure.
  */
-export function renderVerdict(plain: RenderSide | null, rendered: RenderSide | null): { verdict: RenderVerdict; why: string } {
-  if (!plain || !rendered) return { verdict: "unknown", why: !plain && !rendered ? "Neither fetch returned the page." : !plain ? "The plain fetch did not return the page, so there is nothing to compare the rendered page with." : "The browser fetch did not return the page, so what Google's renderer sees is not known." };
-  const reasons: string[] = [];
-  const more = (a: number | null, b: number | null, ratio: number, floor: number) => a !== null && b !== null && b - a >= floor && b >= a * ratio;
-  if (more(plain.words, rendered.words, 1.5, 100)) reasons.push(`${plain.words} words in the HTML, ${rendered.words} once JavaScript has run`);
-  if (more(plain.internalLinks, rendered.internalLinks, 1.5, 10)) reasons.push(`${plain.internalLinks} links to the site's own pages in the HTML, ${rendered.internalLinks} once rendered`);
-  if (!plain.title && rendered.title) reasons.push("the title only exists once rendered");
-  if (!plain.h1 && rendered.h1) reasons.push("the main heading only exists once rendered");
-  if (reasons.length) return { verdict: "needs_js", why: `Depends on JavaScript: ${reasons.join("; ")}.` };
-  return { verdict: "same", why: `Much the same either way: ${plain.words ?? "?"} words and ${plain.internalLinks ?? "?"} own-site links in the HTML, ${rendered.words ?? "?"} and ${rendered.internalLinks ?? "?"} once rendered.` };
+export function renderVerdict(plain: RenderSide | null, rendered: RenderSide | null, domain?: string): { verdict: RenderVerdict; why: string } {
+  const unknown = (why: string) => ({ verdict: "unknown" as const, why });
+  if (!plain || !rendered) return unknown(!plain && !rendered ? "Neither fetch returned the page." : !plain ? "The plain fetch did not return the page, so there is nothing to compare the browser visit with." : "The browser fetch did not return the page, so there is nothing to compare the HTML with.");
+  if (!okStatus(plain) || !okStatus(rendered)) return unknown(`The plain fetch was ${said(plain)} and the browser fetch was ${said(rendered)}. Only two successful answers can be compared — a redirect, an error page or a visit that was blocked says nothing about JavaScript.`);
+  const key = (u: string | null) => { if (!u) return null; try { const x = new URL(u); return `${bare(x.hostname)}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return null; } };
+  for (const s of [plain, rendered]) { if (s.finalUrl && domain) { try { if (!onSite(new URL(s.finalUrl).hostname, domain)) return unknown("One of the visits ended on another website, so the two are not compared."); } catch { /* not an address: ignored */ } } }
+  if (key(plain.finalUrl) && key(rendered.finalUrl) && key(plain.finalUrl) !== key(rendered.finalUrl)) return unknown("The two visits ended on different pages, so they are not compared.");
+  if (!plain.measured || !rendered.measured) return unknown("One of the visits came back without word or link counts, so there is nothing to compare.");
+  const more: string[] = [], less: string[] = [];
+  const gap = (a: number | null, b: number | null, floor: number) => (a === null || b === null ? 0 : b - a >= floor && b >= a * 1.5 ? 1 : a - b >= floor && a >= b * 1.5 ? -1 : 0);
+  const w = gap(plain.words, rendered.words, 100), l = gap(plain.internalLinks, rendered.internalLinks, 10);
+  if (w) (w > 0 ? more : less).push(`${plain.words} words in the HTML, ${rendered.words} in the browser visit`);
+  if (l) (l > 0 ? more : less).push(`${plain.internalLinks} link${plain.internalLinks === 1 ? "" : "s"} to the site's own pages in the HTML, ${rendered.internalLinks} in the browser visit`);
+  if (!plain.title && rendered.title) more.push("a title in the browser visit and none in the HTML");
+  if (plain.title && !rendered.title) less.push("a title in the HTML and none in the browser visit");
+  if (!plain.h1 && rendered.h1) more.push("a main heading in the browser visit and none in the HTML");
+  if (plain.h1 && !rendered.h1) less.push("a main heading in the HTML and none in the browser visit");
+  if (more.length) return { verdict: "more", why: `More once JavaScript had run: ${more.join("; ")}.${less.length ? ` Also less: ${less.join("; ")}.` : ""}` };
+  if (less.length) return { verdict: "less", why: `Less once JavaScript had run: ${less.join("; ")}.` };
+  if (plain.words === null || rendered.words === null || plain.internalLinks === null || rendered.internalLinks === null)
+    return unknown("Only part of the page was measured on one of the visits (words or links are missing), so it is not called the same.");
+  return { verdict: "same", why: `Much the same in both visits: ${plain.words} words and ${plain.internalLinks} own-site links in the HTML, ${rendered.words} and ${rendered.internalLinks} in the browser visit.` };
 }
 /** Pure: one page's row from its two fetches (the items the source returned, or null). */
-export function buildRenderRow(url: string, plainItem: any, renderedItem: any): RenderRow {
+export function buildRenderRow(url: string, plainItem: any, renderedItem: any, domain?: string): RenderRow {
   const plain = parseSide(plainItem), rendered = parseSide(renderedItem);
   const t = renderedItem?.page_timing;
   const checks = renderedItem?.checks && typeof renderedItem.checks === "object" ? renderedItem.checks : {};
+  const usable = !!rendered && okStatus(rendered);
   return {
     url, plain, rendered,
-    timing: rendered && t ? { lcp: num(t.largest_contentful_paint), interactive: num(t.time_to_interactive), loaded: num(t.dom_complete) } : null,
-    problems: Object.keys(RENDER_PROBLEMS).filter((k) => checks[k] === true).map((k) => RENDER_PROBLEMS[k]),
-    ...renderVerdict(plain, rendered),
+    timing: usable && t ? { lcp: num(t.largest_contentful_paint), interactive: num(t.time_to_interactive), loaded: num(t.dom_complete) } : null,
+    problems: usable ? Object.keys(RENDER_PROBLEMS).filter((k) => checks[k] === true).map((k) => RENDER_PROBLEMS[k]) : [],
+    ...renderVerdict(plain, rendered, domain),
   };
 }
-export type RenderResult = { rows: RenderRow[]; summary: { pages: number; needsJs: number; same: number; unknown: number }; fetchedAt: string };
-export const summariseRender = (rows: RenderRow[]) => ({ pages: rows.length, needsJs: rows.filter((r) => r.verdict === "needs_js").length, same: rows.filter((r) => r.verdict === "same").length, unknown: rows.filter((r) => r.verdict === "unknown").length });
+export type RenderSummary = { pages: number; more: number; less: number; same: number; unknown: number };
+export type RenderResult = { rows: RenderRow[]; summary: RenderSummary; fetchedAt: string };
+export const summariseRender = (rows: RenderRow[]): RenderSummary => ({ pages: rows.length, more: rows.filter((r) => r.verdict === "more").length, less: rows.filter((r) => r.verdict === "less").length, same: rows.filter((r) => r.verdict === "same").length, unknown: rows.filter((r) => r.verdict === "unknown").length });
 
-/** Fetch every page both ways, three pages at a time. A fetch that fails leaves its side unknown and is not the customer's to pay for; if nothing at all returned, the run fails. */
-export async function fetchRender(urls: string[]): Promise<{ data: RenderResult; costUsd: number; customerUsd: number; costUnknown: false }> {
+/**
+ * Fetch every page both ways, three pages at a time. A fetch that fails leaves its side unknown and is not the
+ * customer's to pay for; if nothing at all returned, the run fails. A fetch is asked for a second time ONLY when the
+ * source said in so many words that the first cost nothing (it refused the request, or the task carries a cost of
+ * exactly 0) — a failure whose cost we do not know may have been billed, so it is allowed for and not repeated.
+ * The customer is never charged more than the figure they were shown (renderEstimateUsd).
+ */
+export async function fetchRender(urls: string[], domain?: string): Promise<{ data: RenderResult; costUsd: number; customerUsd: number; costUnknown: false }> {
   let known = 0, customerUsd = 0, unknownUsd = 0, next = 0, got = 0;
   let firstError: unknown = null;
   const rows: RenderRow[] = new Array(urls.length);
-  /** One fetch. A fetch that failed and was certainly not billed (the source said so, or refused it) is tried once more. */
   const one = async (url: string, js: boolean): Promise<any> => {
+    const allow = () => { unknownUsd += js ? RENDER_BROWSER_USD : RENDER_PLAIN_USD; };
     for (let attempt = 1; ; attempt++) {
-      try {
-        const task: DfsTask = assertOk(await renderDeps.request("POST", "/on_page/instant_pages", [{ url, enable_javascript: js, enable_browser_rendering: js }]), { treatNoResultsAsEmpty: true });
-        const cost = typeof task.cost === "number" ? task.cost : 0;
-        const item = (task.result?.[0] as any)?.items?.[0] ?? null;
-        known += cost;
-        if (item) { customerUsd += cost; got++; return item; }
-        // Answered, but with no page: not the customer's to pay for. Free answers are asked for once more.
-        console.warn(`[seo] rendering check: the ${js ? "browser" : "plain"} fetch returned no page (attempt ${attempt})`);
-        if (cost > 0 || attempt >= 2) return null;
-      } catch (e: any) {
+      let resp: any;
+      try { resp = await renderDeps.request("POST", "/on_page/instant_pages", [{ url, enable_javascript: js, enable_browser_rendering: js }]); }
+      catch (e: any) {
+        // No answer at all (timed out, cut off, refused sign-in): whether it was billed is not known.
         firstError ??= e;
-        const reported = typeof e?.costUsd === "number" ? e.costUsd : 0;
-        known += reported;
         console.warn(`[seo] rendering check: the ${js ? "browser" : "plain"} fetch failed (${e?.code ?? "error"}, attempt ${attempt})`);
-        // A fetch whose cost we never learned may still have been billed: allow for it in our own figure, and do not buy it twice.
-        const maybeBilled = e?.code === "timeout" || (e?.code === "upstream" && !(reported > 0));
-        if (maybeBilled) unknownUsd += js ? RENDER_BROWSER_USD : RENDER_PLAIN_USD;
-        if (maybeBilled || reported > 0 || attempt >= 2 || e?.code === "auth" || e?.code === "not_configured") return null;
+        if (typeof e?.costUsd === "number" && e.costUsd > 0) known += e.costUsd; else if (e?.code !== "auth" && e?.code !== "not_configured") allow();
+        return null;
       }
+      const task = resp?.tasks?.[0];
+      // Refused before any task was made: nothing was bought.
+      const refused = !resp || resp.status_code !== 20000 || !task;
+      const cost: number | null = refused ? 0 : typeof task.cost === "number" && Number.isFinite(task.cost) ? task.cost : null;
+      const item = !refused && task.status_code === 20000 ? (task.result?.[0] as any)?.items?.[0] ?? null : null;
+      if (cost === null) allow(); else known += cost;
+      if (item) { customerUsd += cost ?? 0; got++; return item; }
+      try { assertOk(resp, { treatNoResultsAsEmpty: true }); } catch (e) { firstError ??= e; }
+      console.warn(`[seo] rendering check: the ${js ? "browser" : "plain"} fetch returned no page (attempt ${attempt}, cost ${cost === null ? "not stated" : cost})`);
+      if (cost !== 0 || attempt >= 2) return null;
       await new Promise((r) => setTimeout(r, renderDeps.retryMs));
     }
   };
@@ -146,13 +184,13 @@ export async function fetchRender(urls: string[]): Promise<{ data: RenderResult;
       const i = next++;
       if (i >= urls.length) return;
       const [plain, rendered] = await Promise.all([one(urls[i], false), one(urls[i], true)]);
-      rows[i] = buildRenderRow(urls[i], plain, rendered);
+      rows[i] = buildRenderRow(urls[i], plain, rendered, domain);
     }
   };
   await Promise.all(Array.from({ length: Math.min(3, urls.length) }, worker));
   const costUsd = round6(known + unknownUsd);
   if (!got) throw Object.assign(new Error((firstError as any)?.message ?? "The pages could not be fetched."), { costUsd, costUnknown: false, cause: firstError });
-  return { data: { rows, summary: summariseRender(rows), fetchedAt: new Date().toISOString() }, costUsd, customerUsd: round6(customerUsd), costUnknown: false };
+  return { data: { rows, summary: summariseRender(rows), fetchedAt: new Date().toISOString() }, costUsd, customerUsd: Math.min(round6(customerUsd), renderEstimateUsd(urls.length)), costUnknown: false };
 }
 
 // ── Saved runs ──────────────────────────────────────────────────────────────
@@ -206,9 +244,9 @@ export async function getRender(userId: number, siteId: number, runId: number): 
 }
 
 /** One run, start to finish: fetched, SAVED, and only then charged. A run that cannot be saved is not the customer's to pay for. */
-export async function runRender(userId: number, runId: number, urls: string[], label: string): Promise<RenderResult> {
+export async function runRender(userId: number, runId: number, urls: string[], label: string, domain?: string): Promise<RenderResult> {
   const out = await withBudget(userId, renderEstimateUsd(urls.length), async () => {
-    const o = await fetchRender(urls);
+    const o = await fetchRender(urls, domain);
     let saved = false, lastError: unknown = null;
     for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
       try { saved = await finishRender(runId, o.data, o.costUsd); if (!saved) break; }

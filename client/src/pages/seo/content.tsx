@@ -5,6 +5,7 @@
  * mention. Each new page of results shows its price first; a search you have
  * already run reopens free for a day.
  */
+import { cleanPageUrls, pageKey } from "@shared/seo-page-key";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,10 +61,12 @@ export default function SeoContentPage() {
 
   // Numbers for the pages on screen: free to look for a saved copy, bought only when asked for.
   type Metric = { url: string; linkingSites: number | null; traffic: number | null; keywords: number | null };
-  const pageUrls = useMemo(() => (saved.data?.page?.rows ?? []).map((r) => r.url), [saved.data]);
+  // The same list the server will count, ask about and price: each page once, without #fragments (shared/seo-page-key.ts).
+  const pageUrls = useMemo(() => cleanPageUrls((saved.data?.page?.rows ?? []).map((r) => r.url)), [saved.data]);
   const metricsBody = useMemo(() => ({ urls: pageUrls }), [pageUrls]);
   const metricsKey = ["/api/seo/content/metrics", metricsBody];
-  const metrics = useQuery<{ page: { rows: Metric[]; missing: string[] }; saved?: boolean } | null>({
+  type Retry = { cents: number; links: number; traffic: number };
+  const metrics = useQuery<{ page: { rows: Metric[]; missing: string[] }; saved?: boolean; retry?: Retry | null } | null>({
     queryKey: metricsKey, enabled: pageUrls.length > 0, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/content/metrics", { ...metricsBody, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
@@ -73,17 +76,20 @@ export default function SeoContentPage() {
       qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening these numbers again will not be free.", variant: "destructive" });
     },
-    onError: (e) => toast({ title: "Couldn't get those numbers", description: apiErrorMessage(e), variant: "destructive" }),
+    // A second try with nothing saved to complete (it expired meanwhile) buys nothing: look again, so the full offer and its price come back.
+    onError: (e, v) => { toast({ title: "Couldn't get those numbers", description: apiErrorMessage(e), variant: "destructive" }); if (v.retry) void qc.invalidateQueries({ queryKey: v.key }); },
   });
   // The quote is the server's own figure for exactly this many pages; without it nothing can be bought here.
   const quoteFor = (list: string) => (pageUrls.length ? status.data?.quotes?.[list]?.[pageUrls.length - 1] ?? null : null);
   const canAfford = (cents: number | null) => cents != null && (!status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= cents);
   const metricsPrice = quoteFor("pageMetrics");
   const canPayMetrics = canAfford(metricsPrice);
-  const missingPart = metrics.data?.page?.missing?.[0] ?? null;
-  const retryPrice = missingPart ? quoteFor(missingPart === "links" ? "pageMetricsLinks" : "pageMetricsTraffic") : null;
-  // The address itself, nothing folded together: a page with and without its last slash can be two pages.
-  const metricOf = (url: string) => metrics.data?.page?.rows.find((m) => m.url === url) ?? null;
+  // What the saved answer is still without, and the server's exact figure for asking again for only that.
+  const retry = metrics.data?.retry ?? null;
+  const wholePart = metrics.data?.page?.missing?.[0] ?? null;
+  // Matched on the page's key — the address without its fragment, nothing else folded together.
+  const byKey = useMemo(() => new Map((metrics.data?.page?.rows ?? []).map((m) => [m.url, m] as const)), [metrics.data]);
+  const metricOf = (url: string) => byKey.get(pageKey(url) ?? url) ?? null;
   // Ordering by a number puts pages without that number last; the search's own order is kept among equals.
   const ordered = useMemo(() => {
     const rows = saved.data?.page?.rows ?? [];
@@ -135,7 +141,7 @@ export default function SeoContentPage() {
               ) : !metrics.data?.page ? (
                 <>
                   <button type="button" className="g-pill g-pill--sm" disabled={addMetrics.isPending || !status.data?.configured || !canPayMetrics || metrics.isLoading} onClick={() => addMetrics.mutate({ body: metricsBody, key: metricsKey })} data-testid="button-content-metrics">
-                    {addMetrics.isPending ? <Loader2 className="animate-spin" /> : null} Add linking sites and search visits for these {page.rows.length} pages{metricsPrice != null ? ` — up to ${money(metricsPrice)}` : ""}
+                    {addMetrics.isPending ? <Loader2 className="animate-spin" /> : null} Add linking sites and search visits for these {pageUrls.length} pages{metricsPrice != null ? ` — up to ${money(metricsPrice)}` : ""}
                   </button>
                   <span className="g-text-2">{metricsPrice == null ? (status.isLoading ? "Getting the price…" : "The price couldn't be loaded, so this can't be bought yet — reload the page.") : !canPayMetrics ? "Not enough SEO data left — add credit above." : "Shows which of these pages are worth learning from, or asking for a link."}</span>
                 </>
@@ -144,10 +150,13 @@ export default function SeoContentPage() {
                   <label className="g-text-2 flex items-center gap-2">Order these pages by
                     <select className="g-select" value={by} onChange={(e) => setBy(e.target.value as typeof by)} data-testid="select-content-by"><option value="search">The search's own order</option><option value="links">Most linking sites</option><option value="traffic">Most estimated US search visits</option></select>
                   </label>
-                  {missingPart && (
-                    <span role="status" data-testid="content-metrics-missing"><span style={{ color: "var(--g-red)" }}>{missingPart === "links" ? "Linking sites" : "Search visits"} didn't load (not charged).</span>{" "}
-                      <button type="button" className="g-link" disabled={addMetrics.isPending || !status.data?.configured || !canAfford(retryPrice)} onClick={() => addMetrics.mutate({ body: metricsBody, key: metricsKey, retry: true })} data-testid="button-content-metrics-retry">
-                        {addMetrics.isPending ? "Trying…" : `Try that part again${retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}`}
+                  {retry && (
+                    <span role="status" data-testid="content-metrics-missing">
+                      <span style={wholePart ? { color: "var(--g-red)" } : undefined} className={wholePart ? undefined : "g-text-2"}>
+                        {wholePart ? `${wholePart === "links" ? "Linking sites" : "Search visits"} didn't load (not charged).` : `The source gave no figure for ${[retry.links ? `linking sites on ${retry.links} page${retry.links === 1 ? "" : "s"}` : "", retry.traffic ? `search visits on ${retry.traffic} page${retry.traffic === 1 ? "" : "s"}` : ""].filter(Boolean).join(" and ")}; asking again may not change that.`}
+                      </span>{" "}
+                      <button type="button" className="g-link" disabled={addMetrics.isPending || !status.data?.configured || !canAfford(retry.cents)} onClick={() => addMetrics.mutate({ body: metricsBody, key: metricsKey, retry: true })} data-testid="button-content-metrics-retry">
+                        {addMetrics.isPending ? "Trying…" : `Ask again for just those — up to ${money(retry.cents)}`}
                       </button>
                     </span>
                   )}

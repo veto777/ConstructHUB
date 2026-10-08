@@ -50,10 +50,16 @@ export type DirectoryRow = {
   /** Per site: true = a link was found but the source gave no count for it (the number in `links` is then a floor of 1, not a count). Left out when every count is real. */
   uncounted?: boolean[];
 };
-export type DirectoriesPage = { sites: string[]; rows: DirectoryRow[]; /** Sites whose lookup did not load (their column is unknown, not empty). */ missing: string[]; fetchedAt: string };
+export type DirectoriesPage = {
+  sites: string[]; rows: DirectoryRow[];
+  /** Sites whose lookup did not load (their column is unknown, not empty). */ missing: string[];
+  /** Sites for which the source had more rows than one lookup returns: a directory not among them is unknown for that site, not "no link". Left out when none. */
+  partial?: string[];
+  fetchedAt: string;
+};
 
 /** Pure: the table from each site's lookup (null = it failed). A directory's sub-domains count as the directory. */
-export function buildDirectories(sites: string[], results: (any[] | null)[], fetchedAt = new Date().toISOString()): DirectoriesPage {
+export function buildDirectories(sites: string[], results: (any[] | null)[], fetchedAt = new Date().toISOString(), /** Per site: true = the answer was cut short. */ cutShort: boolean[] = []): DirectoriesPage {
   const perSite = results.map((items) => {
     if (!items) return null;
     const found = new Map<string, { n: number; uncounted: boolean }>();
@@ -69,11 +75,13 @@ export function buildDirectories(sites: string[], results: (any[] | null)[], fet
     }
     return found;
   });
+  const partial = sites.filter((_, n) => perSite[n] && cutShort[n]);
   return {
-    sites, fetchedAt, missing: sites.filter((_, n) => !perSite[n]),
+    sites, fetchedAt, missing: sites.filter((_, n) => !perSite[n]), ...(partial.length ? { partial } : {}),
     rows: DIRECTORIES.map((dir) => {
       const uncounted = perSite.map((f) => f?.get(dir.domain)?.uncounted === true);
-      return { ...dir, links: perSite.map((f) => (f ? f.get(dir.domain)?.n ?? 0 : null)), ...(uncounted.some(Boolean) ? { uncounted } : {}) };
+      // Not among the rows of an answer that was cut short: not looked at, so unknown — never "no link".
+      return { ...dir, links: perSite.map((f, n) => (f ? f.get(dir.domain)?.n ?? (cutShort[n] ? null : 0) : null)), ...(uncounted.some(Boolean) ? { uncounted } : {}) };
     }),
   };
 }
@@ -81,12 +89,16 @@ export function buildDirectories(sites: string[], results: (any[] | null)[], fet
 /** One lookup per site, together. A site whose lookup fails is marked missing and not charged; all failing fails. */
 export async function fetchDirectories(sites: string[]): Promise<{ data: DirectoriesPage; costUsd: number; customerUsd: number; costUnknown: boolean }> {
   let costUsd = 0, customerUsd = 0, costUnknown = false, firstError: unknown = null;
-  const results = await Promise.all(sites.map(async (site) => {
+  const cutShort: boolean[] = sites.map(() => false);
+  const results = await Promise.all(sites.map(async (site, n) => {
     try {
       const task: DfsTask = assertOk(await directoriesDeps.request("POST", "/backlinks/referring_domains/live", [directoryRequest(site)]), { treatNoResultsAsEmpty: true });
       const cost = typeof task.cost === "number" ? task.cost : 0;
       costUsd += cost; customerUsd += cost;
-      return taskItems(task);
+      const items = taskItems(task), total = num((task.result?.[0] as any)?.total_count);
+      // More rows exist than came back (many sub-domains of the directories link to this site): say so, do not guess.
+      cutShort[n] = total !== null ? total > items.length : items.length >= DIRECTORY_ROWS;
+      return items;
     } catch (e: any) {
       firstError ??= e;
       costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
@@ -96,5 +108,5 @@ export async function fetchDirectories(sites: string[]): Promise<{ data: Directo
   }));
   if (results.every((r) => r === null)) throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError ?? "The lookups failed.")), { costUsd, costUnknown });
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
-  return { data: buildDirectories(sites, results), costUsd: r6(costUsd), customerUsd: r6(customerUsd), costUnknown };
+  return { data: buildDirectories(sites, results, undefined, cutShort), costUsd: r6(costUsd), customerUsd: r6(customerUsd), costUnknown };
 }
