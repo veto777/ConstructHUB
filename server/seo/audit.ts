@@ -185,11 +185,20 @@ const DONE_SQL = `status='completed' AND jsonb_typeof(report)='object'`;
 export type AuditRun = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
 
 /** The newest audit of a domain with the crawl before it, the health trend and any crawl in progress. */
-export async function siteAudit(user: number, domain: string): Promise<{ /** The Google profile the newest crawl was compared with: the next crawl uses it too, so the same checks run. */ locationId: number | null; audit: (AuditSummary & { jobId: string }) | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
+/** Pages of two crawls compared by address (as the crawler compares them): reached now and not then, and the reverse. Pure. */
+export function pageChanges(now: AuditPage[], before: AuditPage[]): { added: string[]; removed: string[] } {
+  const key = (u: string) => { try { const x = new URL(u); return `${x.host.toLowerCase().replace(/^www\./, "")}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return u; } };
+  const a = new Set(now.map((p) => key(p.url))), b = new Set(before.map((p) => key(p.url)));
+  return { added: now.filter((p) => !b.has(key(p.url))).map((p) => p.url), removed: before.filter((p) => !a.has(key(p.url))).map((p) => p.url) };
+}
+export const PAGE_CHANGE_LIST = 50;
+export type AuditComparison = { jobId: string; at: string | null; /** true = chosen by the customer (not the crawl before). */ chosen: boolean;
+  addedPages: number; removedPages: number; added: string[]; removed: string[]; /** The two crawls' page limits differ: a page "no longer reached" may only be beyond the smaller one. */ capsDiffer: boolean };
+export async function siteAudit(user: number, domain: string, opts: { vs?: string | null } = {}): Promise<{ /** The Google profile the newest crawl was compared with: the next crawl uses it too, so the same checks run. */ locationId: number | null; audit: (AuditSummary & { jobId: string; comparedWith: AuditComparison | null }) | null; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
   const d = bare(domain);
   const [{ rows: done }, { rows: open }] = await Promise.all([
     pool.query(
-      `SELECT id, completed_at, report, profile->>'id' AS location_id, ${PAGES_SQL} AS pages FROM sitescan_jobs
+      `SELECT id, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages FROM sitescan_jobs
         WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
     pool.query(
       `SELECT id, status, error, created_at, ${CRAWLED_SQL} AS crawled, page_cap FROM sitescan_jobs
@@ -197,7 +206,21 @@ export async function siteAudit(user: number, domain: string): Promise<{ /** The
   ]);
   const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: r.error, createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
   const newest = open[0];
-  const audit = done[0] ? { jobId: done[0].id as string, ...auditSummary(done[0].report, done[0].pages, done[1] ? { report: done[1].report, pages: done[1].pages } : null) } : null;
+  // The crawl to compare with: one the customer chose (this account's, this site's, finished and older than the newest),
+  // else the one before the newest.
+  let prev = done[1] ?? null, chosen = false, vsMissing = false;
+  if (opts.vs && done[0] && opts.vs !== done[0].id) {
+    const { rows: [v] } = await pool.query(
+      `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$3 AND user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND completed_at < $4`,
+      [user, d, opts.vs, done[0].completed_at]).catch(() => ({ rows: [] as any[] }));
+    if (v) { prev = v; chosen = true; } else vsMissing = true;
+  }
+  const audit = done[0] ? (() => {
+    const s = auditSummary(done[0].report, done[0].pages, prev ? { report: prev.report, pages: prev.pages } : null);
+    const ch = prev ? pageChanges(done[0].pages, prev.pages) : null;
+    return { jobId: done[0].id as string, ...s, comparedWith: prev && ch ? { jobId: prev.id as string, at: prev.completed_at ? new Date(prev.completed_at).toISOString() : null, chosen,
+      addedPages: ch.added.length, removedPages: ch.removed.length, added: ch.added.slice(0, PAGE_CHANGE_LIST), removed: ch.removed.slice(0, PAGE_CHANGE_LIST), capsDiffer: Number(prev.page_cap) !== Number(done[0].page_cap) } : null };
+  })() : null;
   const history = done.flatMap((j: any) => {
     try {
       const s = auditSummary(j.report, j.pages);
@@ -206,7 +229,7 @@ export async function siteAudit(user: number, domain: string): Promise<{ /** The
   }).reverse();
   const locationId = Number(done[0]?.location_id) > 0 ? Number(done[0].location_id) : null;
   return {
-    locationId, audit, history,
+    locationId, audit, history, ...(vsMissing ? { vsMissing } : {}),
     running: newest && (newest.status === "queued" || newest.status === "running") ? run(newest) : null,
     lastFailed: newest && newest.status === "failed" ? run(newest) : null,
   };

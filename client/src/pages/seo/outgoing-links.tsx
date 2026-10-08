@@ -26,6 +26,8 @@ type Data = { jobId: string; scannedAt: string | null; linksMeasured: boolean | 
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const path = (u: string) => { try { const x = new URL(u); return (x.pathname + x.search) || "/"; } catch { return u; } };
 
+/** A cell's label for screen readers (the phone layout hides the table header). */
+const Label = ({ children }: { children: string }) => <span className="sr-only">{children}: </span>;
 export function OutgoingLinksView({ site }: { site: SeoSite }) {
   const q = useQuery<Data | null>({
     queryKey: [`/api/seo/sites/${site.id}/audit/outgoing`], refetchOnMount: "always", retry: false,
@@ -53,7 +55,7 @@ export function OutgoingLinksView({ site }: { site: SeoSite }) {
     <div data-testid="outgoing-links">
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">The other websites your pages link to. Links to suppliers, associations and directories are normal; a link to a page that no longer answers is worth fixing, and a website you did not expect here is worth a look.</p>
       {d.linksMeasured === null && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-no-pages">No page of this crawl loaded, so there are no links to read. Run a new crawl in Site audit.</p>}
-      {d.linksMeasured === false && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages that loaded have no links at all in their HTML — which happens when links are added by JavaScript (the crawl does not run it). What is listed is only what the HTML had.</p>}
+      {d.linksMeasured === false && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages that loaded have no web (http/https) links saved from their HTML — one possible reason is links added by JavaScript, which the crawl does not run. (Phone and email links are not counted.) What is listed is only what the HTML had.</p>}
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
         <span className="g-text-2" data-testid="text-outgoing-meta">From the crawl of {d.scannedAt ? fmtDate(d.scannedAt) : "an unknown date"}: {fmtNum(d.links)} link{d.links === 1 ? "" : "s"} to {fmtNum(d.domains)} other website{d.domains === 1 ? "" : "s"}, from {fmtNum(d.pagesRead)} page{d.pagesRead === 1 ? "" : "s"} that loaded.</span>
         <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!d.linkedDomains.length} onClick={exportCsv} data-testid="button-outgoing-export"><Download /> Export</button>
@@ -73,17 +75,17 @@ export function OutgoingLinksView({ site }: { site: SeoSite }) {
           </ul>
         )}
       </section>
-      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no links to other websites." : "None were found in the HTML (its links may be added by JavaScript)."}</p></Empty> : (
+      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no web links to other websites." : "No web links were saved from the HTML (one possible reason: links added by JavaScript)."}</p></Empty> : (
         <div className="overflow-x-auto">
           <table className="g-table w-full" data-testid="table-outgoing">
             <thead><tr><th>Website</th><th className="num">Pages linking</th><th className="num">Links</th><th>For example</th><th className="num" title="Of its addresses the crawl checked: how many, and how many were gone or a server error">Checked / broken</th></tr></thead>
             <tbody>
               {d.linkedDomains.slice(0, shown).map((x) => (
                 <tr key={x.domain}>
-                  <td className="max-w-[14rem] truncate" data-label="Website" title={x.domain}>{x.domain}</td>
-                  <td className="num" data-label="Pages linking">{fmtNum(x.pages)}</td><td className="num" data-label="Links">{fmtNum(x.links)}</td>
-                  <td className="max-w-[24rem] !whitespace-normal text-[12px] [overflow-wrap:anywhere]" data-label="For example">{x.examples[0] ? <><span className="g-text-2">{path(x.examples[0].from)} →</span> <a href={x.examples[0].to} target="_blank" rel="noreferrer" className="g-link">{x.examples[0].to.replace(/^https?:\/\/(www\.)?/, "")}</a>{x.examples[0].anchor && x.examples[0].anchor !== "(no text)" ? <span className="g-text-2"> “{x.examples[0].anchor}”</span> : x.examples[0].anchor === "(no text)" ? <span className="g-text-2"> (no link text in the HTML)</span> : <span className="g-text-2"> (link text not saved by this crawl)</span>}</> : "—"}</td>
-                  <td className="num" data-label="Checked / broken">{x.checked ? `${fmtNum(x.checked)} / ${fmtNum(x.broken)}` : "not checked"}</td>
+                  <td className="max-w-[14rem] truncate" data-label="Website" title={x.domain}><Label>Website</Label>{x.domain}</td>
+                  <td className="num" data-label="Pages linking"><Label>Pages linking</Label>{fmtNum(x.pages)}</td><td className="num" data-label="Links"><Label>Links</Label>{fmtNum(x.links)}</td>
+                  <td className="max-w-[24rem] !whitespace-normal text-[12px] [overflow-wrap:anywhere]" data-label="For example"><Label>For example</Label>{x.examples[0] ? <><span className="g-text-2">{path(x.examples[0].from)} →</span> <a href={x.examples[0].to} target="_blank" rel="noreferrer" className="g-link">{x.examples[0].to.replace(/^https?:\/\/(www\.)?/, "")}</a>{x.examples[0].anchor && x.examples[0].anchor !== "(no text)" ? <span className="g-text-2"> “{x.examples[0].anchor}”</span> : x.examples[0].anchor === "(no text)" ? <span className="g-text-2"> (no link text in the HTML)</span> : <span className="g-text-2"> (link text not saved by this crawl)</span>}</> : "—"}</td>
+                  <td className="num" data-label="Checked / broken"><Label>Checked, broken</Label>{x.checked ? `${fmtNum(x.checked)} / ${fmtNum(x.broken)}` : "not checked"}</td>
                 </tr>
               ))}
             </tbody>

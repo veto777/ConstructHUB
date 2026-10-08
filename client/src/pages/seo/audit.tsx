@@ -31,7 +31,8 @@ type Audit = {
   scores: { overall: number | null; categories: Record<string, number | null> } | null;
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
-type AuditData = { locationId: number | null; audit: Audit | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
+type AuditData = { locationId: number | null; audit: (Audit & { comparedWith?: Compared | null }) | null; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -90,7 +91,12 @@ export default function SeoAuditPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site?.id}/audit`;
-  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+  // The crawl the newest one is compared with: null = the one before it. Chosen per site; the page always says which.
+  const [vsBySite, setVsBySite] = useState<Record<number, string>>({});
+  const vs = site ? vsBySite[site.id] ?? null : null;
+  const q = useQuery<AuditData>({
+    queryKey: [key, vs], enabled: !!site,
+    queryFn: async () => { const r = await fetch(`${key}${vs ? `?vs=${encodeURIComponent(vs)}` : ""}`, { credentials: "include" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -110,6 +116,9 @@ export default function SeoAuditPage() {
   const categories = [...new Set((a?.issues ?? []).map((i) => i.category))];
   const total = a ? a.crawled + a.statuses.failed : 0;
   const trend = (d?.history ?? []).filter((h) => h.health !== null);
+  const cmp = a?.comparedWith ?? null;
+  const before = cmp?.chosen && cmp.at ? `the crawl of ${fmtDate(cmp.at)}` : "the crawl before";
+  const earlier = (d?.history ?? []).filter((h) => a && h.jobId !== a.jobId).reverse(); // newest first
   const exportAll = () => a && downloadCsv(`site-audit-${site?.domain}.csv`, [["Severity", "Issue", "Category", "Affected", "Page or entry"], ...a.issues.flatMap((i) => i.items.map((u) => [SEVERITY[i.severity].label, i.title, CATEGORY[i.category] ?? i.category, String(i.count), u]))]);
 
   return (
@@ -154,7 +163,7 @@ export default function SeoAuditPage() {
               <div className="min-w-0">
                 <h2 className="g-text text-[16px] font-medium">Health score</h2>
                 <p className="g-text-2 text-[13px]">The share of crawled pages with no errors.</p>
-                {a.healthChange !== null && a.healthChange !== 0 && <p className="mt-1 text-[13px]"><span className={`g-move ${a.healthChange > 0 ? "g-move--up" : "g-move--down"}`}>{a.healthChange > 0 ? "▲" : "▼"}{Math.abs(a.healthChange)}</span> <span className="g-text-2">since the crawl before</span></p>}
+                {a.healthChange !== null && a.healthChange !== 0 && <p className="mt-1 text-[13px]"><span className={`g-move ${a.healthChange > 0 ? "g-move--up" : "g-move--down"}`}>{a.healthChange > 0 ? "▲" : "▼"}{Math.abs(a.healthChange)}</span> <span className="g-text-2">since {before}</span></p>}
                 <p className="g-text-2 mt-1 text-[12px]">Crawled {fmtDate(a.scannedAt)}</p>
               </div>
             </section>
@@ -221,6 +230,40 @@ export default function SeoAuditPage() {
             </div>
           )}
 
+          {earlier.length > 0 && (
+            <section className="mb-4 rounded-lg border p-4" style={card} data-testid="audit-compare">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="g-text text-[16px] font-medium">Compared with</h2>
+                <select className="g-select" aria-label="Crawl to compare with" value={cmp?.chosen ? cmp.jobId : ""} data-testid="select-audit-vs"
+                  onChange={(e) => site && setVsBySite((m) => { const n = { ...m }; if (e.target.value) n[site.id] = e.target.value; else delete n[site.id]; return n; })}>
+                  <option value="">The crawl before ({fmtDate(earlier[0].at)})</option>
+                  {earlier.slice(1).map((h) => <option key={h.jobId} value={h.jobId}>Crawl of {fmtDate(h.at)}{h.health !== null ? ` — health ${h.health}` : ""}</option>)}
+                </select>
+                {q.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
+              </div>
+              {d?.vsMissing && <p className="mt-2 text-[13px]" role="alert">That crawl is no longer available, so the newest crawl is compared with the crawl before it.</p>}
+              {cmp && (
+                <div className="mt-2 text-[13px]">
+                  <p className="g-text-2">Every change, fixed issue and health move on this page is the crawl of {fmtDate(a.scannedAt)} against {before}{cmp.chosen && cmp.at ? "" : cmp.at ? ` (${fmtDate(cmp.at)})` : ""}.</p>
+                  <p className="g-text mt-1" data-testid="text-audit-page-changes">{fmtNum(cmp.addedPages)} page{cmp.addedPages === 1 ? "" : "s"} reached now and not then; {fmtNum(cmp.removedPages)} reached then and not now.</p>
+                  {cmp.capsDiffer && <p className="g-text-2 mt-1 text-[12px]">The two crawls stopped at different page limits, so a page "not reached now" may only lie beyond the smaller limit.</p>}
+                  {(cmp.addedPages > 0 || cmp.removedPages > 0) && (
+                    <details className="mt-1" data-testid="audit-page-changes">
+                      <summary className="g-link cursor-pointer">Show the pages</summary>
+                      <div className="mt-2 grid gap-4 md:grid-cols-2">
+                        {([["Reached now, not then", cmp.added, cmp.addedPages], ["Reached then, not now", cmp.removed, cmp.removedPages]] as const).map(([t, list, n]) => (
+                          <div key={t}><h3 className="g-text font-medium">{t}</h3>
+                            {list.length === 0 ? <p className="g-text-2">None.</p> : <ul className="space-y-0.5">{list.map((u) => <li key={u} className="truncate"><a href={u} className="g-link" target="_blank" rel="noreferrer">{u}</a></li>)}</ul>}
+                            {n > list.length && <p className="g-text-2 text-[12px]">The first {fmtNum(list.length)} of {fmtNum(n)}.</p>}
+                          </div>))}
+                      </div>
+                      <p className="g-text-2 mt-2 text-[12px]">"Not reached" means the crawl did not get to the page — it may still exist (a removed link, a robots rule or the page limit can each stop a crawl short of it).</p>
+                    </details>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
           <nav className="g-tabs" aria-label="Audit views">
             {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["links", "Internal links"], ["outgoing", "Outgoing links"], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
           </nav>
@@ -247,7 +290,7 @@ export default function SeoAuditPage() {
           ) : (
             <div className="overflow-x-auto">
             <table className="g-table w-full" data-testid="table-audit-issues">
-              <thead><tr><th aria-label="Show details" className="w-12" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num whitespace-nowrap pr-2" title="Change in affected pages since the crawl before">Change</th></tr></thead>
+              <thead><tr><th aria-label="Show details" className="w-12" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num whitespace-nowrap pr-2" title={`Change in affected pages since ${before}`}>Change</th></tr></thead>
               <tbody>
                 {issues.map((i) => {
                   const isOpen = open === i.key, shown = isOpen && !showAll ? i.items.slice(0, 25) : i.items;
@@ -288,7 +331,7 @@ export default function SeoAuditPage() {
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">
               <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
-              <p className="g-text-2 mb-2 text-[13px]">The crawl before found these, and this crawl could not check them the same way — it didn't look at the same pages, didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
+              <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages, didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>
@@ -296,7 +339,7 @@ export default function SeoAuditPage() {
           )}
           {a.fixed.length > 0 && (
             <section className="mt-6" data-testid="audit-fixed">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Fixed since the crawl before</h2>
+              <h2 className="g-text mb-2 text-[16px] font-medium">Fixed since {before}</h2>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.fixed.map((f) => <li key={f.key}><span className="g-move g-move--up">✓</span> {f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>

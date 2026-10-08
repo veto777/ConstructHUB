@@ -5,7 +5,7 @@
  * page never spends SEO data; "Analyse" / "Refresh" on a card buys a new
  * Site Explorer report for that site.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
@@ -23,7 +23,8 @@ type Card = {
   audit: { health: number | null; errors: number; scannedAt: string | null } | null;
   /** null = the count could not be read just now. */
   openTasks?: number | null;
-  rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null };
+  /** Each keyword's newest check on ONE device (`device`), between `firstOn` and `checkedOn`. */
+  rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null; firstOn?: string | null; device?: "desktop" | "mobile" | null };
   report: {
     fetchedAt: string; authority: number | null; backlinks: number | null; referringDomains: number | null;
     organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null; top3: number | null; top10: number | null;
@@ -82,8 +83,10 @@ export default function SeoDashboardPage() {
   const [sort, setSort] = useState<SortKey>(() => { try { const v = window.localStorage.getItem("seo.dashboard.sort"); return (SORTS.some(([k]) => k === v) ? v : "added") as SortKey; } catch { return "added"; } });
   const chooseSort = (k: SortKey) => { setSort(k); try { window.localStorage.setItem("seo.dashboard.sort", k); } catch { /* private window */ } };
   // Groups (a client, a region): the dashboard can show one group or all. Remembered on this computer.
-  const [group, setGroup] = useState<string>(() => { try { return window.localStorage.getItem("seo.dashboard.group") ?? ""; } catch { return ""; } });
-  const chooseGroup = (g: string) => { setGroup(g); try { window.localStorage.setItem("seo.dashboard.group", g); } catch { /* private window */ } };
+  // The group filter: "all", "none" (sites in no group) or "g:" + a group's name in lower case — a group's own name can
+  // never be mistaken for a choice, and "Roofing" and "roofing" are one group.
+  const [group, setGroup] = useState<string>(() => { try { return window.localStorage.getItem("seo.dashboard.groupFilter") ?? "all"; } catch { return "all"; } });
+  const chooseGroup = (g: string) => { setGroup(g); try { window.localStorage.setItem("seo.dashboard.groupFilter", g); } catch { /* private window */ } };
   const [editing, setEditing] = useState<number | null>(null);
   const [groupDraft, setGroupDraft] = useState("");
   const setSiteGroup = useMutation({
@@ -107,14 +110,24 @@ export default function SeoDashboardPage() {
       return sort === "name" ? String(x).localeCompare(String(y)) : Number(y) - Number(x);
     });
   }, [dash.data, sort]);
-  const groups = useMemo(() => [...new Set((dash.data?.cards ?? []).map((c) => c.site.group).filter((g): g is string => !!g))].sort((a, b) => a.localeCompare(b)), [dash.data]);
-  // A remembered group that no site is in any more shows everything rather than nothing.
-  const activeGroup = group === "__none__" || groups.includes(group) ? group : "";
-  const shownCards = activeGroup === "" ? cards : cards.filter((c) => (activeGroup === "__none__" ? !c.site.group : c.site.group === activeGroup));
+  const groupKey = (g: string) => `g:${g.toLowerCase()}`;
+  // Each group once (by name, any letter case), shown with the first spelling met.
+  const groups = useMemo(() => { const m = new Map<string, string>(); for (const c of dash.data?.cards ?? []) if (c.site.group && !m.has(groupKey(c.site.group))) m.set(groupKey(c.site.group), c.site.group); return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1])); }, [dash.data]);
+  const anyUngrouped = (dash.data?.cards ?? []).some((c) => !c.site.group);
+  // A remembered choice that matches nothing any more shows everything — and is forgotten once the sites have loaded,
+  // so it cannot come back by itself later.
+  const valid = group === "all" || (group === "none" && anyUngrouped) || groups.some(([k]) => k === group);
+  useEffect(() => { if (dash.isSuccess && !valid) chooseGroup("all"); }, [dash.isSuccess, valid]); // eslint-disable-line react-hooks/exhaustive-deps
+  const activeGroup = valid ? group : "all";
+  const groupLabel = activeGroup === "none" ? "Not in a group" : groups.find(([k]) => k === activeGroup)?.[1] ?? "";
+  const shownCards = activeGroup === "all" ? cards : cards.filter((c) => (activeGroup === "none" ? !c.site.group : !!c.site.group && groupKey(c.site.group) === activeGroup));
   // The group's totals, from the same numbers as its cards (tracked keywords checked, open tasks known).
   const totals = useMemo(() => {
     const checked = shownCards.filter((c) => c.rank.checked);
+    const dates = checked.flatMap((c) => [c.rank.firstOn ?? c.rank.checkedOn, c.rank.checkedOn]).filter((d): d is string => !!d).sort();
+    const devices = [...new Set(checked.map((c) => c.rank.device).filter(Boolean))];
     return { sites: shownCards.length, keywords: shownCards.reduce((n, c) => n + (c.site.keywordCount ?? 0), 0), top10: checked.reduce((n, c) => n + c.rank.top10, 0), checked: checked.length,
+      from: dates[0] ?? null, to: dates[dates.length - 1] ?? null, devices,
       openTasks: shownCards.some((c) => c.openTasks == null) ? null : shownCards.reduce((n, c) => n + (c.openTasks ?? 0), 0) };
   }, [shownCards]);
   const price = status.data?.prices ? money(status.data.prices.explorerReport) : "";
@@ -132,7 +145,7 @@ export default function SeoDashboardPage() {
           <p className="mt-2">Just want to look a domain up? Open <Link href="/seo/explorer" className="g-link">Site explorer</Link> — any site, yours or a competitor's.</p>
         </Empty>
       )}
-      {cards.length > 1 && (
+      {(cards.length > 1 || activeGroup !== "all") && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
           <label className="g-text-2 flex items-center gap-2">Order
             <select className="g-input g-select !w-auto !py-1" value={sort} onChange={(e) => chooseSort(e.target.value as SortKey)} data-testid="select-dashboard-sort">
@@ -140,25 +153,25 @@ export default function SeoDashboardPage() {
             </select>
           </label>
           {groups.length > 0 && (
-            <label className="g-text-2 flex items-center gap-2">Group
-              <select className="g-input g-select !w-auto !py-1" value={activeGroup} onChange={(e) => chooseGroup(e.target.value)} data-testid="select-dashboard-group">
-                <option value="">All sites</option>
-                {groups.map((g) => <option key={g} value={g}>{g}</option>)}
-                <option value="__none__">Not in a group</option>
+            <label className="g-text-2 flex min-w-0 max-w-full items-center gap-2">Group
+              <select className="g-input g-select !w-auto min-w-0 max-w-[16rem] !py-1" value={activeGroup} onChange={(e) => chooseGroup(e.target.value)} data-testid="select-dashboard-group">
+                <option value="all">All sites</option>
+                {groups.map(([k, g]) => <option key={k} value={k}>{g}</option>)}
+                {anyUngrouped && <option value="none">Not in a group</option>}
               </select>
             </label>
           )}
           <span className="g-text-2">Starred sites stay on top.</span>
         </div>
       )}
-      {activeGroup !== "" && (
-        <p className="g-text mb-3 text-[13px]" data-testid="text-group-totals">
-          <b className="font-medium">{activeGroup === "__none__" ? "Not in a group" : activeGroup}</b>: {fmtNum(totals.sites)} site{totals.sites === 1 ? "" : "s"} · {fmtNum(totals.keywords)} tracked keywords{totals.checked ? ` · ${fmtNum(totals.top10)} in the top 10 (latest check of ${totals.checked} site${totals.checked === 1 ? "" : "s"})` : ""} · {totals.openTasks == null ? "open tasks not known" : `${fmtNum(totals.openTasks)} open task${totals.openTasks === 1 ? "" : "s"}`}
+      {activeGroup !== "all" && (
+        <p className="g-text mb-3 text-[13px] [overflow-wrap:anywhere]" data-testid="text-group-totals">
+          <b className="font-medium">{groupLabel}</b>: {fmtNum(totals.sites)} site{totals.sites === 1 ? "" : "s"} · {fmtNum(totals.keywords)} tracked keywords{totals.checked ? ` · ${fmtNum(totals.top10)} in the top 10 — each keyword's newest check${totals.devices.length === 1 ? ` on ${totals.devices[0]}` : " (desktop for sites that track it, else mobile)"}, ${totals.from === totals.to ? fmtDate(totals.from) : `${fmtDate(totals.from)} to ${fmtDate(totals.to)}`}, ${totals.checked} site${totals.checked === 1 ? "" : "s"}` : ""} · {totals.openTasks == null ? "open tasks not known" : `${fmtNum(totals.openTasks)} open task${totals.openTasks === 1 ? "" : "s"}`}
         </p>
       )}
-      <datalist id="seo-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
+      <datalist id="seo-groups">{groups.map(([k, g]) => <option key={k} value={g} />)}</datalist>
       <div className="space-y-4" data-testid="seo-dashboard">
-        {activeGroup !== "" && shownCards.length === 0 && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>Choose another group above.</p></Empty>}
+        {activeGroup !== "all" && shownCards.length === 0 && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>Choose another group above, or <button type="button" className="g-link" onClick={() => chooseGroup("all")}>show all sites</button>.</p></Empty>}
         {shownCards.map(({ site: s, rank, report: r, audit, openTasks }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
@@ -170,14 +183,14 @@ export default function SeoDashboardPage() {
                 <h2 className="g-text text-[18px] font-medium"><Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-link">{s.domain}</Link></h2>
                 <span className="g-text-2 text-[12px]">{r ? `analysed ${fmtDate(r.fetchedAt)}` : "not analysed yet"}</span>
                 {editing === s.id ? (
-                  <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }); }} data-testid={`form-group-${s.id}`}>
+                  <form className="flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto" onSubmit={(e) => { e.preventDefault(); setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }); }} data-testid={`form-group-${s.id}`}>
                     <label className="sr-only" htmlFor={`group-${s.id}`}>Group for {s.domain}</label>
-                    <input id={`group-${s.id}`} className="g-input !h-8 w-40 !py-1 text-[13px]" list="seo-groups" maxLength={40} value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} placeholder="e.g. Smith Roofing" autoFocus data-testid={`input-group-${s.id}`} />
+                    <input id={`group-${s.id}`} className="g-input !h-8 w-40 min-w-0 max-w-full flex-1 !py-1 text-[13px] sm:flex-none" list="seo-groups" maxLength={40} value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} placeholder="e.g. Smith Roofing" autoFocus data-testid={`input-group-${s.id}`} />
                     <button type="submit" className="g-pill g-pill--sm" disabled={setSiteGroup.isPending}>Save</button>
                     <button type="button" className="g-pill g-pill--sm" onClick={() => setEditing(null)}>Cancel</button>
                   </form>
                 ) : (
-                  <button type="button" className="g-chip g-chip--sm" onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
+                  <button type="button" className="g-chip g-chip--sm max-w-full !whitespace-normal text-left [overflow-wrap:anywhere]" onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
                 )}
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
@@ -196,7 +209,7 @@ export default function SeoDashboardPage() {
                   <Metric label="Backlinks" value={compact(r.backlinks)} />
                   <Metric label="Organic traffic" value={compact(r.organicTraffic)} delta={<Delta series={r.history?.map((h) => h.traffic)} />} spark={<Spark data={r.history?.map((h) => h.traffic)} color="#e8710a" />} hint={r.trafficValue != null ? `Value $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo` : undefined} />
                   <Metric label="Organic keywords" value={compact(r.organicKeywords)} delta={<Delta series={r.history?.map((h) => h.keywords)} />} spark={<Spark data={r.history?.map((h) => h.keywords)} color="#e8710a" />} hint={r.top10 != null ? `${fmtNum(r.top3)} in top 3 · ${fmtNum(r.top10)} in top 10` : undefined} />
-                  <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10 · checked ${fmtDate(rank.checkedOn)}` : s.keywordCount ? "First check runs this week" : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
+                  <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10${rank.device ? ` on ${rank.device}` : ""} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? "First check runs this week" : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">

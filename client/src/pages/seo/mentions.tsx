@@ -14,7 +14,7 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
 type Page = { marksUnavailable?: boolean; name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
 type Watch = { watch: boolean; nextAt: string | null; note?: string | null; checks?: number; chosen?: boolean; missing?: boolean; latest: { id: number; name?: string; since: string; takenAt: string; page: Page } | null };
-type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch };
+type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch; /** When this read was STARTED here (not when it arrived): what it says about a verdict is no newer than that. */ readAt: number };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
 /** Whether the words of `name` appear together, as whole words, in `text`. */
@@ -32,7 +32,8 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${siteId}/mentions`;
-  const q = useQuery<View>({ queryKey: [checkId ? `${key}?check=${checkId}` : key], refetchOnMount: "always" });
+  const q = useQuery<View>({ queryKey: [checkId ? `${key}?check=${checkId}` : key], refetchOnMount: "always",
+    queryFn: async ({ queryKey }) => { const readAt = Date.now(); return { ...(await api("GET", queryKey[0] as string)), readAt }; } });
   const [name, setName] = useState("");
   const [placesText, setPlacesText] = useState("");
   // Every answer seen on this screen, by name — a purchase stays on screen even when it could not be saved, and going
@@ -59,12 +60,13 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // What the server has said about each page's verdict, by name and page (as the server compares pages), from any
   // answer whose verdicts DID load — the ordinary check, a looked-up name, the watched check. An answer whose verdicts
   // could not be read changes nothing here, so a known verdict never disappears.
-  // Each entry carries WHEN it became known: a verdict saved here is known at once, and an answer can replace it only
-  // if that answer is newer than the save (an answer read before the save could still carry the old verdict).
+  // Each entry carries WHEN it became known: a verdict saved here is known when the save is answered, and an answer
+  // can replace it only if that answer's read STARTED after then (a read started earlier — even one that arrives
+  // later — may carry the old verdict). Reads are timed when they start, never when they arrive.
   const [known, setKnown] = useState<Record<string, { v: Verdict; at: number }>>({});
   const learn = (p: Page | null | undefined, at: number) => {
     if (!p || p.marksUnavailable) return;
-    setKnown((m) => { const next = { ...m }; for (const r of p.rows) { const k = `${norm(p.name)}|${pageKey(r.url)}`; if (!next[k] || next[k].at <= at) next[k] = { v: r.mark ?? null, at }; } return next; });
+    setKnown((m) => { const next = { ...m }; for (const r of p.rows) { const k = `${norm(p.name)}|${pageKey(r.url)}`; if (!next[k] || next[k].at < at) next[k] = { v: r.mark ?? null, at }; } return next; });
   };
   const mark = useMutation({
     mutationFn: (v: { siteId: number; name: string; url: string; verdict: Verdict; was: Verdict }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, url: v.url, verdict: v.verdict }),
@@ -78,7 +80,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // Fresh server data has every saved verdict: what was shown here for settled ones gives way to it (another tab's
   // change included). Ones still in flight stay until they are answered.
   // Every answer whose verdicts DID load teaches what the server holds (one saying they could not be read teaches nothing).
-  useEffect(() => { learn(q.data?.page, q.dataUpdatedAt); learn(q.data?.watch?.latest?.page, q.dataUpdatedAt); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (q.data) { learn(q.data.page, q.data.readAt); learn(q.data.watch?.latest?.page, q.data.readAt); } }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -109,12 +111,12 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   const canPay = (cents: number | null) => cents != null && (available === -1 || available >= cents);
   // Another name typed: its saved answer, if there is one, is looked up free before anything is offered for sale.
   const typed = norm(name), typedOk = /^[\p{L}\p{N}][\p{L}\p{N} &'’.,-]*$/u.test(name.trim()) && name.trim().length >= 3;
-  const peek = useQuery<Page | null>({
+  const peek = useQuery<(Page & { readAt: number }) | null>({
     // Also for a name already on screen: after a verdict it is read again, so a name other than the saved one gets its fresh verdicts too.
     queryKey: ["mentions-peek", siteId, typed], enabled: typedOk, retry: false, staleTime: 60_000,
-    queryFn: async () => { try { return (await api("POST", key, { name: name.trim(), peek: true })).page as Page; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryFn: async () => { const readAt = Date.now(); try { const pg = (await api("POST", key, { name: name.trim(), peek: true })).page as Page | null; return pg ? { ...pg, readAt } : null; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  useEffect(() => { if (peek.data) { keep(peek.data); learn(peek.data, peek.dataUpdatedAt); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (peek.data) { keep(peek.data); learn(peek.data, peek.data.readAt); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;

@@ -58,6 +58,7 @@ import { linkOpportunities } from "./link-opportunities";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
 import { serpGroups } from "./serp-groups";
+import { dashboardRanks, groupNameSql } from "./dashboard";
 import { aiSummary } from "./ai-summary";
 import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, comparePick, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
 import { searchLocations, locationByCode } from "./locations";
@@ -1065,13 +1066,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const audits = await auditHealthByDomain(user, sites.map((s: any) => s.domain));
     // null = the count could not be read just now (shown as unknown, never as "none open").
     const openTasks = await openTaskCounts(user, sites.map((s: any) => s.id)).catch(() => null);
-    // One query for every site's newest positions (not one per site).
-    const { rows: ranks } = await pool.query(
-      `SELECT site_id, count(*) FILTER (WHERE position<=3)::int AS top3, count(*) FILTER (WHERE position<=10)::int AS top10,
-              count(*) FILTER (WHERE position IS NOT NULL)::int AS ranked, count(*)::int AS checked, max(checked_on)::text AS checked_on
-         FROM (SELECT DISTINCT ON (keyword_id) site_id, position, checked_on FROM seo_rank_checks WHERE site_id = ANY($1::int[]) ORDER BY keyword_id, checked_on DESC, position NULLS LAST) x
-        GROUP BY site_id`, [sites.map((s: any) => s.id)]);
-    const rankOf = new Map<number, any>(ranks.map((r: any) => [r.site_id, r]));
+    const rankOf = await dashboardRanks(sites.map((s: any) => s.id));
     const cards = [];
     for (const s of sites) {
       const rank = rankOf.get(s.id);
@@ -1080,7 +1075,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         site: siteView(s),
         audit: audits.get(auditDomainKey(s.domain)) ?? null,
         openTasks: openTasks ? openTasks.get(s.id) ?? 0 : null,
-        rank: { top3: rank?.top3 ?? 0, top10: rank?.top10 ?? 0, ranked: rank?.ranked ?? 0, checked: rank?.checked ?? 0, checkedOn: rank?.checked_on ?? null },
+        rank: rank ?? { top3: 0, top10: 0, ranked: 0, checked: 0, checkedOn: null, firstOn: null, device: null },
         report: r ? {
           fetchedAt: r.fetchedAt, authority: r.links?.authority ?? null, backlinks: r.links?.backlinks ?? null, referringDomains: r.links?.referringDomains ?? null,
           organicKeywords: r.organic?.keywords ?? null, organicTraffic: r.organic?.traffic ?? null, trafficValue: r.organic?.trafficValue ?? null,
@@ -1340,7 +1335,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // past beyond "now"), a longer one moves it out.
       `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop),
               rank_frequency=coalesce($6, rank_frequency),
-              group_name=CASE WHEN $7 THEN nullif($8, '') ELSE group_name END,
+              group_name=${groupNameSql("$7", "$8")},
               next_rank_check_at = CASE WHEN $6 IS NOT NULL AND $6 <> rank_frequency THEN greatest(now(), coalesce(last_rank_check_at, now()) + make_interval(hours => CASE $6 WHEN 'daily' THEN 24 WHEN 'twice_weekly' THEN 84 ELSE 168 END)) ELSE next_rank_check_at END,
               next_mention_at = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND lower(coalesce(business_name, '')) IS DISTINCT FROM lower(coalesce($3, '')) THEN now() ELSE next_mention_at END,
               mention_watch_note = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND nullif(btrim(coalesce($3, '')), '') IS NULL THEN 'no_name' ELSE mention_watch_note END
@@ -1370,9 +1365,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // Site Audit: the newest crawl of the site's domain, its change since the crawl before, the health
   // trend and any crawl in progress. Reads Site Scan's crawls (sitescan_jobs) — no SEO data spent.
+  // ?vs=<crawl id>: compare the newest crawl with that earlier one instead of the one before it.
   route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json({ site: siteView(site), ...(await siteAudit(user, site.domain)) });
+    const vs = typeof req.query.vs === "string" && /^[0-9a-f-]{36}$/i.test(req.query.vs) ? req.query.vs : null;
+    res.json({ site: siteView(site), ...(await siteAudit(user, site.domain, { vs })) });
   });
 
   // Site Audit → Pages: every page of the newest crawl with indexability, click depth and internal links. Saved crawl only.

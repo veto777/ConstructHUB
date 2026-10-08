@@ -19,6 +19,7 @@ export type GscRow = {
 };
 export type GscBreakdown = {
   dimension: "page" | "query"; property: string; through: string | null; days: number; previousDays: number; comparable: boolean;
+  /** Some of these 56 days are still being read from Google for this report, or a read of them failed: rows may be missing, so no change is shown. */ incomplete: boolean;
   /** "domain" = every address of the domain, sub-domains included; "prefix" = only addresses under that URL. */ coverage: "domain" | "prefix";
   /** The other properties of this site on the account (not used here). */ others: string[];
   rows: GscRow[]; /** More pages/searches than are listed (the busiest are kept). */ more: number; total: number;
@@ -26,15 +27,15 @@ export type GscBreakdown = {
 
 /**
  * The site's Search Console property: of this account's properties for the domain, the one with the most recent data
- * (the domain property when it is as fresh as any) — so an old, unsynced property never hides a working one. The others
- * are named on the page.
+ * OF THE REPORT ASKED FOR (by page / by search — a property whose totals are fresh but whose page report never arrived
+ * does not win), the domain property when it is as fresh as any. The others are named on the page.
  */
-export async function gscAssetFor(user: number, domain: string): Promise<{ id: number; external_id: string; others: string[] } | null> {
+export async function gscAssetFor(user: number, domain: string, dimension: "date" | "page" | "query" = "date"): Promise<{ id: number; external_id: string; others: string[] } | null> {
   const { rows } = await pool.query(
-    `SELECT a.id, a.external_id, (SELECT max(date) FROM gsc_analytics g WHERE g.asset_id=a.id AND g.dimension='date') AS last
+    `SELECT a.id, a.external_id, (SELECT max(date) FROM gsc_analytics g WHERE g.asset_id=a.id AND g.dimension=$3) AS last
        FROM edge_assets a WHERE a.user_id=$1 AND a.provider='gsc' AND a.external_id = ANY($2::text[])
       ORDER BY last DESC NULLS LAST, (a.external_id LIKE 'sc-domain:%') DESC, a.id`,
-    [user, [`sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`, `http://${domain}/`, `http://www.${domain}/`, `sc-domain:www.${domain}`]]);
+    [user, [`sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`, `http://${domain}/`, `http://www.${domain}/`, `sc-domain:www.${domain}`], dimension]);
   if (!rows.length) return null;
   return { id: rows[0].id, external_id: rows[0].external_id, others: rows.slice(1).map((r: any) => r.external_id) };
 }
@@ -53,7 +54,7 @@ export function mergeWindows(cur: { key: string; clicks: number; impressions: nu
 
 /** null = no Search Console property for the site's domain on this account. */
 export async function gscBreakdown(user: number, site: { id: number; domain: string }, dimension: "page" | "query"): Promise<GscBreakdown | null> {
-  const asset = await gscAssetFor(user, site.domain);
+  const asset = await gscAssetFor(user, site.domain, dimension);
   if (!asset) return null;
   // The two windows end at the newest day synced for the site as a whole (dimension 'date'), the same as the summary.
   const { rows: [w] } = await pool.query(
@@ -63,7 +64,17 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
             (SELECT count(DISTINCT date)::int FROM gsc_analytics WHERE asset_id=$1 AND dimension=$2 AND date > last.d - ${2 * GSC_WINDOW} AND date <= last.d - ${GSC_WINDOW}) AS prev_days
        FROM last`, [asset.id, dimension]);
   const coverage = asset.external_id.startsWith("sc-domain:") ? "domain" as const : "prefix" as const;
-  if (!w?.through) return { dimension, property: asset.external_id, coverage, others: asset.others, through: null, days: 0, previousDays: 0, comparable: false, rows: [], more: 0, total: 0 };
+  if (!w?.through) return { dimension, property: asset.external_id, coverage, others: asset.others, through: null, days: 0, previousDays: 0, comparable: false, incomplete: false, rows: [], more: 0, total: 0 };
+  // A read of these days for this report that has not finished (queued, running, or failed — a long report comes in
+  // pages of 25,000 rows, each its own job) and was not replaced since by a finished full read of the same days: some
+  // rows may be missing, so the two windows are not compared.
+  const { rows: [inc] } = await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2 AND j.state <> 'done'
+        AND (j.payload->>'end')::date > $3::date - ${2 * GSC_WINDOW} AND (j.payload->>'start')::date <= $3::date
+        AND NOT EXISTS (SELECT 1 FROM edge_jobs k WHERE k.asset_id=j.asset_id AND k.kind='analytics' AND k.payload->>'dimension'=$2 AND k.state='done'
+          AND k.payload->>'start'=j.payload->>'start' AND k.payload->>'end'=j.payload->>'end' AND (k.payload->>'offset')::int=0 AND k.id > j.id)) AS v`,
+    [asset.id, dimension, w.through]).catch(() => ({ rows: [{ v: false }] }));
+  const incomplete = !!inc?.v;
   const agg = (fromOffset: number, toOffset: number) => pool.query(
     `SELECT key, sum(clicks)::float8 AS clicks, sum(impressions)::float8 AS impressions,
             CASE WHEN sum(impressions) > 0 THEN sum(position * impressions) / sum(impressions) END::float8 AS position
@@ -80,5 +91,5 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
   // The busiest in EITHER window are kept, so a page that lost all its clicks is still listed among the losers.
   const weight = (r: GscRow) => Math.max(r.clicks ?? 0, r.prevClicks ?? 0);
   rows.sort((a, b) => weight(b) - weight(a) || (b.impressions ?? b.prevImpressions ?? 0) - (a.impressions ?? a.prevImpressions ?? 0) || a.key.localeCompare(b.key));
-  return { dimension, property: asset.external_id, coverage, others: asset.others, through: w.through, days: w.days, previousDays: w.prev_days, comparable: w.days >= GSC_WINDOW && prevComplete, rows: rows.slice(0, GSC_ROWS), more: Math.max(0, rows.length - GSC_ROWS), total: rows.length };
+  return { dimension, property: asset.external_id, coverage, others: asset.others, through: w.through, days: w.days, previousDays: w.prev_days, comparable: w.days >= GSC_WINDOW && prevComplete && !incomplete, incomplete, rows: rows.slice(0, GSC_ROWS), more: Math.max(0, rows.length - GSC_ROWS), total: rows.length };
 }

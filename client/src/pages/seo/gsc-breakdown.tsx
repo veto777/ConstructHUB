@@ -10,7 +10,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
 
 type Row = { key: string; clicks: number | null; impressions: number | null; position: number | null; prevClicks: number | null; prevImpressions: number | null; prevPosition: number | null; tracked?: boolean };
-type Data = { dimension: "page" | "query"; property: string; coverage: "domain" | "prefix"; others: string[]; through: string | null; days: number; previousDays: number; comparable: boolean; rows: Row[]; more: number; total: number };
+type Data = { dimension: "page" | "query"; property: string; coverage: "domain" | "prefix"; others: string[]; through: string | null; days: number; previousDays: number; comparable: boolean; incomplete?: boolean; rows: Row[]; more: number; total: number };
 type Sort = "clicks" | "gain" | "loss";
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const pathOf = (u: string, domain: string) => { try { const x = new URL(u); return x.hostname.replace(/^www\./, "") === domain.replace(/^www\./, "") ? (x.pathname + x.search) || "/" : u; } catch { return u; } };
@@ -67,7 +67,7 @@ export function GscBreakdownView({ site }: { site: SeoSite }) {
         : (
         <>
           <p className="g-text-2 mb-2 text-[12px]" data-testid="text-gsc-basis">
-            {d.property}{d.coverage === "domain" ? " (the whole domain, sub-domains included)" : " (only addresses under this URL)"}{d.others.length ? `; also on your account: ${d.others.join(", ")}` : ""}. The 28 days to {fmtDate(d.through)} ({fmtNum(d.days)} of 28 with data) against the 28 before ({fmtNum(d.previousDays)} of 28 with data){d.comparable ? "" : " — not both complete, so changes are not shown"}. Google returns only some rows — it leaves out rare searches and caps how many it sends — so "not returned" is not a zero, and the searches add up to fewer clicks than the site's total. {fmtNum(d.total)} {dimension === "page" ? "pages" : "searches"}{d.more > 0 ? `, the busiest ${fmtNum(d.rows.length)} listed` : ""}.
+            {d.property}{d.coverage === "domain" ? " (the whole domain, sub-domains included)" : " (only addresses under this URL)"}{d.others.length ? `; also on your account: ${d.others.join(", ")}` : ""}. The 28 days to {fmtDate(d.through)} ({fmtNum(d.days)} of 28 with data) against the 28 before ({fmtNum(d.previousDays)} of 28 with data){d.comparable ? "" : d.incomplete ? " — some of these days are still being read from Google (or a read failed), so changes are not shown yet" : " — not both complete, so changes are not shown"}. Google returns only some rows — it leaves out rare searches and caps how many it sends — so "not returned" is not a zero, and the searches add up to fewer clicks than the site's total. {fmtNum(d.total)} {dimension === "page" ? "pages" : "searches"}{d.more > 0 ? `, the busiest ${fmtNum(d.rows.length)} listed` : ""}.
           </p>
           {rows.length === 0 ? <p className="g-text-2 text-[13px]">No {dimension === "page" ? "pages" : "searches"} returned for these 56 days.</p> : (
             <div className="overflow-x-auto">

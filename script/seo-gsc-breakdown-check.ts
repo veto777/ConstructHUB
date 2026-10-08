@@ -35,6 +35,22 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await pool.query("INSERT INTO edge_assets(user_id, connection_id, provider, external_id, name, domain, status) VALUES(1,$1,'gsc','http://gscb.example/','x','gscb.example','ok')", [conn.id]);
   const chosen = (await gscBreakdown(1, site, "page"))!;
   ok(chosen.property === "sc-domain:gscb.example" && chosen.others.join() === "http://gscb.example/" && chosen.coverage === "domain", `the property with data is used, the other named (${chosen.property}; ${chosen.others})`);
+  // A property whose site totals are fresher but whose page report never arrived does not win the page report.
+  const { rows: [fresh] } = await pool.query("INSERT INTO edge_assets(user_id, connection_id, provider, external_id, name, domain, status) VALUES(1,$1,'gsc','https://gscb.example/','x','gscb.example','ok') RETURNING id", [conn.id]);
+  await pool.query("INSERT INTO gsc_analytics(asset_id,dimension,date,key,clicks,impressions,position) VALUES($1,'date',current_date - 1,'',9,90,3)", [fresh.id]);
+  const byPage = (await gscBreakdown(1, site, "page"))!;
+  ok(byPage.property === "sc-domain:gscb.example" && byPage.others.includes("https://gscb.example/"), `the property that has the page report is used for it (${byPage.property})`);
+  // A read of these days that has not finished (a failed second page of rows): not comparable, said why.
+  await pool.query(`CREATE TABLE IF NOT EXISTS edge_jobs (id bigserial PRIMARY KEY, user_id integer NOT NULL, connection_id integer NOT NULL, asset_id integer REFERENCES edge_assets(id) ON DELETE CASCADE, kind text NOT NULL, payload jsonb NOT NULL DEFAULT '{}', state text NOT NULL DEFAULT 'queued')`);
+  const range = { dimension: "page", start: new Date(Date.now() - 40 * 864e5).toISOString().slice(0, 10), end: new Date(Date.now() - 13 * 864e5).toISOString().slice(0, 10) };
+  await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'failed')", [conn.id, asset.id, JSON.stringify({ ...range, offset: 25000 })]);
+  await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'queued')", [conn.id, asset.id, JSON.stringify({ ...range, dimension: "query", offset: 0 })]);
+  const part = (await gscBreakdown(1, site, "page"))!;
+  ok(part.incomplete && !part.comparable, "a failed read of some of these days: no changes are shown");
+  ok((await gscBreakdown(1, site, "query"))!.incomplete, "a queued read of the search report marks that report");
+  await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'done')", [conn.id, asset.id, JSON.stringify({ ...range, offset: 0 })]);
+  const redone = (await gscBreakdown(1, site, "page"))!;
+  ok(!redone.incomplete && redone.comparable, "a later finished full read of the same days replaces it");
   await pool.query("DELETE FROM edge_connections WHERE id=$1", [conn.id]); await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`gsc breakdown checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

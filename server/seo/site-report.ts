@@ -31,6 +31,8 @@ export const REPORT_SCHEDULE_DDL = [
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS lease_token text`,
   // Each recipient's delivery of each report period: 'pending' while a send is under way (with its sender's token and
   // when it started), 'sent' once the email went. A pending row older than half an hour is a send that died.
+  // 'uncertain': a send that died after the email log claimed it — it may well have gone, so it is never sent again
+  // (nobody gets a report twice); the Reports page says so.
   `CREATE TABLE IF NOT EXISTS seo_report_deliveries (
      site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
      period text NOT NULL,
@@ -40,6 +42,11 @@ export const REPORT_SCHEDULE_DDL = [
      updated_at timestamptz NOT NULL DEFAULT now(),
      PRIMARY KEY (site_id, period, recipient)
    )`,
+  `DO $$ BEGIN
+     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname='seo_report_deliveries_state_check' AND pg_get_constraintdef(oid) NOT LIKE '%uncertain%') THEN
+       ALTER TABLE seo_report_deliveries DROP CONSTRAINT seo_report_deliveries_state_check;
+       ALTER TABLE seo_report_deliveries ADD CONSTRAINT seo_report_deliveries_state_check CHECK (state IN ('pending','sent','uncertain'));
+     END IF; END $$`,
 ];
 
 export const MAX_RECIPIENTS = 5;
@@ -378,7 +385,11 @@ export const sendPeriod = (frequency: string, at = new Date()) => (frequency ===
 
 export async function getSchedule(userId: number, siteId: number) {
   const { rows: [s] } = await pool.query(`SELECT frequency, recipients, next_send_at AS "nextSendAt", last_sent_at AS "lastSentAt" FROM seo_report_schedules WHERE site_id=$1 AND user_id=$2`, [siteId, userId]);
-  return s ?? { frequency: "off", recipients: [], nextSendAt: null, lastSentAt: null };
+  // Sends of the last 60 days that died after the email may have gone: not sent again, and said.
+  const { rows: uncertain } = await pool.query(
+    `SELECT recipient, updated_at AS at FROM seo_report_deliveries WHERE site_id=$1 AND state='uncertain' AND updated_at > now() - interval '60 days'
+       AND EXISTS (SELECT 1 FROM seo_sites WHERE id=$1 AND user_id=$2) ORDER BY updated_at DESC LIMIT 20`, [siteId, userId]).catch(() => ({ rows: [] as any[] }));
+  return { ...(s ?? { frequency: "off", recipients: [], nextSendAt: null, lastSentAt: null }), uncertain: uncertain.map((u: any) => ({ recipient: u.recipient as string, at: new Date(u.at).toISOString() })) };
 }
 export async function saveSchedule(userId: number, siteId: number, input: z.infer<typeof scheduleInput>) {
   const recipients = [...new Set(input.recipients)];

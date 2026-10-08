@@ -56,9 +56,9 @@ export function reportEmail(r: SiteReport, opts: { brandName?: string | null; se
  * dedupe window ("send now" passes a fresh one). An empty report (nothing saved
  * for the site yet) is not sent; an address that opted out is skipped.
  */
-export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[] }> {
+export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[]; uncertain: string[] }> {
   const report = await buildSiteReport(userId, siteId, opts);
-  if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [] };
+  if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [], uncertain: [] };
   const out = new Set(await optedOut(userId));
   const [{ rows: [brand] }, { rows: [me] }] = await Promise.all([
     pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [userId]).catch(() => ({ rows: [] as any[] })),
@@ -66,10 +66,11 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
   ]);
   const pdf = await renderReportPdf(report, brand ?? null);
   let sent = 0, skipped = 0, failed = 0;
-  const refused: string[] = [];
+  const refused: string[] = [], unsure: string[] = [];
   for (const raw of recipients) {
     const to = norm(raw);
-    if (out.has(to)) { refused.push(to); skipped++; continue; }
+    // Read again just before this recipient (a long pass can outlast an unsubscribe made while it runs).
+    if (out.has(to) || (await pool.query("SELECT 1 FROM seo_report_optouts WHERE user_id=$1 AND email=$2", [userId, to])).rows.length) { refused.push(to); skipped++; continue; }
     const mail = reportEmail(report, { brandName: brand?.name ?? null, senderName: me?.company_name ?? null, unsubscribe: unsubscribeUrl(userId, to) });
     // This recipient's delivery for the period: claimed before sending; "sent" only once the email went. Already sent =
     // done; a send under way elsewhere (pending, young) = not done yet, tried again later; a pending one older than half
@@ -83,19 +84,29 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
     if (!claim) {
       const { rows: [had] } = await pool.query("SELECT state FROM seo_report_deliveries WHERE site_id=$1 AND period=$2 AND recipient=$3", [siteId, period, to]);
       if (had?.state === "sent") { skipped++; continue; }
+      if (had?.state === "uncertain") { unsure.push(to); skipped++; continue; }
       failed++; continue;   // being sent right now by another pass: not done, so the occurrence stays open
     }
     try {
       const attach = [{ filename: `seo-report-${report.domain}.pdf`, content: pdf, contentType: "application/pdf" }];
-      let went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
+      const went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
       if (!went) {
-        // The email log holds a claim for this key that our delivery row does not show as sent: a send that died after
-        // claiming. Its claim is released (only that old one) and the email sent once more.
-        await pool.query("DELETE FROM email_log WHERE dedupe_key=$1 AND sent_at < now() - interval '30 minutes'", [key]);
-        went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
+        // The email log holds a claim for this key that our delivery row does not show as sent. Young: another send is
+        // under way — tried again later. Older than half an hour: a send that died after claiming, and it may have
+        // died AFTER the email went — so it is never sent again (nobody gets a report twice). The delivery is marked
+        // "not known" and the Reports page says so; the occurrence can finish.
+        const { rows: [old] } = await pool.query("SELECT 1 FROM email_log WHERE dedupe_key=$1 AND sent_at < now() - interval '30 minutes'", [key]);
+        if (!old) throw new Error("another send of this email is under way");
+        const { rowCount } = await pool.query("UPDATE seo_report_deliveries SET state='uncertain', updated_at=now() WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4 AND state='pending'", [siteId, period, to, token]);
+        if (!rowCount) throw new Error("this delivery was taken over by another pass");
+        unsure.push(to); skipped++;
+        console.warn(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")}: an earlier send died after claiming it — not sent again, delivery not known`);
+        continue;
       }
-      if (!went) throw new Error("another send of this email is under way");
-      await pool.query("UPDATE seo_report_deliveries SET state='sent', updated_at=now() WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4", [siteId, period, to, token]);
+      // The email went. If another pass took this delivery over meanwhile, the row is not ours to mark; it finds the
+      // email log's claim and does not send again. Said in the log.
+      const { rowCount } = await pool.query("UPDATE seo_report_deliveries SET state='sent', updated_at=now() WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4", [siteId, period, to, token]);
+      if (!rowCount) console.warn(`[seo] report for site ${siteId}: sent, but its delivery row had been taken over by another pass`);
       sent++;
     } catch (e: any) {
       failed++;
@@ -103,7 +114,7 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
       console.error(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")} failed: ${e?.message ?? e}`);
     }
   }
-  return { sent, skipped, failed, empty: false, optedOut: refused };
+  return { sent, skipped, failed, empty: false, optedOut: refused, uncertain: unsure };
 }
 
 /** How long a due schedule is held while its emails go out; if the process dies, it is due again after this. */

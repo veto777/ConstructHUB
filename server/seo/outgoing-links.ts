@@ -34,7 +34,7 @@ export const answerOf = (s: number | null, reason?: string): Answer | null =>
   : s >= 300 ? "redirect_unfollowed" : s === 204 ? "no_content" : null;
 export type BrokenOutgoing = { to: string; status: number | null; answer: Answer; /** Pages that link to it (up to 5) and how many in all. */ from: string[]; fromCount: number };
 export type OutgoingLinks = {
-  /** false = most loaded pages had no links of any kind in their HTML; null = no page loaded, nothing to say. */ linksMeasured: boolean | null; pagesRead: number; domains: number; links: number;
+  /** false = most loaded pages had no web (http/https) link saved from their HTML; null = no page loaded, nothing to say. */ linksMeasured: boolean | null; pagesRead: number; domains: number; links: number;
   linkedDomains: LinkedDomain[]; /** More linked websites than are listed. */ more: number;
   broken: BrokenOutgoing[]; /** External addresses the crawl checked (a sample), and how many links point at addresses it did not. */ checkedAddresses: number; uncheckedLinks: number;
 };
@@ -76,7 +76,7 @@ export function outgoingLinks(pages: readonly OutPage[], checks: readonly LinkCh
   const brokenList = externalUrls.filter((u) => checked.has(u) && checked.get(u) !== null)
     .map((u) => ({ to: u, status: statusOf.get(u) ?? null, answer: checked.get(u)!, from: [...fromOf.get(u)!].slice(0, 5), fromCount: fromOf.get(u)!.size }))
     .sort((a, b) => Number(isBroken(b.answer)) - Number(isBroken(a.answer)) || b.fromCount - a.fromCount || a.to.localeCompare(b.to));
-  // Whether the HTML had links at all to read: most loaded pages carry no link of any kind (to the site or elsewhere).
+  // Whether the HTML had web links to read: most loaded pages carry no saved http(s) link (to the site or elsewhere).
   const withLinks = loaded.filter((p) => Array.isArray(p.links) && p.links.some((l) => typeof l === "string" && /^https?:/i.test(l))).length;
   return {
     linksMeasured: loaded.length === 0 ? null : loaded.length < 5 ? withLinks > 0 : withLinks * 2 >= loaded.length, pagesRead: loaded.length,

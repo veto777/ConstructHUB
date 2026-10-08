@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditSummary, groupFindings, healthScore, issueKey, ITEM_CAP, type AuditPage, type AuditReport } from "./audit";
+import { auditSummary, groupFindings, healthScore, issueKey, ITEM_CAP, pageChanges, type AuditPage, type AuditReport } from "./audit";
 
 const page = (url: string, status = 200, redirects = 0): AuditPage => ({ url, status, redirects });
 const finding = (id: string, severity: string, urls: string[], title = id) => ({ id, category: "technical", severity, title, urls, why: "why", fix: "fix" });
@@ -162,5 +162,14 @@ describe("what counts as broken, and what counts as fixed", () => {
     expect(s.issues).toEqual([]);
     expect(s.health).toBeNull();
     expect(groupFindings([{ id: "x", severity: "warning", category: "content", title: 5, urls: "u" } as any]).get("x")!.items).toEqual([]);
+  });
+});
+
+describe("pageChanges", () => {
+  it("compares two crawls' pages by address — www, a trailing slash and case of the host are the same page", () => {
+    const now = [page("https://a.com/"), page("https://www.a.com/new"), page("https://A.com/kept/")];
+    const before = [page("https://a.com"), page("https://a.com/kept"), page("https://a.com/old?x=1")];
+    expect(pageChanges(now, before)).toEqual({ added: ["https://www.a.com/new"], removed: ["https://a.com/old?x=1"] });
+    expect(pageChanges(now, now)).toEqual({ added: [], removed: [] });
   });
 });
