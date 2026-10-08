@@ -1,0 +1,25 @@
+{
+  "helpKey": "jobcam",
+  "durationSec": 60,
+  "video": {
+    "key": "tutorials/jobcam.2f1b3361.mp4",
+    "bytes": 5084165,
+    "sha256": "2f1b3361136d9ddaf99735fd6aef4aee6d684299d2a4d69cabc9c62e8f03e376"
+  },
+  "captions": {
+    "key": "tutorials/jobcam.889b3790.vtt",
+    "bytes": 1464,
+    "sha256": "889b3790fbd55b2746a187c6d590fa73d7931716dea578ce29f2afbb7e61c196"
+  },
+  "poster": {
+    "key": "tutorials/jobcam.27063b3c.jpg",
+    "bytes": 97216,
+    "sha256": "27063b3cd7286fe04e772dea3db04523d721c1fa3186bc69cabcdb90ffd7150c"
+  },
+  "uploaded": {
+    "at": "2026-10-08T00:32:34.400Z",
+    "video": "0a1328090d9a276aae0e2b3f4fae2697",
+    "captions": "f9246390b0f649107896ae00de693945",
+    "poster": "3ec7bd806b772db97beca48af33c447b"
+  }
+}
