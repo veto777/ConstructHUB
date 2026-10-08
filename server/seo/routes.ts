@@ -19,6 +19,7 @@ import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryP
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { setMentionWatch, mentionWatchView, retryWatchedLinks } from "./mention-watch";
 import { siteOutgoingLinks } from "./outgoing-links";
+import { gscBreakdown } from "./gsc-breakdown";
 import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, nameOk as mentionNameOk, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
@@ -1419,6 +1420,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const out = await linkOpportunities(user, site);
     if (!out) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
+    res.json(out);
+  });
+  // Google's own clicks by page or by search (Search Console, as synced), the last 28 days against the 28 before. Saved data only.
+  route("get", "/api/seo/sites/:id/search-console/:dimension", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const dimension = z.enum(["page", "query"]).parse(req.params.dimension);
+    const out = await gscBreakdown(user, site, dimension);
+    if (!out) return res.status(404).json({ code: "no_property", message: "No Search Console property for this site is connected." });
     res.json(out);
   });
   // Site audit → Outgoing links: the other websites the site links to, from the newest crawl. Saved data only.

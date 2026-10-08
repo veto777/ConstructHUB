@@ -110,7 +110,8 @@ export type CrawlState = {
   initialized: boolean;
   llms: boolean;
   imageChecks?: { url: string; bytes: number; pages: string[] }[];
-  linkChecks: { url: string; status: number | null }[];
+  /** `reason` when there was no status: "redirect_not_followed" (sent somewhere the check does not go), "timeout", "failed". */
+  linkChecks: { url: string; status: number | null; reason?: "redirect_not_followed" | "timeout" | "failed" }[];
 };
 /** Pure: what one answer to a missing-page address says. */
 export function classifyMissingPage(

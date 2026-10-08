@@ -16,6 +16,10 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await sendDueReports().catch(() => 0);
   const b = await read();
   ok(new Date(b.work_cutoff).getTime() === new Date(a.work_cutoff).getTime() && new Date(b.work_since).getTime() === new Date(a.work_since).getTime() && b.work_period === a.work_period, "a retry keeps the same occurrence");
+  // A pass whose lease was taken over cannot finish the occurrence: only the current holder's token works.
+  await pool.query("UPDATE seo_report_schedules SET lease_token='someone-else' WHERE site_id=$1", [site.id]);
+  const stale = await pool.query("UPDATE seo_report_schedules SET work_cutoff=NULL WHERE site_id=$1 AND lease_token=$2", [site.id, "an-old-pass"]);
+  ok(stale.rowCount === 0 && (await read()).work_cutoff !== null, "a stale pass's completion changes nothing");
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`report schedule checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

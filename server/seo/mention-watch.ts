@@ -159,12 +159,16 @@ export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; p
   }
   // The window: from where the last check of this name ended (less the overlap; or the page it resumes from), to now.
   const { rows: [last] } = await pool.query(
-    "SELECT window_to, complete, page->>'resumeFrom' AS resume, page->>'resumeTo' AS resume_to, coalesce((page->>'resumeOffset')::int, 0) AS resume_offset, created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 1", [site.id, key]);
-  // Carrying on a window that was not read to its end: the same start and END, from the next position.
+    "SELECT since, window_to, complete, page->>'resumeFrom' AS resume, page->>'resumeTo' AS resume_to, coalesce((page->>'resumeOffset')::int, 0) AS resume_offset, created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 1", [site.id, key]);
+  // Carrying on a window that was not read to its end: the same start and END, from the next position. A window left
+  // unfinished by the older way of carrying on (no kept end) is read again whole from its start to its end, with the
+  // pages it already read left out as seen — nothing of it is abandoned.
   const resuming = !!last && !last.complete && !!last.resume && !!last.resume_to;
-  const to = resuming ? new Date(last.resume_to) : new Date();
+  const replaying = !!last && !last.complete && !resuming && !!last.window_to;
+  const to = resuming ? new Date(last.resume_to) : replaying ? new Date(last.window_to) : new Date();
   const from = !last ? new Date(to.getTime() - FIRST_LOOKBACK_DAYS * 864e5)
     : resuming ? new Date(last.resume)
+    : replaying ? new Date(last.since)
     : new Date(new Date(last.window_to ?? last.created_at).getTime() - OVERLAP_DAYS * 864e5);
   // Seen: every page read by any check of this name whose window reaches into this one (however many checks that is).
   const { rows: prev } = await pool.query(

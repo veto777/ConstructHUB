@@ -112,8 +112,10 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           (u) => new URL(u).origin === origin && rule.allowed(u),
         );
         state.linkChecks.push({ url, status: result.status });
-      } catch {
-        state.linkChecks.push({ url, status: null });
+      } catch (e: any) {
+        // Why there was no status, so a redirect the check would not follow is not reported as a page that did not answer.
+        const m = String(e?.message ?? e);
+        state.linkChecks.push({ url, status: null, reason: /Redirect excluded/i.test(m) ? "redirect_not_followed" : /timed out|timeout/i.test(m) ? "timeout" : "failed" });
       }
       await checkpoint(state);
     }

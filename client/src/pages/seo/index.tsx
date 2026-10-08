@@ -1,4 +1,5 @@
 /** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
+import { GscBreakdownView } from "./gsc-breakdown";
 import { SerpFeatureChips, hasFeature, ownsFeature } from "./serp-features";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -104,6 +105,7 @@ export default function SeoOverviewPage() {
           <RankHistoryPanel site={site} />
           <CompetingPages site={site} />
           <SerpGroupsPanel site={site} />
+          {o?.searchConsole && <GscBreakdownView site={site} />}
           <CompetitorPanel site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (

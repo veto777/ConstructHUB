@@ -27,6 +27,8 @@ export const REPORT_SCHEDULE_DDL = [
   // The rest of the occurrence, fixed with it: where its work starts, and the period its emails are counted under.
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_since timestamptz`,
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_period text`,
+  // Who holds the lease: only that pass may finish the occurrence or move its next date.
+  `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS lease_token text`,
 ];
 
 export const MAX_RECIPIENTS = 5;

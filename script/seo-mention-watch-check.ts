@@ -125,6 +125,15 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   const waiting = await site();
   ok(calls === 0 && waiting.mention_watch_note === "bad_name" && new Date(waiting.next_mention_at).getTime() - Date.now() > 6 * 864e5, "a name that cannot be searched: nothing bought, waits a week, says why");
   await pool.query("UPDATE seo_sites SET business_name='Alpine Exteriors' WHERE id=$1", [s.id]);
+  // 15. A window left unfinished by the older way of carrying on (no kept end): read again whole, from its start to its end.
+  await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
+  await pool.query(`INSERT INTO seo_mention_checks(site_id, user_id, name, name_key, since, page, window_from, window_to, complete, run_on)
+    VALUES($1,1,'Alpine Exteriors','alpine exteriors','2026-09-01T00:00:00Z',$2,'2026-09-01T00:00:00Z','2026-09-20T00:00:00Z',false,current_date - 1)`, [s.id, JSON.stringify({ name: "Alpine Exteriors", rows: [], resumeFrom: "2026-09-10T00:00:00Z" })]);
+  let legacyAsk: any = null;
+  mentionWatchDeps.request = (async (_m: string, _p: string, body: any[]) => { calls++; legacyAsk = body[0]; return ok20([], 0.025); }) as any;
+  const lease7 = (await pool.query("UPDATE seo_sites SET business_name='Alpine Exteriors', next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
+  await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease7 });
+  ok(String(legacyAsk.filters[2][2]).startsWith("2026-09-01") && String(legacyAsk.filters[4][2]).startsWith("2026-09-20") && !legacyAsk.offset, `an old unfinished window is read again whole: ${legacyAsk.filters[2][2]} to ${legacyAsk.filters[4][2]}`);
   // 8. Turned off: nothing due; another account cannot turn it on.
   await setMentionWatch(1, s.id, false);
   ok((await site()).next_mention_at === null, "turned off: nothing due");

@@ -43,19 +43,24 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   const keep = (p: Page) => setKept((m) => {
     const k = norm(p.name), had0 = m[k];
     // Verdicts that could not be read are not "no verdict": the ones known from an earlier answer are kept.
-    if (p.marksUnavailable && had0) { const known = new Map(had0.rows.map((r) => [r.url, r.mark])); p = { ...p, rows: p.rows.map((r) => ({ ...r, mark: known.get(r.url) ?? r.mark })) }; }
+    if (p.marksUnavailable && had0) { const before = new Map(had0.rows.map((r) => [pageKey(r.url), r.mark])); p = { ...p, rows: p.rows.map((r) => ({ ...r, mark: before.get(pageKey(r.url)) ?? r.mark })) }; }
     const had = had0;
     const t = (x: Page) => [x.fetchedAt, x.linksChecked ? (x.linksCheckedAt ?? x.fetchedAt) : ""].join("|");
     if (!had || t(p) >= t(had)) return { ...m, [k]: p };
     if (p.marksUnavailable) return m;
-    const marks = new Map(p.rows.map((r) => [r.url, r.mark]));
-    return { ...m, [k]: { ...had, rows: had.rows.map((r) => (marks.has(r.url) ? { ...r, mark: marks.get(r.url) } : r)) } };
+    const marks = new Map(p.rows.map((r) => [pageKey(r.url), r.mark]));
+    return { ...m, [k]: { ...had, rows: had.rows.map((r) => (marks.has(pageKey(r.url)) ? { ...r, mark: marks.get(pageKey(r.url)) } : r)) } };
   });
   const [filter, setFilter] = useState<"prospects" | "yours" | "unsure" | "linked" | "notMine" | "all">("prospects");
   // Verdicts given on this screen, per name and PAGE: shown at once as pending, one request at a time per page (its
   // buttons wait), confirmed when the server answers, and put back to what they were if it refuses.
   type Verdict = "mine" | "not_mine" | null;
   const [marking, setMarking] = useState<Record<string, { verdict: Verdict; pending: boolean }>>({});
+  // What the server has said about each page's verdict, by name and page (as the server compares pages), from any
+  // answer whose verdicts DID load — the ordinary check, a looked-up name, the watched check. An answer whose verdicts
+  // could not be read changes nothing here, so a known verdict never disappears.
+  const [known, setKnown] = useState<Record<string, Verdict>>({});
+  const learn = (p: Page | null | undefined) => { if (!p || p.marksUnavailable) return; setKnown((m) => ({ ...m, ...Object.fromEntries(p.rows.map((r) => [`${norm(p.name)}|${pageKey(r.url)}`, r.mark ?? null])) })); };
   const mark = useMutation({
     mutationFn: (v: { siteId: number; name: string; url: string; verdict: Verdict; was: Verdict }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, url: v.url, verdict: v.verdict }),
     onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: true } })),
@@ -70,7 +75,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // THAT name gives way to it (another tab's change included). Pending ones, and other names', stay.
   const retire = (name: string) => setMarking((m) => Object.fromEntries(Object.entries(m).filter(([k, v]) => v.pending || !k.startsWith(`${norm(name)}|`))));
   // Only an answer whose verdicts DID load retires anything: one saying they could not be read keeps what is known.
-  useEffect(() => { if (q.data?.page && !q.data.page.marksUnavailable) retire(q.data.page.name); if (q.data?.watch?.latest && !q.data.watch.latest.page.marksUnavailable) retire(q.data.watch.latest.page.name); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { learn(q.data?.page); learn(q.data?.watch?.latest?.page); if (q.data?.page && !q.data.page.marksUnavailable) retire(q.data.page.name); if (q.data?.watch?.latest && !q.data.watch.latest.page.marksUnavailable) retire(q.data.watch.latest.page.name); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -106,7 +111,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
     queryKey: ["mentions-peek", siteId, typed], enabled: typedOk, retry: false, staleTime: 60_000,
     queryFn: async () => { try { return (await api("POST", key, { name: name.trim(), peek: true })).page as Page; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  useEffect(() => { if (peek.data) { keep(peek.data); if (!peek.data.marksUnavailable) retire(peek.data.name); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (peek.data) { keep(peek.data); learn(peek.data); if (!peek.data.marksUnavailable) retire(peek.data.name); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
@@ -122,8 +127,10 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   const rows = (page?.rows ?? []).map((r) => ({ ...r, place: placeOf(r) }));
   // The customer's verdict decides when there is one; otherwise the place match is a pointer to check, nothing more.
   const markKeyFor = (name: string, r: Row) => `${norm(name)}|${pageKey(r.url)}`;
-  const markOfFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o && !o.pending ? o.verdict : r.mark ?? null; };
-  const shownMarkFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o ? o.verdict : r.mark ?? null; };
+  // Settled overlay, else what the server is known to have said, else what this row carries.
+  const serverMark = (name: string, r: Row): Verdict => { const k = markKeyFor(name, r); return k in known ? known[k] : r.mark ?? null; };
+  const markOfFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o && !o.pending ? o.verdict : serverMark(name, r); };
+  const shownMarkFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o ? o.verdict : serverMark(name, r); };
   const pendingFor = (name: string, r: Row) => !!marking[markKeyFor(name, r)]?.pending;
   // Groups use the settled verdict, so a row being marked stays where it is (and keeps focus) until the answer comes;
   // its buttons show the choice being saved.
