@@ -723,7 +723,7 @@ async function main() {
     const startMs = now();
     if (!(i === 0 && step.action === "goto")) {
       // Each session has its own player; a `session` step changes which one is on camera.
-      const before = current!;
+      const before: Session = current!;
       before.player.beginStep();
       await play(step);
       if (current !== before) current!.player.beginStep();
