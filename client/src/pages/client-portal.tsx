@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { clientPortalView, errorStatusOf } from "@shared/client-portal-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,19 +37,34 @@ const day = (d?: string | null) => (d ? new Date(d).toLocaleDateString() : null)
  *                   linking out to the existing public token pages (/e/:token,
  *                   /i/:token) which handle approve/pay.
  */
+const PREVIEW_FLAG = "ch_portal_preview";
+const previewFlag = {
+  get: () => { try { return sessionStorage.getItem(PREVIEW_FLAG) === "1"; } catch { return false; } },
+  set: (on: boolean) => { try { on ? sessionStorage.setItem(PREVIEW_FLAG, "1") : sessionStorage.removeItem(PREVIEW_FLAG); } catch { /* storage blocked */ } },
+};
+
 export default function ClientPortalPage() {
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["/api/client/documents"],
     retry: false,
   });
+  // Remember that this tab was a contractor preview, so its 15-minute expiry
+  // reads as "the preview ended" rather than the client sign-in screen.
+  useEffect(() => { if (data) previewFlag.set(data.contractorPreview === true); }, [data]);
 
-  if (isLoading) {
+  const previewParam =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("preview") === "expired";
+  const view = clientPortalView({
+    loading: isLoading, errorStatus: errorStatusOf(error), previewParam, wasPreview: previewFlag.get(),
+  });
+
+  if (view === "preview-ended") return <PreviewEnded refused={previewParam} />;
+  if (view === "loading") {
     return <div className="flex justify-center p-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   }
-
   // 401 is not an error here — it IS the signed-out state.
-  if (error) {
-    if (String((error as Error).message).startsWith("401")) return <RequestLink />;
+  if (view === "sign-in") return <RequestLink />;
+  if (view === "error") {
     return (
       <div className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4">
         <ErrorCard title="Couldn't load your documents" description="Please try again in a moment." />
@@ -57,6 +73,58 @@ export default function ClientPortalPage() {
   }
 
   return <Dashboard data={data} />;
+}
+
+/* ── Contractor preview that did not open, or ran out ────────────────────── */
+
+/** This page without ?preview=… (dev's ?client=1 face flag is kept). */
+function signInHref(): string {
+  const q = new URLSearchParams(window.location.search);
+  q.delete("preview");
+  const rest = q.toString();
+  return `${window.location.pathname}${rest ? `?${rest}` : ""}`;
+}
+
+function PreviewEnded({ refused }: { refused: boolean }) {
+  // The CRM origin for this domain, from the server (never from the URL).
+  const { data } = useQuery<{ crmUrl: string }>({ queryKey: ["/api/client/auth/preview-return"], retry: false });
+  return (
+    <main className="min-h-screen bg-muted/40 flex items-start justify-center py-16 px-4" data-testid="preview-ended">
+      <div className="w-full max-w-md space-y-4">
+        <div className="flex justify-center pb-1"><CrmLogo height={34} testid="client-portal-brand" /></div>
+        <Card className="shadow-md border-amber-500/40">
+          <CardContent className="p-6 space-y-3">
+            <h1 className="text-xl font-semibold tracking-tight" data-testid="text-preview-ended-title">
+              {refused ? "This client preview couldn't be opened" : "This client preview has ended"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {refused
+                ? "The preview link is no longer valid. A preview link works for 15 minutes and only from the “See what the client sees” button — it can't be reopened from history or a bookmark."
+                : "A contractor preview lasts 15 minutes, and this one has run out."}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Go back to the client's page in the CRM and click <strong>See what the client sees</strong> again.
+              Nothing was changed, and your client was not notified.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {data?.crmUrl && (
+                <Button asChild data-testid="link-preview-ended-crm">
+                  <a href={data.crmUrl}>Back to the CRM</a>
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => window.close()} data-testid="button-preview-ended-close">
+                Close this tab
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Are you the homeowner? <a className="text-primary underline" href={signInHref()} data-testid="link-preview-ended-signin"
+                onClick={() => previewFlag.set(false)}>Sign in to your documents</a>.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  );
 }
 
 /* ── Signed out: request a magic link ────────────────────────────────────── */
@@ -761,7 +829,7 @@ function Dashboard({ data }: { data: any }) {
           </div>
 
           {/* Read-only banner when the contractor opens this portal as the client. */}
-          {preview && <ContractorPreviewBanner customerName={customer?.displayName} />}
+          {preview && <ContractorPreviewBanner customerName={customer?.displayName} returnUrl={data.previewReturnUrl} />}
 
           {viewBody[view]}
 

@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { jobcamError, jobcamFetch } from "@/lib/jobcam-api";
 import { cn } from "@/lib/utils";
+import { shareRecipient, type CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 
 type Share = {
   id: string; kind: "gallery" | "timeline"; title: string | null; mediaIds: string[]; showDetails: boolean; hasPassword: boolean;
@@ -26,7 +27,11 @@ export function ShareDialog({ projectId, customerId, open, onOpenChange, mediaId
   const { toast } = useToast();
   const listKey = [`/api/crm/projects/${projectId}/jobcam/shares`];
   const { data: shares } = useQuery<Share[]>({ queryKey: listKey, enabled: open });
-  const { data: customer } = useQuery<any>({ queryKey: [`/api/crm/customers/${customerId}`], enabled: open && !!customerId });
+  // The client record is under `customer` in this response — the shared type
+  // keeps this from being read at the top level again ("Prefilled from .").
+  const { data: detail, isLoading: customerLoading, isError: customerError } = useQuery<CrmCustomerDetailResponse>({
+    queryKey: [`/api/crm/customers/${customerId}`], enabled: open && !!customerId,
+  });
   const [kind, setKind] = useState<"gallery" | "timeline">(mediaIds.length ? "gallery" : "timeline");
   const [title, setTitle] = useState("");
   const [password, setPassword] = useState("");
@@ -39,7 +44,11 @@ export function ShareDialog({ projectId, customerId, open, onOpenChange, mediaId
   const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
   useEffect(() => { if (open) { setKind(mediaIds.length ? "gallery" : "timeline"); setMade(null); } }, [open, mediaIds.length]);
-  useEffect(() => { if (customer) setTo(channel === "email" ? (customer.email ?? "") : (customer.phone ?? "")); }, [customer, channel]);
+  const recipient = shareRecipient(
+    !customerId ? { state: "none" } : customerError ? { state: "error" } : customerLoading || !detail ? { state: "loading" } : { state: "ready", detail },
+    channel,
+  );
+  useEffect(() => { if (open) setTo(recipient.to); }, [open, recipient.to, channel]);
 
   const create = useMutation({
     mutationFn: () => jobcamFetch<Share>(`/api/crm/projects/${projectId}/jobcam/shares`, {
@@ -124,7 +133,7 @@ export function ShareDialog({ projectId, customerId, open, onOpenChange, mediaId
               </div>
               <input value={to} onChange={(e) => setTo(e.target.value)} className="g-input" placeholder={channel === "email" ? "client@example.com" : "(555) 555-0123"} inputMode={channel === "email" ? "email" : "tel"} data-testid="jobcam-share-to" />
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} className="g-input py-2 min-h-[60px]" placeholder="A note for the client (optional)" data-testid="jobcam-share-message" />
-              {customer && <p className="text-xs text-muted-foreground">Prefilled from {customer.displayName}.</p>}
+              {recipient.hint && <p className="text-xs text-muted-foreground" data-testid="jobcam-share-recipient-hint">{recipient.hint}</p>}
               <div className="flex justify-end gap-2">
                 <GooglePill size="sm" variant="quiet" label="Make another" onClick={() => setMade(null)} testId="jobcam-share-another" />
                 <GooglePill size="sm" variant="solid" icon={channel === "email" ? Mail : MessageSquare} label={send.isPending ? "Sending…" : channel === "email" ? "Send email" : "Send text"} disabled={send.isPending || !to.trim()} onClick={() => send.mutate(made)} testId="jobcam-share-send" />

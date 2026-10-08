@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { amountDueCents, previewEstimatePage } from "@shared/estimate-totals";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { apiErrorMessage, queryClient } from "@/lib/queryClient";
@@ -124,7 +125,9 @@ function PayCard({ token, company, estimate, payInfo }: {
   // Exactly what the pay route charges (payments.ts): the deposit when one is
   // set, otherwise the APPROVED total — which already reflects any optional
   // discounts the client ticked when signing.
-  const amount = estimate.depositCents || (estimate.approvedTotalCents ?? estimate.totalCents);
+  // One function for both sides (shared/estimate-totals.ts): a deposit is
+  // never more than the signed total.
+  const amount = amountDueCents(estimate);
   // Only a LOADED pay-info can say no rail is offered; while it loads (or if
   // it fails) the plain Pay button stays and the server answers honestly.
   const noOnlineRail = Boolean(payInfo) && !payInfo.cardAvailable && !payInfo.achAvailable;
@@ -506,33 +509,36 @@ export default function PublicEstimatePage() {
   // taxable base and tax is charged on the reduced base. The server
   // re-computes on approve; this is only what the client sees before signing.
   const offers: any[] = discountOffers ?? [];
-  const selBps = Math.min(10_000,
-    offers.filter((o) => selectedDiscounts.includes(o.id)).reduce((s, o) => s + (o.percentBps ?? 0), 0));
+  const tickedOffers = offers.filter((o) => selectedDiscounts.includes(o.id));
+  // ── Client-selectable scopes ──────────────────────────────────────────────
+  // Options carrying their own line items are checkboxes. The server
+  // regenerates the real document from the ticked ones — until then the
+  // client is looking at TWO candidate deals: the document as written, and
+  // the scopes they ticked. Both are totalled by the one shared function.
+  const selectable: any[] = (options ?? []).filter((o: any) => o.selectable);
+  const scopesOnOffer = selectable.length > 0 && !settled && !expired && !preview && !blocked;
+  const chosenOptions = scopesOnOffer ? selectable.filter((o) => selectedOptions.includes(o.id)) : [];
+  const live = previewEstimatePage(e, chosenOptions, tickedOffers);
+  const selBps = live.document.optionalDiscountBps;
   const previewing = selBps > 0 && !settled;
-  const optDiscountCents = Math.round(((e.taxableBaseCents ?? 0) * selBps) / 10_000);
-  const shownTaxCents = previewing
-    ? Math.round(((e.taxableBaseCents ?? 0) - optDiscountCents) * (e.taxRateBps ?? 0) / 10_000)
-    : e.taxCents;
+  const optDiscountCents = live.document.optionalDiscountCents;
+  const shownTaxCents = previewing ? live.document.taxCents : e.taxCents;
   const shownTotalCents = previewing
-    ? Math.max(0, (e.subtotalCents ?? 0) - (e.discountCents ?? 0) - optDiscountCents + shownTaxCents)
+    ? live.document.totalCents
     : (settled === "approved" ? (e.approvedTotalCents ?? e.totalCents) : e.totalCents);
+  // The deposit the pay step will ask for — never more than the total shown.
+  const shownDepositCents = e.depositCents ? Math.min(e.depositCents, shownTotalCents) : 0;
   const appliedDiscounts: any[] = settled === "approved" && Array.isArray(e.selectedDiscounts) ? e.selectedDiscounts : [];
 
   const toggleDiscount = (id: string, on: boolean) =>
     setSelectedDiscounts((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
-  // ── Client-selectable scopes ──────────────────────────────────────────────
-  // Options carrying their own line items are checkboxes; the live total uses
-  // the server's per-option subtotal/taxable and mirrors the approve-time
-  // discount math (server/crm/discounts.ts). The server regenerates the real
-  // document — this is only what the client sees before confirming.
-  const selectable: any[] = (options ?? []).filter((o: any) => o.selectable);
-  const chosenOptions = selectable.filter((o) => selectedOptions.includes(o.id));
-  const selSubtotalCents = chosenOptions.reduce((s, o) => s + (o.subtotalCents ?? 0), 0);
-  const selTaxableCents = chosenOptions.reduce((s, o) => s + (o.taxableCents ?? 0), 0);
-  const selDiscountCents = Math.round((selTaxableCents * selBps) / 10_000);
-  const selTaxCents = Math.round(((selTaxableCents - selDiscountCents) * (e.taxRateBps ?? 0)) / 10_000);
-  const selTotalCents = Math.max(0, selSubtotalCents - selDiscountCents + selTaxCents);
+  const sel = live.scopes;
+  const selSubtotalCents = sel ? sel.subtotalCents - sel.lineDiscountCents : 0;
+  const selDiscountCents = sel?.optionalDiscountCents ?? 0;
+  const selTaxCents = sel?.taxCents ?? 0;
+  const selTotalCents = sel?.totalCents ?? 0;
+  const scopePriceCents = (o: any) => (o.subtotalCents ?? 0) - (o.lineDiscountCents ?? 0);
   const toggleOption = (id: string, on: boolean) =>
     setSelectedOptions((cur) => (on ? [...cur, id] : cur.filter((x) => x !== id)));
 
@@ -641,7 +647,7 @@ export default function PublicEstimatePage() {
           </Card>
         )}
 
-        {selectable.length > 0 && !settled && !expired && !preview && !blocked ? (
+        {scopesOnOffer ? (
           <Card className="shadow-sm" data-testid="options-checklist">
             <CardHeader>
               <CardTitle className="text-lg">Choose your scopes</CardTitle>
@@ -667,7 +673,7 @@ export default function PublicEstimatePage() {
                         </div>
                         {o.description && <p className="text-xs mt-1.5 line-through">{o.description}</p>}
                         {o.subtotalCents != null && (
-                          <div className="text-xl font-semibold tabular-nums mt-3 line-through">{money(o.subtotalCents)}</div>
+                          <div className="text-xl font-semibold tabular-nums mt-3 line-through">{money(scopePriceCents(o))}</div>
                         )}
                       </div>
                     );
@@ -692,7 +698,7 @@ export default function PublicEstimatePage() {
                       </div>
                       {o.description && <p className="text-xs text-muted-foreground mt-1.5">{o.description}</p>}
                       {o.subtotalCents != null && (
-                        <div className="text-xl font-semibold tabular-nums mt-3">{money(o.subtotalCents)}</div>
+                        <div className="text-xl font-semibold tabular-nums mt-3">{money(scopePriceCents(o))}</div>
                       )}
                       {o.recommended && !reviewing && (
                         <div className="mt-2"><StatusPill tone="info" dot={false}>recommended</StatusPill></div>
@@ -949,10 +955,10 @@ export default function PublicEstimatePage() {
                 <div className="flex justify-between border-t pt-2 text-lg font-bold">
                   Total <span className="tabular-nums">{money(shownTotalCents)}</span>
                 </div>
-                {e.depositCents ? (
+                {shownDepositCents ? (
                   <div className="flex justify-between text-muted-foreground">
                     <span>Deposit due</span>
-                    <span className="font-medium tabular-nums">{money(e.depositCents)}</span>
+                    <span className="font-medium tabular-nums" data-testid="text-deposit-due">{money(shownDepositCents)}</span>
                   </div>
                 ) : null}
               </div>
@@ -1011,9 +1017,21 @@ export default function PublicEstimatePage() {
                   </span>
                 </label>
               ))}
-              {previewing && (
+              {/* The total these ticks lead to. With scopes ticked above,
+                  that is the ticked scopes' total (the same number as "Your
+                  total" in the scope card) — never the full estimate's. */}
+              {previewing && live.noteBasis === "scopes" && (
                 <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
-                  Your new total: <strong className="text-foreground">{money(shownTotalCents)}</strong> —
+                  Your new total for the {chosenOptions.length === 1 ? "scope" : `${chosenOptions.length} scopes`} you
+                  ticked ({chosenOptions.map((o) => o.name).join(", ")}):{" "}
+                  <strong className="text-foreground" data-testid="text-discount-note-total">{money(live.noteTotalCents)}</strong> —
+                  verified against the offer conditions when the job is scheduled. The full estimate as
+                  written would be {money(live.document.totalCents)}.
+                </p>
+              )}
+              {previewing && live.noteBasis === "document" && (
+                <p className="text-xs text-muted-foreground" data-testid="text-discount-note">
+                  Your new total: <strong className="text-foreground" data-testid="text-discount-note-total">{money(live.noteTotalCents)}</strong> —
                   verified against the offer conditions when the job is scheduled.
                 </p>
               )}
@@ -1047,6 +1065,16 @@ export default function PublicEstimatePage() {
                   placeholder={customer.displayName} data-testid="input-signature"
                   className="h-12 text-base" />
               </div>
+              {/* Ticking scopes is not a selection until it is generated:
+                  this button signs the document above, as written. */}
+              {chosenOptions.length > 0 && (
+                <p className="rounded-lg border border-amber-300/60 bg-amber-50 p-3 text-xs text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+                  data-testid="text-approve-scope-warning">
+                  You ticked {chosenOptions.map((o) => o.name).join(", ")} above. Approving here signs the full
+                  estimate as written — <strong>{money(shownTotalCents)}</strong>. To sign only what you ticked
+                  ({money(selTotalCents)}), use <strong>Review selection</strong> first.
+                </p>
+              )}
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button disabled={name.trim().length < 2 || respond.isPending}
                   className="w-full sm:w-auto h-12 sm:h-10"

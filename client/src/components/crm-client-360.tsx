@@ -16,7 +16,8 @@
  *   - PortalFinancing         — the org's financing links; every click is
  *                               recorded before the link opens
  */
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { inNativeApp } from "@/lib/app-shell";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -260,40 +261,95 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
 
 export function ViewAsClientButton({ customerId }: { customerId: string }) {
   const { toast } = useToast();
+  // The tab is opened IN the click (a real user gesture) and pointed at the
+  // preview once the grant is minted. Opening it after the request — as this
+  // did — is not a user gesture any more: Safari, Firefox and the iPhone app
+  // block that silently, and the button looked dead.
+  const tab = useRef<Window | null>(null);
+  // Set when no tab could be opened: the preview is offered as a plain link.
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+  const closeTab = () => { try { tab.current?.close(); } catch { /* already gone */ } tab.current = null; };
   const preview = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/customers/${customerId}/portal-preview`, {})).json(),
-    onSuccess: (r: any) => { if (r.url) window.open(r.url, "_blank", "noopener"); },
-    onError: (e: any) => toast({ title: "Could not open client view", description: String(e.message ?? e), variant: "destructive" }),
+    onSuccess: (r: any) => {
+      const url = typeof r?.url === "string" ? r.url : "";
+      if (!url) {
+        closeTab();
+        toast({ title: "Could not open client view", description: "The server did not return a preview link. Please try again.", variant: "destructive" });
+        return;
+      }
+      const w = tab.current;
+      tab.current = null;
+      if (w && !w.closed) { w.location.replace(url); return; }
+      // Inside the iPhone app there are no tabs: the preview opens in place
+      // (its banner carries the way back to this page).
+      if (inNativeApp()) { window.location.assign(url); return; }
+      setBlockedUrl(url);
+      toast({ title: "Your browser blocked the new tab", description: "Use the “Open client view” link next to the button." });
+    },
+    onError: (e: any) => {
+      closeTab();
+      toast({ title: "Could not open client view", description: String(e.message ?? e), variant: "destructive" });
+    },
   });
 
+  const start = () => {
+    setBlockedUrl(null);
+    let w: Window | null = null;
+    try { w = window.open("", "_blank"); } catch { w = null; }
+    if (w) {
+      try {
+        w.opener = null; // same isolation "noopener" gave, without losing the handle
+        w.document.title = "Opening the client view…";
+        w.document.body.style.cssText = "font:16px system-ui,sans-serif;margin:3rem;color:#444";
+        w.document.body.textContent = "Opening the client view… If nothing happens, close this tab and try again from the client's page.";
+      } catch { /* a blank tab still gets navigated below */ }
+    }
+    tab.current = w;
+    preview.mutate();
+  };
+
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => preview.mutate()}
-      disabled={preview.isPending}
-      data-testid="button-view-as-client"
-    >
-      {preview.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
-      See what the client sees
-    </Button>
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={start}
+        disabled={preview.isPending}
+        data-testid="button-view-as-client"
+      >
+        {preview.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
+        See what the client sees
+      </Button>
+      {blockedUrl && (
+        <a href={blockedUrl} target="_blank" rel="noopener" className="text-sm font-medium text-primary underline"
+          onClick={() => setBlockedUrl(null)} data-testid="link-view-as-client-fallback">
+          Open client view
+        </a>
+      )}
+    </span>
   );
 }
 
 /* ── Portal: the read-only banner for contractor previews ────────────────── */
 
-export function ContractorPreviewBanner({ customerName }: { customerName?: string | null }) {
+export function ContractorPreviewBanner({ customerName, returnUrl }: { customerName?: string | null; returnUrl?: string | null }) {
   return (
     <div
       data-testid="banner-contractor-preview"
-      className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2"
+      className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 flex flex-wrap items-center gap-2"
     >
       <Eye className="h-4 w-4 shrink-0" />
-      <span>
+      <span className="min-w-0 flex-1">
         <strong>Contractor preview</strong> — you're seeing this portal as {customerName ?? "your client"}.
         It is read-only: uploads, messages and financing applications are disabled.
       </span>
+      {returnUrl && (
+        <a href={returnUrl} className="font-medium underline whitespace-nowrap" data-testid="link-preview-back-to-crm">
+          ← Back to the CRM
+        </a>
+      )}
     </div>
   );
 }
