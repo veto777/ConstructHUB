@@ -10,6 +10,7 @@ import {
   DEFAULT_YOUTUBE_CHANNEL_ID, UPLOAD_CHUNK_BYTES, YT_ANALYTICS_SCOPE, YT_FORCE_SSL_SCOPE, YT_READONLY_SCOPE, YT_UPLOAD_SCOPE, YoutubeError,
   addToPlaylist, analyticsUrl, captionRequest, completeConnect, consentUrl, expectedChannelId, getChannelAnalytics, getYoutubeAccessToken,
   newPendingState, oauthErrorCode, requestedScopes, revokeToken, setThumbnail, stateMatches, uploadCaption, uploadSessionRequest, uploadVideo,
+  PUBLISH_AT_MIN_LEAD_MS, getVideoStatus, normalizePublishAt, updateVideoSchedule,
   type Deps, type YoutubeGrant,
 } from "./client";
 
@@ -289,6 +290,95 @@ describe("uploading a video", () => {
     const odd = mockFetch([{ status: 200, headers: { location: "https://elsewhere.example/upload" } }]);
     await expect(uploadVideo({ filePath: file, title: "x" }, deps(odd.http, memoryStore().store))).rejects.toMatchObject({ code: "upload" });
     expect(odd.calls).toHaveLength(1);
+  });
+});
+
+describe("scheduled publishing", () => {
+  const manage = () => memoryStore({ scopes: [YT_UPLOAD_SCOPE, YT_READONLY_SCOPE, YT_FORCE_SSL_SCOPE] });
+
+  it("sends a scheduled upload as private with publishAt in UTC, whatever privacy was asked for", () => {
+    const r = uploadSessionRequest({ filePath: "x", title: "t", privacyStatus: "public", publishAt: "2026-10-09T09:00:00-04:00" }, 1, NOW);
+    expect(r.body.status).toEqual({ privacyStatus: "private", publishAt: "2026-10-09T13:00:00Z", selfDeclaredMadeForKids: false });
+    expect(uploadSessionRequest({ filePath: "x", title: "t", privacyStatus: "public" }, 1, NOW).body.status).toEqual({ privacyStatus: "public", selfDeclaredMadeForKids: false });
+  });
+
+  it("refuses a publish time that is in the past, under 15 minutes ahead, or not a time", () => {
+    const at = (ms: number) => new Date(NOW + ms).toISOString();
+    expect(PUBLISH_AT_MIN_LEAD_MS).toBe(900_000);
+    expect(() => normalizePublishAt(at(-1000), NOW)).toThrow(/in the past/);
+    expect(() => normalizePublishAt(at(14 * 60_000), NOW)).toThrow(/15 minutes/);
+    expect(normalizePublishAt(at(15 * 60_000), NOW)).toBe("2026-10-07T12:15:00Z");
+    expect(normalizePublishAt("2026-11-01T06:00:00-05:00", NOW)).toBe("2026-11-01T11:00:00Z");
+    for (const bad of ["tomorrow", "2026-10-09", "2026-10-09T09:00:00", "", "2026-13-40T09:00:00Z"]) expect(() => normalizePublishAt(bad, NOW), bad).toThrow(YoutubeError);
+    expect(() => uploadSessionRequest({ filePath: "x", title: "t", publishAt: at(60_000) }, 1, NOW)).toThrow(/15 minutes/);
+  });
+
+  it("uploads with the schedule and returns the publishAt YouTube confirmed, opening no session for a bad time", async () => {
+    const file = path.join(dir, "sched.mp4");
+    await writeFile(file, Buffer.alloc(3000, 2));
+    const { http, calls } = mockFetch([
+      { status: 200, headers: { location: "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=s3" } },
+      { status: 200, json: { id: "vid_sched1", status: { privacyStatus: "private", uploadStatus: "uploaded", publishAt: "2026-10-09T13:00:00Z" } } },
+    ]);
+    const out = await uploadVideo({ filePath: file, title: "Scheduled", publishAt: "2026-10-09T13:00:00.000Z", categoryId: "26" }, deps(http, memoryStore().store));
+    expect(out).toEqual({ videoId: "vid_sched1", privacyStatus: "private", uploadStatus: "uploaded", publishAt: "2026-10-09T13:00:00Z" });
+    expect(JSON.parse(calls[0].body)).toEqual({
+      snippet: { title: "Scheduled", description: "", categoryId: "26" },
+      status: { privacyStatus: "private", publishAt: "2026-10-09T13:00:00Z", selfDeclaredMadeForKids: false },
+    });
+    const none = mockFetch([]);
+    await expect(uploadVideo({ filePath: file, title: "Late", publishAt: new Date(NOW - 60_000).toISOString() }, deps(none.http, memoryStore().store))).rejects.toMatchObject({ code: "request", status: 400 });
+    expect(none.calls).toHaveLength(0);
+  });
+
+  it("reads a video's status alone by default, and status + snippet + processing when asked", async () => {
+    const basic = mockFetch([{ json: { items: [{ status: { uploadStatus: "processed", privacyStatus: "public" } }] } }]);
+    expect(await getVideoStatus("vid_12345", deps(basic.http, memoryStore().store))).toEqual({ uploadStatus: "processed", privacyStatus: "public", rejectionReason: null, failureReason: null });
+    expect(basic.calls[0].url).toBe("https://www.googleapis.com/youtube/v3/videos?part=status&id=vid_12345");
+
+    const full = mockFetch([{ json: { items: [{
+      status: { uploadStatus: "processed", privacyStatus: "private", publishAt: "2026-10-09T13:00:00Z" },
+      snippet: { title: "How to search", channelId: DEFAULT_YOUTUBE_CHANNEL_ID, publishedAt: "2026-10-07T12:00:01Z", thumbnails: { default: {}, medium: {}, high: {} } },
+      processingDetails: { processingStatus: "succeeded" },
+    }] } }, { json: { items: [] } }]);
+    const d = deps(full.http, memoryStore().store); // youtube.readonly is enough: no manage scope in this store
+    expect(await getVideoStatus("vid_12345", d, { full: true })).toEqual({
+      uploadStatus: "processed", privacyStatus: "private", rejectionReason: null, failureReason: null,
+      publishAt: "2026-10-09T13:00:00.000Z", publishedAt: "2026-10-07T12:00:01.000Z", title: "How to search", channelId: DEFAULT_YOUTUBE_CHANNEL_ID,
+      processingStatus: "succeeded", thumbnailSizes: ["default", "medium", "high"],
+    });
+    expect(full.calls[0].url).toBe("https://www.googleapis.com/youtube/v3/videos?part=status%2Csnippet%2CprocessingDetails&id=vid_12345");
+    expect(full.calls[0].method).toBe("GET");
+    expect(await getVideoStatus("vid_12345", d, { full: true })).toBeNull();
+  });
+
+  it("moves a private video's publish time, sending back the status fields it must not reset", async () => {
+    const { http, calls } = mockFetch([
+      { json: { items: [{ status: { privacyStatus: "private", publishAt: "2026-10-09T13:00:00Z", embeddable: true, license: "youtube", publicStatsViewable: true, selfDeclaredMadeForKids: false, uploadStatus: "processed", madeForKids: false } }] } },
+      { json: { id: "vid_12345", status: { privacyStatus: "private", publishAt: "2026-10-10T16:00:00Z" } } },
+    ]);
+    const out = await updateVideoSchedule("vid_12345", "2026-10-10T12:00:00-04:00", deps(http, manage().store));
+    expect(out).toEqual({ videoId: "vid_12345", publishAt: "2026-10-10T16:00:00Z", privacyStatus: "private" });
+    expect(calls[0].url).toBe("https://www.googleapis.com/youtube/v3/videos?part=status&id=vid_12345");
+    expect(calls[1].method).toBe("PUT");
+    expect(calls[1].url).toBe("https://www.googleapis.com/youtube/v3/videos?part=status");
+    expect(JSON.parse(calls[1].body)).toEqual({
+      id: "vid_12345",
+      status: { privacyStatus: "private", publishAt: "2026-10-10T16:00:00Z", embeddable: true, license: "youtube", publicStatsViewable: true, selfDeclaredMadeForKids: false },
+    });
+  });
+
+  it("refuses to reschedule without the manage scope, a published video, a missing video, or a past time — before any write", async () => {
+    const none = mockFetch([]);
+    await expect(updateVideoSchedule("vid_12345", "2026-10-10T16:00:00Z", deps(none.http, memoryStore().store))).rejects.toMatchObject({ code: "missing_scope" });
+    await expect(updateVideoSchedule("vid_12345", new Date(NOW + 60_000).toISOString(), deps(none.http, manage().store))).rejects.toThrow(/15 minutes/);
+    expect(none.calls).toHaveLength(0);
+    const pub = mockFetch([{ json: { items: [{ status: { privacyStatus: "public" } }] } }]);
+    await expect(updateVideoSchedule("vid_12345", "2026-10-10T16:00:00Z", deps(pub.http, manage().store))).rejects.toMatchObject({ status: 409 });
+    expect(pub.calls).toHaveLength(1);
+    const gone = mockFetch([{ json: { items: [] } }]);
+    await expect(updateVideoSchedule("vid_12345", "2026-10-10T16:00:00Z", deps(gone.http, manage().store))).rejects.toMatchObject({ status: 404 });
+    expect(gone.calls).toHaveLength(1);
   });
 });
 

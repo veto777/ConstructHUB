@@ -319,7 +319,7 @@ function apiError(status: number, d: any): YoutubeError {
     return new YoutubeError("quota", "YouTube's daily limit for this app is used up. Try again after midnight Pacific time.", 429, { reason });
   if (status === 403 && /insufficient/i.test(reason))
     return new YoutubeError("missing_scope", "The connection does not include the permission this needs. Reconnect on /admin/youtube.", 403, { reason });
-  return new YoutubeError("request", `YouTube rejected the request (${status}${/^[A-Za-z_.]{1,60}$/.test(reason) ? ` ${reason}` : ""})`, status >= 500 ? 502 : 400, { reason });
+  return new YoutubeError("request", `YouTube rejected the request (${status}${/^[A-Za-z_.]{1,60}$/.test(reason) ? ` ${reason}` : ""})`, status >= 500 ? 502 : 400, { reason, httpStatus: status });
 }
 
 /* ── Upload (resumable protocol) ──────────────────────────────────────────── */
@@ -348,10 +348,29 @@ export type UploadVideoInput = {
   privacyStatus?: "private" | "unlisted" | "public";
   madeForKids?: boolean;
   defaultLanguage?: string;
+  /**
+   * Scheduled publishing: an ISO date-time at least PUBLISH_AT_MIN_LEAD_MS ahead. YouTube accepts
+   * `status.publishAt` only on a PRIVATE video that has never been published, and makes it public
+   * itself at that time — so with this set the request always says "private", whatever
+   * `privacyStatus` asks for. Sent as RFC 3339 in UTC.
+   */
+  publishAt?: string;
 };
 
+/** A scheduled time closer than this is refused: the upload and YouTube's processing have to finish first. */
+export const PUBLISH_AT_MIN_LEAD_MS = 15 * 60 * 1000;
+
+/** A publish time as YouTube wants it (RFC 3339, UTC, whole seconds) — or a refusal when it is not a time or is too soon. */
+export function normalizePublishAt(publishAt: string, now: number = Date.now()): string {
+  const t = typeof publishAt === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(publishAt) ? Date.parse(publishAt) : NaN;
+  if (!Number.isFinite(t)) throw new YoutubeError("request", "The publish time must be an ISO date-time with a time zone (2026-10-09T13:00:00Z)", 400);
+  if (t < now) throw new YoutubeError("request", "The publish time is in the past", 400);
+  if (t < now + PUBLISH_AT_MIN_LEAD_MS) throw new YoutubeError("request", "The publish time must be at least 15 minutes ahead", 400);
+  return new Date(Math.floor(t / 1000) * 1000).toISOString().replace(".000Z", "Z");
+}
+
 /** The metadata request that opens a resumable upload session (exported for the tests). */
-export function uploadSessionRequest(input: UploadVideoInput, size: number): { url: string; headers: Record<string, string>; body: any } {
+export function uploadSessionRequest(input: UploadVideoInput, size: number, now: number = Date.now()): { url: string; headers: Record<string, string>; body: any } {
   const title = input.title.trim();
   if (!title || title.length > 100 || /[<>]/.test(title)) throw new YoutubeError("upload", "A video title is 1–100 characters, without < or >", 400);
   const description = input.description ?? "";
@@ -366,15 +385,29 @@ export function uploadSessionRequest(input: UploadVideoInput, size: number): { u
       "X-Upload-Content-Length": String(size),
       "X-Upload-Content-Type": "video/*",
     },
-    body: { snippet, status: { privacyStatus: input.privacyStatus ?? "private", selfDeclaredMadeForKids: input.madeForKids ?? false } },
+    body: {
+      snippet,
+      status: input.publishAt !== undefined
+        ? { privacyStatus: "private", publishAt: normalizePublishAt(input.publishAt, now), selfDeclaredMadeForKids: input.madeForKids ?? false }
+        : { privacyStatus: input.privacyStatus ?? "private", selfDeclaredMadeForKids: input.madeForKids ?? false },
+    },
   };
 }
+
+/** `publishAt` is present only when YouTube's answer carried one (a scheduled upload). */
+export type UploadedVideo = { videoId: string; privacyStatus: string | null; uploadStatus: string | null; publishAt?: string };
+const uploaded = (d: any): UploadedVideo => ({
+  videoId: String(d.id), privacyStatus: d.status?.privacyStatus ?? null, uploadStatus: d.status?.uploadStatus ?? null,
+  ...(typeof d.status?.publishAt === "string" ? { publishAt: d.status.publishAt } : {}),
+});
 
 /**
  * Upload one video file. Returns the new video's id and the privacy status
  * YouTube actually gave it (which can be "private" whatever was asked for).
+ * With `publishAt` the video is uploaded private and YouTube publishes it at
+ * that time (videos.insert — covered by youtube.upload, scheduled or not).
  */
-export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<{ videoId: string; privacyStatus: string | null; uploadStatus: string | null }> {
+export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<UploadedVideo> {
   const http = deps.http ?? fetch;
   if (!input.source === !input.filePath) throw new YoutubeError("upload", "Give the video as a file path or as a source, not both", 400);
   const file = input.source ? null : await open(input.filePath!, "r");
@@ -399,8 +432,8 @@ export async function uploadVideo(input: UploadVideoInput, deps: Deps): Promise<
 
 async function sendVideo(
   input: UploadVideoInput, size: number, readChunk: (offset: number, length: number) => Promise<Buffer>, deps: Deps, http: typeof fetch,
-): Promise<{ videoId: string; privacyStatus: string | null; uploadStatus: string | null }> {
-  const session = uploadSessionRequest(input, size);
+): Promise<UploadedVideo> {
+  const session = uploadSessionRequest(input, size, (deps.now ?? Date.now)());
   const { r: opened } = await call(deps, session.url, { method: "POST", headers: session.headers, body: JSON.stringify(session.body) });
   const location = opened.headers.get("location");
   if (!location || !location.startsWith("https://www.googleapis.com/")) throw new YoutubeError("upload", "YouTube did not open an upload session");
@@ -425,7 +458,7 @@ async function sendVideo(
       if (r.status === 200 || r.status === 201) {
         const d: any = await r.json().catch(() => ({}));
         if (!d?.id) throw new YoutubeError("upload", "YouTube accepted the file but returned no video id");
-        return { videoId: String(d.id), privacyStatus: d.status?.privacyStatus ?? null, uploadStatus: d.status?.uploadStatus ?? null };
+        return uploaded(d);
       }
       if (r.status === 308) { offset = nextOffset(r); failures = 0; await input.onProgress?.(offset, size); continue; }
       if (r.status >= 500 && ++failures <= 5) {
@@ -436,7 +469,7 @@ async function sendVideo(
         catch { continue; }
         if (s.status === 200 || s.status === 201) {
           const d: any = await s.json().catch(() => ({}));
-          if (d?.id) return { videoId: String(d.id), privacyStatus: d.status?.privacyStatus ?? null, uploadStatus: d.status?.uploadStatus ?? null };
+          if (d?.id) return uploaded(d);
         }
         if (s.status === 308) offset = nextOffset(s);
         continue;
@@ -449,17 +482,79 @@ async function sendVideo(
 /**
  * What YouTube says about one of the channel's own videos after the upload:
  * `uploadStatus` is uploaded → processed, or rejected / failed / deleted with
- * a reason. Null when YouTube no longer lists the video. (videos.list, part
- * status — covered by youtube.readonly.)
+ * a reason. Null when YouTube no longer lists the video.
+ *
+ * videos.list is covered by youtube.readonly (which both kinds of connection
+ * have). By default only part=status is asked for. `{ full: true }` asks for
+ * status, snippet and processingDetails — processingDetails is an owner-only
+ * part, which the same youtube.readonly grant of the channel's owner covers —
+ * and fills the optional fields: the scheduled time, when it went public, the
+ * title, how far processing is, and which thumbnail sizes exist.
  */
-export type VideoStatus = { uploadStatus: string | null; privacyStatus: string | null; rejectionReason: string | null; failureReason: string | null };
-export async function getVideoStatus(videoId: string, deps: Deps): Promise<VideoStatus | null> {
+export type VideoStatus = {
+  uploadStatus: string | null; privacyStatus: string | null; rejectionReason: string | null; failureReason: string | null;
+  /** The scheduled publish time (only while the video is private and scheduled). */
+  publishAt?: string | null;
+  /** When the video went public (for a private video: when it was uploaded). */
+  publishedAt?: string | null;
+  title?: string | null;
+  channelId?: string | null;
+  /** processingDetails.processingStatus: processing | succeeded | failed | terminated. */
+  processingStatus?: string | null;
+  /**
+   * The thumbnail sizes YouTube lists (default, medium, high, standard, maxres). The API has no
+   * field that says whether a thumbnail is a custom one — this is only what exists.
+   */
+  thumbnailSizes?: string[];
+};
+export async function getVideoStatus(videoId: string, deps: Deps, opts: { full?: boolean } = {}): Promise<VideoStatus | null> {
   if (!idOk(videoId)) throw new YoutubeError("request", "Invalid video id", 400);
-  const { d } = await call(deps, `${API}/videos?part=status&id=${encodeURIComponent(videoId)}`);
-  const s = (Array.isArray(d?.items) ? d.items : [])[0]?.status;
+  const { d } = await call(deps, `${API}/videos?part=${opts.full ? "status%2Csnippet%2CprocessingDetails" : "status"}&id=${encodeURIComponent(videoId)}`);
+  const item = (Array.isArray(d?.items) ? d.items : [])[0];
+  const s = item?.status;
   if (!s) return null;
   const text = (v: unknown) => (typeof v === "string" && /^[A-Za-z]{1,40}$/.test(v) ? v : null);
-  return { uploadStatus: text(s.uploadStatus), privacyStatus: text(s.privacyStatus), rejectionReason: text(s.rejectionReason), failureReason: text(s.failureReason) };
+  const time = (v: unknown) => (typeof v === "string" && Number.isFinite(Date.parse(v)) ? new Date(Date.parse(v)).toISOString() : null);
+  const base = { uploadStatus: text(s.uploadStatus), privacyStatus: text(s.privacyStatus), rejectionReason: text(s.rejectionReason), failureReason: text(s.failureReason) };
+  if (!opts.full) return base;
+  const thumbs = item.snippet?.thumbnails;
+  return {
+    ...base,
+    publishAt: time(s.publishAt),
+    publishedAt: time(item.snippet?.publishedAt),
+    title: typeof item.snippet?.title === "string" ? item.snippet.title.slice(0, 200) : null,
+    channelId: typeof item.snippet?.channelId === "string" && idOk(item.snippet.channelId) ? item.snippet.channelId : null,
+    processingStatus: text(item.processingDetails?.processingStatus),
+    thumbnailSizes: thumbs && typeof thumbs === "object" ? Object.keys(thumbs).filter((k) => /^[a-z]{1,12}$/.test(k)) : [],
+  };
+}
+
+/**
+ * Move (or set) the scheduled publish time of a video that is still private.
+ *
+ * videos.update is NOT covered by youtube.upload or youtube.readonly: it needs
+ * youtube.force-ssl (or the broader youtube / youtubepartner), the same
+ * permission captions and playlists need. An update of part=status replaces
+ * every writable field of that part, so the current values are read first
+ * (videos.list, youtube.readonly) and sent back unchanged beside the new time.
+ * A video that is already public (or unlisted) is refused: YouTube schedules
+ * only a private video that has never been published.
+ */
+export async function updateVideoSchedule(videoId: string, publishAt: string, deps: Deps): Promise<{ videoId: string; publishAt: string; privacyStatus: string | null }> {
+  if (!idOk(videoId)) throw new YoutubeError("request", "Invalid video id", 400);
+  const at = normalizePublishAt(publishAt, (deps.now ?? Date.now)());
+  await requireManageScope(deps, "Rescheduling a video");
+  const { d: cur } = await call(deps, `${API}/videos?part=status&id=${encodeURIComponent(videoId)}`);
+  const s = (Array.isArray(cur?.items) ? cur.items : [])[0]?.status;
+  if (!s) throw new YoutubeError("request", "YouTube does not list this video", 404);
+  if (s.privacyStatus !== "private") throw new YoutubeError("request", "Only a private video can be scheduled; this one is already published", 409);
+  const status: Record<string, unknown> = { privacyStatus: "private", publishAt: at };
+  for (const k of ["embeddable", "license", "publicStatsViewable", "selfDeclaredMadeForKids", "containsSyntheticMedia"] as const)
+    if (s[k] !== undefined) status[k] = s[k];
+  const { d } = await call(deps, `${API}/videos?part=status`, {
+    method: "PUT", headers: { "Content-Type": "application/json; charset=UTF-8" }, body: JSON.stringify({ id: videoId, status }),
+  });
+  return { videoId, publishAt: typeof d?.status?.publishAt === "string" ? d.status.publishAt : at, privacyStatus: d?.status?.privacyStatus ?? null };
 }
 
 /** "Range: bytes=0-N" on a 308 says N+1 bytes are stored; no Range header means none are. */

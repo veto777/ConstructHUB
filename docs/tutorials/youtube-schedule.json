@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "timezone": "America/New_York",
+  "channelId": "UCRsxhhzhirrQCnqETChhyFw",
+  "videos": [
+    {
+      "helpKey": "database-directory",
+      "title": "How to Find Any Building Permit Office & Permit Portal (All 50 States) | ConstructHUB",
+      "videoId": "AOXDXMcGM_I",
+      "url": "https://www.youtube.com/watch?v=AOXDXMcGM_I",
+      "status": "published",
+      "publishAt": "2026-10-07T22:38:22.000Z",
+      "publishAtEastern": "2026-10-07 18:38 EDT (Wednesday)",
+      "uploadedAt": null,
+      "sha256": "0b38aee8a0a66f3ece523d3dbecda7e5e68bc818c20030fb68e1ac0b77ab09f6",
+      "captions": "not recorded (posted by the one-off script)",
+      "thumbnail": "ok",
+      "playlist": "not recorded (posted by the one-off script)",
+      "note": "Posted public on 2026-10-07 (Eastern) by a one-off script, before this scheduler existed. Thumbnail set 2026-10-08T00:35Z after the channel was phone-verified.",
+      "checkedAt": "2026-10-08T00:40:39.267Z"
+    },
+    {
+      "helpKey": "crm-clients",
+      "title": "How to find a client and read their page | ConstructHUB CRM",
+      "videoId": "WekJrfc9uKA",
+      "url": "https://www.youtube.com/watch?v=WekJrfc9uKA",
+      "status": "published",
+      "publishAt": "2026-10-08T00:08:51.000Z",
+      "publishAtEastern": "2026-10-07 20:08 EDT (Wednesday)",
+      "uploadedAt": "2026-10-08T00:08:28.456Z",
+      "sha256": "522893de281f48795c44507b5c962f62efa37974988360f173a5222b0a0a55c7",
+      "captions": "ok",
+      "thumbnail": "ok",
+      "playlist": "ok",
+      "note": "Posted public on 2026-10-07 (Eastern) by a one-off script, before this scheduler existed. Thumbnail set 2026-10-08T00:35Z after the channel was phone-verified.",
+      "checkedAt": "2026-10-08T00:40:39.267Z"
+    },
+    {
+      "helpKey": "crm-create-estimate",
+      "title": "How to create and send an estimate | ConstructHUB CRM",
+      "videoId": "LBp-QTFJ54E",
+      "url": "https://www.youtube.com/watch?v=LBp-QTFJ54E",
+      "status": "published",
+      "publishAt": "2026-10-08T00:08:51.000Z",
+      "publishAtEastern": "2026-10-07 20:08 EDT (Wednesday)",
+      "uploadedAt": "2026-10-08T00:08:32.581Z",
+      "sha256": "0113926615beea57f566766f6dde24a5e237d3f6319e9550ed2bfb3b1bb92210",
+      "captions": "ok",
+      "thumbnail": "ok",
+      "playlist": "ok",
+      "note": "Posted public on 2026-10-07 (Eastern) by a one-off script, before this scheduler existed. Thumbnail set 2026-10-08T00:35Z after the channel was phone-verified.",
+      "checkedAt": "2026-10-08T00:40:39.267Z"
+    },
+    {
+      "helpKey": "crm-schedule",
+      "title": "How to schedule and edit an appointment | ConstructHUB CRM",
+      "videoId": "-IbM3E9w04I",
+      "url": "https://www.youtube.com/watch?v=-IbM3E9w04I",
+      "status": "published",
+      "publishAt": "2026-10-08T00:09:03.000Z",
+      "publishAtEastern": "2026-10-07 20:09 EDT (Wednesday)",
+      "uploadedAt": "2026-10-08T00:08:36.837Z",
+      "sha256": "caf01312e71c613aff353289121d2f5d858076abd3e0644606d865ad70a07f03",
+      "captions": "ok",
+      "thumbnail": "ok",
+      "playlist": "ok",
+      "note": "Posted public on 2026-10-07 (Eastern) by a one-off script, before this scheduler existed. Thumbnail set 2026-10-08T00:35Z after the channel was phone-verified.",
+      "checkedAt": "2026-10-08T00:40:39.267Z"
+    }
+  ]
+}

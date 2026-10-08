@@ -125,8 +125,9 @@ selectors (`text=Outstanding balance`) only where there is no test id.
 
 ## Publishing to YouTube
 
-Nothing is uploaded to YouTube by the line: there are no YouTube credentials. Each production leaves
-everything upload-ready in `analysis/video-out/<helpKey>/`:
+Producers do not upload anything: a production leaves everything upload-ready in
+`analysis/video-out/<helpKey>/`, and **one** person or agent — the coordinator, never a producer slot
+— runs the scheduler from an up-to-date checkout of `main` on vb11.
 
 | File | What it is |
 | --- | --- |
@@ -135,14 +136,74 @@ everything upload-ready in `analysis/video-out/<helpKey>/`:
 | `thumbnail.jpg` | 1280×720, under 2 MB (`thumbnail-320.png`: the same at list size) |
 | `youtube.json` | Channel (Construct HUB, `@ConstructHUB-t3v`, `UCRsxhhzhirrQCnqETChhyFw`), title, description with chapter timestamps from the step timings, "Try it" and in-app help links, tags, playlist, category, `madeForKids: false`, language `en`, `privacyStatus: "private"`, and the measured size / length / loudness of the file |
 
-By hand today: upload `walkthrough.mp4` in YouTube Studio, paste title / description / tags from
-`youtube.json`, add `captions.srt` ("with timing"), set `thumbnail.jpg`, file it in the playlist.
+### The scheduler — `scripts/tutorials/youtube-schedule.ts`
 
-`scripts/tutorials/youtube-upload.ts <helpKey>` is the next piece: a dry run by default (it prints
-what it would send), `--upload` refuses without `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`
-(OAuth, `youtube.upload` scope, granted by the channel's owner). It always uploads **private** — the
-owner publishes. It is written from the API reference and has **never been run against Google**; the
-first real upload is one video, by hand, with the owner watching.
+Three videos a day, published **by YouTube itself**: each video is uploaded now as *private* with a
+publish time (`status.publishAt`) and YouTube makes it public at that time. Nothing of ours has to be
+running when a video goes out, and there is no cron.
+
+```bash
+cd ~/ConstructHUB-<checkout of main>          # the manifests in shared/help/videos decide what is eligible
+S="npx tsx --env-file=/home/voiceban/ConstructHUB-live/.env scripts/tutorials/youtube-schedule.ts"
+
+npx tsx scripts/tutorials/youtube-schedule.ts   # DRY RUN (default): the table of what would go out and when
+$S --go                                         # upload them: private + publish time, captions, thumbnail, playlist
+$S --reconcile                                  # ask YouTube what really happened; update the ledger
+$S --retry-thumbnails --go                      # set thumbnails that are not "ok" yet
+npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutorials/youtube-calendar.md
+```
+
+- **When.** After a batch of videos has been merged to `main` and deployed (so the in-app page the
+  description links to shows the video): dry run, read the table, `--go`, `--calendar`, commit the
+  ledger and the calendar. `--reconcile` once a day while videos are going out — it exits 2 and
+  prints `!!!!` lines when something needs a person.
+- **The ledger**, `docs/tutorials/youtube-schedule.json` (committed), is the source of truth for what
+  is posted: video id, link, status (`scheduled` / `published` / `failed`), the publish time in UTC
+  and Eastern, the sha256 of the mp4 that went up, and how captions / thumbnail / playlist went. It
+  is written after every video and every step, so an interrupted run loses nothing. **A key that is
+  in the ledger is never uploaded again**, and a slot that is taken is never moved.
+- **Eligible** = `walkthrough.mp4` + `captions.srt` + `youtube.json` in an out-dir, the mp4 is the
+  encode `youtube.json` describes, **and** `shared/help/videos/<helpKey>.json` exists in the checkout
+  the tool runs from (the video is merged). `--out-dir DIR` (repeatable) says where to look; by
+  default every `~/ConstructHUB*/analysis/video-out`. The dry run lists what it found but will not
+  post, and why; `--include-unmerged` (dry run only) previews those too.
+- **Slots.** Every day in America/New_York gets one morning, one midday and one late time, each from
+  its own pool (06:00 06:30 07:00 08:00 09:00 · 11:00 12:00 12:30 13:00 14:00 · 15:30 16:00 17:00
+  18:30 19:30), picked from the date itself: always at least three hours apart, never the same time
+  in the same slot two days running, the same answer every time it is asked, DST-correct. The host
+  clock (UTC on vb11) plays no part. `--per-day 2` is morning + late; `--per-day 1` is one time a day
+  from 06:00 09:00 12:00 14:00 16:00 18:30 08:00 11:00 15:00 19:30. New videos start tomorrow
+  (Eastern) or on the last day in the ledger that still has a free slot; `--start YYYY-MM-DD` moves that.
+- **Order**, `docs/tutorials/youtube-order.json`: tracks, one per area (getting started, clients and
+  leads, estimates, schedule, invoices and payments, projects, JobCam, messages, team and settings,
+  integrations, client portal), each in learning order. The scheduler takes one video from each track
+  in turn, so a day's three videos come from three areas. A key that is not produced yet keeps its
+  place and takes the next free slot when it arrives; a key in no track goes last, alphabetically.
+  Add a new feature's key to its track when you add its row to `CRM-VIDEO-PLAN.md`.
+- **Quota.** One run uploads at most `--max` videos (default 30; the project allows about 100
+  uploads a day and customers' own uploads share that). When YouTube says the day's limit is used up
+  the run stops cleanly; run it again after midnight Pacific.
+- **A new cut of a posted video** is reported ("the mp4 … is NOT the file that was uploaded") and not
+  re-uploaded. `--replace <helpKey>` uploads the new file into the same slot (or the next free one if
+  the old one is already public) and prints the old video id: **delete that one by hand in YouTube
+  Studio** — the tool never deletes a video, and an old scheduled video would otherwise go public too.
+- **Category** is `youtube.json`'s `categoryId` (the step script's `youtube.category`, 28 by default);
+  26 (Howto & Style) when it names none; `--category N` forces one for a run. Never made for kids.
+- **Thumbnails.** The channel is phone-verified (since 2026-10-08), so `thumbnail.jpg` is set with the
+  upload. A refusal is recorded as `failed: …` and shouted about; a video with no `thumbnail.jpg` yet
+  is `pending`. `--retry-thumbnails --go` tries every one that is not `ok` again.
+- **What it touches in production:** it reads the channel connection from the production database and
+  saves the refreshed access token there (the same thing the server does). Nothing else is written.
+  The plain dry run and `--calendar` use neither the database nor Google.
+- **What YouTube requires for a scheduled upload:** the video must be private and never published;
+  the time at least 15 minutes ahead (the tool keeps an hour). A Google Cloud project that has not
+  passed YouTube's API audit gets its uploads locked private — this project's uploads did go public
+  on 2026-10-07, so it is not locked today; if that ever changes, `--reconcile` reports the video as
+  `LOCKED PRIVATE` once its time has passed.
+
+The library is `server/youtube/schedule.ts` (tests: `server/youtube/schedule.test.ts`); the YouTube
+calls are in `server/youtube/client.ts` (`uploadVideo` with `publishAt`, `updateVideoSchedule`,
+`getVideoStatus`).
 
 **The thumbnail template** (`scripts/tutorials/brand.ts`, rendered by `thumbnail.ts`): a saturated
 brand-blue field (#1a73e8, brighter and deeper at the edges) with faint rays, an orange shape

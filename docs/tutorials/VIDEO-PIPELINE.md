@@ -44,7 +44,7 @@ orange with the mascot.
 | Machine-wide locks under `/tmp/claude-1000/constructhub-tutorials/`: `tts.lock` (one voice request at a time, 250 ms pause, shared clip cache `tts-cache/`), `encode.lock` (one ffmpeg at a time, `nice -n 10`, `-threads 4`), `slot<N>.lock` | `scripts/tutorials/lib.ts` (`withLock`, `run`) |
 | Intro card, end card and the YouTube thumbnail (our artwork, bundled Anton font) | `scripts/tutorials/brand.ts`, `thumbnail.ts`, `assets/` |
 | One manifest file per video + one file per new help entry, collected through generated indexes (`merge=union`) | `shared/help/videos/`, `shared/help/entries/<group>/`, `scripts/tutorials/gen-index.ts` |
-| YouTube metadata per video, and a dry-run uploader that has never been run against Google | `youtube.json` from `mux.ts`; `scripts/tutorials/youtube-upload.ts` |
+| YouTube metadata per video; the scheduler that posts three a day through YouTube's own scheduled publishing, with its ledger, order and calendar | `youtube.json` from `mux.ts`; `scripts/tutorials/youtube-schedule.ts`, `server/youtube/schedule.ts`, `docs/tutorials/youtube-{schedule,order}.json`, `youtube-calendar.md` — see "Publishing to YouTube" in `PRODUCER-GUIDE.md` |
 
 **Recording databases are schemas today.** The intended design is `CREATE DATABASE <name> TEMPLATE
 constructhub_tut_template`. The dev role (`constructhub_dev`) has no CREATEDB on vb11 and
@@ -326,7 +326,7 @@ permissions line, the "Connections" list heading and `tab-connection-work-queue`
 2. Grant the dev role CREATEDB (or pre-create the databases) so recording databases are real
    databases, as designed; then test `db.ts` in database mode.
 3. Owner inputs: a Stripe test-mode account and a HOVER sandbox for the demo workspace (three BLOCKED
-   videos), YouTube OAuth credentials (the uploader is untested), a demo Cloudflare account and a
+   videos), a demo Cloudflare account and a
    demo Google account for the platform videos, and (only if wanted) Higgsfield.
 4. Recorder: a drag action (pipeline), a file-upload action (imports, logo), the client host with its
    one-time code (the homeowner's side of an estimate).
