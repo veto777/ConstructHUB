@@ -7,6 +7,7 @@ export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_discount_defaults } from "./crm-discount-defaults.json";
 export { default as v_crm_estimate_attachments } from "./crm-estimate-attachments.json";
 export { default as v_crm_estimate_tax_deposit } from "./crm-estimate-tax-deposit.json";
+export { default as v_crm_financing } from "./crm-financing.json";
 export { default as v_crm_follow_up_cadence } from "./crm-follow-up-cadence.json";
 export { default as v_crm_hover } from "./crm-hover.json";
 export { default as v_crm_integrations } from "./crm-integrations.json";
