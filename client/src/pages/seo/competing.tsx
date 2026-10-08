@@ -37,17 +37,24 @@ export function CompetingPages({ site }: { site: SeoSite }) {
       {d.comparable === 0 ? `Not enough checks yet to say whether Google switches between your pages: none of your ${fmtNum(d.keywords)} checked keyword${d.keywords === 1 ? "" : "s"} has ranked in two checks.` : `No change of address seen: ${basis}, and for each of them the checks recorded the same address every time.`}
     </p>
   );
-  // Each address is its own fact (a fact holds 300 characters; one long list would be cut mid-address). Up to five,
-  // newest first, each with how often it was shown; the rest are counted. Twelve facts at most, plain names (server/seo/tasks.ts).
-  const task = (i: Item): PlanTask => ({
-    kind: "page", title: `Look at which page should rank for "${i.keyword}"${town(i.location) ? ` (${town(i.location)})` : ""}`, target: i.pages[0]?.url ?? null,
-    facts: {
-      ...Object.fromEntries(i.pages.slice(0, 5).map((p, n) => [`page${n + 1}`, `${p.url} — ${p.times} of ${i.checks} checks, last ${p.lastSeen} at position ${p.lastPosition}`.slice(0, 300)])),
-      ...(i.pages.length > 5 ? { morePages: i.pages.length - 5 } : {}),
-      ...(i.variants?.length ? { variants: `${i.variants.length} group${i.variants.length === 1 ? "" : "s"} of addresses differing only by http/https, www or a last slash` } : {}),
-      device: i.device, location: i.location ?? "not set", checks: `${i.checks} ranked checks, ${i.switches} change${i.switches === 1 ? "" : "s"} of address`, period: `${i.firstRanked} to ${i.lastRanked}`, latestCheck: i.lastCheck,
-    }, source: `competing:${i.keywordId}`,
-  });
+  // What the task keeps (12 facts of 300 characters at most, plain names — server/seo/tasks.ts): the three addresses shown
+  // most recently, each as its own fact and each with its evidence as another, so neither is cut to fit the other. An
+  // address too long for a fact is not shortened into what would look like another address — its site and the
+  // beginning of its path are given, marked as cut.
+  const fitUrl = (u: string) => { if (u.length <= 300) return u; try { const x = new URL(u); return `${x.origin}${x.pathname.slice(0, 120)}… (address too long to keep whole — see the rank tracker)`; } catch { return "(address too long to keep — see the rank tracker)"; } };
+  const task = (i: Item): PlanTask => {
+    const rankedAny = i.lastRankedAny ?? i.lastRanked;
+    return {
+      kind: "page", title: `Look at which page should rank for "${i.keyword}"${town(i.location) ? ` (${town(i.location)})` : ""}`, target: i.pages[0]?.url && i.pages[0].url.length <= 500 ? i.pages[0].url : null,
+      facts: {
+        ...Object.fromEntries(i.pages.slice(0, 3).flatMap((p, n) => [[`page${n + 1}`, fitUrl(p.url)], [`page${n + 1}Seen`, `${p.times} of ${i.checks} ranked checks, last ${p.lastSeen} at position ${p.lastPosition}, best ${p.best}`]])),
+        ...(i.pages.length > 3 ? { morePages: i.pages.length - 3 } : {}),
+        ...(i.variants?.length ? { variants: `${i.variants.length} group${i.variants.length === 1 ? "" : "s"} of addresses differing only by http/https, www or a last slash — not checked whether they are one page` } : {}),
+        where: `${i.device}${i.location ? ` · ${i.location}` : ""}`, checks: `${i.checks} ranked checks from ${i.firstRanked} to ${i.lastRanked}, ${i.switches} change${i.switches === 1 ? "" : "s"} of address`,
+        latest: i.lastCheck > rankedAny ? `${i.lastCheck}: not found` : rankedAny > i.lastRanked ? `${rankedAny}: ranked, page not recorded` : `${i.lastRanked}: ranked, page recorded`,
+      }, source: `competing:${i.keywordId}`,
+    };
+  };
   const table = (items: Item[], testId: string) => (
     <div className="overflow-x-auto">
       <table className="g-table w-full" data-testid={testId}>
@@ -95,7 +102,7 @@ export function CompetingPages({ site }: { site: SeoSite }) {
         </>
       ) : <p className="g-text-2 mb-2 text-[13px]" data-testid="competing-no-alternating">No keyword was seen going back and forth between two pages.</p>}
       {([["changed", changed, "where the page changed and has not changed back", "That is normal after a page is moved, replaced or improved — worth a look only if the page shown now is not the one you want found."],
-         ["variants", variants, "shown under addresses that differ only slightly", "Addresses that differ only by http/https, \"www\" or a last slash. They may be one page reached two ways, or two pages — this has not been checked. If opening one does not take you to the other, they are two pages to Google."]] as const).map(([k, list, what, note]) => list.length > 0 && (
+         ["variants", variants, "shown under addresses that differ only slightly", "Addresses that differ only by http/https, \"www\" or a last slash. They may be one page reached two ways, or two pages — this has not been checked. It depends on whether one redirects to the other, on the canonical tag each carries, and in the end on which address Google itself chooses; URL Inspection in Search Console shows that choice."]] as const).map(([k, list, what, note]) => list.length > 0 && (
         <div className="mt-2" key={k}>
           <button type="button" className="g-link text-[13px]" aria-expanded={more === k} onClick={() => setMore(more === k ? null : k)} data-testid={`button-competing-${k}`}>{more === k ? "Hide" : "Show"} {list.length} keyword{list.length === 1 ? "" : "s"} {what}</button>
           {more === k && (<><p className="g-text-2 my-2 max-w-3xl text-[13px]">{note}</p>{table(list, `table-competing-${k}`)}</>)}

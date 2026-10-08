@@ -85,6 +85,16 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
     };
   }
   const i = (Array.isArray(a.items) ? a.items[0] : null) ?? {};
+  // Keyword watch: searches the site started, or stopped, ranking for between two monthly snapshots.
+  if (a.kind === "kw_new" || a.kind === "kw_lost") {
+    const list: any[] = Array.isArray(i.keywords) ? i.keywords : [];
+    const line = (k: any) => (a.kind === "kw_new" ? `"${k.keyword}" — position ${k.position ?? "?"}${k.volume != null ? `, ${k.volume} searches a month` : ""}` : `"${k.keyword}" — was at position ${k.was ?? "?"}`);
+    return {
+      kind: a.kind === "kw_new" ? "seo.rank_gain" : "seo.rank_drop", title: a.title, severity: a.kind === "kw_new" ? "info" : "warning",
+      body: `Since the snapshot of ${i.since ?? "last month"}:\n` + list.slice(0, 5).map(line).join("\n") + (list.length + (Number(i.more) || 0) > 5 ? `\n…and ${list.length + (Number(i.more) || 0) - 5} more.` : ""),
+      actionLabel: "See the keywords", actionUrl: "/seo/alerts",
+    };
+  }
   if (a.kind === "grid_down" || a.kind === "grid_up")
     return {
       kind: "seo.grid_change", title: a.title, severity: a.kind === "grid_down" ? "warning" : "info",
