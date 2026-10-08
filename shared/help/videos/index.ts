@@ -7,6 +7,7 @@ export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_follow_up_cadence } from "./crm-follow-up-cadence.json";
 export { default as v_crm_hover } from "./crm-hover.json";
 export { default as v_crm_integrations } from "./crm-integrations.json";
+export { default as v_crm_migrate_assisted } from "./crm-migrate-assisted.json";
 export { default as v_crm_migrate } from "./crm-migrate.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_database_directory } from "./database-directory.json";
