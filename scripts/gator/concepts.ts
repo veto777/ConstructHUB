@@ -16,6 +16,7 @@
  */
 import type { Cue } from "./sound";
 import { MORE_CONCEPTS } from "./concepts-more";
+import { LIVE_CONCEPTS } from "./concepts-live";
 
 /** What every still prompt starts with: the mascot, as drawn (client/public/mascot/gator-standing-1024.v1.webp). */
 export const CHARACTER = [
@@ -26,7 +27,7 @@ export const CHARACTER = [
   "Same thick black outlines, same glossy cel-shaded cartoon sticker style, same colours and proportions as the references. The whole scene, background included, is drawn in that same bold cartoon style — not photorealistic.",
 ].join(" ");
 /** …and ends with. */
-export const FRAMING = "Vertical 9:16 illustration, full-bleed: the artwork fills the whole tall frame from edge to edge, with no border, margin, panel or white band. The character is large and sits in the middle band of the frame; the top third of the frame is calm, empty background (sky, wall or ceiling) with his hard hat below it, and the bottom quarter holds nothing important. Exactly one alligator. No people. No text, letters, numbers, signs with writing, logos, brand names, badges or watermarks anywhere.";
+export const FRAMING = "Vertical 9:16 illustration, full-bleed: the artwork fills the whole tall frame from edge to edge, with no border, margin, panel, vignette or white band; the background scene (ground, walls, sky) is drawn right out to all four edges, never a plain white or blank backdrop. The character is large and sits in the middle band of the frame; the top third of the frame is calm, empty background (sky, wall or ceiling) with his hard hat below it, and the bottom quarter holds nothing important. Exactly one alligator. No people. No text, letters, numbers, signs with writing, logos, brand names, badges or watermarks anywhere.";
 export const NEGATIVE = "text, letters, numbers, captions, logo, brand name, watermark, photorealistic, live action, extra limbs, extra fingers, deformed hands, second alligator, human, sunglasses removed, hard hat removed, flicker, morphing";
 export const MOTION_STYLE = "2D cartoon animation, the same bold cel-shaded style as the image, smooth and simple motion. His hard hat and sunglasses stay on. Nothing morphs. No text appears.";
 
@@ -43,6 +44,37 @@ export type Shot = {
   shiftDown?: number;
   /** Caption beats, in seconds from the start of this shot as it plays. The first beat of the first shot is the hook. */
   beats: ShotBeat[];
+  /**
+   * He talks (docs/gator/VOICE.md). The line is spoken in his one voice (voice.ts) and starts `lead`
+   * seconds into the shot (default 0.5). Write it for the voice: dry, short, trade-savvy.
+   */
+  say?: { text: string; lead?: number };
+  /**
+   * Which model animates the shot. Default "kling" (Kling 2.5 Turbo Standard, 720p). "kling-pro": the
+   * same family's Pro tier, for a hero shot. "wan-talk": Wan 2.7 driven by the spoken line, so the jaw
+   * follows the words (needs `say`). "kling-voice": Kling 3.0 with its own generated voice — a
+   * the first comparison sample. "talk": THE HOUSE METHOD since the owner heard the samples (2026-10-08):
+   * Kling 3.0 Standard with its own sound, the fixed voice description below, the line in quotes; every
+   * take is measured against the approved voice and transcribed (voiceprint.ts, asr.py).
+   */
+  video?: "kling" | "kling-pro" | "wan-talk" | "kling-voice" | "talk";
+  /** Seconds to generate for this shot (default 5; only "talk" may ask for more — up to 15 — for a longer line or a one-take vlog). */
+  seconds?: number;
+  /** "live": the photoreal alligator (concepts-live.ts) instead of the cartoon mascot — set by the concept. */
+  look?: "live";
+  /** The whole prompt for the video model, used as written (the live one-take formats write their own). */
+  rawMotion?: boolean;
+  /** The whole prompt for the STILL, used as written and drawn without the gator's reference (a shot of the supporting cast, the goat, a trap). */
+  rawStill?: boolean;
+  /** How loud this shot's own generated sound sits in the mix, 0–1 (default 0.7; a scream is 0.9, room tone 0.3). */
+  ownGain?: number;
+  /**
+   * Put the shot's "pop" cues where the picture actually moves instead of on a fixed beat: "peaks" = every
+   * burst of motion found in the clip (a nail gun, a drill), "max" = the single biggest one (a chalk line).
+   */
+  sync?: "peaks" | "max";
+  /** Animate a still that was already drawn and approved for another shot: "<conceptId>/<shotId>". */
+  stillFrom?: string;
   /** A speech bubble over the picture (x, y: the bubble's centre, in 1080×1920 pixels). */
   bubble?: { at: number; dur: number; text: string; x: number; y: number; tail: "left" | "right" };
   /** Sound cues, in seconds from the start of this shot as it plays. */
@@ -68,6 +100,24 @@ export type Concept = {
   youtubeTitle: string;
   /** One of the three pilots produced on 2026-10-08. */
   pilot?: boolean;
+  /** "live": the photoreal alligator, found-footage look. Default: the cartoon mascot. */
+  look?: "live";
+  /**
+   * "oneshot": ONE continuous take and nothing burned into the picture — no meme text, no logo, no end tag
+   * (the formula of the owner's reference clips); a captioned variant is rendered beside it for comparison.
+   * Default: the meme-caption cut with the end tag.
+   */
+  cut?: "oneshot";
+  /** Small subtitles of what is HEARD (lower third), instead of big caption beats for spoken lines — when the line is the joke. */
+  subtitles?: boolean;
+  /** Seconds of end tag (default 1.5; 0.8 for the fail formats; 0 for none). */
+  endTagSec?: number;
+  /** false: no logo bug over the picture. */
+  logo?: boolean;
+  /** The style of the styles experiment (docs/gator/STYLES.md), carried into the viral ledger. */
+  style?: number;
+  /** Not one of the thirty: a test piece (a voice sample). Left out of the document and the queue. */
+  sample?: boolean;
 };
 
 export const END_TAG = { line: "run the whole job.", brand: "ConstructHUB", site: "constructhub.us" };
@@ -154,11 +204,103 @@ const PILOTS: Concept[] = [
   },
 ];
 
-export const CONCEPTS: Concept[] = [...PILOTS, ...MORE_CONCEPTS];
+/**
+ * PRODUCTION NOTES — what phase 2 (2026-10-08) changed in a concept when it was made: who talks and what
+ * he says, which shots get the dearer model, where the foley follows the picture. Merged over the shots.
+ */
+const DEADPAN34 = "He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.";
+const PRODUCTION: Record<string, Record<string, Partial<Shot>>> = {
+  "permit-office-359": {
+    s1: { video: "kling-pro" },
+    s2: { video: "kling-pro", use: 4.8, say: { text: "Closes at four. It's three fifty-nine. Fuhgeddaboudit.", lead: 0.5 }, cues: [{ type: "thud", at: 0.05 }, { type: "air", at: 0, dur: 4.8 }],
+      scene: `At the closed glass doors of a plain civic office building, blinds pulled down behind the glass, he holds a roll of blueprints hanging limp in one hand. ${DEADPAN34}`,
+      motion: "He glances at the closed doors, then turns his head back to the viewer and talks, deadpan, with a small shrug. The roll of blueprints droops in his hand." },
+  },
+  "where-is-my-tape": {
+    s1: { video: "kling-pro" },
+    s2: { video: "kling-pro", use: 4.6, beats: [], say: { text: "Twenty minutes. On my belt. The whole time.", lead: 0.5 }, cues: [{ type: "whoosh", at: 0 }, { type: "air", at: 0, dur: 4.6 }],
+      scene: `Medium shot in the same garage workshop: he holds an orange tape measure up in one hand, just unclipped from his own tool belt. ${DEADPAN34}`,
+      motion: "He holds the tape measure up, looks at it, then looks at the viewer and talks, deadpan, shaking his head slightly." },
+  },
+  "measure-twice": {
+    s2: { use: 4.4, beats: [], say: { text: "Measured twice. Cut once. Still short.", lead: 0.6 }, cues: [{ type: "thud", at: 0.05 }, { type: "air", at: 0, dur: 4.4 }],
+      scene: `He holds a cut wooden board up across an open doorway frame; the board is clearly a hand's width too short and does not reach the other side. ${DEADPAN34}`,
+      motion: "He holds the too-short board against the opening, looks at the gap, then turns his head to the viewer and talks, deadpan." },
+  },
+  "permit-office-in-seconds": {
+    s2: { use: 5.0, beats: [], say: { text: "Found the permit office in ten seconds. Parking? Different story.", lead: 0.3 }, cues: [{ type: "ding", at: 0.05, gain: 0.6 }, { type: "air", at: 0, dur: 5.0 }],
+      scene: `He leans against a generic unmarked orange pickup truck holding a phone in one hand, its screen a soft plain glow with nothing readable; a folded paper map lies on the bonnet. ${DEADPAN34}`,
+      motion: "He glances at the glowing phone, nods, then looks at the viewer and talks, dry and matter-of-fact, ending with a small shrug." },
+  },
+  "coffee-ran-out": {
+    s2: { use: 4.6, beats: [], say: { text: "Seven fifteen. No coffee. Long day, my friend.", lead: 0.5 }, cues: [{ type: "air", at: 0, dur: 4.6 }],
+      scene: `On an early-morning jobsite he holds an empty paper cup in one hand and a steel thermos hanging from the other. ${DEADPAN34}`,
+      motion: "He looks into the empty cup, then at the viewer, and talks, deadpan and tired. A light wind moves a scrap of paper across the ground behind him." },
+  },
+  "zero-percent-rain": {
+    s2: { use: 4.4, say: { text: "Zero percent, they said. Zero.", lead: 0.8 }, cues: [{ type: "thud", at: 0 }, { type: "air", at: 0, dur: 4.4, gain: 3 }],
+      scene: `Heavy cartoon rain pours straight down on him as he stands beside a wet concrete slab, soaked, holding a comically tiny umbrella over his hard hat. ${DEADPAN34}`,
+      motion: "Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, looks at the viewer and talks, deadpan." },
+  },
+  "chalk-line-snap": { s1: { sync: "max" } },
+  "deck-boards-rhythm": { s1: { sync: "peaks" } },
+};
+/** The ten made in phase 2, in the order they were made. */
+export const PHASE2_IDS = ["permit-office-359", "where-is-my-tape", "measure-twice", "permit-office-in-seconds", "coffee-ran-out", "zero-percent-rain", "chalk-line-snap", "deck-boards-rhythm", "pov-first-on-site", "paid-same-day"];
+export const CONCEPTS: Concept[] = [...PILOTS, ...MORE_CONCEPTS].map((c) => (PRODUCTION[c.id] ? { ...c, shots: c.shots.map((s) => ({ ...s, ...(PRODUCTION[c.id][s.id] ?? {}) })) } : c));
 
-export const conceptById = (id: string): Concept => { const c = CONCEPTS.find((x) => x.id === id); if (!c) throw new Error(`${id} is not a concept (${CONCEPTS.map((x) => x.id).join(", ")})`); return c; };
-export const stillPrompt = (s: Shot): string => `${CHARACTER} Scene: ${s.scene} ${FRAMING}`;
-export const motionPrompt = (s: Shot): string => `The cartoon alligator in the hard hat and sunglasses. ${s.motion} ${MOTION_STYLE}`;
+/** Voice samples (2026-10-08): the same line, the same still, two ways of making him talk. */
+const PROFILE = "He keeps the same three-quarter profile as in the image the whole time — he does not turn to face the viewer; only his eyes-line, jaw and shoulders move. Deadpan, unimpressed, never smiling or laughing. He lowers the coffee cup and talks; when he has finished he shakes his head once, slowly.";
+const sampleTalk = (id: string, video: "wan-talk" | "kling-voice" | "kling", motion = "He lowers the coffee cup, looks straight at the viewer, deadpan, and talks. When he has finished he shakes his head once, slowly."): Concept => ({
+  id, title: `Talking sample (${video})`, format: "job-site pain", evergreen: true, sample: true,
+  hook: "Day 9.",
+  shots: [{
+    id: "s1", stillFrom: "two-day-job/s2", scene: "", video,
+    motion,
+    use: 5.0, say: { text: "Two days, he says. Two days.", lead: 0.7 },
+    beats: [beat(0, "Day 9.", "9."), { at: 0.7, text: "Two days, he says. Two days.", accent: "says.", pos: "low" }],
+    cues: [{ type: "air", at: 0, dur: 5.0 }, { type: "thud", at: 0.1, gain: 0.5 }],
+  }],
+  sound: "Open air; the line carries it.",
+  caption: "Two days, he says.", hashtags: ["contractorlife", "construction", "contractorhumor", "bluecollar", "jobsite"], linkedin: null, youtubeTitle: "Two days, he says",
+});
+/** The owner's talking samples in the house method (2026-10-08): three lines, one voice — to judge consistency. */
+const finalTalk = (id: string, stillFrom: string, hook: string, accent: string, line: string, motion: string, seconds = 5): Concept => ({
+  id, title: `Talking final (${line})`, format: "job-site pain", evergreen: true, sample: true, hook,
+  shots: [{ id: "s1", stillFrom, scene: "", video: "talk", seconds, motion, use: seconds, say: { text: line }, beats: [beat(0, hook, accent)], cues: [] }],
+  sound: "His voice and the room; nothing else.",
+  caption: line, hashtags: ["contractorlife", "construction", "contractorhumor", "bluecollar", "jobsite"], linkedin: null, youtubeTitle: hook.replace(/[<>]/g, ""),
+});
+export const FINALS: Concept[] = [
+  finalTalk("talking-final-1", "two-day-job/s2", "Day 9.", "9.", "Two days, he says. Two days.", "He holds his coffee cup, looks at the viewer and talks, unimpressed; when he has finished he shakes his head once, slowly."),
+  finalTalk("talking-final-2", "permit-office-359/s2", "3:59 PM.", "3:59", "Permit office closes at four. It's three fifty-nine.", "He stands at the closed office doors holding the roll of plans, looks at the viewer and talks, unimpressed, with a small shrug at the end.", 6),
+  finalTalk("talking-final-3", "while-youre-here/s2", "Almost made it home.", "home.", "“While you're here.” Three words. Three more hours.", "He stands frozen beside the truck, looking at the viewer over his shoulder, and talks, flat and tired; a slow blink-less stare at the end.", 6),
+];
+export const SAMPLES: Concept[] = [
+  sampleTalk("talking-sample-1", "wan-talk"), sampleTalk("talking-sample-2", "kling-voice"),
+  sampleTalk("talking-sample-3", "kling", PROFILE), sampleTalk("talking-sample-4", "wan-talk", PROFILE),
+];
+
+export const conceptById = (id: string): Concept => { const c = [...CONCEPTS, ...SAMPLES, ...FINALS, ...LIVE_CONCEPTS].find((x) => x.id === id); if (!c) throw new Error(`${id} is not a concept (${CONCEPTS.map((x) => x.id).join(", ")})`); return c; };
+export const LIVE_CHARACTER = "Use the reference image: it shows the animal. THE SAME animal, unchanged: a real adult American alligator standing upright on its hind legs like a person — photorealistic, real scales, real proportions, dark olive-green hide, pale cream throat and belly, long snout — wearing a yellow construction hard hat, dark wraparound safety sunglasses and an orange hi-vis safety vest with silver reflective stripes.";
+export const LIVE_FRAMING = "A photograph, not an illustration: it looks like a frame from an ordinary phone video — flat natural daylight, slightly imperfect framing, everything in focus, no cinematic lighting, no blur, no filter. Vertical 9:16, filling the frame edge to edge. Exactly one alligator. No people. No text, letters, numbers, logos, brand names or watermarks anywhere.";
+export const stillPrompt = (s: Shot): string => (s.rawStill ? s.scene : s.look === "live" ? `${LIVE_CHARACTER} Scene: ${s.scene} ${LIVE_FRAMING}` : `${CHARACTER} Scene: ${s.scene} ${FRAMING}`);
+export const TALKING = "He is speaking: his long jaw opens and closes clearly with every word, like a cartoon character talking, and closes when he stops.";
+export const SILENT = "His mouth stays closed in his usual smirk the whole time; no teeth-baring grin.";
+/**
+ * THE VOICE, as every talking prompt describes it — verbatim, never reworded (a generated voice is a new
+ * performance each time; the same words are the first thing that keeps it the same man).
+ */
+export const VOICE_DESCRIPTION = "in the voice of a man of about fifty: a gravelly baritone, dry and unhurried, with a New York / North Jersey working-class accent, completely deadpan — no laughing, no shouting. No music and no other voices: only his voice and quiet room tone";
+/** What the talking model must not change about him (it has no negative prompt; sample 2 gave him eyes). */
+export const ON_MODEL_TALKING = "His sunglasses are opaque and dark with an orange tint at all times: his eyes are never visible, not even for a frame. His hard hat stays on. The same vest and hoodie, the same bold cartoon drawing style throughout. He keeps the pose and the three-quarter angle of the image. His long jaw moves only while he is speaking and is shut before and after. No other character appears. No text appears.";
+export const LIVE_VOICE_NOTE = `His voice is ${VOICE_DESCRIPTION.replace(/^in /, "")}.`;
+export function motionPrompt(s: Shot): string {
+  if (s.rawMotion) return s.say ? `${s.motion} ${LIVE_VOICE_NOTE}` : s.motion;
+  const who = "The cartoon alligator in the hard hat and sunglasses.";
+  if (s.video === "talk") return `${who} ${s.motion} He starts speaking almost at once and says, ${VOICE_DESCRIPTION}: "${s.say!.text}" ${ON_MODEL_TALKING}`;
+  return `${who} ${s.motion} ${s.say ? (s.video === "kling-voice" ? `He says, in a gravelly, warm, dry New Jersey accent: "${s.say.text}" ` : "") + TALKING : SILENT} ${MOTION_STYLE}`;
+}
 
 /* ── The post text ────────────────────────────────────────────────────────── */
 
@@ -183,21 +325,28 @@ export const BANNED = /\b(ford|chevy|chevrolet|ram|toyota|dewalt|milwaukee|makit
 export function lintConcept(c: Concept): string[] {
   const bad: string[] = [], words = (s: string) => s.trim().split(/\s+/).length;
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.id)) bad.push("the id is not kebab-case");
-  if (words(c.hook) > 8) bad.push(`the hook is ${words(c.hook)} words (8 at most)`);
+  // A one-shot's hook is its caption line (nothing is burned in), so it may be a sentence.
+  if (words(c.hook) > (c.cut === "oneshot" ? 14 : 8)) bad.push(`the hook is ${words(c.hook)} words (${c.cut === "oneshot" ? 14 : 8} at most)`);
   if (!c.shots.length || c.shots.length > 3) bad.push("one to three shots");
-  if (c.shots[0]?.beats[0]?.at !== 0 || c.shots[0].beats[0].text !== c.hook) bad.push("the first beat of the first shot must be the hook, at 0 s");
+  if (c.cut === "oneshot") { if (c.shots.length !== 1 || c.shots[0].beats.length) bad.push("a one-shot clip is one shot with nothing burned in"); }
+  else if (c.shots[0]?.beats[0]?.at !== 0 || c.shots[0].beats[0].text !== c.hook) bad.push("the first beat of the first shot must be the hook, at 0 s");
   const sec = c.shots.reduce((n, s) => n + s.use, 0);
   if (sec < 4 || sec > 20) bad.push(`${sec.toFixed(1)} s of shots (5–20 s)`);
+  if (c.look === "live" && c.shots.some((s) => s.look !== "live")) bad.push("a live concept's shots are live");
   for (const s of c.shots) {
     if ((s.shiftDown ?? 0) < 0 || (s.shiftDown ?? 0) > 300) bad.push(`${s.id}: shiftDown is 0–300`);
-    if (s.use <= 0 || (s.from ?? 0) + s.use * (s.speed ?? 1) > 5 + 1e-9) bad.push(`${s.id}: uses more than the 5 s that are generated`);
+    if (s.seconds !== undefined && (s.video !== "talk" || s.seconds < 3 || s.seconds > 15 || !Number.isInteger(s.seconds))) bad.push(`${s.id}: \`seconds\` is 3–15, for a shot with the model's own sound`);
+    if (s.use <= 0 || (s.from ?? 0) + s.use * (s.speed ?? 1) > (s.seconds ?? 5) + 1e-9) bad.push(`${s.id}: uses more than the ${s.seconds ?? 5} s that are generated`);
+    if (s.say && (s.say.text.length > 260 || (s.video !== "talk" && (s.say.lead ?? 0.5) + 1 > s.use))) bad.push(`${s.id}: the spoken line is too long for the shot`);
+    if ((s.video === "wan-talk" || s.video === "kling-voice" || (s.video === "talk" && !s.rawMotion)) && !s.say) bad.push(`${s.id}: a talking model needs a line`);
     for (const b of s.beats) { if (b.at < 0 || b.at >= s.use) bad.push(`${s.id}: a beat starts outside the shot`); if (b.accent && !b.text.toLowerCase().includes(b.accent.toLowerCase())) bad.push(`${s.id}: the accent “${b.accent}” is not in “${b.text}”`); }
+    if (!s.stillFrom && !s.scene.trim()) bad.push(`${s.id}: no scene`);
     if (/\b(roof|ladder|scaffold)/i.test(s.scene) && /\b(stands?|kneels?|sits?|climbs?|walks?) on (a |the )?(pitched |finished |residential )*(roof|ladder|scaffold)/i.test(s.scene) && !/harness|three points of contact|guard ?rail/i.test(s.scene)) bad.push(`${s.id}: he is at height without a harness, a guard rail or three points of contact in the prompt`);
     if (/sunglasses (off|removed)|without (his )?(hard hat|sunglasses)|takes off/i.test(`${s.scene} ${s.motion}`)) bad.push(`${s.id}: the hard hat and sunglasses stay on`);
   }
   if (c.hashtags.length !== 5 || c.hashtags.some((t) => !/^[a-z0-9]+$/.test(t))) bad.push("five hashtags, lower case, no #");
   if (c.youtubeTitle.length > 80 || /[<>]/.test(c.youtubeTitle)) bad.push("the YouTube title is over 80 characters or has < >");
-  const everything = [c.title, c.hook, c.caption, c.linkedin ?? "", c.youtubeTitle, ...c.shots.flatMap((s) => [s.scene, s.motion, s.bubble?.text ?? "", ...s.beats.map((b) => b.text)])].join("\n");
+  const everything = [c.title, c.hook, c.caption, c.linkedin ?? "", c.youtubeTitle, ...c.shots.flatMap((s) => [s.scene, s.motion, s.bubble?.text ?? "", s.say?.text ?? "", ...s.beats.map((b) => b.text)])].join("\n");
   const m = BANNED.exec(everything);
   if (m) bad.push(`“${m[0]}” — a brand, a person, politics or a word we do not use`);
   const p = postsOf(c);

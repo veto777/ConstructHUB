@@ -58,7 +58,7 @@ Output: `analysis/gator-shorts/<conceptId>/` — `clip.mp4` (1080×1920, 30 fps,
 
 Character block: `Use the reference images: image 1 is the full-body model sheet of our mascot, image 2 is a close-up of his head. Draw THE SAME character, unchanged: a stocky cartoon alligator with green scaly skin and a cream-yellow jaw and belly, a long rounded snout with small white teeth showing in a confident closed-mouth smirk, a glossy yellow hard hat, black wraparound sunglasses with orange-tinted lenses (always on, eyes never visible), a black hoodie with the hood down, an orange hi-vis safety vest with yellow and silver reflective stripes worn over the hoodie, black cargo work trousers, a black tool belt with a tape measure, tan lace-up work boots, and a thick green tail with dark ridges. Same thick black outlines, same glossy cel-shaded cartoon sticker style, same colours and proportions as the references. The whole scene, background included, is drawn in that same bold cartoon style — not photorealistic.`
 
-Framing block: `Vertical 9:16 illustration, full-bleed: the artwork fills the whole tall frame from edge to edge, with no border, margin, panel or white band. The character is large and sits in the middle band of the frame; the top third of the frame is calm, empty background (sky, wall or ceiling) with his hard hat below it, and the bottom quarter holds nothing important. Exactly one alligator. No people. No text, letters, numbers, signs with writing, logos, brand names, badges or watermarks anywhere.`
+Framing block: `Vertical 9:16 illustration, full-bleed: the artwork fills the whole tall frame from edge to edge, with no border, margin, panel, vignette or white band; the background scene (ground, walls, sky) is drawn right out to all four edges, never a plain white or blank backdrop. The character is large and sits in the middle band of the frame; the top third of the frame is calm, empty background (sky, wall or ceiling) with his hard hat below it, and the bottom quarter holds nothing important. Exactly one alligator. No people. No text, letters, numbers, signs with writing, logos, brand names, badges or watermarks anywhere.`
 
 Motion style (appended to every motion prompt): `2D cartoon animation, the same bold cel-shaded style as the image, smooth and simple motion. His hard hat and sunglasses stay on. Nothing morphs. No text appears.` Negative prompt: `text, letters, numbers, captions, logo, brand name, watermark, photorealistic, live action, extra limbs, extra fingers, deformed hands, second alligator, human, sunglasses removed, hard hat removed, flicker, morphing`
 
@@ -303,7 +303,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 4. The permit office closes at 4
 
-`permit-office-359` · job-site pain · evergreen · 7.7 s with the end tag
+`permit-office-359` · job-site pain · evergreen · 9.5 s with the end tag
 
 **Hook on screen:** “3:58 PM. PERMIT OFFICE CLOSES AT 4.”
 
@@ -312,12 +312,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He runs flat out toward the building, arms pumping, the blueprints under one arm, dust puffing behind his boots. The camera tracks alongside him.`
 - Caption beats: 0.0 s “3:58 PM. PERMIT OFFICE CLOSES AT 4.” — orange: 4.
 
-**Shot s2** — 3 s of a 5 s generation
-- Still prompt (after the character block): `He stands at the closed glass doors of the plain civic office, blinds pulled down behind the glass, shoulders dropped, the roll of blueprints hanging limp in one hand, looking back at the viewer, deadpan.`
-- Motion prompt: `He stands still at the closed doors. The roll of blueprints slowly droops and unrolls to the ground. He turns his head to the viewer, deadpan.`
+**Shot s2** — 4.8 s of a 5 s generation
+- Still prompt (after the character block): `At the closed glass doors of a plain civic office building, blinds pulled down behind the glass, he holds a roll of blueprints hanging limp in one hand. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `He glances at the closed doors, then turns his head back to the viewer and talks, deadpan, with a small shrug. The roll of blueprints droops in his hand.`
 - Caption beats: 0.1 s “3:59.” — orange: 3:59.
 
-**Sound:** A fast tick and a racing bed for the sprint; a thud at the doors and the three-note “wah-wah”. (cues: beat, tick, thud, sad)
+**Sound:** A fast tick and a racing bed for the sprint; a thud at the doors and the three-note “wah-wah”. (cues: beat, tick, thud, air)
 
 **Instagram**
 > Every contractor has lost this race at least once. Look the office up before you drive across the county.
@@ -488,21 +488,21 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 8. Zero percent chance of rain
 
-`zero-percent-rain` · job-site pain · trend / season dependent — Seasonal: spring and storm season; any week the weather is the news. · 7.3 s with the end tag
+`zero-percent-rain` · job-site pain · trend / season dependent — Seasonal: spring and storm season; any week the weather is the news. · 8.5 s with the end tag
 
 **Hook on screen:** “FORECAST: 0% CHANCE OF RAIN.”
 
 **Shot s1** — 2.6 s of a 5 s generation
-- Still prompt (after the character block): `He stands beside a freshly poured, perfectly smooth concrete driveway slab in wooden forms, holding a concrete float, pleased, under a bright sky with one small grey cloud directly overhead.`
+- Still prompt (after the character block): `He stands on the grass just outside the wooden forms of a freshly poured, perfectly smooth concrete driveway slab — both boots on the grass, not on the concrete — holding a concrete float at his side, pleased, under a bright sky with one small grey cloud directly overhead.`
 - Motion prompt: `He admires the smooth wet concrete and nods, satisfied. Above him the one small grey cloud grows and darkens.`
 - Caption beats: 0.0 s “FORECAST: 0% CHANCE OF RAIN.” — orange: 0%
 
-**Shot s2** — 3.2 s of a 5 s generation
-- Still prompt (after the character block): `Heavy cartoon rain pours down on him as he stands in the same spot, soaked, deadpan, holding a comically tiny umbrella over the hard hat. Raindrops dimple the wet concrete behind him.`
-- Motion prompt: `Rain pours straight down. He stands completely still under the tiny umbrella, deadpan, water streaming off his hard hat. Raindrops splash on the concrete.`
+**Shot s2** — 4.4 s of a 5 s generation
+- Still prompt (after the character block): `Heavy cartoon rain pours straight down on him as he stands beside a wet concrete slab, soaked, holding a comically tiny umbrella over his hard hat. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, looks at the viewer and talks, deadpan.`
 - Caption beats: 0.1 s “THE 0%:” — orange: 0%:
 
-**Sound:** A calm bed; a thunder-thud, steady rain noise and the three-note “wah-wah”. (cues: air, beat, thud, sad)
+**Sound:** A calm bed; a thunder-thud, steady rain noise and the three-note “wah-wah”. (cues: air, beat, thud)
 
 **Instagram**
 > The app said zero. The sky said “hold my float.”
@@ -570,7 +570,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 10. Where is my tape measure?
 
-`where-is-my-tape` · job-site pain · evergreen · 7.7 s with the end tag
+`where-is-my-tape` · job-site pain · evergreen · 9.3 s with the end tag
 
 **Hook on screen:** “WHERE IS MY TAPE MEASURE?”
 
@@ -579,12 +579,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He rummages frantically through the tool bag, lifting tools and setting them down, then looks left and right.`
 - Caption beats: 0.0 s “WHERE IS MY TAPE MEASURE?” — orange: TAPE
 
-**Shot s2** — 3 s of a 5 s generation
-- Still prompt (after the character block): `Close-up at hip height: the orange tape measure is clipped right there on his tool belt. His hand hovers just above it. His face, in the upper part of the frame, looks down at it, deadpan.`
-- Motion prompt: `He slowly looks down at the tape measure clipped to his own belt, pauses, then slowly looks up at the viewer, deadpan.`
-- Caption beats: 0.2 s “IT WAS ON MY BELT.” — orange: BELT.
+**Shot s2** — 4.6 s of a 5 s generation
+- Still prompt (after the character block): `Medium shot in the same garage workshop: he holds an orange tape measure up in one hand, just unclipped from his own tool belt. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `He holds the tape measure up, looks at it, then looks at the viewer and talks, deadpan, shaking his head slightly.`
+- Caption beats: 
 
-**Sound:** A busy bed for the search; cut to a swish and a slow clock for the reveal. (cues: beat, pop, whoosh, tick)
+**Sound:** A busy bed for the search; cut to a swish and a slow clock for the reveal. (cues: beat, pop, whoosh, air)
 
 **Instagram**
 > Twenty minutes. It was on my belt for all twenty.
@@ -700,7 +700,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 13. Measure twice, cut once
 
-`measure-twice` · job-site pain · evergreen · 7.7 s with the end tag
+`measure-twice` · job-site pain · evergreen · 8.9 s with the end tag
 
 **Hook on screen:** “MEASURE TWICE. CUT ONCE.”
 
@@ -709,12 +709,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He measures the board carefully with the tape, marks it with the pencil, then measures it a second time and nods.`
 - Caption beats: 0.0 s “MEASURE TWICE. CUT ONCE.” — orange: TWICE.
 
-**Shot s2** — 3.2 s of a 5 s generation
-- Still prompt (after the character block): `He holds the cut board up against an open doorway frame. The board is clearly a hand's width too short and does not reach the other side. He looks at the gap, deadpan.`
-- Motion prompt: `He holds the board up to the opening. It is too short. He looks at the gap, then slowly turns his head to the viewer, deadpan.`
-- Caption beats: 0.2 s “STILL SHORT.” — orange: SHORT.
+**Shot s2** — 4.4 s of a 5 s generation
+- Still prompt (after the character block): `He holds a cut wooden board up across an open doorway frame; the board is clearly a hand's width too short and does not reach the other side. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `He holds the too-short board against the opening, looks at the gap, then turns his head to the viewer and talks, deadpan.`
+- Caption beats: 
 
-**Sound:** A patient bed with two pencil ticks; a thud and the “wah-wah”. (cues: beat, tick, thud, sad)
+**Sound:** A patient bed with two pencil ticks; a thud and the “wah-wah”. (cues: beat, tick, thud, air)
 
 **Instagram**
 > Measured twice. Cut once. Read the tape wrong both times.
@@ -878,7 +878,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 17. The coffee ran out at 7:15
 
-`coffee-ran-out` · job-site pain · evergreen · 7.7 s with the end tag
+`coffee-ran-out` · job-site pain · evergreen · 9.5 s with the end tag
 
 **Hook on screen:** “7:15 AM. THE COFFEE IS GONE.”
 
@@ -887,12 +887,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He shakes the upside-down thermos. One single drop falls into the cup. He peers into the thermos, then into the cup.`
 - Caption beats: 0.0 s “7:15 AM. THE COFFEE IS GONE.” — orange: GONE.
 
-**Shot s2** — 2.8 s of a 5 s generation
-- Still prompt (after the character block): `He stands holding the empty paper cup, staring into the distance over the jobsite, completely deadpan, the thermos hanging from his other hand.`
-- Motion prompt: `He stares into the distance, motionless and deadpan. A light wind moves a scrap of paper across the ground behind him.`
-- Caption beats: 0.2 s “LONG DAY AHEAD.” — orange: LONG
+**Shot s2** — 4.6 s of a 5 s generation
+- Still prompt (after the character block): `On an early-morning jobsite he holds an empty paper cup in one hand and a steel thermos hanging from the other. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `He looks into the empty cup, then at the viewer, and talks, deadpan and tired. A light wind moves a scrap of paper across the ground behind him.`
+- Caption beats: 
 
-**Sound:** Morning air, one drip, then the “wah-wah”. (cues: air, tick, sad)
+**Sound:** Morning air, one drip, then the “wah-wah”. (cues: air, tick)
 
 **Instagram**
 > Some losses you feel all day.
@@ -1368,7 +1368,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 29. Finding the permit office in seconds
 
-`permit-office-in-seconds` · product tie-in · evergreen · 7.3 s with the end tag
+`permit-office-in-seconds` · product tie-in · evergreen · 9.3 s with the end tag
 
 **Hook on screen:** “WHICH OFFICE HANDLES THIS PERMIT?”
 
@@ -1377,12 +1377,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He looks over the big paper map, turning it one way and then the other, and scratches the back of his hard hat, puzzled.`
 - Caption beats: 0.0 s “WHICH OFFICE HANDLES THIS PERMIT?” — orange: PERMIT?
 
-**Shot s2** — 3 s of a 5 s generation
-- Still prompt (after the character block): `He leans against a generic unmarked orange pickup truck holding a phone in one hand, its screen a soft plain glow with nothing readable, giving a thumbs-up with the other hand, a relaxed closed-mouth grin. The paper map lies folded on the bonnet.`
-- Motion prompt: `He looks at the glowing phone, nods, and gives a slow thumbs-up to the viewer.`
-- Caption beats: 0.1 s “FOUND IT. IN SECONDS.” — orange: SECONDS.
+**Shot s2** — 5 s of a 5 s generation
+- Still prompt (after the character block): `He leans against a generic unmarked orange pickup truck holding a phone in one hand, its screen a soft plain glow with nothing readable; a folded paper map lies on the bonnet. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
+- Motion prompt: `He glances at the glowing phone, nods, then looks at the viewer and talks, dry and matter-of-fact, ending with a small shrug.`
+- Caption beats: 
 
-**Sound:** A puzzled clock; a bell and an easy bed when he finds it. (cues: tick, air, ding, beat)
+**Sound:** A puzzled clock; a bell and an easy bed when he finds it. (cues: tick, air, ding)
 
 **Instagram**
 > City or county? Which portal? Look the permit office up before you drive — the directory is at constructhub.us.

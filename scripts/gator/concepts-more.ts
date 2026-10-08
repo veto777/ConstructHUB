@@ -83,7 +83,7 @@ export const MORE_CONCEPTS: Concept[] = [
     id: "zero-percent-rain", title: "Zero percent chance of rain", format: "job-site pain", evergreen: false, timing: "Seasonal: spring and storm season; any week the weather is the news.",
     hook: "Forecast: 0% chance of rain.",
     shots: [
-      shot("s1", 2.6, "He stands beside a freshly poured, perfectly smooth concrete driveway slab in wooden forms, holding a concrete float, pleased, under a bright sky with one small grey cloud directly overhead.",
+      shot("s1", 2.6, "He stands on the grass just outside the wooden forms of a freshly poured, perfectly smooth concrete driveway slab — both boots on the grass, not on the concrete — holding a concrete float at his side, pleased, under a bright sky with one small grey cloud directly overhead.",
         "He admires the smooth wet concrete and nods, satisfied. Above him the one small grey cloud grows and darkens.",
         [b(0, "Forecast: 0% chance of rain.", "0%")], [{ type: "air", at: 0, dur: 2.6 }, { type: "beat", at: 0, dur: 2.6, bpm: 100, gain: 0.4 }]),
       shot("s2", 3.2, "Heavy cartoon rain pours down on him as he stands in the same spot, soaked, deadpan, holding a comically tiny umbrella over the hard hat. Raindrops dimple the wet concrete behind him.",

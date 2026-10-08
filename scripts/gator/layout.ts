@@ -29,10 +29,14 @@ export type Beat = {
   at: number; until: number; text: string;
   /** The one word drawn in orange (as written in `text`, punctuation ignored). */
   accent?: string; pos: "top" | "low";
+  /** A subtitle, not a meme caption: small type, two lines at most, at the bottom of the low zone (the one-shot formats). */
+  small?: boolean;
 };
 export type CaptionBox = { beat: Beat; px: number; lines: string[]; rect: Rect };
 
 export const MAX_PX = 132, MIN_PX = 64, MAX_LINES = 3;
+/** Subtitles (the one-shot formats, where the picture is the joke and the words only help a muted viewer). */
+export const SUBTITLE_PX = 60;
 const pitch = (px: number) => Math.round(px * 1.14);
 const EDGE = 14;
 /** How far below the top of its line box Anton's capitals start, in ems (the font's ascent is taller than its capitals). */
@@ -60,8 +64,8 @@ export function wrapCaption(text: string, maxW: number, px: number, maxLines = M
 /** The biggest type at which a beat fits its zone: big enough to read on a phone, or an error. */
 export function layoutBeat(beat: Beat): CaptionBox {
   const zone = ZONES[beat.pos], edge = EDGE;
-  for (let px = MAX_PX; px >= MIN_PX; px -= 4) {
-    const lines = wrapCaption(beat.text, zone.w - 2 * edge, px);
+  for (let px = beat.small ? SUBTITLE_PX : MAX_PX; px >= (beat.small ? SUBTITLE_PX - 12 : MIN_PX); px -= 4) {
+    const lines = wrapCaption(beat.text, zone.w - 2 * edge, px, beat.small ? 2 : MAX_LINES);
     if (!lines) continue;
     const h = (lines.length - 1) * pitch(px) + Math.round(px * 1.02) + 2 * edge;
     if (h > zone.h) continue;

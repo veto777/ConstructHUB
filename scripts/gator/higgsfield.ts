@@ -88,6 +88,17 @@ export const pilotCap = (now: Date): Ledger["cap"] => ({
   derivation: `${PILOT.videos} × ${PILOT.video.credits} credits ($${PILOT.video.usd.toFixed(2)}; ${PILOT.video.what}) + ${PILOT.images} × ${PILOT.image.credits} credits ($${PILOT.image.usd.toFixed(2)}; ${PILOT.image.what}) — prices from POST /estimate on 2026-10-08, 1 credit = $0.0625`,
   setAt: now.toISOString(),
 });
+/**
+ * Phase 2 (2026-10-08, after the owner saw the pilot): a hard cap for the phase, on top of what the pilot
+ * spent — $25.00 at first, raised to $40.00 the same day when the talking shots moved to a model with its
+ * own voice (dearer). The ledger's cap becomes the pilot's spend + 1600 credits.
+ */
+export const PHASE2 = { usd: 100, credits: 1600, pilotSpentCredits: 41.12 };
+export const phase2Cap = (now: Date): Ledger["cap"] => ({
+  credits: round3(PHASE2.pilotSpentCredits + PHASE2.credits), usd: round3((PHASE2.pilotSpentCredits + PHASE2.credits) * 0.0625),
+  derivation: `phase 2: $${PHASE2.usd.toFixed(2)} = ${PHASE2.credits} credits (1 credit = $0.0625) on top of the pilot's ${PHASE2.pilotSpentCredits} credits ($2.57) — a hard cap (the styles experiment; raised from $25.00, $40.00 and $60.00 on 2026-10-08 by the owner's coordinator: long shots with native audio cost more)`,
+  setAt: now.toISOString(),
+});
 export const emptyLedger = (now: Date): Ledger => ({
   version: 1, cap: pilotCap(now),
   balance: { before: "not readable: the API has no balance endpoint (console.higgsfield.ai only)", after: "see `spent` — the sum of this ledger's charged entries" },
@@ -127,7 +138,7 @@ export async function estimate(io: Io, c: Creds, model: string, params: Record<s
 }
 
 /** Put a local image where a model can fetch it (a presigned upload; free). The key is not sent to the storage host. */
-export async function uploadInput(io: Io, c: Creds, data: Buffer, contentType: "image/png" | "image/jpeg" | "image/webp"): Promise<string> {
+export async function uploadInput(io: Io, c: Creds, data: Buffer, contentType: "image/png" | "image/jpeg" | "image/webp" | "audio/wav"): Promise<string> {
   const r = await call(io, c, "POST", `${HF_BASE}/files/generate-upload-url`, { content_type: contentType });
   if (r.status !== 200 || !r.json?.upload_url || !r.json?.public_url) throw new Error(`Higgsfield answered ${r.status} to the upload request: ${detail(r)}`);
   const put = await io.fetch(String(r.json.upload_url), { method: "PUT", headers: { ...(r.json.upload_headers ?? { "Content-Type": contentType }) }, body: data });

@@ -152,7 +152,11 @@ async function main() {
     }
     const num = (name: string): number | null => { const v = args.flags[name]; if (v === undefined) return null; const n = Number(v); if (!Number.isFinite(n) || n <= 0) throw new Error(`--${name} must be a positive number`); return n; };
     const now = new Date();
+    // The gator shorts post to the same accounts: their ledger counts towards the shared rate rule.
+    const viralFile = path.join(ROOT, "docs", "gator", "viral-schedule.json");
+    const otherPosts = fs.existsSync(viralFile) ? (JSON.parse(fs.readFileSync(viralFile, "utf8")).posts as { accountId: string; status: string; scheduledTime: string | null; createdAt: string }[]).filter((p) => p.status !== "failed").map((p) => ({ accountId: p.accountId, at: p.scheduledTime ?? p.createdAt })) : [];
     const { planned, skipped } = planPosts(videos, targets, ledger, {
+      otherPosts,
       now, spreadMin: num("spread"), perDay: num("per-day"), warmupStart: typeof args.flags["warmup-start"] === "string" ? args.flags["warmup-start"] : (process.env.TUTORIAL_SOCIAL_START || null),
       warmupDays: num("warmup-days") ?? undefined, retryFailed: !!args.flags["retry-failed"],
     });

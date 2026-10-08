@@ -26,6 +26,7 @@
 import { createHash } from "node:crypto";
 import { SCHEDULE_TZ, addDays, easternLabel, zoneTime, zonedToUtc } from "../../server/youtube/schedule";
 import { PLATFORM_RULES, SOCIAL_PLATFORMS, type SocialPlatform } from "./social-text";
+import { rateRefusal } from "./social-rate";
 
 export const BLOTATO_BASE = "https://backend.blotato.com/v2";
 
@@ -198,6 +199,11 @@ export type PlanOptions = {
   warmupStart?: string | null; warmupDays?: number; warmupPerDay?: number;
   retryFailed?: boolean;
   tz?: string;
+  /**
+   * Posts of the OTHER stream (the gator shorts' ledger) on these accounts: they count towards the
+   * shared rate rule (social-rate.ts) — LinkedIn 3 and a young Instagram account 4 in any 24 hours.
+   */
+  otherPosts?: readonly { accountId: string; at: Date | string }[];
 };
 export const WARMUP_DAYS = 14, WARMUP_PER_DAY = 1, CADENCE_PER_DAY = 3;
 /** A time closer than this is sent without `scheduledTime` (Blotato wants a future time; "now" is simply now). */
@@ -223,6 +229,11 @@ export function planPosts(videos: readonly VideoForPost[], targets: readonly Tar
   targets.forEach((t, ti) => {
     const used = new Map<string, number>();
     for (const p of ledger.posts) if (p.accountId === t.id && counts(p)) { const d = zoneTime(p.scheduledTime ?? p.createdAt, tz).date; used.set(d, (used.get(d) ?? 0) + 1); }
+    // When this account posts, in both streams: the ledger, the other stream, and what this plan adds.
+    const times: number[] = [
+      ...ledger.posts.filter((p) => p.accountId === t.id && counts(p)).map((p) => new Date(p.scheduledTime ?? p.createdAt).getTime()),
+      ...(o.otherPosts ?? []).filter((p) => p.accountId === t.id).map((p) => new Date(p.at).getTime()),
+    ];
     // --spread: this account's own clock — it starts a few minutes after the account before it.
     let cursor = o.now.getTime() + ti * (3 + stable(3, "account-offset", t.id)) * MIN;
     for (const v of order) {
@@ -243,15 +254,17 @@ export function planPosts(videos: readonly VideoForPost[], targets: readonly Tar
           if (t.platform === "linkedin") at = followYouTube(o.now, "linkedin", v.helpKey, t.id, tz);
         }
       }
-      // The day's share for this account: move on, a day at a time, until one has room.
+      // The day's share for this account: move on, a day at a time, until one has room — and until the
+      // platform's own rate allows it (both streams counted).
       for (let guard = 0; guard < 400; guard++) {
         const d = zoneTime(at, tz).date;
-        if ((used.get(d) ?? 0) < capOn(d) && !(t.platform === "linkedin" && o.spreadMin == null && isWeekend(d))) break;
+        if ((used.get(d) ?? 0) < capOn(d) && !(t.platform === "linkedin" && o.spreadMin == null && isWeekend(d)) && !rateRefusal(t.platform, at, times)) break;
         const next = addDays(d, 1), clock = zoneTime(at, tz).time;
         at = zonedToUtc(next, o.spreadMin != null || t.platform !== "linkedin" ? clock : hhmm(9 * 60 + stable(120, "morning", v.helpKey, t.id)), tz);
       }
       const d = zoneTime(at, tz).date;
       used.set(d, (used.get(d) ?? 0) + 1);
+      times.push(at.getTime());
       if (o.spreadMin != null) cursor = Math.max(cursor, at.getTime()) + (o.spreadMin + stable(Math.max(1, Math.floor(o.spreadMin / 3) + 1), "spread", v.helpKey, t.id)) * MIN;
       const immediate = at.getTime() - o.now.getTime() < IMMEDIATE_WITHIN_MS;
       const iso = immediate ? null : new Date(Math.round(at.getTime() / 1000) * 1000).toISOString();

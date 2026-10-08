@@ -15,10 +15,13 @@
  *     only the clips written a LinkedIn version (the others do not belong there).
  *   · YouTube Shorts: one a day through our own YouTube client (never through Blotato), `#Shorts` in the
  *     title, `status.containsSyntheticMedia: true`, never within 45 minutes of a tutorial's publish time.
+ *   · The platforms' own allowances for a young account, shared with the tutorial cuts (social-rate.ts):
+ *     LinkedIn 3 posts and Instagram 4 in any rolling 24 hours.
  *   · A clip goes to an account once. The viral ledger (docs/gator/viral-schedule.json) is the record.
  */
 import { SCHEDULE_TZ, addDays, easternLabel, zoneTime, zonedToUtc } from "../../server/youtube/schedule";
 import { stable, type LedgerPost, type SocialLedger } from "../tutorials/social-post-lib";
+import { rateRefusal } from "../tutorials/social-rate";
 
 export type ViralPlatform = "instagram" | "tiktok" | "linkedin" | "youtube";
 export const VIRAL_RULES = {
@@ -93,6 +96,9 @@ export function planViral(clips: readonly ViralClip[], targets: readonly ViralTa
         // Never back-to-back: the posts on either side of the slot on this account must not be gator clips.
         const prev = marks.filter((m) => m.at <= at).sort((a, b) => b.at - a.at)[0], next = marks.filter((m) => m.at > at).sort((a, b) => a.at - b.at)[0];
         if (prev?.viral || next?.viral) { why = "it would sit next to another gator clip"; continue; }
+        // The platform's own allowance, shared with the tutorial cuts (social-rate.ts).
+        const rate = rateRefusal(t.platform, at, marks.map((m) => m.at));
+        if (rate) { why = rate; continue; }
         if (marks.some((m) => Math.abs(m.at - at) < VIRAL_RULES.minGapMin * MIN)) { why = `within ${VIRAL_RULES.minGapMin} minutes of another post`; continue; }
         found = s;
       }

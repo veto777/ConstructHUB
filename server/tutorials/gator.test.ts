@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
-  BudgetError, HF_BASE, PILOT, assertWithinBudget, charged, emptyLedger, estimate, generate, pilotCap, redact, spent, uploadInput,
+  BudgetError, HF_BASE, PHASE2, PILOT, assertWithinBudget, charged, emptyLedger, estimate, generate, phase2Cap, pilotCap, redact, spent, uploadInput,
   type Creds, type Fetch, type GenerateInput, type Io, type Ledger,
 } from "../../scripts/gator/higgsfield";
-import { CONCEPTS, lintConcept, motionPrompt, postsOf, stillPrompt } from "../../scripts/gator/concepts";
+import { CONCEPTS, PHASE2_IDS, SAMPLES, conceptById, lintConcept, motionPrompt, postsOf, stillPrompt } from "../../scripts/gator/concepts";
 import { END_TAG_SEC, H, LOGO_RECT, MAX_SEC, MIN_PX, W, ZONES, assFile, layoutBeat, wrapCaption, type Beat } from "../../scripts/gator/layout";
-import { timeline } from "../../scripts/gator/make";
+import { automaticChecks, mayPost, nextInQueue, type Queue } from "../../scripts/gator/daily";
+import { VOICE, voiceFilter, voiceKey } from "../../scripts/gator/voice";
+import { accountTimes, nextAllowed, rateRefusal } from "../../scripts/tutorials/social-rate";
+import { bandFault, clipSpent, hatRow, lineBeats, peaksOf, timeline } from "../../scripts/gator/make";
 import fs from "fs";
 import { DOC, conceptsMd } from "../../scripts/gator/concepts-doc";
-import { viralMain } from "../../scripts/gator/post";
+import { mediaKey, planAsap, plannedMediaUrl, viralMain } from "../../scripts/gator/post";
 import { RATE, synth, toPcm } from "../../scripts/gator/sound";
 import { VIRAL_RULES, emptyViralLedger, planViral, slotFor, weekOf, type ViralClip, type ViralLedgerPost, type ViralTarget } from "../../scripts/gator/stream";
-import { buildPost, emptyLedger as emptySocialLedger, type LedgerPost, type SocialLedger } from "../../scripts/tutorials/social-post-lib";
+import { buildPost, emptyLedger as emptySocialLedger, planPosts, type LedgerPost, type SocialLedger, type VideoForPost } from "../../scripts/tutorials/social-post-lib";
 import { SAFE_AREA, inside, overlaps, safeRect } from "../../scripts/tutorials/social-lib";
 import { uploadSessionRequest } from "../youtube/client";
 import { zoneTime } from "../youtube/schedule";
@@ -292,7 +295,7 @@ describe("gator shorts — the writers' room", () => {
   it("every clip is short, ends on the 1.5 s tag, and the tag is the short part", () => {
     for (const c of CONCEPTS) {
       const t = timeline(c);
-      expect(t.totalSec - t.bodySec).toBe(END_TAG_SEC);
+      expect(t.totalSec - t.bodySec).toBeCloseTo(END_TAG_SEC, 6);
       expect(t.totalSec, c.id).toBeLessThanOrEqual(Math.min(MAX_SEC, 21.5));
       expect(t.bodySec, c.id).toBeGreaterThanOrEqual(4);
       expect(t.shots.reduce((n, s) => n + s.frames, 0) / 30).toBeCloseTo(t.bodySec, 6);
@@ -450,10 +453,192 @@ describe("gator shorts — the viral stream in the calendar", () => {
     planViral(CLIPS, [IG], { now, viral: emptyViralLedger(), tutorial: tut });
     expect(JSON.stringify(tut)).toBe(before);
   });
-  it("the viral stream is a dry run: --go is refused", async () => {
+  it("posting is never “whatever is in the folder”: --go needs the clips named", async () => {
     const err = console.error; let said = "";
     console.error = (s: string) => { said += s; };
     try { expect(await viralMain(["--stream", "viral", "--go"])).toBe(1); } finally { console.error = err; }
-    expect(said).toMatch(/dry run only/);
+    expect(said).toMatch(/--go needs the clips named/);
+  });
+  it("media names are ones the tutorials' media route serves", async () => {
+    const { TUTORIAL_FILE } = await import("../../shared/help/videos");
+    const sha = "0bb7606d" + "0".repeat(56);
+    for (const what of ["clip", "cover"] as const) {
+      expect(plannedMediaUrl("shingle-rhythm", sha, what).startsWith("https://constructhub.us/api/tutorials/media/gator-shingle-rhythm.social-")).toBe(true);
+      expect(mediaKey("shingle-rhythm", sha, what).startsWith("tutorials/")).toBe(true);
+      expect(TUTORIAL_FILE.test(mediaKey("shingle-rhythm", sha, what).slice("tutorials/".length))).toBe(true);
+    }
+  });
+  it("“post these now”: per account the first at once, the next ones minutes apart, accounts a minute apart", () => {
+    const r = planAsap(CLIPS.slice(0, 3), [IG, TT], emptyViralLedger(), now, 4, { overrideRate: true });
+    expect(r.planned).toHaveLength(6);
+    const mins = (id: string) => r.planned.filter((p) => p.target.id === id).map((p) => (p.at.getTime() - now.getTime()) / 60000);
+    expect(mins("76607")).toEqual([0, 4, 8]);
+    expect(mins("63054")).toEqual([1, 5, 9]);
+    // A clip that is already out on an account is not sent to it again; a failed attempt may be repeated.
+    const viral = emptyViralLedger();
+    const post = (conceptId: string, status: ViralLedgerPost["status"]): ViralLedgerPost => ({ ...tutorialPost("76607", "instagram", "2026-10-11T16:05:00Z", `gator:${conceptId}`), status, stream: "viral", conceptId, aiGenerated: true });
+    viral.posts.push(post("clip-a", "published"), post("clip-b", "failed"));
+    const again = planAsap(CLIPS.slice(0, 2), [IG], viral, now, 4, { overrideRate: true });
+    expect(again.planned.map((p) => p.conceptId)).toEqual(["clip-b"]);
+    expect(again.skipped).toEqual([{ conceptId: "clip-a", accountId: "76607", reason: "already published" }]);
+  });
+});
+
+describe("the platforms' rate rule — one allowance for both streams", () => {
+  const T0 = Date.parse("2026-10-08T04:00:00Z"), h = (n: number) => T0 + n * 3600000;
+  it("LinkedIn: three posts in any rolling 24 hours, then a refusal", () => {
+    expect(rateRefusal("linkedin", h(3), [h(0), h(1)])).toBeNull();
+    expect(rateRefusal("linkedin", h(3), [h(0), h(1), h(2)])).toMatch(/4 posts in 24 hours — 3 at most/);
+    expect(rateRefusal("linkedin", h(24.1), [h(0), h(1), h(2)])).toBeNull();               // the first has left the window
+    expect(rateRefusal("linkedin", h(23.9), [h(0), h(1), h(2)])).not.toBeNull();
+    // A post is also refused when it would overfill the window of one already scheduled AFTER it.
+    expect(rateRefusal("linkedin", h(0), [h(1), h(2), h(3)])).not.toBeNull();
+    expect(rateRefusal("tiktok", h(0), Array.from({ length: 30 }, (_x, i) => h(i / 10)))).toBeNull();
+  });
+  it("Instagram: four in 24 hours for the account's first two weeks, then the rule lapses", () => {
+    const four = [h(0), h(1), h(2), h(3)];
+    expect(rateRefusal("instagram", h(4), four)).toMatch(/5 posts in 24 hours — 4 at most/);
+    expect(rateRefusal("instagram", h(4), four.slice(1))).toBeNull();
+    const later = [h(0), ...[0, 1, 2, 3].map((i) => h(15 * 24 + i))];
+    expect(rateRefusal("instagram", h(15 * 24 + 4), later)).toBeNull();
+    expect(rateRefusal("instagram", h(13 * 24 + 4), [h(0), ...[0, 1, 2, 3].map((i) => h(13 * 24 + i))])).not.toBeNull();
+  });
+  it("says when the account is free again, and failed posts do not count", () => {
+    const free = nextAllowed("linkedin", new Date(h(3)), [h(0), h(1), h(2)])!;
+    expect(free.getTime()).toBeGreaterThanOrEqual(h(24));
+    expect(free.getTime()).toBeLessThan(h(24.5));
+    const post = (status: string, at: number) => ({ accountId: "38445", status, scheduledTime: new Date(at).toISOString(), createdAt: new Date(at).toISOString() });
+    const tutorial = { posts: [post("published", h(0)), post("failed", h(0.5)), { ...post("scheduled", h(1)), accountId: "other" }] }, viral = { posts: [post("scheduled", h(2))] };
+    expect(accountTimes("38445", tutorial, viral)).toEqual([h(0), h(2)]);
+  });
+  it("the gator poster counts the tutorial cuts — and “now” does not mean “more than the account can take”", () => {
+    const now = new Date("2026-10-08T04:30:00Z");
+    const LI: ViralTarget = { id: "38445", platform: "linkedin", name: "Construct HUB" };
+    const clip = (id: string): ViralClip => ({ conceptId: id, platforms: { linkedin: { text: id } } });
+    const tut = (iso: string): LedgerPost => ({ helpKey: iso, accountId: "38445", platform: "linkedin", account: "x", cut: "feed.mp4", mediaUrl: "", mediaSha256: "", textSha256: "", textLength: 1, scheduledTime: iso, scheduledEastern: "", status: "published", postSubmissionId: "p", createdAt: iso });
+    // The night of 2026-10-08: three tutorial cuts on LinkedIn since 22:31 Eastern, then gator clips "now".
+    const tutorial: SocialLedger = { ...emptySocialLedger(), posts: [tut("2026-10-08T02:31:56Z"), tut("2026-10-08T03:14:56Z"), tut("2026-10-08T03:58:56Z")] };
+    const r = planAsap([clip("a"), clip("b")], [LI], emptyViralLedger(), now, 4, { tutorial });
+    expect(r.planned).toEqual([]);
+    expect(r.skipped).toHaveLength(2);
+    expect(r.skipped[0].reason).toMatch(/3 at most.*free again 2026-10-08 22:45 EDT/);
+    // The owner can still say "send it": the override is a flag, not the default.
+    expect(planAsap([clip("a")], [LI], emptyViralLedger(), now, 4, { tutorial, overrideRate: true }).planned).toHaveLength(1);
+    // The cadence planner keeps the rule too.
+    const planned = planViral([clip("a")], [LI], { now, viral: emptyViralLedger(), tutorial }).planned;
+    expect(planned).toHaveLength(1);
+    expect(planned[0].at.getTime()).toBeGreaterThan(Date.parse("2026-10-09T02:31:56Z"));
+  });
+  it("the tutorial poster counts the gator clips", () => {
+    const now = new Date("2026-10-12T13:00:00Z");
+    const video = (k: string, at: string): VideoForPost => ({ helpKey: k, publishAt: at, posts: { linkedin: { text: "t", cut: "feed.mp4", media: { url: "https://constructhub.us/api/tutorials/media/x.mp4", sha256: "s" } } } });
+    const target = { id: "38445", platform: "linkedin" as const, name: "Construct HUB" };
+    const base = planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5 }).planned[0].at;
+    const three = [-3, -2, -1].map((n) => ({ accountId: "38445", at: new Date(base.getTime() + n * 3600000) }));
+    const pushed = planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5, otherPosts: three }).planned[0].at;
+    expect(pushed.getTime()).toBeGreaterThan(base.getTime() + 12 * 3600000);
+    expect(planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5, otherPosts: three.slice(1) }).planned[0].at.getTime()).toBe(base.getTime());
+  });
+});
+
+describe("gator shorts — he talks", () => {
+  it("one voice: the recipe is in one place, and a line's cache key changes with the recipe or the words", () => {
+    expect(VOICE).toMatchObject({ persona: "marcus", kokoroVoice: "am_adam", pitch: 0.9, tempo: 1.14, rate: 48000 });
+    expect(voiceFilter()).toMatch(/^asetrate=24000\*0\.9,aresample=48000,atempo=1\.14,highpass=f=70,/);
+    expect(voiceKey("Two days.")).toBe(voiceKey("Two days."));
+    expect(voiceKey("Two days.")).not.toBe(voiceKey("Three days."));
+    expect(voiceKey("Two days.", { ...VOICE, pitch: 0.85 } as unknown as typeof VOICE)).not.toBe(voiceKey("Two days."));
+    expect(fs.readFileSync("docs/gator/VOICE.md", "utf8")).toContain("`marcus` = Kokoro voice `am_adam`");
+  });
+  it("a talking shot uses the house method: his own voice over a loose jaw, in profile", () => {
+    const talkers = PHASE2_IDS.map(conceptById).filter((c) => c.shots.some((s) => s.say));
+    expect(talkers.length).toBeGreaterThanOrEqual(6);
+    expect(PHASE2_IDS.length - talkers.length).toBeGreaterThanOrEqual(4);
+    for (const c of talkers) for (const s of c.shots.filter((x) => x.say)) {
+      expect(["kling", "kling-pro", undefined]).toContain(s.video);            // never the model that invents a voice
+      expect(s.say!.text.length, c.id).toBeLessThanOrEqual(70);
+      expect(s.scene).toMatch(/three-quarter view.*profile/);
+      expect(motionPrompt(s)).toContain("his long jaw opens and closes");
+      expect(motionPrompt(s)).not.toContain("New Jersey");                     // the accent is not asked of a video model
+    }
+    for (const c of CONCEPTS) for (const s of c.shots.filter((x) => !x.say)) expect(motionPrompt(s)).toContain("mouth stays closed");
+    // The comparison sample is the only place a model's own voice is used, and it is not one of the thirty.
+    expect(SAMPLES.every((c) => c.sample && !CONCEPTS.includes(c))).toBe(true);
+    expect(CONCEPTS.flatMap((c) => c.shots).some((s) => s.video === "kling-voice" || s.video === "wan-talk")).toBe(false);
+  });
+  it("the line is burned in, sentence by sentence, for as long as it is said", () => {
+    const beats = lineBeats("Closes at four. It's three fifty-nine. Fuhgeddaboudit.", 10, 3, 14);
+    expect(beats.map((b) => b.text)).toEqual(["Closes at four.", "It's three fifty-nine.", "Fuhgeddaboudit."]);
+    expect(beats[0].at).toBe(10);
+    expect(beats.every((b) => b.pos === "low")).toBe(true);
+    for (let i = 1; i < beats.length; i++) expect(beats[i].at).toBeCloseTo(beats[i - 1].until, 6);
+    expect(beats[2].until).toBeCloseTo(13.7, 6);                               // it lingers 0.7 s after he stops
+    expect(lineBeats("Two days, he says. Two days.", 0, 2, 5).map((b) => b.text)).toEqual(["Two days, he says. Two days."]);
+    for (const b of beats) expect(layoutBeat(b).px).toBeGreaterThanOrEqual(80);
+    const c = conceptById("permit-office-359"), tl = timeline(c, { s2: 2.82 });
+    expect(tl.beats.filter((b) => b.pos === "low").map((b) => b.text)).toEqual(["Closes at four.", "It's three fifty-nine.", "Fuhgeddaboudit."]);
+    for (const b of tl.beats) expect(inside(layoutBeat(b).rect, ZONES[b.pos])).toBe(true);
+    expect(() => timeline(c, { s2: 4.4 })).toThrow(/longer than the shot/);
+  });
+  it("a caption stays until the next one in the same place — a low line does not wipe the hook", () => {
+    const tl = timeline(SAMPLES[0], { s1: 1.73 }), hook = tl.beats.find((b) => b.pos === "top")!;
+    expect(hook.until).toBeCloseTo(5, 6);
+  });
+});
+
+describe("gator shorts — what the machine checks by itself", () => {
+  it("foley follows the picture: bursts of motion are found, close ones merged", () => {
+    const diff = Array.from({ length: 96 }, () => 1);
+    for (const f of [11, 35, 36, 59, 83]) diff[f] = 9;
+    diff[36] = 12;
+    const peaks = peaksOf(diff, 24);
+    expect(peaks.map((p) => Math.round(p.at * 24) - 1)).toEqual([11, 36, 59, 83]);
+    expect(peaksOf(Array.from({ length: 50 }, () => 2), 24)).toEqual([]);
+    const c = conceptById("deck-boards-rhythm"), tl = timeline(c, {}, { s1: [0.5, 1.7, 2.9] });
+    expect(tl.cues.filter((q) => q.type === "pop").map((q) => q.at)).toEqual([0.5, 1.7, 2.9]);
+    expect(timeline(c).cues.filter((q) => q.type === "pop").length).toBe(1);   // unsynced: the written beat (one repeating cue)
+  });
+  it("finds the top of his hard hat, and is not fooled by a sunset", () => {
+    const w = 40, h = 60, frame = (paint: (x: number, y: number) => [number, number, number]) => { const b = new Uint8Array(w * h * 3); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b.set(paint(x, y), (y * w + x) * 3); return b; };
+    const sky: [number, number, number] = [90, 160, 240], hat: [number, number, number] = [245, 190, 30];
+    expect(hatRow(frame((x, y) => (y >= 22 && y < 30 && x >= 12 && x < 26 ? hat : sky)), w, h)).toBe(22);
+    expect(hatRow(frame(() => sky), w, h)).toBeNull();
+    expect(hatRow(frame((x, y) => (y < 10 ? [250, 170, 60] : y >= 40 && y < 46 && x >= 10 && x < 22 ? hat : sky)), w, h)).toBe(40);
+  });
+  it("sees a still that does not fill the frame", () => {
+    const w = 20, h = 50, frame = (band: number) => { const b = new Uint8Array(w * h * 3); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b.set(y < band || y >= h - band ? [252, 250, 246] : [(x * 12) % 255, (y * 5) % 255, 90], (y * w + x) * 3); return b; };
+    expect(bandFault(frame(0), w, h)).toBeNull();
+    expect(bandFault(frame(1), w, h)).toBeNull();
+    expect(bandFault(frame(8), w, h)).toMatch(/does not fill the frame.*16% at the top, 16% at the bottom/);
+  });
+  it("the experiment's cap is $100 on top of the pilot, and a clip has its own budget", () => {
+    const cap = phase2Cap(NOW);
+    expect(cap.credits).toBe(1641.12);
+    expect(PHASE2.credits * 0.0625).toBe(100);
+    const ledger = emptyLedger(NOW);
+    const e = (key: string, credits: number, status: "completed" | "failed") => ({ key, kind: "video" as const, model: "m", params: {}, paramsSha256: "", idempotencyKey: key, credits, usd: credits * 0.0625, status, requestId: null, statusUrl: null, createdAt: NOW.toISOString() });
+    ledger.entries.push(e("a/s1/still/take1", 1.6, "completed"), e("a/s1/video/still1-take1", 3.36, "completed"), e("a/s1/video/still1-take2", 3.36, "failed"), e("ab/s1/still/take1", 1.6, "completed"));
+    expect(clipSpent(ledger, "a")).toBe(4.96);
+    expect(clipSpent(ledger, "ab")).toBe(1.6);
+  });
+  it("the daily command: the next approved concept, and nothing posted without a reviewer", () => {
+    const q: Queue = { version: 1, order: ["x-gone", "a", "b", "c"], state: { a: { status: "approved", at: "t" } } };
+    expect(nextInQueue(q, ["a", "b", "c"])).toBe("b");
+    expect(nextInQueue({ ...q, state: { ...q.state, b: { status: "rejected", at: "t" }, c: { status: "ready-for-review", at: "t" } } }, ["a", "b", "c"])).toBeNull();
+    expect(mayPost(q, "b")).toMatch(/has not been made/);
+    expect(mayPost(q, "a")).toMatch(/already approved/);
+    expect(mayPost({ ...q, state: { b: { status: "rejected", at: "t", why: "two tails" } } }, "b")).toMatch(/rejected: two tails/);
+    expect(mayPost({ ...q, state: { b: { status: "ready-for-review", at: "t" } } }, "b")).toBeNull();
+    const c = conceptById("permit-office-359");
+    const good = { clip: { width: 1080, height: 1920, fps: 30, durationSec: 9.5, lufs: -14.2, truePeakDb: -3 }, aiGenerated: true, disclosure: { tiktok: { isAiGenerated: true }, youtube: { containsSyntheticMedia: true } }, speech: { lineOverBedDb: 14 } };
+    expect(automaticChecks(c, good, 14, 24).failed).toEqual([]);
+    const bad = automaticChecks(c, { ...good, clip: { ...good.clip, lufs: -19 }, aiGenerated: false, speech: { lineOverBedDb: 6 } }, 30, 24).failed.join(" | ");
+    expect(bad).toMatch(/-19 LUFS/); expect(bad).toMatch(/AI-generated flag is missing/); expect(bad).toMatch(/only 6 dB over the bed/); expect(bad).toMatch(/over the clip's budget/);
+  });
+  it("a Short goes out public, labelled synthetic, with #Shorts in its title", () => {
+    const p = postsOf(conceptById("while-youre-here")).youtube!;
+    const req = uploadSessionRequest({ title: p.title!, description: p.text, categoryId: "24", privacyStatus: "public", containsSyntheticMedia: true }, 5_000_000);
+    expect(req.body.status).toEqual({ privacyStatus: "public", selfDeclaredMadeForKids: false, containsSyntheticMedia: true });
+    expect(req.body.snippet.title).toMatch(/#Shorts$/);
   });
 });
