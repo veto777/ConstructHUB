@@ -29,7 +29,11 @@ export type VoiceCheck = {
   serpTop: SerpEntry[] | null; rivals: Record<string, number | null> | null;
   localPack: { position: number; title: string; domain: string | null }[] | null;
 };
-export type VoiceRow = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null };
+/**
+ * `observed`: the keywords on which this site's place is known (always all for the site itself; for a competitor, the
+ * checks that saved its position or the top ten). Its figures are of those keywords only; 0 = not measured.
+ */
+export type VoiceRow = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null; observed: number };
 export type Voice = {
   keywords: number;
   /** The site and the competitors it follows, most visible first. */
@@ -61,12 +65,16 @@ export function shareOfVoice(checks: VoiceCheck[], siteDomain: string, competito
   const site = bare(siteDomain), followed = competitors.map(bare);
   const weighted = checks.length > 0 && checks.every((c) => (c.volume ?? 0) > 0);
   const weight = (c: VoiceCheck) => (weighted ? (c.volume as number) : 1);
-  const total = checks.reduce((a, c) => a + weight(c), 0);
+  // A competitor's place is known on a check only if that check saved its position or the top ten (outside the top
+  // ten it wins no share either way); checks that saved neither are left out of its figures, and counted.
+  const seenOn = (c: VoiceCheck, domain: string) => (c.rivals != null && Object.prototype.hasOwnProperty.call(c.rivals, domain)) || (c.serpTop?.length ?? 0) > 0;
   const row = (domain: string, isSite: boolean): VoiceRow => {
-    const positions = checks.map((c) => positionOf(c, domain, isSite));
+    const mine = isSite ? checks : checks.filter((c) => seenOn(c, domain));
+    const positions = mine.map((c) => positionOf(c, domain, isSite));
     const ranked = positions.filter((p): p is number => p !== null);
-    const won = checks.reduce((a, c, i) => a + weight(c) * clickShare(positions[i]), 0);
-    return {
+    const total = mine.reduce((a, c) => a + weight(c), 0);
+    const won = mine.reduce((a, c, i) => a + weight(c) * clickShare(positions[i]), 0);
+    return { observed: mine.length,
       domain, isSite, ranked: ranked.length, top3: ranked.filter((p) => p <= 3).length, top10: ranked.filter((p) => p <= 10).length,
       averagePosition: ranked.length ? Math.round((ranked.reduce((a, b) => a + b, 0) / ranked.length) * 10) / 10 : null,
       visibility: total ? Math.round((won / total / CLICK_SHARE[0]) * 1000) / 10 : 0,

@@ -117,6 +117,8 @@ export function healthScore(report: AuditReport, pages: AuditPage[]): number | n
   return c.pages ? Math.round(((c.pages - c.errorPages) / c.pages) * 100) : null;
 }
 
+/** Findings about the answer itself (judged from the status alone), not about what a page says. */
+const ANSWER_CHECKS = new Set(["status", "fetch", "redirects", "https"]);
 export function auditSummary(report: AuditReport, pages: AuditPage[], previous?: { report: AuditReport; pages: AuditPage[] } | null): AuditSummary {
   const now = groupFindings(report.findings), before = previous ? groupFindings(previous.report.findings) : null;
   const issues: AuditIssue[] = [...now.values()].map((g) => {
@@ -129,7 +131,7 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   }).sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.count - a.count || a.title.localeCompare(b.title));
   // An issue that is gone is "fixed" only if this crawl could have found it again: at least one of its pages was
   // crawled this time, and (for the checks that compare with the Google profile) a profile was attached this time too.
-  const crawledNow = new Set(pages.map((p) => p.url));
+  const statusNow = new Map(pages.map((p) => [p.url, p.status] as const));
   const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
@@ -159,9 +161,15 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
       const pagesOf = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
       return pagesOf.length > 0 && pagesOf.every((u) => measured.has(u));
     }
-    // Every page it was on must have been looked at again (an entry such as "URL — score 41" starts with its page).
+    // Every page it was on must have been looked at again — and, for anything read from the page itself (content,
+    // indexing, tags), have answered normally (2xx) this time: a page now down or redirecting was not re-read, so its
+    // issue is "not re-checked", never "fixed". Checks of the answer itself (status, fetch, redirects, https) need only
+    // the page to have been asked again.
     const urls = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
-    return urls.length === 0 || urls.every((u) => crawledNow.has(u));
+    const answerOnly = ANSWER_CHECKS.has(g.key);
+    // (Pages are saved under their final address: an http address fixed by sending it to https is found as its https twin.)
+    const answerOf = (u: string) => statusNow.get(u) ?? (g.key === "https" ? statusNow.get(u.replace(/^http:/i, "https:")) : undefined);
+    return urls.length === 0 || urls.every((u) => { const st = answerOnly ? answerOf(u) : statusNow.get(u); return st !== undefined && (answerOnly || (st >= 200 && st < 300)); });
   };
   const brief = (g: Group) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length });
   const fixed = gone.filter(recheckable).map(brief), notRechecked = gone.filter((g) => !recheckable(g)).map(brief);

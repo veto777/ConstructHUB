@@ -182,3 +182,12 @@ describe("odd but readable crawls", () => {
     expect([g.get("x")!.category, g.get("x")!.why, g.get("x")!.fix]).toEqual(["technical", "", ""]);
   });
 });
+
+describe("fixed means re-read", () => {
+  it("an issue on a page that is now down is not re-checked, never fixed; a status issue on a page that now answers is fixed", () => {
+    const before = { report: { findings: [finding("noindex", "warning", ["https://a.com/svc"]), finding("status", "critical", ["https://a.com/old"])] }, pages: [page("https://a.com/svc"), page("https://a.com/old", 404)] };
+    const now = auditSummary({ findings: [] }, [page("https://a.com/svc", 503), page("https://a.com/old", 200)], before);
+    expect(now.fixed.map((f) => f.key)).toEqual(["status"]);
+    expect(now.notRechecked.map((f) => f.key)).toEqual(["noindex"]);
+  });
+});

@@ -946,6 +946,18 @@ Verdict: eight new defects, none HIGH. Kimi (pre-deploy review): no serious defe
  Kimi's earlier lows (audit #49 round): the Pages tab's 1xx rule, the empty-tag wording and the permanent "unusual: 0" row - FIXED; a read that keeps colliding with crawl updates after three tries is still a plain error (rare).
  NOT DONE: as audit #43; a PDF font for every script.
 
+## Codex audit #51 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-51.md) - Kimi reviewed the fixes before deploy
+
+Verdict: five new defects, one HIGH (ranked by customer impact, as asked). Kimi: nothing serious; three trivial clean-ups and one low point, all done.
+
+ 1 HIGH a page now down could turn its old issues "fixed" ....... FIXED (an issue read from the page itself counts as re-checked only if every page it was on answered 2xx this time; status / fetch / redirect / https findings need only the page asked again - an http address now sent to https is found as its https twin. Unit test with the audit's own example)
+ 2 Competitors stale after a rank check ......................... FIXED (refreshed with the history on check completion and keyword changes; read again after a minute when looked at)
+ 3 competitors with no saved place shown as 0% .................. FIXED (each competitor's figures rest only on the checks that saved its place - "not measured", or "on N of M")
+ 4 focus refresh never fired .................................... FIXED (always, whatever the app's default)
+ 5 Pages tab filters and counts used different status rules ..... FIXED (one rule)
+ Also: a stored crawl error is shown only as one short plain line, else the general wording.
+ NOT DONE: as audit #43; a PDF font for every script.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -1029,3 +1041,4 @@ Verdict: eight new defects, none HIGH. Kimi (pre-deploy review): no serious defe
 - 10/8 audit #48 fixes: 405 tests; nineteen real-Postgres scripts passing (outgoing 5/5 with a broken newest crawl). Browser (vb11, commit checked): Site audit, health tile, outgoing links on both real crawls; 1440 and 390 px, no overflow, no page errors.
 - 10/8 slice 62 (competitors by tag) + audit #49 fixes: 406 tests; nineteen real-Postgres scripts passing (rank tags 9/9 with share of voice by tag). Browser (vb11, commit checked): the tag choice keeps focus, an unknown tag refused; Site audit, health tile, groups; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #50 fixes: 406 tests; nineteen real-Postgres scripts passing. Kimi reviewed the diff before deploy. Browser (vb11, commit checked): competitors by tag, Site audit pickers, outgoing links on both real crawls; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #51 fixes: 407 tests; nineteen real-Postgres scripts passing. Kimi reviewed the diff before deploy. Browser (vb11, commit checked): competitors, Site audit fixed / not re-checked; 1440 and 390 px, no overflow, no page errors.

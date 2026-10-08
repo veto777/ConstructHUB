@@ -11,7 +11,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, fmtDate, fmtNum, type SeoSite } from "./shell";
 
-type Row = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null };
+type Row = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null; observed?: number };
 type Voice = { device: string; devices?: string[]; tracked?: number; checkedOn: string | null; hasPages: boolean; max: number; keywords: number; competitors: string[]; domains: Row[];
   seenMost: { domain: string; keywords: number; bestPosition: number }[]; mapLeaders: { title: string; domain: string | null; keywords: number; isSite: boolean }[] };
 
@@ -29,6 +29,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
   const key = `/api/seo/sites/${site.id}/voice${params ? `?${params}` : ""}`;
   // The answer for the previous choice stays on screen (marked as loading) while another tag loads, so the choice keeps its focus.
   const q = useQuery<Voice & { tag?: string | null; tags?: string[] }>({ queryKey: [key], refetchOnMount: "always",
+    // Not kept forever: read again after a minute when looked at again (a check run elsewhere shows up).
+    staleTime: 60_000, refetchOnWindowFocus: true,
     // Only this site's earlier answer may stand in (never another site's while it loads).
     placeholderData: (prev, prevQuery) => (typeof prevQuery?.queryKey[0] === "string" && prevQuery.queryKey[0].startsWith(`/api/seo/sites/${site.id}/voice`) ? prev : undefined) });
   // Following or dropping a competitor changes every tag's view, so all of them are read again.
@@ -89,12 +91,13 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
               <li key={d.domain} data-testid={`voice-${d.domain}`}>
                 <div className="flex items-center gap-2 text-[13px]">
                   <span className={`min-w-0 flex-1 truncate ${d.isSite ? "g-text font-medium" : "g-text"}`}>{d.domain}{d.isSite && <span className="g-text-2 font-normal"> · you</span>}</span>
-                  {unmeasured ? <span className="g-text-2 text-[12px]">not measured</span> : <>
+                  {unmeasured || (!d.isSite && d.observed === 0) ? <span className="g-text-2 text-[12px]">not measured{!unmeasured ? " — no check saved its place yet" : ""}</span> : <>
+                  {!d.isSite && d.observed != null && d.observed < v.keywords && <span className="g-text-2 text-[11px]">on {fmtNum(d.observed)} of {fmtNum(v.keywords)}</span>}
                   <span className="g-text-2 text-[12px] tabular-nums">{d.top10} in top 10{d.averagePosition != null ? ` · avg ${d.averagePosition}` : ""}</span>
                   <span className="g-text w-12 text-right tabular-nums">{d.visibility}%</span></>}
                   {!d.isSite && <button type="button" className="g-text-2" aria-label={`Stop following ${d.domain}`} disabled={remove.isPending} onClick={() => remove.mutate(d.domain)}><X className="h-3.5 w-3.5" /></button>}
                 </div>
-                {!unmeasured && <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? "var(--g-blue)" : "#9aa0a6" }} /></div>}
+                {!unmeasured && (d.isSite || d.observed !== 0) && <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? "var(--g-blue)" : "#9aa0a6" }} /></div>}
               </li>
             ))}
           </ul>

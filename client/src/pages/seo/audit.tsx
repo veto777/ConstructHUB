@@ -42,6 +42,8 @@ const SEVERITY: Record<Severity, { label: string; plural: string; color: string 
 const CATEGORY: Record<string, string> = { technical: "Technical", performance: "Performance", local: "Local", content: "Content", "ai-readiness": "AI readiness" };
 /** An area's name: only from the known list (an area name from the crawl is never looked up as anything else). */
 const catName = (k: unknown) => (typeof k === "string" ? (Object.prototype.hasOwnProperty.call(CATEGORY, k) ? CATEGORY[k] : k) : "Other");
+/** A stored crawl error as a customer sentence: one plain line, at most 200 characters, else the general wording. */
+const crawlError = (e: string | null) => { const s = (e ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim(); return s && s.length <= 200 ? s : "The crawl stopped before it completed."; };
 const STATUS = [
   { key: "ok", label: "Working (2xx)", color: "var(--g-green)" },
   { key: "redirected", label: "Redirected (3xx)", color: "var(--g-blue)" },
@@ -101,7 +103,7 @@ export default function SeoAuditPage() {
   const choose = (c: { at: string | null; vs: string | null }) => site && setPick((m) => ({ ...m, [site.id]: c }));
   const q = useQuery<AuditData>({
     queryKey: [key, at, vs], enabled: !!site,
-    queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchOnWindowFocus: true,
+    queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchOnWindowFocus: "always",
     // While a crawl runs, every 6 seconds; otherwise every 5 minutes, so a crawl finished (or changed) elsewhere shows up.
     refetchInterval: (query) => (query.state.data?.running ? 6000 : 5 * 60_000) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
@@ -158,7 +160,7 @@ export default function SeoAuditPage() {
       {d && !running && d.lastFailed && (
         <div className="g-callout mb-4" role="alert" data-testid="audit-failed">
           <h3>The last crawl didn't finish</h3>
-          <p>{d.lastFailed.error || "The crawl stopped before it completed."} Started {fmtDate(d.lastFailed.createdAt)}.{a ? " The results below are from the crawl before it." : ""}</p>
+          <p>{crawlError(d.lastFailed.error)} Started {fmtDate(d.lastFailed.createdAt)}.{a ? " The results below are from the crawl before it." : ""}</p>
         </div>
       )}
       {site && d?.newestUnreadable && (
@@ -377,7 +379,7 @@ export default function SeoAuditPage() {
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">
               <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
-              <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages, didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
+              <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages, a page didn't answer normally this time (an error or a redirect), didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>
