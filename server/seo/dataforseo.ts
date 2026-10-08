@@ -544,8 +544,8 @@ export function parseBacklinkRow(item: any): Backlink | null {
   if (!item || typeof item !== "object") return null;
   return {
     domainFrom: str(item.domain_from),
-    urlFrom: str(item.url_from),
-    urlTo: str(item.url_to),
+    urlFrom: safeHttpUrl(item.url_from),
+    urlTo: safeHttpUrl(item.url_to),
     anchor: str(item.anchor),
     dofollow: item.dofollow === true,
     rank: num(item.rank),
@@ -571,6 +571,29 @@ export async function backlinksSummary(input: { target: string }): Promise<Price
   const response = await request("POST", "/backlinks/summary/live", [backlinksPayload(input.target)]);
   const task = assertOk(response, { treatNoResultsAsEmpty: true });
   return { data: parseBacklinkSummary(task.result?.[0] ?? {}), costUsd: taskCost(task) };
+}
+
+/** One linking site that stopped linking: who, how strong, from which page to which, and when it was last seen. */
+export type LostLink = { domain: string; /** 0–100. */ authority: number | null; from: string | null; to: string | null; anchor: string | null; lastSeen: string | null; follow: boolean };
+export function parseLostLink(item: any): LostLink | null {
+  const domain = safeDomain(item?.domain_from);
+  if (!domain) return null;
+  const rank = num(item.domain_from_rank);
+  return {
+    domain, authority: rank === null ? null : Math.max(0, Math.min(100, Math.round(rank / 10))), from: safeHttpUrl(item.url_from), to: safeHttpUrl(item.url_to),
+    anchor: str(item.anchor)?.slice(0, 200) ?? null, lastSeen: str(item.last_seen)?.slice(0, 10) ?? null, follow: item.dofollow === true,
+  };
+}
+/** The request for it: one row per linking site, strongest first, among links last seen after `since` (YYYY-MM-DD) and now gone. */
+export const lostLinksRequest = (target: string, since: string, limit: number) => ({
+  ...backlinksPayload(target), backlinks_status_type: "lost", mode: "one_per_domain", limit: Math.min(100, Math.max(1, limit)),
+  filters: ["last_seen", ">", since], order_by: ["domain_from_rank,desc"],
+});
+/** The linking sites lost since a date — named, not just counted. */
+export async function lostLinks(input: { target: string; since: string; limit: number }): Promise<Priced<{ items: LostLink[]; total: number | null }>> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.since)) throw new DataForSeoError("invalid", "since must be a date");
+  const task = assertOk(await request("POST", "/backlinks/backlinks/live", [lostLinksRequest(input.target, input.since, input.limit)]), { treatNoResultsAsEmpty: true });
+  return { data: { items: taskItems(task).map(parseLostLink).filter((x): x is LostLink => !!x), total: num(task.result?.[0]?.total_count) }, costUsd: taskCost(task) };
 }
 
 export async function backlinksList(input: { target: string; limit: number }): Promise<Priced<{ items: Backlink[]; totalCount: number | null }>> {

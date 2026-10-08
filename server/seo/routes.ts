@@ -30,7 +30,7 @@ import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthl
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
-import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier } from "./pricing";
+import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier, estimateLostLinksUsd } from "./pricing";
 import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
@@ -77,7 +77,8 @@ export const SEO_PRICES = {
   keywordOverview: retailCents(KEYWORD_OVERVIEW_TYPICAL_USD),
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
-  backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** A snapshot: the summary and the top 100 linking pages, plus (from the second snapshot on) the linking sites lost since the last one. */
+  backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100) + estimateLostLinksUsd()),
   /** Content explorer: one page of results. */
   contentSearch: retailCents(CONTENT_TYPICAL_USD),
   /** Batch analysis: a flat part plus so much per 100 websites. */
@@ -505,11 +506,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/backlinks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const { rows } = await pool.query(
-      "SELECT id, taken_on::text AS taken_on, summary, backlinks FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [site.id]);
+      "SELECT id, taken_on::text AS taken_on, summary, backlinks, changes FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [site.id]);
     const [latest, previous] = rows;
     res.json({
       site: siteView(site), configured: isConfigured(),
-      snapshot: latest ? { id: latest.id, takenOn: latest.taken_on, summary: latest.summary, backlinks: latest.backlinks } : null,
+      snapshot: latest ? { id: latest.id, takenOn: latest.taken_on, summary: latest.summary, backlinks: latest.backlinks, changes: latest.changes ?? null } : null,
       previous: previous ? { takenOn: previous.taken_on, summary: previous.summary } : null,
       nextSnapshotAt: site.next_backlinks_at,
     });

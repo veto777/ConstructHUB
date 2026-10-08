@@ -95,6 +95,8 @@ export const SEO_SCHEMA_DDL = [
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (site_id, taken_on)
   )`,
+  // The linking sites lost since the snapshot before (named, with the page that linked): { since, lost: [...], lostTotal }.
+  `ALTER TABLE seo_backlink_snapshots ADD COLUMN IF NOT EXISTS changes jsonb`,
   // DataForSEO spend, per paying account per calendar month (UTC). The cap in
   // server/seo/budget.ts reads the platform-wide sum of a month.
   `CREATE TABLE IF NOT EXISTS seo_api_usage (
