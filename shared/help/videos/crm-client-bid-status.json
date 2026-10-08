@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-client-bid-status",
+  "durationSec": 55,
+  "video": {
+    "key": "tutorials/crm-client-bid-status.ecc13535.mp4",
+    "bytes": 4612344,
+    "sha256": "ecc13535c7bdc1b6f1380f97169c977395660b40fe85b526669f142dbf571026"
+  },
+  "captions": {
+    "key": "tutorials/crm-client-bid-status.5b595737.vtt",
+    "bytes": 1207,
+    "sha256": "5b595737838802fda9fde16bdff5c592910cee44245a5b9be25c7097d829b1fc"
+  },
+  "poster": {
+    "key": "tutorials/crm-client-bid-status.14a4efa1.jpg",
+    "bytes": 102161,
+    "sha256": "14a4efa165a736c1833dc3c6e8b8c77713afae8da179a3232a7f4213815c7b89"
+  },
+  "uploaded": {
+    "at": "2026-10-08T02:15:52.183Z",
+    "video": "e6b2e0c320bc55108871621359b2816e",
+    "captions": "92488f6d776a4618cf28f521a8def466",
+    "poster": "b9f9c65dd4d427da5da44a40bad673f5"
+  }
+}

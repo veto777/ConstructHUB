@@ -1,0 +1,112 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-bid-status",
+  "title": "Sort clients by bid status",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "caption": "Clients",
+      "narration": "On Clients in the ConstructHUB CRM, these tabs sort your clients by where their bid stands.",
+      "url": "/crm/clients",
+      "chapter": "The bid status tabs"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tabs-bid-status\"]",
+      "caption": "All, Job Won, Undecided, Declined",
+      "narration": "Each tab has a count: All, Job Won, Undecided and Declined."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-won\"]",
+      "caption": "Job Won",
+      "narration": "Choose Job Won to see the clients who approved an estimate.",
+      "chapter": "Job Won and Undecided"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pill-bid-\"]",
+      "caption": "The Bid column",
+      "narration": "The Bid column shows the same status on each row."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-undecided\"]",
+      "caption": "Undecided",
+      "narration": "Undecided is everyone with an estimate you've sent that they haven't answered."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-\"]",
+      "caption": "Who to follow up",
+      "narration": "These clients are still deciding, so this is a good list to call."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-declined\"]",
+      "caption": "Declined",
+      "narration": "Declined lists clients who turned an estimate down."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-bid-tab-empty\"]",
+      "caption": "Nobody yet",
+      "narration": "Nobody has declined here, so this list is empty."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-all\"]",
+      "caption": "All",
+      "narration": "All brings everyone back.",
+      "chapter": "Where the status comes from",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Vince Castellano\") td:nth-child(4)",
+      "caption": "A dash",
+      "narration": "A dash means the client has no sent, approved or declined estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tabs-bid-status\"]",
+      "caption": "Kept up to date",
+      "narration": "You never set the status yourself. It comes from the client's estimates."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find the tabs on Clients, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to sort clients by bid status | ConstructHUB CRM",
+    "description": "A short walkthrough of the bid status tabs on Clients in the ConstructHUB CRM. You will see who has approved an estimate, who has not answered yet, and where each status comes from.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "bid tracking",
+      "estimate follow up",
+      "client management"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Who said yes",
+    "accent": "yes",
+    "step": 1,
+    "kicker": "CRM Tutorial"
+  }
+}
