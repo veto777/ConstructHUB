@@ -1,0 +1,89 @@
+/**
+ * Real-Postgres check of place-level rank tracking, the map pack and alerts. Not part of the unit suite.
+ * Run after script/seo-ledger-check.ts on the same THROWAWAY database (it also proves the schema upgrades in place):
+ *   DATABASE_URL=postgres://.../seotest npx tsx script/seo-local-check.ts
+ */
+import { pool } from "../server/db";
+import { ensureSeoSchema } from "../server/seo/schema";
+import { budgetDeps } from "../server/seo/budget";
+import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps } from "../server/seo/jobs";
+import { dataforseoDeps } from "../server/seo/dataforseo";
+import { searchLocations, locationByCode } from "../server/seo/locations";
+import { raiseRankAlerts, raiseLinkAlerts, listAlerts, unreadAlerts, markAlertsRead } from "../server/seo/alerts";
+
+let failed = 0;
+const eq = (label: string, got: unknown, want: unknown) => {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) failed++;
+  console.log(`${ok ? "PASS" : "FAIL"}  ${label}${ok ? "" : `  got ${JSON.stringify(got)} want ${JSON.stringify(want)}`}`);
+};
+const one = async (sql: string, args: unknown[] = []) => (await pool.query(sql, args)).rows[0];
+
+async function main() {
+  await ensureSeoSchema();
+  await ensureSeoSchema(); // twice: every statement must be safe to repeat
+  eq("1a the old one-keyword-per-site rule is gone, the per-place rule is there",
+    [(await one("SELECT count(*)::int n FROM pg_constraint WHERE conname='seo_keywords_site_id_keyword_key'")).n, (await one("SELECT count(*)::int n FROM pg_indexes WHERE indexname='seo_keywords_site_keyword_place'")).n], [0, 1]);
+
+  // places
+  await pool.query(`INSERT INTO seo_locations(code,name,type) VALUES (1015214,'Tampa,Florida,United States','City'),(200539,'Tampa-St Petersburg (Sarasota), FL,Florida,United States','DMA Region'),(9012345,'Tampa Heights,Florida,United States','Neighborhood'),(33602,'33602,Florida,United States','Postal Code') ON CONFLICT DO NOTHING`);
+  eq("2a typing 'tam' offers the city first", (await searchLocations("tam")).map((l) => [l.label, l.kind]), [["Tampa, Florida", "City"], ["Tampa-St Petersburg (Sarasota), FL, Florida", "Metro area"], ["Tampa Heights, Florida", "Neighborhood"]]);
+  eq("2b a ZIP code is found by its digits", (await searchLocations("336")).map((l) => l.label), ["33602, Florida"]);
+  eq("2c wildcards typed by a user are not wildcards", (await searchLocations("%%")).length, 0);
+  eq("2d a code that is not a place we offer is refused", await locationByCode(424242), null);
+
+  budgetDeps.allowanceCents = async () => 100000;
+  dataforseoDeps.env = () => ({ DATAFORSEO_LOGIN: "x", DATAFORSEO_PASSWORD: "y" });
+  const site = await one("INSERT INTO seo_sites(user_id,domain,devices,business_name) VALUES(1,'alpine.example','desktop','Alpine Exteriors') RETURNING *");
+  const us = await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,1,'roof repair') RETURNING id", [site.id]);
+  const tampa = await one("INSERT INTO seo_keywords(site_id,user_id,keyword,location_code,location_name) VALUES($1,1,'roof repair',1015214,'Tampa, Florida') RETURNING id", [site.id]);
+  const dup: any = await pool.query("INSERT INTO seo_keywords(site_id,user_id,keyword,location_code) VALUES($1,1,'roof repair',1015214)", [site.id]).catch((e) => e);
+  eq("3a the same keyword can be tracked in two places, but not twice in one", [us.id !== tampa.id, dup?.code], [true, "23505"]);
+
+  let sent: any[] = [];
+  seoJobDeps.serpTaskPost = (async (i: any) => { sent = i.tasks; return { data: i.tasks.map((t: any, n: number) => ({ ...t, taskId: `t${n}` })), costUsd: 0.0012 }; }) as any;
+  const result = (position: number | null, local: number | null) => ({ status: "completed", result: { position, url: position ? "https://alpine.example/" : null, serpFeatures: ["local_pack", "organic"], localPosition: local, localPack: [{ position: 1, title: "Big Roofer", domain: null }, { position: 2, title: "Alpine Exteriors", domain: null }] } });
+
+  // first check: nothing to compare with
+  let run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  eq("4a the Tampa keyword is sent with Tampa's code, the other with none", sent.map((t) => t.locationCode ?? null).sort(), [1015214, null].sort());
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? result(3, 2) : result(4, null))) as any;
+  await collectRunningRuns();
+  eq("4b positions and the map pack are saved", (await pool.query("SELECT position, local_position, jsonb_array_length(local_pack) pack FROM seo_rank_checks WHERE site_id=$1 ORDER BY keyword_id", [site.id])).rows, [{ position: 4, local_position: null, pack: 2 }, { position: 3, local_position: 2, pack: 2 }]);
+  eq("4c a first check raises no alert", (await listAlerts(1, site.id)).length, 0);
+
+  // a week later: one keyword falls, the Tampa one leaves the map pack and rises
+  await pool.query("UPDATE seo_rank_checks SET checked_on=current_date-7 WHERE site_id=$1", [site.id]);
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? result(3, null) : result(9, null))) as any;
+  await collectRunningRuns();
+  const alerts = await listAlerts(1, site.id);
+  eq("5a one alert for the falls", alerts.map((a: any) => [a.kind, a.title]), [["rank_drop", "2 rankings fell for alpine.example"]]);
+  eq("5b it says what fell, and where", alerts[0].items.map((i: any) => [i.what, i.location, i.from, i.to]).sort(), [["dropped", null, 4, 9], ["left_map_pack", "Tampa, Florida", 2, null]].sort());
+  await raiseRankAlerts(site.id, run.id);
+  eq("5c raising the same run again adds nothing", (await listAlerts(1, site.id)).length, 1);
+  eq("5d it is unread until marked", [await unreadAlerts(1), (await markAlertsRead(1, [alerts[0].id]), await unreadAlerts(1))], [1, 0]);
+
+  // alerts switched off
+  await pool.query("UPDATE seo_rank_checks SET checked_on=checked_on-7 WHERE site_id=$1", [site.id]);
+  await pool.query("UPDATE seo_sites SET alerts_enabled=false WHERE id=$1", [site.id]);
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  seoJobDeps.serpTaskGet = (async () => result(30, null)) as any;
+  await collectRunningRuns();
+  eq("6  with alerts off, a fall raises nothing", (await listAlerts(1, site.id)).length, 1);
+
+  // links
+  await pool.query("UPDATE seo_sites SET alerts_enabled=true WHERE id=$1", [site.id]);
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary) VALUES ($1,1,current_date-30,'{"referringDomains":100,"backlinks":900}'),($1,1,current_date,'{"referringDomains":90,"backlinks":700}')`, [site.id]);
+  eq("7a ten linking sites lost raises a links alert", await raiseLinkAlerts(site.id), "links_lost");
+  eq("7b once", await raiseLinkAlerts(site.id), null);
+  eq("7c another account sees none of it", (await listAlerts(2, null)).length, 0);
+
+  console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
+  await pool.end();
+  process.exit(failed ? 1 : 0);
+}
+main().catch((e) => { console.error("CRASHED", e); process.exit(2); });

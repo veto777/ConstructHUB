@@ -1,0 +1,149 @@
+/**
+ * SEO alerts: what changed between one check and the next that a business
+ * owner needs to hear about — rankings lost or won, the Google map pack
+ * entered or left, linking sites lost or gained. Built from saved data, so an
+ * alert never costs SEO data. Each alert is one row in seo_alerts (the Alerts
+ * page) and one platform notification (the bell, and email when it is on).
+ */
+import { pool } from "../db";
+import { notifyUser } from "../account-events";
+
+export const DEFAULT_DROP = 3;
+/** Movement below this position is noise: nobody sees page three. */
+export const WATCH_DEPTH = 20;
+
+export type CheckPair = {
+  keywordId: number; keyword: string; device: string; location: string | null;
+  position: number | null; previous: number | null;
+  local: number | null; previousLocal: number | null;
+};
+export type RankChange = {
+  keyword: string; device: string; location: string | null;
+  /** "lost" = no longer in the tracked results, "new" = newly in them. */
+  what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack";
+  from: number | null; to: number | null;
+};
+
+/**
+ * What moved enough to matter between two checks of the same keywords.
+ * A drop or gain counts when it is at least `threshold` positions and the
+ * better of the two positions is inside the first WATCH_DEPTH results.
+ */
+export function rankChanges(pairs: CheckPair[], threshold = DEFAULT_DROP): { drops: RankChange[]; gains: RankChange[] } {
+  const drops: RankChange[] = [], gains: RankChange[] = [];
+  const t = Math.max(1, Math.floor(threshold));
+  for (const p of pairs) {
+    const base = { keyword: p.keyword, device: p.device, location: p.location };
+    if (p.previous !== null && p.position === null) { if (p.previous <= WATCH_DEPTH) drops.push({ ...base, what: "lost", from: p.previous, to: null }); }
+    else if (p.previous === null && p.position !== null) { if (p.position <= WATCH_DEPTH) gains.push({ ...base, what: "new", from: null, to: p.position }); }
+    else if (p.previous !== null && p.position !== null) {
+      const moved = p.position - p.previous;
+      if (moved >= t && p.previous <= WATCH_DEPTH) drops.push({ ...base, what: "dropped", from: p.previous, to: p.position });
+      else if (-moved >= t && p.position <= WATCH_DEPTH) gains.push({ ...base, what: "improved", from: p.previous, to: p.position });
+    }
+    if (p.previousLocal !== null && p.local === null) drops.push({ ...base, what: "left_map_pack", from: p.previousLocal, to: null });
+    else if (p.previousLocal === null && p.local !== null) gains.push({ ...base, what: "entered_map_pack", from: null, to: p.local });
+  }
+  const weight = (c: RankChange) => Math.min(c.from ?? 999, c.to ?? 999);
+  return { drops: drops.sort((a, b) => weight(a) - weight(b)), gains: gains.sort((a, b) => weight(a) - weight(b)) };
+}
+
+/** One line a person can read: `"roof repair" in Tampa, Florida fell from 4 to 9 (mobile)`. */
+export function describeChange(c: RankChange): string {
+  const where = c.location ? ` in ${c.location}` : "";
+  const dev = ` (${c.device})`;
+  switch (c.what) {
+    case "dropped": return `"${c.keyword}"${where} fell from ${c.from} to ${c.to}${dev}`;
+    case "lost": return `"${c.keyword}"${where} dropped out of the results — it was ${c.from}${dev}`;
+    case "left_map_pack": return `"${c.keyword}"${where} is no longer in the Google map pack — it was ${c.from}${dev}`;
+    case "improved": return `"${c.keyword}"${where} rose from ${c.from} to ${c.to}${dev}`;
+    case "new": return `"${c.keyword}"${where} now ranks at ${c.to}${dev}`;
+    case "entered_map_pack": return `"${c.keyword}"${where} is now in the Google map pack at ${c.to}${dev}`;
+  }
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+export const ITEM_CAP = 200;
+
+/** Insert the alert once (per site, kind and source); true when it is new. */
+async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<boolean> {
+  const { rowCount } = await pool.query(
+    `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING`,
+    [userId, siteId, kind, source, title, JSON.stringify(items.slice(0, ITEM_CAP))]);
+  return (rowCount ?? 0) > 0;
+}
+
+/** After a rank run: compare each keyword's newest check with the one before it and raise what moved. */
+export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ drops: number; gains: number }> {
+  const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled, alert_drop FROM seo_sites WHERE id=$1", [siteId]);
+  if (!site || site.alerts_enabled === false) return { drops: 0, gains: 0 };
+  const { rows } = await pool.query(
+    `SELECT k.id AS "keywordId", k.keyword, k.location_name AS location, x.device,
+            max(x.position) FILTER (WHERE rn=1) AS position, max(x.position) FILTER (WHERE rn=2) AS previous,
+            max(x.local_position) FILTER (WHERE rn=1) AS local, max(x.local_position) FILTER (WHERE rn=2) AS "previousLocal",
+            bool_or(rn=1 AND x.run_id=$2) AS in_run
+       FROM (SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn FROM seo_rank_checks c WHERE c.site_id=$1) x
+       JOIN seo_keywords k ON k.id=x.keyword_id
+      WHERE rn<=2 GROUP BY k.id, k.keyword, k.location_name, x.device HAVING count(*)=2`, [siteId, runId]);
+  // Only keywords this run actually checked, and only those that had a check before it.
+  const { drops, gains } = rankChanges(rows.filter((r: any) => r.in_run), site.alert_drop ?? DEFAULT_DROP);
+  const link = "/seo/alerts";
+  if (drops.length && await saveAlert(site.user_id, siteId, "rank_drop", runId, `${plural(drops.length, "ranking")} fell for ${site.domain}`, drops)) {
+    await notifyUser(site.user_id, "seo.rank_drop", {
+      title: `${plural(drops.length, "ranking")} fell for ${site.domain}`,
+      body: drops.slice(0, 5).map(describeChange).join("\n") + (drops.length > 5 ? `\n…and ${drops.length - 5} more.` : ""),
+      link, severity: "warning", actionLabel: "See what changed", actionUrl: link,
+    }).catch((e: any) => console.error(`[seo] rank-drop notification failed: ${e?.message ?? e}`));
+  }
+  if (gains.length && await saveAlert(site.user_id, siteId, "rank_gain", runId, `${plural(gains.length, "ranking")} improved for ${site.domain}`, gains)) {
+    await notifyUser(site.user_id, "seo.rank_gain", {
+      title: `${plural(gains.length, "ranking")} improved for ${site.domain}`,
+      body: gains.slice(0, 5).map(describeChange).join("\n") + (gains.length > 5 ? `\n…and ${gains.length - 5} more.` : ""),
+      link, severity: "info", actionLabel: "See what changed", actionUrl: link,
+    }).catch((e: any) => console.error(`[seo] rank-gain notification failed: ${e?.message ?? e}`));
+  }
+  return { drops: drops.length, gains: gains.length };
+}
+
+/** Linking sites lost or gained between two snapshots, when it is at least 3 sites and 5% of what there was. */
+export function linkChange(now: number | null | undefined, before: number | null | undefined): { kind: "links_lost" | "links_gained"; by: number } | null {
+  if (typeof now !== "number" || typeof before !== "number") return null;
+  const by = now - before;
+  if (Math.abs(by) < Math.max(3, Math.ceil(before * 0.05))) return null;
+  return { kind: by < 0 ? "links_lost" : "links_gained", by: Math.abs(by) };
+}
+
+/** After a backlink snapshot: compare with the snapshot before it. */
+export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
+  const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled FROM seo_sites WHERE id=$1", [siteId]);
+  if (!site || site.alerts_enabled === false) return null;
+  const { rows } = await pool.query("SELECT taken_on::text AS taken_on, summary FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [siteId]);
+  if (rows.length < 2) return null;
+  const [latest, previous] = rows;
+  const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
+  if (!change) return null;
+  const lost = change.kind === "links_lost";
+  const title = `${site.domain} ${lost ? "lost" : "gained"} ${plural(change.by, "linking site")}`;
+  const items = [{ from: previous.summary.referringDomains, to: latest.summary.referringDomains, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null }];
+  if (!(await saveAlert(site.user_id, siteId, change.kind, latest.taken_on, title, items))) return null;
+  await notifyUser(site.user_id, "seo.links_change", {
+    title, body: `Sites linking to ${site.domain}: ${previous.summary.referringDomains} on ${previous.taken_on}, ${latest.summary.referringDomains} now.`,
+    link: "/seo/alerts", severity: lost ? "warning" : "info", actionLabel: "See the links", actionUrl: "/seo/backlinks",
+  }).catch((e: any) => console.error(`[seo] link notification failed: ${e?.message ?? e}`));
+  return change.kind;
+}
+
+export async function listAlerts(userId: number, siteId: number | null, limit = 100) {
+  const { rows } = await pool.query(
+    `SELECT a.id, a.site_id AS "siteId", s.domain, a.kind, a.title, a.items, a.read_at AS "readAt", a.created_at AS "createdAt"
+       FROM seo_alerts a JOIN seo_sites s ON s.id=a.site_id
+      WHERE a.user_id=$1 AND ($2::int IS NULL OR a.site_id=$2) ORDER BY a.created_at DESC LIMIT $3`, [userId, siteId, limit]);
+  return rows;
+}
+export async function unreadAlerts(userId: number): Promise<number> {
+  const { rows: [r] } = await pool.query("SELECT count(*)::int n FROM seo_alerts WHERE user_id=$1 AND read_at IS NULL", [userId]);
+  return r?.n ?? 0;
+}
+export async function markAlertsRead(userId: number, ids: number[] | null): Promise<void> {
+  await pool.query(`UPDATE seo_alerts SET read_at=now() WHERE user_id=$1 AND read_at IS NULL AND ($2::bigint[] IS NULL OR id = ANY($2))`, [userId, ids]);
+}

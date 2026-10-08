@@ -34,6 +34,8 @@ export type SeoStatus = {
   usage: SeoUsage;
   credits: SeoCreditsInfo;
   prices: SeoPrices;
+  /** Alerts not yet read (the badge on the Alerts tab). */
+  alertsUnread?: number;
   /** The most a lookup can cost: what must be available for it to start. */
   holds?: Partial<SeoPrices>;
   packs: number[];
@@ -45,7 +47,7 @@ export type SeoStatus = {
   };
 };
 export type SeoSite = {
-  id: number; domain: string; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
+  id: number; domain: string; businessName?: string | null; alertsEnabled?: boolean; alertDrop?: number; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
   keywordCount: number; nextRankCheckAt: string | null; lastRankCheckAt: string | null; nextBacklinksAt: string | null; lastBacklinksAt: string | null;
 };
 
@@ -91,6 +93,7 @@ const TABS = [
   { href: "/seo/keywords", label: "Keywords explorer" },
   { href: "/seo/rank-tracker", label: "Rank tracker" },
   { href: "/seo/audit", label: "Site audit" },
+  { href: "/seo/alerts", label: "Alerts" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
 ];
@@ -118,7 +121,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
         ) : (
           <>
             <nav className="g-tabs" aria-label="SEO sections">
-              {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}</Link>)}
+              {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
             </nav>
             {picker && <SitePicker site={site} onSite={onSite} sites={sites} />}
             <UsageLine status={status} />

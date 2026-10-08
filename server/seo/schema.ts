@@ -1,3 +1,4 @@
+import { LOCATION_SCHEMA_DDL } from "./locations";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -104,6 +105,34 @@ export const SEO_SCHEMA_DDL = [
   ...CREDIT_SCHEMA_DDL,
   // Saved pages of Site Explorer reports and keyword overviews (server/seo/reports.ts).
   ...REPORT_SCHEMA_DDL,
+  // Places a rank check can be run from (server/seo/locations.ts).
+  ...LOCATION_SCHEMA_DDL,
+  // A keyword can be tracked in several places: the same keyword in Tampa and in Clearwater is two rows.
+  `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_code integer`,
+  `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_name text`,
+  `ALTER TABLE seo_keywords DROP CONSTRAINT IF EXISTS seo_keywords_site_id_keyword_key`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_keywords_site_keyword_place ON seo_keywords(site_id, keyword, coalesce(location_code, 0))`,
+  // The Google map pack: this business's place in it (1-3, null = not in it) and who was in it.
+  `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_position integer`,
+  `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_pack jsonb`,
+  // The name on the Google Business Profile (map-pack entries often carry no website), and alert settings.
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS business_name text`,
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alerts_enabled boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alert_drop integer NOT NULL DEFAULT 3`,
+  // What changed between checks (server/seo/alerts.ts). `source` is what raised it (a rank run id, a snapshot date).
+  `CREATE TABLE IF NOT EXISTS seo_alerts (
+    id bigserial PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
+    kind text NOT NULL CHECK (kind IN ('rank_drop','rank_gain','links_lost','links_gained')),
+    source text NOT NULL,
+    title text NOT NULL,
+    items jsonb NOT NULL DEFAULT '[]'::jsonb,
+    read_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (site_id, kind, source)
+  )`,
+  `CREATE INDEX IF NOT EXISTS seo_alerts_user ON seo_alerts(user_id, created_at DESC)`,
 ];
 
 export async function ensureSeoSchema() {

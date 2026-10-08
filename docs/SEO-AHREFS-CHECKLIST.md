@@ -47,8 +47,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
 - [x] DONE  D2  History: project chart (visibility %, average position) and positions-by-band chart per check date; click a keyword for its own history chart and table. Built from saved checks, free. NOT yet seen with real check data (no tracked sites exist on production yet).
 - [x] PART  D3  Tags: set a tag when adding keywords, filter the history by tag. TODO: edit tags in the table (API exists), competitors on the same keywords, share of voice vs competitors.
-- [ ] TODO  D4  Local / map-pack positions by city.
-- [ ] TODO  D5  SERP features won per keyword; scheduled email report.
+- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. NOT seen in a browser. US only.
+- [ ] TODO  D5  SERP features won per keyword (only the map pack is tracked so far); scheduled email report.
 
 ## E. Billing of SEO data (shared/seo-credits.ts, server/seo/credits.ts, budget.ts)
 - [x] DONE  E1  Every lookup charged at 4x wholesale, reserved then settled to the real cost. Codex FAIL (double refund possible; cost of parallel calls lost on failure) -> fixed 10-08: a reservation settles exactly once; failed reports carry the full cost; a failed lookup costs the customer nothing.
@@ -65,7 +65,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] PART  F2  HTTP status distribution (2xx / 3xx / 4xx / 5xx / failed) and per-area scores. TODO: crawl depth, indexability report, internal-link report, per-page explorer, pause/resume, custom page limit (fixed at 150).
 
 ## G. Other Ahrefs tools
-- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.  G4  Alerts (new/lost links, new keywords).
+- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.
+- [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
 - [ ] TODO  G5  Client-ready PDF reports and scheduled reports.  G6  Batch analysis of many domains.
 
 ## Codex audit #2 (2026-10-08, read-only, in a container; report: tower1 ~/codex-audits/out/seo-audit-2.md)
@@ -121,3 +122,5 @@ Health score: non-page files and off-site redirects no longer count as failures 
   against the real stored crawl. Still NOT seen in a browser by the builder; the rank-history charts have never had real data.
 - 2026-10-08 (slice 3): Content gap + Link intersect, durable ledger, Codex audit #3 fixes. 100 SEO unit tests pass;
   script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still NOT seen in a browser.
+- 2026-10-08 (slice 4): place-level tracking, map pack, alerts. 113 SEO unit tests pass; script/seo-local-check.ts 17/17 on a
+  throwaway Postgres that still had the old schema and rows (the upgrade runs in place); map pack found on live results.

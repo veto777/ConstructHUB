@@ -39,6 +39,8 @@ import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ES
 import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
 import { rankHistory, keywordHistory } from "./rank-history";
+import { searchLocations, locationByCode } from "./locations";
+import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
 
 /**
@@ -83,6 +85,8 @@ const siteInput = z.object({
 }).strict();
 const keywordsInput = z.object({
   keywords: z.array(z.string().trim().min(1).max(200)).min(1).max(500),
+  /** Where to check these from (a place from /api/seo/locations); omitted = the site's own place. */
+  locationCode: z.number().int().positive().optional(),
   tags: z.array(z.string().trim().min(1).max(40)).max(10).default([]),
   volumes: z.array(z.object({ keyword: z.string(), searchVolume: z.number().min(0).max(2_000_000_000).transform(Math.round).nullable(), cpc: z.number().min(0).max(99_999).nullable(), difficulty: z.number().min(0).max(100).transform(Math.round).nullable() })).max(500).optional(),
 }).strict();
@@ -108,6 +112,12 @@ const keywordOverviewInput = z.object({
   refresh: z.boolean().default(false),
 }).strict();
 const historyInput = z.object({ device: z.enum(["desktop", "mobile"]).optional(), tag: z.string().trim().min(1).max(40).optional() }).strict();
+const settingsInput = z.object({
+  businessName: z.string().trim().max(120).nullable().optional(),
+  alertsEnabled: z.boolean().optional(),
+  alertDrop: z.number().int().min(1).max(20).optional(),
+}).strict();
+const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -212,7 +222,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.setHeader("Cache-Control", "no-store");
     // The customer's SEO data credit and what each lookup costs them (shared/seo-credits.ts).
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
-    const body: Record<string, unknown> = { configured: isConfigured(), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
+    const body: Record<string, unknown> = { configured: isConfigured(), alertsUnread: await unreadAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
       body.admin = { vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
@@ -266,9 +276,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/overview", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const [{ rows: keywords }, { rows: checks }, { rows: runs }, gsc] = await Promise.all([
-      pool.query("SELECT id, keyword, tags, search_volume, cpc::float8 AS cpc, difficulty FROM seo_keywords WHERE site_id=$1 ORDER BY keyword", [site.id]),
+      pool.query("SELECT id, keyword, tags, search_volume, cpc::float8 AS cpc, difficulty, location_name FROM seo_keywords WHERE site_id=$1 ORDER BY keyword, location_name NULLS FIRST", [site.id]),
       pool.query(
-        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features FROM (
+        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack FROM (
            SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
            FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
       pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
@@ -281,10 +291,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     }
     const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
     const rows = keywords.map((k: any) => ({
-      id: k.id, keyword: k.keyword, tags: k.tags ?? [], searchVolume: k.search_volume, cpc: k.cpc, difficulty: k.difficulty,
+      id: k.id, keyword: k.keyword, location: k.location_name ?? null, tags: k.tags ?? [], searchVolume: k.search_volume, cpc: k.cpc, difficulty: k.difficulty,
       positions: Object.fromEntries(devices.map((d) => {
         const l = latest.get(`${k.id}:${d}`), p = previous.get(`${k.id}:${d}`);
-        return [d, l ? { position: l.position, url: l.url, checkedOn: l.checked_on, previous: p?.position ?? null, previousOn: p?.checked_on ?? null, features: l.serp_features ?? [] } : null];
+        return [d, l ? { position: l.position, url: l.url, checkedOn: l.checked_on, previous: p?.position ?? null, previousOn: p?.checked_on ?? null, features: l.serp_features ?? [],
+          local: l.local_position ?? null, previousLocal: p?.local_position ?? null, pack: Array.isArray(l.local_pack) ? l.local_pack : [] } : null];
       })),
     }));
     const primary = devices[0];
@@ -306,6 +317,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       improved: moved.filter((m) => m > 0).length,
       declined: moved.filter((m) => m < 0).length,
       lastCheckedOn: checks[0]?.checked_on ?? null,
+      inMapPack: rows.filter((r) => r.positions[primary]?.local != null).length,
+      withMapPack: rows.filter((r) => (r.positions[primary]?.pack?.length ?? 0) > 0).length,
     };
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     res.json({
@@ -321,7 +334,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
     const unique = [...new Set(input.keywords.map((k) => k.toLowerCase().replace(/\s+/g, " ").trim()).filter(Boolean))];
     // Plan limit: tracked keywords across the account (keywords already on this site are not re-added, so count only the new ones).
-    const { rows: existing } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1 AND keyword=ANY($2::text[])", [site.id, unique]);
+    // A place other than the site's own makes these separate keywords: "roof repair" in Tampa and in Clearwater both count.
+    let place: { code: number; label: string } | null = null;
+    if (input.locationCode && input.locationCode !== site.location_code) {
+      place = await locationByCode(input.locationCode);
+      if (!place) return res.status(400).json({ message: "Pick the place from the list." });
+    }
+    const { rows: existing } = await pool.query("SELECT keyword FROM seo_keywords WHERE site_id=$1 AND keyword=ANY($2::text[]) AND coalesce(location_code,0)=$3", [site.id, unique, place?.code ?? 0]);
     const adding = unique.length - existing.length;
     if (n + adding > MAX_KEYWORDS_PER_SITE) return res.status(403).json({ message: `Up to ${MAX_KEYWORDS_PER_SITE} keywords per site.` });
     const { rows: [{ total }] } = await pool.query("SELECT count(*)::int total FROM seo_keywords WHERE user_id=$1", [user]);
@@ -340,11 +359,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     for (const keyword of unique) {
       const v = volumes.get(keyword);
       const r = await pool.query(
-        `INSERT INTO seo_keywords(site_id,user_id,keyword,tags,search_volume,cpc,difficulty,volume_checked_at)
-         VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5::int IS NULL THEN NULL ELSE now() END)
-         ON CONFLICT(site_id,keyword) DO UPDATE SET tags=(SELECT array(SELECT DISTINCT unnest(seo_keywords.tags || EXCLUDED.tags)))
+        `INSERT INTO seo_keywords(site_id,user_id,keyword,tags,search_volume,cpc,difficulty,volume_checked_at,location_code,location_name)
+         VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5::int IS NULL THEN NULL ELSE now() END,$8,$9)
+         ON CONFLICT (site_id, keyword, coalesce(location_code, 0)) DO UPDATE SET tags=(SELECT array(SELECT DISTINCT unnest(seo_keywords.tags || EXCLUDED.tags)))
          RETURNING (xmax = 0) AS inserted`,
-        [site.id, user, keyword, input.tags, v?.searchVolume ?? null, v?.cpc ?? null, v?.difficulty ?? null]);
+        [site.id, user, keyword, input.tags, v?.searchVolume ?? null, v?.cpc ?? null, v?.difficulty ?? null, place?.code ?? null, place?.label ?? null]);
       if (r.rows[0]?.inserted) added++;
     }
     res.status(201).json({ added, total: n + added });
@@ -561,6 +580,35 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ cards, configured: isConfigured() });
   });
 
+  // Places a rank check can be run from: cities, ZIP codes, counties, states. Free (the list is saved locally).
+  route("get", "/api/seo/locations", async (req, res) => {
+    const q = String(req.query.q ?? "").slice(0, 80);
+    if (q.trim().length < 2) return res.json({ items: [] });
+    if (!isConfigured()) return notReady(res);
+    res.json({ items: await searchLocations(q) });
+  });
+
+  // Tracking settings for one site: the business name on its Google profile (to find it in the map pack) and alerts.
+  route("post", "/api/seo/sites/:id/settings", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = settingsInput.parse(req.body);
+    const { rows: [row] } = await pool.query(
+      `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop)
+        WHERE id=$1 RETURNING *`,
+      [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null]);
+    res.json(siteView(row));
+  });
+
+  // Alerts: what changed between checks. Saved rows only.
+  route("get", "/api/seo/alerts", async (req, res, user) => {
+    const siteId = req.query.siteId === undefined ? null : (await ownedSite(user, req.query.siteId)).id;
+    res.json({ alerts: await listAlerts(user, siteId), unread: await unreadAlerts(user) });
+  });
+  route("post", "/api/seo/alerts/read", async (req, res, user) => {
+    await markAlertsRead(user, readInput.parse(req.body ?? {}).ids ?? null);
+    res.json({ ok: true, unread: await unreadAlerts(user) });
+  });
+
   // Site Audit: the newest crawl of the site's domain, its change since the crawl before, the health
   // trend and any crawl in progress. Reads Site Scan's crawls (sitescan_jobs) — no SEO data spent.
   route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
@@ -607,7 +655,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
 function siteView(s: any) {
   return {
-    id: s.id, domain: s.domain, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
+    id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
     keywordCount: s.keyword_count ?? 0, nextRankCheckAt: s.next_rank_check_at, lastRankCheckAt: s.last_rank_check_at,
     nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at,
   };
