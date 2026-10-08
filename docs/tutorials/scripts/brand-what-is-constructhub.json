@@ -1,0 +1,151 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-what-is-constructhub",
+  "title": "What is ConstructHUB?",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/",
+      "caption": "The dashboard",
+      "chapter": "The problem",
+      "narration": "Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online."
+    },
+    {
+      "action": "highlight",
+      "selector": "a:has-text(\"Open CRM\")",
+      "caption": "Two products",
+      "narration": "ConstructHUB is two products: Business tools, and a CRM."
+    },
+    {
+      "action": "goto",
+      "url": "/databases",
+      "caption": "Database Directory",
+      "chapter": "Business tools",
+      "narration": "Business tools start with a directory of county and city permit offices."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-database-search\"]",
+      "value": "Houston",
+      "caption": "Search a city",
+      "narration": "Type a city or a county.",
+      "holdMs": 1500
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "caption": "Verified portal",
+      "narration": "A checked link opens the office's own permit portal. No guessed addresses."
+    },
+    {
+      "action": "goto",
+      "url": "/property",
+      "caption": "Property Records",
+      "narration": "County property records offices are listed the same way."
+    },
+    {
+      "action": "goto",
+      "url": "/features",
+      "caption": "Every feature",
+      "narration": "The same product looks after your Google listing, your reviews and your website."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "The CRM: pipeline",
+      "chapter": "The CRM",
+      "narration": "The second product is the CRM. Every job is a card, from lead to paid."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "caption": "One job",
+      "narration": "Open a job, and its estimate, schedule and invoices are together."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates/demo-estimate-e-1998",
+      "caption": "A signed estimate",
+      "narration": "Send an estimate from your price book."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Approved by Nora Hadley/",
+      "caption": "Approved online",
+      "narration": "Your client approves it online."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "caption": "Schedule",
+      "narration": "Put the visit"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"event-\"]:has-text(\"Hadl\")",
+      "caption": "On the calendar",
+      "narration": "on the schedule."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "narration": "File job-site photos to the job"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-grid\"]",
+      "caption": "JobCam feed",
+      "narration": "with JobCam."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/invoices",
+      "caption": "Invoices",
+      "narration": "Then send the invoice,"
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has-text(\"INV-2001\")",
+      "caption": "Paid",
+      "narration": "and record the payment."
+    },
+    {
+      "action": "goto",
+      "url": "/features",
+      "caption": "How to start",
+      "chapter": "How to start",
+      "narration": "Buy one or both. Each has its own plans, at ConstructHUB dot U S."
+    }
+  ],
+  "youtube": {
+    "title": "What is ConstructHUB? Business tools and a CRM for contractors",
+    "description": "ConstructHUB is two products for contractors. Business tools hold a directory of county and city permit offices, county property records, and tools for your Google listing, reviews and website. The CRM runs the job: pipeline, estimates your client approves online, schedule, job photos, invoices and payments. Each product has its own plans.",
+    "tags": [
+      "ConstructHUB",
+      "contractor software",
+      "contractor CRM",
+      "permit office directory",
+      "building permits",
+      "estimating software",
+      "job site photos",
+      "Google Business Profile",
+      "construction business",
+      "contractor tools"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "What is ConstructHUB?",
+    "accent": "ConstructHUB?",
+    "kicker": "Start here",
+    "step": 8
+  }
+}

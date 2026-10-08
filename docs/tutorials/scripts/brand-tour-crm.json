@@ -1,0 +1,173 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-tour-crm",
+  "title": "ConstructHUB CRM in 2 minutes",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "A lead comes in",
+      "narration": "Here is one job in the ConstructHUB CRM, from the first call to the final payment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"stage-col-lead\"]",
+      "caption": "Leads",
+      "narration": "Every job starts as a lead on the pipeline."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "caption": "The Hadley job",
+      "narration": "This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "narration": "Every client has a page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Caleb & Nora Hadley",
+      "narration": "Open the Hadleys, and the whole job is in one place."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-quick-actions\"]",
+      "caption": "Quick actions",
+      "narration": "Quick actions start the next step: a visit, an estimate, a payment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1998\")",
+      "caption": "The estimate",
+      "chapter": "Estimate and signature",
+      "narration": "The estimate went out by email. You can see when they opened it, and when they approved."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates/demo-estimate-e-1998",
+      "caption": "Estimate lines",
+      "narration": "Each line came from the price book, with its quantity and its price."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Approved by Nora Hadley/",
+      "caption": "Signed",
+      "narration": "Nora approved it online by typing her name. Now it is a signed contract."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "caption": "Schedule",
+      "chapter": "Schedule and job photos",
+      "narration": "Next, the visit goes on the schedule."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"event-\"]:has-text(\"Hadl\")",
+      "caption": "The visit",
+      "narration": "Open it for the time, the client, and who is going."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "The crew sees it on their own calendar."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Back to the client",
+      "narration": "On site, the crew shoots photos with JobCam."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Caleb & Nora Hadley",
+      "narration": "Back on the Hadleys' page,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-customer-jobcam\"]",
+      "caption": "JobCam",
+      "narration": "each shot is filed to this client's job."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-convert-\"]",
+      "caption": "Create invoice",
+      "chapter": "Invoice and payment",
+      "narration": "When the work is done, choose Create invoice on the approved estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"invoice-\"]",
+      "caption": "The invoice",
+      "narration": "The invoice is made from the estimate, ready to send."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-record-payment-\"]",
+      "caption": "Record payment",
+      "narration": "When the check arrives, choose Record payment."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-payment\"]",
+      "caption": "Record it",
+      "narration": "Check the amount, and record it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"invoice-\"]",
+      "caption": "Paid",
+      "narration": "The invoice is marked paid, and the client gets a receipt by email."
+    },
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "narration": "Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "caption": "Where to start",
+      "narration": "The CRM is its own product, with its own plans. See them at ConstructHUB dot U S."
+    }
+  ],
+  "youtube": {
+    "title": "ConstructHUB CRM in 2 minutes: one job from lead to paid",
+    "description": "One job in the ConstructHUB CRM from start to finish. A lead on the pipeline becomes an estimate the client approves online by typing their name. The visit goes on the schedule, JobCam files the crew's photos to the job, and the approved estimate becomes an invoice that is marked paid when the check is recorded. Everything shown is a demo workspace with made-up clients.",
+    "tags": [
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "construction CRM",
+      "estimate software",
+      "e-signature",
+      "job scheduling",
+      "job site photos",
+      "invoicing for contractors",
+      "contractor software",
+      "CRM tour"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Lead to paid",
+    "accent": "paid",
+    "kicker": "CRM in 2 minutes",
+    "step": 19
+  }
+}

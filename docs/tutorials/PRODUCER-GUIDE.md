@@ -305,6 +305,18 @@ new one. Merge `video-fixtures` into your branch when your current video is done
   and replace each with the uuid from "Demo data" (or a `:has-text` selector) before you re-record.
 - **After any change of yours to the seeds** — `check-demo.ts <slot>` ("Demo data").
 
+## Overview films ("Start here")
+
+The films that say what ConstructHUB is are not tutorials: their facts and scripts live in
+`docs/brand/FACT-BASE.md` and `docs/brand/VIDEO-SCRIPTS.md`, their help entries in
+`shared/help/entries/start-here/` (keys start `brand-`; the group leads `/tutorials`, in the order
+`START_HERE_ORDER` in `shared/help/registry.ts` gives). They are made on the same line. Two things
+differ: a tour may cross both apps — a `goto` opens a `/crm…` path on the CRM host and any other path
+on the main host, whatever the base. Their scripts find the demo clients and jobs by name, never by
+id. The Hadley job (Austin, TX) carries three demo photos for these
+films. Nothing in a brand film names a competitor or states a competitor's price without the owner's
+sign-off recorded in `VIDEO-SCRIPTS.md`.
+
 ## Publishing to YouTube
 
 Producers do not upload anything: a production leaves everything upload-ready in

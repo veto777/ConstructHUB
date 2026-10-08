@@ -16,3 +16,5 @@ export { default as e_crm_report_issue } from "./crm/crm-report-issue";
 export { default as e_crm_schedule_views } from "./crm/crm-schedule-views";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
+export { default as e_brand_tour_crm } from "./start-here/brand-tour-crm";
+export { default as e_brand_what_is_constructhub } from "./start-here/brand-what-is-constructhub";

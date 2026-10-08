@@ -123,7 +123,8 @@ async function main() {
   const loudnorm = `loudnorm=I=${LOUDNESS.I}:TP=${LOUDNESS.TP}:LRA=${LOUDNESS.LRA}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
 
   // 4 ── The two cards (our own artwork and type), then intro + capture + end → H.264/AAC.
-  const kicker = helpEntry(script.helpKey)?.group === "CRM" ? "CRM Tutorial" : "ConstructHUB Tutorial";
+  const group = helpEntry(script.helpKey)?.group;
+  const kicker = group === "Start here" ? "Start here" : group === "CRM" ? "CRM Tutorial" : "ConstructHUB Tutorial";
   await renderStill(introCardHtml(title, kicker), at("_intro.png"), width);
   await renderStill(endCardHtml(), at("_end.png"), width);
   const cardS = cardMs / 1000, endS = endCardMs / 1000, fade = 0.25;

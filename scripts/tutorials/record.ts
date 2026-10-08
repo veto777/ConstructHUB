@@ -44,6 +44,7 @@ import { ROOT, flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type Narr
 
 /** The only place an `upload` step may take files from: generated demo files (gen-assets.ts). */
 export const ASSETS_DIR = path.join(ROOT, "scripts", "tutorials", "assets");
+import { isCrmRoute } from "../../shared/help/registry";
 
 /** Injected into every document of the recording context. Plain JS: it runs in the page. */
 function overlay() {
@@ -332,7 +333,7 @@ class Player {
     const page = this.page;
     if (step.action === "goto") {
       await this.ring(null);
-      await page.goto(new URL(step.url!, base).toString(), { waitUntil: "domcontentloaded" });
+      await page.goto(hostFor(step.url!, base), { waitUntil: "domcontentloaded" });
       await settle(page);
       return;
     }
@@ -468,6 +469,21 @@ class Player {
   }
 }
 
+/**
+ * A tour may cross the two apps (the overview films do): a /crm path is opened on the CRM's host name,
+ * any other path on the main host — same machine, same port. For a script that stays in one app this
+ * is the base it was given.
+ */
+const CRM_HOST = "portal.constructhub.us", CLIENT_HOST = "client.constructhub.us";
+export function hostFor(pathname: string, base: string): string {
+  const u = new URL(base);
+  // The homeowner's browser stays on the client host: its pages are not the contractor's CRM or the platform.
+  if (u.hostname === CLIENT_HOST) return new URL(pathname, u).toString();
+  const crm = isCrmRoute(pathname.split(/[?#]/)[0]);
+  if (crm) u.hostname = CRM_HOST; else if (u.hostname === CRM_HOST) u.hostname = "127.0.0.1";
+  return new URL(pathname, u).toString();
+}
+
 /** The page has stopped loading: network quiet, fonts in, one more beat for the first paint. */
 async function settle(page: Page) {
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
@@ -557,7 +573,8 @@ async function main() {
     const origin = new URL(sessionBase(name));
     const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
     // No cookie banner, on any of the app's hosts this person may land on (a checkout returns to the CRM host).
-    await context.addCookies([...new Set([origin.hostname, "portal.constructhub.us", "client.constructhub.us"])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
+    // …and on the main host by address: a tour that crosses from one app to the other (hostFor) must not meet it on the way.
+    await context.addCookies([...new Set([origin.hostname, "127.0.0.1", CRM_HOST, CLIENT_HOST])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
     // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
     await context.addInitScript(overlay);
