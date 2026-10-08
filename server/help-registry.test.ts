@@ -299,17 +299,19 @@ describe("tutorial step scripts", () => {
       expect(f).toBe(`${script.helpKey}.json`);
       expect(helpEntry(script.helpKey), script.helpKey).toBeTruthy();
       expect(VOICE_PERSONA_IDS).toContain(script.narrator);
-      // A script never carries a real credential: a typed secret is a {{PLACEHOLDER}} filled at record time, and blurred.
-      // What is not a secret may be typed as it is: the NAME given to a key ("Reporting script"), a search box,
-      // and a demo address at example.com (the only email domain a script may show).
+      // A script never carries a real credential, and the rule is about the VALUE being typed — not about what the
+      // field's selector happens to be called (a key's NAME, a client's example.com address and a search are fine):
+      //   · a {{PLACEHOLDER}} (filled from the environment at record time) is always blurred;
+      //   · anything else must be demo text: no email outside example.com, no phone outside 555-01xx,
+      //     nothing shaped like a key or a token; and a password field only ever takes a placeholder.
       for (const s of script.steps.filter((x) => x.action === "type")) {
-        const sel = s.selector ?? "", value = s.value ?? "";
-        const placeholder = /^\{\{[A-Z_]+\}\}$/.test(value);
-        const secretField = /key|token|password|secret/i.test(sel) && !/name|label|search/i.test(sel);
-        const emailField = /email/i.test(sel);
-        if (secretField || (emailField && !/^[a-z0-9._+-]+@example\.com$/i.test(value)))
-          { expect(placeholder, `${f}: ${sel} takes a secret — type a {{PLACEHOLDER}}`).toBe(true); expect(s.redact, f).toBe(true); }
-        if (placeholder && !/^\{\{DATE/.test(value)) expect(s.redact, `${f}: a placeholder value is blurred`).toBe(true);
+        const sel = s.selector ?? "", value = s.value ?? "", where = `${f}: "${value.slice(0, 24)}" typed into ${sel}`;
+        if (/\{\{(?!DATE)[A-Z0-9_]+\}\}/.test(value)) { expect(s.redact, `${where} — a placeholder is blurred`).toBe(true); continue; }
+        expect(/password/i.test(sel) || /type=["']?password/i.test(sel), `${where} — a password is a {{PLACEHOLDER}}`).toBe(false);
+        for (const email of value.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []) expect(email, where).toMatch(/@([a-z0-9-]+\.)*example\.com$/i);
+        for (const phone of value.match(/\(?\b\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\b/g) ?? []) expect(phone.replace(/\D/g, ""), where).toMatch(/^\d{3}55501\d\d$/);
+        expect(/\b(sk|pk|rk|whsec|ghp|gho|xox[abp])[_-][A-Za-z0-9_-]{8,}|\bAKIA[A-Z0-9]{12,}|\beyJ[A-Za-z0-9_-]{10,}\.|\bBearer\s+\S{12,}/.test(value), `${where} — looks like a key or a token`).toBe(false);
+        expect(/\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/.test(value), `${where} — a long random-looking string`).toBe(false);
       }
     }
   });

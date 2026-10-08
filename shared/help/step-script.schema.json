@@ -91,7 +91,9 @@
               "drag",
               "session",
               "fixture",
-              "wait-for"
+              "wait-for",
+              "scroll-to",
+              "card"
             ]
           },
           "url": {
@@ -189,6 +191,119 @@
             "minimum": 100,
             "maximum": 120000,
             "description": "wait-for: how long to wait (default 15000)."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 400,
+            "description": "scroll-to: how far under the top of the window the target comes to rest, in CSS px (default 84)."
+          },
+          "dialog": {
+            "enum": [
+              "accept",
+              "dismiss"
+            ],
+            "description": "click: answer the browser's own confirm box (window.confirm). Without it the recorder answers Cancel."
+          },
+          "punch": {
+            "type": "number",
+            "minimum": 1.1,
+            "maximum": 1.8,
+            "description": "highlight / hover: push in on the target for this step. Undone by the next step."
+          },
+          "card": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "headline"
+            ],
+            "description": "card: a full-screen brand card — a stat, or two columns (them, us). A card that shows a price needs a footnote with a year.",
+            "properties": {
+              "kicker": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 44
+              },
+              "headline": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 64
+              },
+              "accent": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 28
+              },
+              "stat": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "value",
+                  "label"
+                ],
+                "properties": {
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 10
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 64
+                  }
+                }
+              },
+              "columns": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "title"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 34
+                    },
+                    "value": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 10
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 60
+                    },
+                    "lines": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 64
+                      }
+                    },
+                    "us": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "footnote": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 200
+              },
+              "mascot": {
+                "type": "boolean"
+              }
+            }
           }
         },
         "allOf": [
@@ -218,7 +333,8 @@
                     "select",
                     "scroll",
                     "upload",
-                    "drag"
+                    "drag",
+                    "scroll-to"
                   ]
                 }
               }
@@ -325,6 +441,20 @@
                 }
               ]
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "action": {
+                  "const": "card"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "card"
+              ]
+            }
           }
         ]
       }
@@ -406,6 +536,16 @@
           "maximum": 79
         }
       }
+    },
+    "redactSelectors": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "description": "Plain CSS selectors blurred from page load, on every page of the recording, before the element first paints."
     }
   }
 }

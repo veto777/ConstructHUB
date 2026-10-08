@@ -245,3 +245,14 @@ export function run(cmd: string, args: string[], opts: { nice?: boolean; quiet?:
     child.on("close", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`${cmd} exited ${code}\n${(stderr || stdout).slice(-2000)}`)));
   });
 }
+
+/**
+ * Where to seek to read a video's LAST picture frame, in seconds: half a frame before its timestamp,
+ * so the first frame at or after the seek point is the last one. Counted in frames, not taken from
+ * the file's length — the sound runs a few ms longer than the picture, and "length − 60 ms" landed
+ * past the last frame about one run in five (check.ts: "only N-1 of N frames could be read").
+ */
+export function lastFrameSeekSec(nbFrames: number, fps: number): number {
+  if (!Number.isInteger(nbFrames) || nbFrames < 1 || !(fps > 0)) throw new Error(`cannot place the last frame of ${nbFrames} frames at ${fps} fps`);
+  return Math.max(0, (nbFrames - 1.5) / fps);
+}

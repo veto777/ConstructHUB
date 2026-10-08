@@ -45,6 +45,7 @@ import { ROOT, flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type Narr
 /** The only place an `upload` step may take files from: generated demo files (gen-assets.ts). */
 export const ASSETS_DIR = path.join(ROOT, "scripts", "tutorials", "assets");
 import { isCrmRoute } from "../../shared/help/registry";
+import { CARD_SAFE, cardHtml } from "./card";
 
 /** Injected into every document of the recording context. Plain JS: it runs in the page. */
 function overlay() {
@@ -70,6 +71,9 @@ function overlay() {
     #__tut .sync{position:absolute;inset:0;background:#000;display:none}
     #__tut .sync.on{display:block}
     .__tut-blur{filter:blur(7px)!important}
+    #__tut .card{position:absolute;inset:0;display:none}
+    #__tut.carding .card{display:block}
+    #__tut.carding .cur,#__tut.carding .ring,#__tut.carding .url{display:none}
     /* The assistant launcher and its welcome bubble are not part of any feature being taught. */
     [data-testid="hub-launcher"],[data-testid="hub-welcome-bubble"],[data-testid="hub-panel"]{display:none!important}
     /* …nor is the unread count on the CRM's bell. */
@@ -82,7 +86,7 @@ function overlay() {
   root.id = "__tut";
   root.setAttribute("aria-hidden", "true");
   root.innerHTML = `<style>${css}</style><div class="veil"></div><div class="ring"></div><div class="url"></div>
-    <svg class="cur" viewBox="0 0 26 26"><path d="M5 3v18.2l4.7-4.4 3 7 3.1-1.3-3-6.9H19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="sync"></div>`;
+    <div class="card"></div><svg class="cur" viewBox="0 0 26 26"><path d="M5 3v18.2l4.7-4.4 3 7 3.1-1.3-3-6.9H19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="sync"></div>`;
   const ring = root.querySelector(".ring") as HTMLElement, cur = root.querySelector(".cur") as HTMLElement;
   const url = root.querySelector(".url") as HTMLElement;
   let pos = { x: Math.round(innerWidth * 0.93), y: Math.round(innerHeight * 0.55) }; // the page's empty right margin
@@ -163,6 +167,37 @@ function overlay() {
     /** Make the compositor produce a frame (the screencast only sends one when something changed). */
     nudge() { mount(); cur.style.opacity = cur.style.opacity === "0.999" ? "1" : "0.999"; },
     blur(el: Element) { el.classList.add("__tut-blur"); },
+    /** A full-screen card over the page (markup from scripts/tutorials/card.ts), or null to take it away. Whole figures count up. */
+    card(html: string | null) {
+      mount();
+      const box = root.querySelector(".card") as HTMLElement;
+      root.classList.toggle("carding", !!html);
+      box.innerHTML = html ?? "";
+      for (const el of Array.from(box.querySelectorAll("[data-count]")) as HTMLElement[]) {
+        const full = el.getAttribute("data-count")!, pre = full.startsWith("$") ? "$" : "", end = Number(full.replace("$", "")), t0 = performance.now(), wait = 260, dur = 620;
+        if (!Number.isFinite(end)) continue;
+        el.textContent = `${pre}0`;
+        const tick = (t: number) => {
+          const u = Math.min(1, Math.max(0, (t - t0 - wait) / dur)), e = 1 - Math.pow(1 - u, 3);
+          el.textContent = `${pre}${Math.round(end * e)}`;
+          if (u < 1 && el.isConnected) requestAnimationFrame(tick); else if (el.isConnected) el.textContent = full;
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+    /**
+     * Push in on an element (the page is scaled about its centre), or null to come back out. The
+     * overlay is not inside <body>, so the ring and the cursor keep their size and follow the element.
+     */
+    punch(el: Element | null, scale = 1.35) {
+      const b = document.body;
+      if (!b) return;
+      b.style.transition = "transform .5s cubic-bezier(.2,.8,.2,1)";
+      if (!el) { b.style.transform = ""; setTimeout(() => { if (!b.style.transform) { b.style.transformOrigin = ""; b.style.transition = ""; } }, 560); return; }
+      const r = el.getBoundingClientRect(), o = b.getBoundingClientRect();
+      b.style.transformOrigin = `${r.left + r.width / 2 - o.left}px ${r.top + r.height / 2 - o.top}px`;
+      b.style.transform = `scale(${scale})`;
+    },
     /** A full black frame: the mark mux.ts looks for to line the video's clock up with the recorder's. */
     sync(on: boolean) { mount(); (root.querySelector(".sync") as HTMLElement).classList.toggle("on", on); },
     /** For the thumbnail's screenshot: the cursor off, and where the ring is (CSS px), or null. */
@@ -173,6 +208,14 @@ function overlay() {
       return { x: r.left, y: r.top, width: r.width, height: r.height };
     },
   };
+}
+
+/** The stylesheet behind a script's `redactSelectors`: unreadable from the first paint, on every page of the recording. */
+export const redactCss = (selectors: readonly string[]): string => `${selectors.join(",")}{filter:blur(9px)!important;user-select:none!important}`;
+/** Runs in every document before any of its own scripts: the rule is in place before the app can draw the element. */
+function redactFromLoad(css: string) {
+  const add = () => { if (document.getElementById("__tut-redact") || !document.documentElement) return !!document.getElementById("__tut-redact"); const s = document.createElement("style"); s.id = "__tut-redact"; s.textContent = css; document.documentElement.appendChild(s); return true; };
+  if (!add()) { new MutationObserver((_m, o) => { if (add()) o.disconnect(); }).observe(document, { childList: true }); document.addEventListener("DOMContentLoaded", add); }
 }
 
 /** Width and height of a JPEG, from its SOF marker. */
@@ -265,6 +308,12 @@ export class Player {
     this.pos = to;
   }
 
+  /** A card is up / the page is pushed in: both are undone before the next step does anything. */
+  punched = false;
+  async clearStage() {
+    await this.page.evaluate(() => { const t = (window as any).__tut; if (!t) return false; const had = !!document.querySelector("#__tut.carding"); t.card(null); return had; }).catch(() => false);
+    if (this.punched) { this.punched = false; await this.page.evaluate(() => (window as any).__tut?.punch(null)).catch(() => {}); await sleep(520); }
+  }
   private ringed: Locator | null = null;
   private ringOffTimer: ReturnType<typeof setTimeout> | null = null;
   /** After a click: the ring goes a moment later. Cancelled by the next `ring()` — it must never wipe the NEXT step's ring. */
@@ -359,6 +408,29 @@ export class Player {
     if (step.action === "wait") return;
     if (step.action === "back") { await this.ring(null); await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page); return; }
     if (step.action === "press") { await page.keyboard.press(step.value!); return; }
+    if (step.action === "card") {
+      await this.ring(null);
+      await page.evaluate((html) => (window as any).__tut.card(html), cardHtml(step.card!));
+      // What the phone cuts frame: the card's middle column, where everything that matters is.
+      this.aimed = { ...CARD_SAFE };
+      return;
+    }
+    if (step.action === "scroll-to") {
+      // Open a long page AT something (a settings card), without a text-fragment address and its purple highlight.
+      await this.ring(null);
+      const to = page.locator(fill(step.selector!)).first();
+      await to.waitFor({ state: "attached", timeout: 20_000 });
+      await to.evaluate((el, offset) => {
+        // The nearest thing that scrolls: the page itself, or a panel inside it.
+        let host: Element | null = el.parentElement;
+        while (host && !(/(auto|scroll)/.test(getComputedStyle(host).overflowY) && host.scrollHeight > host.clientHeight + 4)) host = host.parentElement;
+        const top = el.getBoundingClientRect().top - (host ? host.getBoundingClientRect().top : 0) - offset;
+        (host ?? document.scrollingElement ?? document.documentElement).scrollBy({ top, behavior: "smooth" });
+      }, step.offset ?? 84);
+      let last = await to.boundingBox();
+      for (let i = 0, still = 0; i < 30 && still < 2; i++) { await sleep(120); const box = await to.boundingBox(); still = box && last && Math.abs(box.y - last.y) < 0.5 ? still + 1 : 0; last = box; }
+      return;
+    }
 
     const target = page.locator(fill(step.selector!)).first();
     if (step.action === "upload") {
@@ -415,6 +487,7 @@ export class Player {
       point = now;
       await this.glide(point);
     }
+    if (step.punch && (step.action === "highlight" || step.action === "hover")) { await sleep(250); await target.evaluate((el, z) => (window as any).__tut?.punch(el, z), step.punch); this.punched = true; }
     switch (step.action) {
       case "highlight": break;
       case "hover": await page.mouse.move(point.x, point.y); break;
@@ -601,6 +674,8 @@ async function main() {
     // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
     await context.addInitScript(overlay);
+    // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
+    if (script.redactSelectors?.length) await context.addInitScript(redactFromLoad, redactCss(script.redactSelectors));
     await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
     // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
     // sees") opens it in this one instead; the script comes back with a `back` step.
@@ -701,6 +776,10 @@ async function main() {
   };
   async function play(step: TutorialStep): Promise<void> {
     const session = current!;
+    // A card or a push-in belongs to the step that asked for it.
+    if (step.action !== "card" || session.player.punched) await session.player.clearStage();
+    // The page's own "are you sure?" (window.confirm): a headless browser shows no box and answers Cancel unless told otherwise.
+    if (step.action === "click" && step.dialog) session.page.once("dialog", (d) => { void (step.dialog === "accept" ? d.accept() : d.dismiss()).catch(() => {}); });
     if (step.action === "session") {
       // …opened at an address a fixture helper hands over (the link in an email, a checkout link), or at `url`.
       if (!step.fixture) return switchTo(step.session!, step.url);

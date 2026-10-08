@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, redactCss } from "../../scripts/tutorials/record";
+import { CARD_SAFE, cardHtml } from "../../scripts/tutorials/card";
+import { lastFrameSeekSec } from "../../scripts/tutorials/lib";
+import { tutorialCardSchema } from "@shared/help/step-script";
 import { SLOT_MAX, SLOT_PORT, isSlot } from "../../scripts/tutorials/app";
 
 /**
@@ -211,6 +214,76 @@ describe("the recorder's ring, dwell and hosts", () => {
     expect(src).toMatch(/this\.aimed = last/);          // target box for the social cuts…
     expect(src).toMatch(/target: pointed\.target, ringOffMs: pointed\.ringOffMs, cursor: pointed\.cursor/); // …saved with the cursor path
     expect(src).toMatch(/page\.goto\(hostFor\(step\.url!, base\)/); // host-switching goto
+  });
+});
+
+describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
+  const them = { title: "Them", value: "$99", unit: "a month", lines: ["One line"] }, us = { title: "Us", value: "$49", us: true };
+
+  it("the schema knows the two new actions and their fields, and the JSON Schema twin agrees", () => {
+    for (const a of ["scroll-to", "card"]) expect(STEP_ACTIONS).toContain(a);
+    const twin = JSON.parse(read("shared/help/step-script.schema.json"));
+    for (const f of ["offset", "card", "dialog", "punch"]) expect(twin.properties.steps.items.properties[f], f).toBeTruthy();
+    expect(twin.properties.redactSelectors).toBeTruthy();
+    ok({ action: "scroll-to", selector: "[data-testid=card-defaults]" }); ok({ action: "scroll-to", selector: "x", offset: 120 });
+    bad({ action: "scroll-to" }); bad({ action: "highlight", selector: "x", offset: 10 });
+    ok({ action: "click", selector: "x", dialog: "accept" }); bad({ action: "highlight", selector: "x", dialog: "accept" });
+    ok({ action: "highlight", selector: "x", punch: 1.4 }); bad({ action: "click", selector: "x", punch: 1.4 }); bad({ action: "highlight", selector: "x", punch: 3 });
+    ok({ action: "card", card: { headline: "Five apps to run one job?" } });
+    bad({ action: "card" }); bad({ action: "card", selector: "x", card: { headline: "Hello there" } }); bad({ action: "highlight", selector: "x", card: { headline: "Hello there" } });
+  });
+
+  it("a card that shows a price must say whose price and as of when; a stat and columns do not mix", () => {
+    const card = (c: Record<string, unknown>) => tutorialCardSchema.safeParse(c).success;
+    expect(card({ headline: "Five seats", stat: { value: "5", label: "seats on Essentials" } })).toBe(true);
+    expect(card({ headline: "Them vs us", columns: [them, us] })).toBe(false);                                  // a price, no footnote
+    expect(card({ headline: "Them vs us", columns: [them, us], footnote: "List prices, month to month." })).toBe(false); // no date
+    expect(card({ headline: "Them vs us", columns: [them, us], footnote: "List prices, month to month, as of October 2026. Different features — check both." })).toBe(true);
+    expect(card({ headline: "$94 for five", footnote: "ConstructHUB CRM Essentials, list price, October 2026" })).toBe(true);
+    expect(card({ headline: "$94 for five" })).toBe(false);
+    expect(card({ headline: "Both", stat: { value: "5", label: "seats" }, columns: [them, us], footnote: "2026" })).toBe(false);
+    expect(card({ headline: "One", columns: [them] })).toBe(false);
+    expect(card({ headline: "Stop overpaying", accent: "cheaper" })).toBe(false);
+  });
+
+  it("draws a card from its spec alone: every word escaped, nothing fetched, the content inside the column every cut shows", () => {
+    const a = { font: "data:font/ttf;base64,AAAA", gator: "data:image/webp;base64,BBBB" };
+    const html = cardHtml({ kicker: "As of <October> 2026", headline: "Half the price?", accent: "half", columns: [{ ...them, title: "A & B <Co>" }, us], footnote: "List \"price\", 2026", mascot: true }, a);
+    expect(html).toContain("A &amp; B &lt;Co&gt;");
+    expect(html).toContain("As of &lt;October&gt; 2026");
+    expect(html).toContain("List &quot;price&quot;, 2026");
+    expect(html).toContain(`<span class="o">Half</span> the price?`);
+    expect(html).toContain(`<div class="col us">`);
+    expect(html).toContain(`data-count="$49"`);
+    expect(html).toContain(`src="${a.gator}"`);
+    expect(html.split(a.font).join("").split(a.gator).join("")).not.toMatch(/https?:\/\/|file:/); // nothing fetched: the font and the mascot are inlined
+    expect(html.match(/url\(/g)).toHaveLength(1);
+    expect(cardHtml({ headline: "No gator here" }, a)).not.toContain("<img");
+    // The middle column fits the widest shot a phone cut can take of a 1024×576 page (social-lib maxCropW: 1495 master px = 797 CSS px), clear of the caption strip.
+    expect(CARD_SAFE.width).toBeLessThanOrEqual(797);
+    expect(CARD_SAFE.x * 2 + CARD_SAFE.width).toBe(1024);
+    expect(CARD_SAFE.y + CARD_SAFE.height + 26).toBeLessThanOrEqual(576 - CAPTION_SAFE(576));
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/this\.aimed = \{ \.\.\.CARD_SAFE \}/); // …and that column is what the recorder reports as the step's target
+  });
+
+  it("blurs a script's redactSelectors from page load — a stylesheet, in place before the page draws", () => {
+    expect(redactCss(['[data-testid="text-new-api-key"] code', ".join-link"])).toBe('[data-testid="text-new-api-key"] code,.join-link{filter:blur(9px)!important;user-select:none!important}');
+    const script = (redactSelectors: string[]) => { try { parseTutorialScript({ helpKey: "x", title: "t", viewport: { width: 1024, height: 576 }, steps: [{ action: "goto", url: "/", caption: "c", narration: "n" }], redactSelectors }); return true; } catch { return false; } };
+    expect(script(['[data-testid="text-new-api-key"] code'])).toBe(true);
+    for (const sel of ["text=Secret", "div >> code", 'p:has-text("key")', "a{color:red}", "x</style>"]) expect(script([sel]), sel).toBe(false);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/addInitScript\(redactFromLoad, redactCss\(script\.redactSelectors\)\)/);
+    expect(src).toMatch(/step\.dialog === "accept" \? d\.accept\(\) : d\.dismiss\(\)/);
+  });
+
+  it("finds a video's last frame by counting frames, never from the file's length", () => {
+    expect(lastFrameSeekSec(1800, 30)).toBeCloseTo(59.95, 6);        // the last frame starts at 59.9667 s: the seek is before it and after frame 1798
+    expect(lastFrameSeekSec(1800, 30)).toBeGreaterThan(1798 / 30);
+    expect(lastFrameSeekSec(1800, 30)).toBeLessThan(1799 / 30);
+    expect(lastFrameSeekSec(1, 30)).toBe(0);
+    expect(() => lastFrameSeekSec(0, 30)).toThrow();
+    expect(read("scripts/tutorials/check.ts")).not.toMatch(/seconds \* 1000 - 60\]/);
   });
 });
 
