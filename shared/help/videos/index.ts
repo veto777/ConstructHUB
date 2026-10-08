@@ -2,6 +2,7 @@
 // One line per recorded walkthrough (its manifest file).
 export { default as v_crm_api_keys } from "./crm-api-keys.json";
 export { default as v_crm_billing } from "./crm-billing.json";
+export { default as v_crm_change_orders } from "./crm-change-orders.json";
 export { default as v_crm_client_bid_status } from "./crm-client-bid-status.json";
 export { default as v_crm_client_edit } from "./crm-client-edit.json";
 export { default as v_crm_client_export } from "./crm-client-export.json";
@@ -9,7 +10,6 @@ export { default as v_crm_client_new } from "./crm-client-new.json";
 export { default as v_crm_client_notes } from "./crm-client-notes.json";
 export { default as v_crm_client_portal } from "./crm-client-portal.json";
 export { default as v_crm_client_quick_actions } from "./crm-client-quick-actions.json";
-export { default as v_crm_change_orders } from "./crm-change-orders.json";
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_company_settings } from "./crm-company-settings.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";

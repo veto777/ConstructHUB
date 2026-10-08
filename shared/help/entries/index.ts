@@ -2,6 +2,7 @@
 // One line per help entry file.
 export { default as e_crm_api_keys } from "./crm/crm-api-keys";
 export { default as e_crm_billing } from "./crm/crm-billing";
+export { default as e_crm_change_orders } from "./crm/crm-change-orders";
 export { default as e_crm_client_bid_status } from "./crm/crm-client-bid-status";
 export { default as e_crm_client_edit } from "./crm/crm-client-edit";
 export { default as e_crm_client_export } from "./crm/crm-client-export";
@@ -10,17 +11,16 @@ export { default as e_crm_client_notes } from "./crm/crm-client-notes";
 export { default as e_crm_client_portal } from "./crm/crm-client-portal";
 export { default as e_crm_client_quick_actions } from "./crm/crm-client-quick-actions";
 export { default as e_crm_company_settings } from "./crm/crm-company-settings";
-export { default as e_crm_change_orders } from "./crm/crm-change-orders";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_create_menu } from "./crm/crm-create-menu";
 export { default as e_crm_document_defaults } from "./crm/crm-document-defaults";
 export { default as e_crm_estimate_approved } from "./crm/crm-estimate-approved";
 export { default as e_crm_estimate_discounts } from "./crm/crm-estimate-discounts";
 export { default as e_crm_estimate_edit } from "./crm/crm-estimate-edit";
+export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
 export { default as e_crm_estimate_quick } from "./crm/crm-estimate-quick";
 export { default as e_crm_estimate_tracking } from "./crm/crm-estimate-tracking";
 export { default as e_crm_follow_ups } from "./crm/crm-follow-ups";
-export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
 export { default as e_crm_invoice_create } from "./crm/crm-invoice-create";
 export { default as e_crm_invoice_receipt } from "./crm/crm-invoice-receipt";
 export { default as e_crm_jobcam_project } from "./crm/crm-jobcam-project";
