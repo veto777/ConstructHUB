@@ -355,6 +355,12 @@ export type UploadVideoInput = {
    * `privacyStatus` asks for. Sent as RFC 3339 in UTC.
    */
   publishAt?: string;
+  /**
+   * YouTube's altered-or-synthetic-content disclosure (`status.containsSyntheticMedia`, settable in
+   * videos.insert). Sent only when given: the tutorials leave it out; the AI-generated gator shorts
+   * (scripts/gator) send `true`.
+   */
+  containsSyntheticMedia?: boolean;
 };
 
 /** A scheduled time closer than this is refused: the upload and YouTube's processing have to finish first. */
@@ -387,9 +393,12 @@ export function uploadSessionRequest(input: UploadVideoInput, size: number, now:
     },
     body: {
       snippet,
-      status: input.publishAt !== undefined
-        ? { privacyStatus: "private", publishAt: normalizePublishAt(input.publishAt, now), selfDeclaredMadeForKids: input.madeForKids ?? false }
-        : { privacyStatus: input.privacyStatus ?? "private", selfDeclaredMadeForKids: input.madeForKids ?? false },
+      status: {
+        ...(input.publishAt !== undefined
+          ? { privacyStatus: "private", publishAt: normalizePublishAt(input.publishAt, now), selfDeclaredMadeForKids: input.madeForKids ?? false }
+          : { privacyStatus: input.privacyStatus ?? "private", selfDeclaredMadeForKids: input.madeForKids ?? false }),
+        ...(input.containsSyntheticMedia !== undefined ? { containsSyntheticMedia: input.containsSyntheticMedia } : {}),
+      },
     },
   };
 }

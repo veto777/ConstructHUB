@@ -172,6 +172,8 @@ export type LedgerPost = {
   status: "sending" | "in-progress" | "scheduled" | "published" | "failed";
   postSubmissionId: string | null; publicUrl?: string | null; errorMessage?: string | null;
   createdAt: string; checkedAt?: string | null;
+  /** Absent = a tutorial cut. The gator shorts are their own stream with their own ledger (scripts/gator/stream.ts). */
+  stream?: "tutorial" | "viral";
 };
 export type SocialLedger = { version: 1; timezone: string; posts: LedgerPost[] };
 export const emptyLedger = (): SocialLedger => ({ version: 1, timezone: SCHEDULE_TZ, posts: [] });

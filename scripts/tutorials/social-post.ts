@@ -15,6 +15,8 @@
  *   --i-checked ID      "I looked: this account is ConstructHUB's although its name does not say so" (repeatable)
  *   --retry-failed      plan again what Blotato reported as failed
  *   --out-dir DIR       where the productions are (repeatable); --ledger FILE
+ *   --stream viral      the OTHER stream: the AI-generated gator shorts (scripts/gator, docs/gator/CONCEPTS.md)
+ *                       with their own cadence and ledger — DRY RUN ONLY for now: `--go` is refused
  *
  * Without --spread a post follows its video's YouTube publish time (docs/tutorials/youtube-schedule.json):
  * the same Eastern day, 30–90 minutes later; LinkedIn only on weekdays 08:30–17:00 Eastern, else the
@@ -87,6 +89,12 @@ function loadVideo(helpKey: string, publishAt: string, outDirs: string[]): Video
 async function main() {
   const argv = process.argv.slice(2);
   const args = parseArgs(argv, ["go", "reconcile", "retry-failed", "brief"]);
+  // The gator shorts are a separate stream: their own plan, cadence and ledger (scripts/gator/post.ts).
+  if (args.flags.stream !== undefined && args.flags.stream !== "tutorial") {
+    if (args.flags.stream !== "viral") { console.error(redact("\n✗ --stream is tutorial or viral", process.env.TUTORIAL_BLOTATO_KEY ?? "")); process.exit(1); }
+    const { viralMain } = await import("../gator/post");
+    process.exit(await viralMain(argv));
+  }
   const key = process.env.TUTORIAL_BLOTATO_KEY ?? "";
   const say = (line: string) => console.log(redact(line, key));
   const io: Io = {

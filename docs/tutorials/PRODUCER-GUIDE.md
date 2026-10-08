@@ -438,6 +438,16 @@ git add docs/tutorials/social-schedule.json && git commit      #    the ledger i
   `social-text.ts`. Not verified by a real post yet: that Instagram honours `coverImageUrl` and that LinkedIn
   accepts a 4:5 video through Blotato (its page lists 16:9, 9:16 and 1:1; LinkedIn itself takes 4:5).
 
+## The other stream: gator shorts ("viral clips")
+
+Short AI-generated clips of the mascot, mixed into the social calendar beside the tutorial cuts — a separate
+stream with its own tools (`scripts/gator/`), budget ledger (`analysis/gator-shorts/ledger.json`), cadence and
+posting ledger (`docs/gator/viral-schedule.json`). Everything about it — the house rules, the thirty concepts
+with their prompts, how a clip is made, what it costs, the cadence — is in **`docs/gator/CONCEPTS.md`**.
+`social-post.ts --stream viral` prints its plan; it is a dry run only (`--go` is refused) until the owner has
+approved the clips. Generation spends Higgsfield credits: `make.ts` prices every call first, refuses anything
+over the ledger's cap and never pays twice for a shot.
+
 ## Pitfalls already hit (and what the tools now do about them)
 
 - **The CRM only renders on its own host name.** Browse `http://portal.constructhub.us:<port>`; the
