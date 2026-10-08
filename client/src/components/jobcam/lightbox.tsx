@@ -9,6 +9,7 @@ import { GooglePill } from "@/components/google";
 import { TagPicker } from "./tag-picker";
 import { dateTimeLabel, formatBytes, formatDuration, jobcamError, jobcamFetch, type JobcamMediaItem } from "@/lib/jobcam-api";
 import { cn } from "@/lib/utils";
+import { confirmAction, isConfirmOpen } from "@/components/confirm-dialog";
 
 /**
  * Full-screen viewer: swipe (touch) / arrows / keys, video playback with the
@@ -38,6 +39,8 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
   useEffect(() => { setCaption(m?.caption ?? ""); }, [m?.id, m?.caption]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // A confirmation on top owns the keyboard: its Escape must not also close the viewer.
+      if (isConfirmOpen()) return;
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight" && index < items.length - 1) onIndex(index + 1);
       if (e.key === "ArrowLeft" && index > 0) onIndex(index - 1);
@@ -90,7 +93,13 @@ export function Lightbox({ items, index, onIndex, onClose, readOnly = false, can
           )}
           <a href={`${m.urls.original}?download=1`} className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10" aria-label="Download original" data-testid="jobcam-lightbox-download"><Download className="h-5 w-5" /></a>
           {editable && (
-            <button type="button" onClick={() => { if (window.confirm("Delete this from the project?")) del.mutate(); }} disabled={del.isPending} className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10" aria-label="Delete" data-testid="jobcam-lightbox-delete">
+            <button type="button" onClick={() => confirmAction({
+              id: "jobcam-delete-media",
+              title: `Delete this ${m.kind === "video" ? "video" : "photo"} from the project?`,
+              description: "It is removed from the project and from every shared link. This can't be undone.",
+              confirmLabel: "Delete",
+              onConfirm: () => del.mutate(),
+            })} disabled={del.isPending} className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-white/10" aria-label="Delete" data-testid="jobcam-lightbox-delete">
               {del.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
             </button>
           )}

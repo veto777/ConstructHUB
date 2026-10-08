@@ -11,6 +11,7 @@ import { getEntitlements } from "../entitlements";
 import { seoIncluded } from "./plan";
 import { withBudget, SeoBudgetError } from "./budget";
 import { isConfigured } from "./dataforseo";
+import { SeoCustomerError } from "./public-errors";
 import { saveAlert, deliverAlert } from "./alerts";
 import { GRID_SIZES, GRID_SPACINGS, beginScan, failScan, fetchGrid, finishScan, gridEstimateUsd, readPin, type GridPin, type GridScan } from "./grid";
 
@@ -47,7 +48,7 @@ export const GRID_WATCH_DDL = [
 ];
 
 const period = (every: string) => (every === "weekly" ? "7 days" : "1 month");
-export class WatchError extends Error { constructor(message: string, readonly status = 400) { super(message); this.name = "WatchError"; } }
+export class WatchError extends SeoCustomerError {}
 
 export async function listWatches(userId: number, siteId: number): Promise<GridWatch[]> {
   const { rows } = await pool.query(`SELECT id, keyword, size, spacing::float8 AS spacing, every, next_at AS "nextAt" FROM seo_grid_watches WHERE site_id=$1 AND user_id=$2 ORDER BY created_at`, [siteId, userId]);

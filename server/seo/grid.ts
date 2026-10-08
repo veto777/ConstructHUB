@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { pool } from "../db";
 import { request, assertOk, taskItems, safeDomain, normalizeBusinessName, type DfsTask } from "./dataforseo";
+import { publicNote } from "./public-errors";
 
 export const GRID_SIZES = [3, 5, 7] as const;
 /** Miles between neighbouring points. */
@@ -314,12 +315,14 @@ export async function listScans(userId: number, siteId: number, limit = 40): Pro
   const { rows } = await pool.query(
     `SELECT id, keyword, size, spacing::float8 AS spacing, status, error, scan->'center' AS center, avg_rank::float8 AS "avgRank", points, checked, found, top3, created_at AS at
        FROM seo_grid_scans WHERE site_id=$1 AND user_id=$2 AND status IN ('done','failed') ORDER BY created_at DESC, id DESC LIMIT $3`, [siteId, userId, limit]);
-  return rows;
+  // A failed scan's note is shown in the history: made safe on the way out, like getScan's.
+  return rows.map((r: any) => ({ ...r, error: r.status === "failed" ? publicNote(r.error, "The scan could not be completed.") ?? "The scan could not be completed." : null }));
 }
 export type ScanState = { id: number; status: "running" | "done" | "failed"; scan: (GridScan & { id: number }) | null; error: string | null };
 export async function getScan(userId: number, siteId: number, scanId: number): Promise<ScanState | null> {
   await closeStale(siteId);
   const { rows: [row] } = await pool.query(`SELECT id, scan, status, error FROM seo_grid_scans WHERE id=$1 AND site_id=$2 AND user_id=$3`, [scanId, siteId, userId]);
   if (!row) return null;
-  return { id: row.id, status: row.status, scan: row.status === "done" && row.scan ? { ...(row.scan as GridScan), id: row.id } : null, error: row.status === "failed" ? row.error ?? "The scan could not be completed." : null };
+  // The note is made safe on the way out (server/seo/public-errors.ts): rows saved by earlier versions are shown neutral, never rewritten.
+  return { id: row.id, status: row.status, scan: row.status === "done" && row.scan ? { ...(row.scan as GridScan), id: row.id } : null, error: row.status === "failed" ? publicNote(row.error, "The scan could not be completed.") ?? "The scan could not be completed." : null };
 }

@@ -60,7 +60,9 @@ export function watchPage(page: Page): PageGuards {
       badResponses.push(`${s} ${url}`);
     }
   });
-  // confirm()/alert() are part of real flows (e.g. Void invoice) — accept them.
+  // Native confirm()/alert() still exist on platform pages — accept them. The
+  // CRM's destructive actions ask in the in-product dialog instead (confirmAction):
+  // click `button-confirm-<id>` / `button-cancel-<id>`.
   page.on("dialog", (d) => void d.accept().catch(() => {}));
 
   return {

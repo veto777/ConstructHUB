@@ -33,7 +33,7 @@ import { getBaseUrl } from "../auth";
 import { portalBaseUrl, clientPortalBaseUrl } from "../site-context";
 import {
   logEvent, presentEstimate, recalcEstimate, nextDocNumber,
-  ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend,
+  ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend,
 } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
@@ -93,7 +93,7 @@ const VIEW_DEDUPE_MIN = 30;
  * entities.ts (the PATCH route's "marked sent" stamps the same clock) and
  * re-exported here, where the send route and its tests have always found it.
  */
-export { ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend };
+export { ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend };
 
 /**
  * A heartbeat says "I was still here N seconds after the last one". Gaps are
@@ -329,8 +329,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const from = ctx.member.displayName || ctx.org.name;
     // Sending starts the expiry clock (default 7 days). Computed once here so
     // the email and the row agree.
+    // A RE-send never shortens: if the contractor already extended this
+    // estimate past the fresh 7-day window, the later date stands.
     const sentAt = new Date();
-    const expiresAt = estimateExpiryOnSend(sentAt);
+    const freshExpiry = estimateExpiryOnSend(sentAt);
+    const expiresAt = est.expiresAt && est.expiresAt.getTime() > freshExpiry.getTime()
+      ? est.expiresAt
+      : freshExpiry;
 
     // Bid discounts: an estimate with no offers of its own inherits the org's
     // default set at send time — Settings decides the standard offers, the
@@ -1320,7 +1325,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
   });
 
   /** Push the expiry date out — e.g. the client asked for the weekend to
-   *  decide. Only while the estimate is still unanswered. */
+   *  decide. Only while the estimate is still unanswered. Adds `days` to the
+   *  later of (current expiry, now), so it can only ever move the date later. */
   app.post("/api/crm/estimates/:id/extend", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1339,10 +1345,14 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (est.approvedAt) return res.status(409).json({ message: "This estimate has been approved — expiry no longer applies." });
     if (est.declinedAt) return res.status(409).json({ message: "This estimate has been declined." });
 
-    const expiresAt = estimateExpiryOnSend(new Date(), parsed.data.days);
+    // Added on top of the time the client still has (or from now, once
+    // expired) — extending must never move the date earlier.
+    const expiresAt = estimateExpiryOnExtend(est.expiresAt, new Date(), parsed.data.days);
     const [row] = await db.update(crmEstimates).set({ expiresAt, updatedAt: new Date() })
       .where(eq(crmEstimates.id, est.id)).returning();
-    await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, { days: parsed.data.days, expiresAt });
+    await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, {
+      days: parsed.data.days, expiresAt, previousExpiresAt: est.expiresAt,
+    });
     logActivity(ctx, "estimate.extended", {
       entityType: "estimate", entityId: est.id, customerId: est.customerId,
       meta: { number: est.number, days: parsed.data.days },

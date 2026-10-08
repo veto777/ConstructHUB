@@ -2853,19 +2853,19 @@ export type VoiceSpamRow = typeof voiceSpam.$inferSelect;
 export type VoiceUsageRow = typeof voiceUsage.$inferSelect;
 
 // ── SEO toolset (server/seo/*) ──────────────────────────────────────────────
-// Rank tracker, keyword research, backlinks, competitor gap and the DataForSEO
+// Rank tracker, keyword research, backlinks, competitor gap and the SEO data
 // spend ledger. The DDL that creates these lives in server/seo/schema.ts (run at
 // boot and by scripts/apply-schema-migration.ts); these definitions mirror it.
 export const seoSites = pgTable("seo_sites", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   domain: text("domain").notNull(),
-  /** DataForSEO location_code (2840 = United States). */
+  /** Data-source location_code (2840 = United States). */
   locationCode: integer("location_code").notNull().default(2840),
   languageCode: text("language_code").notNull().default("en"),
   /** 'desktop' | 'mobile' | 'both' */
   devices: text("devices").notNull().default("both"),
-  /** SERP depth in results (10–100; DataForSEO bills per page of 10). */
+  /** SERP depth in results (10–100; the data source bills per page of 10). */
   serpDepth: integer("serp_depth").notNull().default(10),
   nextRankCheckAt: timestamp("next_rank_check_at", { withTimezone: true }).notNull().defaultNow(),
   nextBacklinksAt: timestamp("next_backlinks_at", { withTimezone: true }).notNull().defaultNow(),
@@ -2895,7 +2895,7 @@ export const seoRankRuns = pgTable("seo_rank_runs", {
   trigger: text("trigger").notNull().default("weekly"),
   /** 'queued' | 'running' | 'done' | 'failed' */
   status: text("status").notNull().default("queued"),
-  /** Posted DataForSEO task ids still being polled: [{taskId, keywordId, device}]. */
+  /** Posted data-source task ids still being polled: [{taskId, keywordId, device}]. */
   tasks: jsonb("tasks").notNull().default(sql`'[]'::jsonb`),
   total: integer("total").notNull().default(0),
   checked: integer("checked").notNull().default(0),

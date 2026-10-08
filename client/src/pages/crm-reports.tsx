@@ -14,6 +14,7 @@ import {
   CrmPage, CrmPageHeader, EmptyState, ErrorCard, SectionTitle, StatusPill,
   crmTable, statusTone,
 } from "@/components/crm-ui";
+import { confirmAction } from "@/components/confirm-dialog";
 
 /**
  * Measurement report imports. Upload a HOVER PDF or paste the report text —
@@ -172,7 +173,13 @@ export default function CrmReportsPage() {
       {r.status === "draft" && canManage && (
         <button type="button" className="text-sm text-destructive hover:underline disabled:opacity-50"
           disabled={discard.isPending} data-testid={`${tid}report-discard-${r.id}`}
-          onClick={() => { if (window.confirm("Discard this unconfirmed import? Nothing was filed from it.")) discard.mutate(r.id); }}>
+          onClick={() => confirmAction({
+            id: "discard-report-draft",
+            title: "Discard this unconfirmed import?",
+            description: "The draft is deleted. No client was created and nothing was filed from it. This can't be undone — to use the report you would upload or paste it again.",
+            confirmLabel: "Discard draft",
+            onConfirm: () => discard.mutate(r.id),
+          })}>
           Discard
         </button>
       )}

@@ -43,6 +43,7 @@ import { InvoiceReceiptButton } from "@/components/crm-receipt";
 import { QuickBid } from "@/components/crm-quick-bid";
 import { AppointmentForm, type Appointment } from "@/components/crm-appointment-form";
 import { InfoTip } from "@/components/info-tip";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -1704,7 +1705,13 @@ export default function CrmClientPage() {
                           aria-label={`Void invoice ${inv.number}`} title="Void invoice"
                           disabled={voidInvoice.isPending}
                           onClick={() => {
-                            if (window.confirm(`Void ${inv.number}? This can't be undone.`)) voidInvoice.mutate(inv.id);
+                            confirmAction({
+                              id: "void-invoice",
+                              title: `Void invoice ${inv.number}?`,
+                              description: "The invoice is cancelled and can no longer be paid. It stays in the list, marked void, for your records. This can't be undone — to bill this work you would create a new invoice.",
+                              confirmLabel: "Void invoice",
+                              onConfirm: () => voidInvoice.mutate(inv.id),
+                            });
                           }}>
                           <Ban className="h-4 w-4" />
                         </Button>

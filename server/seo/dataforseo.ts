@@ -24,6 +24,7 @@
  *   the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 import { clampSerpDepth } from "./pricing";
+import { SEO_NOT_READY_MESSAGE } from "./plan";
 
 export const API_BASE = "https://api.dataforseo.com/v3";
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -44,6 +45,27 @@ export function isConfigured(env: NodeJS.ProcessEnv = dataforseoDeps.env()): boo
 
 export type DataForSeoErrorCode = "not_configured" | "auth" | "rate_limited" | "upstream" | "task_failed" | "invalid" | "timeout";
 
+/**
+ * What a CUSTOMER reads for each kind of failure: what happened and what to do, never who the
+ * source is, never its own words. Every one of these is thrown either by a free call or from
+ * inside withBudget (server/seo/budget.ts), which settles a failed lookup at no charge to the
+ * customer — that is why they can say so.
+ */
+export const SEO_SOURCE_PUBLIC_MESSAGES: Record<DataForSeoErrorCode, string> = {
+  not_configured: SEO_NOT_READY_MESSAGE,
+  auth: "SEO data is temporarily unavailable — our team has been told. Your credits were not charged.",
+  rate_limited: "The keyword data service is busy — try again in a minute. Your credits were not charged.",
+  timeout: "The keyword data service took too long to answer — try again in a minute. Your credits were not charged.",
+  upstream: "The keyword data service didn't answer — try again in a few minutes. Your credits were not charged.",
+  invalid: "That request couldn't be run — check the keyword or website and try again. Your credits were not charged.",
+  task_failed: "This report could not be completed — try again in a few minutes. Your credits were not charged.",
+};
+
+/**
+ * `message` is INTERNAL: it names the vendor and may quote its `status_message` verbatim — for the
+ * log, the issue desk and platform admins only. Anything a customer can read uses `publicMessage` /
+ * `publicCode` (through server/seo/public-errors.ts, the one place that turns an error into a response).
+ */
 export class DataForSeoError extends Error {
   constructor(
     readonly code: DataForSeoErrorCode,
@@ -55,6 +77,8 @@ export class DataForSeoError extends Error {
     super(message);
     this.name = "DataForSeoError";
   }
+  get publicCode(): string { return `seo_source_${this.code}`; }
+  get publicMessage(): string { return SEO_SOURCE_PUBLIC_MESSAGES[this.code] ?? SEO_SOURCE_PUBLIC_MESSAGES.upstream; }
 }
 
 export interface DfsTask {

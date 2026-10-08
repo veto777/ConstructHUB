@@ -25,7 +25,14 @@ test.describe("/crm/settings — Calendar card", () => {
     await expect(page.getByText("Copied", { exact: true })).toBeVisible();
 
     // Regenerate: URL changes, the old one dies, the new one serves.
+    // Escape dismisses the confirm without rotating; Confirm rotates.
     await page.getByTestId("button-regenerate-calendar-feed").click();
+    await expect(page.getByTestId("dialog-confirm-regenerate-calendar-feed")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("dialog-confirm-regenerate-calendar-feed")).toHaveCount(0);
+    await expect(urlInput).toHaveValue(url1);
+    await page.getByTestId("button-regenerate-calendar-feed").click();
+    await page.getByTestId("button-confirm-regenerate-calendar-feed").click();
     // exact: the aria-live announcer span carries the same words prefixed with "Notification ".
     await expect(page.getByText("New feed URL generated", { exact: true })).toBeVisible();
     await expect(urlInput).not.toHaveValue(url1);

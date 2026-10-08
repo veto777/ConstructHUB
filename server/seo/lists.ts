@@ -10,6 +10,7 @@
  */
 import { marketLabel } from "@shared/seo-markets";
 import { z } from "zod";
+import { SeoCustomerError } from "./public-errors";
 import { pool } from "../db";
 import { request, assertOk, taskItems } from "./dataforseo";
 import { estimateLabsUsd } from "./pricing";
@@ -98,7 +99,7 @@ export const listItemsInput = z.object({
 }).strict().refine((v) => v.listId !== undefined || v.name !== undefined, { message: "Choose a list or name a new one." });
 
 export type ListRef = { id: number; name: string; locationCode: number; languageCode: string };
-export class ListError extends Error { constructor(message: string, readonly status = 400) { super(message); this.name = "ListError"; } }
+export class ListError extends SeoCustomerError {}
 
 export async function listsOf(userId: number) {
   const { rows } = await pool.query(
