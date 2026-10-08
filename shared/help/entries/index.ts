@@ -2,3 +2,4 @@
 // One line per help entry file.
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_pricebook_add } from "./crm/crm-pricebook-add";
+export { default as e_crm_pricebook_template } from "./crm/crm-pricebook-template";
