@@ -45,6 +45,8 @@ export type SiteReport = {
   search: { fetchedAt: string; authority: number | null; referringDomains: number | null; backlinks: number | null; organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null;
     trafficChange: number | null; keywordsChange: number | null; referringDomainsChange: number | null } | null;
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
+  /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
+  searchConsole: { clicks: number; impressions: number; position: number | null; previousClicks: number; previousImpressions: number } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
 };
 
@@ -87,17 +89,21 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
 }
 
 /** Everything the report says about a site this account owns; null when the site is not theirs. */
+/** Swappable: Search Console lives in server/seo/routes.ts (searchConsoleSummary); passed in to keep this module free of the route file. */
+export const reportDeps: { searchConsole: (userId: number, domain: string) => Promise<SiteReport["searchConsole"]> } = { searchConsole: async () => null };
+
 export async function buildSiteReport(userId: number, siteId: number): Promise<SiteReport | null> {
   const { rows: [site] } = await pool.query("SELECT id, domain, devices, location_code, language_code FROM seo_sites WHERE id=$1 AND user_id=$2", [siteId, userId]);
   if (!site) return null;
   const primary = site.devices === "mobile" ? "mobile" : "desktop";
-  const [{ rows: checks }, { rows: [saved] }, audit, { rows: alerts }] = await Promise.all([
+  const [{ rows: checks }, { rows: [saved] }, audit, gsc, { rows: alerts }] = await Promise.all([
     pool.query(
       `SELECT c.keyword_id AS "keywordId", k.keyword, NULLIF(k.location_name, 'United States') AS location, k.search_volume AS volume, c.device, c.checked_on::text AS "checkedOn",
               c.position, c.local_position AS local, (jsonb_typeof(c.local_pack)='array' AND jsonb_array_length(c.local_pack)>0) AS "hasPack"
          FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id WHERE c.site_id=$1 AND c.checked_on >= current_date - 120`, [site.id]),
     pool.query(`SELECT report FROM seo_domain_reports WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$4 ORDER BY created_at DESC LIMIT 1`, [userId, site.domain, site.location_code, site.language_code]),
     siteAudit(userId, site.domain).catch(() => null),
+    reportDeps.searchConsole(userId, site.domain).catch(() => null),
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
   const ranks = rankingsSection(checks, primary);
@@ -120,6 +126,7 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
       errors: a.totals.error.affected, warnings: a.totals.warning.affected, notices: a.totals.notice.affected,
       topIssues: a.issues.slice(0, 6).map((i) => ({ title: i.title, severity: i.severity, count: i.count })),
     } : null,
+    searchConsole: gsc ? { clicks: Math.round(gsc.clicks), impressions: Math.round(gsc.impressions), position: gsc.position, previousClicks: Math.round(gsc.previousClicks), previousImpressions: Math.round(gsc.previousImpressions) } : null,
     alerts,
   };
 }
@@ -144,6 +151,11 @@ export function reportHighlights(r: SiteReport): [string, string][] {
     if (k.averagePosition !== null) rows.push(["Average position", `${k.averagePosition}${k.previousAverage !== null && k.previousAverage !== k.averagePosition ? ` (was ${k.previousAverage})` : ""}`]);
     if (k.withMapPack > 0) rows.push(["In the Google map pack", `${k.inMapPack} of ${k.withMapPack} searches that show a map`]);
   }
+  if (r.searchConsole) {
+    const g = r.searchConsole;
+    rows.push(["Clicks from Google, last 28 days", `${n(g.clicks)}${signed(g.clicks - g.previousClicks)}`]);
+    rows.push(["Times shown in Google, last 28 days", `${n(g.impressions)}${signed(g.impressions - g.previousImpressions)}`]);
+  }
   if (r.search) {
     rows.push(["Estimated visits from Google / month", `${n(r.search.organicTraffic)}${signed(r.search.trafficChange)}`]);
     rows.push(["Keywords the site ranks for", `${n(r.search.organicKeywords)}${signed(r.search.keywordsChange)}`]);
@@ -154,7 +166,7 @@ export function reportHighlights(r: SiteReport): [string, string][] {
   return rows;
 }
 
-export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit;
+export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole;
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
@@ -194,6 +206,14 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
+    }
+    if (r.searchConsole) {
+      const g = r.searchConsole;
+      heading("Clicks from Google — Search Console, last 28 days");
+      pair("Clicks", `${n(g.clicks)}${signed(g.clicks - g.previousClicks)}`);
+      pair("Times shown in results", `${n(g.impressions)}${signed(g.impressions - g.previousImpressions)}`);
+      if (g.position !== null) pair("Average position", String(g.position));
+      line("These are Google's own counts for the site. Changes in brackets compare with the 28 days before.", soft);
     }
     if (r.search) {
       heading(`Search presence — analysed ${day(r.search.fetchedAt)}`);

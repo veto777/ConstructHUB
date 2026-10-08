@@ -45,6 +45,7 @@ import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
+import { reportDeps } from "./site-report";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
 import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
 import { takeBudget } from "../growth-limits";
@@ -801,6 +802,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       unsubscribePage(res, "You won't get these reports any more", `<p style="line-height:1.6;color:#444">Your address has been removed from this sender's SEO reports. Nothing else is needed.</p>`);
     } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); unsubscribePage(res, "Something went wrong", `<p style="line-height:1.6;color:#444">Please try again in a minute.</p>`, 500); }
   });
+
+  // The report reads Search Console through this file's own summary (the same one the rank tracker shows).
+  reportDeps.searchConsole = async (userId, domain) => searchConsoleSummary(userId, domain);
 
   // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
   const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
