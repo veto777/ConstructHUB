@@ -32,7 +32,7 @@ export const REPORT_SCHEDULE_DDL = [
   // Each recipient's delivery of each report period: 'pending' while a send is under way (with its sender's token and
   // when it started), 'sent' once the email went. A pending row older than half an hour is a send that died.
   // 'uncertain': a send that died after the email log claimed it — it may well have gone, so it is never sent again
-  // (nobody gets a report twice); the Reports page says so.
+  // automatically; the Reports page says so.
   `CREATE TABLE IF NOT EXISTS seo_report_deliveries (
      site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
      period text NOT NULL,
@@ -383,13 +383,25 @@ export function nextSendAt(frequency: "off" | "weekly" | "monthly", from = new D
 /** The dedupe period a send belongs to: one email per recipient per week / month. */
 export const sendPeriod = (frequency: string, at = new Date()) => (frequency === "weekly" ? `w${Math.floor(at.getTime() / (7 * 864e5))}` : at.toISOString().slice(0, 7));
 
+export const UNCERTAIN_DAYS = 60, UNCERTAIN_LIST = 20;
+/** A delivery period in words: "the October 2026 report", "the weekly report of the week from Oct 5", "a report sent by hand". */
+export function periodWords(period: string): string {
+  const m = period.match(/^(\d{4})-(\d{2})$/);
+  if (m) return `the ${new Date(Date.UTC(+m[1], +m[2] - 1, 1)).toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })} report`;
+  const w = period.match(/^w(\d+)$/);
+  if (w) return `the weekly report of the week from ${new Date(Number(w[1]) * 7 * 864e5).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}`;
+  return "a report sent by hand";
+}
 export async function getSchedule(userId: number, siteId: number) {
   const { rows: [s] } = await pool.query(`SELECT frequency, recipients, next_send_at AS "nextSendAt", last_sent_at AS "lastSentAt" FROM seo_report_schedules WHERE site_id=$1 AND user_id=$2`, [siteId, userId]);
-  // Sends of the last 60 days that died after the email may have gone: not sent again, and said.
-  const { rows: uncertain } = await pool.query(
-    `SELECT recipient, updated_at AS at FROM seo_report_deliveries WHERE site_id=$1 AND state='uncertain' AND updated_at > now() - interval '60 days'
-       AND EXISTS (SELECT 1 FROM seo_sites WHERE id=$1 AND user_id=$2) ORDER BY updated_at DESC LIMIT 20`, [siteId, userId]).catch(() => ({ rows: [] as any[] }));
-  return { ...(s ?? { frequency: "off", recipients: [], nextSendAt: null, lastSentAt: null }), uncertain: uncertain.map((u: any) => ({ recipient: u.recipient as string, at: new Date(u.at).toISOString() })) };
+  // Sends of the last 60 days that may have gone without our knowing: not sent again, and said — with the report they
+  // belong to. null = they could not be read just now (never shown as "none").
+  const r = await pool.query(
+    `SELECT recipient, period, updated_at AS at, count(*) OVER ()::int AS total FROM seo_report_deliveries WHERE site_id=$1 AND state='uncertain' AND updated_at > now() - interval '${UNCERTAIN_DAYS} days'
+       AND EXISTS (SELECT 1 FROM seo_sites WHERE id=$1 AND user_id=$2) ORDER BY updated_at DESC LIMIT ${UNCERTAIN_LIST}`, [siteId, userId]).catch(() => null);
+  return { ...(s ?? { frequency: "off", recipients: [], nextSendAt: null, lastSentAt: null }),
+    uncertain: r ? r.rows.map((u: any) => ({ recipient: u.recipient as string, period: periodWords(u.period), at: new Date(u.at).toISOString() })) : null,
+    uncertainMore: r?.rows.length ? Math.max(0, r.rows[0].total - r.rows.length) : 0, uncertainDays: UNCERTAIN_DAYS };
 }
 export async function saveSchedule(userId: number, siteId: number, input: z.infer<typeof scheduleInput>) {
   const recipients = [...new Set(input.recipients)];

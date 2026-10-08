@@ -16,11 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { holdNote } from "./shell";
 import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 
-type SortKey = "added" | "name" | "traffic" | "authority" | "top10" | "tasks";
-const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"]];
+type SortKey = "added" | "name" | "traffic" | "authority" | "top10" | "tasks" | "health";
+const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"], ["health", "Lowest site health first"]];
 type Card = {
   site: SeoSite;
-  audit: { health: number | null; errors: number; scannedAt: string | null } | null;
+  /** From the site's own crawls (Site audit); trend = the newest crawls with a score, oldest first. */
+  audit: { health: number | null; errors: number; scannedAt: string | null; crawled?: number; trend?: { at: string; health: number; crawled: number; pageCap: number | null }[] } | null;
   /** null = the count could not be read just now. */
   openTasks?: number | null;
   /** Each keyword's newest check on ONE device (`device`), between `firstOn` and `checkedOn`. */
@@ -68,6 +69,26 @@ function Metric({ label, value, delta, spark, hint, testId }: { label: string; v
   );
 }
 
+/**
+ * Site health from the site's own crawls: the newest score, its move since the crawl before, and the trend of the last
+ * few crawls. Health is the share of crawled pages with no errors, so crawls of different sizes are said.
+ */
+function HealthTile({ audit, siteId }: { audit: Card["audit"]; siteId: number }) {
+  const trend = audit?.trend ?? [];
+  const last = trend[trend.length - 1], before = trend[trend.length - 2];
+  const move = audit?.health != null && last && before && last.at === audit.scannedAt ? last.health - before.health : null;
+  const caps = new Set(trend.map((t) => t.pageCap)), sizes = trend.map((t) => t.crawled);
+  const uneven = caps.size > 1 || (sizes.length > 1 && Math.min(...sizes) * 2 < Math.max(...sizes));
+  const hint = !audit ? "No crawl yet — run one in Site audit"
+    : audit.health == null ? `Crawled ${fmtDate(audit.scannedAt)} — no page could be scored`
+    : `${fmtNum(audit.errors)} page${audit.errors === 1 ? "" : "s"} with errors · crawled ${fmtDate(audit.scannedAt)}${trend.length > 1 ? ` · last ${trend.length} crawls` : ""}${uneven ? " (of different sizes)" : ""}`;
+  return (
+    <Metric label="Site health" value={audit?.health == null ? "—" : String(audit.health)} testId={`metric-health-${siteId}`}
+      delta={move ? <span className={`g-move ${move > 0 ? "g-move--up" : "g-move--down"} ml-1`} aria-label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`}>{move > 0 ? "+" : "−"}{Math.abs(move)}</span> : null}
+      spark={<Spark data={trend.map((t) => t.health)} color="#1e8e3e" />} hint={hint} />
+  );
+}
+
 export default function SeoDashboardPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
@@ -101,13 +122,13 @@ export default function SeoDashboardPage() {
   });
   // Starred sites first, always; then the chosen order. A site with no number for that order goes last.
   const cards = useMemo(() => {
-    const value = (c: Card): number | string | null => sort === "name" ? c.site.domain : sort === "traffic" ? c.report?.organicTraffic ?? null : sort === "authority" ? c.report?.authority ?? null : sort === "top10" ? (c.rank.checked ? c.rank.top10 : null) : sort === "tasks" ? c.openTasks ?? null : null;
+    const value = (c: Card): number | string | null => sort === "name" ? c.site.domain : sort === "traffic" ? c.report?.organicTraffic ?? null : sort === "authority" ? c.report?.authority ?? null : sort === "top10" ? (c.rank.checked ? c.rank.top10 : null) : sort === "tasks" ? c.openTasks ?? null : sort === "health" ? c.audit?.health ?? null : null;
     return [...(dash.data?.cards ?? [])].sort((a, b) => {
       if (!!a.site.starred !== !!b.site.starred) return a.site.starred ? -1 : 1;
       if (sort === "added") return 0;
       const x = value(a), y = value(b);
       if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
-      return sort === "name" ? String(x).localeCompare(String(y)) : Number(y) - Number(x);
+      return sort === "name" ? String(x).localeCompare(String(y)) : sort === "health" ? Number(x) - Number(y) : Number(y) - Number(x);
     });
   }, [dash.data, sort]);
   const groupKey = (g: string) => `g:${g.toLowerCase()}`;
@@ -190,7 +211,7 @@ export default function SeoDashboardPage() {
                     <button type="button" className="g-pill g-pill--sm" onClick={() => setEditing(null)}>Cancel</button>
                   </form>
                 ) : (
-                  <button type="button" className="g-chip g-chip--sm max-w-full !whitespace-normal text-left [overflow-wrap:anywhere]" onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
+                  <button type="button" className="g-chip g-chip--sm max-w-full !whitespace-normal text-left !normal-case [overflow-wrap:anywhere]" onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
                 )}
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
@@ -203,17 +224,19 @@ export default function SeoDashboardPage() {
                 </div>
               </div>
               {r ? (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-3 xl:grid-cols-6">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 xl:grid-cols-7">
                   <Metric label="Authority" value={r.authority == null ? "—" : String(r.authority)} delta={<Delta series={r.linkHistory?.map((h) => h.authority ?? 0)} />} spark={<Spark data={r.linkHistory?.map((h) => h.authority ?? 0)} color="#673ab7" />} testId={`metric-authority-${s.id}`} />
                   <Metric label="Referring domains" value={compact(r.referringDomains)} delta={<Delta series={r.linkHistory?.map((h) => h.referringDomains)} />} spark={<Spark data={r.linkHistory?.map((h) => h.referringDomains)} color="#1a73e8" />} />
                   <Metric label="Backlinks" value={compact(r.backlinks)} />
                   <Metric label="Organic traffic" value={compact(r.organicTraffic)} delta={<Delta series={r.history?.map((h) => h.traffic)} />} spark={<Spark data={r.history?.map((h) => h.traffic)} color="#e8710a" />} hint={r.trafficValue != null ? `Value $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo` : undefined} />
                   <Metric label="Organic keywords" value={compact(r.organicKeywords)} delta={<Delta series={r.history?.map((h) => h.keywords)} />} spark={<Spark data={r.history?.map((h) => h.keywords)} color="#e8710a" />} hint={r.top10 != null ? `${fmtNum(r.top3)} in top 3 · ${fmtNum(r.top10)} in top 10` : undefined} />
+                  <HealthTile audit={audit} siteId={s.id} />
                   <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10${rank.device ? ` on ${rank.device}` : ""} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? "First check runs this week" : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
-                  <p className="g-text-2 text-[14px]">No numbers for this site yet. <b className="g-text font-medium">Analyse</b> builds its report: authority, backlinks, search traffic, keywords and competitors.</p>
+                  {audit && <div className="w-full max-w-[14rem]"><HealthTile audit={audit} siteId={s.id} /></div>}
+                  <p className="g-text-2 text-[14px]">No search numbers for this site yet. <b className="g-text font-medium">Analyse</b> builds its report: authority, backlinks, search traffic, keywords and competitors.</p>
                   <Button size="sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Analyse — about {price}</Button>
                   <span className="g-text-2 text-[13px]">Tracked keywords: {fmtNum(s.keywordCount)}</span>
                 </div>

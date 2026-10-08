@@ -101,7 +101,9 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
  * after a successful send. Throws when the account has no email address or
  * the send itself fails (the dedupe row is released first so a retry works).
  */
-export async function sendTransactionalEmail(userId: number, kind: string, dedupeKey: string, email: TransactionalEmail): Promise<boolean> {
+export async function sendTransactionalEmail(userId: number, kind: string, dedupeKey: string, email: TransactionalEmail,
+  /** strict: the backup account is tried only when the first send certainly failed, and a send that may have gone
+   *  keeps its claim (nothing sends it again) and throws with `ambiguous: true`. */ opts: { strict?: boolean } = {}): Promise<boolean> {
   if (!Number.isInteger(userId) || !kind || !dedupeKey) throw new Error("sendTransactionalEmail: userId, kind and dedupeKey are required");
   const { rows: [claim] } = await pool.query(
     "INSERT INTO email_log(user_id, kind, dedupe_key, sent_at) VALUES ($1, $2, $3, now()) ON CONFLICT (dedupe_key) DO NOTHING RETURNING id",
@@ -121,10 +123,10 @@ export async function sendTransactionalEmail(userId: number, kind: string, dedup
       html: email.html,
       text: email.text ?? htmlToText(email.html),
       ...(email.attachments?.length ? { attachments: email.attachments } : {}),
-    });
+    }, false, opts.strict ? { failover: "definite" } : {});
     return true;
-  } catch (e) {
-    await pool.query("DELETE FROM email_log WHERE id=$1", [claim.id]).catch(() => {});
+  } catch (e: any) {
+    if (!(opts.strict && e?.ambiguous)) await pool.query("DELETE FROM email_log WHERE id=$1", [claim.id]).catch(() => {});
     throw e;
   }
 }

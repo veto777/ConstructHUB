@@ -89,11 +89,11 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
     }
     try {
       const attach = [{ filename: `seo-report-${report.domain}.pdf`, content: pdf, contentType: "application/pdf" }];
-      const went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
+      const went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach }, { strict: true });
       if (!went) {
         // The email log holds a claim for this key that our delivery row does not show as sent. Young: another send is
         // under way — tried again later. Older than half an hour: a send that died after claiming, and it may have
-        // died AFTER the email went — so it is never sent again (nobody gets a report twice). The delivery is marked
+        // died AFTER the email went — so it is not sent again automatically. The delivery is marked
         // "not known" and the Reports page says so; the occurrence can finish.
         const { rows: [old] } = await pool.query("SELECT 1 FROM email_log WHERE dedupe_key=$1 AND sent_at < now() - interval '30 minutes'", [key]);
         if (!old) throw new Error("another send of this email is under way");
@@ -109,6 +109,12 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
       if (!rowCount) console.warn(`[seo] report for site ${siteId}: sent, but its delivery row had been taken over by another pass`);
       sent++;
     } catch (e: any) {
+      // A send that may have been accepted before it failed: its email-log claim is kept and the delivery is "not
+      // known" — not sent again automatically, and the Reports page says so.
+      if (e?.ambiguous) {
+        const { rowCount } = await pool.query("UPDATE seo_report_deliveries SET state='uncertain', updated_at=now() WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4 AND state='pending'", [siteId, period, to, token]).catch(() => ({ rowCount: 0 }));
+        if (rowCount) { unsure.push(to); skipped++; console.warn(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")}: the send broke off and may have gone — not sent again, delivery not known`); continue; }
+      }
       failed++;
       await pool.query("DELETE FROM seo_report_deliveries WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4 AND state='pending'", [siteId, period, to, token]).catch(() => {});
       console.error(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")} failed: ${e?.message ?? e}`);

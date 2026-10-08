@@ -1365,11 +1365,18 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // Site Audit: the newest crawl of the site's domain, its change since the crawl before, the health
   // trend and any crawl in progress. Reads Site Scan's crawls (sitescan_jobs) — no SEO data spent.
-  // ?vs=<crawl id>: compare the newest crawl with that earlier one instead of the one before it.
+  // ?at=<crawl id>: show that crawl instead of the newest; ?vs=<crawl id>: compare with that earlier one instead of
+  // the one just before. A malformed id is refused (never quietly read as "no choice").
   route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    const vs = typeof req.query.vs === "string" && /^[0-9a-f-]{36}$/i.test(req.query.vs) ? req.query.vs : null;
-    res.json({ site: siteView(site), ...(await siteAudit(user, site.domain, { vs })) });
+    const ids: Record<"at" | "vs", string | null> = { at: null, vs: null };
+    for (const k of ["at", "vs"] as const) {
+      const v = req.query[k];
+      if (v === undefined || v === "") continue;
+      if (typeof v !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v)) return void res.status(400).json({ message: "That crawl could not be found." });
+      ids[k] = v.toLowerCase();
+    }
+    res.json({ site: siteView(site), ...(await siteAudit(user, site.domain, ids)) });
   });
 
   // Site Audit → Pages: every page of the newest crawl with indexability, click depth and internal links. Saved crawl only.

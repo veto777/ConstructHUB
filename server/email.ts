@@ -170,13 +170,16 @@ export async function trySend(useBackup: boolean, mailOptions: any, replyToSelf:
   const fromEmail = getFromEmail(useBackup)!;
   const label = useBackup ? "BACKUP" : "PRIMARY";
 
-  await transporter.verify();
+  // Each failure is tagged with where it happened (see smtpFailureIsDefinite): before anything was sent, the server's
+  // own refusal, or during the send itself.
+  try { await transporter.verify(); } catch (e: any) { throw Object.assign(e instanceof Error ? e : new Error(String(e)), { stage: "verify" }); }
   console.log(`[SMTP ${label}] Connection verified (${fromEmail})`);
 
   swapFromEmail(mailOptions, fromEmail);
   if (replyToSelf) mailOptions.replyTo = fromEmail;
 
-  const info = await transporter.sendMail(mailOptions);
+  let info: any;
+  try { info = await transporter.sendMail(mailOptions); } catch (e: any) { throw Object.assign(e instanceof Error ? e : new Error(String(e)), { stage: "send" }); }
 
   const accepted = Array.isArray(info.accepted) ? info.accepted.map(String) : [];
   const rejected = Array.isArray(info.rejected) ? info.rejected.map(String) : [];
@@ -186,7 +189,7 @@ export async function trySend(useBackup: boolean, mailOptions: any, replyToSelf:
   }
 
   if (accepted.length === 0 && mailOptions.to) {
-    throw new Error(`No recipients accepted by ${label} SMTP`);
+    throw Object.assign(new Error(`No recipients accepted by ${label} SMTP`), { stage: "rejected" });
   }
 
   console.log(`[SMTP ${label}] Delivered to ${accepted.join(", ")} | Response: ${info.response}`);
@@ -228,12 +231,35 @@ function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[
   return { accepted: to, rejected: [], response: "sink: written to tmp/email-outbox.jsonl" };
 }
 
-export async function sendWithFallback(mailOptions: any, replyToSelf = false) {
+/**
+ * Whether a failed send certainly did NOT deliver: it failed before sending (connecting, signing in), or the server
+ * itself answered with a refusal (a 4xx/5xx reply, every recipient refused, a bad sender or message). Anything else — a
+ * connection that broke or timed out mid-send — may have been accepted before it broke: not known.
+ */
+export function smtpFailureIsDefinite(e: any): boolean {
+  if (!e || typeof e !== "object") return false;
+  if (e.stage === "verify" || e.stage === "rejected") return true;
+  if (e.stage !== "send") return false;
+  if (typeof e.responseCode === "number" && e.responseCode >= 400) return true;
+  if (["EAUTH", "EENVELOPE", "EMESSAGE"].includes(e.code)) return true;
+  return e.code === "ECONNECTION" && e.command === "CONN";
+}
+
+/**
+ * `opts.failover`: "always" (the default — any failure tries the backup account) or "definite" — the backup is tried
+ * only when the first send certainly did not deliver; otherwise the error is thrown with `ambiguous: true`, so a caller
+ * that must never send twice can hold its claim instead of retrying.
+ */
+export async function sendWithFallback(mailOptions: any, replyToSelf = false, opts: { failover?: "always" | "definite" } = {}) {
   if (!realSendAllowed()) return sinkToOutbox(mailOptions);
   try {
     return await trySend(false, { ...mailOptions }, replyToSelf);
   } catch (primaryErr: any) {
     console.error(`[SMTP PRIMARY] Failed: ${primaryErr.message}`);
+    if (opts.failover === "definite" && !smtpFailureIsDefinite(primaryErr)) {
+      console.error("[SMTP] The first send may have been accepted before it failed — not retried");
+      throw Object.assign(primaryErr instanceof Error ? primaryErr : new Error(String(primaryErr)), { ambiguous: true });
+    }
 
     if (!process.env.SMTP_EMAIL_BACKUP || !process.env.SMTP_APP_PASSWORD_BACKUP) {
       console.error("[SMTP] No backup credentials configured — cannot failover");
@@ -247,7 +273,7 @@ export async function sendWithFallback(mailOptions: any, replyToSelf = false) {
       return result;
     } catch (backupErr: any) {
       console.error(`[SMTP BACKUP] Also failed: ${backupErr.message}`);
-      throw new Error(`Both SMTP accounts failed. Primary: ${primaryErr.message} | Backup: ${backupErr.message}`);
+      throw Object.assign(new Error(`Both SMTP accounts failed. Primary: ${primaryErr.message} | Backup: ${backupErr.message}`), smtpFailureIsDefinite(backupErr) ? {} : { ambiguous: true });
     }
   }
 }

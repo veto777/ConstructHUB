@@ -32,8 +32,16 @@ const H = "https://compare.example";
   ok(!vs.audit?.fixed.length && vs.audit?.notRechecked.some((f) => f.key === "missing-title" && f.previous === 2), `against the chosen crawl: ${JSON.stringify(vs.audit?.notRechecked)}`);
   for (const [bad, why] of [[other, "another account's crawl"], [otherSite, "another site's crawl"], [newest, "the newest itself"], [randomUUID(), "an unknown id"]] as const) {
     const r = await siteAudit(1, "compare.example", { vs: bad });
-    ok(r.audit?.comparedWith?.jobId === middle && (bad === newest ? !r.vsMissing : r.vsMissing === true), `${why} is refused and the crawl before is used`);
+    ok(r.audit?.comparedWith?.jobId === middle && r.vsMissing === true, `${why} is refused, said, and the crawl before is used`);
   }
+  // Any two crawls: an older crawl shown, compared with the one before it or a chosen one older still.
+  const shown = await siteAudit(1, "compare.example", { at: middle });
+  ok(shown.audit?.jobId === middle && shown.audit.latest === false && shown.audit.comparedWith?.jobId === oldest && !shown.audit.comparedWith.chosen && shown.latestId === newest, "an older crawl can be shown, against the crawl before it; the newest is still named");
+  const newer = await siteAudit(1, "compare.example", { at: middle, vs: newest });
+  ok(newer.vsMissing === true && newer.audit?.comparedWith?.jobId === oldest, "a crawl newer than the one shown is not a baseline (said)");
+  const foreign = await siteAudit(1, "compare.example", { at: other });
+  ok(foreign.atMissing === true && foreign.audit?.jobId === newest, "another account's crawl cannot be shown (said; the newest is shown)");
+  ok(def.crawls.map((c) => c.jobId).join() === [newest, middle, oldest].join() && def.crawls[2].pageCap === 100, "the pickers list this account's crawls of this site, newest first, with their page limits");
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://compare.example%' OR url LIKE 'https://elsewhere.example%'");
   console.log(`audit compare checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

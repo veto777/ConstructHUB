@@ -28,7 +28,7 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   const again = await sendSiteReport(1, site.id, ["a@example.com"], period);
   ok(again.sent === 0 && again.failed === 0 && again.uncertain.length === 1, "a retry of the occurrence does not send it either, and can finish");
   const sch = await getSchedule(1, site.id), other = await getSchedule(2, site.id);
-  ok(sch.uncertain.length === 1 && sch.uncertain[0].recipient === "a@example.com" && other.uncertain.length === 0, "the Reports page is told, and only the site's own account");
+  ok(sch.uncertain?.length === 1 && sch.uncertain[0].recipient === "a@example.com" && sch.uncertain[0].period === "the October 2026 report" && other.uncertain?.length === 0, `the Reports page is told which report, and only the site's own account: ${JSON.stringify(sch.uncertain)}`);
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`report uncertain checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

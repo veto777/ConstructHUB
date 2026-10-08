@@ -20,6 +20,7 @@ export type GscRow = {
 export type GscBreakdown = {
   dimension: "page" | "query"; property: string; through: string | null; days: number; previousDays: number; comparable: boolean;
   /** Some of these 56 days are still being read from Google for this report, or a read of them failed: rows may be missing, so no change is shown. */ incomplete: boolean;
+  /** Whether every read finished could not be checked just now (then `incomplete` is true too). */ completenessUnknown?: boolean;
   /** "domain" = every address of the domain, sub-domains included; "prefix" = only addresses under that URL. */ coverage: "domain" | "prefix";
   /** The other properties of this site on the account (not used here). */ others: string[];
   rows: GscRow[]; /** More pages/searches than are listed (the busiest are kept). */ more: number; total: number;
@@ -65,16 +66,22 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
        FROM last`, [asset.id, dimension]);
   const coverage = asset.external_id.startsWith("sc-domain:") ? "domain" as const : "prefix" as const;
   if (!w?.through) return { dimension, property: asset.external_id, coverage, others: asset.others, through: null, days: 0, previousDays: 0, comparable: false, incomplete: false, rows: [], more: 0, total: 0 };
-  // A read of these days for this report that has not finished (queued, running, or failed — a long report comes in
-  // pages of 25,000 rows, each its own job) and was not replaced since by a finished full read of the same days: some
-  // rows may be missing, so the two windows are not compared.
-  const { rows: [inc] } = await pool.query(
-    `SELECT EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2 AND j.state <> 'done'
-        AND (j.payload->>'end')::date > $3::date - ${2 * GSC_WINDOW} AND (j.payload->>'start')::date <= $3::date
-        AND NOT EXISTS (SELECT 1 FROM edge_jobs k WHERE k.asset_id=j.asset_id AND k.kind='analytics' AND k.payload->>'dimension'=$2 AND k.state='done'
-          AND k.payload->>'start'=j.payload->>'start' AND k.payload->>'end'=j.payload->>'end' AND (k.payload->>'offset')::int=0 AND k.id > j.id)) AS v`,
-    [asset.id, dimension, w.through]).catch(() => ({ rows: [{ v: false }] }));
-  const incomplete = !!inc?.v;
+  // Every read of these days for this report must be finished. Google sends a long report in pages of 25,000 rows,
+  // each its own job, and a page still waiting may belong to an earlier read whose next page a newer read could not
+  // queue again (one waiting copy of a job at a time) — so ANY read still queued or running means incomplete, whatever
+  // finished after it. A failed read counts until a full read of the same days (its first page) is queued after it
+  // and finished — and that read's own later pages are then judged the same way. A check that cannot be made is
+  // "not known", never "complete".
+  const jobsTable = await pool.query("SELECT to_regclass('edge_jobs') IS NOT NULL AS ok").then((r) => !!r.rows[0]?.ok, () => null);
+  const inc = jobsTable === false ? { v: false } : jobsTable === null ? null : await pool.query(
+    `SELECT EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2
+        AND j.payload->>'end' > $4::text AND j.payload->>'start' <= $3::text
+        AND (j.state IN ('queued','running')
+          OR (j.state <> 'done' AND NOT EXISTS (SELECT 1 FROM edge_jobs k WHERE k.asset_id=j.asset_id AND k.kind='analytics' AND k.payload->>'dimension'=$2 AND k.state='done'
+                AND k.payload->>'start'=j.payload->>'start' AND k.payload->>'end'=j.payload->>'end' AND k.payload->>'offset'='0' AND k.id > j.id)))) AS v`,
+    [asset.id, dimension, String(w.through), new Date(Date.parse(`${w.through}T00:00:00Z`) - 2 * GSC_WINDOW * 864e5).toISOString().slice(0, 10)]).then((r) => r.rows[0], () => null);
+  const incomplete = inc ? !!inc.v : true;
+  const unknown = !inc;
   const agg = (fromOffset: number, toOffset: number) => pool.query(
     `SELECT key, sum(clicks)::float8 AS clicks, sum(impressions)::float8 AS impressions,
             CASE WHEN sum(impressions) > 0 THEN sum(position * impressions) / sum(impressions) END::float8 AS position
@@ -91,5 +98,5 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
   // The busiest in EITHER window are kept, so a page that lost all its clicks is still listed among the losers.
   const weight = (r: GscRow) => Math.max(r.clicks ?? 0, r.prevClicks ?? 0);
   rows.sort((a, b) => weight(b) - weight(a) || (b.impressions ?? b.prevImpressions ?? 0) - (a.impressions ?? a.prevImpressions ?? 0) || a.key.localeCompare(b.key));
-  return { dimension, property: asset.external_id, coverage, others: asset.others, through: w.through, days: w.days, previousDays: w.prev_days, comparable: w.days >= GSC_WINDOW && prevComplete && !incomplete, incomplete, rows: rows.slice(0, GSC_ROWS), more: Math.max(0, rows.length - GSC_ROWS), total: rows.length };
+  return { dimension, property: asset.external_id, coverage, others: asset.others, through: w.through, days: w.days, previousDays: w.prev_days, comparable: w.days >= GSC_WINDOW && prevComplete && !incomplete, incomplete, ...(unknown ? { completenessUnknown: true } : {}), rows: rows.slice(0, GSC_ROWS), more: Math.max(0, rows.length - GSC_ROWS), total: rows.length };
 }

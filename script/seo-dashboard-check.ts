@@ -2,9 +2,12 @@
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { dashboardRanks, groupNameSql } from "../server/seo/dashboard";
+import { ensureSiteScanSchema } from "../server/sitescan/schema";
+import { auditHealthByDomain, HEALTH_TREND } from "../server/seo/audit";
+import { randomUUID } from "node:crypto";
 let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else { n++; console.log("PASS ", m); } };
 (async () => {
-  await ensureSeoSchema();
+  await ensureSeoSchema(); await ensureSiteScanSchema();
   await pool.query("DELETE FROM seo_sites WHERE domain LIKE '%.dash.example'");
   const site = async (user: number, d: string, devices = "both") => (await pool.query("INSERT INTO seo_sites(user_id, domain, devices) VALUES($1,$2,$3) RETURNING id", [user, `${d}.dash.example`, devices])).rows[0].id as number;
   const a = await site(1, "a"), b = await site(1, "b", "mobile"), c = await site(2, "c");
@@ -25,6 +28,20 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   ok(ra.device === "desktop" && ra.top3 === 0 && ra.top10 === 1 && ra.checked === 2, `one device, never the better of two: ${JSON.stringify(ra)}`);
   ok(ra.firstOn! < ra.checkedOn!, "the dates the newest checks span are said");
   ok(rb.device === "mobile" && rb.top10 === 1 && rb.top3 === 0, `a mobile-only site counts mobile: ${JSON.stringify(rb)}`);
+  // Site health over the newest crawls: 8 crawls of a.dash.example, health falling from 100 as pages break.
+  await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://a.dash.example%'");
+  for (let i = 0; i < 8; i++) {
+    const pages = Array.from({ length: 10 }, (_, k) => ({ url: `https://a.dash.example/p${k}`, status: k < i ? 404 : 200, redirects: [] }));
+    await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,'https://a.dash.example/',$3,$4,'completed','{}'::jsonb, now() - $5::int * interval '1 day')`,
+      [randomUUID(), 1, i === 0 ? 100 : 150, JSON.stringify({ pages }), 8 - i]);
+  }
+  await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,2,'https://a.dash.example/',150,'{"pages":[]}','completed','{}'::jsonb, now())`, [randomUUID()]);
+  const h = (await auditHealthByDomain(1, ["a.dash.example", "www.none.dash.example"])).get("a.dash.example")!;
+  ok(h && h.trend.length === HEALTH_TREND, `the trend is the newest ${HEALTH_TREND} crawls: ${h?.trend.length}`);
+  ok(h.trend.every((t, k) => k === 0 || t.at > h.trend[k - 1].at) && h.trend[h.trend.length - 1].at === h.scannedAt && h.health === h.trend[h.trend.length - 1].health, "oldest first, ending with the crawl the score is from");
+  ok(h.trend[0].health > h.trend[h.trend.length - 1].health && h.crawled === 10, `health falls as pages break: ${h.trend.map((t) => t.health)}`);
+  ok(h.trend.every((t) => t.pageCap === 150), "each point carries its page limit (the older 100-page crawl is outside the newest six)");
+  await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://a.dash.example%'");
   await pool.query("DELETE FROM seo_sites WHERE domain LIKE '%.dash.example'");
   console.log(`dashboard checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

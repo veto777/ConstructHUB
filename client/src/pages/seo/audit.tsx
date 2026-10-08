@@ -32,7 +32,7 @@ type Audit = {
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
-type AuditData = { locationId: number | null; audit: (Audit & { comparedWith?: Compared | null }) | null; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null }[]; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -63,13 +63,13 @@ function HealthRing({ value }: { value: number | null }) {
 }
 
 /** Change in affected pages: fewer is better, so a drop is green. */
-function Change({ issue }: { issue: Issue }) {
+function Change({ issue, before }: { issue: Issue; /** The crawl compared with, in words ("the crawl before", "the crawl of Sep 3"). */ before: string }) {
   if (issue.change === null) return <span className="g-text-2">—</span>;
   if (issue.isNew) return <span className="g-chip g-chip--sm" style={{ color: "var(--g-red)" }}>New</span>;
   if (issue.change === 0) return <span className="g-move g-move--flat" aria-label="No change">·</span>;
   return issue.change < 0
-    ? <span className="g-move g-move--up" aria-label={`${-issue.change} fewer than the last crawl`}>▼{-issue.change}</span>
-    : <span className="g-move g-move--down" aria-label={`${issue.change} more than the last crawl`}>▲{issue.change}</span>;
+    ? <span className="g-move g-move--up" aria-label={`${-issue.change} fewer than ${before}`}>▼{-issue.change}</span>
+    : <span className="g-move g-move--down" aria-label={`${issue.change} more than ${before}`}>▲{issue.change}</span>;
 }
 
 /** Quoted, and a cell from the open web is never allowed to run as a spreadsheet formula. */
@@ -91,12 +91,14 @@ export default function SeoAuditPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site?.id}/audit`;
-  // The crawl the newest one is compared with: null = the one before it. Chosen per site; the page always says which.
-  const [vsBySite, setVsBySite] = useState<Record<number, string>>({});
-  const vs = site ? vsBySite[site.id] ?? null : null;
+  // The crawl shown (null = the newest) and the crawl it is compared with (null = the one just before it). Chosen per
+  // site; the page always says which.
+  const [pick, setPick] = useState<Record<number, { at: string | null; vs: string | null }>>({});
+  const at = site ? pick[site.id]?.at ?? null : null, vs = site ? pick[site.id]?.vs ?? null : null;
+  const choose = (c: { at: string | null; vs: string | null }) => site && setPick((m) => ({ ...m, [site.id]: c }));
   const q = useQuery<AuditData>({
-    queryKey: [key, vs], enabled: !!site,
-    queryFn: async () => { const r = await fetch(`${key}${vs ? `?vs=${encodeURIComponent(vs)}` : ""}`, { credentials: "include" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+    queryKey: [key, at, vs], enabled: !!site,
+    queryFn: async () => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -118,7 +120,13 @@ export default function SeoAuditPage() {
   const trend = (d?.history ?? []).filter((h) => h.health !== null);
   const cmp = a?.comparedWith ?? null;
   const before = cmp?.chosen && cmp.at ? `the crawl of ${fmtDate(cmp.at)}` : "the crawl before";
-  const earlier = (d?.history ?? []).filter((h) => a && h.jobId !== a.jobId).reverse(); // newest first
+  // Every finished crawl, newest first; the ones older than the crawl shown can be compared with.
+  const crawls = d?.crawls ?? [];
+  /** The crawl shown, by when it finished — the date the pickers name it by. */
+  const shownDate = a?.completedAt ?? a?.scannedAt ?? null;
+  const shownAt = crawls.findIndex((c) => a && c.jobId === a.jobId);
+  const earlier = shownAt >= 0 ? crawls.slice(shownAt + 1) : [];
+  const crawlWord = (c: { at: string | null; pageCap: number | null }, i: number) => `${fmtDate(c.at)}${crawls.filter((x) => fmtDate(x.at) === fmtDate(c.at)).length > 1 ? ` (#${crawls.length - i})` : ""}${c.pageCap ? ` · up to ${fmtNum(c.pageCap)} pages` : ""}`;
   const exportAll = () => a && downloadCsv(`site-audit-${site?.domain}.csv`, [["Severity", "Issue", "Category", "Affected", "Page or entry"], ...a.issues.flatMap((i) => i.items.map((u) => [SEVERITY[i.severity].label, i.title, CATEGORY[i.category] ?? i.category, String(i.count), u]))]);
 
   return (
@@ -164,7 +172,7 @@ export default function SeoAuditPage() {
                 <h2 className="g-text text-[16px] font-medium">Health score</h2>
                 <p className="g-text-2 text-[13px]">The share of crawled pages with no errors.</p>
                 {a.healthChange !== null && a.healthChange !== 0 && <p className="mt-1 text-[13px]"><span className={`g-move ${a.healthChange > 0 ? "g-move--up" : "g-move--down"}`}>{a.healthChange > 0 ? "▲" : "▼"}{Math.abs(a.healthChange)}</span> <span className="g-text-2">since {before}</span></p>}
-                <p className="g-text-2 mt-1 text-[12px]">Crawled {fmtDate(a.scannedAt)}</p>
+                <p className="g-text-2 mt-1 text-[12px]">Crawled {fmtDate(shownDate)}</p>
               </div>
             </section>
             <section className="rounded-lg border p-4" style={card} data-testid="audit-crawled">
@@ -230,28 +238,40 @@ export default function SeoAuditPage() {
             </div>
           )}
 
-          {earlier.length > 0 && (
+          {crawls.length > 1 && (
             <section className="mb-4 rounded-lg border p-4" style={card} data-testid="audit-compare">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="g-text text-[16px] font-medium">Compared with</h2>
-                <select className="g-select" aria-label="Crawl to compare with" value={cmp?.chosen ? cmp.jobId : ""} data-testid="select-audit-vs"
-                  onChange={(e) => site && setVsBySite((m) => { const n = { ...m }; if (e.target.value) n[site.id] = e.target.value; else delete n[site.id]; return n; })}>
-                  <option value="">The crawl before ({fmtDate(earlier[0].at)})</option>
-                  {earlier.slice(1).map((h) => <option key={h.jobId} value={h.jobId}>Crawl of {fmtDate(h.at)}{h.health !== null ? ` — health ${h.health}` : ""}</option>)}
-                </select>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">Showing</span>
+                  <select className="g-select min-w-0 max-w-full" value={a.latest === false ? a.jobId : ""} data-testid="select-audit-at"
+                    onChange={(e) => choose({ at: e.target.value || null, vs: null })}>
+                    <option value="">The newest crawl ({fmtDate(crawls[0].at)})</option>
+                    {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i + 1)}</option>)}
+                  </select></label>
+                {earlier.length > 0 && (
+                  <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">compared with</span>
+                    <select className="g-select min-w-0 max-w-full" value={cmp?.chosen ? cmp.jobId : ""} data-testid="select-audit-vs"
+                      onChange={(e) => choose({ at, vs: e.target.value || null })}>
+                      <option value="">The crawl before it ({fmtDate(earlier[0].at)})</option>
+                      {earlier.slice(1).map((c) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, crawls.indexOf(c))}</option>)}
+                    </select></label>
+                )}
                 {q.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
               </div>
-              {d?.vsMissing && <p className="mt-2 text-[13px]" role="alert">That crawl is no longer available, so the newest crawl is compared with the crawl before it.</p>}
+              {crawls.length >= 100 && <p className="g-text-2 mt-1 text-[12px]">The newest 100 crawls are listed.</p>}
+              {d?.atMissing && <p className="mt-2 text-[13px]" role="alert">That crawl is no longer available, so the newest crawl is shown.</p>}
+              {d?.vsMissing && <p className="mt-2 text-[13px]" role="alert">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown), so the crawl before it is used.</p>}
+              {a.latest === false && <p className="mt-2 text-[13px]" role="note" data-testid="audit-older-note">You are looking at the crawl of {fmtDate(shownDate)}, not the newest. Its issues, health and counts are shown; Pages, Internal links and Outgoing links read the newest crawl. <button type="button" className="g-link" onClick={() => choose({ at: null, vs: null })}>Show the newest crawl</button></p>}
+              {!cmp && <p className="g-text-2 mt-2 text-[13px]">No earlier crawl to compare this one with.</p>}
               {cmp && (
                 <div className="mt-2 text-[13px]">
-                  <p className="g-text-2">Every change, fixed issue and health move on this page is the crawl of {fmtDate(a.scannedAt)} against {before}{cmp.chosen && cmp.at ? "" : cmp.at ? ` (${fmtDate(cmp.at)})` : ""}.</p>
-                  <p className="g-text mt-1" data-testid="text-audit-page-changes">{fmtNum(cmp.addedPages)} page{cmp.addedPages === 1 ? "" : "s"} reached now and not then; {fmtNum(cmp.removedPages)} reached then and not now.</p>
+                  <p className="g-text-2">Every change, fixed issue and health move on this page is the crawl of {fmtDate(shownDate)} against {before}{cmp.chosen && cmp.at ? "" : cmp.at ? ` (${fmtDate(cmp.at)})` : ""}.</p>
+                  <p className="g-text mt-1" data-testid="text-audit-page-changes">{fmtNum(cmp.addedPages)} page{cmp.addedPages === 1 ? "" : "s"} reached in the crawl of {fmtDate(shownDate)} and not in {before}; {fmtNum(cmp.removedPages)} the other way round.</p>
                   {cmp.capsDiffer && <p className="g-text-2 mt-1 text-[12px]">The two crawls stopped at different page limits, so a page "not reached now" may only lie beyond the smaller limit.</p>}
                   {(cmp.addedPages > 0 || cmp.removedPages > 0) && (
                     <details className="mt-1" data-testid="audit-page-changes">
                       <summary className="g-link cursor-pointer">Show the pages</summary>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        {([["Reached now, not then", cmp.added, cmp.addedPages], ["Reached then, not now", cmp.removed, cmp.removedPages]] as const).map(([t, list, n]) => (
+                        {([[`Reached on ${fmtDate(shownDate)}, not before`, cmp.added, cmp.addedPages], [`Reached before, not on ${fmtDate(shownDate)}`, cmp.removed, cmp.removedPages]] as const).map(([t, list, n]) => (
                           <div key={t}><h3 className="g-text font-medium">{t}</h3>
                             {list.length === 0 ? <p className="g-text-2">None.</p> : <ul className="space-y-0.5">{list.map((u) => <li key={u} className="truncate"><a href={u} className="g-link" target="_blank" rel="noreferrer">{u}</a></li>)}</ul>}
                             {n > list.length && <p className="g-text-2 text-[12px]">The first {fmtNum(list.length)} of {fmtNum(n)}.</p>}
@@ -267,9 +287,11 @@ export default function SeoAuditPage() {
           <nav className="g-tabs" aria-label="Audit views">
             {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["links", "Internal links"], ["outgoing", "Outgoing links"], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
           </nav>
-          {view === "pages" && <AuditPages site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
-          {view === "links" && site && <LinkOpportunitiesView site={site} />}
-          {view === "outgoing" && site && <OutgoingLinksView site={site} />}
+          {a.latest === false && (view === "pages" || view === "links" || view === "outgoing") && <p className="g-text-2 mb-2 text-[12px]" role="note">This view is the newest crawl ({fmtDate(crawls[0]?.at ?? null)}), not the crawl of {fmtDate(shownDate)} shown above.</p>}
+          {/* These read the newest crawl; keyed by it, so a crawl that finishes while one is open is read again at once. */}
+          {view === "pages" && <AuditPages key={d?.latestId ?? ""} site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "links" && site && <LinkOpportunitiesView key={d?.latestId ?? ""} site={site} />}
+          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestId ?? ""} site={site} />}
           {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -301,7 +323,7 @@ export default function SeoAuditPage() {
                         <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
                         <td data-label="Area" className="g-text-2">{CATEGORY[i.category] ?? i.category}</td>
                         <td className="num" data-label="Affected">{fmtNum(i.count)}</td>
-                        <td className="num pr-2" data-label="Change since last crawl"><Change issue={i} /></td>
+                        <td className="num pr-2" data-label={`Change since ${before}`}><Change issue={i} before={before} /></td>
                       </tr>
                       {isOpen && (
                         <tr data-testid={`detail-issue-${i.key}`}>
@@ -316,7 +338,7 @@ export default function SeoAuditPage() {
                               {!showAll && i.items.length > 25 && <button type="button" className="g-pill g-pill--sm" onClick={() => setShowAll(true)}>Show all {fmtNum(i.items.length)}</button>}
                               {i.count > i.items.length && <span className="g-text-2 text-[12px]">Showing the first {fmtNum(i.items.length)} of {fmtNum(i.count)}.</span>}
                               <button type="button" className="g-pill g-pill--sm" onClick={() => downloadCsv(`${i.key}-${site.domain}.csv`, [["Issue", "Page or entry"], ...i.items.map((u) => [i.title, u])])}><Download /> Export this list</button>
-                              <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt, ...(i.items.length ? { examples: i.items.slice(0, 3).join(" , ").slice(0, 300) } : {}), ...(i.why ? { finding: i.why.length > 300 ? `${i.why.slice(0, 297)}…` : i.why } : {}) }, source: `audit:${i.key}` }]} />
+                              {a.latest !== false && <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt, ...(i.items.length ? { examples: i.items.slice(0, 3).join(" , ").slice(0, 300) } : {}), ...(i.why ? { finding: i.why.length > 300 ? `${i.why.slice(0, 297)}…` : i.why } : {}) }, source: `audit:${i.key}` }]} />}
                             </div>
                           </td>
                         </tr>

@@ -184,7 +184,6 @@ const DONE_SQL = `status='completed' AND jsonb_typeof(report)='object'`;
 
 export type AuditRun = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
 
-/** The newest audit of a domain with the crawl before it, the health trend and any crawl in progress. */
 /** Pages of two crawls compared by address (as the crawler compares them): reached now and not then, and the reverse. Pure. */
 export function pageChanges(now: AuditPage[], before: AuditPage[]): { added: string[]; removed: string[] } {
   const key = (u: string) => { try { const x = new URL(u); return `${x.host.toLowerCase().replace(/^www\./, "")}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return u; } };
@@ -194,32 +193,54 @@ export function pageChanges(now: AuditPage[], before: AuditPage[]): { added: str
 export const PAGE_CHANGE_LIST = 50;
 export type AuditComparison = { jobId: string; at: string | null; /** true = chosen by the customer (not the crawl before). */ chosen: boolean;
   addedPages: number; removedPages: number; added: string[]; removed: string[]; /** The two crawls' page limits differ: a page "no longer reached" may only be beyond the smaller one. */ capsDiffer: boolean };
-export async function siteAudit(user: number, domain: string, opts: { vs?: string | null } = {}): Promise<{ /** The Google profile the newest crawl was compared with: the next crawl uses it too, so the same checks run. */ locationId: number | null; audit: (AuditSummary & { jobId: string; comparedWith: AuditComparison | null }) | null; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
+/** How many finished crawls the crawl pickers list. */
+export const CRAWL_LIST = 100;
+export type CrawlChoice = { jobId: string; at: string | null; pageCap: number | null };
+export async function siteAudit(user: number, domain: string, opts: { at?: string | null; vs?: string | null } = {}): Promise<{
+  /** The Google profile the newest crawl was compared with: the next crawl uses it too, so the same checks run. */ locationId: number | null;
+  /** The crawl shown and the one it is compared with (by default the newest and the one before it). */
+  audit: (AuditSummary & { jobId: string; latest: boolean; /** When this crawl finished (the date the pickers use). */ completedAt: string | null; comparedWith: AuditComparison | null }) | null;
+  /** The newest finished crawl (the Pages, links and outgoing views read it). */ latestId: string | null;
+  /** Every finished crawl of the site, newest first (up to CRAWL_LIST), for the pickers. */ crawls: CrawlChoice[];
+  /** A chosen crawl that is not this account's finished crawl of this site (or, for `vs`, not older than the one shown): the default was used and the page says so. */
+  atMissing?: boolean; vsMissing?: boolean;
+  history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
   const d = bare(domain);
-  const [{ rows: done }, { rows: open }] = await Promise.all([
+  const [{ rows: done }, { rows: open }, { rows: list }] = await Promise.all([
     pool.query(
       `SELECT id, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages FROM sitescan_jobs
         WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
     pool.query(
       `SELECT id, status, error, created_at, ${CRAWLED_SQL} AS crawled, page_cap FROM sitescan_jobs
         WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
+    pool.query(
+      `SELECT id, completed_at, page_cap FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC, id LIMIT ${CRAWL_LIST}`, [user, d]),
   ]);
   const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: r.error, createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
   const newest = open[0];
-  // The crawl to compare with: one the customer chose (this account's, this site's, finished and older than the newest),
-  // else the one before the newest.
-  let prev = done[1] ?? null, chosen = false, vsMissing = false;
-  if (opts.vs && done[0] && opts.vs !== done[0].id) {
-    const { rows: [v] } = await pool.query(
-      `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$3 AND user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND completed_at < $4`,
-      [user, d, opts.vs, done[0].completed_at]).catch(() => ({ rows: [] as any[] }));
-    if (v) { prev = v; chosen = true; } else vsMissing = true;
+  // One crawl, only if it is this account's finished crawl of this site (and, when `before` is given, older than it).
+  const load = async (id: string, before?: Date) => (await pool.query(
+    `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$3 AND user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2
+       ${before ? "AND completed_at < $4" : ""}`, before ? [user, d, id, before] : [user, d, id])).rows[0] ?? null;
+  // The crawl shown: the one chosen, else the newest.
+  let cur = done[0] ?? null, atMissing = false;
+  if (opts.at && cur && opts.at !== cur.id) { const c = await load(opts.at); if (c) cur = c; else atMissing = true; }
+  // The crawl it is compared with: the one chosen (older than the one shown), else the one just before it.
+  let prev: any = null, chosen = false, vsMissing = false;
+  if (cur) {
+    if (opts.vs) { const v = opts.vs === cur.id ? null : await load(opts.vs, cur.completed_at); if (v) { prev = v; chosen = true; } else vsMissing = true; }
+    if (!prev) {
+      const i = done.findIndex((j: any) => j.id === cur.id);
+      prev = i >= 0 && done[i + 1] ? done[i + 1] : (await pool.query(
+        `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND completed_at < $3 ORDER BY completed_at DESC LIMIT 1`,
+        [user, d, cur.completed_at])).rows[0] ?? null;
+    }
   }
-  const audit = done[0] ? (() => {
-    const s = auditSummary(done[0].report, done[0].pages, prev ? { report: prev.report, pages: prev.pages } : null);
-    const ch = prev ? pageChanges(done[0].pages, prev.pages) : null;
-    return { jobId: done[0].id as string, ...s, comparedWith: prev && ch ? { jobId: prev.id as string, at: prev.completed_at ? new Date(prev.completed_at).toISOString() : null, chosen,
-      addedPages: ch.added.length, removedPages: ch.removed.length, added: ch.added.slice(0, PAGE_CHANGE_LIST), removed: ch.removed.slice(0, PAGE_CHANGE_LIST), capsDiffer: Number(prev.page_cap) !== Number(done[0].page_cap) } : null };
+  const audit = cur ? (() => {
+    const s = auditSummary(cur.report, cur.pages, prev ? { report: prev.report, pages: prev.pages } : null);
+    const ch = prev ? pageChanges(cur.pages, prev.pages) : null;
+    return { jobId: cur.id as string, latest: cur.id === done[0]?.id, ...s, completedAt: cur.completed_at ? new Date(cur.completed_at).toISOString() : null, comparedWith: prev && ch ? { jobId: prev.id as string, at: prev.completed_at ? new Date(prev.completed_at).toISOString() : null, chosen,
+      addedPages: ch.added.length, removedPages: ch.removed.length, added: ch.added.slice(0, PAGE_CHANGE_LIST), removed: ch.removed.slice(0, PAGE_CHANGE_LIST), capsDiffer: Number(prev.page_cap) !== Number(cur.page_cap) } : null };
   })() : null;
   const history = done.flatMap((j: any) => {
     try {
@@ -229,26 +250,38 @@ export async function siteAudit(user: number, domain: string, opts: { vs?: strin
   }).reverse();
   const locationId = Number(done[0]?.location_id) > 0 ? Number(done[0].location_id) : null;
   return {
-    locationId, audit, history, ...(vsMissing ? { vsMissing } : {}),
+    locationId, audit, history, latestId: done[0]?.id ?? null, ...(atMissing ? { atMissing } : {}), ...(vsMissing ? { vsMissing } : {}),
+    crawls: list.map((r: any) => ({ jobId: r.id, at: r.completed_at ? new Date(r.completed_at).toISOString() : null, pageCap: r.page_cap == null ? null : Number(r.page_cap) })),
     running: newest && (newest.status === "queued" || newest.status === "running") ? run(newest) : null,
     lastFailed: newest && newest.status === "failed" ? run(newest) : null,
   };
 }
 
 /** Health score per domain for the dashboard cards: newest completed crawl of each. */
-export async function auditHealthByDomain(user: number, domains: string[]): Promise<Map<string, { health: number | null; errors: number; scannedAt: string | null }>> {
-  const out = new Map<string, { health: number | null; errors: number; scannedAt: string | null }>();
+/** How many crawls of a site the dashboard's health trend shows. */
+export const HEALTH_TREND = 6;
+export type HealthPoint = { at: string; health: number; crawled: number; pageCap: number | null };
+export type SiteHealth = { health: number | null; errors: number; scannedAt: string | null; crawled: number;
+  /** The newest crawls with a score, oldest first (up to HEALTH_TREND). Each says how many pages it crawled and its page limit, as health is a share of the pages crawled. */ trend: HealthPoint[] };
+export async function auditHealthByDomain(user: number, domains: string[]): Promise<Map<string, SiteHealth>> {
+  const out = new Map<string, SiteHealth>();
   if (!domains.length) return out;
   const { rows } = await pool.query(
-    `SELECT DISTINCT ON (host) host, completed_at, report, pages FROM (
-       SELECT ${HOST_SQL} AS host, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs
-        WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j
+    `SELECT host, completed_at, report, page_cap, pages FROM (
+       SELECT host, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM (
+         SELECT ${HOST_SQL} AS host, completed_at, report, page_cap, state, row_number() OVER (PARTITION BY ${HOST_SQL} ORDER BY completed_at DESC) AS n FROM sitescan_jobs
+          WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j WHERE n <= ${HEALTH_TREND}) k
       ORDER BY host, completed_at DESC`, [user, domains.map(bare)]);
   for (const r of rows) {
     // One unreadable crawl must not take the whole dashboard down.
     try {
       const s = auditSummary(r.report, r.pages);
-      out.set(r.host, { health: s.health, errors: s.totals.error.affected, scannedAt: r.completed_at });
+      const had = out.get(r.host);
+      const at = r.completed_at ? new Date(r.completed_at).toISOString() : null;
+      const point = s.health !== null && at ? [{ at, health: s.health, crawled: s.crawled, pageCap: r.page_cap == null ? null : Number(r.page_cap) }] : [];
+      // Newest first in the rows: the first one read is the site's current picture; older ones only add to the trend.
+      if (!had) out.set(r.host, { health: s.health, errors: s.totals.error.affected, scannedAt: at, crawled: s.crawled, trend: point });
+      else had.trend.unshift(...point);
     } catch (e: any) { console.warn(`[seo] audit of ${r.host} could not be read: ${e?.message ?? e}`); }
   }
   return out;

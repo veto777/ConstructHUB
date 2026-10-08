@@ -24,7 +24,7 @@ type Report = {
   alerts: { title: string; kind: string; createdAt: string }[];
   work?: { unavailable?: boolean; since?: string | null; days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number; today?: string; overdue?: { title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number } | null;
 };
-type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null; uncertain?: { recipient: string; at: string }[] };
+type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null; uncertain?: { recipient: string; period: string; at: string }[] | null; uncertainMore?: number; uncertainDays?: number };
 type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
@@ -52,7 +52,7 @@ export default function SeoReportsPage() {
   const send = useMutation({
     mutationFn: () => api("POST", `${key}/send`, { recipients: list }),
     onSuccess: (x: { sent: number; failed?: number; empty: boolean; optedOut?: string[]; uncertain?: string[] }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" }
-      : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : "", x.uncertain?.length ? `An earlier send to ${x.uncertain.join(", ")} was cut off and may have arrived, so it was not sent again.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
+      : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : "", x.uncertain?.length ? `A send to ${x.uncertain.join(", ")} broke off and may have arrived, so it was not sent again automatically.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't send the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const invalid = !list.length || tooMany || bad.length > 0;
@@ -144,7 +144,8 @@ export default function SeoReportsPage() {
             {(bad.length > 0 || tooMany) && <p className="mt-1 text-[12px]" style={{ color: "var(--g-red)" }} role="alert">{tooMany ? "Up to 5 addresses." : `Not an email address: ${bad.slice(0, 2).join(", ")}`}</p>}
             <p className="g-text-2 mt-2 text-[12px]">Every email says you asked for it and has a link the recipient can use to stop them.</p>
             {(d.optedOut?.length ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-optouts">Asked not to get your reports (they are skipped): {d.optedOut!.join(", ")}</p>}
-            {(d.schedule.uncertain?.length ?? 0) > 0 && <p className="mt-2 text-[12px]" role="note" data-testid="text-report-uncertain">Not known whether these arrived — the send was cut off after it may have gone, so it was not repeated (nobody gets a report twice): {d.schedule.uncertain!.map((u) => `${u.recipient} (${fmtDate(u.at)})`).join(", ")}.</p>}
+            {d.schedule.uncertain === null && <p className="g-text-2 mt-2 text-[12px]" role="note" data-testid="text-report-uncertain-unread">Couldn't check just now whether any report email is in doubt.</p>}
+            {(d.schedule.uncertain?.length ?? 0) > 0 && <p className="mt-2 text-[12px]" role="note" data-testid="text-report-uncertain">Not known whether these arrived — the send broke off and may have gone through, so it was not sent again automatically (the last {d.schedule.uncertainDays ?? 60} days): {d.schedule.uncertain!.map((u) => `${u.period} to ${u.recipient} (${fmtDate(u.at)})`).join("; ")}{d.schedule.uncertainMore ? `; and ${d.schedule.uncertainMore} more` : ""}.</p>}
             {d.schedule.frequency !== "off" && <p className="g-text-2 mt-2 text-[12px]" data-testid="text-report-next">Next report {fmtDate(d.schedule.nextSendAt)}{d.schedule.lastSentAt ? ` · last sent ${fmtDate(d.schedule.lastSentAt)}` : ""}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button type="submit" disabled={save.isPending || (frequency !== "off" && invalid)} data-testid="button-report-save">{save.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden />}{save.isPending ? "Saving…" : "Save schedule"}</Button>

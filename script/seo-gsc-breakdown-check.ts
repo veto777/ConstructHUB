@@ -51,6 +51,12 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'done')", [conn.id, asset.id, JSON.stringify({ ...range, offset: 0 })]);
   const redone = (await gscBreakdown(1, site, "page"))!;
   ok(!redone.incomplete && redone.comparable, "a later finished full read of the same days replaces it");
+  // An earlier read's next page still waiting, and a newer full read finished after it (its own next page could not
+  // be queued while the old one waits): still incomplete.
+  await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'queued')", [conn.id, asset.id, JSON.stringify({ ...range, offset: 50000 })]);
+  await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'done')", [conn.id, asset.id, JSON.stringify({ ...range, offset: 0 })]);
+  ok((await gscBreakdown(1, site, "page"))!.incomplete, "a waiting page of an earlier read is not hidden by a newer first page");
+  await pool.query("UPDATE edge_jobs SET state='done' WHERE state='queued' AND payload->>'dimension'='page'");
   await pool.query("DELETE FROM edge_connections WHERE id=$1", [conn.id]); await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`gsc breakdown checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });
