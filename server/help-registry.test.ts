@@ -299,9 +299,18 @@ describe("tutorial step scripts", () => {
       expect(f).toBe(`${script.helpKey}.json`);
       expect(helpEntry(script.helpKey), script.helpKey).toBeTruthy();
       expect(VOICE_PERSONA_IDS).toContain(script.narrator);
-      // A script never carries a real credential: typed secrets are {{PLACEHOLDERS}} filled at record time, and blurred.
-      for (const s of script.steps.filter((x) => x.action === "type" && /key|token|password|email/i.test(x.selector ?? "")))
-        { expect(s.value, f).toMatch(/^\{\{[A-Z_]+\}\}$/); expect(s.redact, f).toBe(true); }
+      // A script never carries a real credential: a typed secret is a {{PLACEHOLDER}} filled at record time, and blurred.
+      // What is not a secret may be typed as it is: the NAME given to a key ("Reporting script"), a search box,
+      // and a demo address at example.com (the only email domain a script may show).
+      for (const s of script.steps.filter((x) => x.action === "type")) {
+        const sel = s.selector ?? "", value = s.value ?? "";
+        const placeholder = /^\{\{[A-Z_]+\}\}$/.test(value);
+        const secretField = /key|token|password|secret/i.test(sel) && !/name|label|search/i.test(sel);
+        const emailField = /email/i.test(sel);
+        if (secretField || (emailField && !/^[a-z0-9._+-]+@example\.com$/i.test(value)))
+          { expect(placeholder, `${f}: ${sel} takes a secret — type a {{PLACEHOLDER}}`).toBe(true); expect(s.redact, f).toBe(true); }
+        if (placeholder && !/^\{\{DATE/.test(value)) expect(s.redact, `${f}: a placeholder value is blurred`).toBe(true);
+      }
     }
   });
 
