@@ -1,0 +1,122 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pipeline-move",
+  "title": "Move a job to the next stage",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "The Pipeline",
+      "chapter": "Use the stage menu",
+      "narration": "When a job moves forward, move its card. Here's how, on the Pipeline in the ConstructHUB CRM."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ferrante\")",
+      "caption": "A lead",
+      "narration": "This flooring job is still a lead. Let's say you've started pricing it."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ferrante\") [data-testid^=\"select-stage-\"]",
+      "value": "Estimating",
+      "caption": "Choose Estimating",
+      "narration": "Open the menu at the bottom of the card, and choose Estimating."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ferrante\")",
+      "caption": "Moved to Estimating",
+      "narration": "The card moves to the Estimating column straight away."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=drag a card to move it",
+      "caption": "Or drag the card",
+      "narration": "You can also drag a card from one column and drop it on another."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Wrenhaven\") [data-testid^=\"button-edit-project-\"]",
+      "caption": "The pencil",
+      "chapter": "Change stage, owner and value together",
+      "narration": "To change more than the stage, click the pencil on a card."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-edit-stage\"]",
+      "value": "Proposal Sent",
+      "caption": "Stage",
+      "narration": "Set the stage. This proposal has gone out, so choose Proposal Sent."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-edit-owner\"]",
+      "value": "Rita Santos",
+      "caption": "Owner",
+      "narration": "Pick who owns the job."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-value\"]",
+      "value": "7400",
+      "caption": "Contract value",
+      "narration": "And type the contract value."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-edit\"]",
+      "caption": "Save changes",
+      "narration": "Choose Save changes.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Wrenhaven\")",
+      "caption": "Under Proposal Sent",
+      "narration": "The job is now under Proposal Sent, and the card shows its value."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"stage-col-approved\"]",
+      "caption": "Approved moves by itself",
+      "chapter": "The stage that moves by itself",
+      "narration": "One move happens by itself. When a client approves an estimate, the job moves to Approved."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "You'll find the Pipeline in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to move a job to the next stage | ConstructHUB CRM",
+    "description": "A short walkthrough of moving jobs along the Pipeline in the ConstructHUB CRM. You will move a card with its stage menu, then use the pencil to change a job's stage, owner and contract value together.",
+    "tags": [
+      "sales pipeline",
+      "job stages",
+      "contractor CRM",
+      "construction CRM",
+      "job tracking",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Move jobs forward",
+    "accent": "forward",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

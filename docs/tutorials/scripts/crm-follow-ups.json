@@ -1,0 +1,123 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-follow-ups",
+  "title": "Work your follow-ups",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "caption": "Home",
+      "narration": "Needs attention, on Home in the ConstructHUB CRM, is your list of people to get back to.",
+      "url": "/crm",
+      "chapter": "Needs attention"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-new-leads\"]",
+      "caption": "New leads",
+      "narration": "New leads are the jobs that came in over the last two weeks."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-needs-estimate\"]",
+      "caption": "Needs an estimate",
+      "narration": "Needs an estimate lists the leads that don't have an estimate yet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-manage-follow-ups\"]",
+      "caption": "Follow-ups",
+      "narration": "For clients you want to keep in touch with, choose Follow-ups.",
+      "chapter": "Set a follow-up rhythm",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"select-add-follow-up-search\"]",
+      "caption": "Find the client",
+      "narration": "Search for the client.",
+      "value": "Halvorsen"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"select-add-follow-up-option-\"]:has-text(\"Halvorsen-Quist\")",
+      "caption": "Add them",
+      "narration": "Click their name, and they start on a weekly rhythm.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"followup-row-\"]:has-text(\"Halvorsen-Quist\")",
+      "caption": "Next due",
+      "narration": "The row shows when the next follow-up is due."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"select-add-follow-up-search\"]",
+      "caption": "Another client",
+      "narration": "Let's add one more.",
+      "value": "Orozco"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"select-add-follow-up-option-\"]:has-text(\"Luis Orozco\")",
+      "caption": "Add them",
+      "narration": "Luis Orozco.",
+      "holdMs": 700
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid^=\"followup-row-\"]:has-text(\"Luis Orozco\") [data-testid^=\"select-cadence-\"]",
+      "caption": "Biweekly",
+      "narration": "Change the rhythm to Biweekly, or choose Off to stop it.",
+      "value": "Biweekly"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"dialog-follow-ups\"] p",
+      "caption": "When it comes due",
+      "narration": "When a follow-up comes due, the client lands in Needs attention.",
+      "chapter": "When a follow-up is due"
+    },
+    {
+      "action": "press",
+      "caption": "Close",
+      "narration": "Call them, then choose Done beside their name, and the count starts again.",
+      "value": "Escape"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "caption": "Menu: Home",
+      "narration": "You'll find Needs attention on Home, at the top of the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to work your follow-ups | ConstructHUB CRM",
+    "description": "A short walkthrough of Needs attention on Home in the ConstructHUB CRM. You will see your new leads and the leads that still need an estimate, and put clients on a weekly or biweekly follow-up rhythm.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "lead follow up",
+      "sales follow up",
+      "contractor leads"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Work your follow-ups",
+    "accent": "follow-ups",
+    "step": 6,
+    "kicker": "CRM Tutorial"
+  }
+}

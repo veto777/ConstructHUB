@@ -1,0 +1,107 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-export",
+  "title": "Export your client list",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Export your clients",
+      "narration": "You can take your whole client list out of the ConstructHUB CRM as a spreadsheet file."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-export-clients\"]",
+      "caption": "Export CSV",
+      "narration": "On Clients, the button is Export CSV."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-export-clients\"]",
+      "caption": "Download the file",
+      "holdMs": 900,
+      "narration": "Click it, and your browser saves the file. The page stays where it is."
+    },
+    {
+      "action": "highlight",
+      "selector": "th:has-text(\"Client\")",
+      "caption": "One row per client",
+      "chapter": "What is in the file",
+      "narration": "The file has one row for every client, sorted by name."
+    },
+    {
+      "action": "highlight",
+      "selector": "th:has-text(\"Contact\")",
+      "caption": "Email and phone",
+      "narration": "Each row has the client's email and phone,"
+    },
+    {
+      "action": "highlight",
+      "selector": "th:has-text(\"Address\")",
+      "caption": "Address",
+      "narration": "their address, city, state and ZIP,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-\"] td:first-child",
+      "caption": "Notes and date added",
+      "narration": "plus your intake notes, and the date the client was added."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-won\"]",
+      "caption": "Tabs do not change the export",
+      "chapter": "The whole list, every time",
+      "holdMs": 700,
+      "narration": "Export doesn't follow the tab you're on, or what you've searched for."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-export-clients\"]",
+      "caption": "Always the whole list",
+      "narration": "Even with Job Won showing, Export CSV gives you every client."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-import-clients\"]",
+      "caption": "Import",
+      "narration": "Import, right beside it, is for bringing clients in from another system."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find Export CSV on Clients, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to export your client list | ConstructHUB CRM",
+    "description": "A short walkthrough of Export CSV in the ConstructHUB CRM. You will download your client list as a spreadsheet file, see what each row holds, and learn that the export is always the whole list.",
+    "tags": [
+      "export clients",
+      "client list CSV",
+      "contractor CRM",
+      "construction CRM",
+      "client management",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Export your clients",
+    "accent": "Export",
+    "kicker": "CRM Tutorial",
+    "step": 1
+  }
+}

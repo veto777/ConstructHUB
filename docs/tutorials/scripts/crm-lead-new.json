@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-lead-new",
+  "title": "Add a lead",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "The Pipeline",
+      "chapter": "Add a lead",
+      "narration": "A lead is a job you haven't won yet. Here's how to add one in the ConstructHUB CRM."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-new-lead\"]",
+      "caption": "New lead",
+      "narration": "On the Pipeline, choose New lead.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-name\"]",
+      "value": "Delgado patio cover",
+      "caption": "Lead name",
+      "narration": "Give the lead a name that says who it is and what the job is."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"radio-lead-existing-customer\"]",
+      "caption": "Existing client",
+      "narration": "If this person is already a client, choose Existing client and search for them."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-customer-name\"]",
+      "value": "Elena Delgado",
+      "caption": "Client name",
+      "chapter": "Client and value",
+      "narration": "For someone new, type their name. The CRM adds them to your clients."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-value\"]",
+      "value": "9500",
+      "caption": "Estimated value",
+      "narration": "Estimated value is optional. Type a rough number if you have one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create-lead\"]",
+      "caption": "Add to pipeline",
+      "narration": "Then choose Add to pipeline.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Delgado patio cover\")",
+      "caption": "In the Lead column",
+      "chapter": "Where the lead shows up",
+      "narration": "The lead lands in the first stage, Lead, with its value."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "caption": "Home",
+      "narration": "It also shows on Home.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-new-leads\"]",
+      "caption": "New leads",
+      "narration": "Under Needs attention, it's listed with your new leads,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-needs-estimate\"]",
+      "caption": "Needs an estimate",
+      "narration": "and under Needs an estimate, until you write one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "You'll find New lead on the Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to add a lead | ConstructHUB CRM",
+    "description": "A short walkthrough of adding a lead in the ConstructHUB CRM. You will name the lead, choose a new or an existing client, add an estimated value, and see where the lead shows up on the Pipeline and on Home.",
+    "tags": [
+      "add a lead",
+      "contractor leads",
+      "sales pipeline",
+      "contractor CRM",
+      "construction CRM",
+      "lead tracking",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Add a lead",
+    "accent": "lead",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}
