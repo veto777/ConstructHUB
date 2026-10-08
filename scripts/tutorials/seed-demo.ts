@@ -24,7 +24,7 @@ import { spawnSync } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
-import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
+import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuid, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
 
 const raw = process.env.DATABASE_URL;
 if (!raw) throw new Error("DATABASE_URL is not set");
@@ -117,6 +117,26 @@ async function main() {
   await q(`update crm_orgs set timezone = 'America/New_York', email = 'office@aspireinteriors.example.com', license_number = 'DEMO-FL-1001' where id = $1`, [orgId]);
   for (const table of ["crm_members", "crm_divisions"])
     await q(`update ${table} set email = replace(email, '@aspireinteriors.co', '@aspireinteriors.example.com') where org_id = $1 and email like '%@aspireinteriors.co'`, [orgId]);
+  // ── Divisions: one per demo state, every address invented (batch D, 2026-10-08) ─────────────────
+  // The base seed's two divisions read like a real business ("2211 Meridian St, Bellingham, WA" as
+  // headquarters, "1847 Main Street, Sarasota"). The demo company works in Florida, New York and
+  // Texas, so: Florida — Sarasota is the headquarters; the Washington row BECOMES New York — Albany
+  // (same row, same id: nothing points at a division that is gone); Texas — Austin is added. Street
+  // lines are made up ("Demo …", with a suite) and were not checked against real ones; only the
+  // city / state / ZIP are real places. Licence numbers are DEMO-<state>-1001.
+  // NO SALES-TAX RATE is set on any division or on the company: the app's own starting state
+  // (PRODUCER-GUIDE.md "Sales tax"), and where crm-sales-tax begins.
+  const txDivision = demoUuid("demo-division-tx");
+  await q(`update crm_divisions set code = 'NY', name = 'Aspire Interiors — New York', email = 'ny@aspireinteriors.example.com', phone = '(518) 555-0142',
+             address_line1 = '77 Demo Larkspur St', address_line2 = 'Suite 5', city = 'Albany', state = 'NY', postal_code = '12210', license_state = 'NY', is_headquarters = false, updated_at = now()
+           where org_id = $1 and code = 'WA' and not exists (select 1 from crm_divisions where org_id = $1 and code = 'NY')`, [orgId]);
+  await q(`update crm_divisions set address_line1 = '410 Demo Harbor Way', address_line2 = 'Suite 2', is_headquarters = true, updated_at = now()
+           where org_id = $1 and code = 'FL' and (address_line1 = '1847 Main Street' or address_line2 is null)`, [orgId]);
+  await q(`insert into crm_divisions (id, org_id, name, code, email, phone, address_line1, address_line2, city, state, postal_code, license_number, license_state, is_headquarters)
+           values ($1, $2, 'Aspire Interiors — Texas', 'TX', 'tx@aspireinteriors.example.com', '(512) 555-0131', '1200 Demo Cedar Elm Blvd', 'Suite 140', 'Austin', 'TX', '78704', 'DEMO-TX-1001', 'TX', false)
+           on conflict (id) do nothing`, [txDivision, orgId]);
+  // The company's own address was the same street line: the same invented one as its Florida division.
+  await q(`update crm_orgs set address_line1 = '410 Demo Harbor Way', address_line2 = 'Suite 2' where id = $1 and address_line1 = '1847 Main Street'`, [orgId]);
   await q(`update crm_divisions set license_number = 'DEMO-' || code || '-1001' where org_id = $1`, [orgId]);
   await q(`update crm_members set title = 'Owner' where org_id = $1 and role = 'owner' and title is null`, [orgId]);
 
@@ -282,6 +302,10 @@ async function main() {
         p.pm ? member(p.pm) : null, p.sales ? member(p.sales) : null, ago(p.stageDays * 24 * 60), p.status === "complete" ? ago(p.stageDays * 24 * 60) : null, at]);
   }
   projects = await q(`select id, number from crm_projects where org_id = $1`, [orgId]);
+  // Each New York and Texas job runs under its state's division (the Florida jobs fall to the headquarters,
+  // which is the Florida division — one of them names it outright, as the base seed left it).
+  await q(`update crm_projects p set division_id = d.id from crm_divisions d
+            where p.org_id = $1 and d.org_id = $1 and d.code = p.state and p.state in ('NY', 'TX') and p.division_id is null and p.number = any($2::text[])`, [orgId, [...DEMO_PROJECT_NUMBERS]]);
   const projectOf = (doc: string, key: "estimate" | "invoice"): string | null => { const p = newProjects.find((x) => x[key] === doc); return p ? project(p.number) : null; };
   const emailOf = (name: string): string => newClients.find((c) => c.name === name)!.email;
 
