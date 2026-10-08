@@ -705,8 +705,16 @@ export default function CrmProjectPage() {
                 <p className="text-sm text-destructive">Couldn't load permit suggestions — refresh to try again.</p>
               )}
               {permits?.message && <p className="text-sm text-muted-foreground">{permits.message}</p>}
-              {permits?.jurisdiction && (
-                <p className="text-sm text-muted-foreground">Matched on <strong>{permits.jurisdiction}</strong></p>
+              {/* What was matched and on what basis (its own office / the issuer the routing source names / the
+                  county our records place it in). A county is never picked because it shares the city's name. */}
+              {permits?.jurisdiction && !permits.message && (
+                <p className="text-sm text-muted-foreground" data-testid="text-permit-match">
+                  <strong>{permits.jurisdiction}</strong>
+                  {permits.note ? <> — {permits.note}</> : null}
+                  {permits.basis === "routed" && permits.issuedBySource && (
+                    <> <a href={permits.issuedBySource} target="_blank" rel="noreferrer" className="underline">Source</a></>
+                  )}
+                </p>
               )}
               {permits?.portals?.map((p: any) => (
                 <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2">
@@ -723,12 +731,26 @@ export default function CrmProjectPage() {
                 </div>
               ))}
               {permits && !permits.portals?.length && !permits.message && (
-                <EmptyState
-                  compact
-                  icon={FileBadge}
-                  title="No official portal on file for this jurisdiction"
-                  description="We won't invent one — search manually."
-                />
+                <>
+                  <EmptyState
+                    compact
+                    icon={FileBadge}
+                    title="No official portal on file for this jurisdiction"
+                    description="We won't invent one, or borrow one from a place with a similar name — search manually."
+                  />
+                  {/* An honest web search, labelled as a search — never a portal link. */}
+                  {permits.jurisdiction && permits.basis !== "no-city" && (
+                    <div className="flex justify-center">
+                      <a
+                        href={`https://www.google.com/search?q=${encodeURIComponent(`${permits.jurisdiction} building permit office`)}`}
+                        target="_blank" rel="noreferrer" data-testid="link-permit-search-fallback"
+                        title="No official portal on record — search the web for this jurisdiction's permit office"
+                      >
+                        <Button size="sm" variant="outline">Find permit portal</Button>
+                      </a>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
