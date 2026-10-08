@@ -32,6 +32,7 @@ import {
 import { and, eq, isNull, desc, sql, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
+import { amountDueCents } from "@shared/estimate-totals";
 import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
@@ -491,9 +492,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be paid." });
     // Charge the SIGNED amount, same as the public deposit flow.
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay on this estimate." });
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
@@ -673,9 +672,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
     if (!(await requireDocSession(req, res, est.customerId))) return;
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     const rails = await onlinePaymentRails(org, amount ?? 0);
     res.json({ financing: getPrimaryFinancing(org), cardAvailable: rails.card, achAvailable: rails.ach });
   });
@@ -797,9 +794,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     // Pay-in-full must charge the SIGNED amount: an approval with selected
     // optional discounts persists the recomputed approvedTotalCents, and the
     // contract PDF + notifications all show it — the charge must match.
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay." });
 
     // Double-pay guard: the deposit must not be collectable twice.

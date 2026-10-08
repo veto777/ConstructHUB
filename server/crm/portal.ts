@@ -44,6 +44,7 @@ import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
+import { lineBases } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
@@ -251,13 +252,8 @@ function publicEstimateView(
   // count (they affect the total); only the item ROWS are dropped below.
   // Exposed so the client page can preview optional discounts live with the
   // same math the server applies on approve (server/crm/discounts.ts).
-  let taxable = 0, lineDiscount = 0;
-  for (const i of items) {
-    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
-    if (i.kind === "discount") { lineDiscount += Math.abs(line); continue; }
-    if (i.taxable) taxable += line;
-  }
-  const taxableBaseCents = Math.max(0, taxable - lineDiscount);
+  const bases = lineBases(items);
+  const taxableBaseCents = Math.max(0, bases.taxableCents - bases.lineDiscountCents);
   return {
     estimate: {
       id: est.id, number: est.number, title: est.title, status: est.status,
@@ -680,21 +676,25 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         // scope ALWAYS shows its price — the client is choosing between
         // priced scopes and the running total is the point; showTotal only
         // governs the legacy display tiers (no items) below.
+        // The bases come from the SAME function the regenerated estimate is
+        // totalled with (shared/estimate-totals.ts), over the same item
+        // defaults select-options applies when it copies the scope.
         const scopeItems = Array.isArray(o.items) ? (o.items as any[]) : [];
-        let subtotal = 0, taxable = 0;
-        for (const i of scopeItems) {
-          const line = Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 1000)) / 1000);
-          subtotal += line;
-          if (i.taxable !== false) taxable += line;
-        }
+        const bases = lineBases(scopeItems.map((i) => ({
+          kind: typeof i.kind === "string" ? i.kind : "labor",
+          unitPriceCents: i.unitPriceCents ?? 0,
+          quantityMilli: i.quantityMilli ?? 1000,
+          taxable: i.taxable !== false,
+        })));
         return {
           id: o.id, name: o.name, tier: o.tier, description: o.description,
           recommended: o.recommended,
           totalCents: o.showTotal ? o.totalCents : undefined,
           selectedAt: o.selectedAt,
           selectable: scopeItems.length > 0,
-          subtotalCents: scopeItems.length ? subtotal : undefined,
-          taxableCents: scopeItems.length ? taxable : undefined,
+          subtotalCents: scopeItems.length ? bases.subtotalCents : undefined,
+          lineDiscountCents: scopeItems.length ? bases.lineDiscountCents : undefined,
+          taxableCents: scopeItems.length ? bases.taxableCents : undefined,
         };
       }),
       // A selection-generated estimate pre-ticks the discounts the client
