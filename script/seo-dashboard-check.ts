@@ -48,9 +48,14 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await pool.query("UPDATE sitescan_jobs SET state='{\"pages\":[]}' WHERE id::text=$1", [ids[ids.length - 2]]);
   const g = (await auditHealthByDomain(1, ["a.dash.example"])).get("a.dash.example")!;
   ok(g.trend[g.trend.length - 2].health === null && g.trend.length === HEALTH_TREND && g.health !== null, "a crawl with no score stays in the trend as a gap (worked out again: it changed)");
-  await pool.query("UPDATE sitescan_jobs SET report='{\"findings\":{\"bad\":1},\"errors\":5}'::jsonb WHERE id::text=$1", [g.jobId]);
+  // A page's status changed in the saved crawl (report untouched): worked out again.
+  await pool.query(`UPDATE sitescan_jobs SET state=jsonb_set(state, '{pages,9,status}', '500') WHERE id::text=$1`, [g.jobId]);
+  const s2 = (await auditHealthByDomain(1, ["a.dash.example"])).get("a.dash.example")!;
+  ok(s2.errorPages === (g.errorPages ?? 0) + 1, `a changed page status is seen: ${g.errorPages} -> ${s2.errorPages}`);
+  // The newest crawl's saved report broken: it stays the current crawl, "could not be read" — never an older score.
+  await pool.query("UPDATE sitescan_jobs SET report='\"oops\"'::jsonb WHERE id::text=$1", [g.jobId]);
   const u = (await auditHealthByDomain(1, ["a.dash.example"])).get("a.dash.example")!;
-  ok(u.jobId === g.jobId && (u.readable === false || u.health !== null), `the newest crawl stays the current one even when odd: ${JSON.stringify({ readable: u.readable, health: u.health })}`);
+  ok(u.jobId === g.jobId && u.readable === false && u.health === null, `a broken newest crawl is said, not replaced: ${JSON.stringify({ readable: u.readable, health: u.health })}`);
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://a.dash.example%'");
   await pool.query("DELETE FROM seo_sites WHERE domain LIKE '%.dash.example'");
   console.log(`dashboard checks passed: ${n}`); await pool.end();

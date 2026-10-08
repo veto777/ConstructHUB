@@ -8,10 +8,10 @@ import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
 
-type Row = { tag: string | null; keywords: number; checked: number; ranked: number; top3: number; top10: number; averagePosition: number | null; visibility: number | null; compared: number; visibilityChange: number | null; top10Change: number | null; positionNow: number | null; positionBefore: number | null; rankedBoth: number; newSince: number };
+type Row = { tag: string | null; keywords: number; checked: number; ranked: number; top3: number; top10: number; averagePosition: number | null; visibility: number | null; compared: number; weighted: boolean; visibilityChange: number | null; top10Change: number | null; positionNow: number | null; positionBefore: number | null; rankedBoth: number; newSince: number };
 type Span = { from: string; to: string; keywords: number };
 const spanWords = (x: Span) => (x.from === x.to ? fmtDate(x.from) : `${fmtDate(x.from)} to ${fmtDate(x.to)}`);
-type Data = { device: "desktop" | "mobile"; devices: ("desktop" | "mobile")[]; now: Span | null; before: Span | null; all: Row; rows: Row[] };
+type Data = { device: "desktop" | "mobile"; devices: ("desktop" | "mobile")[]; deviceFallback?: boolean; now: Span | null; before: Span | null; all: Row; rows: Row[] };
 /** A cell's label for screen readers (the phone layout hides the table header). */
 const Label = ({ children }: { children: string }) => <span className="sr-only">{children}: </span>;
 /** A change: up is good for visibility and the top 10. */
@@ -41,18 +41,18 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
         )}
       </div>
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-tags-basis">
-        {d.now ? <>Each keyword's newest check on {d.device} ({spanWords(d.now)}){d.before ? ` against its own check before (${spanWords(d.before)})` : " — none has a check before it to compare with"}. Changes count only keywords with both; a keyword checked once is counted apart as new, never as a gain. A keyword can carry more than one tag, so the tags add up to more than all keywords. Visibility is our estimate of the share of the clicks available.</> : "No check of these keywords on this device yet."}
+        {d.deviceFallback ? "This site does not track that device. " : ""}{d.now ? <>Each keyword's newest saved day on {d.device} ({spanWords(d.now)}){d.before ? ` against its own saved day before (${spanWords(d.before)})` : " — none has a day before it to compare with"} (a later check on the same day replaces the earlier one). Changes count only keywords with both — the figure under each change says how many; a keyword checked once is counted apart as new, never as a gain. A keyword can carry more than one tag, so the tags add up to more than all keywords. Visibility is an index, not a share of real clicks: 100 would mean every keyword first; weighted by search volume where every keyword has one, otherwise each keyword counts once.</> : "No check of these keywords on this device yet."}
       </p>
       {d.now && (
         <div className="overflow-x-auto">
           <table className="g-table w-full" data-testid="table-rank-tags">
-            <thead><tr><th>Tag</th><th className="num">Keywords</th><th className="num">Visibility</th><th className="num">In the top 10</th><th className="num">Avg. position</th><th className="num">New since</th></tr></thead>
+            <thead><tr><th>Tag</th><th className="num">Keywords</th><th className="num">Visibility index</th><th className="num">In the top 10</th><th className="num">Avg. position</th><th className="num">New since</th></tr></thead>
             <tbody>
               {list.map((r) => (
                 <tr key={r.tag ?? "\u0000none"} data-testid={`row-tag-${r.tag === "" ? "all" : r.tag ?? "none"}`} className={r.tag === "" ? "font-medium" : undefined}>
                   <td className="max-w-[16rem] !whitespace-normal [overflow-wrap:anywhere]" data-label="Tag"><Label>Tag</Label>{r.tag === "" ? "All keywords" : r.tag === null ? <span className="g-text-2">No tag</span> : r.tag}</td>
                   <td className="num" data-label="Keywords"><Label>Keywords</Label>{fmtNum(r.keywords)}{r.checked < r.keywords && <span className="g-text-2 block text-[11px]">{fmtNum(r.checked)} checked</span>}</td>
-                  <td className="num" data-label="Visibility"><Label>Visibility</Label>{r.visibility === null ? "—" : `${r.visibility}%`}<Move v={r.visibilityChange} unit=" pts" /></td>
+                  <td className="num" data-label="Visibility index"><Label>Visibility index</Label>{r.visibility === null ? "—" : r.visibility}<Move v={r.visibilityChange} />{r.visibility !== null && <span className="g-text-2 block text-[11px]">{r.weighted ? "by search volume" : "each keyword once"}{r.visibilityChange !== null ? ` · change on ${fmtNum(r.compared)}` : ""}</span>}</td>
                   <td className="num" data-label="In the top 10"><Label>In the top 10</Label>{fmtNum(r.top10)}<Move v={r.top10Change} />{r.top3 > 0 && <span className="g-text-2 block text-[11px]">{fmtNum(r.top3)} in the top 3</span>}</td>
                   <td className="num" data-label="Avg. position"><Label>Average position</Label>{r.averagePosition ?? "—"}{r.positionNow !== null && r.positionBefore !== null && <span className="g-text-2 block text-[11px]">{r.rankedBoth} ranked both times: {r.positionBefore} → {r.positionNow}</span>}</td>
                   <td className="num" data-label="New since"><Label>New since</Label>{d.before ? fmtNum(r.newSince) : "—"}</td>

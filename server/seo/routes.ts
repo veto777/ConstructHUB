@@ -1459,8 +1459,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Rank tracker by tag: each tag's keywords on the newest check against the one before, one device. Saved checks only.
   route("get", "/api/seo/sites/:id/rank-tags", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    const device = req.query.device === "desktop" || req.query.device === "mobile" ? req.query.device : null;
-    res.json(await rankTags(site, device));
+    const d = req.query.device;
+    if (d !== undefined && d !== "" && d !== "desktop" && d !== "mobile") return void res.status(400).json({ message: "Choose desktop or mobile." });
+    res.json(await rankTags(site, d === "desktop" || d === "mobile" ? d : null));
   });
 
   // ── Keyword watch: a monthly snapshot of what the site ranks for, compared with the one before ──

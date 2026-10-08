@@ -16,7 +16,7 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, us
 type Mover = { keyword: string; location: string | null; device: string; from: number | null; to: number | null };
 type Report = {
   domain: string; generatedAt: string; comparedWith: string | null;
-  rankings: { tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
+  rankings: { byTag?: { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number }[]; moreTags?: number; tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[] } | null;
   search: { fetchedAt: string } | null;
   searchConsole?: { clicks: number } | null;
@@ -98,6 +98,21 @@ export default function SeoReportsPage() {
                   <div className="overflow-x-auto"><table className="g-table mt-2"><thead><tr><th>Keyword</th><th className="num">Position</th><th className="num">Was</th><th className="num">Map pack</th><th className="num">Searches / mo</th></tr></thead>
                     <tbody>{r.rankings.keywords.map((k, i) => <tr key={i}><td>{k.keyword}{k.location && <span className="g-text-2 text-[12px]"> · {k.location}</span>}</td><td className="num">{k.position ?? "not ranked"}</td><td className="num g-text-2">{k.previous ?? "—"}</td><td className="num">{k.local != null ? `#${k.local}` : "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody></table></div>
                 </details>
+                {(r.rankings.byTag?.length ?? 0) > 0 && (
+                  <div className="mt-3 overflow-x-auto" data-testid="report-by-tag">
+                    <h3 className="g-text mb-1 text-[14px] font-medium">By tag</h3>
+                    <table className="g-table w-full text-[13px]"><thead><tr><th>Tag</th><th className="num">Keywords</th><th className="num">In the top 10</th><th className="num">Visibility index</th></tr></thead>
+                      <tbody>{r.rankings.byTag!.map((t) => (
+                        <tr key={t.tag}>
+                          <td className="!whitespace-normal [overflow-wrap:anywhere]" data-label="Tag"><span className="sr-only">Tag: </span>{t.tag}</td>
+                          <td className="num" data-label="Keywords"><span className="sr-only">Keywords: </span>{fmtNum(t.keywords)}</td>
+                          <td className="num" data-label="In the top 10"><span className="sr-only">In the top 10: </span>{fmtNum(t.top10)}{t.top10Change ? <span className={`g-move ${t.top10Change > 0 ? "g-move--up" : "g-move--down"} ml-1`}>{t.top10Change > 0 ? "+" : "−"}{Math.abs(t.top10Change)}</span> : null}</td>
+                          <td className="num" data-label="Visibility index"><span className="sr-only">Visibility index: </span>{t.visibility === null ? "—" : t.visibility}{t.visibilityChange ? <span className={`g-move ${t.visibilityChange > 0 ? "g-move--up" : "g-move--down"} ml-1`}>{t.visibilityChange > 0 ? "+" : "−"}{Math.abs(t.visibilityChange)}</span> : null}</td>
+                        </tr>))}</tbody></table>
+                    {(r.rankings.moreTags ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]">…and {r.rankings.moreTags} more tags.</p>}
+                    <p className="g-text-2 mt-1 text-[12px]">{r.comparedWith ? `Changes count only the keywords in both checks (${fmtDate(r.rankings.checkedOn)} and ${fmtDate(r.comparedWith)}); ` : ""}a keyword can carry several tags. The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).</p>
+                  </div>
+                )}
               </section>
             )}
             {r.audit && r.audit.topIssues.length > 0 && (

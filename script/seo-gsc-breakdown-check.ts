@@ -25,6 +25,12 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
     if (d >= 31) await ins("page", d, "https://gscb.example/old", 1);
     await ins("query", d, "Roof Repair", 1);
   }
+  // Older rows with no record of how they were read prove nothing: not comparable, "not known".
+  const legacy = (await gscBreakdown(1, site, "page"))!;
+  ok(legacy.completenessUnknown === true && !legacy.comparable, "rows with no record of a finished read: completeness not known");
+  // Finished full reads covering every day (as the sync records them), for both reports.
+  for (const dim of ["page", "query", "date"]) for (const [from, to] of [[70, 43], [42, 15], [14, 0]]) await pool.query("INSERT INTO edge_jobs(user_id, connection_id, asset_id, kind, payload, state) VALUES(1,$1,$2,'analytics',$3,'done')",
+    [conn.id, asset.id, JSON.stringify({ dimension: dim, start: new Date(Date.now() - from * 864e5).toISOString().slice(0, 10), end: new Date(Date.now() - to * 864e5).toISOString().slice(0, 10), offset: 0 })]);
   const p = (await gscBreakdown(1, site, "page"))!;
   ok(p.days === 28 && p.previousDays === 28 && p.comparable, `two full windows (${p.days}/${p.previousDays})`);
   const a = p.rows.find((r) => r.key.endsWith("/a"))!, old = p.rows.find((r) => r.key.endsWith("/old"))!;

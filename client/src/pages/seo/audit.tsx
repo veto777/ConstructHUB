@@ -98,7 +98,7 @@ export default function SeoAuditPage() {
   const choose = (c: { at: string | null; vs: string | null }) => site && setPick((m) => ({ ...m, [site.id]: c }));
   const q = useQuery<AuditData>({
     queryKey: [key, at, vs], enabled: !!site,
-    queryFn: async () => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+    queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -165,7 +165,7 @@ export default function SeoAuditPage() {
       {site && d && !a && <div className="mt-6" data-testid="audit-rendering-alone"><RenderCheck site={site} /></div>}
       {/* Said whatever else is on the page, even with one crawl or none left. */}
       {site && d?.atMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-at-missing">That crawl is no longer available, so {a ? "the newest crawl is shown" : "there is no crawl to show"}.</p>}
-      {site && d?.vsMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-vs-missing">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown){a ? ", so the crawl before it is used" : ""}.</p>}
+      {site && d?.vsMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-vs-missing">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown){a?.comparedWith ? ", so the crawl before it is used" : a ? ", and there is no earlier crawl to compare with" : ""}.</p>}
       {site && a && (
         <>
           <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">

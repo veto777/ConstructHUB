@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { rankTags } from "../server/seo/rank-tags";
+import { buildSiteReport } from "../server/seo/site-report";
 let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else { n++; console.log("PASS ", m); } };
 (async () => {
   await ensureSeoSchema();
@@ -30,6 +31,10 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   ok(siding.top10Change === -1 && siding.ranked === 0, "siding dropped out of the top 10");
   const m = await rankTags(site, "mobile");
   ok(m.device === "mobile" && m.now?.keywords === 1 && m.before === null && m.rows.find((r) => r.tag === "roofing")!.visibilityChange === null, "mobile: one old check, so no changes are claimed");
+  const rep = await buildSiteReport(1, site.id);
+  const bt = rep?.rankings?.byTag ?? [];
+  ok(bt.map((t) => t.tag).join() === "roofing,siding" && bt[0].keywords === 2, `the client report carries the tags: ${JSON.stringify(bt)}`);
+  ok((await buildSiteReport(2, site.id)) === null, "another account gets no report of the site");
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`rank tags checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

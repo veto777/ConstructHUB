@@ -33,6 +33,14 @@ describe("rankingsSection", () => {
     expect(first.section).toMatchObject({ previousTop10: null, improved: [], declined: [] });
     expect(rankingsSection([], "desktop")).toBeNull();
   });
+  it("by tag: the same two checks, each tag on its own; none when no keyword has a tag", () => {
+    expect(out.section.byTag).toBeUndefined();
+    const tagged = checks.map((c) => ({ ...c, tags: c.keywordId === 4 ? ["windows", "tampa"] : c.keywordId === 3 ? ["roofing"] : c.keywordId === 1 ? ["roofing"] : [] }));
+    const t = rankingsSection(tagged, "desktop", 30, today)!.section.byTag!;
+    expect(t.map((x) => [x.tag, x.keywords, x.top10, x.top10Change, x.compared, x.newSince])).toEqual([
+      ["roofing", 2, 1, -1, 2, 0], ["tampa", 1, 1, null, 0, 1], ["windows", 1, 1, null, 0, 1],
+    ]);
+  });
 });
 
 const report = (over: Partial<SiteReport> = {}): SiteReport => ({

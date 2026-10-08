@@ -279,12 +279,14 @@ export type SiteHealth = HealthPoint & { trend: HealthPoint[] };
 export async function auditHealthByDomain(user: number, domains: string[]): Promise<Map<string, SiteHealth>> {
   const out = new Map<string, SiteHealth>();
   if (!domains.length) return out;
-  // The newest crawls of each site, without their pages: identity, date, page limit and a fingerprint of what was saved.
+  // The newest finished crawls of each site — identity only, whatever was saved in them (a crawl whose saved result is
+  // broken is still the newest, "could not be read"). The row's version (xmin, changed by any update of the row) is the
+  // fingerprint: a crawl changed in any way afterwards is worked out again, and nothing of its payload is read here.
   const { rows: jobs } = await pool.query(
     `SELECT id::text AS id, host, completed_at, page_cap, fp FROM (
-       SELECT id, ${HOST_SQL} AS host, completed_at, page_cap, md5(report::text || ':' || ${CRAWLED_SQL}::text) AS fp,
+       SELECT id, ${HOST_SQL} AS host, completed_at, page_cap, xmin::text AS fp,
               row_number() OVER (PARTITION BY ${HOST_SQL} ORDER BY completed_at DESC, id) AS n
-         FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j
+         FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND ${HOST_SQL} = ANY($2)) j
       WHERE n <= ${HEALTH_TREND} ORDER BY host, completed_at DESC, id`, [user, domains.map(bare)]);
   if (!jobs.length) return out;
   // Worked out once per crawl: read the saved figures; work out (and save) only the crawls that have none, or changed.
@@ -292,12 +294,21 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   const known = new Map(saved.map((r: any) => [r.job_id, r]));
   const missing = jobs.filter((j: any) => known.get(j.id)?.fingerprint !== j.fp);
   if (missing.length) {
-    const { rows } = await pool.query(`SELECT id::text AS id, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
+    const { rows } = await pool.query(
+      `SELECT id::text AS id, xmin::text AS fp, report, ${PAGES_SQL} AS pages,
+              (jsonb_typeof(report)='object' AND jsonb_typeof(state->'pages')='array'
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string')) AS well_formed
+         FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
     for (const r of rows) {
-      const fp = missing.find((j: any) => j.id === r.id)!.fp;
+      // The version read now (it may have changed since the list above; then it is worked out again next time).
+      const fp = r.fp;
       let row: any;
-      // One unreadable crawl must not take the whole dashboard down: it is "not readable", and said.
-      try { const c = healthCounts(r.report, r.pages); row = { job_id: r.id, fingerprint: fp, readable: true, health: healthScore(r.report, r.pages), error_pages: c.errorPages, crawled: c.pages }; }
+      // One unreadable crawl must not take the whole dashboard down: it is "not readable", and said. A saved result that
+      // is not what a finished crawl writes (no report, pages that are not pages) is not read as an empty crawl either.
+      try {
+        if (!r.well_formed) throw new Error("the saved crawl is not in the expected form");
+        const c = healthCounts(r.report, r.pages); row = { job_id: r.id, fingerprint: fp, readable: true, health: healthScore(r.report, r.pages), error_pages: c.errorPages, crawled: c.pages };
+      }
       catch (e: any) { console.warn(`[seo] crawl ${r.id} could not be read for its health: ${e?.message ?? e}`); row = { job_id: r.id, fingerprint: fp, readable: false, health: null, error_pages: null, crawled: null }; }
       known.set(r.id, row);
       await pool.query(

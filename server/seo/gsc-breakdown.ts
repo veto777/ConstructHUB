@@ -74,14 +74,20 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
   // "not known", never "complete" — so is a database with no record of reads at all.
   const jobsTable = await pool.query("SELECT to_regclass('edge_jobs') IS NOT NULL AS ok").then((r) => !!r.rows[0]?.ok, () => false);
   const inc = !jobsTable ? null : await pool.query(
-    `SELECT EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2
+    `SELECT
+       -- Positive evidence: every one of the 56 days was covered by a finished full read (its first page) of this report.
+       -- Rows synced with no record of how (older imports) prove nothing either way.
+       NOT EXISTS (SELECT 1 FROM generate_series(($4::text)::date + 1, ($3::text)::date, interval '1 day') g(day)
+          WHERE NOT EXISTS (SELECT 1 FROM edge_jobs k WHERE k.asset_id=$1 AND k.kind='analytics' AND k.payload->>'dimension'=$2 AND k.state='done'
+                  AND k.payload->>'offset'='0' AND k.payload->>'start' <= to_char(g.day, 'YYYY-MM-DD') AND k.payload->>'end' >= to_char(g.day, 'YYYY-MM-DD'))) AS covered,
+       EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2
         AND j.payload->>'end' > $4::text AND j.payload->>'start' <= $3::text
         AND (j.state IN ('queued','running')
           OR (j.state <> 'done' AND NOT EXISTS (SELECT 1 FROM edge_jobs k WHERE k.asset_id=j.asset_id AND k.kind='analytics' AND k.payload->>'dimension'=$2 AND k.state='done'
                 AND k.payload->>'start'=j.payload->>'start' AND k.payload->>'end'=j.payload->>'end' AND k.payload->>'offset'='0' AND k.id > j.id)))) AS v`,
     [asset.id, dimension, String(w.through), new Date(Date.parse(`${w.through}T00:00:00Z`) - 2 * GSC_WINDOW * 864e5).toISOString().slice(0, 10)]).then((r) => r.rows[0], () => null);
-  const incomplete = inc ? !!inc.v : true;
-  const unknown = !inc;
+  const incomplete = inc ? !!inc.v || !inc.covered : true;
+  const unknown = !inc || (!inc.v && !inc.covered);
   const agg = (fromOffset: number, toOffset: number) => pool.query(
     `SELECT key, sum(clicks)::float8 AS clicks, sum(impressions)::float8 AS impressions,
             CASE WHEN sum(impressions) > 0 THEN sum(position * impressions) / sum(impressions) END::float8 AS position

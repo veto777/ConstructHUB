@@ -9,6 +9,7 @@ import { gridReportLines, type GridReportLine } from "./grid-monitor";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
 import { pool } from "../db";
+import { tagOverview } from "./rank-tags";
 import { siteAudit } from "./audit";
 
 export const REPORT_SCHEDULE_DDL = [
@@ -68,6 +69,8 @@ export type SiteReport = {
     /** The ten biggest moves each way; the counts are of all of them. */
     improved: Mover[]; declined: Mover[]; improvedCount: number; declinedCount: number;
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[];
+    /** By tag, when the keywords carry tags (up to REPORT_TAGS, most keywords first); changes only on keywords in both checks. */
+    byTag?: ReportTag[]; moreTags?: number;
   } | null;
   search: { fetchedAt: string; authority: number | null; referringDomains: number | null; backlinks: number | null; organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null;
     trafficChange: number | null; keywordsChange: number | null; referringDomainsChange: number | null } | null;
@@ -119,7 +122,10 @@ export function workSection(rows: { title: string; status: string; done_at: stri
   };
 }
 
-type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean };
+type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean; tags?: string[] | null };
+/** One tag (a service, a town) in the report: the same comparison as the rankings (the latest check against the earlier one). */
+export type ReportTag = { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number };
+export const REPORT_TAGS = 20;
 
 const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
 const lastChange = (series: number[] | undefined) => (series && series.length > 1 ? Math.round(series[series.length - 1] - series[0]) : null);
@@ -142,6 +148,10 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
   const keywords = [...now.values()].map((c) => ({ keyword: c.keyword, location: c.location, position: c.position, previous: before.get(c.keywordId)?.position ?? null, local: c.local, volume: c.volume, had: before.has(c.keywordId) }));
   const moved = keywords.filter((k) => k.had && k.position !== k.previous).map((k) => ({ keyword: k.keyword, location: k.location, device: primaryDevice, from: k.previous, to: k.position, by: (k.previous ?? 101) - (k.position ?? 101) }));
   const strip = ({ by: _by, ...m }: (typeof moved)[number]): Mover => m;
+  // By tag: the keywords of the latest check, each tag on its own; the same two checks as everything above.
+  const kws = [...now.values()].map((c) => ({ id: c.keywordId, tags: Array.isArray(c.tags) ? c.tags.filter((t) => typeof t === "string" && t) : [], volume: c.volume }));
+  const tagged = kws.some((k) => k.tags.length) ? tagOverview(kws, new Map([...now].map(([id, c]) => [id, c.position])), earlier ? new Map([...before].map(([id, c]) => [id, c.position])) : null).rows.filter((t) => t.tag !== null) : [];
+  const byTag: ReportTag[] = tagged.sort((a, b) => b.keywords - a.keywords || String(a.tag).localeCompare(String(b.tag))).map((t) => ({ tag: t.tag as string, keywords: t.checked, top3: t.top3, top10: t.top10, top10Change: t.top10Change, visibility: t.visibility, visibilityChange: t.visibilityChange, compared: t.compared, newSince: t.newSince }));
   return {
     comparedWith: earlier,
     section: {
@@ -153,6 +163,7 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
       improved: moved.filter((m) => m.by > 0).sort((a, b) => b.by - a.by).slice(0, 10).map(strip),
       declined: moved.filter((m) => m.by < 0).sort((a, b) => a.by - b.by).slice(0, 10).map(strip),
       keywords: keywords.map(({ had: _had, ...k }) => k).sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || a.keyword.localeCompare(b.keyword)).slice(0, 50),
+      ...(byTag.length ? { byTag: byTag.slice(0, REPORT_TAGS), moreTags: Math.max(0, byTag.length - REPORT_TAGS) } : {}),
     },
   };
 }
@@ -173,7 +184,7 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
   const [{ rows: checks }, { rows: [saved] }, audit, gsc, { rows: alerts }] = await Promise.all([
     pool.query(
       `SELECT c.keyword_id AS "keywordId", k.keyword, NULLIF(k.location_name, 'United States') AS location, k.search_volume AS volume, c.device, c.checked_on::text AS "checkedOn",
-              c.position, c.local_position AS local, (jsonb_typeof(c.local_pack)='array' AND jsonb_array_length(c.local_pack)>0) AS "hasPack"
+              c.position, c.local_position AS local, (jsonb_typeof(c.local_pack)='array' AND jsonb_array_length(c.local_pack)>0) AS "hasPack", k.tags
          FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id WHERE c.site_id=$1 AND c.checked_on >= current_date - 120`, [site.id]),
     pool.query(`SELECT report FROM seo_domain_reports WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$4 ORDER BY created_at DESC LIMIT 1`, [userId, site.domain, site.location_code, site.language_code]),
     siteAudit(userId, site.domain).catch(() => null),
@@ -322,6 +333,15 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
+      if (k.byTag?.length) {
+        room(60); doc.moveDown(0.5).font("Helvetica-Bold").fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
+        const tcols = [0, width * 0.42, width * 0.58, width * 0.78];
+        const trow = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(c, 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+        trow(["Tag", "Keywords", "In the top 10", "Visibility index"], true);
+        for (const t of k.byTag) trow([pdfSafe(t.tag), n(t.keywords), `${n(t.top10)}${signed(t.top10Change)}`, t.visibility === null ? "—" : `${t.visibility}${t.visibilityChange ? ` (${t.visibilityChange > 0 ? "+" : "−"}${Math.abs(t.visibilityChange)})` : ""}`]);
+        if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
+        line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks; a keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).`, soft);
+      }
     }
     if (r.searchConsole) {
       const g = r.searchConsole;
