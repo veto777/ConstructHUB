@@ -25,6 +25,7 @@ import { and, desc, eq, isNull, inArray, or } from "drizzle-orm";
 import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
 import { logTeamActivity } from "./stats";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg } from "./divisions";
+import { objectPolicy } from "./object-access";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -62,10 +63,20 @@ async function followUpsForOrg(ctx: OrgContext): Promise<FollowUpRow[]> {
   let maps: Awaited<ReturnType<typeof divisionMapsForOrg>> | null = null;
   if (scope) maps = await divisionMapsForOrg(ctx.org.id);
 
+  // A seat without "See all jobs" is reminded only about clients on its own
+  // work (the client it owns, or one whose project/job it is assigned to) —
+  // the same object policy as the client list. Cadenced clients are few, so
+  // only those are checked.
+  const cadenced = rows.filter((c) => c.cadenceDays && c.cadenceDays >= 1);
+  const own = ctx.permissions.viewAllJobs
+    ? null
+    : new Set((await objectPolicy(ctx).filter("customers", cadenced)).map((c) => c.id));
+
   const now = Date.now();
   const out: FollowUpRow[] = [];
-  for (const c of rows) {
+  for (const c of cadenced) {
     if (!c.cadenceDays || c.cadenceDays < 1) continue;
+    if (own && !own.has(c.id)) continue;
     if (scope && maps && !divisionVisible(scope, maps.byCustomer.get(c.id) ?? null)) continue;
     const baseline = (c.lastFollowUpAt ?? c.createdAt ?? new Date(now)).getTime();
     const dueAt = baseline + c.cadenceDays * DAY;
@@ -119,9 +130,14 @@ export async function crmAttentionFor(ctx: OrgContext, { cap = 10, rowLimit = 20
     .orderBy(desc(crmProjects.createdAt))
     .limit(rowLimit);
 
+  // "Assigned" is the object policy's definition (project manager, sales rep,
+  // or on the crew of one of the project's jobs) — not the PM column alone.
   const scope = divisionScopeOf(ctx.member);
+  const own = ctx.permissions.viewAllJobs
+    ? null
+    : new Set((await objectPolicy(ctx).filter("projects", rows)).map((p) => p.id));
   const visible = rows.filter((p) =>
-    (ctx.permissions.viewAllJobs || p.pmId === ctx.member.id) &&
+    (!own || own.has(p.id)) &&
     (!scope || divisionVisible(scope, p.divisionId)));
 
   // An estimate "covers" a lead when it points at the project OR at the

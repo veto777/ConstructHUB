@@ -70,6 +70,19 @@ const FEED_EVENT_TYPES = ["sent", "viewed", "approved", "declined", "shared"] as
  * policy, so they total only the rows they can open.
  */
 export async function crmStatsFor(ctx: OrgContext) {
+  const full = await crmStatsNumbers(ctx);
+  // "See reporting" without "See prices" is a count-only view: how many open
+  // estimates, never what they add up to.
+  if (ctx.permissions.seePrices) return full;
+  const countOnly = (r: { count: number }) => ({ count: r.count, totalCents: undefined as number | undefined });
+  return {
+    openEstimates: countOnly(full.openEstimates), jobsWon: countOnly(full.jobsWon),
+    unscheduledJobs: countOnly(full.unscheduledJobs), openInvoices: countOnly(full.openInvoices),
+    openPipeline: countOnly(full.openPipeline), clients: full.clients,
+  };
+}
+
+async function crmStatsNumbers(ctx: OrgContext) {
   const orgId = ctx.org.id;
 
   // Reuse the object policy before aggregation, including assignment overrides.
@@ -257,6 +270,8 @@ export async function crmTeamActivityFor(ctx: OrgContext, limit: number): Promis
     .where(and(eq(crmPayments.orgId, orgId), eq(crmPayments.status, "succeeded")))
     .orderBy(desc(crmPayments.createdAt)).limit(limit);
   for (const p of pays) {
+    // "<client> paid $1,750.00" is an amount — not for a price-blind seat.
+    if (!ctx.permissions.seePrices) break;
     if (restricted && !await access.visible("payments", p.id)) continue;
     items.push({
       id: `p:${p.id}`,

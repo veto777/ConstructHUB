@@ -21,7 +21,8 @@ import {
 } from "@shared/schema";
 import { isThemeColorId } from "@shared/theme-colors";
 import { and, eq, desc, isNull, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, listOrgsForUser, getSeatUsage, seatLimitBody, withSeatLock, type SeatLock } from "./tenancy";
+import { requireOrg, requirePermission, grantExceedsOwn, listOrgsForUser, getSeatUsage, seatLimitBody, withSeatLock, type SeatLock } from "./tenancy";
+import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { registerCrmEntityRoutes } from "./entities";
 import { registerCrmPortalRoutes, registerCrmInvoicePortalRoutes } from "./portal";
 import { registerCrmPaymentRoutes } from "./payments";
@@ -811,6 +812,21 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (parsed.data.role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
       return res.status(403).json({ message: "Only an owner or admin can grant the pm role" });
     }
+    // A delegate who holds "Manage team" only through an override never makes
+    // a seat (their own included) more powerful than the one they hold.
+    if (parsed.data.role !== undefined || parsed.data.permissions !== undefined || parsed.data.status !== undefined) {
+      const lacking = grantExceedsOwn(
+        ctx, parsed.data.role ?? target.role,
+        parsed.data.permissions !== undefined ? parsed.data.permissions : target.permissions,
+      );
+      if (lacking) {
+        return res.status(403).json({
+          message: `You can only give out access you have yourself. This change includes “${CRM_PERMISSION_LABELS[lacking]}”, which your own seat doesn't have — ask an owner or admin.`,
+        });
+      }
+    }
+    // The cost rate is cost data: setting it needs "See costs and margins".
+    if (parsed.data.hourlyCostCents !== undefined && !requirePermission(res, ctx, "seeCosts")) return;
     // A division scope must point at one of the org's own divisions.
     if (parsed.data.divisionId) {
       const div = await getDivision(ctx.org.id, parsed.data.divisionId);
@@ -853,9 +869,21 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       }
     }
     if (Object.keys(parsed.data).length) {
+      // The audit line says WHAT access changed (role from → to, each switch
+      // turned on or off) — never just "permissions". Cost-rate amounts stay out.
+      const before = crmEffectivePermissions(target.role, target.permissions);
+      const after = crmEffectivePermissions(row.role, row.permissions);
+      const permissionChanges = CRM_PERMISSIONS
+        .filter((p) => before[p] !== after[p])
+        .map((p) => ({ key: p, on: after[p] }));
       logActivity(ctx, "member.updated", {
         entityType: "member", entityId: target.id,
-        meta: { fields: Object.keys(parsed.data), name: target.displayName || target.email },
+        meta: {
+          fields: Object.keys(parsed.data), name: target.displayName || target.email,
+          ...(row.role !== target.role ? { role: { from: target.role, to: row.role } } : {}),
+          ...(row.status !== target.status ? { status: { from: target.status, to: row.status } } : {}),
+          ...(permissionChanges.length ? { permissionChanges } : {}),
+        },
       });
     }
     res.json(presentMember(row, ctx.permissions.seeCosts));
@@ -877,6 +905,13 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     if (!target) return res.status(404).json({ message: "Member not found" });
     if (target.userId === ctx.org.ownerUserId) {
       return res.status(400).json({ message: "The owner cannot be removed. Transfer ownership first." });
+    }
+    // A delegate never removes a seat that holds more access than their own.
+    const above = grantExceedsOwn(ctx, target.role, target.permissions);
+    if (above) {
+      return res.status(403).json({
+        message: `This person has access your own seat doesn't (“${CRM_PERMISSION_LABELS[above]}”) — ask an owner or admin to remove them.`,
+      });
     }
 
     const [row] = await db
@@ -997,6 +1032,13 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
     }
     if (role === "pm" && ctx.member.role !== "owner" && ctx.member.role !== "admin") {
       return res.status(403).json({ message: "Only an owner or admin can invite a pm" });
+    }
+    // Same rule as editing a seat: a delegate invites nobody above themselves.
+    const lacking = grantExceedsOwn(ctx, role, permissions);
+    if (lacking) {
+      return res.status(403).json({
+        message: `You can only give out access you have yourself. This invitation includes “${CRM_PERMISSION_LABELS[lacking]}”, which your own seat doesn't have — ask an owner or admin.`,
+      });
     }
     if (divisionId) {
       const div = await getDivision(ctx.org.id, divisionId);

@@ -19,8 +19,9 @@ import {
   crmOrgs,
 } from "@shared/schema";
 import { and, eq, asc, desc, ilike, or, sql } from "drizzle-orm";
-import { requireOrg, requireOwnerRole, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requireOwnerRole, requirePermission, stripMoney, type OrgContext } from "./tenancy";
 import { logActivity } from "./activity";
+import { objectPolicy } from "./object-access";
 import {
   evalFormula, validateFormula, formulaSymbols, unknownSymbols, unknownSymbolMessage, FormulaError,
 } from "./formula";
@@ -29,14 +30,21 @@ import { priceFloorLockOf } from "./price-floor";
 type GetUser = (req: any, res: any) => any;
 
 /** Cost is privileged; price is not. Same rule as everywhere else. */
-const presentMaterial = (m: any, ctx: OrgContext) => ({
-  ...m, costCents: ctx.permissions.seeCosts ? m.costCents : undefined,
-  priceCents: ctx.permissions.seePrices ? m.priceCents : undefined,
-});
-const presentLabor = (l: any, ctx: OrgContext) => ({
-  ...l, hourlyCostCents: ctx.permissions.seeCosts ? l.hourlyCostCents : undefined,
-  hourlyPriceCents: ctx.permissions.seePrices ? l.hourlyPriceCents : undefined,
-});
+const presentMaterial = (m: any, ctx: OrgContext) =>
+  stripMoney(ctx, m, { price: ["priceCents"], cost: ["costCents"] });
+const presentLabor = (l: any, ctx: OrgContext) =>
+  stripMoney(ctx, l, { price: ["hourlyPriceCents"], cost: ["hourlyCostCents"] });
+/**
+ * A price-book SKU per seat. Selling numbers (flat price, per-sq-ft rate,
+ * percentage, minimum charge) are prices; the flat cost and the markup over
+ * cost are cost-side (a markup next to a price gives the cost away). Used by
+ * the list AND the single-item read — the latter used to return the raw row.
+ */
+export const presentPbItem = (i: any, ctx: OrgContext) =>
+  stripMoney(ctx, i, {
+    price: ["flatPriceCents", "rateCentsPerSqft", "percentBps", "minChargeCents"],
+    cost: ["flatCostCents", "markupBps"],
+  });
 
 export type ExpandedLine = {
   kind: string; name: string; description: string | null;
@@ -204,7 +212,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   // The org's item categories — feeds the category filter and the parent
   // pickers on the Price book page.
   app.get("/api/crm/pricebook/categories", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const rows = await db.select().from(crmPbCategories)
       .where(eq(crmPbCategories.orgId, ctx.org.id)).orderBy(asc(crmPbCategories.sortOrder));
@@ -228,7 +237,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
   // Active labor rates, default first — the Labor tab of the Price book page.
   app.get("/api/crm/pricebook/labor-rates", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const rows = await db.select().from(crmPbLaborRates)
       .where(and(eq(crmPbLaborRates.orgId, ctx.org.id), eq(crmPbLaborRates.active, true)))
@@ -292,7 +302,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   // Active materials — the Materials tab of the Price book page (search by
   // name/SKU, filter by category).
   app.get("/api/crm/pricebook/materials", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const q = String(req.query.q || "").trim();
     const where = [eq(crmPbMaterials.orgId, ctx.org.id), eq(crmPbMaterials.active, true)];
@@ -459,7 +470,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   // The price book itself — the items tab on /crm/pricebook: search (name or
   // code), category/division filters, newest-first, capped at 500 rows.
   app.get("/api/crm/pricebook/items", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const q = String(req.query.q || "").trim();
     const where = [eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.active, true)];
@@ -468,10 +480,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     const rows = await db.select().from(crmPbItems).where(and(...where))
       .orderBy(asc(crmPbItems.name)).limit(500);
     res.json(rows.map((i) => ({
-      ...i,
-      flatPriceCents: ctx.permissions.seePrices ? i.flatPriceCents : undefined,
-      flatCostCents: ctx.permissions.seeCosts ? i.flatCostCents : undefined,
-      rateCentsPerSqft: ctx.permissions.seePrices ? i.rateCentsPerSqft : undefined,
+      ...presentPbItem(i, ctx),
       formulaSymbols: i.qtyFormula ? formulaSymbols(i.qtyFormula) : [],
     })));
   });
@@ -508,11 +517,12 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       entityType: "pricebook_item", entityId: row.id,
       meta: { change: "created", name: row.name, code: row.code },
     });
-    res.status(201).json(row);
+    res.status(201).json(presentPbItem(row, ctx));
   });
 
   app.get("/api/crm/pricebook/items/:id", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const [item] = await db.select().from(crmPbItems)
       .where(and(eq(crmPbItems.orgId, ctx.org.id), eq(crmPbItems.id, req.params.id))).limit(1);
@@ -523,7 +533,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     const accessories = await db.select().from(crmPbItemAccessories)
       .where(and(eq(crmPbItemAccessories.orgId, ctx.org.id), eq(crmPbItemAccessories.itemId, item.id)));
     res.json({
-      item: { ...item, formulaSymbols: item.qtyFormula ? formulaSymbols(item.qtyFormula) : [] },
+      item: { ...presentPbItem(item, ctx), formulaSymbols: item.qtyFormula ? formulaSymbols(item.qtyFormula) : [] },
       parts, accessories,
     });
   });
@@ -566,7 +576,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       entityType: "pricebook_item", entityId: row.id,
       meta: { change: "updated", name: row.name, fields: Object.keys(patch) },
     });
-    res.json(row);
+    res.json(presentPbItem(row, ctx));
   });
 
   /**
@@ -634,9 +644,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
 
   /** Dry-run an assembly. Lets the UI preview before anything is committed. */
   app.post("/api/crm/pricebook/items/:id/preview", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
-    if (!ctx.permissions.seePrices) return res.status(403).json({ message: "Requires permission: seePrices" });
     const p = z.object({
       quantityMilli: z.number().int().min(0).max(100_000_000).default(1000),
       symbols: z.record(z.number()).optional(),
@@ -745,7 +754,8 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
   // ── Packages (good / better / best) ───────────────────────────────────────
 
   app.get("/api/crm/pricebook/packages", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // The price book is prices: a price-blind seat is refused, not shown an empty book.
+    const ctx = await ctxFor(req, res, "seePrices");
     if (!ctx) return;
     const rows = await db.select().from(crmPbPackages)
       .where(and(eq(crmPbPackages.orgId, ctx.org.id), eq(crmPbPackages.active, true)))
@@ -844,7 +854,16 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         taxable: l.taxable,
       })),
     } as any).returning();
-    res.status(201).json({ option: row, warnings });
+    // Same view as GET …/options: a cost-blind seat (the pm) never gets line costs back.
+    res.status(201).json({
+      option: {
+        ...stripMoney(ctx, row, { price: ["subtotalCents", "totalCents"] }),
+        items: Array.isArray(row.items)
+          ? (row.items as any[]).map((i) => stripMoney(ctx, i, { price: ["unitPriceCents"], cost: ["unitCostCents"] }))
+          : row.items,
+      },
+      warnings,
+    });
   });
 
   /** Seed a starter price book so the feature is usable before data entry. */
@@ -949,7 +968,9 @@ export function registerCrmMeasurementRoutes(app: Express, getDevUser: GetUser):
     if (req.query.projectId) where.push(eq(crmMeasurements.projectId, String(req.query.projectId)));
     const rows = await db.select().from(crmMeasurements).where(and(...where))
       .orderBy(desc(crmMeasurements.createdAt)).limit(200);
-    res.json({ measurements: rows, providers: CRM_MEASUREMENT_PROVIDERS });
+    // Measurements carry a client's address: a seat without "See all jobs"
+    // gets only those on its own work (same policy as every other list).
+    res.json({ measurements: await objectPolicy(ctx).filter("measurements", rows), providers: CRM_MEASUREMENT_PROVIDERS });
   });
 
   app.post("/api/crm/measurements", async (req: any, res) => {

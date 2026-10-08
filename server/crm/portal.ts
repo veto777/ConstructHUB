@@ -1268,6 +1268,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Who opened the bid, from where, and who they forwarded it to is sales
+    // intelligence for the people who write estimates — not for the crew.
+    if (!requirePermission(res, ctx, "manageEstimates")) return;
 
     const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
@@ -1698,6 +1701,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // the reply carries the invoice and its totals
 
     const parsed = z.object({
       email: z.string().email().optional(),

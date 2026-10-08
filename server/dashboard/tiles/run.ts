@@ -92,11 +92,15 @@ export const runTiles: TileSources = {
       return ok([metric("todayVisits", "Today's visits", visits.length, "count")], openCrm);
     }
     const s = await crmStatsFor(crm);
+    // A reporting seat without "See prices" gets the counts, never the dollar totals (crmStatsFor leaves them out).
+    const usd = (c: number | undefined, suffix: string) => (c === undefined ? {} : { hint: `${formatUsd(c)} ${suffix}` });
     return ok([
-      metric("pipeline", "Pipeline value", s.openPipeline.totalCents, "cents", { hint: `${s.openPipeline.count.toLocaleString("en-US")} open project${s.openPipeline.count === 1 ? "" : "s"}` }),
-      metric("openEstimates", "Open estimates", s.openEstimates.count, "count", { hint: `${formatUsd(s.openEstimates.totalCents)} quoted` }),
-      metric("jobsWon", "Jobs won", s.jobsWon.count, "count", { hint: `${formatUsd(s.jobsWon.totalCents)} approved`, tone: s.jobsWon.count ? "good" : undefined }),
-      metric("openInvoices", "Open invoices", s.openInvoices.count, "count", { hint: `${formatUsd(s.openInvoices.totalCents)} due` }),
+      s.openPipeline.totalCents === undefined
+        ? metric("pipeline", "Open projects", s.openPipeline.count, "count")
+        : metric("pipeline", "Pipeline value", s.openPipeline.totalCents, "cents", { hint: `${s.openPipeline.count.toLocaleString("en-US")} open project${s.openPipeline.count === 1 ? "" : "s"}` }),
+      metric("openEstimates", "Open estimates", s.openEstimates.count, "count", usd(s.openEstimates.totalCents, "quoted")),
+      metric("jobsWon", "Jobs won", s.jobsWon.count, "count", { ...usd(s.jobsWon.totalCents, "approved"), tone: s.jobsWon.count ? "good" : undefined }),
+      metric("openInvoices", "Open invoices", s.openInvoices.count, "count", usd(s.openInvoices.totalCents, "due")),
       metric("unscheduled", "Sold, not scheduled", s.unscheduledJobs.count, "count", { tone: watch(s.unscheduledJobs.count) }),
       metric("clients", "Active clients", s.clients.count, "count"),
     ], openCrm);
