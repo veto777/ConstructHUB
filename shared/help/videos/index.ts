@@ -11,5 +11,6 @@ export { default as v_crm_estimate_draft } from "./crm-estimate-draft.json";
 export { default as v_crm_payments } from "./crm-payments.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_team_activity } from "./crm-team-activity.json";
+export { default as v_crm_team_cost_rate } from "./crm-team-cost-rate.json";
 export { default as v_crm_team_crew_view } from "./crm-team-crew-view.json";
 export { default as v_database_directory } from "./database-directory.json";
