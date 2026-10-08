@@ -67,7 +67,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export const ITEM_CAP = 200;
 
 /** Insert the alert once (per site, kind and source); its id when it is new, null when it already exists. */
-async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
+export async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
   const { rows: [row] } = await pool.query(
     `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING RETURNING id`,
     [userId, siteId, kind, source, title, JSON.stringify(items.slice(0, ITEM_CAP))]);
@@ -75,7 +75,7 @@ async function saveAlert(userId: number, siteId: number, kind: string, source: s
 }
 
 /** The bell / email text for a saved alert. Pure, for tests. */
-export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
+export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change" | "seo.grid_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
   if (a.kind === "rank_drop" || a.kind === "rank_gain") {
     const items = (Array.isArray(a.items) ? a.items : []) as RankChange[];
     return {
@@ -85,6 +85,12 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
     };
   }
   const i = (Array.isArray(a.items) ? a.items[0] : null) ?? {};
+  if (a.kind === "grid_down" || a.kind === "grid_up")
+    return {
+      kind: "seo.grid_change", title: a.title, severity: a.kind === "grid_down" ? "warning" : "info",
+      body: `Local grid for "${i.keyword ?? ""}" (${i.size} × ${i.size} points): in the first three local results at ${i.top3} of ${i.checked} points, was ${i.wasTop3} of ${i.wasChecked}. Position score ${i.score ?? "—"}, was ${i.wasScore ?? "—"} (lower is better).`,
+      actionLabel: "See the grid", actionUrl: "/seo/local-grid",
+    };
   return {
     kind: "seo.links_change", title: a.title, severity: a.kind === "links_lost" ? "warning" : "info",
     body: `Sites linking to ${a.domain}: ${i.from ?? "?"} on ${i.since ?? "the last snapshot"}, ${i.to ?? "?"} now.`,

@@ -5,7 +5,9 @@
  */
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
-import { beginScan, runningScan, finishScan, failScan, getScan, listScans, savePin, readPin, buildScan, gridPoints, pinInput } from "../server/seo/grid";
+import { beginScan, runningScan, finishScan, failScan, getScan, listScans, savePin, readPin, buildScan, gridPoints, pinInput, type MapListing } from "../server/seo/grid";
+import { saveWatch, listWatches, deleteWatch, raiseGridAlert, gridReportLines, watchInput, MAX_WATCHES } from "../server/seo/grid-monitor";
+import { listAlerts } from "../server/seo/alerts";
 
 let failed = 0;
 const eq = (label: string, got: unknown, want: unknown) => {
@@ -52,6 +54,38 @@ async function main() {
   await failScan(last!.id, "No data left");
   eq("7 a failed scan stays in the history with its reason", (await listScans(1, s.id)).map((x) => [x.keyword, x.status, x.error ? "reason" : null]), [["k3", "failed", "reason"], ["k", "done", null], ["k2", "failed", "reason"]]); // k2 was dated half an hour back above, so it is the oldest
   eq("7b a late result cannot overwrite a scan that already failed", await finishScan(last!.id, scan, 0.018), false);
+
+  // Repeating scans, the alert on a clear change, and the report lines.
+  await pool.query("DELETE FROM seo_grid_scans WHERE site_id=$1", [s.id]); await pool.query("DELETE FROM seo_grid_watches WHERE site_id=$1", [s.id]); await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
+  const w = await saveWatch(1, s.id, watchInput.parse({ keyword: "Roof  Repair", size: 3, spacing: 2, every: "monthly" }));
+  const again = await saveWatch(1, s.id, watchInput.parse({ keyword: "roof repair", size: 3, spacing: 2, every: "weekly" }));
+  eq("8 a repeating scan is one row per search and shape; choosing again changes how often", [w.keyword, again.id === w.id, again.every, (await listWatches(1, s.id)).length, (await listWatches(2, s.id)).length], ["roof repair", true, "weekly", 1, 0]);
+  for (let i = 0; i < MAX_WATCHES - 1; i++) await saveWatch(1, s.id, watchInput.parse({ keyword: `extra ${i}`, size: 3, spacing: 2, every: "monthly" }));
+  const tooMany: any = await saveWatch(1, s.id, watchInput.parse({ keyword: "one more", size: 3, spacing: 2, every: "monthly" })).catch((e) => e);
+  eq("8b at most five per site, and another account cannot stop one", [tooMany?.status, await deleteWatch(2, s.id, w.id), (await listWatches(1, s.id)).length], [403, false, MAX_WATCHES]);
+
+  const listing = (name: string, rank: number, cid: string): MapListing => ({ name, rank, cid, domain: null, address: null, lat: null, lng: null, rating: null, reviews: null });
+  const scanAt = async (ourRank: number, daysAgo: number) => {
+    const b = await beginScan(1, s.id, { keyword: "roof repair", size: 3, spacing: 2 });
+    const built = buildScan({ keyword: "roof repair", size: 3, spacing: 2, pin, domain: "grid.example" }, cells, cells.map(() => [listing("A", ourRank === 1 ? 2 : 1, "50"), listing("Grid Co", ourRank, "12")].sort((x, y) => x.rank - y.rank)));
+    await finishScan(b.id, built, 0.018);
+    await pool.query("UPDATE seo_grid_scans SET created_at = now() - make_interval(days => $2) WHERE id=$1", [b.id, daysAgo]);
+    return b.id;
+  };
+  const older = await scanAt(1, 30), newer = await scanAt(9, 0);
+  eq("9 nothing to compare the first scan with", await raiseGridAlert(s.id, older), null);
+  eq("9b from first everywhere to ninth everywhere is an alert, raised once", [await raiseGridAlert(s.id, newer), await raiseGridAlert(s.id, newer), (await listAlerts(1, s.id)).alerts?.length ?? (await listAlerts(1, s.id) as any).length], ["grid_down", "grid_down", 1]);
+  const alert: any = ((await listAlerts(1, s.id)) as any).alerts?.[0] ?? ((await listAlerts(1, s.id)) as any)[0];
+  eq("9c the alert says what changed", [alert.kind, /got worse across your area/.test(alert.title), alert.items[0].top3, alert.items[0].wasTop3, alert.items[0].checked], ["grid_down", true, 0, 9, 9]);
+  const lines = await gridReportLines(1, s.id);
+  eq("10 the report line is the newest scan of the repeating search with the one before it", lines.map((l) => [l.keyword, l.top3, l.checked, l.score, l.previous?.top3, l.previous?.score]), [["roof repair", 0, 9, 9, 9, 1]]);
+  eq("10b another account gets no lines", await gridReportLines(2, s.id), []);
+  // A different listing in the same search is not comparable.
+  await savePin(1, s.id, pinInput.parse({ name: "Grid Co North", lat: 49.2, lng: -122.4, cid: "77" }));
+  const moved = await beginScan(1, s.id, { keyword: "roof repair", size: 3, spacing: 2 });
+  const pin2 = pinInput.parse({ name: "Grid Co North", lat: 49.2, lng: -122.4, cid: "77" });
+  await finishScan(moved.id, buildScan({ keyword: "roof repair", size: 3, spacing: 2, pin: pin2, domain: "grid.example" }, gridPoints(pin2, 3, 2), gridPoints(pin2, 3, 2).map(() => [listing("Grid Co North", 1, "77")])), 0.018);
+  eq("11 a scan centred on a different listing is not compared with the old one", await raiseGridAlert(s.id, moved.id), null);
 
   console.log(failed ? `\n${failed} FAILED` : "\nall passed");
   await pool.end();

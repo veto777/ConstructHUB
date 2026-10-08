@@ -23,6 +23,7 @@ import { deliverPendingAlerts } from "./alerts";
 import { sendDueReports } from "./site-report-send";
 import { trackedCompetitors } from "./voice";
 import { runDueAiChecks } from "./ai-monthly";
+import { runDueGridWatches } from "./grid-monitor";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -327,6 +328,9 @@ export async function seoTick(): Promise<void> {
       await runDueAiChecks().catch((e) => console.error("[seo] monthly AI questions failed", e?.message ?? e));
       await sendDueReports().catch((e) => console.error("[seo] scheduled reports failed", e?.message ?? e));
       await runDueBacklinkSnapshots();
+      // A scan takes a minute or two, so it is started here and left to finish on its own (it leases its watch, the
+      // database allows one running scan per site, and it never runs two passes at once).
+      void runDueGridWatches().catch((e) => console.error("[seo] repeating grids failed", e?.message ?? e));
     } finally {
       await client.query("SELECT pg_advisory_unlock($1)", [LOCK_KEY]).catch(() => {});
     }

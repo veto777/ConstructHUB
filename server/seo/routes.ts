@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
 import { findMarket } from "@shared/seo-markets";
@@ -211,7 +212,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       } catch (e: any) {
         if (e instanceof z.ZodError) return void res.status(400).json({ message: "Invalid input", issues: e.issues.slice(0, 3) });
         // The internal cap tripped: a neutral "paused" to the customer; the dollars are already in the log.
-        if (e instanceof ListError) return void res.status(e.status).json({ message: e.message });
+        if (e instanceof ListError || e instanceof WatchError) return void res.status(e.status).json({ message: e.message });
         if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message, ...(e.code === "seo_credits" ? { packs: SEO_CREDIT_PACKS } : {}) });
         if (e instanceof DataForSeoError) {
           const status = e.code === "not_configured" ? 503 : e.code === "auth" ? 502 : e.code === "rate_limited" ? 429 : e.code === "invalid" || e.code === "task_failed" ? 400 : 502;
@@ -599,7 +600,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // The saved pin and the scans so far. Spends nothing.
   route("get", "/api/seo/sites/:id/grid", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
+    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), watches: await listWatches(user, site.id), maxWatches: MAX_WATCHES, sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
   });
   // Search Google Maps for the business, to choose the listing the grid is centred on. One small lookup.
   route("post", "/api/seo/sites/:id/grid/locate", async (req, res, user) => {
@@ -630,30 +631,28 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     // One at a time per site — the database's rule, so a second server process cannot start another.
     const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
-    const scanId = started.id, points = input.size * input.size;
-    void (async () => {
-      try {
-        await withBudget(user, gridEstimateUsd(points), async () => {
-          const o = await fetchGrid({ keyword, size: input.size, spacing: input.spacing, pin, domain: site.domain });
-          // Saved BEFORE it is charged: if the results cannot be written, this throws, the lookup counts as failed and
-          // the customer pays nothing. (A crash after the save and before the charge leaves a saved scan and an open
-          // hold, which the reconciler closes at no charge.) So a scan is never paid for and then missing.
-          let saved = false, lastError: unknown = null;
-          for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
-            try { saved = await finishScan(scanId, o.data as GridScan, o.costUsd); if (!saved) break; }
-            catch (e) { lastError = e; await new Promise((r) => setTimeout(r, 500 * attempt)); }
-          }
-          if (!saved) throw Object.assign(new Error(`local grid scan ${scanId} could not be saved: ${(lastError as any)?.message ?? "it is no longer running"}`), { costUsd: o.costUsd, costUnknown: o.costUnknown, notSaved: true });
-          return o;
-        }, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` });
-      } catch (e: any) {
+    const scanId = started.id;
+    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` })
+      .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`);
         const message = e instanceof SeoBudgetError ? e.message : e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : e instanceof DataForSeoError ? vendorErrorMessage(e) : "The scan could not be completed. Try again in a few minutes.";
         await failScan(scanId, message).catch(() => {});
-      }
-    })();
+      });
     res.status(202).json({ id: scanId, running: true });
   }));
+  // Repeat a scan every week or month (run by the scheduler from the month's included data only).
+  route("post", "/api/seo/sites/:id/grid/watch", (req, res, user) => serial(`gridwatch:${user}`, async () => {
+    const site = await ownedSite(user, req.params.id);
+    const input = watchInput.parse(req.body);
+    if (hasOperator(input.keyword)) return res.status(400).json({ message: NO_OPERATORS });
+    if (!readPin((site as { grid_pin?: unknown }).grid_pin)) return res.status(400).json({ message: "Choose your business on Google Maps first." });
+    res.status(201).json({ watch: await saveWatch(user, site.id, input) });
+  }));
+  route("delete", "/api/seo/sites/:id/grid/watch/:watchId", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    await deleteWatch(user, site.id, id.parse(req.params.watchId));
+    res.json({ ok: true });
+  });
   route("get", "/api/seo/sites/:id/grid/:scanId", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const state = await getScan(user, site.id, id.parse(req.params.scanId));

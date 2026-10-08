@@ -12,15 +12,18 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
-type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained";
+type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up";
+type GridItem = { keyword: string; size: number; spacing: number; top3: number; checked: number; score: number | null; wasTop3: number; wasChecked: number; wasScore: number | null; since: string };
 type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null };
 type LinkItem = { from: number; to: number; since: string; backlinksFrom: number | null; backlinksTo: number | null };
-type Alert = { id: number; siteId: number; domain: string; kind: Kind; title: string; items: (RankItem | LinkItem)[]; readAt: string | null; createdAt: string };
+type Alert = { id: number; siteId: number; domain: string; kind: Kind; title: string; items: (RankItem | LinkItem | GridItem)[]; readAt: string | null; createdAt: string };
 
 const KIND: Record<Kind, { label: string; good: boolean }> = {
   rank_drop: { label: "Rankings fell", good: false }, rank_gain: { label: "Rankings improved", good: true },
   links_lost: { label: "Links lost", good: false }, links_gained: { label: "Links gained", good: true },
+  grid_down: { label: "Local grid worse", good: false }, grid_up: { label: "Local grid better", good: true },
 };
+const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better" };
 const WHAT: Record<RankItem["what"], (i: RankItem) => string> = {
   dropped: (i) => `fell from ${i.from} to ${i.to}`,
   lost: (i) => `dropped out of the results (was ${i.from})`,
@@ -52,7 +55,7 @@ export default function SeoAlertsPage() {
     <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <nav className="g-tabs !mb-0" aria-label="Which alerts">
-          {(["all", "rank_drop", "rank_gain", "links_lost", "links_gained"] as const).map((k) => <a key={k} href={`#${k}`} aria-current={kind === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setKind(k); }} data-testid={`tab-alerts-${k}`}>{k === "all" ? "All" : KIND[k].label}</a>)}
+          {(["all", "rank_drop", "rank_gain", "links_lost", "links_gained", "grid_down", "grid_up"] as const).map((k) => <a key={k} href={`#${k}`} aria-current={kind === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setKind(k); }} data-testid={`tab-alerts-${k}`}>{k === "all" ? "All" : KIND[k].label}</a>)}
         </nav>
         {site && (
           <label className="flex items-center gap-2 text-[13px]"><span className="g-text-2">Show</span>
@@ -70,7 +73,7 @@ export default function SeoAlertsPage() {
       {q.isSuccess && alerts.length === 0 && (
         <Empty testId="alerts-empty">
           <h3>{(q.data?.alerts.length ?? 0) > 0 ? "No alerts of this kind" : "No alerts yet"}</h3>
-          <p>{(q.data?.alerts.length ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check or a monthly backlink snapshot finds a real change from the one before it. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
+          <p>{(q.data?.alerts.length ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check, a monthly backlink snapshot or a repeating local grid finds a real change from the one before it. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
         </Empty>
       )}
       <ul className="space-y-3" data-testid="list-alerts">
@@ -88,11 +91,13 @@ export default function SeoAlertsPage() {
                 <thead><tr><th>Keyword</th><th>Where</th><th>Device</th><th>What happened</th></tr></thead>
                 <tbody>{(a.items as RankItem[]).map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}</td></tr>)}</tbody>
               </table>
+            ) : a.kind === "grid_down" || a.kind === "grid_up" ? (
+              (a.items as GridItem[]).map((i, n) => <p key={n} className="g-text text-[13px]">"{i.keyword}", {i.size} × {i.size} points {i.spacing} mile{i.spacing === 1 ? "" : "s"} apart: in the first three local results at <b className="font-medium tabular-nums">{i.top3} of {i.checked}</b> points, was <b className="font-medium tabular-nums">{i.wasTop3} of {i.wasChecked}</b> on {fmtDate(i.since)}. Position score {i.score ?? "—"}, was {i.wasScore ?? "—"} (lower is better).</p>)
             ) : (
               (a.items as LinkItem[]).map((i, n) => <p key={n} className="g-text text-[13px]">Sites linking to {a.domain}: <b className="font-medium tabular-nums">{fmtNum(i.from)}</b> on {fmtDate(i.since)}, <b className="font-medium tabular-nums">{fmtNum(i.to)}</b> now{i.backlinksFrom != null && i.backlinksTo != null ? ` (total links ${fmtNum(i.backlinksFrom)} → ${fmtNum(i.backlinksTo)})` : ""}.</p>)
             )}
             <p className="mt-2 text-[13px]">
-              <Link href={a.kind.startsWith("rank") ? "/seo/rank-tracker" : "/seo/backlinks"} className="g-link" onClick={() => onSite(a.siteId)}>{a.kind.startsWith("rank") ? "Open the rank tracker" : "Open backlinks"} for {a.domain}</Link>
+              <Link href={a.kind.startsWith("rank") ? "/seo/rank-tracker" : a.kind.startsWith("grid") ? "/seo/local-grid" : "/seo/backlinks"} className="g-link" onClick={() => onSite(a.siteId)}>{a.kind.startsWith("rank") ? "Open the rank tracker" : a.kind.startsWith("grid") ? "Open the local grid" : "Open backlinks"} for {a.domain}</Link>
             </p>
           </li>
         ))}
