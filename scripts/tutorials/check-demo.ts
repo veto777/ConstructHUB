@@ -30,6 +30,9 @@ import { UUID_ID_TABLES, UUID_RE } from "./demo-ids";
 
 const BROKEN = /not found|isn['’]t available|something went wrong|couldn['’]t load|failed to load|no longer exists/i;
 
+/** The page being opened — printed when the walk itself dies (a crashed tab), so the page that did it is known. */
+let where = "";
+
 async function main() {
   const slot = Number(process.argv[2]);
   if (!isSlot(slot)) throw new Error("Usage: npx tsx scripts/tutorials/check-demo.ts <slot>   (the slot's app must be up: app.ts up <slot>)");
@@ -65,17 +68,28 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true, args: ["--host-resolver-rules=MAP portal.constructhub.us 127.0.0.1, MAP client.constructhub.us 127.0.0.1"] });
   const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
-  const page = await context.newPage();
-  let where = "", pages = 0;
+  let page = await context.newPage();
+  let pages = 0;
   const flag = (what: string) => { problems.push(`${where}: ${what}`); };
-  page.on("pageerror", (e) => flag(`page error — ${e.message.slice(0, 200)}`));
-  page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) flag(`console error — ${m.text().slice(0, 200)}`); });
-  page.on("response", (r) => { if (r.status() >= 400 && new URL(r.url()).port === String(port)) flag(`${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`); });
-  page.on("requestfailed", (r) => { const f = r.failure()?.errorText ?? ""; if (!/ERR_ABORTED/.test(f) && new URL(r.url()).port === String(port)) flag(`request failed — ${new URL(r.url()).pathname} ${f}`); });
+  const watch = (p: Page) => {
+    p.on("pageerror", (e) => flag(`page error — ${e.message.slice(0, 200)}`));
+    p.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) flag(`console error — ${m.text().slice(0, 200)}`); });
+    p.on("response", (r) => { if (r.status() >= 400 && new URL(r.url()).port === String(port)) flag(`${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`); });
+    p.on("requestfailed", (r) => { const f = r.failure()?.errorText ?? ""; if (!/ERR_ABORTED/.test(f) && new URL(r.url()).port === String(port)) flag(`request failed — ${new URL(r.url()).pathname} ${f}`); });
+
+  };
+  watch(page);
+  /**
+   * A fresh tab every dozen pages. A dev server sends the app as hundreds of separate modules (one per
+   * help entry and per video manifest, too): after some eighty page loads in ONE tab Chromium answers
+   * net::ERR_INSUFFICIENT_RESOURCES and then the tab crashes — the walk's own doing, not the app's.
+   */
+  const freshTab = async () => { await page.close().catch(() => {}); page = await context.newPage(); watch(page); };
 
   /** Open a page, wait until it is quiet, and require the texts and test ids a viewer must see. */
   const open = async (label: string, url: string, need: { text?: string[]; ids?: string[] } = {}): Promise<void> => {
     where = `${label} (${url})`; pages++;
+    if (pages % 12 === 0) await freshTab();
     await page.goto(base + url, { waitUntil: "domcontentloaded", timeout: 90_000 });
     await settle(page);
     await require(label, need);
@@ -182,4 +196,4 @@ async function settle(page: Page): Promise<void> {
   await page.waitForTimeout(350);
 }
 
-main().then(() => process.exit(0), (e) => { console.error(`✗ ${e instanceof Error ? e.message : e}`); process.exit(1); });
+main().then(() => process.exit(0), (e) => { console.error(`✗ ${e instanceof Error ? e.message : e}${where ? `\n  while on: ${where}` : ""}`); process.exit(1); });
