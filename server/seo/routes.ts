@@ -49,6 +49,8 @@ import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-repor
 import { takeBudget } from "../growth-limits";
 import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
 import { listingNamed } from "./dataforseo";
+import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage } from "./batch";
+import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
@@ -66,6 +68,9 @@ export const SEO_PRICES = {
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
   backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** Batch analysis: a flat part plus so much per 100 websites. */
+  batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
+  batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD + LABS_ITEM_USD)),
   /** AI visibility: one question to one assistant, and one AI-mentions lookup. */
   aiChatgpt: retailCents(AI_ENGINES.chatgpt.typicalUsd),
   aiGemini: retailCents(AI_ENGINES.gemini.typicalUsd),
@@ -662,6 +667,20 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ removed: await removeFromList(user, id.parse(req.params.id), removeInput.parse(req.body).keywords) });
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
+
+  // ── Batch analysis: headline numbers for up to 100 websites. Saved for a day; `peek` never buys. ──
+  route("post", "/api/seo/batch", async (req, res, user) => {
+    const input = batchInput.parse(req.body);
+    const { domains, rejected } = cleanDomains(input.domains);
+    if (!domains.length) return res.status(400).json({ message: "Enter at least one website like example.com" });
+    const key = cacheKey("batch", [...domains].sort());
+    const saved = await cached<BatchPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true, rejected });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<BatchPage>(user, key, "batch", CACHE_HOURS, batchEstimateUsd(domains.length), () => fetchBatch(domains), false, `Batch analysis — ${domains.length} website${domains.length === 1 ? "" : "s"}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, rejected });
+  });
 
   // ── AI visibility ───────────────────────────────────────────────────────────
   // The site's saved questions with the newest answer from each assistant. Saved rows only.

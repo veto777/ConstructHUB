@@ -359,6 +359,24 @@ export default function SeoExplorerPage() {
               <p className="g-text-2 mt-2 text-[12px]">Blue area: referring domains. Purple: total backlinks (right scale). Green and red: links gained and lost each month.</p>
             </Panel>
           )}
+          {(report.history?.length ?? 0) > 1 && (
+            <Panel title="Organic keywords by position" hint="by month" testId="panel-position-history" className="mb-4">
+              <div className="h-56">
+                <ResponsiveContainer>
+                  <ComposedChart data={report.history!.map((h) => ({ month: h.month, top3: h.top3, top10: Math.max(0, h.top10 - h.top3), rest: Math.max(0, h.keywords - h.top10) }))} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="var(--g-divider)" vertical={false} />
+                    <XAxis dataKey="month" tickFormatter={(m) => monthLabel(String(m))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={24} />
+                    <YAxis tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} allowDecimals={false} />
+                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
+                    <Area type="monotone" dataKey="top3" name="Positions 1–3" stackId="p" stroke="#188038" fill="#188038" fillOpacity={0.7} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="top10" name="Positions 4–10" stackId="p" stroke="#1a73e8" fill="#1a73e8" fillOpacity={0.6} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="rest" name="Positions 11–100" stackId="p" stroke="#9aa0a6" fill="#9aa0a6" fillOpacity={0.4} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="g-text-2 mt-2 text-[12px]">Green: keywords ranking in the top 3. Blue: positions 4–10. Grey: the rest of the first hundred.</p>
+            </Panel>
+          )}
           {report.intents && (
             <Panel title="Organic keywords by intent" hint={`of the top ${report.keywords?.length ?? 0} keywords`} testId="panel-intents" className="mb-4">
               <table className="g-table">
