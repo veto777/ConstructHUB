@@ -1,0 +1,166 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-discounts",
+  "title": "Add a discount to an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "Offers the client can choose",
+      "narration": "There are two ways to discount an estimate. Here are both."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-draft\"]",
+      "caption": "Tick Draft",
+      "narration": "On Estimates, tick Draft to find one you have not sent yet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-1999\"]",
+      "caption": "Open the estimate",
+      "holdMs": 1200,
+      "narration": "Open it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-discounts-demo-estimate-e-1999\"]",
+      "caption": "Discounts",
+      "narration": "Under the total, choose Discounts."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"preset-marketing\"]",
+      "caption": "Optional offers",
+      "narration": "These are optional offers. Each has a percent off, and a condition the client must meet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-preset-pay_in_full\"]",
+      "caption": "Tick an offer",
+      "narration": "Tick the ones this client may choose on their estimate page."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-custom-discount-label\"]",
+      "value": "Neighbor referral",
+      "caption": "Custom offer: label",
+      "chapter": "Write your own offer",
+      "narration": "You can also write your own. Give it a label,"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-custom-discount-pct\"]",
+      "value": "3",
+      "caption": "Percent",
+      "narration": "a percent off,"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-custom-discount-conditions\"]",
+      "value": "A neighbor books a job with us",
+      "caption": "Conditions",
+      "narration": "and what the client must do to qualify."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-custom-discount\"]",
+      "caption": "Add custom offer",
+      "narration": "Choose Add custom offer."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-discounts\"]",
+      "caption": "Save offers",
+      "narration": "Then choose Save offers."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-edit-estimate\"]",
+      "caption": "Edit",
+      "chapter": "A fixed amount off",
+      "narration": "For a fixed amount off, choose Edit."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-edit-add-line\"]",
+      "caption": "Add line",
+      "narration": "Choose Add line."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"edit-line-name-3\"]",
+      "value": "Repeat client discount",
+      "caption": "Name the line",
+      "narration": "Name the line."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"edit-line-kind-3\"]",
+      "value": "discount",
+      "caption": "Kind: discount",
+      "narration": "Set Kind to discount."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"edit-line-price-3\"]",
+      "value": "150",
+      "caption": "The amount",
+      "narration": "Then type the amount."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-edit-total\"]",
+      "caption": "Subtracted from the total",
+      "narration": "A discount line subtracts from the total."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-estimate-edit\"]",
+      "caption": "Save changes",
+      "narration": "Choose Save changes."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"detail-line-3\"]",
+      "caption": "The discount line",
+      "narration": "The estimate now has the discount as its own line, and a lower total."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Menu: Estimates",
+      "narration": "You'll find Estimates in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to add a discount to an estimate | ConstructHUB CRM",
+    "description": "A short walkthrough of discounts on an estimate in the ConstructHUB CRM. You will tick optional offers the client can choose, write a custom offer with its own percent and conditions, and add a fixed discount line that subtracts from the total.",
+    "tags": [
+      "estimate discount",
+      "contractor discount",
+      "contractor estimate",
+      "estimating software",
+      "sales offer",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Discounts done right",
+    "accent": "discounts",
+    "kicker": "CRM Tutorial",
+    "step": 18
+  }
+}
