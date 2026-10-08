@@ -183,6 +183,10 @@ export interface RankCheckResult {
   localPosition: number | null;
   /** Who Google showed in the map pack, in order. Empty when there was none. */
   localPack: { position: number; title: string; domain: string | null }[];
+  /** The first ten organic results: who the customer is up against on this search. */
+  serpTop: { position: number; domain: string; url: string | null; title: string | null }[];
+  /** Where each followed competitor stood in the crawled results (null = not found in them). */
+  rivals: Record<string, number | null>;
 }
 
 /** A business name reduced to what identifies it: lower case, no punctuation, no "LLC"/"Inc". */
@@ -214,13 +218,14 @@ export function isOurListing(item: { domain?: unknown; title?: unknown }, target
 }
 
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
-export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }, items: any[]): RankCheckResult {
+export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }, items: any[]): RankCheckResult {
   const target = input.targetDomain.toLowerCase().replace(/^www\./, "");
   const match = items.find((item) => {
     if (!item || item.type !== "organic" || typeof item.domain !== "string") return false;
     const d = item.domain.toLowerCase().replace(/^www\./, "");
     return d === target || d.endsWith(`.${target}`);
   });
+  const organic = items.filter((i) => i && i.type === "organic" && typeof i.domain === "string" && i.domain);
   const packItems = items.filter((i) => i && i.type === "local_pack");
   const pack = packItems.map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: str(i.title) ?? "", domain: str(i.domain) }));
   // The website decides wherever it appears in the pack; the name is only a fallback for entries that show none.
@@ -234,6 +239,12 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
     serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean))],
     localPosition: ours >= 0 ? pack[ours].position : null,
     localPack: pack,
+    serpTop: organic.slice(0, 10).map((i) => ({ position: num(i.rank_group) ?? num(i.rank_absolute) ?? 0, domain: String(i.domain).toLowerCase().replace(/^www\./, ""), url: str(i.url), title: str(i.title)?.slice(0, 120) ?? null })).filter((e) => e.position > 0),
+    rivals: Object.fromEntries((input.competitors ?? []).map((c) => {
+      const want = c.toLowerCase().replace(/^www\./, "");
+      const hit = organic.find((i) => { const d = String(i.domain).toLowerCase().replace(/^www\./, ""); return d === want || d.endsWith(`.${want}`); });
+      return [want, hit ? num(hit.rank_group) ?? num(hit.rank_absolute) : null];
+    })),
   };
 }
 
@@ -292,12 +303,12 @@ export type RankTaskOutcome =
   | { status: "completed"; result: RankCheckResult };
 
 /** Collect one queued task (free). */
-export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): Promise<RankTaskOutcome> {
+export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }): Promise<RankTaskOutcome> {
   const response = await request("GET", `/serp/google/organic/task_get/advanced/${encodeURIComponent(input.taskId)}`);
   return parseTaskGet(response, input);
 }
 
-export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): RankTaskOutcome {
+export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }): RankTaskOutcome {
   const task = response?.tasks?.[0];
   if (!response || response.status_code !== 20000 || !task)
     throw new DataForSeoError("upstream", response?.status_message || "DataForSEO task_get failed", 0, response?.status_code);

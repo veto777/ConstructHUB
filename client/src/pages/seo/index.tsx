@@ -9,8 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 import { KeywordHistory, RankHistoryPanel } from "./rank-history";
 import { LocationPicker, type Place } from "./location-picker";
+import { CompetitorPanel } from "./rank-competitors";
 
-type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[] } | null;
+type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[]; top?: { position: number; domain: string; url?: string | null; title?: string | null }[] } | null;
 type Overview = {
   site: SeoSite; devices: ("desktop" | "mobile")[];
   summary: { tracked: number; checked: number; top3: number; top10: number; averagePosition: number | null; improved: number; declined: number; lastCheckedOn: string | null; inMapPack?: number; withMapPack?: number };
@@ -91,6 +92,7 @@ export default function SeoOverviewPage() {
             {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <RankHistoryPanel site={site} />
+          <CompetitorPanel site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (
             <p className="g-text-2 mb-4 flex flex-wrap items-center gap-2 text-[13px]" data-testid="volumes-missing">
@@ -118,7 +120,12 @@ export default function SeoOverviewPage() {
                       <td className="num g-text-2" data-label="Checked">{first ? fmtDate(first.checkedOn) : "—"}</td>
                       <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-8 !px-2" onClick={() => remove.mutate(r.id)} aria-label={`Remove ${r.keyword}`} data-testid={`button-remove-${r.id}`}><Trash2 /></button></td>
                     </tr>
-                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>Google's map pack for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} /></td></tr>}
+                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>Google's map pack for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} />{(first?.top?.length ?? 0) > 0 && (
+                      <div className="mt-3" data-testid={`serp-${r.id}`}>
+                        <h4 className="g-text mb-1 text-[13px] font-medium">Google's first page for this search <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
+                        <ol className="space-y-0.5 text-[13px]">{first!.top!.map((t) => { const mine = t.domain === site.domain || t.domain.endsWith(`.${site.domain}`); return <li key={`${t.position}-${t.domain}`} className={mine ? "g-text font-medium" : "g-text-2"}><span className="inline-block w-6 tabular-nums">{t.position}.</span> {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="g-link">{t.domain}</a> : t.domain}{mine ? " · you" : ""}{t.title ? <span className="g-text-2 font-normal"> — {t.title}</span> : null}</li>; })}</ol>
+                      </div>
+                    )}</td></tr>}
                     </Fragment>
                   );
                 })}

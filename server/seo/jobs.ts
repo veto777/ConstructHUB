@@ -21,6 +21,7 @@ import { reserveBudget, settleBudget, withBudget, reconcileReservations, refundR
 import { retailCents } from "@shared/seo-credits";
 import { deliverPendingAlerts } from "./alerts";
 import { sendDueReports } from "./site-report-send";
+import { trackedCompetitors } from "./voice";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -155,6 +156,7 @@ export async function collectRunningRuns(): Promise<void> {
   for (const run of runs) {
     try {
       const { rows: [site] } = await pool.query("SELECT domain, business_name FROM seo_sites WHERE id=$1", [run.site_id]);
+      const competitors = await trackedCompetitors(run.site_id).catch(() => [] as string[]);
       const tasks: PostedRankTask[] = Array.isArray(run.tasks) ? run.tasks : [];
       const pending: PostedRankTask[] = [];
       const failures: string[] = [];
@@ -164,7 +166,7 @@ export async function collectRunningRuns(): Promise<void> {
       budget -= batch.length;
       for (let i = 0; i < batch.length; i += TASK_GET_CONCURRENCY) {
         const chunk = batch.slice(i, i + TASK_GET_CONCURRENCY);
-        const settled = await Promise.allSettled(chunk.map((t) => seoJobDeps.serpTaskGet({ taskId: t.taskId, keywordId: t.keywordId, keyword: t.keyword, targetDomain: site?.domain ?? "", businessName: site?.business_name ?? null })));
+        const settled = await Promise.allSettled(chunk.map((t) => seoJobDeps.serpTaskGet({ taskId: t.taskId, keywordId: t.keywordId, keyword: t.keyword, targetDomain: site?.domain ?? "", businessName: site?.business_name ?? null, competitors })));
         for (let j = 0; j < chunk.length; j++) {
           const t = chunk[j], r = settled[j];
           if (r.status === "rejected") { pending.push(t); continue; }
@@ -173,11 +175,11 @@ export async function collectRunningRuns(): Promise<void> {
           const res = r.value.result;
           try {
           await pool.query(
-            `INSERT INTO seo_rank_checks(keyword_id,site_id,run_id,checked_on,device,position,url,serp_features,local_position,local_pack)
-             VALUES($1,$2,$3,current_date,$4,$5,$6,$7,$8,$9)
+            `INSERT INTO seo_rank_checks(keyword_id,site_id,run_id,checked_on,device,position,url,serp_features,local_position,local_pack,serp_top,rivals)
+             VALUES($1,$2,$3,current_date,$4,$5,$6,$7,$8,$9,$10,$11)
              ON CONFLICT(keyword_id,checked_on,device) DO UPDATE SET position=EXCLUDED.position,url=EXCLUDED.url,serp_features=EXCLUDED.serp_features,run_id=EXCLUDED.run_id,
-               local_position=EXCLUDED.local_position,local_pack=EXCLUDED.local_pack`,
-            [t.keywordId, run.site_id, run.id, t.device, res.position, res.url, JSON.stringify(res.serpFeatures), res.localPosition ?? null, JSON.stringify(res.localPack ?? [])]);
+               local_position=EXCLUDED.local_position,local_pack=EXCLUDED.local_pack,serp_top=EXCLUDED.serp_top,rivals=EXCLUDED.rivals`,
+            [t.keywordId, run.site_id, run.id, t.device, res.position, res.url, JSON.stringify(res.serpFeatures), res.localPosition ?? null, JSON.stringify(res.localPack ?? []), JSON.stringify(res.serpTop ?? []), JSON.stringify(res.rivals ?? {})]);
           written++;
           } catch (e: any) {
             // 23503: the keyword was removed while its check was in the queue — drop the result, keep the run going.

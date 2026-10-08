@@ -1,6 +1,7 @@
 import { LOCATION_SCHEMA_DDL } from "./locations";
 import { LIST_SCHEMA_DDL } from "./lists";
 import { REPORT_SCHEDULE_DDL } from "./site-report";
+import { VOICE_SCHEMA_DDL } from "./voice";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -107,6 +108,8 @@ export const SEO_SCHEMA_DDL = [
   ...CREDIT_SCHEMA_DDL,
   // Saved pages of Site Explorer reports and keyword overviews (server/seo/reports.ts).
   ...REPORT_SCHEMA_DDL,
+  // Followed competitors and the saved result pages (server/seo/voice.ts).
+  ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
   ...REPORT_SCHEDULE_DDL,
   // Keyword lists (server/seo/lists.ts).

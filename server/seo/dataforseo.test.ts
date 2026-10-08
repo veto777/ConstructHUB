@@ -104,7 +104,11 @@ describe("rank checks (standard queue)", () => {
     const items = fixture("task_get").tasks[0].result[0].items;
     const r = buildRankResult({ keywordId: 11, keyword: "roofing contractor tampa", targetDomain: "constructhub.us" }, items);
     expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic"],
-      localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }] });
+      localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }],
+      serpTop: [{ position: 1, domain: "bigroofer.example", url: "https://bigroofer.example/tampa", title: "Big Roofer" }, { position: 2, domain: "constructhub.us", url: "https://www.constructhub.us/roofing/tampa", title: "Tampa roofing contractors" }, { position: 3, domain: "blog.constructhub.us", url: "https://blog.constructhub.us/roofing", title: "Blog" }],
+      rivals: {} });
+    // followed competitors: found in the organic results (a subdomain counts), or null
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "constructhub.us", competitors: ["www.BigRoofer.example", "nowhere.example"] }, items).rivals).toEqual({ "bigroofer.example": 1, "nowhere.example": null });
     // a local-pack hit on another domain is not an organic ranking
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "tamparoofpros.example" }, items).position).toBeNull();
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "bigroofer.example" }, items)).toMatchObject({ position: 1, url: "https://bigroofer.example/tampa" });
