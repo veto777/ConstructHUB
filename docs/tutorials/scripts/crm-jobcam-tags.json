@@ -1,0 +1,168 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-tags",
+  "title": "Tag job photos and filter by tag",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Pick the photos",
+      "narration": "Tags make job photos easy to find later. Here is how to tag several at once."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-2001\") a",
+      "caption": "Open the job",
+      "narration": "Open the job from the Pipeline. Here, the Kane hardwood job.",
+      "holdMs": 900
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-jobcam\"]",
+      "caption": "JobCam tab",
+      "narration": "Choose its JobCam tab.",
+      "holdMs": 900
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-panel-open\"]",
+      "caption": "Open feed",
+      "narration": "Then Open feed, for the job's photos with all the tools.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "button[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Tags on a photo",
+      "narration": "A photo's tag shows in its corner."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-select-toggle\"]",
+      "caption": "Select",
+      "narration": "To tag several photos together, choose Select.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "button[data-testid=\"jobcam-tile-demo-photo-04\"]",
+      "caption": "Tick a photo",
+      "narration": "Tick the photos you want.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "button[data-testid=\"jobcam-tile-demo-photo-02\"]",
+      "caption": "And another",
+      "narration": "This one too.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-bulk-tags\"]",
+      "caption": "Tags",
+      "chapter": "Add a tag",
+      "narration": "In the bar that appears, choose Tags.",
+      "holdMs": 800
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"jobcam-bulk-tags-search\"]",
+      "value": "Punch list",
+      "caption": "A new tag",
+      "narration": "Pick a tag from the list, or type a new one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-bulk-tags-create\"]",
+      "caption": "Add the new tag",
+      "narration": "Choose Add, and the new tag is made and ticked.",
+      "holdMs": 900
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close the list",
+      "narration": "Close the list.",
+      "holdMs": 600
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-bulk-tag-add\"]",
+      "caption": "Add to the photos",
+      "narration": "Then choose Add, to put the tag on both photos.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "button[data-testid=\"jobcam-tile-demo-photo-04\"]",
+      "caption": "Two tags",
+      "narration": "Each of them now carries two tags."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-select-toggle\"]",
+      "caption": "Done",
+      "chapter": "Filter by tag",
+      "narration": "Choose Done to leave select mode.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-tags\"]",
+      "caption": "Filter: Tags",
+      "narration": "To find tagged photos later, choose Tags, beside the search box.",
+      "holdMs": 800
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"jobcam-filter-tags-option-\"]:has-text(\"Punch list\")",
+      "caption": "Punch list",
+      "narration": "Tick the tag.",
+      "holdMs": 1000
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "The filtered feed",
+      "narration": "The feed now shows only the two photos with that tag.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Where to find it",
+      "narration": "JobCam in the left menu has the same tools, across all your jobs."
+    }
+  ],
+  "youtube": {
+    "title": "How to tag job photos and filter by tag | ConstructHUB CRM",
+    "description": "Organise job-site photos in ConstructHUB JobCam. Select several photos, add an existing tag or make a new one, and filter the feed by tag to find them again. Recorded in a demo workspace; the pictures are placeholder cards made for the demo.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "JobCam",
+      "job site photos",
+      "photo tags",
+      "organise photos",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Tag job photos",
+    "accent": "Tag",
+    "kicker": "CRM Tutorial",
+    "step": 13
+  }
+}

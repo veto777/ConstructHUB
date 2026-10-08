@@ -13,6 +13,7 @@ export { default as v_crm_financing } from "./crm-financing.json";
 export { default as v_crm_follow_up_cadence } from "./crm-follow-up-cadence.json";
 export { default as v_crm_hover } from "./crm-hover.json";
 export { default as v_crm_integrations } from "./crm-integrations.json";
+export { default as v_crm_jobcam_tags } from "./crm-jobcam-tags.json";
 export { default as v_crm_migrate_assisted } from "./crm-migrate-assisted.json";
 export { default as v_crm_migrate } from "./crm-migrate.json";
 export { default as v_crm_pamphlets } from "./crm-pamphlets.json";
