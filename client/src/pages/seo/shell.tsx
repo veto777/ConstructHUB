@@ -101,6 +101,7 @@ const TABS = [
   { href: "/seo/content", label: "Content explorer" },
   { href: "/seo/rank-tracker", label: "Rank tracker" },
   { href: "/seo/local-grid", label: "Local grid" },
+  { href: "/seo/plan", label: "Action plan" },
   { href: "/seo/audit", label: "Site audit" },
   { href: "/seo/ai", label: "AI visibility" },
   { href: "/seo/alerts", label: "Alerts" },

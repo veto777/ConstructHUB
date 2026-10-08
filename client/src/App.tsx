@@ -103,6 +103,7 @@ const SeoReportsPage = lazyPage(() => import("@/pages/seo/reports"));
 const SeoAiPage = lazyPage(() => import("@/pages/seo/ai"));
 const SeoBatchPage = lazyPage(() => import("@/pages/seo/batch"));
 const SeoLocalGridPage = lazyPage(() => import("@/pages/seo/grid"));
+const SeoPlanPage = lazyPage(() => import("@/pages/seo/plan"));
 const SeoContentPage = lazyPage(() => import("@/pages/seo/content"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
@@ -235,6 +236,7 @@ function DashboardRouter() {
       <Route path="/seo/ai" component={SeoAiPage} />
       <Route path="/seo/batch" component={SeoBatchPage} />
       <Route path="/seo/local-grid" component={SeoLocalGridPage} />
+      <Route path="/seo/plan" component={SeoPlanPage} />
       <Route path="/seo/content" component={SeoContentPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
@@ -435,7 +437,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",

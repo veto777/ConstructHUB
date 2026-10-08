@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
@@ -673,6 +674,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
   });
 
+  // ── Action plan: what the customer decided to do about a finding. Spends nothing. ──
+  route("get", "/api/seo/sites/:id/tasks", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const tasks = await listTasks(user, site.id);
+    // Audit tasks: say when the newest crawl no longer finds the issue (the customer still decides when it is done).
+    const crawl = tasks.some((t) => t.kind === "audit" && (t.status === "todo" || t.status === "doing")) ? (await siteAudit(user, site.domain).catch(() => null))?.audit ?? null : null;
+    res.json({ tasks: markResolved(tasks, crawl ? new Set(crawl.issues.map((i) => i.key)) : null, crawl?.scannedAt ?? null), max: MAX_OPEN_TASKS });
+  });
+  route("post", "/api/seo/sites/:id/tasks", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.status(201).json(await addTasks(user, site.id, tasksInput.parse(req.body).tasks));
+  });
+  route("post", "/api/seo/tasks/:id", async (req, res, user) => { res.json({ task: await updateTask(user, id.parse(req.params.id), taskPatch.parse(req.body)) }); });
+  route("delete", "/api/seo/tasks/:id", async (req, res, user) => { await deleteTask(user, id.parse(req.params.id)); res.json({ ok: true }); });
+
   // ── Opportunities (Site Explorer): what to work on next, from one lookup ────
   route("post", "/api/seo/opportunities", async (req, res, user) => {
     const input = oppInput.parse(req.body);
@@ -719,6 +735,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
               (SELECT report FROM seo_domain_reports r WHERE r.user_id=s.user_id AND r.domain=s.domain AND r.location_code=s.location_code AND r.language_code=s.language_code ORDER BY r.created_at DESC LIMIT 1) AS report
          FROM seo_sites s WHERE s.user_id=$1 ORDER BY s.created_at`, [user]);
     const audits = await auditHealthByDomain(user, sites.map((s: any) => s.domain));
+    const openTasks = await openTaskCounts(user, sites.map((s: any) => s.id)).catch(() => new Map<number, number>());
     // One query for every site's newest positions (not one per site).
     const { rows: ranks } = await pool.query(
       `SELECT site_id, count(*) FILTER (WHERE position<=3)::int AS top3, count(*) FILTER (WHERE position<=10)::int AS top10,
@@ -733,6 +750,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       cards.push({
         site: siteView(s),
         audit: audits.get(auditDomainKey(s.domain)) ?? null,
+        openTasks: openTasks.get(s.id) ?? 0,
         rank: { top3: rank?.top3 ?? 0, top10: rank?.top10 ?? 0, ranked: rank?.ranked ?? 0, checked: rank?.checked ?? 0, checkedOn: rank?.checked_on ?? null },
         report: r ? {
           fetchedAt: r.fetchedAt, authority: r.links?.authority ?? null, backlinks: r.links?.backlinks ?? null, referringDomains: r.links?.referringDomains ?? null,

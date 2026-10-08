@@ -18,6 +18,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSit
 type Card = {
   site: SeoSite;
   audit: { health: number | null; errors: number; scannedAt: string | null } | null;
+  openTasks?: number;
   rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null };
   report: {
     fetchedAt: string; authority: number | null; backlinks: number | null; referringDomains: number | null;
@@ -91,7 +92,7 @@ export default function SeoDashboardPage() {
         </Empty>
       )}
       <div className="space-y-4" data-testid="seo-dashboard">
-        {cards.map(({ site: s, rank, report: r, audit }) => {
+        {cards.map(({ site: s, rank, report: r, audit, openTasks }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
             <section key={s.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
@@ -102,6 +103,7 @@ export default function SeoDashboardPage() {
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
                   <Link href="/seo/rank-tracker" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>
                   <Link href="/seo/audit" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-audit-${s.id}`}>Site audit{audit?.health != null ? ` · health ${audit.health}` : ""}</Link>
+                  <Link href="/seo/plan" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-plan-${s.id}`}>Action plan{openTasks ? ` · ${openTasks} open` : ""}</Link>
                   <button type="button" className="g-pill g-pill--sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-${s.id}`} title={`A new report costs about ${price} of your SEO data.${holdNote(status.data, "explorerReport")}`}>
                     {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"} · {price}
                   </button>
