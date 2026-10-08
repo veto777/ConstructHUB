@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareKeywordSnapshots, fetchKeywordSnapshot, coverage, keywordAlerts, keywordWatchDeps, parseSnapshotKeyword, KW_SNAPSHOT_ROWS, type KeywordSnapshot, type SnapshotKeyword } from "./keyword-watch";
+import { compareKeywordSnapshots, comparePick, pagesChanged, pageKey, fetchKeywordSnapshot, coverage, keywordAlerts, keywordWatchDeps, parseSnapshotKeyword, KW_SNAPSHOT_ROWS, type KeywordSnapshot, type SnapshotKeyword } from "./keyword-watch";
 
 const k = (keyword: string, position: number | null, volume: number | null = 100, traffic: number | null = 10): SnapshotKeyword => ({ keyword, position, volume, traffic, path: "/" });
 const snap = (takenOn: string, keywords: SnapshotKeyword[], total: number | null = keywords.length, over: Partial<KeywordSnapshot> = {}): KeywordSnapshot => ({ id: Number(takenOn.replace(/-/g, "")), takenOn, locationCode: 2840, languageCode: "en", total, fetched: keywords.length, keywords, ...over });
@@ -49,5 +49,27 @@ describe("keyword watch", () => {
     const many = Array.from({ length: 150 }, (_, i) => k(`kw ${i}`, i === 149 ? 3 : 55, 100, 150 - i));
     const big = compareKeywordSnapshots(snap("2026-10-08", many), snap("2026-09-08", []));
     expect([big.added.length, keywordAlerts(big).added.map((x) => x.keyword)]).toEqual([150, ["kw 149"]]);
+  });
+  it("by page: keywords and visits in each snapshot, and why a page's count moved", () => {
+    const kp = (keyword: string, path: string | null, traffic: number | null = 10): SnapshotKeyword => ({ keyword, position: 5, volume: 100, traffic, path });
+    const before = [kp("siding bellingham", "/siding/bellingham/", 40), kp("siding ferndale", "/siding/ferndale", 12), kp("roof repair", "/"), kp("gutters", "/gutters", null)];
+    const now = [kp("siding bellingham", "/siding/bellingham", 25), kp("siding lynden", "/siding/bellingham", 5), kp("siding ferndale", "/", 8), kp("roof repair", "/", 11), kp("gutters", "/gutters", 3)];
+    const p = pagesChanged(now, before);
+    // "/siding/bellingham/" and "/siding/bellingham" are one page; ferndale's keyword is now ranked with the home page.
+    expect(p.map((x) => [x.path, x.before.keywords, x.after.keywords, x.before.visits, x.after.visits])).toEqual([
+      ["/siding/ferndale", 1, 0, 12, 0], ["/siding/bellingham", 1, 2, 40, 30], ["/", 1, 2, 10, 19], ["/gutters", 1, 1, 0, 3],
+    ]);
+    expect(p.find((x) => x.path === "/siding/ferndale")).toMatchObject({ movedOut: 1, gone: 0 });
+    expect(p.find((x) => x.path === "/")).toMatchObject({ movedIn: 1, added: 0 });
+    expect(p.find((x) => x.path === "/siding/bellingham")).toMatchObject({ added: 1 });
+    expect(p.find((x) => x.path === "/gutters")!.before).toEqual({ keywords: 1, visits: 0, unknown: 1 });   // an unknown estimate is not a zero
+    expect([pageKey("/a/?x=1#top"), pageKey("/"), pageKey("//"), pageKey(null)]).toEqual(["/a?x=1", "/", "/", null]);
+    // Not comparable (another country): no pages either.
+    expect(compareKeywordSnapshots(snap("2026-10-08", [k("a", 1)]), snap("2026-09-08", [k("a", 1)], 1, { locationCode: 2124 })).pages).toEqual([]);
+  });
+  it("snapshot ids to compare: decimal, positive, within the database's integer range", () => {
+    expect(comparePick.safeParse({ now: "12", before: "3" })).toMatchObject({ success: true, data: { now: 12, before: 3 } });
+    for (const bad of [{ now: "2147483648", before: "1" }, { now: "0", before: "1" }, { now: "1e3", before: "1" }, { now: "-1", before: "1" }, { now: ["1", "2"], before: "1" }, { now: "1" }])
+      expect(comparePick.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
   });
 });

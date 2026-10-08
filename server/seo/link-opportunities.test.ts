@@ -85,4 +85,25 @@ describe("internal links to add", () => {
     const withCopies = findLinkOpportunities([page("/", "Home", [`${H}/gutters`]), page("/gutters", "seamless gutters"), page("/a", "seamless gutters"), ...copies, ...filler], [target(1, "seamless gutters", "/gutters")]);
     expect([withCopies.boilerplate, withCopies.items.map((i) => i.from)]).toEqual([0, [`${H}/a`]]);
   });
+  it("a copy never stands in for a page that was not crawled; loops resolve to nothing; copies of a mentioning page count once", () => {
+    // /service was never crawled; only its printable copy was. Nothing is suggested towards the copy.
+    const copyOnly = findLinkOpportunities([page("/", "Home", [`${H}/service-print`]), page("/service-print", "Gutter cleaning", [`${H}/`], { canonical: `${H}/service` }), page("/post", "We do gutter cleaning."), ...filler],
+      [target(1, "gutter cleaning", "/service")]);
+    expect([copyOnly.items, copyOnly.notCrawled, copyOnly.notUsable]).toEqual([[], 1, 0]);
+    // The page itself crawled but noindexed, with a usable copy: not usable, nothing suggested.
+    const hidden = findLinkOpportunities([page("/", "Home", [`${H}/service`]), page("/service", "Gutter cleaning", [`${H}/`], { noindex: true }), page("/service-print", "Gutter cleaning", [`${H}/`], { canonical: `${H}/service` }), page("/post", "We do gutter cleaning."), ...filler],
+      [target(1, "gutter cleaning", "/service")]);
+    expect([hidden.items, hidden.notUsable]).toEqual([[], 1]);
+    // Two pages naming each other canonical: neither is an alias of the other, whichever is asked about.
+    const loop = findLinkOpportunities([page("/", "Home", [`${H}/a`]), page("/a", "A", [`${H}/`], { canonical: `${H}/b` }), page("/b", "We do gutter cleaning.", [`${H}/`], { canonical: `${H}/a` }), ...filler],
+      [target(1, "gutter cleaning", "/a")]);
+    expect(loop.items.map((i) => [i.from, i.to])).toEqual([[`${H}/b`, `${H}/a`]]);
+    // Five copies of one mentioning page are one page: the phrase is not "on most pages", and the suggestion is one.
+    const copies = [page("/post", "seamless gutters guide"), ...Array.from({ length: 5 }, (_, i) => page(`/post-amp-${i}`, "seamless gutters guide", [`${H}/`], { canonical: `${H}/post` }))];
+    const once = findLinkOpportunities([page("/", "Home", [`${H}/gutters`]), page("/gutters", "Gutters"), ...copies, ...filler], [target(1, "seamless gutters", "/gutters")]);
+    expect([once.boilerplate, once.items.map((i) => i.from)]).toEqual([0, [`${H}/post`]]);
+    // The task identity does not depend on which copy the crawl found first.
+    const reversed = findLinkOpportunities([page("/", "Home", [`${H}/gutters`]), page("/gutters", "Gutters"), ...[...copies].reverse(), ...filler], [target(1, "seamless gutters", "/gutters")]);
+    expect(reversed.items.map((i) => i.pair)).toEqual(once.items.map((i) => i.pair));
+  });
 });

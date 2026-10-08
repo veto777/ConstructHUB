@@ -463,7 +463,7 @@ export async function crawl(
         if (saved) {
           // The address that led here is an alias of the saved page: kept, so "this page already links there" can see it.
           for (const redirect of r.redirects)
-            if (!saved.redirects.includes(redirect) && saved.redirects.length < 20)
+            if (!saved.redirects.includes(redirect) && saved.redirects.length < 100)
               saved.redirects.push(redirect);
           state.queue.shift();
           await checkpoint(state);

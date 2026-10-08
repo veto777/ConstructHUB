@@ -5,6 +5,7 @@
  * A finding added twice is one task (`source` says where it came from).
  */
 import { z } from "zod";
+import { sameUrlKey } from "./audit-pages";
 import { pool } from "../db";
 import { SeoCustomerError } from "./public-errors";
 import { safeHttpUrl } from "./dataforseo";
@@ -138,6 +139,8 @@ export async function listTasks(userId: number, siteId: number, closedLimit = 10
  * Add findings to the plan. One that is already there (same source) is left as it is and does not count against the
  * limit. The limit holds across requests: the site's row is locked for the count and the inserts.
  */
+/** Two addresses compared the way the suggestions compare them (scheme, "www", last slash and fragment do not matter). */
+const linkPair = (from: unknown, to: unknown) => `${sameUrlKey(String(from ?? ""))}\u0000${sameUrlKey(String(to ?? ""))}`;
 export async function addTasks(userId: number, siteId: number, tasks: z.infer<typeof taskInput>[]): Promise<{ added: number; already: number }> {
   const client = await pool.connect();
   try {
@@ -151,12 +154,12 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
     // A suggested internal link planned before tasks were identified by their pair of pages ("link-opp:<keyword>:<path>")
     // is the same link: matched by the page it is on and the page it links to.
     const pairs = tasks.some((t) => t.source?.startsWith("link-pair:"))
-      ? new Set<string>((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND source LIKE 'link-opp:%'", [siteId])).rows.map((r: any) => `${r.target}\u0000${r.link_to}`))
+      ? new Set<string>((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND source LIKE 'link-opp:%'", [siteId])).rows.map((r: any) => linkPair(r.target, r.link_to)))
       : new Set<string>();
     const fresh = tasks.filter((t) => {
       if (!t.source) return true;
       if (known.has(t.source)) return false;
-      if (t.source.startsWith("link-pair:") && pairs.has(`${t.target}\u0000${t.facts.linkTo}`)) return false;
+      if (t.source.startsWith("link-pair:") && pairs.has(linkPair(t.target, t.facts.linkTo))) return false;
       known.add(t.source); return true;
     });
     const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);

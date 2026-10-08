@@ -50,7 +50,7 @@ function TrendCard({ s }: { s: Summary }) {
           </tbody>
         </table>
       </div>
-      <p className="g-text-2 mt-2 text-[12px]">Months can hold different questions and assistants, so a column is not like for like with the next — {s.compare ? "the comparison below is" : "no two months share a question asked of the same assistant yet, so there is no like-for-like comparison; ask the same questions again next month"}. Names are read from what the answers set in bold: one business written two ways can appear twice. Months are calendar months in UTC.</p>
+      <p className="g-text-2 mt-2 text-[12px]">Months can hold different questions and assistants, so a column is not like for like with the next — {s.compare ? "the comparison below is" : "the newest month shares no question asked of the same assistant with any earlier month, so there is no like-for-like comparison; ask the same questions again"}. Names are read from what the answers set in bold: one business written two ways can appear twice. Months are calendar months in UTC.</p>
       {s.truncated && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>There are more saved answers than are read at once, so the oldest months here may be missing answers.</p>}
     </div>
   );

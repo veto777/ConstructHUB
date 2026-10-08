@@ -428,6 +428,13 @@ it("a missing-page fix is about a part of the site, judged again only where it w
   const legacy = a.map((f) => { const asked = first.missingPages!.find((m) => f.page === "https://fixture.test/" ? !m.url.includes("/services/") : m.url.includes("/services/"))!.url; return { ...f, page: asked, key: `legacy-${asked}`, done: true }; });
   const carried = reconcileFixes(fixesOf(second), legacy, second);
   expect(carried.map((f) => [f.page, f.verification, f.done])).toEqual([["https://fixture.test/", "still present", true], ["https://fixture.test/services/", "still present", true]]);
+  // Several old records for one part — an open one marked done, and one already marked fixed after it — merge to the open
+  // one, "done" kept, whatever their order.
+  const top = legacy[0];
+  for (const olds of [[{ ...top, key: "o1", done: true, verification: "still present" as const }, { ...top, key: "o2", page: top.page + "x", done: false, verification: "fixed" as const }], [{ ...top, key: "o2", page: top.page + "x", done: false, verification: "fixed" as const }, { ...top, key: "o1", done: true, verification: "still present" as const }]]) {
+    const r = reconcileFixes(fixesOf(second), olds, second).find((f) => f.page === "https://fixture.test/")!;
+    expect([r.verification, r.done]).toEqual(["still present", true]);
+  }
   // A redirect the crawl does not follow (to another site) is said, not dropped.
   const away = await run((url, allowed) => { allowed?.("https://elsewhere.test/landing"); throw new Error("Redirect excluded by crawl policy"); });
   expect(away.missingPages!.map((m) => m.note)).toEqual(["sent on to https://elsewhere.test/landing, which this crawl does not follow", "sent on to https://elsewhere.test/landing, which this crawl does not follow"]);

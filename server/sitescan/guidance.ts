@@ -684,17 +684,21 @@ export function reconcileFixes(
 ): Fix[] {
   // A missing-page fix saved under the made-up address of its crawl (before fixes were named by the part of the site)
   // is the same fix as the one named by that part now: renamed first, so its history and "done" carry over.
-  previous = [
-    ...new Map(
-      previous
-        .map((f) =>
-          f.findingId === "soft-404" && missingPageFixPage(f.page) !== f.page
-            ? { ...f, page: missingPageFixPage(f.page), key: fixKey("soft-404", missingPageFixPage(f.page), f.target) }
-            : f,
-        )
-        .map((f) => [f.key, f] as const),
-    ).values(),
-  ];
+  // Several old ones can land on one part (or on a fix already named by it): they are merged, not overwritten — an open
+  // one ("new" / "still present") wins over one marked fixed, and "done" is kept if any open one was done.
+  const merged = new Map<string, Fix>();
+  for (const f0 of previous) {
+    const f =
+      f0.findingId === "soft-404" && missingPageFixPage(f0.page) !== f0.page
+        ? { ...f0, page: missingPageFixPage(f0.page), key: fixKey("soft-404", missingPageFixPage(f0.page), f0.target) }
+        : f0;
+    const had = merged.get(f.key);
+    if (!had) { merged.set(f.key, f); continue; }
+    const open = (x: Fix) => x.verification !== "fixed";
+    const keep = open(had) || !open(f) ? had : f;
+    merged.set(f.key, { ...keep, done: [had, f].some((x) => open(x) && x.done) || (!open(keep) && keep.done) });
+  }
+  previous = [...merged.values()];
   const old = new Map(previous.map((f) => [f.key, f])),
     keys = new Set(current.map((f) => f.key));
   const result: Fix[] = current.map((f) => ({

@@ -62,7 +62,11 @@ function contextOf(text: string, keyword: string): string {
   const a = Math.max(0, m.index - 60), b = Math.min(text.length, m.index + m[0].length + 60);
   return `${a > 0 ? "…" : ""}${text.slice(a, b).replace(/\s+/g, " ").trim()}${b < text.length ? "…" : ""}`;
 }
-export const pairKey = (from: string, to: string) => createHash("sha256").update(`${sameUrlKey(from)}\u0000${sameUrlKey(to)}`).digest("hex").slice(0, 24);
+/** Identity of a suggested link: the two pages' identities (after aliases), hashed. */
+const pairOf = (fromKey: string, toKey: string) => createHash("sha256").update(`${fromKey}\u0000${toKey}`).digest("hex").slice(0, 24);
+export const pairKey = (from: string, to: string) => pairOf(sameUrlKey(from), sameUrlKey(to));
+/** How far an alias chain is followed; a longer one, or a loop, is left unresolved (the address stands for itself). */
+const MAX_ALIAS_HOPS = 50;
 
 /**
  * Which crawled page an address stands for, by what the crawl saw: the page itself, an address that redirected to it,
@@ -78,8 +82,18 @@ function aliasesOf(pages: readonly OppPage[]): (u: string) => string {
     const k = sameUrlKey(p.url);
     if (typeof p.canonical === "string" && p.canonical && !to.has(k)) { const c = sameUrlKey(p.canonical); if (c !== k) to.set(k, c); }
   }
-  // Followed to the end (redirect -> copy -> the page it names canonical), with a guard against loops.
-  return (u: string) => { let k = sameUrlKey(u); for (let n = 0, seen = new Set([k]); n < 10 && to.has(k); n++) { const next = to.get(k)!; if (seen.has(next)) break; seen.add(next); k = next; } return k; };
+  // Followed to its end (redirect -> copy -> the page it names canonical). A loop, or a chain longer than
+  // MAX_ALIAS_HOPS, has no end: the address is then left as itself, the same whichever address of it is asked about.
+  return (u: string) => {
+    const start = sameUrlKey(u);
+    let k = start;
+    for (let n = 0, seen = new Set([k]); to.has(k); n++) {
+      const next = to.get(k)!;
+      if (seen.has(next) || n >= MAX_ALIAS_HOPS) return start;
+      seen.add(next); k = next;
+    }
+    return k;
+  };
 }
 
 /** Pure. `pages` are the crawl's pages; `targets` the tracked keywords with their newest check. */
@@ -87,10 +101,11 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   const usable = pages.filter((p) => p.status >= 200 && p.status < 300 && !p.noindex && typeof p.text === "string");
   const measured = linksMeasurable(pages.map((p) => ({ url: p.url, status: p.status, links: p.links } as RawPage)));
   const resolve = aliasesOf(pages);
-  const crawled = new Set(pages.map((p) => resolve(p.url)));
-  // The page that stands for an identity is the page itself — not a copy of it that names it canonical.
+  // The page that stands for an identity is the page ITSELF (its own address is the identity) — never a copy that
+  // names it canonical: when the page itself was not crawled, or not usable, nothing is suggested towards it.
+  const crawled = new Set(pages.filter((p) => sameUrlKey(p.url) === resolve(p.url)).map((p) => sameUrlKey(p.url)));
   const byKey = new Map<string, OppPage>();
-  for (const p of usable) { const k = resolve(p.url); if (!byKey.has(k) || sameUrlKey(p.url) === k) byKey.set(k, p); }
+  for (const p of usable) { const k = resolve(p.url); if (sameUrlKey(p.url) === k && !byKey.has(k)) byKey.set(k, p); }
   let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0;
   const known: (OppTarget & { url: string })[] = [];
   for (const t of targets) {
@@ -102,7 +117,14 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   const cutPages = usable.filter((p) => p.text.length >= LINK_OPP_TEXT).length;
   const empty = { linksMeasured: measured, targets: known.length, boilerplate: 0, notRanking, notCrawled, notUsable, tooShort, cutPages, items: [], more: 0 };
   if (!measured || !known.length) return empty;
-  const texts = usable.map((p) => ({ p, key: resolve(p.url), flat: flat(p.text), links: new Set((Array.isArray(p.links) ? p.links.slice(0, LINK_OPP_LINKS) : []).filter((l): l is string => typeof l === "string").map(resolve)) }));
+  // One source per identity: copies of a page (they name it canonical) are that page, counted once — the page itself
+  // when it is usable, otherwise the copy with the first address in order (the same whatever order the crawl found them).
+  const sources = new Map<string, OppPage>();
+  for (const p of [...usable].sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0))) {
+    const k = resolve(p.url), had = sources.get(k);
+    if (!had || (sameUrlKey(p.url) === k && sameUrlKey(had.url) !== k)) sources.set(k, p);
+  }
+  const texts = [...sources.entries()].map(([key, p]) => ({ p, key, flat: flat(p.text), links: new Set((Array.isArray(p.links) ? p.links.slice(0, LINK_OPP_LINKS) : []).filter((l): l is string => typeof l === "string").map(resolve)) }));
   const all: LinkOpportunity[] = [];
   let boilerplate = 0;
   const done = new Set<string>(), perTarget = new Map<string, number>();
@@ -126,7 +148,7 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
       if (n >= LINK_OPP_PER_TARGET) break;
       done.add(pair); perTarget.set(target, n + 1);
       all.push({ keywordId: t.keywordId, keyword: t.keyword, volume: t.volume, position: t.position, checkedOn: t.checkedOn, device: t.device, place: t.place,
-        to: targetPage.url, from: x.p.url, fromTitle: x.p.title, context: contextOf(x.p.text, t.keyword), pair: pairKey(x.p.url, targetPage.url) });
+        to: targetPage.url, from: x.p.url, fromTitle: x.p.title, context: contextOf(x.p.text, t.keyword), pair: pairOf(x.key, target) });
     }
   }
   return { ...empty, boilerplate, targets: known.length - boilerplate, items: all.slice(0, LINK_OPP_MAX), more: Math.max(0, all.length - LINK_OPP_MAX) };
@@ -141,7 +163,7 @@ const TEXT_PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'noindex', COALESCE(p->'noindex' = 'true'::jsonb, false), 'title', p->>'title',
     'text', left(COALESCE(p->>'text', ''), ${LINK_OPP_TEXT}),
     'canonical', CASE WHEN jsonb_typeof(p->'canonical')='string' THEN p->>'canonical' END,
-    'redirects', ${strings("redirects", 20)},
+    'redirects', ${strings("redirects", 100)},
     'links', ${strings("links", LINK_OPP_LINKS)}) ORDER BY ord)
   FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
  WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;

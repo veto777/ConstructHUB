@@ -79,16 +79,44 @@ export type KeywordComparison = {
   /** Every change, never cut short (a snapshot holds KW_SNAPSHOT_ROWS at most): ordered by traffic (added) and by the position held (gone). */
   added: KeywordChange[]; gone: KeywordChange[];
   now: { keywords: number; total: number | null }; before: { keywords: number; total: number | null };
+  /**
+   * By the site's page each keyword ranks with: keywords and estimated visits in each snapshot, and why the count moved
+   * (newly seen / no longer seen, or a keyword seen in both that the data now has ranking with another page). Visits add
+   * up only the keywords whose estimate is known (`unknown` says how many were not). Biggest change in visits first.
+   * Empty when the snapshots are not comparable. Within the snapshots' own limits (see `basis`).
+   */
+  pages: PageChange[];
 };
+export type PageSide = { keywords: number; visits: number; unknown: number };
+export type PageChange = { path: string | null; before: PageSide; after: PageSide; added: number; gone: number; movedIn: number; movedOut: number };
+/** One spelling of a page's path for comparing: no trailing slash (but "/"), no fragment; the query kept. Pure. */
+export const pageKey = (path: string | null): string | null => {
+  if (path === null || path === undefined) return null;
+  const p = String(path).replace(/#.*$/, ""), [base, ...q] = p.split("?");
+  return `${base.replace(/\/+$/, "") || "/"}${q.length ? `?${q.join("?")}` : ""}`;
+};
+/** Pure: keywords grouped by page in two snapshots of the same market. */
+export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[]): PageChange[] {
+  const pages = new Map<string, PageChange>();
+  const side = (): PageSide => ({ keywords: 0, visits: 0, unknown: 0 });
+  const at = (path: string | null) => { const k = pageKey(path) ?? "\u0000"; return pages.get(k) ?? pages.set(k, { path: pageKey(path), before: side(), after: side(), added: 0, gone: 0, movedIn: 0, movedOut: 0 }).get(k)!; };
+  const add = (x: PageSide, k: SnapshotKeyword) => { x.keywords++; if (k.traffic === null) x.unknown++; else x.visits += k.traffic; };
+  const was = new Map(before.map((k) => [k.keyword, k] as const)), is = new Map(now.map((k) => [k.keyword, k] as const));
+  for (const k of before) { const pg = at(k.path); add(pg.before, k); const n = is.get(k.keyword); if (!n) pg.gone++; else if (pageKey(n.path) !== pageKey(k.path)) pg.movedOut++; }
+  for (const k of now) { const pg = at(k.path); add(pg.after, k); const b = was.get(k.keyword); if (!b) pg.added++; else if (pageKey(b.path) !== pageKey(k.path)) pg.movedIn++; }
+  const round = (x: PageSide) => ({ ...x, visits: Math.round(x.visits * 10) / 10 });
+  return [...pages.values()].map((p) => ({ ...p, before: round(p.before), after: round(p.after) }))
+    .sort((a, b) => Math.abs(b.after.visits - b.before.visits) - Math.abs(a.after.visits - a.before.visits) || Math.abs(b.after.keywords - b.before.keywords) - Math.abs(a.after.keywords - a.before.keywords) || String(a.path).localeCompare(String(b.path)));
+}
 /** Pure. */
 export function compareKeywordSnapshots(now: KeywordSnapshot, before: KeywordSnapshot): KeywordComparison {
   const head = { since: before.takenOn, takenOn: now.takenOn, locationCode: now.locationCode, languageCode: now.languageCode, now: { keywords: now.keywords.length, total: now.total }, before: { keywords: before.keywords.length, total: before.total } };
-  if (now.locationCode !== before.locationCode || now.languageCode !== before.languageCode) return { ...head, basis: "none", added: [], gone: [] };
+  if (now.locationCode !== before.locationCode || now.languageCode !== before.languageCode) return { ...head, basis: "none", added: [], gone: [], pages: [] };
   const was = new Map(before.keywords.map((k) => [k.keyword, k] as const)), is = new Set(now.keywords.map((k) => k.keyword));
   const added = now.keywords.filter((k) => !was.has(k.keyword)).sort((a, b) => (b.traffic ?? -1) - (a.traffic ?? -1) || (a.position ?? 999) - (b.position ?? 999) || (a.keyword < b.keyword ? -1 : 1));
   const gone = before.keywords.filter((k) => !is.has(k.keyword)).map((k) => ({ ...k, was: k.position })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (b.volume ?? -1) - (a.volume ?? -1) || (a.keyword < b.keyword ? -1 : 1));
   const a = coverage(now), b = coverage(before);
-  return { ...head, basis: a === null || b === null ? "unknown" : a && b ? "whole" : "top", added, gone };
+  return { ...head, basis: a === null || b === null ? "unknown" : a && b ? "whole" : "top", added, gone, pages: pagesChanged(now.keywords, before.keywords) };
 }
 /** Which changes are worth an alert — from the whole lists, and only when both snapshots hold everything the source has. Pure. */
 export function keywordAlerts(c: KeywordComparison): { added: KeywordChange[]; gone: KeywordChange[] } {
@@ -298,7 +326,8 @@ export async function runDueKeywordSnapshots(): Promise<number> {
 export const KW_HISTORY_LIMIT = 36;
 export type SnapshotSummary = { id: number; takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string };
 /** ?now=&before= on the view: two snapshot ids to compare instead of the newest two. */
-export const comparePick = z.object({ now: z.coerce.number().int().positive(), before: z.coerce.number().int().positive() }).strict();
+const snapshotId = z.string().regex(/^[1-9][0-9]{0,9}$/).transform(Number).pipe(z.number().int().max(2147483647));
+export const comparePick = z.object({ now: snapshotId, before: snapshotId }).strict();
 export type KeywordWatchView = {
   watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean;
   latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null;
@@ -308,7 +337,7 @@ export type KeywordWatchView = {
   sameMarket: boolean;
   comparison: KeywordComparison | null;
   /** Which two snapshots `comparison` is (the newest two unless others were asked for). */
-  pair: { nowId: number; beforeId: number; chosen: boolean } | null;
+  pair: { nowId: number; beforeId: number; chosen: boolean; /** The two snapshots themselves — also when they are older than the listed ones. */ now: SnapshotSummary; before: SnapshotSummary } | null;
   /** The site's snapshots, newest first, up to KW_HISTORY_LIMIT, and how many there are in all. */
   snapshots: SnapshotSummary[]; snapshotCount: number;
 };
@@ -330,6 +359,7 @@ export async function keywordWatchView(userId: number, site: { id: number; kw_wa
        FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 ORDER BY taken_on DESC LIMIT ${KW_HISTORY_LIMIT}`, [site.id, userId]);
   const snapshots: SnapshotSummary[] = list.map((r: any) => ({ id: r.id, takenOn: String(r.taken_on).slice(0, 10), keywords: r.n, total: r.total ?? null, whole: coverage({ total: r.total ?? null, fetched: r.fetched ?? null, keywords: { length: r.n } as unknown[] }), locationCode: r.location_code, languageCode: r.language_code }));
   const [cNow, cBefore] = chosen ?? [now, before];
+  const summary = (x: KeywordSnapshot): SnapshotSummary => ({ id: x.id, takenOn: x.takenOn, keywords: x.keywords.length, total: x.total, whole: coverage(x), locationCode: x.locationCode, languageCode: x.languageCode });
   const { rows: [d] } = await pool.query("SELECT current_date::text AS today, ((current_date + 1)::timestamp AT TIME ZONE current_setting('TimeZone'))::timestamptz AS next");
   return {
     watch: !!site.kw_watch, nextAt: site.kw_watch && site.next_kw_snapshot_at ? new Date(site.next_kw_snapshot_at as string).toISOString() : null, rows: KW_SNAPSHOT_ROWS, alertsOn: site.alerts_enabled !== false,
@@ -337,7 +367,7 @@ export async function keywordWatchView(userId: number, site: { id: number; kw_wa
     nextDayAt: new Date(d.next).toISOString(),
     sameMarket: !now || (now.locationCode === (site.location_code ?? 2840) && now.languageCode === (site.language_code ?? "en")),
     comparison: cNow && cBefore ? compareKeywordSnapshots(cNow, cBefore) : null,
-    pair: cNow && cBefore ? { nowId: cNow.id, beforeId: cBefore.id, chosen: !!chosen } : null,
+    pair: cNow && cBefore ? { nowId: cNow.id, beforeId: cBefore.id, chosen: !!chosen, now: summary(cNow), before: summary(cBefore) } : null,
     snapshots, snapshotCount: list.length ? Number(list[0].all_count) : 0,
   };
 }

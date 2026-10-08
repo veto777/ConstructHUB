@@ -29,8 +29,8 @@ async function main() {
   eq("1b the first copy is the one kept, with its facts and a safe link", [kw.title, kw.facts, kw.url], ["Move \"roof repair\" up from position 7", { volume: 880, position: 7 }, "https://plan.example/roofing"]);
   // A suggested link planned under the old identity (keyword + page) is the same link under the new one (the pair of pages).
   await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES(1,$1,'page','old link task','https://plan.example/blog/a',$2,'link-opp:7:/blog/a')", [s.id, JSON.stringify({ linkTo: "https://plan.example/siding", words: "vinyl siding" })]);
-  const pairAgain = await addTasks(1, s.id, [t({ kind: "page", title: "Link from /blog/a to /siding", target: "https://plan.example/blog/a", facts: { linkTo: "https://plan.example/siding" }, source: "link-pair:abc" }), t({ kind: "page", title: "Link from /blog/a to /roofing", target: "https://plan.example/blog/a", facts: { linkTo: "https://plan.example/roofing" }, source: "link-pair:def" })]);
-  eq("1c a link planned under the old identity is not planned twice; another link from the same page is new", pairAgain, { added: 1, already: 1 });
+  const pairAgain = await addTasks(1, s.id, [t({ kind: "page", title: "Link from /blog/a to /siding", target: "http://www.plan.example/blog/a/", facts: { linkTo: "https://plan.example/siding/" }, source: "link-pair:abc" }), t({ kind: "page", title: "Link from /blog/a to /roofing", target: "https://plan.example/blog/a", facts: { linkTo: "https://plan.example/roofing" }, source: "link-pair:def" })]);
+  eq("1c a link planned under the old identity (written another way: http, www, last slash) is not planned twice; another link from the same page is new", pairAgain, { added: 1, already: 1 });
   await pool.query("DELETE FROM seo_tasks WHERE site_id=$1 AND (source LIKE 'link-opp:%' OR source LIKE 'link-pair:%')", [s.id]);
 
   const foreign: any = await addTasks(2, s.id, [t({ kind: "other", title: "x" })]).catch((e) => e);

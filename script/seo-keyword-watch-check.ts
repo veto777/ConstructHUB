@@ -155,6 +155,17 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   } else ok(false, "an alert with its snapshot ids exists to open");
   const refused = async (p: { now: number; before: number }, user = 1) => keywordWatchView(user, await site(), p).then(() => 0, (e) => e?.status ?? e?.statusCode ?? -1);
   ok((await refused({ now: oldest, before: newest })) === 400 && (await refused({ now: newest, before: newest })) === 400 && (await refused({ now: newest, before: 99999999 })) === 404 && (await refused({ now: newest, before: oldest }, 2)) === 404, "the later one as 'before', the same twice, an unknown id and another account's request are refused");
+  // 7c. A pair older than the listed snapshots still comes back with both snapshots described; another site of the
+  // same account cannot be asked for this site's snapshots.
+  await pool.query(`INSERT INTO seo_keyword_snapshots(site_id, user_id, taken_on, location_code, language_code, keywords, total, fetched, alerts_done)
+    SELECT $1, 1, current_date - 400 - g, 2840, 'en', '[{"keyword":"old","position":3,"volume":10,"traffic":1,"path":"/"}]'::jsonb, 1, 1, true FROM generate_series(1, 40) g`, [s.id]);
+  const deep = (await pool.query("SELECT id FROM seo_keyword_snapshots WHERE site_id=$1 ORDER BY taken_on LIMIT 2", [s.id])).rows.map((r) => r.id);
+  const dv = await keywordWatchView(1, await site(), { now: deep[1], before: deep[0] });
+  ok(dv.snapshots.length === 36 && dv.snapshotCount > 36 && !dv.snapshots.some((x) => x.id === deep[1]) && dv.pair?.now.id === deep[1] && dv.pair.before.id === deep[0] && dv.pair.now.keywords === 1, "a pair older than the listed 36 comes back with both snapshots described");
+  const { rows: [other] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'kwother.example') RETURNING *");
+  ok((await keywordWatchView(1, other, { now: deep[1], before: deep[0] }).then(() => 0, (e) => e?.status)) === 404, "another site of the same account cannot be asked for this site's snapshots");
+  await pool.query("DELETE FROM seo_sites WHERE id=$1", [other.id]);
+  await pool.query("DELETE FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on < current_date - 400", [s.id]);
   // 8. A site tracked in another country now than its snapshots were taken for: said, not passed off as the current one.
   await pool.query("UPDATE seo_sites SET location_code=2124 WHERE id=$1", [s.id]);
   ok((await keywordWatchView(1, await site())).sameMarket === false, "snapshots from the country the site used to be tracked in are flagged");

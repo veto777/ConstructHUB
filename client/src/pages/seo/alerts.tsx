@@ -46,7 +46,7 @@ function KwAlert({ kind, item: i, domain, onOpen }: { kind: Kind; item: KwItem; 
       <p className="g-text-2 text-[13px]">In our search data{i.locationCode ? ` for ${marketLabel(i.locationCode, i.languageCode ?? "en")}` : ""}: the snapshot of {i.takenOn ? fmtDate(i.takenOn) : "that day"} compared with the one of {fmtDate(i.since)}. It is the data's view, not Google's own — track a search in the rank tracker to check Google itself.</p>
       <table className="g-table mt-2">
         <thead><tr><th>Keyword</th><th className="num">{kind === "kw_new" ? "Position then" : "Position before"}</th><th className="num">Volume / mo</th></tr></thead>
-        <tbody>{shown.map((k) => <tr key={k.keyword}><td>{k.keyword}</td><td className="num">{(kind === "kw_new" ? k.position : k.was) ?? "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody>
+        <tbody>{shown.map((k) => <tr key={k.keyword}><td>{k.keyword}</td><td className="num" data-label={kind === "kw_new" ? "Position then" : "Position before"}>{(kind === "kw_new" ? k.position : k.was) ?? "—"}</td><td className="num" data-label="Volume / mo">{fmtNum(k.volume)}</td></tr>)}</tbody>
       </table>
       {kept > 20 && <button type="button" className="g-link mt-1 text-[13px]" aria-expanded={all} onClick={() => setAll(!all)}>{all ? "Show the first 20" : `Show all ${fmtNum(kept)} kept with this alert`}</button>}
       {more > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(more)} more changed than this alert keeps — the comparison lists every one.</p>}
@@ -116,7 +116,7 @@ export default function SeoAlertsPage() {
                 <tbody>{(a.items as RankItem[]).map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}</td></tr>)}</tbody>
               </table>
             ) : a.kind === "kw_new" || a.kind === "kw_lost" ? (
-              (a.items as unknown as KwItem[]).map((i, n) => <KwAlert key={n} kind={a.kind} item={i} domain={a.domain} onOpen={i.snapshotId && i.beforeId ? () => { onSite(a.siteId); setKwPick({ siteId: a.siteId, now: i.snapshotId!, before: i.beforeId! }); requestAnimationFrame(() => document.getElementById("keyword-watch")?.scrollIntoView({ behavior: "smooth", block: "start" })); } : undefined} />)
+              (a.items as unknown as KwItem[]).map((i, n) => <KwAlert key={n} kind={a.kind} item={i} domain={a.domain} onOpen={i.snapshotId && i.beforeId ? () => { onSite(a.siteId); setKwPick({ siteId: a.siteId, now: i.snapshotId!, before: i.beforeId!, fromAlert: true }); requestAnimationFrame(() => document.getElementById("keyword-watch")?.scrollIntoView({ behavior: "smooth", block: "start" })); } : undefined} />)
             ) : a.kind === "grid_down" || a.kind === "grid_up" ? (
               (a.items as GridItem[]).map((i, n) => <p key={n} className="g-text text-[13px]">"{i.keyword}", {i.size} × {i.size} points {i.spacing} mile{i.spacing === 1 ? "" : "s"} apart: in the first three local results at <b className="font-medium tabular-nums">{i.top3} of {i.checked}</b> points, was <b className="font-medium tabular-nums">{i.wasTop3} of {i.wasChecked}</b> on {fmtDate(i.since)}. Position score {i.score ?? "—"}, was {i.wasScore ?? "—"} (lower is better).</p>)
             ) : (
