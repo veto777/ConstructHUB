@@ -6,6 +6,7 @@ export { default as v_crm_estimate_edit } from "./crm-estimate-edit.json";
 export { default as v_crm_estimates } from "./crm-estimates.json";
 export { default as v_crm_invoices } from "./crm-invoices.json";
 export { default as v_crm_payment_record } from "./crm-payment-record.json";
+export { default as v_crm_payment_reverse } from "./crm-payment-reverse.json";
 export { default as v_crm_pricebook_add } from "./crm-pricebook-add.json";
 export { default as v_crm_pricebook_template } from "./crm-pricebook-template.json";
 export { default as v_crm_pricebook } from "./crm-pricebook.json";
