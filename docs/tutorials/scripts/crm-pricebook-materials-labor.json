@@ -1,0 +1,167 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pricebook-materials-labor",
+  "title": "Materials and labor rates",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pricebook",
+      "caption": "Price book",
+      "chapter": "Add a material",
+      "narration": "Materials and labor rates are what your price book is built from. Here is how to keep them current."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=/Materials/]",
+      "caption": "Materials",
+      "narration": "In the Price book, open the Materials tab.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-mat-\"] >> nth=0",
+      "caption": "What a material holds",
+      "narration": "Each material has a unit, your cost, your price, a waste percent, and the margin."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-mat-name\"]",
+      "value": "Quarter round, primed",
+      "caption": "Name",
+      "narration": "To add one, type its name."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-mat-unit\"]",
+      "value": "lf",
+      "caption": "Unit",
+      "narration": "Choose the unit you buy it in."
+    },
+    {
+      "action": "type",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"Cost $\")) > input",
+      "value": "0.60",
+      "caption": "Cost",
+      "narration": "Type what it costs you."
+    },
+    {
+      "action": "type",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"Price $\")) > input",
+      "value": "1.50",
+      "caption": "Price",
+      "narration": "And what you charge."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-material\"]",
+      "caption": "Add",
+      "narration": "Then click the plus button.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-mat-\"]:has-text(\"Quarter round\")",
+      "caption": "In the list",
+      "narration": "It joins the list, and the margin is worked out for you."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-mat-\"]:has-text(\"Quarter round\") [data-testid^=\"button-edit-mat-\"]",
+      "caption": "Edit",
+      "chapter": "Change a price",
+      "narration": "When a price goes up, choose the pencil on that row.",
+      "holdMs": 800
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-mat-price\"]",
+      "value": "1.65",
+      "caption": "New price",
+      "narration": "Type the new price."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-mat\"]",
+      "caption": "Save",
+      "narration": "And save.",
+      "holdMs": 900
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=/Labor/]",
+      "caption": "Labor",
+      "chapter": "Labor rates",
+      "narration": "Labor works the same way, on the Labor tab.",
+      "holdMs": 800
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lab-name\"]",
+      "value": "Tile setter",
+      "caption": "Name",
+      "narration": "Name the rate."
+    },
+    {
+      "action": "type",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"Cost/hr $\")) > input",
+      "value": "34",
+      "caption": "Cost per hour",
+      "narration": "Cost per hour is what you pay."
+    },
+    {
+      "action": "type",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"Price/hr $\")) > input",
+      "value": "80",
+      "caption": "Price per hour",
+      "narration": "Price per hour is what you charge."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-labor\"]",
+      "caption": "Add",
+      "narration": "Then click the plus button.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-lab-\"]:has-text(\"Tile setter\")",
+      "caption": "In the list",
+      "narration": "The new rate is in your list, with its cost and its price."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Where to find it",
+      "narration": "Materials and Labor are tabs of the Price book, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to add materials and labor rates | ConstructHUB CRM",
+    "description": "Keep your costs and prices current in the ConstructHUB CRM price book. Add a material with its unit, cost and price, change a price, and add a labor rate. The margin is worked out for you. Recorded in a demo workspace with made-up numbers.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "price book",
+      "material prices",
+      "labor rates",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Know your margins",
+    "accent": "margins",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

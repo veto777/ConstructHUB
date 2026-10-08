@@ -1,0 +1,124 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-payment-methods",
+  "title": "Choose how clients can pay",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Bank, card, or both",
+      "narration": "Choose how clients may pay you online: by bank transfer, by card, or both."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-rail-policy\"] >> text=Payment methods you offer",
+      "caption": "Payment methods you offer",
+      "narration": "In Settings, under Payments, find Payment methods you offer."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"select-rail-mode\"]",
+      "caption": "Allowed methods",
+      "narration": "Open Allowed methods. You can allow both, bank transfer only, or card only.",
+      "holdMs": 900
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Keep both",
+      "narration": "We will keep both.",
+      "holdMs": 500
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-ach-only-over\"]",
+      "value": "5000",
+      "caption": "Bank only above an amount",
+      "narration": "With both allowed, you can make large payments bank transfer only. Type the amount where that starts."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-rail-policy\"]",
+      "caption": "Save payment methods",
+      "narration": "Choose Save payment methods. Clients only see the methods you allow.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-card-fee\"] >> text=Pass the card processing fee to the client",
+      "caption": "The card fee",
+      "chapter": "Pass on the card fee",
+      "narration": "Next, you can pass the card processing fee to the client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-pass-fee\"]",
+      "caption": "Switch it on",
+      "narration": "Switch it on, and a card checkout adds a line called Card processing fee.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-surcharge-pct\"]",
+      "value": "3",
+      "caption": "Card surcharge",
+      "narration": "Type the percent to add for cards."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-card-fee\"]",
+      "caption": "Save fee setting",
+      "narration": "And choose Save fee setting.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-card-fee\"] >> text=/Bank transfer \\(ACH\\) is always fee-free/",
+      "caption": "Bank transfer has no added fee",
+      "chapter": "What clients see",
+      "narration": "A client who pays by bank transfer is never charged that fee."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-payments\"]",
+      "caption": "Open payments",
+      "narration": "These rules apply to online payments through your own Stripe account, set up on the Payments page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "Payment methods are in Settings, near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to choose the payment methods clients can use | ConstructHUB CRM",
+    "description": "Decide how clients pay you online in the ConstructHUB CRM: bank transfer, card, or both, with bank transfer only above an amount you set. You can also pass the card processing fee to the client. Recorded in a demo workspace with a stand-in payment account.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "ACH payments",
+      "card payments",
+      "card processing fee",
+      "online payments",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "How clients pay",
+    "accent": "pay",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-client-share",
+  "title": "A client shares the estimate with someone else",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "The client shares it",
+      "narration": "An estimate often needs a second opinion. Your client can share it, and you see who it went to."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "luis.orozco@example.com",
+        "estimate": "E-2002"
+      },
+      "caption": "The client's estimate",
+      "narration": "First, your client's screen. They have the estimate open."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"share-estimate-card\"]",
+      "caption": "Need someone else to see this?",
+      "narration": "Under the estimate is a box that asks: need someone else to see this?"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"share-estimate-card\"] input",
+      "value": "maria.orozco@example.com",
+      "caption": "The other person's address",
+      "chapter": "Send a secure link",
+      "narration": "They type the other person's email address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-share-estimate\"]",
+      "caption": "Send secure link",
+      "narration": "And choose Send secure link.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-shared-with\"]",
+      "caption": "Shared with",
+      "narration": "The page confirms who it was shared with. That person gets their own link by email."
+    },
+    {
+      "action": "session",
+      "url": "/crm/clients",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "What you see",
+      "narration": "Now your screen, in the CRM.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Luis Orozco\") a",
+      "caption": "Open the client",
+      "narration": "Open the client.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\")",
+      "caption": "The estimate",
+      "narration": "Under Estimates, his estimate has a new note: one access event."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\") [data-testid^=\"access-events-\"]",
+      "caption": "Open it",
+      "narration": "Choose it.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\") [data-testid^=\"access-events-list-\"]",
+      "caption": "Who and when",
+      "narration": "It shows who your client shared the estimate with, and when."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "You will find this on the client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "When a client shares your estimate | ConstructHUB CRM",
+    "description": "In the ConstructHUB CRM a client can share an estimate with a spouse or business partner from the estimate page. The other person gets their own secure link, and you see who it was shared with. Recorded in a demo workspace with made-up people.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor estimate",
+      "share an estimate",
+      "decision makers",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See who is reading",
+    "accent": "reading",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}

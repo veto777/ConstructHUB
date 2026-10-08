@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-client-portal-signin",
+  "durationSec": 59,
+  "video": {
+    "key": "tutorials/crm-client-portal-signin.0d1526fd.mp4",
+    "bytes": 4555118,
+    "sha256": "0d1526fda428a1b48d5973957a35677d945c7e7f14038b0841fe1121e1d6a9f8"
+  },
+  "captions": {
+    "key": "tutorials/crm-client-portal-signin.b6e26c03.vtt",
+    "bytes": 1267,
+    "sha256": "b6e26c03aa256522622a79d830f4988e6a7b6d7a67c395a22198fc92e1f3b31d"
+  },
+  "poster": {
+    "key": "tutorials/crm-client-portal-signin.d88c9783.jpg",
+    "bytes": 77173,
+    "sha256": "d88c97836fff695b930b564a00a0a333a0d85447e288067682b4f8564b1ebbc7"
+  },
+  "uploaded": {
+    "at": "2026-10-08T08:13:03.537Z",
+    "video": "3d5301de65d8c01a347b3112bd9aae94",
+    "captions": "835c1d8eb0ac80ca8c01aeac4e66154b",
+    "poster": "8b724cb48bc736fc32ab46af485f1f78"
+  }
+}

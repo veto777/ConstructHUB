@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-estimate-client-decline",
+  "durationSec": 65,
+  "video": {
+    "key": "tutorials/crm-estimate-client-decline.7a314fcc.mp4",
+    "bytes": 5586823,
+    "sha256": "7a314fccee90473cfc0c04713f30ff13039730db6488a09eb58a7d4c3335d01c"
+  },
+  "captions": {
+    "key": "tutorials/crm-estimate-client-decline.c8ef6d8e.vtt",
+    "bytes": 1247,
+    "sha256": "c8ef6d8e5793a03988351526d5ad6ed2baad6c4d5088ca0f21ae6b22cf1c98ab"
+  },
+  "poster": {
+    "key": "tutorials/crm-estimate-client-decline.89681873.jpg",
+    "bytes": 84092,
+    "sha256": "8968187345bf44ca649573a925dc61863362084773bcc5caa248d20112e28e14"
+  },
+  "uploaded": {
+    "at": "2026-10-08T08:05:33.745Z",
+    "video": "3f49625976223d542f9a8bbaa472b8e4",
+    "captions": "871350a0fcdd48c4e4693274de172d21",
+    "poster": "7de800474bda74f9a675c0f4a54203c1"
+  }
+}

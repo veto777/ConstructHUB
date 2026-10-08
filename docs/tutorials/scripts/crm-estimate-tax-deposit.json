@@ -1,0 +1,141 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-tax-deposit",
+  "title": "Tax, deposit and hidden lines on an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "Tax and deposit",
+      "narration": "An estimate has a few settings beyond its lines: the tax rate, a deposit, and what the client sees."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-1999\"]",
+      "caption": "Open E-1999",
+      "narration": "Open the estimate. This one is a draft for Imani Brewster, in Dallas.",
+      "holdMs": 800
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-edit-estimate\"]",
+      "caption": "Edit",
+      "narration": "Choose Edit.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-edit-tax\"]",
+      "caption": "Tax %",
+      "narration": "Tax percent is the rate for this one estimate. You can type a different rate here."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-deposit\"]",
+      "value": "500",
+      "caption": "Deposit",
+      "narration": "Deposit is what you ask for up front. Type the amount in dollars."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"edit-line-1\"]",
+      "caption": "Two boxes under every line",
+      "chapter": "Line by line",
+      "narration": "Further down, every line has two boxes underneath."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"edit-line-taxable-1\"]",
+      "caption": "Taxable",
+      "narration": "Untick Taxable, and that line is left out of the tax.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"edit-line-hidden-1\"]",
+      "caption": "Hidden from client",
+      "narration": "Tick Hidden from client to keep a line off the client's copy.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-edit-tax\"]",
+      "caption": "Totals update",
+      "narration": "The tax and the total update as you go."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-estimate-edit\"]",
+      "caption": "Save changes",
+      "narration": "Choose Save changes.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"detail-line-1\"]",
+      "caption": "Marked hidden",
+      "chapter": "What the client sees",
+      "narration": "On your copy, that line is now marked hidden."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Deposit due",
+      "caption": "Deposit due",
+      "narration": "And the deposit shows under the total."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview-estimate\"]",
+      "caption": "Preview",
+      "narration": "Preview opens the client's view.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"estimate-document\"] table",
+      "caption": "The client's lines",
+      "narration": "Your client sees two lines. The hidden one is not listed, but its price is still in the total."
+    },
+    {
+      "action": "back",
+      "caption": "Back to the CRM",
+      "narration": "Close the preview to come back to the estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Where to find it",
+      "narration": "Every estimate is under Estimates, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set tax and a deposit on an estimate | ConstructHUB CRM",
+    "description": "Fine-tune an estimate in the ConstructHUB CRM: set its tax rate, ask for a deposit, mark a line as not taxable, and hide a line from the client's copy. Then preview what the client sees. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor estimate",
+      "sales tax on estimate",
+      "deposit",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Tax and deposit",
+    "accent": "deposit",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

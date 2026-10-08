@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-pamphlets",
+  "durationSec": 61,
+  "video": {
+    "key": "tutorials/crm-pamphlets.ac703324.mp4",
+    "bytes": 5862218,
+    "sha256": "ac703324dbf459d638de3c6e7dae4d6b7027a080a4e827bda6c8e636babf994b"
+  },
+  "captions": {
+    "key": "tutorials/crm-pamphlets.a602d0de.vtt",
+    "bytes": 1261,
+    "sha256": "a602d0ded92f098cc08b96d919593c05d4047fb6adffb5cbbcb9e0fcf620903c"
+  },
+  "poster": {
+    "key": "tutorials/crm-pamphlets.e10959cc.jpg",
+    "bytes": 82881,
+    "sha256": "e10959cc24654eb349da8f3931ec15451423eb1c83aed3eea2d3892820554682"
+  },
+  "uploaded": {
+    "at": "2026-10-08T07:50:32.791Z",
+    "video": "796fb3a22267f7e4199af68dca10323b",
+    "captions": "045a17ac4fb6b94fd95da5181da2124a",
+    "poster": "f91d2e5613f84014ca6bcc77aacd8625"
+  }
+}

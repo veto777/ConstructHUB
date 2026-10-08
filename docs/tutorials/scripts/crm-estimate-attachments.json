@@ -1,0 +1,130 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-attachments",
+  "title": "Attach files to an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Attach the file",
+      "narration": "Attach a spec sheet or a care guide to an estimate, and your client can download it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Halvorsen-Quist Properties\") a",
+      "caption": "Open the client",
+      "narration": "Open the client. Here, Halvorsen-Quist Properties, in San Antonio.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2000\")",
+      "caption": "The estimate",
+      "narration": "Under Estimates, find the estimate the file belongs to."
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2000\") [data-testid^=\"button-attach-\"]",
+      "files": [
+        "care-guide.pdf"
+      ],
+      "caption": "Attach",
+      "narration": "Choose Attach, and pick the file. It can be a PDF or a picture.",
+      "holdMs": 600
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2000\") [data-testid^=\"estimate-attachment-\"]",
+      "caption": "Uploaded",
+      "narration": "It uploads in a moment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2000\") [data-testid^=\"estimate-attachment-\"]",
+      "caption": "Pinned to the estimate",
+      "narration": "The file is now pinned to this estimate. The bin beside it takes it off again."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com",
+        "estimate": "E-2000"
+      },
+      "caption": "The client's estimate",
+      "chapter": "What your client sees",
+      "narration": "Now your client's screen, with the estimate open."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"estimate-attachments\"]",
+      "caption": "Attached documents",
+      "narration": "Below the estimate is a section called Attached documents, with your file."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"public-attachment-download-\"]",
+      "caption": "Download",
+      "narration": "They choose Download to open it."
+    },
+    {
+      "action": "session",
+      "url": "/crm/clients",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "Your record",
+      "narration": "Back in the CRM, open the client again.",
+      "holdMs": 1000
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Halvorsen-Quist Properties\") a",
+      "caption": "Open the client",
+      "narration": "Halvorsen-Quist Properties.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"timeline-entry-att-\"]",
+      "caption": "Logged under Activity",
+      "narration": "The client's Activity shows when the file was attached."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Attach is on each estimate, on the client's page under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to attach files to an estimate | ConstructHUB CRM",
+    "description": "Add a spec sheet, a care guide or a photo to an estimate in the ConstructHUB CRM. The file is pinned to that estimate and your client downloads it from the estimate page. Recorded in a demo workspace with a made-up client and a sample PDF.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor estimate",
+      "estimate attachments",
+      "spec sheet",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Attach spec sheets",
+    "accent": "Attach",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

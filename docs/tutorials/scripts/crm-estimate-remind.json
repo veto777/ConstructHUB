@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-remind",
+  "title": "Nudge a client about an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Find the quiet estimate",
+      "narration": "A client has your estimate and has gone quiet. One click sends them a reminder."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Luis Orozco\") a",
+      "caption": "Open the client",
+      "narration": "Open the client. Here, Luis Orozco.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\")",
+      "caption": "Sent and opened, not answered",
+      "narration": "Under Estimates, his estimate was sent and opened, but he has not answered."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\") [data-testid^=\"button-remind-\"]",
+      "caption": "Remind",
+      "narration": "Remind is on every sent estimate that is still waiting for an answer."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2002\") [data-testid^=\"button-remind-\"]",
+      "caption": "Choose Remind",
+      "chapter": "Send the reminder",
+      "narration": "Choose Remind.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "li[role=\"status\"]:has-text(\"Reminder recorded\")",
+      "caption": "Reminder recorded",
+      "narration": "The CRM confirms it. An email went out, and a text as well."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-phone\"]",
+      "caption": "The text goes to their mobile",
+      "narration": "The text goes to the mobile number on the client's page."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.link",
+      "input": {
+        "to": "luis.orozco@example.com"
+      },
+      "caption": "The client opens the email",
+      "chapter": "What your client gets",
+      "narration": "Now your client's screen. The reminder email has a button that opens the estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-total\"]",
+      "caption": "The same estimate",
+      "narration": "It is the same estimate, with its total."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"prepared-for\"]",
+      "caption": "Ready to approve",
+      "narration": "They can read it again, and approve it from this page."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "narration": "Back in the CRM, you can remind again any time the estimate is still open.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Remind is on the client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to remind a client about an estimate | ConstructHUB CRM",
+    "description": "When a client goes quiet on an estimate, send a reminder from the ConstructHUB CRM in one click. The client gets an email, and a text when texting is set up, with a link back to the estimate. Recorded in a demo workspace; no real message is sent.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "estimate follow-up",
+      "estimate reminder",
+      "text reminders",
+      "close more bids",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Nudge quiet clients",
+    "accent": "Nudge",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}

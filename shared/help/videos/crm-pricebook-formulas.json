@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-pricebook-formulas",
+  "durationSec": 71,
+  "video": {
+    "key": "tutorials/crm-pricebook-formulas.fd7e0323.mp4",
+    "bytes": 5543429,
+    "sha256": "fd7e0323904d62a828f4f121b6857c96ded59c26e031c2c217056a610213e35c"
+  },
+  "captions": {
+    "key": "tutorials/crm-pricebook-formulas.b02447c6.vtt",
+    "bytes": 1508,
+    "sha256": "b02447c62b60473b968d3d2ffa7f8fdf2678e2b350e939213d6b6b37f7329167"
+  },
+  "poster": {
+    "key": "tutorials/crm-pricebook-formulas.9904824d.jpg",
+    "bytes": 87562,
+    "sha256": "9904824d3a0c23dabe20742b5f00f0e5bd0cf8d8def4060172dd9b8bb263098a"
+  },
+  "uploaded": {
+    "at": "2026-10-08T07:57:45.480Z",
+    "video": "9f9b80099d8374f4fee72ad6565dddc2",
+    "captions": "0745c807a2386894fabb914dee5c0afd",
+    "poster": "a1d08c94d62bfb2ed13607321c991c60"
+  }
+}

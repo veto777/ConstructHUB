@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-estimate-client-question",
+  "durationSec": 72,
+  "video": {
+    "key": "tutorials/crm-estimate-client-question.2ed31ab2.mp4",
+    "bytes": 5907785,
+    "sha256": "2ed31ab232a2f3ba367c6d47d7d9eb122b115fa88f7876d0c22f6d464bd88525"
+  },
+  "captions": {
+    "key": "tutorials/crm-estimate-client-question.b6f78109.vtt",
+    "bytes": 1299,
+    "sha256": "b6f781092711091a25d05431e4146fdcc44e5e4a20d94bc587c7b70642091ff1"
+  },
+  "poster": {
+    "key": "tutorials/crm-estimate-client-question.cf43cf66.jpg",
+    "bytes": 83991,
+    "sha256": "cf43cf66a7e230a10540df219c9eafbaf1a2f850d73402c011c7b647eb0a90a0"
+  },
+  "uploaded": {
+    "at": "2026-10-08T07:57:49.835Z",
+    "video": "718145536787ebe55af572cd2510e966",
+    "captions": "4b38730e9090feb67a8b0da95c44b9d8",
+    "poster": "4d2f18e8b78e3077d0be10a4b7c2c90b"
+  }
+}

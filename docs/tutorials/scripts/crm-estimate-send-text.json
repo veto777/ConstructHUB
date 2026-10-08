@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-send-text",
+  "title": "Send an estimate by text as well",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Tick the box",
+      "narration": "An estimate goes to your client by email. You can text them the link at the same time."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Imani Brewster\") a",
+      "caption": "Open the client",
+      "narration": "Open the client. Here, Imani Brewster, in Dallas.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1999\")",
+      "caption": "A draft estimate",
+      "narration": "Under Estimates is a draft that has not been sent yet."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1999\") [data-testid^=\"toggle-send-sms-\"]",
+      "caption": "Also text it",
+      "narration": "Beside the Send button is a box called Also text it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1999\") [data-testid^=\"toggle-send-sms-\"]",
+      "caption": "Tick it",
+      "narration": "Tick it.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1999\") [data-testid^=\"button-send-\"]",
+      "caption": "Send",
+      "chapter": "Send it",
+      "narration": "Then choose Send.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "li[role=\"status\"]:has-text(\"Estimate sent\")",
+      "caption": "Emailed and texted",
+      "narration": "The CRM confirms the estimate was emailed, and texted."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-phone\"]",
+      "caption": "The client's mobile",
+      "narration": "The text goes to the mobile number on the client's page, with a link to the estimate."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Make it the default",
+      "narration": "To have the box ticked every time, go to Settings."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"switch-sms-estimates\"]",
+      "caption": "Text estimates to clients",
+      "narration": "Scroll down to the SMS card, and switch on Text estimates to clients."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-sms-from\"]",
+      "caption": "Your text number",
+      "narration": "Texts are sent from your own text number, shown just above."
+    },
+    {
+      "action": "wait",
+      "caption": "Still your choice each time",
+      "narration": "You can still untick the box on any single send.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Send is on each estimate, on the client's page under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to text an estimate to a client | ConstructHUB CRM",
+    "description": "Send an estimate by email and text at the same time in the ConstructHUB CRM. Tick Also text it beside Send, or make it the default in Settings. Recorded in a demo workspace with a stand-in texting number; no real message is sent.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "text an estimate",
+      "send estimate by text",
+      "SMS for contractors",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Text your estimates",
+    "accent": "Text",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

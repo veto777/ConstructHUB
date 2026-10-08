@@ -1,0 +1,129 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pamphlets",
+  "title": "Brochures for your clients",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Upload it once",
+      "narration": "Upload a brochure or a warranty once, and every client finds it in their portal."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Caleb & Nora Hadley\") a",
+      "caption": "Open any client",
+      "narration": "Open any client. Here, Caleb and Nora Hadley, in Austin.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-pamphlet-manager\"]",
+      "caption": "Company pamphlets",
+      "narration": "At the bottom of the page is Company pamphlets."
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid=\"button-upload-pamphlet\"]",
+      "files": [
+        "care-guide.pdf"
+      ],
+      "caption": "Upload PDF",
+      "narration": "Choose Upload PDF, and pick the file.",
+      "holdMs": 600
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid^=\"pamphlet-row-\"]",
+      "caption": "Uploaded",
+      "narration": "It uploads in a moment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pamphlet-row-\"] >> text=care-guide.pdf",
+      "caption": "Listed for the whole company",
+      "narration": "The file is listed here. It belongs to your whole company, not only to this client."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "hadleys@example.com"
+      },
+      "caption": "A client's portal",
+      "chapter": "What clients see",
+      "narration": "Now a client's screen. This is their portal."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-pamphlets\"]",
+      "caption": "From your company",
+      "narration": "On Home, under your company's name, is the file you uploaded."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pamphlet-download-\"]",
+      "caption": "Download",
+      "narration": "They choose Download to open it."
+    },
+    {
+      "action": "session",
+      "url": "/crm/clients",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "Every client has it",
+      "narration": "Back in the CRM, open a different client.",
+      "holdMs": 1000
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Hannah Lindqvist\") a",
+      "caption": "Another client",
+      "narration": "Hannah Lindqvist, in Buffalo.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pamphlet-row-\"]",
+      "caption": "The same file",
+      "narration": "The same file is on her page too. The bin removes it for everyone."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Company pamphlets is at the bottom of every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to share a brochure with every client | ConstructHUB CRM",
+    "description": "Upload a brochure, a warranty or a care guide once in the ConstructHUB CRM and every client can download it from their portal. Recorded in a demo workspace with made-up clients and a sample PDF.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "client portal",
+      "company brochure",
+      "warranty document",
+      "customer portal",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "One brochure, every client",
+    "accent": "every",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}
