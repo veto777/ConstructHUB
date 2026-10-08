@@ -167,4 +167,11 @@ describe("Search Console numbers in a report", () => {
     const w = workSection([], now, { since: new Date("2026-10-01T00:00:00Z"), hasPlan: true })!;
     expect([w.since, w.doneCount, w.done]).toEqual(["2026-10-01T00:00:00.000Z", 0, []]);
   });
+  it("a scheduled report's work ends at its cutoff: a task done after it is the next report's", async () => {
+    const { workSection } = await import("./site-report");
+    const cutoff = new Date("2026-10-08T12:00:00Z"), since = new Date("2026-10-01T12:00:00Z");
+    const t = (title: string, done_at: string) => ({ title, status: "done", done_at, target: null, note: null, kind: "page" });
+    const w = workSection([t("in", "2026-10-05T00:00:00Z"), t("after the cutoff", "2026-10-08T12:00:01Z"), t("at the last cutoff", "2026-10-01T12:00:00Z")], cutoff, { since })!;
+    expect(w.done.map((x) => x.title)).toEqual(["in"]);
+  });
 });

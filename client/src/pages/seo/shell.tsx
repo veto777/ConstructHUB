@@ -49,7 +49,7 @@ export type SeoStatus = {
   };
 };
 export type SeoSite = {
-  id: number; domain: string; businessName?: string | null; alertsEnabled?: boolean; alertDrop?: number; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
+  id: number; domain: string; businessName?: string | null; alertsEnabled?: boolean; alertDrop?: number; rankFrequency?: "weekly" | "twice_weekly" | "daily"; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
   keywordCount: number; nextRankCheckAt: string | null; lastRankCheckAt: string | null; nextBacklinksAt: string | null; lastBacklinksAt: string | null;
   starred?: boolean; createdAt?: string;
 };

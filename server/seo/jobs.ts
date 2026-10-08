@@ -39,7 +39,20 @@ const RUN_WINDOW_MS = 90 * 60_000;
 const TASK_GETS_PER_TICK = 300;
 const TASK_GET_CONCURRENCY = 10;
 export const BACKLINK_ROWS = 100;
-export const WEEKLY_SKIPPED_MESSAGE = "This month's included SEO data is used up, so the automatic weekly check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.";
+export const WEEKLY_SKIPPED_MESSAGE = "This month's included SEO data is used up, so the automatic check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.";
+/**
+ * How often a site's rankings are checked automatically. `hours` is the gap between checks; `perMonth` the checks in a
+ * 30-day month (what the monthly figure on the page is multiplied by). Every one spends the month's included data only.
+ */
+export const RANK_FREQUENCIES = {
+  weekly: { label: "Every week", hours: 168, perMonth: 30 / 7 },
+  twice_weekly: { label: "Twice a week", hours: 84, perMonth: 30 / 3.5 },
+  daily: { label: "Every day", hours: 24, perMonth: 30 },
+} as const;
+export type RankFrequency = keyof typeof RANK_FREQUENCIES;
+export const RANK_FREQUENCY_KEYS = Object.keys(RANK_FREQUENCIES) as RankFrequency[];
+/** The gap for a site's frequency, as SQL (an unknown value is weekly). */
+const GAP_SQL = (col: string) => `make_interval(hours => CASE ${col} WHEN 'daily' THEN 24 WHEN 'twice_weekly' THEN 84 ELSE 168 END)`;
 
 export type SiteRow = { id: number; user_id: number; domain: string; location_code: number; language_code: string; devices: DeviceSet; serp_depth: number; business_name?: string | null; alerts_enabled?: boolean; alert_drop?: number; next_rank_check_at?: Date; next_backlinks_at?: Date; last_rank_check_at?: Date | null; last_backlinks_at?: Date | null; created_at?: Date };
 
@@ -263,10 +276,17 @@ export async function retryOwedRefunds(): Promise<number> {
   return done;
 }
 
-/** Create the weekly runs for sites that are due (owner's plan still includes the tools, DataForSEO connected). */
+/**
+ * Create the automatic runs for sites that are due (owner's plan still includes the tools, DataForSEO connected), at
+ * each site's own frequency. A site already checked today (the customer pressed "Run check now") is not checked again
+ * the same day: one check a day is all a daily schedule buys.
+ */
 export async function scheduleWeeklyRuns(): Promise<void> {
+  await pool.query(
+    `UPDATE seo_sites SET next_rank_check_at = (current_date + 1)::timestamp AT TIME ZONE 'UTC'
+      WHERE next_rank_check_at <= now() AND last_rank_check_at >= current_date::timestamp AT TIME ZONE 'UTC' AND coalesce(rank_frequency, 'weekly') = 'daily'`).catch(() => {});
   const { rows: due } = await pool.query(
-    `UPDATE seo_sites SET next_rank_check_at=now()+interval '7 days'
+    `UPDATE seo_sites SET next_rank_check_at=now()+${GAP_SQL("coalesce(rank_frequency, 'weekly')")}
      WHERE next_rank_check_at<=now() AND EXISTS (SELECT 1 FROM seo_keywords k WHERE k.site_id=seo_sites.id)
      RETURNING *`);
   if (!due.length || !isConfigured()) return;

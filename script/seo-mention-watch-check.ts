@@ -101,8 +101,16 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   mentionsDeps.request = (async () => ok20([], 0.025)) as any;
   const lease5 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
   await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease5 });
-  const t1 = (await pool.query("SELECT page->>'resumeFrom' AS r, page->>'tieOverflow' AS t, cardinality(seen_keys) AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
-  ok(t1.t === "true" && String(t1.r).startsWith("2026-09-30T08:00:01") && Number(t1.n) === 50, `ties: resumes a second on, says so, keeps every page read (${JSON.stringify(t1)})`);
+  const t1 = (await pool.query("SELECT page->>'resumeFrom' AS r, page->>'resumeOffset' AS o, cardinality(seen_keys) AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
+  ok(String(t1.r).startsWith("2026-09-30T08:00:00") && t1.o === "50" && Number(t1.n) === 50, `ties: the next check reads on INTO that moment, 50 in (${JSON.stringify(t1)})`);
+  // The next check (another day) asks for that moment from the 51st page on, and counts on from there.
+  await pool.query("UPDATE seo_mention_checks SET run_on = run_on - 1, created_at = created_at - interval '1 day' WHERE site_id=$1", [s.id]);
+  let tieAsk: any = null;
+  mentionWatchDeps.request = (async (_m: string, _p: string, body: any[]) => { calls++; tieAsk = body[0]; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.025, result: [{ total_count: 30, items: Array.from({ length: 30 }, (_, i) => item(`u${i}.com`, "Alpine Exteriors news", "/p", "2026-09-30 08:00:00 +00:00")) }] }] }; }) as any;
+  const lease5b = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
+  await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease5b });
+  const t2 = (await pool.query("SELECT complete, jsonb_array_length(page->'rows') AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
+  ok(tieAsk.offset === 50 && tieAsk.filters[2][1] === ">=" && t2.complete === true && t2.n === 30, `the rest of that moment is read: offset ${tieAsk.offset}, ${t2.n} pages, complete ${t2.complete}`);
   // 13. A business name written with two spaces is the same name: its check is saved (not refused forever).
   await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
   await pool.query("UPDATE seo_sites SET business_name='Alpine  Exteriors', mention_name=NULL WHERE id=$1", [s.id]);

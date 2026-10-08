@@ -21,7 +21,7 @@ type Overview = {
   rows: { id: number; keyword: string; location?: string | null; tags: string[]; searchVolume: number | null; cpc: number | null; difficulty: number | null; positions: Record<string, Position> }[];
   runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; created_at: string; finished_at: string | null }[];
   searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean } | null;
-  nextCheck: { serps: number; priceCents?: number; nextAt: string | null };
+  nextCheck: { serps: number; priceCents?: number; nextAt: string | null; perMonthCents?: Record<"weekly" | "twice_weekly" | "daily", number> };
 };
 
 const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
@@ -98,7 +98,7 @@ export default function SeoOverviewPage() {
             ) : (
               <Tile label="Search Console" value="—" hint={<Link href="/search-console" className="g-link">Connect the property for clicks and impressions</Link>} testId="tile-gsc-missing" />
             )}
-            <Tile label="Next weekly check" value={configured ? fmtDate(o.nextCheck.nextAt) : "—"} hint={configured ? `${fmtNum(o.nextCheck.serps)} result page${o.nextCheck.serps === 1 ? "" : "s"} per check` : "Being switched on"} testId="tile-next-check" />
+            <Tile label="Next automatic check" value={configured ? fmtDate(o.nextCheck.nextAt) : "—"} hint={configured ? `${fmtNum(o.nextCheck.serps)} result page${o.nextCheck.serps === 1 ? "" : "s"} per check` : "Being switched on"} testId="tile-next-check" />
             {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <RankHistoryPanel site={site} />
@@ -112,7 +112,7 @@ export default function SeoOverviewPage() {
               <button type="button" className="g-pill g-pill--sm" disabled={volumes.isPending || !configured} onClick={() => volumes.mutate()} data-testid="button-get-volumes">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get search volumes{status.data?.prices?.searchVolumes ? ` · about ${money(status.data.prices.searchVolumes)}` : ""}</button>
             </p>
           )}
-          <TrackingSettings site={site} onSaved={invalidate} />
+          <TrackingSettings site={site} onSaved={invalidate} perMonthCents={o?.nextCheck.perMonthCents} includedCents={status.data?.credits?.includedCents ?? null} />
           {o.rows.length === 0 ? (
             <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href="/seo/keywords" className="g-link">research keywords</Link> and track the ones with volume.</p></Empty>
           ) : (
@@ -214,15 +214,18 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
 }
 
 /** Per-site settings: the name on the Google Business Profile (to find the business in the map pack) and alerts. */
-function TrackingSettings({ site, onSaved }: { site: SeoSite; onSaved: () => void }) {
+const FREQUENCY = { weekly: "Every week", twice_weekly: "Twice a week", daily: "Every day" } as const;
+type Frequency = keyof typeof FREQUENCY;
+function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { site: SeoSite; onSaved: () => void; /** A month of automatic checks at each frequency, at today's keywords. */ perMonthCents?: Record<Frequency, number>; includedCents: number | null }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [name, setName] = useState(site.businessName ?? "");
   const [alerts, setAlerts] = useState(site.alertsEnabled !== false);
   const [drop, setDrop] = useState(site.alertDrop ?? 3);
-  useEffect(() => { setName(site.businessName ?? ""); setAlerts(site.alertsEnabled !== false); setDrop(site.alertDrop ?? 3); }, [site.id, site.businessName, site.alertsEnabled, site.alertDrop]);
+  const [freq, setFreq] = useState<Frequency>(site.rankFrequency ?? "weekly");
+  useEffect(() => { setName(site.businessName ?? ""); setAlerts(site.alertsEnabled !== false); setDrop(site.alertDrop ?? 3); setFreq(site.rankFrequency ?? "weekly"); }, [site.id, site.businessName, site.alertsEnabled, site.alertDrop, site.rankFrequency]);
   const m = useMutation({
-    mutationFn: () => api("POST", `/api/seo/sites/${site.id}/settings`, { businessName: name.trim() || null, alertsEnabled: alerts, alertDrop: drop }),
+    mutationFn: () => api("POST", `/api/seo/sites/${site.id}/settings`, { businessName: name.trim() || null, alertsEnabled: alerts, alertDrop: drop, rankFrequency: freq }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); onSaved(); toast({ title: "Tracking settings saved" }); },
     onError: (e) => toast({ title: "Couldn't save the settings", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -238,6 +241,14 @@ function TrackingSettings({ site, onSaved }: { site: SeoSite; onSaved: () => voi
         <label className="mt-2 flex flex-wrap items-center gap-2"><span className="g-text-2">A ranking counts as moved when it changes by at least</span>
           <select className="g-select" value={drop} onChange={(e) => setDrop(Number(e.target.value))} disabled={!alerts} data-testid="select-alert-drop">{[1, 2, 3, 5, 10].map((n) => <option key={n} value={n}>{n} position{n === 1 ? "" : "s"}</option>)}</select>
         </label>
+        <label className="mt-3 flex flex-wrap items-center gap-2"><span className="g-text-2">Check rankings automatically</span>
+          <select className="g-select" value={freq} onChange={(e) => setFreq(e.target.value as Frequency)} data-testid="select-rank-frequency">
+            {(Object.keys(FREQUENCY) as Frequency[]).map((f) => <option key={f} value={f}>{FREQUENCY[f]}{perMonthCents ? ` — about ${money(perMonthCents[f])} a month` : ""}</option>)}
+          </select>
+        </label>
+        <p className="g-text-2 mt-1 text-[12px]" data-testid="text-rank-frequency-note">
+          {perMonthCents ? `At your ${fmtNum(site.keywordCount)} tracked keyword${site.keywordCount === 1 ? "" : "s"}, a month of checks ${FREQUENCY[freq].toLowerCase()} uses about ${money(perMonthCents[freq])} of SEO data` : "The cost of a month of checks shows here once keywords are tracked"}{includedCents != null && perMonthCents ? ` — your plan includes ${money(includedCents)} a month` : ""}. Automatic checks only use your included data; when it runs out they wait, and are never charged to credit you bought. A site already checked today is not checked again that day.
+        </p>
         <div className="mt-3"><Button type="submit" disabled={m.isPending} data-testid="button-save-settings">{m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}</Button></div>
       </form>
     </details>

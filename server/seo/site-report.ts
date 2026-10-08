@@ -21,6 +21,9 @@ export const REPORT_SCHEDULE_DDL = [
     last_sent_at timestamptz,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // The end of the work a scheduled report covers, fixed when that report is first due: a retry for some recipients
+  // tells the same work, and the next report starts exactly here (no task falls between two reports).
+  `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_cutoff timestamptz`,
 ];
 
 export const MAX_RECIPIENTS = 5;
@@ -77,12 +80,12 @@ export const reportNote = (note: string | null | undefined) => {
 };
 export function workSection(rows: { title: string; status: string; done_at: string | Date | null; target: string | null; note: string | null; kind: string; due_on?: string | null; owner?: string | null }[], now = new Date(), opts: { since?: Date | null; hasPlan?: boolean } = {}): WorkSection | null {
   if (!rows.length && !opts.hasPlan) return null;
-  const since = opts.since ? opts.since.getTime() : now.getTime() - WORK_DAYS * 864e5;
+  const since = opts.since ? opts.since.getTime() : now.getTime() - WORK_DAYS * 864e5, until = now.getTime();
   const today = now.toISOString().slice(0, 10), soon = new Date(now.getTime() + 7 * 864e5).toISOString().slice(0, 10);
   const openRows = rows.filter((t) => t.status === "todo" || t.status === "doing");
   const due = (t: { due_on?: string | null }) => (typeof t.due_on === "string" && /^\d{4}-\d{2}-\d{2}/.test(t.due_on) ? t.due_on.slice(0, 10) : null);
   const overdue = openRows.filter((t) => { const d = due(t); return d !== null && d < today; }).sort((a, b) => due(a)!.localeCompare(due(b)!));
-  const done = rows.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).getTime() >= since)
+  const done = rows.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).getTime() > since && new Date(t.done_at).getTime() <= until)
     .sort((a, b) => new Date(b.done_at!).getTime() - new Date(a.done_at!).getTime());
   return {
     days: WORK_DAYS, doneCount: done.length, open: openRows.length, inProgress: rows.filter((t) => t.status === "doing").length,
@@ -140,7 +143,7 @@ export const reportDeps: { searchConsole: (userId: number, domain: string) => Pr
  * out, so no work falls between two reports). `strict`: a plan that cannot be read fails the report (a scheduled send
  * is then tried again) instead of being shown as unavailable.
  */
-export async function buildSiteReport(userId: number, siteId: number, opts: { workSince?: Date | null; strict?: boolean } = {}): Promise<SiteReport | null> {
+export async function buildSiteReport(userId: number, siteId: number, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<SiteReport | null> {
   const { rows: [site] } = await pool.query("SELECT id, domain, devices, location_code, language_code FROM seo_sites WHERE id=$1 AND user_id=$2", [siteId, userId]);
   if (!site) return null;
   const primary = site.devices === "mobile" ? "mobile" : "desktop";
@@ -159,11 +162,11 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
   let work: WorkSection | null;
   try {
     const [{ rows: tasks }, { rows: [all] }] = await Promise.all([
-      pool.query(`SELECT title, status, done_at, target, note, kind, due_on::text AS due_on, owner FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND (status IN ('todo','doing') OR (status='done' AND done_at > $3))`, [site.id, userId, workSince.toISOString()]),
+      pool.query(`SELECT title, status, done_at, target, note, kind, due_on::text AS due_on, owner FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND (status IN ('todo','doing') OR (status='done' AND done_at > $3 AND done_at <= $4))`, [site.id, userId, workSince.toISOString(), (opts.workUntil ?? new Date()).toISOString()]),
       pool.query("SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND user_id=$2", [site.id, userId]),
     ]);
     // A plan whose tasks were all done earlier still has a section: "nothing marked done in this period".
-    work = workSection(tasks, new Date(), { since: opts.workSince ?? null, hasPlan: Number(all?.n ?? 0) > 0 });
+    work = workSection(tasks, opts.workUntil ?? new Date(), { since: opts.workSince ?? null, hasPlan: Number(all?.n ?? 0) > 0 });
   } catch (e) {
     if (opts.strict) throw e;
     work = { unavailable: true, days: WORK_DAYS, done: [], doneCount: 0, open: 0, inProgress: 0 };
@@ -263,7 +266,7 @@ export const pdfSafe = (t: string) => Array.from(String(t).normalize("NFC").repl
 /** The report as a PDF. `brand` is the account's white-label name and logo (Site Scan branding), when set. */
 export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; logo?: string | null } | null): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: "LETTER", info: { Title: `SEO report — ${r.domain}`, Author: brand?.name || "ConstructHUB" } });
+    const doc = new PDFDocument({ margin: 48, size: "LETTER", info: { Title: `SEO report — ${r.domain}`, Author: pdfSafe(brand?.name || "ConstructHUB") } });
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -276,7 +279,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
 
     try { if (brand?.logo && /^data:image\/(png|jpe?g);base64,/.test(brand.logo)) { doc.image(Buffer.from(brand.logo.split(",")[1], "base64"), { fit: [150, 60] }); doc.moveDown(0.5); } } catch { /* an unreadable logo must not stop the report */ }
     doc.fontSize(22).fillColor(ink).font("Helvetica-Bold").text(`SEO report`).font("Helvetica").fontSize(13).fillColor(soft).text(r.domain);
-    doc.fontSize(10).text(`${day(r.generatedAt)}${r.comparedWith ? ` · rankings compared with ${day(r.comparedWith)}` : ""}${brand?.name ? ` · prepared by ${brand.name}` : ""}`);
+    doc.fontSize(10).text(`${day(r.generatedAt)}${r.comparedWith ? ` · rankings compared with ${day(r.comparedWith)}` : ""}${brand?.name ? ` · prepared by ${pdfSafe(brand.name)}` : ""}`);
 
     if (reportIsEmpty(r)) { doc.moveDown(2).fontSize(11).fillColor(ink).text("There is nothing to report yet. Add keywords to the rank tracker, analyse the site in Site Explorer, and run a site audit — the next report will have their numbers.", { width }); doc.end(); return; }
 
@@ -334,11 +337,11 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       for (const t of r.work.done) line(`  • ${day(t.doneAt)} — ${t.title}${t.note ? ` (${t.note})` : ""}`);
       if (r.work.doneCount > r.work.done.length) line(`…and ${r.work.doneCount - r.work.done.length} more.`, soft);
       if (r.work.overdue?.length) {
-        doc.moveDown(0.3); line(`Past their due date (due before ${day(r.work.today)})`, "#c5221f");
+        doc.moveDown(0.3); line(`Past their due date (due before ${day(r.work.today)}, UTC)`, "#c5221f");
         for (const t of r.work.overdue) line(`  • due ${day(t.dueOn)} — ${t.title}${t.owner ? ` · ${t.owner}` : ""}`);
         if ((r.work.overdueCount ?? 0) > r.work.overdue.length) line(`…and ${(r.work.overdueCount ?? 0) - r.work.overdue.length} more.`, soft);
       }
-      line(`${r.work.open} task${r.work.open === 1 ? " is" : "s are"} still open${r.work.inProgress ? `, ${r.work.inProgress} of them in progress` : ""}${r.work.dueSoon ? `; ${r.work.dueSoon} due in the next 7 days` : ""}. "Done" is what was marked in the action plan; whether a site issue is gone shows in the next crawl.`, soft);
+      line(`${r.work.open} task${r.work.open === 1 ? " is" : "s are"} still open${r.work.inProgress ? `, ${r.work.inProgress} of them in progress` : ""}${r.work.dueSoon ? `; ${r.work.dueSoon} due today or in the next 7 days` : ""}. "Done" is what was marked in the action plan; whether a site issue is gone shows in the next crawl.`, soft);
     }
     if (r.alerts.length) { heading("Alerts in the last month"); for (const a of r.alerts) line(`${day(a.createdAt)} — ${a.title}`); }
     doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });

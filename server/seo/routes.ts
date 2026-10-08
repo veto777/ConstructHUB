@@ -46,7 +46,7 @@ import {
   CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
   type ReportPage, type KeywordOverview,
 } from "./reports";
-import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "./jobs";
+import { enqueueRankRun, postQueuedRun, snapshotBacklinks, RANK_FREQUENCIES, RANK_FREQUENCY_KEYS, type SiteRow } from "./jobs";
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
@@ -223,6 +223,7 @@ const settingsInput = z.object({
   businessName: z.string().trim().max(120).nullable().optional(),
   alertsEnabled: z.boolean().optional(),
   alertDrop: z.number().int().min(1).max(20).optional(),
+  rankFrequency: z.enum(["weekly", "twice_weekly", "daily"]).optional(),
 }).strict();
 const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
@@ -424,7 +425,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     res.json({
       site: siteView({ ...site, keyword_count: keywords.length }), devices, summary, rows, runs: runs.map((r: any) => runView(r, isPlatformAdmin(req.user))), searchConsole: gsc,
-      nextCheck: { serps: estimate.serps, priceCents: retailCents(estimate.usd), nextAt: site.next_rank_check_at ?? null },
+      // What one automatic check costs, and a month of them at each frequency (the same figure, multiplied — never a guess).
+      nextCheck: { serps: estimate.serps, priceCents: retailCents(estimate.usd), nextAt: site.next_rank_check_at ?? null,
+        perMonthCents: Object.fromEntries(RANK_FREQUENCY_KEYS.map((f) => [f, Math.round(retailCents(estimate.usd) * RANK_FREQUENCIES[f].perMonth)])) },
     });
   });
 
@@ -1329,10 +1332,15 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { rows: [row] } = await pool.query(
       // A mentions watch that follows the business name (no name of its own) is due again when that name changes; and
       // switching alerts off ends any failed emails still waiting to be tried again (nothing old is sent later).
+      // A new frequency takes effect from the last check: a shorter gap brings the next check forward (never into the
+      // past beyond "now"), a longer one moves it out.
       `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop),
-              next_mention_at = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND lower(coalesce(business_name, '')) IS DISTINCT FROM lower(coalesce($3, '')) THEN now() ELSE next_mention_at END
+              rank_frequency=coalesce($6, rank_frequency),
+              next_rank_check_at = CASE WHEN $6 IS NOT NULL AND $6 <> rank_frequency THEN greatest(now(), coalesce(last_rank_check_at, now()) + make_interval(hours => CASE $6 WHEN 'daily' THEN 24 WHEN 'twice_weekly' THEN 84 ELSE 168 END)) ELSE next_rank_check_at END,
+              next_mention_at = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND lower(coalesce(business_name, '')) IS DISTINCT FROM lower(coalesce($3, '')) THEN now() ELSE next_mention_at END,
+              mention_watch_note = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND nullif(btrim(coalesce($3, '')), '') IS NULL THEN 'no_name' ELSE mention_watch_note END
         WHERE id=$1 RETURNING *`,
-      [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null]);
+      [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null, input.rankFrequency ?? null]);
     if (input.alertsEnabled === false) await pool.query("UPDATE seo_alerts SET email_retry_at = NULL WHERE site_id=$1 AND email_retry_at IS NOT NULL", [site.id]);
     res.json(siteView(row));
   });
@@ -1499,7 +1507,7 @@ function runView(r: any, admin: boolean) {
 
 function siteView(s: any) {
   return {
-    id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
+    id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, rankFrequency: s.rank_frequency ?? "weekly", locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
     keywordCount: s.keyword_count ?? 0, nextRankCheckAt: s.next_rank_check_at, lastRankCheckAt: s.last_rank_check_at,
     nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at, starred: s.starred === true,
   };

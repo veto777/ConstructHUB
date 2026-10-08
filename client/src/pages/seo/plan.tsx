@@ -17,6 +17,8 @@ type Status = "todo" | "doing" | "done" | "dropped";
 type Counts = { todo: number; doing: number; done: number; dropped: number; doneRecently: number };
 type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed" | "later" | "unavailable"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null }; dueOn?: string | null; owner?: string | null };
 /** Today in the browser's own calendar ("2026-10-08"): due dates are calendar dates, read where the person is. */
+/** A due date in words, with the year when it is not this year ("Oct 12", "Jan 5, 2027"). */
+const dueWords = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", ...(d.slice(0, 4) !== String(new Date().getFullYear()) ? { year: "numeric" } : {}) });
 const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 type Data = { tasks: Task[]; counts: Counts; closedShown: number; closedMax?: number; max: number };
 const RECHECK: Record<NonNullable<Task["recheck"]>, string> = {
@@ -151,8 +153,8 @@ export default function SeoPlanPage() {
                         <span className="g-chip g-chip--sm">{KIND[t.kind]}</span>
                         {t.status !== "todo" && <span className="g-text-2 text-[12px]">{STATUS[t.status]}{t.status === "done" && t.doneAt ? ` ${fmtDate(t.doneAt)}` : ""}</span>}
                         <h2 className={`g-text text-[14px] font-medium ${t.status === "dropped" ? "line-through" : ""}`}>{t.title}</h2>
-                        {t.dueOn && (t.status === "todo" || t.status === "doing") && <span className="g-chip g-chip--sm" style={t.dueOn < today ? { color: "var(--g-red, #c5221f)" } : undefined} data-testid={`task-due-${t.id}`}>{t.dueOn < today ? `Overdue — was due ${fmtDate(t.dueOn)}` : t.dueOn === today ? "Due today" : `Due ${fmtDate(t.dueOn)}`}</span>}
-                        {t.owner && <span className="g-text-2 text-[12px]" data-testid={`task-owner-${t.id}`}>· {t.owner}</span>}
+                        {t.dueOn && (t.status === "todo" || t.status === "doing") && <span className="g-chip g-chip--sm" style={t.dueOn < today ? { color: "var(--g-red, #c5221f)" } : undefined} data-testid={`task-due-${t.id}`}>{t.dueOn < today ? `Overdue — was due ${dueWords(t.dueOn)}` : t.dueOn === today ? "Due today" : `Due ${dueWords(t.dueOn)}`}</span>}
+                        {t.owner && <span className="g-text-2 min-w-0 max-w-full text-[12px] [overflow-wrap:anywhere]" data-testid={`task-owner-${t.id}`}>· {t.owner}</span>}
                       </div>
                       <p className="g-text-2 mt-1 text-[12px]">
                         {t.url ? <a href={t.url} className="g-link" target="_blank" rel="noreferrer">{t.url.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="inline h-3 w-3" aria-hidden /></a> : t.target}
@@ -199,7 +201,7 @@ export default function SeoPlanPage() {
             </ul>
           )}
           {showClosed && closedTotal > closed.length && <p className="g-text-2 mt-3 text-[13px]" data-testid="plan-more-closed">Showing the latest {fmtNum(closed.length)} of {fmtNum(closedTotal)}. {closed.length >= (q.data?.closedMax ?? 5000) ? `The page lists up to ${fmtNum(q.data?.closedMax ?? 5000)}; older ones are still counted above.` : <button type="button" className="g-link" disabled={q.isFetching} onClick={() => setClosedLimit((n) => Math.min(q.data?.closedMax ?? 5000, Math.max(n * 5, n + 100)))}>Show more</button>}</p>}
-          <p className="g-text-2 mt-3 text-[12px]">The plan is yours to keep: nothing here spends SEO data. The numbers on a task are what they were when you added it — the screen it came from has today's.</p>
+          <p className="g-text-2 mt-3 text-[12px]">Due dates are read by your computer's calendar here; the emailed report counts by UTC and says so. The plan is yours to keep: nothing here spends SEO data. The numbers on a task are what they were when you added it — the screen it came from has today's.</p>
         </>
       )}
     </SeoShell>

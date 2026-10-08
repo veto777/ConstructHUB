@@ -13,7 +13,7 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
 type Page = { marksUnavailable?: boolean; name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
-type Watch = { watch: boolean; nextAt: string | null; note?: string | null; checks?: number; chosen?: boolean; latest: { id: number; name?: string; since: string; takenAt: string; page: Page } | null };
+type Watch = { watch: boolean; nextAt: string | null; note?: string | null; checks?: number; chosen?: boolean; missing?: boolean; latest: { id: number; name?: string; since: string; takenAt: string; page: Page } | null };
 type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
@@ -65,7 +65,8 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // An answer from the server for a name has every verdict saved for it: what was shown here for settled verdicts of
   // THAT name gives way to it (another tab's change included). Pending ones, and other names', stay.
   const retire = (name: string) => setMarking((m) => Object.fromEntries(Object.entries(m).filter(([k, v]) => v.pending || !k.startsWith(`${norm(name)}|`))));
-  useEffect(() => { if (q.data?.page) retire(q.data.page.name); if (q.data?.watch?.latest) retire(q.data.watch.latest.page.name); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only an answer whose verdicts DID load retires anything: one saying they could not be read keeps what is known.
+  useEffect(() => { if (q.data?.page && !q.data.page.marksUnavailable) retire(q.data.page.name); if (q.data?.watch?.latest && !q.data.watch.latest.page.marksUnavailable) retire(q.data.watch.latest.page.name); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -101,7 +102,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
     queryKey: ["mentions-peek", siteId, typed], enabled: typedOk, retry: false, staleTime: 60_000,
     queryFn: async () => { try { return (await api("POST", key, { name: name.trim(), peek: true })).page as Page; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  useEffect(() => { if (peek.data) { keep(peek.data); retire(peek.data.name); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (peek.data) { keep(peek.data); if (!peek.data.marksUnavailable) retire(peek.data.name); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
@@ -225,6 +226,7 @@ const WATCH_NOTE: Record<string, string> = {
   bad_name: "The watch is waiting: the name it follows can't be searched as written (use letters, numbers, spaces and & ' . , -). Look for mentions with the name written that way, and it follows that.",
   no_allowance: "The watch is waiting: this month's included SEO data has run out. It tries again daily and is never charged to credit you bought.",
   not_included: "The watch is waiting: your plan doesn't include the SEO tools right now.",
+  no_name: "The watch is waiting: it has no name to follow (the business name was cleared). Look for mentions of a name, or switch the watch off.",
 };
 function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { siteId: number; name: string; watch: Watch; domain: string; retryPrice: number | null; verdict: VerdictTools }) {
   const qc = useQueryClient();
@@ -252,11 +254,12 @@ function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { site
   return (
     <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }} data-testid="mentions-watch">
       <div className="flex flex-wrap items-center gap-3 text-[13px]">
-        <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={set.isPending && set.variables?.siteId === siteId ? set.variables.watch : watch.watch} disabled={set.isPending || !name} onChange={(e) => set.mutate({ siteId, watch: e.target.checked })} data-testid="checkbox-mentions-watch" /><span className="g-text">Watch for new mentions every month</span></label>
+        <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={set.isPending && set.variables?.siteId === siteId ? set.variables.watch : watch.watch} disabled={set.isPending || (!name && !watch.watch)} onChange={(e) => set.mutate({ siteId, watch: e.target.checked })} data-testid="checkbox-mentions-watch" /><span className="g-text">Watch for new mentions every month</span></label>
         <span className="g-text-2">{!name ? "Look for mentions once first, so the watch knows which name to follow." : watch.watch ? `Following "${name}".${watch.nextAt ? ` Next: ${fmtDate(watch.nextAt)}.` : ""}` : "From your included SEO data only; when that has run out it waits, and is never charged to credit you bought."}</span>
       </div>
       {watch.watch && watch.note && <p className="mt-1 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-watch-note">{WATCH_NOTE[watch.note] ?? "The watch is waiting and will try again."}</p>}
-      {watch.watch && !l && !watch.note && <p className="g-text-2 mt-1 text-[13px]" data-testid="mentions-watch-first">No watched check yet{watch.nextAt ? ` — the first runs on or after ${fmtDate(watch.nextAt)}` : ""}. It looks at pages published in the month before it.</p>}
+      {watch.missing && <p className="mt-1 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-watch-missing">The check this link is for isn't available (it may belong to another site). {l ? "Showing the newest check instead." : ""}</p>}
+      {watch.watch && !l && !watch.note && !watch.missing && <p className="g-text-2 mt-1 text-[13px]" data-testid="mentions-watch-first">No watched check yet{watch.nextAt ? ` — the first runs on or after ${fmtDate(watch.nextAt)}` : ""}. It looks at pages published in the month before it.</p>}
       {watch.chosen && <p className="mt-1 text-[13px]" role="status" data-testid="mentions-watch-chosen">Showing the check an alert was raised from{l?.name ? ` (for "${l.name}")` : ""}. <a href={`/seo/mentions?site=${siteId}`} className="g-link">Show the newest</a></p>}
       {l && (
         <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">

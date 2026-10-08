@@ -156,6 +156,10 @@ export const SEO_SCHEMA_DDL = [
   // The name on the Google Business Profile (map-pack entries often carry no website), and alert settings.
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS business_name text`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alerts_enabled boolean NOT NULL DEFAULT true`,
+  // How often rankings are checked automatically (server/seo/jobs.ts RANK_FREQUENCIES).
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS rank_frequency text NOT NULL DEFAULT 'weekly'`,
+  `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'seo_sites_rank_frequency_check') THEN
+     ALTER TABLE seo_sites ADD CONSTRAINT seo_sites_rank_frequency_check CHECK (rank_frequency IN ('weekly','twice_weekly','daily')); END IF; END $$`,
   // Unlinked mentions (server/seo/mentions.ts): the name searched last and the places a mention is read for.
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_name text`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_places text[]`,

@@ -137,7 +137,10 @@ export async function deliverAlert(alertId: number): Promise<boolean> {
     const m = alertMessage(a);
     const sent = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
     // The bell entry is there; an email that failed is tried again on its own.
-    await pool.query(`UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL, email_retry_at = CASE WHEN $3 THEN now() + interval '15 minutes' ELSE NULL END WHERE id=$1 AND claim_token=$2`, [alertId, token, sent?.email === "failed"]);
+    // A failed email is queued again only while the site's alerts are still on (switching them off meanwhile wins).
+    await pool.query(`UPDATE seo_alerts x SET notified_at=now(), claimed_at=NULL, claim_token=NULL,
+        email_retry_at = CASE WHEN $3 AND (SELECT s.alerts_enabled FROM seo_sites s WHERE s.id = x.site_id) IS NOT FALSE THEN now() + interval '15 minutes' ELSE NULL END
+      WHERE x.id=$1 AND x.claim_token=$2`, [alertId, token, sent?.email === "failed"]);
     return true;
   } catch (e: any) {
     await pool.query("UPDATE seo_alerts SET claimed_at=NULL, claim_token=NULL WHERE id=$1 AND notified_at IS NULL AND claim_token=$2", [alertId, token]).catch(() => {});
@@ -163,6 +166,9 @@ export async function retryAlertEmails(): Promise<number> {
   let sent = 0;
   for (const a of rows) {
     try {
+      // Looked at again just before sending: alerts switched off since the batch was claimed end this one.
+      const { rowCount: on } = await pool.query("SELECT 1 FROM seo_alerts x JOIN seo_sites s ON s.id = x.site_id WHERE x.id=$1 AND x.email_claim=$2 AND s.alerts_enabled IS NOT FALSE", [a.id, token]);
+      if (!on) { await pool.query("UPDATE seo_alerts SET email_retry_at=NULL, email_claim=NULL WHERE id=$1 AND email_claim=$2", [a.id, token]); continue; }
       const m = alertMessage(a);
       const r = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl }, { only: "email" });
       if (r.email !== "failed" || a.email_tries >= EMAIL_TRIES) await pool.query("UPDATE seo_alerts SET email_retry_at=NULL, email_claim=NULL WHERE id=$1 AND email_claim=$2", [a.id, token]);

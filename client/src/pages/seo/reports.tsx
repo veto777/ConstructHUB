@@ -114,11 +114,11 @@ export default function SeoReportsPage() {
                 {r.work.doneCount > r.work.done.length && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(r.work.doneCount - r.work.done.length)} more.</p>}
                 {(r.work.overdue?.length ?? 0) > 0 && (
                   <div className="mt-2" data-testid="report-overdue">
-                    <p className="text-[13px]" style={{ color: "var(--g-red, #c5221f)" }}>Past their due date ({fmtNum(r.work.overdueCount ?? 0)})</p>
-                    <ul className="g-text space-y-0.5 text-[13px]">{r.work.overdue!.map((t, i) => <li key={i}><span className="g-text-2">due {fmtDate(t.dueOn)}</span> — {t.title}{t.owner && <span className="g-text-2"> · {t.owner}</span>}</li>)}</ul>
+                    <p className="text-[13px]" style={{ color: "var(--g-red, #c5221f)" }}>Past their due date ({fmtNum(r.work.overdueCount ?? 0)}) <span className="g-text-2 text-[12px]">— due before {r.work.today ? new Date(`${r.work.today}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "today"}, UTC</span></p>
+                    <ul className="g-text space-y-0.5 text-[13px]">{r.work.overdue!.map((t, i) => <li key={i} className="[overflow-wrap:anywhere]"><span className="g-text-2">due {new Date(`${t.dueOn}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })}</span> — {t.title}{t.owner && <span className="g-text-2"> · {t.owner}</span>}</li>)}</ul>
                   </div>
                 )}
-                {!r.work.unavailable && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}{r.work.dueSoon ? `, ${fmtNum(r.work.dueSoon)} due in the next 7 days` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>}
+                {!r.work.unavailable && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}{r.work.dueSoon ? `, ${fmtNum(r.work.dueSoon)} due today or in the next 7 days` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>}
               </section>
             )}
             {r.alerts.length > 0 && (
