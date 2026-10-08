@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clusterKeywords, CLUSTER_MAX } from "@shared/seo-clusters";
+import { clusterKeywords, stem, CLUSTER_MAX } from "@shared/seo-clusters";
 
 const kw = (keyword: string, volume: number | null = 100) => ({ keyword, volume });
 describe("keywords grouped by shared words", () => {
@@ -9,7 +9,9 @@ describe("keywords grouped by shared words", () => {
       kw("metal roofing prices", 300), kw("metal roofing vs shingles", 150),
       kw("gutter cleaning", 50), kw("siding contractor", null),
     ]);
-    expect(out.map((c) => [c.term, c.rows.length, c.volume])).toEqual([["roof repair", 3, 1600], ["metal roofing", 2, 450], [null, 2, 50]]);
+    expect(out.map((c) => [c.term, c.rows.length, c.volume, c.measured])).toEqual([["roof repair", 3, 1600, 3], ["metal roofing", 2, 450, 2], [null, 2, 50, 1]]);   // the last sum covers one of two keywords, and says so
+    expect(["roofs", "companies", "businesses", "boxes", "patios", "glass", "gas", "bus", "analysis", "business"].map(stem)).toEqual(["roof", "company", "business", "box", "patio", "glass", "gas", "bus", "analysis", "business"]);
+    expect(clusterKeywords([kw("roofing company's reviews"), kw("roofing companies near me"), kw("roofing company cost")])[0]).toMatchObject({ term: "roofing company", rows: { length: 3 } });
     // Plural and singular are one word; every keyword is in exactly one group.
     expect(out[0].rows.map((r) => r.keyword)).toContain("emergency roof repairs");
     expect(out.flatMap((c) => c.rows)).toHaveLength(7);
@@ -21,7 +23,7 @@ describe("keywords grouped by shared words", () => {
   });
   it("is the same every time, makes no group of one, and stops at the limit", () => {
     const rows = [kw("alpha one"), kw("beta two"), kw("gamma three")];
-    expect(clusterKeywords(rows)).toEqual([{ term: null, rows, volume: 300 }]);
+    expect(clusterKeywords(rows)).toEqual([{ term: null, rows, volume: 300, measured: 3 }]);
     const many = Array.from({ length: 300 }, (_, i) => kw(`topic${Math.floor(i / 2)} word${i}`));
     const a = clusterKeywords(many), b = clusterKeywords([...many]);
     expect(a.map((c) => c.term)).toEqual(b.map((c) => c.term));

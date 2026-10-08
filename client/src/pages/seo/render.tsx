@@ -79,7 +79,9 @@ export function RenderCheck({ site }: { site: SeoSite }) {
 
   // "Running" is only what is known: this page's own request in flight, a check it started that the server has not
   // reported back yet, or the server saying one is running. When the server cannot be asked, that is said instead.
-  const running = start.isPending || latest?.status === "running" || (activeId != null && !q.isError);
+  // After a failed ask, the last answer is no longer evidence that a check is running: the form is given back (the
+  // server refuses a second check while one really is running, and returns that one).
+  const running = start.isPending || (!q.isError && (latest?.status === "running" || activeId != null));
   const run: Run | null = !running && latest && latest.status !== "running" ? latest : null;
   const toggle = (u: string) => setPicked((p) => (p.includes(u) ? p.filter((x) => x !== u) : [...p, u]));
   const configured = !!status.data?.configured;

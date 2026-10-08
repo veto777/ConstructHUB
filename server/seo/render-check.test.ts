@@ -48,7 +48,11 @@ describe("rendering check", () => {
     expect(renderVerdict(side(400, 30), side(400, 30, { status: null })).verdict).toBe("unknown");
     expect(renderVerdict(side(40, 3), side(900, 60, { finalUrl: "https://alpine.example/other" })).verdict).toBe("unknown");
     expect(renderVerdict(side(40, 3), side(900, 60, { finalUrl: "https://login.elsewhere.test/" }), "alpine.example").verdict).toBe("unknown");
-    expect(renderVerdict(side(40, 3, { finalUrl: "http://www.alpine.example" }), side(900, 60), "alpine.example").verdict).toBe("more"); // the same page, written another way
+    // Another way of writing the address is another address until shown otherwise; a visit that does not say where it ended proves nothing.
+    expect(renderVerdict(side(40, 3, { finalUrl: "http://www.alpine.example/" }), side(900, 60), "alpine.example").verdict).toBe("unknown");
+    expect(renderVerdict(side(40, 3, { finalUrl: null }), side(900, 60), "alpine.example").verdict).toBe("unknown");
+    expect(renderVerdict(side(40, 3, { finalUrl: "nonsense" }), side(900, 60, { finalUrl: "nonsense" })).verdict).toBe("unknown");
+    expect(renderVerdict(side(40, 3, { finalUrl: "https://alpine.example/#a" }), side(900, 60), "alpine.example").verdict).toBe("more"); // a #fragment is not another page
     expect(renderVerdict(side(null, null, { measured: false, title: null, h1: null }), side(900, 60)).verdict).toBe("unknown");
     // A number the source left out is not a zero — and without it the page is not called the same.
     expect(renderVerdict(side(null, 30), side(900, 30)).verdict).toBe("unknown");
@@ -60,6 +64,8 @@ describe("rendering check", () => {
     expect(row).toMatchObject({ verdict: "more", timing: { lcp: 1988, interactive: 900, loaded: 3397 }, problems: ["Slow to load", "Files that hold up the first paint"] });
     expect(buildRenderRow("https://alpine.example/", item(40, 3), null)).toMatchObject({ verdict: "unknown", timing: null, problems: [] });
     expect(buildRenderRow("https://alpine.example/", item(40, 3), item(900, 60, { ...timing, status_code: 503 }))).toMatchObject({ verdict: "unknown", timing: null, problems: [] });
+    // A browser visit that ended on another site: its timings and problems are not this page's.
+    expect(buildRenderRow("https://alpine.example/", item(40, 3), item(900, 60, { ...timing, url: "https://login.elsewhere.test/" }), "alpine.example")).toMatchObject({ verdict: "unknown", timing: null, problems: [] });
     expect(summariseRender([row, buildRenderRow("u", item(400, 30), item(410, 31)), buildRenderRow("u", null, null), buildRenderRow("u", item(1500, 80), item(300, 12))])).toEqual({ pages: 4, more: 1, less: 1, same: 1, unknown: 1 });
   });
   it("the customer pays for the fetches that returned, never more than the figure shown; a failed one leaves its side unknown", async () => {
@@ -82,6 +88,12 @@ describe("rendering check", () => {
       // A source that charges more than expected: the customer still pays no more than the figure they were shown.
       renderDeps.request = (async () => ok(item(400, 30), 1)) as any;
       expect((await fetchRender(["https://alpine.example/a"])).customerUsd).toBe(renderEstimateUsd(1));
+      // A run closed meanwhile: nothing more is fetched for it.
+      let fetched = 0;
+      renderDeps.request = (async () => { fetched++; return ok(item(400, 30), 0.001); }) as any;
+      const cut = await fetchRender(["https://alpine.example/a", "https://alpine.example/b", "https://alpine.example/c", "https://alpine.example/d", "https://alpine.example/e"], undefined, async () => true);
+      expect(fetched).toBeLessThanOrEqual(6);   // at most the three pages already under way
+      expect(cut.data.rows.filter((r) => r.verdict === "unknown").length).toBeGreaterThanOrEqual(2);
       renderDeps.request = (async () => { throw new DataForSeoError("timeout", "timed out"); }) as any;
       const failed: any = await fetchRender(["https://alpine.example/a"]).catch((e) => e);
       expect(failed).toBeInstanceOf(Error);

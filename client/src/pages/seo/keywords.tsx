@@ -102,8 +102,23 @@ export default function SeoKeywordsPage() {
     onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
-    mutationFn: (v: { rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]; from: SeoMarket }) =>
-      api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: v.rows.map((r) => r.keyword), ...(inSiteMarket(v.from) ? { volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
+    // Five hundred at a time (the most one request takes), one after another; what was added is counted across them.
+    // If one fails part-way, the ones before it stay tracked and the error says how many that was.
+    mutationFn: async (v: { rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]; from: SeoMarket }) => {
+      let added = 0;
+      for (let i = 0; i < v.rows.length; i += 500) {
+        const part = v.rows.slice(i, i + 500);
+        try {
+          const r: { added: number } = await api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: part.map((x) => x.keyword), ...(inSiteMarket(v.from) ? { volumes: part.map((x) => ({ keyword: x.keyword, searchVolume: x.volume, cpc: x.cpc, difficulty: x.difficulty })) } : {}) });
+          added += r.added;
+        } catch (e) {
+          if (i === 0) throw e;
+          refreshSeoData(qc);
+          throw new Error(`${added} keyword${added === 1 ? " was" : "s were"} added, then it stopped: ${apiErrorMessage(e)} The first ${i} of the ${v.rows.length} you chose were sent; choose the rest again.`);
+        }
+      }
+      return { added };
+    },
     onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}`, description: inSiteMarket(v.from) ? undefined : `Those numbers are for ${v.from.label}, not the country this site is tracked in, so they were not copied. Use "Get search volumes" in the rank tracker.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });

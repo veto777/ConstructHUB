@@ -10,6 +10,7 @@ import { pool } from "../db";
 import { request, assertOk } from "./dataforseo";
 import { withBudget } from "./budget";
 import { publicNote } from "./public-errors";
+import { pageKey } from "@shared/seo-page-key";
 
 export const RENDER_MAX_PAGES = 10;
 /** Measured 2026-10-08: plain fetch $0.00015, browser fetch $0.0051. */
@@ -97,9 +98,11 @@ export type RenderRow = {
 const okStatus = (s: RenderSide) => s.status !== null && s.status >= 200 && s.status < 300;
 const said = (s: RenderSide) => (s.status === null ? "answered without a status" : `answered ${s.status}`);
 /**
- * What the two visits of one page show. Compared only when BOTH were answered successfully (2xx), ended on the site
- * and on the same page, and reported their measurements — a blocked visit, an error page or a redirect elsewhere on
- * one side is "could not be compared", never a finding about JavaScript. "More" / "less": half as many words again
+ * What the two visits of one page show. Compared only when BOTH were answered successfully (2xx), BOTH say where they
+ * ended, that is the very same address on the site (nothing folded together: http and https, "www", a last slash are
+ * different addresses until shown otherwise), and both reported their measurements. A blocked visit, an error page,
+ * a redirect elsewhere on one side, or a visit that does not say where it ended is "could not be compared", never a
+ * finding about JavaScript. "More" / "less": half as many words again
  * (and at least 100) or half as many own-site links again (and at least 10) one way or the other, or a title or main
  * heading present on one side only. "Same" needs both words and links measured on both sides. Pure.
  */
@@ -107,9 +110,10 @@ export function renderVerdict(plain: RenderSide | null, rendered: RenderSide | n
   const unknown = (why: string) => ({ verdict: "unknown" as const, why });
   if (!plain || !rendered) return unknown(!plain && !rendered ? "Neither fetch returned the page." : !plain ? "The plain fetch did not return the page, so there is nothing to compare the browser visit with." : "The browser fetch did not return the page, so there is nothing to compare the HTML with.");
   if (!okStatus(plain) || !okStatus(rendered)) return unknown(`The plain fetch was ${said(plain)} and the browser fetch was ${said(rendered)}. Only two successful answers can be compared — a redirect, an error page or a visit that was blocked says nothing about JavaScript.`);
-  const key = (u: string | null) => { if (!u) return null; try { const x = new URL(u); return `${bare(x.hostname)}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return null; } };
-  for (const s of [plain, rendered]) { if (s.finalUrl && domain) { try { if (!onSite(new URL(s.finalUrl).hostname, domain)) return unknown("One of the visits ended on another website, so the two are not compared."); } catch { /* not an address: ignored */ } } }
-  if (key(plain.finalUrl) && key(rendered.finalUrl) && key(plain.finalUrl) !== key(rendered.finalUrl)) return unknown("The two visits ended on different pages, so they are not compared.");
+  const a = pageKey(plain.finalUrl), b = pageKey(rendered.finalUrl);
+  if (!a || !b) return unknown("One of the visits did not say which address it ended on, so it is not known that the two saw the same page.");
+  if (domain && (!onSite(new URL(a).hostname, domain) || !onSite(new URL(b).hostname, domain))) return unknown("One of the visits ended on another website, so the two are not compared.");
+  if (a !== b) return unknown(`The two visits ended on different addresses (${a} and ${b}), so they are not compared.`);
   if (!plain.measured || !rendered.measured) return unknown("One of the visits came back without word or link counts, so there is nothing to compare.");
   const more: string[] = [], less: string[] = [];
   const gap = (a: number | null, b: number | null, floor: number) => (a === null || b === null ? 0 : b - a >= floor && b >= a * 1.5 ? 1 : a - b >= floor && a >= b * 1.5 ? -1 : 0);
@@ -131,7 +135,9 @@ export function buildRenderRow(url: string, plainItem: any, renderedItem: any, d
   const plain = parseSide(plainItem), rendered = parseSide(renderedItem);
   const t = renderedItem?.page_timing;
   const checks = renderedItem?.checks && typeof renderedItem.checks === "object" ? renderedItem.checks : {};
-  const usable = !!rendered && okStatus(rendered);
+  // Timings and problems are the requested page's only when the browser visit succeeded AND ended on this site.
+  const ended = rendered ? pageKey(rendered.finalUrl) : null;
+  const usable = !!rendered && okStatus(rendered) && !!ended && (!domain || onSite(new URL(ended).hostname, domain));
   return {
     url, plain, rendered,
     timing: usable && t ? { lcp: num(t.largest_contentful_paint), interactive: num(t.time_to_interactive), loaded: num(t.dom_complete) } : null,
@@ -150,9 +156,9 @@ export const summariseRender = (rows: RenderRow[]): RenderSummary => ({ pages: r
  * exactly 0) — a failure whose cost we do not know may have been billed, so it is allowed for and not repeated.
  * The customer is never charged more than the figure they were shown (renderEstimateUsd).
  */
-export async function fetchRender(urls: string[], domain?: string): Promise<{ data: RenderResult; costUsd: number; customerUsd: number; costUnknown: false }> {
+export async function fetchRender(urls: string[], domain?: string, /** Asked before each page: true = the run was closed meanwhile, so nothing more is fetched. */ stopped?: () => Promise<boolean>): Promise<{ data: RenderResult; costUsd: number; customerUsd: number; costUnknown: false }> {
   let known = 0, customerUsd = 0, unknownUsd = 0, next = 0, got = 0;
-  let firstError: unknown = null;
+  let firstError: unknown = null, halted = false;
   const rows: RenderRow[] = new Array(urls.length);
   const one = async (url: string, js: boolean): Promise<any> => {
     const allow = () => { unknownUsd += js ? RENDER_BROWSER_USD : RENDER_PLAIN_USD; };
@@ -183,6 +189,8 @@ export async function fetchRender(urls: string[], domain?: string): Promise<{ da
     for (;;) {
       const i = next++;
       if (i >= urls.length) return;
+      // A run closed as interrupted cannot be saved or charged any more: stop buying fetches for it.
+      if (halted || (stopped && i > 0 && await stopped().catch(() => false))) { halted = true; rows[i] = buildRenderRow(urls[i], null, null, domain); continue; }
       const [plain, rendered] = await Promise.all([one(urls[i], false), one(urls[i], true)]);
       rows[i] = buildRenderRow(urls[i], plain, rendered, domain);
     }
@@ -246,7 +254,7 @@ export async function getRender(userId: number, siteId: number, runId: number): 
 /** One run, start to finish: fetched, SAVED, and only then charged. A run that cannot be saved is not the customer's to pay for. */
 export async function runRender(userId: number, runId: number, urls: string[], label: string, domain?: string): Promise<RenderResult> {
   const out = await withBudget(userId, renderEstimateUsd(urls.length), async () => {
-    const o = await fetchRender(urls, domain);
+    const o = await fetchRender(urls, domain, async () => { const { rows: [r] } = await pool.query("SELECT status FROM seo_render_runs WHERE id=$1", [runId]); return r?.status !== "running"; });
     let saved = false, lastError: unknown = null;
     for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
       try { saved = await finishRender(runId, o.data, o.costUsd); if (!saved) break; }

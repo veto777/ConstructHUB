@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mergePageMetrics, retryPlan, planEstimateUsd, buildPageMetrics, cleanUrls, fetchPageMetrics, pageMetricsDeps, pageMetricsEstimateUsd, pageMetricsInput } from "./page-metrics";
-import { buildDirectories, DIRECTORIES, directoriesEstimateUsd, directoriesInput, directoryRequest, fetchDirectories, directoriesDeps } from "./directories";
+import { mergeDirectories, buildDirectories, DIRECTORIES, directoriesEstimateUsd, directoriesInput, directoryRequest, fetchDirectories, directoriesDeps } from "./directories";
 import { DataForSeoError } from "./dataforseo";
 
 const ok = (items: unknown[], cost: number) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ items }] }] });
@@ -93,6 +93,13 @@ describe("directories", () => {
     const cut = buildDirectories(["us.example", "rival.example"], [[{ domain: "yelp.com", backlinks: 2 }], [{ domain: "porch.com", backlinks: 4 }]], "t", [true, false]);
     expect([cut.partial, cut.rows.find((r) => r.domain === "yelp.com")!.links, cut.rows.find((r) => r.domain === "porch.com")!.links]).toEqual([["us.example"], [2, 0], [null, 4]]);
     expect(page.partial).toBeUndefined();
+    // A second try for the site that did not load fills its column only; the columns that loaded are not touched.
+    const second = buildDirectories(["other.example"], [[{ domain: "yelp.com", backlinks: 5 }, { domain: "bbb.org" }]], "t2");
+    const whole = mergeDirectories(page, second);
+    expect([whole.missing, whole.fetchedAt, whole.rows.find((r) => r.domain === "yelp.com")!.links, whole.rows.find((r) => r.domain === "porch.com")!.links]).toEqual([[], "t", [3, 0, 5], [0, 4, 0]]);
+    expect(whole.rows.find((r) => r.domain === "bbb.org")!.uncounted).toEqual([true, false, true]);
+    // A second try that failed again changes nothing.
+    expect(mergeDirectories(page, buildDirectories(["other.example"], [null], "t2"))).toEqual(page);
   });
   it("a site whose lookup fails is not charged; all failing fails", async () => {
     const real = directoriesDeps.request;

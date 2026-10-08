@@ -38,12 +38,13 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
     queryFn: async () => { try { return await api("POST", "/api/seo/directories", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: (v: { body: Record<string, unknown>; key: readonly unknown[]; again: boolean }) => api("POST", "/api/seo/directories", v.again ? { ...v.body, refresh: true } : v.body),
+    mutationFn: (v: { body: Record<string, unknown>; key: readonly unknown[]; again: boolean; missingOnly?: boolean }) => api("POST", "/api/seo/directories", v.missingOnly ? { ...v.body, retryMissing: true } : v.again ? { ...v.body, refresh: true } : v.body),
     onSuccess: (data: { page: Data; saved?: boolean }, v) => {
       qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this again will not be free. Export it now if you need it.", variant: "destructive" });
     },
-    onError: (e) => toast({ title: "Couldn't check the directories", description: apiErrorMessage(e), variant: "destructive" }),
+    // A second try with nothing saved to complete buys nothing: look again, so the full offer and its price come back.
+    onError: (e, v) => { toast({ title: "Couldn't check the directories", description: apiErrorMessage(e), variant: "destructive" }); if (v.missingOnly) void qc.invalidateQueries({ queryKey: v.key }); },
   });
   // The server's own figure for exactly this many sites — what is set aside, and the most that can be charged.
   const quote = (sites: number) => status?.quotes?.directories?.[sites - 1] ?? null;
@@ -109,7 +110,10 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
               <button type="button" className="g-pill g-pill--sm" onClick={exportCsv} data-testid="button-directories-export"><Download /> Export</button>
             </span>
           </div>
-          {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-directories-missing">The check for {d.missing.join(", ")} didn't load and was not charged — {d.missing.length === 1 ? "its column shows" : "their columns show"} "?" rather than a guess. Check again to fill it in.</p>}
+          {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-directories-missing">The check for {d.missing.join(", ")} didn't load and was not charged — {d.missing.length === 1 ? "its column shows" : "their columns show"} "?" rather than a guess.{" "}
+            <button type="button" className="g-link" disabled={run.isPending || !status?.configured || !body || quote(d.missing.length) == null || !(status?.credits == null || status.credits.availableCents === -1 || status.credits.availableCents >= quote(d.missing.length)!)} onClick={() => body && run.mutate({ body, key: queryKey, again: false, missingOnly: true })} data-testid="button-directories-retry">
+              {run.isPending ? "Checking…" : `Check just ${d.missing.length === 1 ? "that site" : "those sites"} again${quote(d.missing.length) != null ? ` — up to ${money(quote(d.missing.length)!)}` : ""}`}
+            </button> The columns that loaded are kept and not bought again.</p>}
           {(d.partial?.length ?? 0) > 0 && <p className="mb-2 text-[13px]" role="status" data-testid="text-directories-partial">For {d.partial!.join(", ")} there were more linking pages than one lookup returns. A directory not among them shows "?" for {d.partial!.length === 1 ? "that site" : "those sites"} — not looked at, rather than "no link".</p>}
           <div className="overflow-x-auto">
             <table className="g-table" data-testid="table-directories">

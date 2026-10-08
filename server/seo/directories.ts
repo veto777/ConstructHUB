@@ -34,6 +34,8 @@ export const directoriesInput = z.object({
   competitors: z.array(z.string().min(3).max(253)).max(DIRECTORIES_MAX_SITES - 1).default([]),
   peek: z.boolean().default(false),
   refresh: z.boolean().default(false),
+  /** Ask again only for the sites whose lookup did not load in the saved answer; what loaded is kept and not bought again. */
+  retryMissing: z.boolean().default(false),
 }).strict();
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -82,6 +84,22 @@ export function buildDirectories(sites: string[], results: (any[] | null)[], fet
       const uncounted = perSite.map((f) => f?.get(dir.domain)?.uncounted === true);
       // Not among the rows of an answer that was cut short: not looked at, so unknown — never "no link".
       return { ...dir, links: perSite.map((f, n) => (f ? f.get(dir.domain)?.n ?? (cutShort[n] ? null : 0) : null)), ...(uncounted.some(Boolean) ? { uncounted } : {}) };
+    }),
+  };
+}
+
+/** A saved answer with the columns that had not loaded filled in from a second try for just those sites. A column that loaded is never touched. Pure. */
+export function mergeDirectories(saved: DirectoriesPage, fresh: DirectoriesPage): DirectoriesPage {
+  const at = (site: string) => { const i = fresh.sites.indexOf(site); return i >= 0 && !fresh.missing.includes(site) ? i : -1; };
+  const partial = [...new Set([...(saved.partial ?? []).filter((s) => !saved.missing.includes(s)), ...(fresh.partial ?? [])])];
+  return {
+    sites: saved.sites, fetchedAt: saved.fetchedAt, missing: saved.missing.filter((s) => at(s) < 0), ...(partial.length ? { partial } : {}),
+    rows: saved.rows.map((row) => {
+      const f = fresh.rows.find((r) => r.domain === row.domain);
+      const fill = (n: number) => saved.missing.includes(saved.sites[n]) && at(saved.sites[n]) >= 0 && f ? at(saved.sites[n]) : -1;
+      const uncounted = saved.sites.map((_, n) => (fill(n) >= 0 ? f!.uncounted?.[fill(n)] === true : row.uncounted?.[n] === true));
+      const { uncounted: _old, ...rest } = row;
+      return { ...rest, links: row.links.map((v, n) => (fill(n) >= 0 ? f!.links[fill(n)] : v)), ...(uncounted.some(Boolean) ? { uncounted } : {}) };
     }),
   };
 }

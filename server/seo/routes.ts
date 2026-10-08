@@ -16,7 +16,7 @@
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
-import { directoriesInput, fetchDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
+import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -52,6 +52,7 @@ import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from ".
 import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
+import { aiSummary } from "./ai-summary";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
@@ -748,6 +749,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const competitors = [...new Set(input.competitors.map((c) => normalizeDomain(c)).filter((c): c is string => !!c && c !== target))].sort();
     const sites = [target, ...competitors];
     const key = cacheKey("directories", [target, competitors]);
+    // A second try for the sites that did not load: one at a time, reading the saved answer again when it is its turn,
+    // and buying only those sites. With nothing saved, or nothing missing, it buys nothing.
+    if (input.retryMissing && !input.peek) {
+      await serial(`directories:${user}:${key}`, async () => {
+        const now = await cached<DirectoriesPage>(user, key, CACHE_HOURS);
+        if (!now) return res.status(409).json({ code: "retry_unavailable", message: "The saved check is no longer there, so there is nothing to complete. Run the check again — the price is on the button." });
+        const again = now.missing.filter((s) => sites.includes(s));
+        if (!again.length) return res.json({ page: now, reused: true });
+        if (!isConfigured()) return notReady(res);
+        const out = await buyOnce<DirectoriesPage>(user, key, "directories-retry", CACHE_HOURS, directoriesEstimateUsd(again.length),
+          async () => { const o = await fetchDirectories(again); return { ...o, data: mergeDirectories(now, o.data) }; }, true, `Directories — ${again.join(", ")} (second try)`);
+        return res.status(201).json({ page: out.data, reused: false, saved: out.saved });
+      });
+      return;
+    }
     const saved = input.refresh ? null : await cached<DirectoriesPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
@@ -972,6 +988,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       pool.query("SELECT keyword, location_name AS location FROM seo_keywords WHERE site_id=$1 ORDER BY (location_name IS NOT NULL AND location_name <> 'United States') DESC, search_volume DESC NULLS LAST, id LIMIT 40", [site.id]),
     ]);
     res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords), tracked: await trackedPrompts(site.id), maxTracked: MAX_TRACKED_PROMPTS });
+  });
+  // The saved answers added up: named / used as a source now and month by month, other businesses named, websites drawn on. Saved rows only.
+  route("get", "/api/seo/sites/:id/ai/summary", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.json(await aiSummary(user, site.id, await trackedCompetitors(site.id)));
   });
   // Ask the chosen assistants one question. One purchase per identical question in flight; an assistant that
   // fails is not charged; the answers are saved so the history builds up.

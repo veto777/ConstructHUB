@@ -12,6 +12,7 @@ import { Check, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AiSummaryPanel } from "./ai-summary";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoStatus } from "./shell";
 
 type Engine = "chatgpt" | "gemini" | "perplexity";
@@ -143,7 +144,7 @@ export default function SeoAiPage() {
   const ask = useMutation({
     mutationFn: (p: string) => api("POST", `${key}/ask`, { prompt: p, engines }),
     onSuccess: (r: { siteId: number; prompt: string; runId: string; saved: boolean; answers: Answer[]; failed: Engine[] }) => {
-      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai`] }); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai/summary`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (r.siteId !== siteRef.current) return;
       setLastRun({ prompt: r.prompt, answers: r.answers.map((a) => ({ ...a, runId: r.runId })), at: new Date().toISOString(), runId: r.runId, saved: r.saved });
       setOpenPrompt(r.prompt); setPrompt("");
@@ -182,6 +183,7 @@ export default function SeoAiPage() {
       {site && q.isError && <div className="g-callout" role="alert" data-testid="ai-error"><h3>Couldn't load AI visibility</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && d && (
         <>
+          <AiSummaryPanel site={site} />
           {!d.businessName && (
             <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); if (name.trim()) saveName.mutate(); }} data-testid="form-ai-business-name">
               <h3>First: what is your business called?</h3>

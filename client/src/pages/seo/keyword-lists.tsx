@@ -6,7 +6,7 @@
 import { MarketPicker } from "./market";
 import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
-import { clusterKeywords } from "@shared/seo-clusters";
+import { clusterKeywords, CLUSTER_MAX } from "@shared/seo-clusters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,8 @@ export function AddToList({ rows, onDone, label = "Add to a list", market = DEFA
 function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testId }: { rows: KwRow[]; picked: Set<string>; toggle: (k: string) => void; /** Lets a whole group be selected at once. */ setPicked?: (next: Set<string>) => void; onOpen?: (k: string) => void; onRemove?: (k: string) => void; testId: string }) {
   const [grouped, setGrouped] = useState(false);
   // Groups are worked out from the keywords themselves (shared/seo-clusters.ts): free, and only when asked for.
-  const groups = useMemo(() => (grouped ? clusterKeywords(rows) : [{ term: null, rows: [...rows], volume: null }]), [grouped, rows]);
+  const groups = useMemo(() => (grouped ? clusterKeywords(rows) : [{ term: null, rows: [...rows], volume: null, measured: 0 }]), [grouped, rows]);
+  const topics = groups.filter((g) => g.term !== null).length;
   const cols = 6 + (onRemove ? 1 : 0);
   const pickGroup = (list: KwRow[], on: boolean) => { if (!setPicked) return; const n = new Set(picked); for (const r of list) on ? n.add(r.keyword) : n.delete(r.keyword); setPicked(n); };
   return (
@@ -77,7 +78,7 @@ function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testI
       {rows.length >= 6 && (
         <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
           <button type="button" className="g-pill g-pill--sm" aria-pressed={grouped} style={grouped ? { background: "var(--g-hover)" } : undefined} onClick={() => setGrouped(!grouped)} data-testid={`${testId}-group`}>Group by topic</button>
-          {grouped && <span className="g-text-2" data-testid={`${testId}-group-note`}>{groups.filter((g) => g.term !== null).length} topics from the words these keywords share — a guide to which keywords one page could cover, not a promise that Google treats them alike.</span>}
+          {grouped && <span className="g-text-2" data-testid={`${testId}-group-note`}>{topics} topic{topics === 1 ? "" : "s"} from the words these keywords share{topics >= CLUSTER_MAX ? ` (the ${CLUSTER_MAX} largest; the rest are under "Other keywords")` : ""} — a starting point for deciding which keywords might share a page. Google may still treat keywords in one group differently.</span>}
         </div>
       )}
       <table className="g-table" data-testid={testId}>
@@ -86,8 +87,8 @@ function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testI
         <tbody key={grouped ? `g:${g.term ?? ""}:${gi}` : "all"}>
           {grouped && (
             <tr data-testid={`${testId}-topic`}>
-              <td>{setPicked && <input type="checkbox" aria-label={`Select all ${g.rows.length} keywords ${g.term ? `about ${g.term}` : "without a topic"}`} checked={g.rows.every((r) => picked.has(r.keyword))} onChange={(e) => pickGroup(g.rows, e.target.checked)} />}</td>
-              <th scope="rowgroup" colSpan={cols - 1} className="text-left"><span className="g-text font-medium">{g.term ?? "No shared topic"}</span> <span className="g-text-2 font-normal">· {g.rows.length} keyword{g.rows.length === 1 ? "" : "s"}{g.volume != null ? ` · ${fmtNum(g.volume)} searches a month together` : ""}</span></th>
+              <td>{setPicked && <input type="checkbox" aria-label={`Select all ${g.rows.length} keywords ${g.term ? `about ${g.term}` : "in no group"}`} checked={g.rows.every((r) => picked.has(r.keyword))} ref={(el) => { if (el) el.indeterminate = !g.rows.every((r) => picked.has(r.keyword)) && g.rows.some((r) => picked.has(r.keyword)); }} onChange={(e) => pickGroup(g.rows, e.target.checked)} />}</td>
+              <th scope="rowgroup" colSpan={cols - 1} className="text-left"><span className="g-text font-medium">{g.term ?? "Other keywords"}</span> <span className="g-text-2 font-normal">· {g.rows.length} keyword{g.rows.length === 1 ? "" : "s"}{g.volume == null ? " · no search volumes yet" : g.measured < g.rows.length ? ` · ${fmtNum(g.volume)} searches a month for the ${g.measured} with a figure` : ` · ${fmtNum(g.volume)} searches a month together`}</span></th>
             </tr>
           )}
           {g.rows.map((r) => (
@@ -199,9 +200,11 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
     onError: (e) => toast({ title: "Couldn't create the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const remove = useMutation({
-    mutationFn: (keywords: string[]) => api("POST", `/api/seo/lists/${current}/remove`, { keywords }),
+    // A thousand at a time (the most one request takes), one after another.
+    mutationFn: async (keywords: string[]) => { for (let i = 0; i < keywords.length; i += 1000) await api("POST", `/api/seo/lists/${current}/remove`, { keywords: keywords.slice(i, i + 1000) }); },
     onSuccess: () => { clear(); refresh(); },
-    onError: (e) => toast({ title: "Couldn't remove that", description: apiErrorMessage(e), variant: "destructive" }),
+    // Some may have gone before it failed: show the list as it now is, and keep the selection so the rest can be tried again.
+    onError: (e) => { refresh(); toast({ title: "Couldn't remove all of those", description: apiErrorMessage(e), variant: "destructive" }); },
   });
   const drop = useMutation({
     mutationFn: (id: number) => api("DELETE", `/api/seo/lists/${id}`),
@@ -251,9 +254,9 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
               <>
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
                   <h3 className="g-text text-[17px] font-medium">{items.data.list.name}</h3>
-                  <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {fmtNum(rows.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month in total</span>
+                  <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : `${fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month ${known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}`; })()}</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen, listMarket); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
