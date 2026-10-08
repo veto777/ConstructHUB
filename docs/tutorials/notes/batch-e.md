@@ -18,7 +18,10 @@ operating the flows in a slot; nothing here is a guess unless it says so.
 - **`crm-estimate-client-options` (E12)** — no demo estimate has options or discount offers, so the
   video adds two options and one offer on camera first (13 short steps) and is 22 steps long. A seeded,
   sent NY/TX estimate with two or three selectable options (option lines from the price book) and one
-  or two enabled offers would let this be re-recorded as a client-only video of about 60 s.
+  or two enabled offers would let this be re-recorded as a client-only video of about 60 s. It runs
+  99 s, has no closing "where to find it" step (cut to stay under 100 s; the last lines name the
+  client's page under Clients), and the ring of the Discounts / Options click is still fading over the
+  dialog for a moment after each opens.
 - **`crm-jobcam-share-link` (E8)** — see "Product defects" 1: the line "Prefilled from ." is on screen
   and the recipient is typed by hand. Re-record once the dialog prefills.
 - **`crm-jobcam-upload` (E7)** — re-produced from the fixture proof. It now starts on the job
