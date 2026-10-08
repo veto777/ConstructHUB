@@ -21,7 +21,10 @@ export default function SeoBacklinksPage() {
   const data = useQuery<Data>({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`], enabled: !!site, refetchOnMount: "always", });
   const refresh = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/backlinks/refresh`),
-    onSuccess: (r: { lostFailed?: boolean }) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast(r?.lostFailed ? { title: "Backlinks updated — except the lost links", description: "That part didn't load and was not charged. Refresh to try again." } : { title: "Backlinks updated" }); },
+    onSuccess: (r: { lostFailed?: boolean; reused?: boolean }) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      // One snapshot is kept per day: today's was already taken, so nothing was bought.
+      if (r?.reused) { toast({ title: "Already refreshed today", description: "Nothing was bought — one snapshot is kept per day, and today's is shown. The next refresh can be made tomorrow (UTC)." }); return; }
+      toast(r?.lostFailed ? { title: "Backlinks updated — except the lost links", description: "That part didn't load and was not charged. Refresh to try again." } : { title: "Backlinks updated" }); },
     onError: (e) => toast({ title: "Couldn't refresh", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const configured = !!status.data?.configured;

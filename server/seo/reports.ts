@@ -539,9 +539,10 @@ export const reportCacheKey = (i: ReportInput & { target: string }) =>
     // "v2": the rule for what a section or page matches changed (exact boundaries), so pages saved under the first rule are not reused.
     ...(effectiveReport(i).path ? ["scope-v4", effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
 
+/** `maxAgeHours` may be a fraction (5 / 60 = five minutes). */
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(
-    `SELECT data FROM seo_report_cache WHERE user_id=$1 AND key=$2 AND created_at > now() - make_interval(hours => $3)`, [userId, key, maxAgeHours]);
+    `SELECT data FROM seo_report_cache WHERE user_id=$1 AND key=$2 AND created_at > now() - ($3::float8 * interval '1 hour')`, [userId, key, maxAgeHours]);
   return row ? (row.data as T) : null;
 }
 /** `db`: a caller's own transaction, so the save can commit together with its other writes. */

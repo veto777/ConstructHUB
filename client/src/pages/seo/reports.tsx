@@ -29,7 +29,8 @@ type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[];
 type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
-const moverText = (m: Mover) => `${m.keyword}${m.location ? ` · ${m.location}` : ""}: ${m.from === null ? `now ${m.to}` : m.to === null ? `was ${m.from}, now not ranked` : `${m.from} → ${m.to}`}`;
+// A missing position is "not found": the site was not within the result pages the check read, which is not proof it ranks nowhere.
+const moverText = (m: Mover) => `${m.keyword}${m.location ? ` · ${m.location}` : ""}: ${m.from === null ? `now ${m.to}` : m.to === null ? `was ${m.from}, now not found` : `${m.from} → ${m.to}`}`;
 const parseEmails = (text: string) => [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean))];
 
 /** A tag's change since the earlier check: measured zero is "±0"; none measured (no keyword in both) is "—". */
@@ -102,7 +103,8 @@ export default function SeoReportsPage() {
                 </div>
                 <details className="mt-3 text-[13px]"><summary className="g-link cursor-pointer">All {fmtNum(r.rankings.keywords.length)} keywords in the report</summary>
                   <div className="overflow-x-auto"><table className="g-table mt-2"><thead><tr><th>Keyword</th><th className="num">Position</th><th className="num">Was</th><th className="num">Map pack</th><th className="num">Searches / mo</th></tr></thead>
-                    <tbody>{r.rankings.keywords.map((k, i) => <tr key={i}><td>{k.keyword}{k.location && <span className="g-text-2 text-[12px]"> · {k.location}</span>}</td><td className="num">{k.position ?? "not ranked"}</td><td className="num g-text-2">{k.previous ?? "—"}</td><td className="num">{k.local != null ? `#${k.local}` : "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody></table></div>
+                    <tbody>{r.rankings.keywords.map((k, i) => <tr key={i}><td>{k.keyword}{k.location && <span className="g-text-2 text-[12px]"> · {k.location}</span>}</td><td className="num" title={k.position == null ? "Not within the result pages the check read" : undefined}>{k.position ?? "not found"}</td><td className="num g-text-2">{k.previous ?? "—"}</td><td className="num">{k.local != null ? `#${k.local}` : "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody></table></div>
+                  <p className="g-text-2 mt-1 text-[12px]">"Not found" means the site was not within the result pages the check read — it may rank further down.</p>
                 </details>
                 {(r.rankings.byTag?.length ?? 0) > 0 && (
                   <div className="mt-3 overflow-x-auto" data-testid="report-by-tag">

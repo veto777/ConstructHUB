@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterAll, beforeAll } from "vitest";
 import { makeSafeFetch, publicIP, siteUrl, type PageResponse } from "./http";
 import { robotsRules } from "./robots";
 import { enrichFindings, fixesFor, reconcileFixes } from "./guidance";
-import { crawl, emptyState, parsePage, findingsFor, scoresFor, classifyMissingPage, MISSING_PAGE_PREFIX } from "./audit";
+import { crawl, emptyState, parsePage, findingsFor, scoresFor, classifyMissingPage, notAskedProbe, MISSING_PAGE_PREFIX } from "./audit";
 import {
   pageSpeed,
   businessSchema,
@@ -310,6 +310,10 @@ it("reads what a site answers for an address that has no page", () => {
   expect(read()).toBe("ok_as_page");
   expect(read({ url: asked + "/" })).toBe("ok_as_page");
   expect(read({ url: "https://www.fixture.test/" })).toBe("sent_home");
+  // The home page by its usual other names is the home page too; a real section is not.
+  for (const u of ["/home", "/home/", "/index.html", "/INDEX.HTM", "/index.php", "/default.aspx"]) expect(read({ url: "https://fixture.test" + u }), u).toBe("sent_home");
+  expect(read({ url: "https://fixture.test/homes-for-sale" })).toBe("ok_as_page");
+  expect(read({ url: "https://fixture.test/services/index.html" })).toBe("ok_as_page");
   // A "nothing here" page marked noindex — in the page or in the response header — is how a client-routed app says so.
   expect(read({ body: '<html><head><meta name="robots" content="noindex"></head><body>Not found</body></html>' })).toBe("noindex");
   expect(read({ headers: { "x-robots-tag": "noindex, nofollow" } })).toBe("noindex");
@@ -463,4 +467,9 @@ it.each(["RoofingContractor", "Plumber", "Electrician", ["Organization", "HVACBu
   expect(findingsFor(state).filter(f => ["schema", "schema-invalid"].includes(f.id))).toEqual([]);
   delete (state.pages[0].schema[0] as any).name;
   expect(findingsFor(state).map(f => f.id)).toContain("schema-invalid");
+});
+
+it("a probe says itself whether it was sent: not allowed (not asked) and asked-but-unanswered are told apart without reading its note", () => {
+  expect(notAskedProbe("https://fixture.test/x", "not asked: robots.txt does not allow it").asked).toBe(false);
+  expect(notAskedProbe("https://fixture.test/x", "no answer", true).asked).toBe(true);
 });

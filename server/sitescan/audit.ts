@@ -85,14 +85,18 @@ export type MissingPageProbe = {
   outcome: MissingPageOutcome;
   /** For "undetermined": why, in words. */
   note?: string;
+  /** Sent (robots.txt allowed it), whether or not an answer came. Absent on crawls saved before it was recorded. */
+  asked?: boolean;
 };
-/** Every address asked for counts — one that was not allowed or got no answer is "undetermined", never dropped. */
-export const notAskedProbe = (url: string, note: string): MissingPageProbe => ({
+/** Every address asked for counts — one that was not allowed or got no answer is "undetermined", never dropped.
+ *  `asked`: false for one robots.txt did not allow; true for one sent that got no answer. */
+export const notAskedProbe = (url: string, note: string, asked = false): MissingPageProbe => ({
   url,
   status: 0,
   finalUrl: url,
   outcome: "undetermined",
   note,
+  asked,
 });
 export type CrawlState = {
   origin?: string;
@@ -169,7 +173,8 @@ export function classifyMissingPage(
   )
     return { ...base, outcome: "noindex" };
   if (samePage(r.url, asked)) return { ...base, outcome: "ok_as_page" };
-  const home = to.pathname.replace(/\/+$/, "") === "";
+  // The home page by any of its usual names: "/", "/home", "/index.html" (or .htm, .php, .asp, .aspx), "/default.aspx".
+  const home = /^(?:\/(?:home|index\.(?:html?|php|aspx?)|default\.aspx?))?$/i.test(to.pathname.replace(/\/+$/, ""));
   return { ...base, outcome: home ? "sent_home" : "ok_as_page" };
 }
 export const emptyState = (url: string): CrawlState => ({
@@ -393,7 +398,7 @@ export async function crawl(
         return ok;
       }).catch((e) => String(e?.message ?? e));
       if (typeof missing !== "string")
-        state.missingPages.push(classifyMissingPage(missing, probe));
+        state.missingPages.push({ ...classifyMissingPage(missing, probe), asked: true });
       else
         state.missingPages.push(
           notAskedProbe(
@@ -403,6 +408,7 @@ export async function crawl(
               : /timed out|timeout/i.test(missing)
                 ? "no answer: the request timed out"
                 : "no answer",
+            true,
           ),
         );
     }

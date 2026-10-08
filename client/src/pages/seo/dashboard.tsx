@@ -172,13 +172,13 @@ export default function SeoDashboardPage() {
   const configured = !!status.data?.configured;
 
   return (
-    <SeoShell title="SEO" description="Your sites at a glance: authority, backlinks, search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="SEO" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
       {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && !sites.isError && (
         <Empty testId="seo-dashboard-empty">
           <h3>Add your first site</h3>
-          <p>Use <b>Add your first site</b> above to start a project. You'll get its authority, backlinks, organic traffic and keywords here, and weekly rank tracking for the keywords you choose.</p>
+          <p>Use <b>Add your first site</b> above to start a project. You'll get its authority, backlinks, estimated organic traffic and keywords here, and weekly rank tracking for the keywords you choose.</p>
           <p className="mt-2">Just want to look a domain up? Open <Link href="/seo/explorer" className="g-link">Site explorer</Link> — any site, yours or a competitor's.</p>
         </Empty>
       )}
@@ -244,15 +244,15 @@ export default function SeoDashboardPage() {
                   <Metric label="Authority" value={r.authority == null ? "—" : String(r.authority)} delta={<Delta series={r.linkHistory?.map((h) => h.authority ?? 0)} />} spark={<Spark data={r.linkHistory?.map((h) => h.authority ?? 0)} color="#673ab7" />} testId={`metric-authority-${s.id}`} />
                   <Metric label="Referring domains" value={compact(r.referringDomains)} delta={<Delta series={r.linkHistory?.map((h) => h.referringDomains)} />} spark={<Spark data={r.linkHistory?.map((h) => h.referringDomains)} color="#1a73e8" />} />
                   <Metric label="Backlinks" value={compact(r.backlinks)} />
-                  <Metric label="Organic traffic" value={compact(r.organicTraffic)} delta={<Delta series={r.history?.map((h) => h.traffic)} />} spark={<Spark data={r.history?.map((h) => h.traffic)} color="#e8710a" />} hint={r.trafficValue != null ? `Value $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo` : undefined} />
+                  <Metric label="Organic traffic (estimate)" value={compact(r.organicTraffic)} delta={<Delta series={r.history?.map((h) => h.traffic)} />} spark={<Spark data={r.history?.map((h) => h.traffic)} color="#e8710a" />} hint={`Visits a month, estimated from rankings${r.trafficValue != null ? ` · worth $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo as ads` : ""}`} />
                   <Metric label="Organic keywords" value={compact(r.organicKeywords)} delta={<Delta series={r.history?.map((h) => h.keywords)} />} spark={<Spark data={r.history?.map((h) => h.keywords)} color="#e8710a" />} hint={r.top10 != null ? `${fmtNum(r.top3)} in top 3 · ${fmtNum(r.top10)} in top 10` : undefined} />
                   <HealthTile audit={audit} siteId={s.id} />
-                  <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10${rank.device ? ` on ${rank.device}` : ""} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? "First check runs this week" : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
+                  <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10${rank.device ? ` on ${rank.device}` : ""} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? `No check saved yet${s.nextRankCheckAt ? ` — the first automatic check is due ${fmtDate(s.nextRankCheckAt)}` : ""}; it is skipped while this month's included data is used up` : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-3">
                   {audit && <div className="w-full max-w-[14rem]"><HealthTile audit={audit} siteId={s.id} /></div>}
-                  <p className="g-text-2 text-[14px]">No search numbers for this site yet. <b className="g-text font-medium">Analyse</b> builds its report: authority, backlinks, search traffic, keywords and competitors.</p>
+                  <p className="g-text-2 text-[14px]">No search numbers for this site yet. <b className="g-text font-medium">Analyse</b> builds its report: authority, backlinks, estimated search traffic, keywords and competitors.</p>
                   <Button size="sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Analyse — about {price}</Button>
                   <span className="g-text-2 text-[13px]">Tracked keywords: {fmtNum(s.keywordCount)}</span>
                 </div>

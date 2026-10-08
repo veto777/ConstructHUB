@@ -25,6 +25,7 @@
  */
 import { clampSerpDepth } from "./pricing";
 import { SEO_NOT_READY_MESSAGE } from "./plan";
+import { markCostUnknown } from "./cost-context";
 
 export const API_BASE = "https://api.dataforseo.com/v3";
 /** The longest one request (retries included) can take. */
@@ -164,7 +165,12 @@ export async function request(method: "GET" | "POST", path: string, body?: unkno
       try { text = await res.text(); }
       catch (e: any) { throw new DataForSeoError(e?.name === "TimeoutError" || e?.name === "AbortError" ? "timeout" : "upstream", `DataForSEO response was cut off on ${path}`); }
       if (!text) throw new DataForSeoError("upstream", "DataForSEO returned an empty response");
-      try { return JSON.parse(text) as DfsResponse; } catch { throw new DataForSeoError("upstream", "DataForSEO returned a non-JSON response"); }
+      let parsed: DfsResponse;
+      try { parsed = JSON.parse(text) as DfsResponse; } catch { throw new DataForSeoError("upstream", "DataForSEO returned a non-JSON response"); }
+      // A task answered without a numeric cost is a cost we do not know, never a free one (see cost-context.ts).
+      for (const t of Array.isArray(parsed?.tasks) ? parsed.tasks : [])
+        if (t && t.status_code === 20000 && !(typeof t.cost === "number" && Number.isFinite(t.cost))) markCostUnknown();
+      return parsed;
     }
     if (res.status >= 500 && attempt < retries) {
       await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS * (attempt + 1)));

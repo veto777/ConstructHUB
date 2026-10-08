@@ -335,7 +335,9 @@ export function registerSiteScanRoutes(
     const profile = j.profile?.id ? await profileFor(user, j.profile.id) : null;
     let id;
     try {
-      id = await enqueue(user, j.url, j.page_cap, Math.max(1, j.psi_pages), profile);
+      // The scan's own PageSpeed setting is kept: a scan run with PageSpeed off (0 pages) is rescanned with it off —
+      // a rescan never spends PageSpeed the customer chose not to. (A row from before the setting existed: 1, the default.)
+      id = await enqueue(user, j.url, j.page_cap, Number.isInteger(j.psi_pages) ? j.psi_pages : 1, profile);
     } catch (e) {
       await refundReservation(reservation, 1); // the rescan never started
       throw e;
@@ -431,6 +433,7 @@ export function registerSiteScanRoutes(
         error: j.error,
         pages: j.state.pages.length,
         pageCap: j.page_cap,
+        psiPages: j.psi_pages,
         report: reportView(j, req.query || {}),
         aiDraft: j.ai_draft,
         shareEnabled: !!j.share_hash,

@@ -297,8 +297,9 @@ export const gscNote = (g: NonNullable<SiteReport["searchConsole"]>) => {
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—");
 const signed = (v: number | null | undefined) => (v == null || v === 0 ? "" : ` (${v > 0 ? "+" : "−"}${n(Math.abs(v))})`);
 const where = (m: { location: string | null }) => (m.location ? ` in ${m.location}` : "");
+// A missing position is "not found": the site was not within the result pages the check read — not proof it ranks nowhere.
 export const moverLine = (m: Mover) =>
-  m.from === null ? `"${m.keyword}"${where(m)} now ranks at ${m.to}` : m.to === null ? `"${m.keyword}"${where(m)} dropped out of the results (was ${m.from})` : `"${m.keyword}"${where(m)} moved from ${m.from} to ${m.to}`;
+  m.from === null ? `"${m.keyword}"${where(m)} now ranks at ${m.to}` : m.to === null ? `"${m.keyword}"${where(m)} is no longer found in the results (was ${m.from})` : `"${m.keyword}"${where(m)} moved from ${m.from} to ${m.to}`;
 
 /** The headline facts, as label / value pairs — the email body and the top of the PDF. */
 export function reportHighlights(r: SiteReport): [string, string][] {
@@ -459,7 +460,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
       const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? fonts.bold : fonts.regular).fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
-      for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
+      for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not found" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
       if (k.byTag?.length) {
         room(60); doc.moveDown(0.5).font(fonts.bold).fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
@@ -525,7 +526,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
     if ((r.grids ?? []).length) {
       heading("Local grid — Google's local results across your area");
       for (const g of r.grids!) pair(`"${g.keyword}" · ${g.size} × ${g.size} points, ${g.spacing} mi apart · ${day(g.at)}`, gridLine(g));
-      line("Each point is a Google search made from that spot. The position score counts a point where the business is not in the first 20 as 21; lower is better.", soft);
+      line("Each point is one lookup of Google's local results made for that spot at the time of the scan. The position score counts a point where the business is not in the first 20 as 21; lower is better.", soft);
     }
     if (r.work?.unavailable) { heading("Work done"); line("The action plan could not be read just now, so this report says nothing about the work done.", soft); }
     else if (r.work) {
@@ -541,7 +542,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       line(`${r.work.open} task${r.work.open === 1 ? " is" : "s are"} still open${r.work.inProgress ? `, ${r.work.inProgress} of them in progress` : ""}${r.work.dueSoon ? `; ${r.work.dueSoon} due today or in the next 7 days` : ""}. "Done" is what was marked in the action plan; whether a site issue is gone shows in the next crawl.`, soft);
     }
     if (r.alerts.length) { heading("Alerts in the last month"); for (const a of r.alerts) line(`${day(a.createdAt)} — ${a.title}`); }
-    doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });
+    doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from, as read by each dated check; \"not found\" means the site was not within the result pages the check read. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });
     doc.end();
   });
 }

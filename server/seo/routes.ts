@@ -75,11 +75,12 @@ import { listingNamed } from "./dataforseo";
 import { contentInput, fetchContent, CONTENT_ESTIMATE_USD, CONTENT_TYPICAL_USD, type ContentPage } from "./content";
 import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage } from "./batch";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
-import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
+import { askInput, mentionsInput, askAi, recentAiRun, type AiEngine, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { alertPage, unreadAlerts, undeliveredAlerts, markAlertsRead, ALERT_KINDS } from "./alerts";
 import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
 import { seoLocks, requestQueues } from "./locks";
+import { siteCapRefuses } from "./site-cap";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -275,6 +276,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
    * and then finding the saved copy (server/seo/locks.ts). A wait past LOCK_WAIT_MS is answered "busy, try again".
    */
   const { inflight, once, serial } = requestQueues(seoLocks.withLock);
+  /**
+   * How long a bought result answers an identical request without buying it again, for lookups that are not otherwise
+   * kept: long enough to catch a double click or a request waiting in another server process (the lock waits up to
+   * 75 seconds), short enough that asking again later is a fresh lookup. 5 minutes; AI questions 2 minutes.
+   */
+  const DUPLICATE_WINDOW_HOURS = 5 / 60, AI_DUPLICATE_SECONDS = 120;
   /** Save a paid result. A failed save must not cost the customer the data they just paid for: they still get the response. */
   const keep = async (what: string, save: () => Promise<void>): Promise<boolean> => {
     try { await save(); return true; } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); return false; }
@@ -356,21 +363,22 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json(rows.map(siteView));
   });
 
-  route("post", "/api/seo/sites", async (req, res, user) => {
+  // One add at a time per account (in every server process), so two adds at 49 sites cannot both pass the count.
+  route("post", "/api/seo/sites", (req, res, user) => serial(`sites:${user}`, async () => {
     const input = siteInput.parse(req.body);
     // A site's own country and language are used by paid lookups later, so only a pair on the list is stored.
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
-    const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_sites WHERE user_id=$1", [user]);
-    if (n >= MAX_SITES) return res.status(403).json({ message: `Up to ${MAX_SITES} sites can be tracked.` });
+    // The cap counts only sites the account does not have yet (server/seo/site-cap.ts).
+    if (await siteCapRefuses(user, domain, MAX_SITES)) return res.status(403).json({ message: `Up to ${MAX_SITES} sites can be tracked.` });
     const { rows: [site] } = await pool.query(
       `INSERT INTO seo_sites(user_id,domain,location_code,language_code,devices,serp_depth) VALUES($1,$2,$3,$4,$5,$6)
        ON CONFLICT(user_id,domain) DO UPDATE SET location_code=EXCLUDED.location_code,language_code=EXCLUDED.language_code,devices=EXCLUDED.devices,serp_depth=EXCLUDED.serp_depth
        RETURNING *, 0 AS keyword_count`,
       [user, domain, input.locationCode, input.languageCode, input.devices, input.serpDepth]);
     res.status(201).json(siteView(site));
-  });
+  }));
 
   route("delete", "/api/seo/sites/:id", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
@@ -484,19 +492,23 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/sites/:id/keywords/volumes", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
-    const { rows } = await pool.query("SELECT id, keyword FROM seo_keywords WHERE site_id=$1 AND (volume_checked_at IS NULL OR volume_checked_at<now()-interval '30 days') ORDER BY id LIMIT 1000", [site.id]);
-    if (!rows.length) return res.json({ updated: 0 });
-    const out = await once(`volumes:${user}:${site.id}`, () =>
-      withBudget(user, estimateAdsVolumeUsd(rows.length), () => adsSearchVolume({ keywords: rows.map((r: any) => r.keyword), locationCode: site.location_code, languageCode: site.language_code }), { label: `Search volumes — ${rows.length} keyword${rows.length === 1 ? "" : "s"} for ${site.domain}` }));
-    const byKeyword = new Map(out.data.map((v) => [v.keyword.toLowerCase(), v]));
-    let updated = 0;
-    for (const r of rows) {
-      const v = byKeyword.get(r.keyword.toLowerCase());
-      if (!v) continue;
-      await pool.query("UPDATE seo_keywords SET search_volume=$2, cpc=$3, volume_checked_at=now() WHERE id=$1", [r.id, v.searchVolume, v.cpc]);
-      updated++;
-    }
-    res.json({ updated });
+    // The keywords still without a volume are read INSIDE the locked section: a request that waited for another (in
+    // this process or another one) finds what that one already filled in, and buys only what is still missing.
+    const result = await once(`volumes:${user}:${site.id}`, async () => {
+      const { rows } = await pool.query("SELECT id, keyword FROM seo_keywords WHERE site_id=$1 AND (volume_checked_at IS NULL OR volume_checked_at<now()-interval '30 days') ORDER BY id LIMIT 1000", [site.id]);
+      if (!rows.length) return { updated: 0 };
+      const out = await withBudget(user, estimateAdsVolumeUsd(rows.length), () => adsSearchVolume({ keywords: rows.map((r: any) => r.keyword), locationCode: site.location_code, languageCode: site.language_code }), { label: `Search volumes — ${rows.length} keyword${rows.length === 1 ? "" : "s"} for ${site.domain}` });
+      const byKeyword = new Map(out.data.map((v) => [v.keyword.toLowerCase(), v]));
+      let updated = 0;
+      for (const r of rows) {
+        const v = byKeyword.get(r.keyword.toLowerCase());
+        if (!v) continue;
+        await pool.query("UPDATE seo_keywords SET search_volume=$2, cpc=$3, volume_checked_at=now() WHERE id=$1", [r.id, v.searchVolume, v.cpc]);
+        updated++;
+      }
+      return { updated };
+    });
+    res.json(result);
   });
 
   // Run now: a rank check queued at the source (results arrive over the next minutes).
@@ -533,9 +545,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = researchInput.parse(req.body);
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     if (!isConfigured()) return notReady(res);
-    const out = await once(`research:${user}:${cleanKeyword(input.seed)}:${input.locationCode}:${input.languageCode}`, () =>
-      withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }), { label: `Keyword ideas — ${cleanKeyword(input.seed)}` }));
-    res.json({ seed: input.seed, items: out.data, usage: await planUsage(user, ent) });
+    // A duplicate made within five minutes (a double click, or a request waiting in another server process) is answered
+    // from the saved copy and bought once (DUPLICATE_WINDOW_HOURS).
+    const out = await buyOnce(user, `research:${cleanKeyword(input.seed)}:${input.locationCode}:${input.languageCode}`, "research", DUPLICATE_WINDOW_HOURS, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }), false, `Keyword ideas — ${cleanKeyword(input.seed)}`);
+    res.json({ seed: input.seed, items: out.data, reused: out.reused, usage: await planUsage(user, ent) });
   });
 
   // Backlinks: the latest snapshot, and "Refresh now".
@@ -558,8 +571,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/sites/:id/backlinks/refresh", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
+    // Already taken today (by hand or by the monthly job): that snapshot is answered, and nothing is bought.
     const snap = await once(`backlinks:${user}:${site.id}`, () => snapshotBacklinks(site));
-    res.status(201).json({ id: snap.id, takenOn: snap.takenOn, lostFailed: snap.lostFailed, usage: await planUsage(user, ent) });
+    res.status(snap.reused ? 200 : 201).json({ id: snap.id, takenOn: snap.takenOn, lostFailed: snap.lostFailed, reused: snap.reused === true, usage: await planUsage(user, ent) });
   });
 
   // ── Site Explorer: any domain, one report ──────────────────────────────────
@@ -651,8 +665,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const input = locateInput.parse(req.body);
     if (!isConfigured()) return notReady(res);
-    const out = await once(`grid-locate:${user}:${site.id}:${input.query.toLowerCase()}`, () =>
-      withBudget(user, gridEstimateUsd(1), () => locateBusiness(input.query), { label: `Local grid — finding "${input.query.slice(0, 80)}" on Google Maps` }));
+    const out = await buyOnce(user, `grid-locate:${site.id}:${input.query.toLowerCase()}`, "grid-locate", DUPLICATE_WINDOW_HOURS, gridEstimateUsd(1), () => locateBusiness(input.query), false, `Local grid — finding "${input.query.slice(0, 80)}" on Google Maps`);
     res.json({ listings: out.data as MapListing[] });
   });
   route("post", "/api/seo/sites/:id/grid/pin", async (req, res, user) => {
@@ -1201,15 +1214,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!(await takeBudget(`seo:ai:${user}`, 40, 1, 3_600_000))) return res.status(429).json({ message: "That is a lot of questions in one hour — try again in a little while." });
     const engines = [...new Set(input.engines)];
     const out = await once(`ai:${user}:${site.id}:${engines.join(",")}:${cleanKeyword(input.prompt)}`, async () => {
+      // The same question to the same assistants, saved in the last two minutes (a request that waited for this one in
+      // another server process): answered from it, nothing bought. A deliberate re-ask later is a new ask.
+      const recent = await recentAiRun(user, site.id, input.prompt, engines, AI_DUPLICATE_SECONDS);
+      if (recent) return { data: { answers: recent.answers, failed: [] as AiEngine[] }, costUsd: 0, runId: recent.runId, saved: true, reused: true };
       const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")})` });
       // Saved as one run. If saving fails the customer still gets the answers, and is told they are not in the history.
       const runId = randomUUID();
       let saved = true;
       try { await saveAiAnswers(user, site.id, input.prompt, o.data.answers, o.costUsd, runId); }
       catch (e: any) { saved = false; console.error(`[seo] AI answers for site ${site.id} were paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
-      return { ...o, runId, saved };
+      return { ...o, runId, saved, reused: false };
     });
-    res.status(201).json({ siteId: site.id, prompt: input.prompt, runId: out.runId, saved: out.saved, answers: out.data.answers, failed: out.data.failed });
+    res.status(out.reused ? 200 : 201).json({ siteId: site.id, prompt: input.prompt, runId: out.runId, saved: out.saved, reused: out.reused, answers: out.data.answers, failed: out.data.failed });
   });
   // Ask a question again every month, or stop. One at a time per account, so the limit cannot be raced.
   route("post", "/api/seo/sites/:id/ai/track", (req, res, user) => serial(`aitrack:${user}`, async () => {
@@ -1545,8 +1562,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!competitor) return res.status(400).json({ message: "Enter the competitor's domain like example.com" });
     if (competitor === site.domain) return res.status(400).json({ message: "That is your own site." });
     if (!isConfigured()) return notReady(res);
-    const out = await once(`competitors:${user}:${site.id}:${competitor}`, () => withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }), { label: `Competitor gap — ${site.domain} vs ${competitor}` }));
-    res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, usage: await planUsage(user, ent) });
+    const out = await buyOnce(user, `competitors:${site.id}:${competitor}:${site.location_code}:${site.language_code}`, "competitors", DUPLICATE_WINDOW_HOURS, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }), false, `Competitor gap — ${site.domain} vs ${competitor}`);
+    res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, reused: out.reused, usage: await planUsage(user, ent) });
   });
 }
 

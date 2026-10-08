@@ -57,7 +57,9 @@ export type SeoSite = {
 };
 
 export const fmtNum = (n: number | null | undefined) => n == null ? "—" : Math.round(n).toLocaleString("en-US");
-export const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "—";
+/** A date as its UTC day ("Oct 8"): a date-only value is that day, a timestamp the UTC day it falls in — the day the
+ *  product files checks, crawls and reports under (the PDF and email say the same day). SeoShell says so once per page. */
+export const fmtDate = (iso: string | null | undefined) => iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "—";
 /** "12 of 50" / "12 · unlimited". */
 export const fmtUnit = (u: Unit | undefined) => !u ? "—" : u.limit < 0 ? `${fmtNum(u.used)} · unlimited` : `${fmtNum(u.used)} of ${fmtNum(u.limit)}`;
 /** Units left this month (Infinity when unlimited). */
@@ -144,6 +146,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
             {picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}
             <UsageLine status={status} />
+            <p className="g-text-2 mb-4 text-[12px]" data-testid="seo-dates-note">Dates of checks, crawls and reports are UTC days — the day each is filed under; in the US evening that is already the next day.</p>
             {status.data && !status.data.configured && <NotReadyNotice />}
             {children}
           </>
@@ -306,10 +309,11 @@ function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
   );
 }
 
-/** Position movement since the previous check: a glyph and the number, never colour alone. */
-export function Move({ now, before, hadBefore }: { now: number | null; before: number | null; /** There was an earlier check, so a missing position means "not ranked then". */ hadBefore?: boolean }) {
-  if (hadBefore && now != null && before == null) return <span className="g-move g-move--up" aria-label="Newly ranked since the last check">new</span>;
-  if (hadBefore && now == null && before != null) return <span className="g-move g-move--down" aria-label={`No longer ranked — was ${before}`}>lost</span>;
+/** Position movement since the previous check: a glyph and the number, never colour alone. A position is where the check
+ *  found the site in the results it read; "new" / "lost" say found / not found, not that a ranking exists or is gone. */
+export function Move({ now, before, hadBefore }: { now: number | null; before: number | null; /** There was an earlier check, so a missing position means "not found then". */ hadBefore?: boolean }) {
+  if (hadBefore && now != null && before == null) return <span className="g-move g-move--up" aria-label="Newly found in the results — not found in the last check">new</span>;
+  if (hadBefore && now == null && before != null) return <span className="g-move g-move--down" aria-label={`No longer found in the results — was ${before} in the last check`}>lost</span>;
   if (now == null || before == null) return null;
   const d = before - now;
   if (d === 0) return <span className="g-move g-move--flat" aria-label="No change">·</span>;

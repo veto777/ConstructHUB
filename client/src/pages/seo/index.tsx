@@ -82,7 +82,7 @@ export default function SeoOverviewPage() {
   useEffect(() => { if (wasRunning.current && !running) refreshHistory(); wasRunning.current = !!running; }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <SeoShell
-      title="Rank tracker" description="Where your site ranks on Google for the keywords you chose, checked every week." site={site} onSite={onSite} sites={sites} status={status}
+      title="Rank tracker" description="Where your site was found in Google's results for the keywords you chose, as of each saved check — automatic checks run weekly by default." site={site} onSite={onSite} sites={sites} status={status}
       actions={site && (
         <Button className="w-full sm:w-auto" disabled={!configured || !o || !o.rows.length || runNow.isPending || running} onClick={() => runNow.mutate()} data-testid="button-run-rank-check" title={!configured ? "Rank tracking is being switched on for your account" : undefined}>
           {runNow.isPending || running ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
@@ -144,15 +144,15 @@ export default function SeoOverviewPage() {
                 return `${verb} on ${yes}${older ? ` of the ${l.length} checked for it; not known for ${older} older check${older === 1 ? "" : "s"}` : ""}`;
               };
               const parts = [
-                maps.length ? `a map pack on ${maps.length} (you are in ${maps.filter((p) => p.local != null).length})` : null,
+                maps.length ? `a map pack on ${maps.length} (you were found in ${maps.filter((p) => p.local != null).length})` : null,
                 count("ai_overview") ? `an AI overview on ${count("ai_overview")} (${known("ai_overview", "it cites you")})` : null,
                 count("featured_snippet") ? `a featured snippet on ${count("featured_snippet")} (${known("featured_snippet", "it is yours")})` : null,
                 count("people_also_ask") ? `"people also ask" on ${count("people_also_ask")}` : null,
               ].filter(Boolean);
-              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">Of your {firsts.length} keyword{firsts.length === 1 ? "" : "s"} checked on {o.devices[0]}, Google shows {parts.join(", ")}.</p> : null;
+              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">In the newest saved check of each of your {firsts.length} keyword{firsts.length === 1 ? "" : "s"} on {o.devices[0]}, the results showed {parts.join(", ")}.</p> : null;
             })()}
             <table className="g-table" data-testid="table-positions">
-              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th title="What else Google shows for this search; a green chip means you are in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
+              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses in the map pack of the saved check, matched by your website or business name">Map pack</th><th title="What else the saved results showed for this search; a green chip means you were found in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
               <tbody>
                 {o.rows.map((r) => {
                   const first = r.positions[o.devices[0]];
@@ -161,16 +161,16 @@ export default function SeoOverviewPage() {
                     <tr data-testid={`row-keyword-${r.id}`}>
                       <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== countryLabel(site.locationCode) && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
                       {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
-                      <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`In the map pack: ${first.pack!.map((p) => p.title).join(", ")}`}>not in it{first.previousLocal != null && <> <span className="g-move g-move--down">lost</span></>}</span> : <span className="g-text-2" title="Google showed no map for this search">no map</span>}</td>
+                      <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`Not found in the map pack, matched by website or business name. In it: ${first.pack!.map((p) => p.title).join(", ")}`}>not found in it{first.previousLocal != null && <> <span className="g-move g-move--down" aria-label={`No longer found in the map pack — was ${first.previousLocal} in the last check`}>lost</span></>}</span> : <span className="g-text-2" title="No map pack in the saved results for this search">no map</span>}</td>
                       <td data-label="On the page">{first ? <SerpFeatureChips features={(first.pack?.length ?? 0) > 0 || first.local != null ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} /> : <span className="g-text-2">—</span>}</td>
                       <td className="num" data-label="Volume">{fmtNum(r.searchVolume)}</td>
                       <td data-label="Page" className="max-w-[280px] truncate">{first?.url ? <a href={first.url} className="g-link" target="_blank" rel="noreferrer">{first.url.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span className="g-text-2">—</span>}</td>
                       <td className="num g-text-2" data-label="Checked">{first ? fmtDate(first.checkedOn) : "—"}</td>
                       <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-8 !px-2" onClick={() => remove.mutate(r.id)} aria-label={`Remove ${r.keyword}`} data-testid={`button-remove-${r.id}`}><Trash2 /></button></td>
                     </tr>
-                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>Google's map pack for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} />{(first?.top?.length ?? 0) > 0 && (
+                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>The map pack in the saved results for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} />{(first?.top?.length ?? 0) > 0 && (
                       <div className="mt-3" data-testid={`serp-${r.id}`}>
-                        <h4 className="g-text mb-1 text-[13px] font-medium">Google's first page for this search <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
+                        <h4 className="g-text mb-1 text-[13px] font-medium">Google's first page for this search, as saved <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
                         <ol className="space-y-0.5 text-[13px]">{first!.top!.map((t) => { const mine = t.domain === site.domain || t.domain.endsWith(`.${site.domain}`); return <li key={`${t.position}-${t.domain}`} className={mine ? "g-text font-medium" : "g-text-2"}><span className="inline-block w-6 tabular-nums">{t.position}.</span> {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="g-link">{t.domain}</a> : t.domain}{mine ? " · you" : ""}{t.title ? <span className="g-text-2 font-normal"> — {t.title}</span> : null}</li>; })}</ol>
                       </div>
                     )}</td></tr>}

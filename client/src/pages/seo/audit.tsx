@@ -183,7 +183,7 @@ export default function SeoAuditPage() {
       {site && d && !a && !running && !d.newestUnreadable && (
         <Empty testId="audit-empty">
           <h3>No crawl of {site.domain} yet</h3>
-          <p>A crawl reads up to 150 pages of the site and checks each for broken pages, redirects, missing titles and descriptions, thin content, slow pages, and whether Google and AI assistants can read it.</p>
+          <p>A crawl reads up to 150 pages of the site the way a simple crawler does — the HTML as sent, without running JavaScript — and checks each for broken pages, redirects, missing titles and descriptions, thin content, slow pages, and whether robots rules or pages with little server-sent text would keep crawlers, Google's and the AI companies' included, from reading it. It is not Googlebot: what Google itself sees can differ.</p>
           <p className="mt-2">It uses one of your plan's monthly Site Scans and no SEO data credit.</p>
         </Empty>
       )}
@@ -195,7 +195,7 @@ export default function SeoAuditPage() {
       {/* Every finished crawl as a dated list — whatever is shown above, and however many have a score. */}
       {site && d && trend.length > 0 && (
         <details className="mb-3 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">{(d.crawls?.length ?? 0) > trend.length ? `The latest ${trend.length} crawls (of ${d.crawls!.length}${d.crawls!.length >= 100 ? "+" : ""}), as a list` : `Every crawl (${trend.length}), as a list`}</summary>
-          <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h, i, all) => <li key={h.jobId}>{fmtDate(h.at)}{all.filter((x) => fmtDate(x.at) === fmtDate(h.at)).length > 1 ? ` ${new Date(h.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
+          <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h, i, all) => <li key={h.jobId}>{fmtDate(h.at)}{all.filter((x) => fmtDate(x.at) === fmtDate(h.at)).length > 1 ? ` ${new Date(h.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })} UTC` : ""}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
         </details>
       )}
       {site && a && (

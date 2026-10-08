@@ -22,7 +22,7 @@ const BUCKETS = [
   { key: "top10", label: "4–10", color: "#34a853" },
   { key: "top20", label: "11–20", color: "#fbbc04" },
   { key: "top100", label: "21+", color: "#e8710a" },
-  { key: "notRanked", label: "Not ranked", color: "#9aa0a6" },
+  { key: "notRanked", label: "Not found", color: "#9aa0a6" },
 ] as const;
 
 export function RankHistoryPanel({ site }: { site: SeoSite }) {
@@ -148,7 +148,7 @@ export function KeywordHistory({ id, devices }: { id: number; devices: Device[] 
           {[...points].reverse().slice(0, 12).map((p) => (
             <tr key={p.date}>
               <td>{fmtDate(p.date)}</td>
-              {devices.map((d) => <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p[d] ?? (p.checked?.[d] === false ? <span className="g-text-2" title="Not checked on this device that day">—</span> : "not ranked")}</td>)}
+              {devices.map((d) => <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p[d] ?? (p.checked?.[d] === false ? <span className="g-text-2" title="Not checked on this device that day">—</span> : <span title="Not within the result pages the check read">not found</span>)}</td>)}
               <td data-label="Page" className="max-w-[320px] truncate">{p.url ? <a href={p.url} className="g-link" target="_blank" rel="noreferrer">{p.url.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span className="g-text-2">—</span>}</td>
             </tr>
           ))}

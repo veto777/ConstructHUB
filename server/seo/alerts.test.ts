@@ -72,7 +72,7 @@ describe("rankAlertTitle", () => {
 describe("describeChange", () => {
   it("reads like a sentence, with the place when there is one", () => {
     expect(describeChange({ keyword: "roof repair", device: "mobile", location: "Tampa, Florida", what: "dropped", from: 4, to: 9 })).toBe('"roof repair" in Tampa, Florida fell from 4 to 9 (mobile)');
-    expect(describeChange({ keyword: "siding", device: "desktop", location: null, what: "lost", from: 7, to: null })).toBe('"siding" dropped out of the results — it was 7 (desktop)');
+    expect(describeChange({ keyword: "siding", device: "desktop", location: null, what: "lost", from: 7, to: null })).toBe('"siding" is no longer found in the results — it was 7 (desktop)');
     expect(describeChange({ keyword: "siding", device: "desktop", location: null, what: "entered_map_pack", from: null, to: 2 })).toBe('"siding" is now in the Google map pack at 2 (desktop)');
   });
 });

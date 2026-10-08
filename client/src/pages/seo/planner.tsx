@@ -27,9 +27,9 @@ const csvCell = (v: string | number | null) => { const s = v == null ? "" : Stri
 /** What a cell says, in colour and in words (colour is never the only signal). */
 function state(c: Cell, rankingsKnown: boolean, volumesKnown: boolean): { bg: string; fg: string; label: string; words: string } {
   if (c.position !== null) {
-    if (c.position <= 3) return { bg: "#188038", fg: "#fff", label: `#${c.position}`, words: `you rank ${c.position}` };
-    if (c.position <= 10) return { bg: "#f9ab00", fg: "#202124", label: `#${c.position}`, words: `you rank ${c.position}, on page one` };
-    return { bg: "#e8710a", fg: "#202124", label: `#${c.position}`, words: `you rank ${c.position}, beyond page one` };
+    if (c.position <= 3) return { bg: "#188038", fg: "#fff", label: `#${c.position}`, words: `the keyword database has you at ${c.position}` };
+    if (c.position <= 10) return { bg: "#f9ab00", fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, on page one` };
+    return { bg: "#e8710a", fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, beyond page one` };
   }
   if (!rankingsKnown) return { bg: "var(--g-divider)", fg: "var(--g-text)", label: "?", words: "your ranking didn't load" };
   if ((c.volume ?? 0) > 0) return { bg: "#c5221f", fg: "#fff", label: "Gap", words: "the keyword database has no ranking for you in its first 100" };
@@ -121,7 +121,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {last.isError && !asked && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="planner-last-error">Couldn't load the services and towns you used last time ({apiErrorMessage(last.error)}). <button type="button" className="g-link" onClick={() => void last.refetch()}>Try again</button> — or type them in.</p>}
       {asked && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved table…</p>}
       {asked && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved table</h3><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
-      {!asked && <Empty testId="planner-intro"><h3>Which service, in which town, needs a page?</h3><p>List what you do and where you do it. For every pairing — "roof repair lynden", "siding ferndale" — you get how often it is searched and where {site.domain} ranks for it. Red cells are searches people make that you do not show up for.</p></Empty>}
+      {!asked && <Empty testId="planner-intro"><h3>Which service, in which town, needs a page?</h3><p>List what you do and where you do it. For every pairing — "roof repair lynden", "siding ferndale" — you get how often it is searched and where the keyword database has {site.domain} ranking for it. Red cells are searches people make for which the database has no ranking for you in its first 100.</p></Empty>}
       {asked && saved.isSuccess && !d && (
         <Empty testId="planner-not-run">
           <h3>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h3>
@@ -136,7 +136,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
         <>
           <div className="g-tiles mb-3">
             <Tile label="Gaps" value={d.summary.gaps == null ? "—" : fmtNum(d.summary.gaps)} hint={d.summary.gaps == null ? (rankingsKnown ? "the search volumes didn't load" : "your rankings didn't load") : `searched ${fmtNum(d.summary.gapVolume)} times a month between them`} testId="tile-planner-gaps" />
-            <Tile label="Beyond the first three" value={d.summary.weak == null ? "—" : fmtNum(d.summary.weak)} hint={d.summary.weak == null ? "your rankings didn't load" : "you rank, with room to move up"} testId="tile-planner-weak" />
+            <Tile label="Beyond the first three" value={d.summary.weak == null ? "—" : fmtNum(d.summary.weak)} hint={d.summary.weak == null ? "your rankings didn't load" : "ranked in the keyword database, with room to move up"} testId="tile-planner-weak" />
             <Tile label="In the first three" value={d.summary.strong == null ? "—" : fmtNum(d.summary.strong)} hint={d.summary.strong == null ? "your rankings didn't load" : undefined} testId="tile-planner-strong" />
             <Tile label="Nothing known" value={d.summary.unknown == null ? "—" : fmtNum(d.summary.unknown)} hint={d.summary.unknown == null ? "part of the table didn't load" : "too few searches to measure"} testId="tile-planner-unknown" />
           </div>
@@ -160,7 +160,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           </div>
           <div className="overflow-x-auto">
             <table className="g-table" data-testid="table-planner">
-              <caption className="sr-only">Each cell is the search made of the service in its row and the town in its column: searches a month and your position. Select cells to act on them.</caption>
+              <caption className="sr-only">Each cell is the search made of the service in its row and the town in its column: searches a month and your position in the keyword database. Select cells to act on them.</caption>
               <thead><tr><th scope="col">Service</th>{d.towns.map((t) => <th key={t} scope="col" className="capitalize">{t}</th>)}</tr></thead>
               <tbody>{d.services.map((s) => (
                 <tr key={s}>

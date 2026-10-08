@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { retailCents } from "@shared/seo-credits";
 import { reserveCredits, settleCredits, SeoCreditShort, type CreditReservation } from "./credits";
+import { withCallCost } from "./cost-context";
 
 /**
  * Swappable for tests. `allowanceCents` is the account's monthly SEO data
@@ -295,19 +296,25 @@ export const releaseBudget = (r: BudgetReservation) => settleBudget(r, 0);
 export async function withBudget<T>(userId: number, estimateUsd: number, call: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; /** What the delivered parts cost — the customer is charged this, not for a part that failed. Defaults to costUsd. */ customerUsd?: number }>, opts: BudgetOptions = {}): Promise<{ data: T; costUsd: number }> {
   const r = await reserveBudget(userId, estimateUsd, opts);
   let out: { data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number };
+  // Set when an answer inside the call came without a cost (server/seo/cost-context.ts): unknown, never zero.
+  const callCost = { unknown: false };
   try {
-    out = await call();
+    out = await withCallCost(callCost, call);
   } catch (e: any) {
     const reported = typeof e?.costUsd === "number" ? e.costUsd : 0;
     // Part of the cost is unknown (a call timed out or the source never answered): our ledger keeps the whole estimate.
     // `costUnknown: false` on the error means the caller has already counted what it could not learn (an allowance per try): believe its figure.
-    const unknown = e?.costUnknown === false ? false : e?.costUnknown === true || e?.code === "timeout" || (e?.code === "upstream" && reported === 0);
+    const unknown = callCost.unknown || (e?.costUnknown === false ? false : e?.costUnknown === true || e?.code === "timeout" || (e?.code === "upstream" && reported === 0));
     await settleBudget(r, unknown ? Math.max(reported, estimateUsd) : reported, 0);
     // The reservation id travels with the error so nothing downstream has to guess what was (not) charged.
     throw e;
   }
   // The data is in hand: settleBudget never throws, so a ledger error cannot lose a result that was paid for.
-  await settleBudget(r, out.costUnknown ? Math.max(out.costUsd, estimateUsd) : out.costUsd, Math.min(out.costUsd, out.customerUsd ?? out.costUsd));
+  // Our ledger: the reported cost, or the estimate when part of it is unknown (an answer without a cost included).
+  // The customer: what the delivered parts cost — and never more than was reserved, the price they were shown (the
+  // source charging more than we measured is ours to carry). A cost we do not know is not invented for the customer.
+  const unknown = out.costUnknown || callCost.unknown;
+  await settleBudget(r, unknown ? Math.max(out.costUsd, estimateUsd) : out.costUsd, Math.min(out.costUsd, out.customerUsd ?? out.costUsd, estimateUsd));
   return out;
 }
 

@@ -83,7 +83,7 @@ describe("words", () => {
   });
   it("a mover reads like a sentence", () => {
     expect(moverLine({ keyword: "roof repair", location: "Tampa, Florida", device: "desktop", from: 9, to: 3 })).toBe('"roof repair" in Tampa, Florida moved from 9 to 3');
-    expect(moverLine({ keyword: "gutters", location: null, device: "desktop", from: 8, to: null })).toBe('"gutters" dropped out of the results (was 8)');
+    expect(moverLine({ keyword: "gutters", location: null, device: "desktop", from: 8, to: null })).toBe('"gutters" is no longer found in the results (was 8)');
     expect(moverLine({ keyword: "siding", location: null, device: "desktop", from: null, to: 5 })).toBe('"siding" now ranks at 5');
   });
   it("knows when there is nothing to report", () => {

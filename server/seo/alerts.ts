@@ -63,7 +63,7 @@ export function describeChange(c: RankChange): string {
   const dev = ` (${c.device})`;
   switch (c.what) {
     case "dropped": return `"${c.keyword}"${where} fell from ${c.from} to ${c.to}${dev}`;
-    case "lost": return `"${c.keyword}"${where} dropped out of the results — it was ${c.from}${dev}`;
+    case "lost": return `"${c.keyword}"${where} is no longer found in the results — it was ${c.from}${dev}`;
     case "left_map_pack": return `"${c.keyword}"${where} is no longer in the Google map pack — it was ${c.from}${dev}`;
     case "improved": return `"${c.keyword}"${where} rose from ${c.from} to ${c.to}${dev}`;
     case "new": return `"${c.keyword}"${where} now ranks at ${c.to}${dev}`;

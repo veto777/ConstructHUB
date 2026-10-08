@@ -1071,7 +1071,8 @@ export default function SiteScanPage() {
                           setFilters(initialReportFilters);
                         })
                       }
-                      label="Rescan / retry PageSpeed"
+                      // A rescan keeps the scan's own settings: with PageSpeed off, it stays off (nothing to retry).
+                      label={job?.psiPages === 0 ? "Rescan (PageSpeed stays off)" : "Rescan / retry PageSpeed"}
                     />
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">

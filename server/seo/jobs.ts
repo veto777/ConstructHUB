@@ -29,6 +29,7 @@ import { runDueMentionChecks } from "./mention-watch";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, claimDeadline, type Deadline, type PostedRankTask, type Device, lostLinks, type LostLink } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
+import { seoLocks } from "./locks";
 import { raiseLinkAlerts, rankAlertPlan, saveRankAlerts, deliverAlert, type RunCoverage } from "./alerts";
 
 import { publicFailure } from "./public-errors";
@@ -421,7 +422,26 @@ export async function scheduleWeeklyRuns(): Promise<void> {
 
 /** Buy the summary + top backlinks for a site and store today's snapshot. */
 /** `automatic`: the monthly job — included data only, never purchased credit. `deadline`: the job's lease deadline (see dataforseo.ts Deadline); nothing is asked of the source after it. */
-export async function snapshotBacklinks(site: SiteRow, automatic = false, deadline?: Deadline): Promise<{ id: number; takenOn: string; costUsd: number; /** The lost-backlinks part did not load (the rest did). */ lostFailed: boolean }> {
+export type BacklinkSnapshotResult = { id: number; takenOn: string; costUsd: number; /** The lost-backlinks part did not load (the rest did). */ lostFailed: boolean;
+  /** Today's snapshot was already taken (by the monthly job or by hand): nothing was bought, and this is that snapshot. */ reused?: boolean };
+/**
+ * One snapshot per site per day, whoever asks: "Refresh now" and the monthly job take the same per-site lock (in every
+ * server process), and whoever gets it second finds today's snapshot and buys nothing — before this, the two could both
+ * buy on the same day and the day's row summed both charges for one snapshot.
+ */
+export async function snapshotBacklinks(site: SiteRow, automatic = false, deadline?: Deadline): Promise<BacklinkSnapshotResult> {
+  return seoLocks.withLock(`backlinks-snapshot:${site.id}`, async () => {
+    const { rows: [today] } = await pool.query(
+      "SELECT id, taken_on::text AS taken_on, changes FROM seo_backlink_snapshots WHERE site_id=$1 AND taken_on = current_date", [site.id]);
+    if (today) {
+      // The monthly job's period closes with the snapshot it found (a refresh by hand already moved it; this is a no-op then).
+      if (automatic) await pool.query("UPDATE seo_sites SET next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
+      return { id: Number(today.id), takenOn: String(today.taken_on).slice(0, 10), costUsd: 0, lostFailed: today.changes?.failed === true, reused: true };
+    }
+    return buySnapshot(site, automatic, deadline);
+  });
+}
+async function buySnapshot(site: SiteRow, automatic: boolean, deadline?: Deadline): Promise<BacklinkSnapshotResult> {
   // With an earlier snapshot to compare with, the linking sites lost since then are named too (one more lookup).
   const { rows: [before] } = await pool.query("SELECT taken_on::text AS taken_on FROM seo_backlink_snapshots WHERE site_id=$1 AND taken_on < current_date ORDER BY taken_on DESC LIMIT 1", [site.id]);
   const estimate = estimateBacklinkSnapshotUsd(BACKLINK_ROWS) + (before ? estimateLostLinksUsd() : 0);

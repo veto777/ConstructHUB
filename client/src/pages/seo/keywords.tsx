@@ -135,7 +135,7 @@ export default function SeoKeywordsPage() {
   const peak = o && o.trend.length ? o.trend.reduce((a, b) => (b.volume > a.volume ? b : a)) : null;
 
   return (
-    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranks today, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
       <nav className="g-tabs" aria-label="Keywords explorer views">
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
       </nav>
@@ -157,8 +157,8 @@ export default function SeoKeywordsPage() {
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
         A keyword's overview costs about {price} of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} {market.label}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
       </p>
-      {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and today's results…" : "Opening the saved overview…"}</p>}
-      {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who holds the top ten today — and hundreds of related searches you can track.</p></Empty>}
+      {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and the top results…" : "Opening the saved overview…"}</p>}
+      {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who held the top ten when it was looked up — and hundreds of related searches you can track.</p></Empty>}
       {!o && !busy && keyword && saved.isError && <div className="g-callout" role="alert" data-testid="keywords-saved-error"><h3>Couldn't check for a saved overview</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {!o && !busy && keyword && !saved.isError && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
 
@@ -202,11 +202,11 @@ export default function SeoKeywordsPage() {
             <section className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-features">
               <h3 className="g-text mb-2 text-[15px] font-medium">On the results page</h3>
               {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <span key={f} className="g-chip g-chip--sm">{FEATURE[f] ?? cap(f.replace(/_/g, " "))}</span>)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
-              <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "Google shows a map pack here, so a strong Google Business Profile matters as much as the website." : "No map pack: this one is won by the website."}</p>
+              <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "The saved results had a map pack, so a strong Google Business Profile matters as much as the website." : "No map pack in the saved results, so the website is what competes here."}</p>
             </section>
           </div>
           <section className="mb-5" data-testid="panel-keyword-serp">
-            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks <span className="g-text-2 text-[12px] font-normal">· Google's top results as of {fmtDate(o.fetchedAt)}</span></h3>
+            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks <span className="g-text-2 text-[12px] font-normal">· Google's top results as saved on {fmtDate(o.fetchedAt)} (desktop)</span></h3>
             {(o.missing?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-keyword-missing">{[o.missing!.includes("results") ? "The top results" : null, o.missing!.includes("authority") ? "Site authority" : null, o.missing!.includes("potential") ? "Traffic potential and parent topic" : null].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1") || "Part of this overview"} didn't load this time; you were not charged for that part. Refresh looks the whole keyword up again.</p>}
             {o.serp.length ? (
               <table className="g-table">
@@ -220,7 +220,7 @@ export default function SeoKeywordsPage() {
                   </tr>
                 ))}</tbody>
               </table>
-            ) : <p className="g-text-2 text-[13px]">Today's results weren't available for this keyword.</p>}
+            ) : <p className="g-text-2 text-[13px]">The top results weren't available for this keyword.</p>}
           </section>
 
           <h3 className="g-text mb-2 text-[15px] font-medium">Keyword ideas</h3>

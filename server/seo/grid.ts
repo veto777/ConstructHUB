@@ -241,7 +241,10 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
   const costUsd = round6(known + unknownTries * GRID_POINT_USD);
   if (results.every((r) => r === null))
     throw Object.assign(new Error((firstError as any)?.message ?? "The local searches failed."), { costUsd, costUnknown: false, cause: firstError });
-  return { data: buildScan(input, cells, results), costUsd, customerUsd: round6(customerUsd), costUnknown: false };
+  // The customer pays for the points that came back, at most the price per point the button showed (GRID_POINT_USD):
+  // a point the source billed above what we measured is ours to carry, never theirs.
+  const returned = results.filter((r) => r !== null).length;
+  return { data: buildScan(input, cells, results), costUsd, customerUsd: round6(Math.min(customerUsd, returned * GRID_POINT_USD)), costUnknown: false };
 }
 
 // ── Saved pins and scans ────────────────────────────────────────────────────

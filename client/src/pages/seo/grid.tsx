@@ -149,7 +149,7 @@ export default function SeoLocalGridPage() {
   const unsure = shown?.summary.unsure ?? 0;
 
   return (
-    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — searched from point after point, for the searches your customers make." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={onSite} sites={sites} status={status}>
       {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h3>No sites yet</h3><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
       {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the local grid</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
@@ -210,14 +210,14 @@ export default function SeoLocalGridPage() {
                 </Button>
               </form>
               <p className="g-text-2 mt-2 text-[13px]" data-testid="text-grid-cost">
-                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one Google search made from that spot{scanPrice != null ? `, about ${money(scanPrice)} of your SEO data in all` : ""}; a search that fails is not charged (one that works but finds no businesses is).
+                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one lookup of Google's local results made for that spot, as if searching from there{scanPrice != null ? ` — about ${money(scanPrice)} of your SEO data in all` : ""}; a lookup that fails is not charged (one that works but finds no businesses is).
                 {scanHold != null && scanPrice != null && scanHold > scanPrice ? ` Up to ${money(scanHold)} is set aside while it runs; what isn't used comes straight back.` : ""} A scan is kept in the history below; running it again is a new scan.
                 {!can(scanHold) && <span style={{ color: "var(--g-red)" }}> Not enough SEO data left — add credit above.</span>}
               </p>
             </section>
           )}
 
-          {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Searching Google from each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
+          {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Looking up Google's local results for each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
           {watchingFailed && <p className="mb-3 text-[13px]" role="alert" style={{ color: "var(--g-red)" }} data-testid="grid-watch-error">Couldn't check on the running scan just now ({apiErrorMessage(active.error)}). Still trying; the scan itself is not affected.</p>}
           {openId != null && !shown && view.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
           {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}

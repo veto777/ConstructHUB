@@ -36,7 +36,7 @@ const KIND: Record<Kind, { label: string; good: boolean }> = {
 const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better", kw_new: "Newly seen", kw_lost: "No longer seen", mention_new: "New mentions" };
 const WHAT: Record<RankItem["what"], (i: RankItem) => string> = {
   dropped: (i) => `fell from ${i.from} to ${i.to}`,
-  lost: (i) => `dropped out of the results (was ${i.from})`,
+  lost: (i) => `no longer found in the results (was ${i.from})`,
   left_map_pack: (i) => `left the Google map pack (was ${i.from})`,
   improved: (i) => `rose from ${i.from} to ${i.to}`,
   new: (i) => `now ranks at ${i.to}`,

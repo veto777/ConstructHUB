@@ -1,6 +1,6 @@
 /**
  * Site Explorer — one domain, everything about it: authority and the backlink
- * profile, organic and paid search footprint, six months of history, the
+ * profile, organic and paid search footprint, two years of monthly history, the
  * keywords and pages that earn its traffic, who it competes with, who links to
  * it and with what anchor text. Any domain, not only a tracked site.
  *

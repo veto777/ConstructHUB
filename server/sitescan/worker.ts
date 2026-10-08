@@ -243,8 +243,9 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         // planned = addresses meant to be asked; asked = sent (robots.txt allowed them); answered = got an answer.
         missingPageProbe: {
           planned: state.missingPages?.length ?? 0,
-          asked: (state.missingPages ?? []).filter(
-            (m) => !/^not asked/.test(m.note ?? ""),
+          // Counted from the probe's own `asked` (crawls saved before it was recorded: from its note).
+          asked: (state.missingPages ?? []).filter((m) =>
+            typeof m.asked === "boolean" ? m.asked : !/^not asked/.test(m.note ?? ""),
           ).length,
           answered: (state.missingPages ?? []).filter((m) => m.status > 0)
             .length,

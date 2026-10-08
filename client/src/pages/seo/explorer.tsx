@@ -238,7 +238,7 @@ export default function SeoExplorerPage() {
   const followedPct = report?.links.referringDomains ? Math.round(((report.links.followedDomains ?? 0) / report.links.referringDomains) * 1000) / 10 : null;
 
   return (
-    <SeoShell title="Site explorer" description="Any website's search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+    <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">
           <span className="sr-only">Domain</span>
@@ -258,7 +258,7 @@ export default function SeoExplorerPage() {
       {!report && !busy && (recent.data?.items.length ?? 0) > 0 && (
         <Panel title="Recently analysed" testId="panel-explorer-recent" className="mb-4">
           <table className="g-table">
-            <thead><tr><th>Domain</th><th className="num">Authority</th><th className="num">Referring domains</th><th className="num">Organic keywords</th><th className="num">Organic traffic</th><th className="num">Analysed</th></tr></thead>
+            <thead><tr><th>Domain</th><th className="num">Authority</th><th className="num">Referring domains</th><th className="num">Organic keywords</th><th className="num">Organic traffic (est.)</th><th className="num">Analysed</th></tr></thead>
             <tbody>
               {recent.data!.items.map((r) => (
                 <tr key={`${r.domain}:${r.locationCode}:${r.languageCode}`}>
@@ -285,7 +285,7 @@ export default function SeoExplorerPage() {
         </section>
       )}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
-        <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
+        <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see an estimate of how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
       )}
 
       {report && (
@@ -348,7 +348,7 @@ export default function SeoExplorerPage() {
             <Panel title="Organic search" testId="panel-organic">
               <div className="grid grid-cols-2 gap-4">
                 <Stat label="Organic keywords" value={compact(report.organic.keywords)} hint={`Top 3: ${fmtNum(report.organic.positions.top3)} · top 10: ${fmtNum(report.organic.positions.top10)}`} testId="stat-organic-keywords" />
-                <Stat label="Organic traffic" value={compact(report.organic.traffic)} hint={`Value ${usd(report.organic.trafficValue)} / mo`} testId="stat-organic-traffic" />
+                <Stat label="Organic traffic (estimate)" value={compact(report.organic.traffic)} hint={`Visits a month, estimated from rankings · worth ${usd(report.organic.trafficValue)} / mo as ads`} testId="stat-organic-traffic" />
               </div>
               <p className="g-text-2 mt-4 text-[12px]" data-testid="text-organic-movement">
                 Since last month: <span style={{ color: "var(--g-green)" }}>▲ {fmtNum(report.organic.isUp)} up</span> · <span style={{ color: "var(--g-red)" }}>▼ {fmtNum(report.organic.isDown)} down</span> · {fmtNum(report.organic.isNew)} new · {fmtNum(report.organic.isLost)} lost

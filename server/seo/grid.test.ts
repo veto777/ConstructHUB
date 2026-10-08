@@ -99,6 +99,15 @@ describe("local grid", () => {
     const twice = rivalsOf([[L("B", 1, { cid: "7" }), L("B", 2, { cid: "7" }), L("C", 3, { cid: "8" })]], t);
     expect(twice.map((r) => [r.name, r.found, r.avgRank])).toEqual([["B", 1, 1], ["C", 1, 3]]);
   });
+  it("a point the source billed above what we measured: the customer pays the price per point shown, the rest is ours", async () => {
+    const real = gridDeps.request;
+    try {
+      gridDeps.request = (async () => ({ status_code: 20000, tasks: [{ status_code: 20000, status_message: "Ok.", cost: 0.005, result: [{ items: [] }] }] })) as any;
+      const out = await fetchGrid({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com" });
+      expect(out.customerUsd).toBeCloseTo(9 * GRID_POINT_USD, 6);
+      expect(out.costUsd).toBeCloseTo(9 * 0.005, 6);
+    } finally { gridDeps.request = real; }
+  });
   it("the customer pays for the points that returned; failed and repeated tries are ours, and stay inside what was reserved", async () => {
     const real = gridDeps.request;
     const ok = (title: string) => ({ status_code: 20000, tasks: [{ status_code: 20000, status_message: "Ok.", cost: 0.002, result: [{ items: [{ type: "local_pack", title, cid: "9877668871764835558" }] }] }] });

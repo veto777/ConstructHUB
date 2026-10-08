@@ -11,7 +11,8 @@ import { Empty, fmtNum, money, SeoShell, Tile, useSelectedSite, useSeoSites, use
 type Row = { id: string; at: string; what: string; status: "charged" | "free" | "running"; cents: number; fromIncluded: number; fromPurchased: number };
 type Usage = { rows: Row[]; purchases: { at: string; cents: number }[]; months: { month: string; cents: number; lookups: number }[]; thisMonth?: string };
 
-const when = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+/** Date and time in the reader's own zone, named — the one place a clock time is shown (the export keeps the ISO UTC time). */
+const when = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 const csvCell = (v: string | number) => { const s = String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 

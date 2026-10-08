@@ -257,6 +257,26 @@ export async function saveAiAnswers(userId: number, siteId: number, prompt: stri
   } finally { client.release(); }
 }
 
+/**
+ * The same question with the same assistants, already asked and saved for this site in the last `withinSeconds` — so a
+ * duplicate request (e.g. one waiting in another server process) is answered from it instead of buying the answers
+ * again. Only a run that has an answer from EVERY assistant asked counts. A deliberate re-ask later is a new ask.
+ */
+export async function recentAiRun(userId: number, siteId: number, prompt: string, engines: AiEngine[], withinSeconds: number): Promise<{ runId: string; answers: AiAnswer[] } | null> {
+  const { rows } = await pool.query(
+    `SELECT run_id::text AS run_id, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer FROM seo_ai_checks
+      WHERE user_id=$1 AND site_id=$2 AND prompt=$3 AND run_id IS NOT NULL AND created_at > now() - ($4::float8 * interval '1 second')
+      ORDER BY created_at DESC, id DESC`, [userId, siteId, onePrompt(prompt), withinSeconds]);
+  const byRun = new Map<string, any[]>();
+  for (const r of rows) (byRun.get(r.run_id) ?? byRun.set(r.run_id, []).get(r.run_id)!).push(r);
+  for (const [runId, list] of byRun) {
+    if (!engines.every((e) => list.some((r) => r.engine === e))) continue;
+    const answers: AiAnswer[] = engines.map((e) => { const r = list.find((x) => x.engine === e)!; return { engine: e, model: r.model ?? "", mentioned: !!r.mentioned, cited: !!r.cited, listedAt: r.listed_at ?? null, businesses: r.businesses ?? [], sources: r.sources ?? [], searches: r.searches ?? [], answer: r.answer ?? "" }; });
+    return { runId, answers };
+  }
+  return null;
+}
+
 export type AiPromptHistory = {
   prompt: string; lastAt: string;
   /** The run the newest answers came from; an answer with another run id is from an earlier ask. */
