@@ -24,6 +24,13 @@ type Overview = {
 const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
 const RUN_TRIGGER: Record<string, string> = { weekly: "weekly check", manual: "run now" };
 
+/** What the Search Console tile says under its number: the comparison when both 28-day windows are complete, otherwise how much of EACH is synced. */
+function gscHint(g: { clicks: number | null; previousClicks: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean }): string {
+  if (g.comparable) return `${fmtNum(g.previousClicks)} the 28 days before`;
+  const now = g.days ?? 0, before = g.previousDays ?? 0;
+  return `${now} of the last 28 days synced${g.through ? ` (to ${fmtDate(g.through)})` : ""}; ${before} of the 28 before — not compared`;
+}
+
 export default function SeoOverviewPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
@@ -82,7 +89,7 @@ export default function SeoOverviewPage() {
             <Tile label="Since last check" value={<><span className="g-move g-move--up text-[20px]">▲{o.summary.improved}</span> <span className="g-move g-move--down text-[20px]">▼{o.summary.declined}</span></>} hint="Keywords up / down" testId="tile-movement" />
             {o.searchConsole ? (
               <>
-                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={o.searchConsole.clicks === null ? "Nothing synced for the last 28 days yet" : (o.searchConsole.days ?? 28) < 28 ? `Only ${o.searchConsole.days} of the 28 days to ${fmtDate(o.searchConsole.through)} are synced` : o.searchConsole.comparable ? `${fmtNum(o.searchConsole.previousClicks)} the 28 days before` : `Not compared: ${o.searchConsole.previousDays ?? 0} of the 28 days before are synced`} testId="tile-gsc-clicks" />
+                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={gscHint(o.searchConsole)} testId="tile-gsc-clicks" />
                 <Tile label="Impressions (28 days)" value={fmtNum(o.searchConsole.impressions)} hint={o.searchConsole.position != null ? `Average position ${o.searchConsole.position}` : o.searchConsole.property} testId="tile-gsc-impressions" />
               </>
             ) : (

@@ -6,7 +6,10 @@
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { beginScan, runningScan, finishScan, failScan, getScan, listScans, savePin, readPin, buildScan, gridPoints, pinInput, type MapListing } from "../server/seo/grid";
-import { saveWatch, listWatches, deleteWatch, raiseGridAlert, gridReportLines, watchInput, MAX_WATCHES } from "../server/seo/grid-monitor";
+import { saveWatch, listWatches, deleteWatch, raiseGridAlert, raiseOwedGridAlerts, runDueGridWatches, gridReportLines, gridMonitorDeps, watchInput, MAX_WATCHES } from "../server/seo/grid-monitor";
+import { gridDeps } from "../server/seo/grid";
+import { budgetDeps } from "../server/seo/budget";
+import { dataforseoDeps } from "../server/seo/dataforseo";
 import { listAlerts } from "../server/seo/alerts";
 
 let failed = 0;
@@ -57,35 +60,87 @@ async function main() {
 
   // Repeating scans, the alert on a clear change, and the report lines.
   await pool.query("DELETE FROM seo_grid_scans WHERE site_id=$1", [s.id]); await pool.query("DELETE FROM seo_grid_watches WHERE site_id=$1", [s.id]); await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
-  const w = await saveWatch(1, s.id, watchInput.parse({ keyword: "Roof  Repair", size: 3, spacing: 2, every: "monthly" }));
-  const again = await saveWatch(1, s.id, watchInput.parse({ keyword: "roof repair", size: 3, spacing: 2, every: "weekly" }));
-  eq("8 a repeating scan is one row per search and shape; choosing again changes how often", [w.keyword, again.id === w.id, again.every, (await listWatches(1, s.id)).length, (await listWatches(2, s.id)).length], ["roof repair", true, "weekly", 1, 0]);
-  for (let i = 0; i < MAX_WATCHES - 1; i++) await saveWatch(1, s.id, watchInput.parse({ keyword: `extra ${i}`, size: 3, spacing: 2, every: "monthly" }));
-  const tooMany: any = await saveWatch(1, s.id, watchInput.parse({ keyword: "one more", size: 3, spacing: 2, every: "monthly" })).catch((e) => e);
-  eq("8b at most five per site, and another account cannot stop one", [tooMany?.status, await deleteWatch(2, s.id, w.id), (await listWatches(1, s.id)).length], [403, false, MAX_WATCHES]);
-
   const listing = (name: string, rank: number, cid: string): MapListing => ({ name, rank, cid, domain: null, address: null, lat: null, lng: null, rating: null, reviews: null });
-  const scanAt = async (ourRank: number, daysAgo: number) => {
-    const b = await beginScan(1, s.id, { keyword: "roof repair", size: 3, spacing: 2 });
-    const built = buildScan({ keyword: "roof repair", size: 3, spacing: 2, pin, domain: "grid.example" }, cells, cells.map(() => [listing("A", ourRank === 1 ? 2 : 1, "50"), listing("Grid Co", ourRank, "12")].sort((x, y) => x.rank - y.rank)));
+  const scanAt = async (keyword: string, ourRank: number, daysAgo: number) => {
+    const b = await beginScan(1, s.id, { keyword, size: 3, spacing: 2 });
+    const built = buildScan({ keyword, size: 3, spacing: 2, pin, domain: "grid.example" }, cells, cells.map(() => [listing("A", ourRank === 1 ? 2 : 1, "50"), listing("Grid Co", ourRank, "12")].sort((x, y) => x.rank - y.rank)));
     await finishScan(b.id, built, 0.018);
     await pool.query("UPDATE seo_grid_scans SET created_at = now() - make_interval(days => $2) WHERE id=$1", [b.id, daysAgo]);
     return b.id;
   };
-  const older = await scanAt(1, 30), newer = await scanAt(9, 0);
+  const noBase: any = await saveWatch(1, s.id, watchInput.parse({ keyword: "never scanned", size: 3, spacing: 2, every: "monthly" })).catch((e) => e);
+  eq("8 a scan that was never run cannot be set to repeat", [noBase?.status, /Run this scan once first/.test(String(noBase?.message))], [400, true]);
+  const older = await scanAt("roof repair", 1, 30);
+  const w = await saveWatch(1, s.id, watchInput.parse({ keyword: "Roof  Repair", size: 3, spacing: 2, every: "monthly" }));
+  const again = await saveWatch(1, s.id, watchInput.parse({ keyword: "roof repair", size: 3, spacing: 2, every: "weekly" }));
+  eq("8a a repeating scan is one row per search and shape; choosing again changes how often", [w.keyword, again.id === w.id, again.every, (await listWatches(1, s.id)).length, (await listWatches(2, s.id)).length], ["roof repair", true, "weekly", 1, 0]);
+  for (let i = 0; i < MAX_WATCHES - 1; i++) { await scanAt(`extra ${i}`, 1, 40); await saveWatch(1, s.id, watchInput.parse({ keyword: `extra ${i}`, size: 3, spacing: 2, every: "monthly" })); }
+  await scanAt("one more", 1, 40);
+  const tooMany: any = await saveWatch(1, s.id, watchInput.parse({ keyword: "one more", size: 3, spacing: 2, every: "monthly" })).catch((e) => e);
+  eq("8b at most five per site, and another account cannot stop one", [tooMany?.status, await deleteWatch(2, s.id, w.id), (await listWatches(1, s.id)).length], [403, false, MAX_WATCHES]);
+  const both = await Promise.allSettled([1, 2].map((n) => saveWatch(1, s.id, watchInput.parse({ keyword: "one more", size: 3, spacing: 2, every: "monthly" })).then(() => n)));
+  eq("8c two requests at once cannot both slip past the limit", [both.filter((r) => r.status === "fulfilled").length, (await listWatches(1, s.id)).length], [0, MAX_WATCHES]);
+  await pool.query("DELETE FROM seo_grid_watches WHERE site_id=$1 AND keyword LIKE 'extra %'", [s.id]);
+
+  const newer = await scanAt("roof repair", 9, 0);
   eq("9 nothing to compare the first scan with", await raiseGridAlert(s.id, older), null);
-  eq("9b from first everywhere to ninth everywhere is an alert, raised once", [await raiseGridAlert(s.id, newer), await raiseGridAlert(s.id, newer), (await listAlerts(1, s.id)).alerts?.length ?? (await listAlerts(1, s.id) as any).length], ["grid_down", "grid_down", 1]);
-  const alert: any = ((await listAlerts(1, s.id)) as any).alerts?.[0] ?? ((await listAlerts(1, s.id)) as any)[0];
-  eq("9c the alert says what changed", [alert.kind, /got worse across your area/.test(alert.title), alert.items[0].top3, alert.items[0].wasTop3, alert.items[0].checked], ["grid_down", true, 0, 9, 9]);
+  eq("9b from first everywhere to ninth everywhere is an alert, raised once", [await raiseGridAlert(s.id, newer), await raiseGridAlert(s.id, newer), (await listAlerts(1, s.id)).length], ["grid_down", "grid_down", 1]);
+  const alert: any = (await listAlerts(1, s.id))[0];
+  eq("9c the alert says what changed, over the points both scans checked", [alert.kind, /got worse across your area/.test(alert.title), alert.items[0].top3, alert.items[0].wasTop3, alert.items[0].checked], ["grid_down", true, 0, 9, 9]);
   const lines = await gridReportLines(1, s.id);
   eq("10 the report line is the newest scan of the repeating search with the one before it", lines.map((l) => [l.keyword, l.top3, l.checked, l.score, l.previous?.top3, l.previous?.score]), [["roof repair", 0, 9, 9, 9, 1]]);
   eq("10b another account gets no lines", await gridReportLines(2, s.id), []);
-  // A different listing in the same search is not comparable.
+
+  // The scheduler: a period is bought once, whatever stops in the middle.
+  budgetDeps.allowanceCents = async () => 100000;
+  gridMonitorDeps.entitled = async () => true;
+  dataforseoDeps.env = () => ({ DATAFORSEO_LOGIN: "x", DATAFORSEO_PASSWORD: "y" });
+  let lookups = 0;
+  const realRequest = gridDeps.request;
+  gridDeps.request = (async () => { lookups++; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.002, result: [{ items: [{ type: "local_pack", title: "A", cid: "50" }, { type: "local_pack", title: "Grid Co", cid: "12" }] }] }] }; }) as any;
+  const watchRow = async () => (await pool.query("SELECT next_at, anchor_at, lease_until, lease_token, run_scan_id, alert_scan_id FROM seo_grid_watches WHERE id=$1", [w.id])).rows[0];
+  await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
+  // (a) the process stopped after the scan was saved and before the period was closed: the watch is due, its lease has run out, its scan is done
+  const bought = await scanAt("roof repair", 2, 0);
+  await pool.query("UPDATE seo_grid_watches SET next_at = now() - interval '3 hours', anchor_at = now() - interval '3 hours', lease_until = now() - interval '1 hour', lease_token = 'dead-worker', run_scan_id = $2 WHERE id=$1", [w.id, bought]);
+  lookups = 0;
+  const ran = await runDueGridWatches();
+  const afterCrash = await watchRow();
+  eq("11 a period whose scan was already bought is closed without buying again", [ran, lookups, afterCrash.run_scan_id, afterCrash.lease_token, new Date(afterCrash.next_at) > new Date()], [1, 0, null, null, true]);
+  eq("11b ...and its comparison was owed and has been made", [afterCrash.alert_scan_id, (await listAlerts(1, s.id)).some((a: any) => a.items?.[0]?.scanId === bought)], [null, true]);
+  // (b) an ordinary due watch: one scan, tied to the period, the next date counted from the anchor
+  const anchor = new Date(Date.now() - 9 * 864e5); // weekly, anchored nine days ago: it is two days late
+  await pool.query("UPDATE seo_grid_watches SET next_at = $2, anchor_at = $2 WHERE id=$1", [w.id, anchor]);
+  lookups = 0;
+  eq("12 a due watch runs one scan of nine points", [await runDueGridWatches(), lookups], [1, 9]);
+  const afterRun = await watchRow();
+  eq("12b the next date is a whole number of weeks from the anchor, not a week from today", [Math.round((new Date(afterRun.next_at).getTime() - anchor.getTime()) / 864e5), afterRun.run_scan_id, afterRun.lease_token], [14, null, null]);
+  eq("12c running the scheduler again straight away buys nothing", [await runDueGridWatches(), lookups], [0, 9]);
+  // (c) a worker whose lease was taken over records nothing
+  await pool.query("UPDATE seo_grid_watches SET next_at = now() - interval '1 minute', lease_until = now() + interval '1 hour', lease_token = 'someone-else' WHERE id=$1", [w.id]);
+  lookups = 0;
+  eq("13 a watch another worker holds is left alone", [await runDueGridWatches(), lookups, (await watchRow()).lease_token], [0, 0, "someone-else"]);
+  // (d) a comparison that was owed when the process stopped is made later, and a stopped watch owes nothing
+  const owed = await scanAt("roof repair", 9, 0);
+  await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
+  await pool.query("UPDATE seo_grid_watches SET lease_until = NULL, lease_token = NULL, next_at = now() + interval '5 days', alert_scan_id = $2 WHERE id=$1", [w.id, owed]);
+  eq("14 an owed comparison is made on a later pass and then cleared", [await raiseOwedGridAlerts(), (await watchRow()).alert_scan_id, (await listAlerts(1, s.id)).length], [1, null, 1]);
+  await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
+  await pool.query("UPDATE seo_grid_watches SET alert_scan_id = $2 WHERE id=$1", [w.id, owed]);
+  await deleteWatch(1, s.id, w.id);
+  eq("14b stopping the watch cancels what it owed", [await raiseOwedGridAlerts(), (await listAlerts(1, s.id)).length], [0, 0]);
+  gridDeps.request = realRequest;
+
+  // A different listing in the same search is not comparable, and is not reported as this business.
+  await scanAt("roof repair", 1, 0);
+  await saveWatch(1, s.id, watchInput.parse({ keyword: "roof repair", size: 3, spacing: 2, every: "monthly" }));
   await savePin(1, s.id, pinInput.parse({ name: "Grid Co North", lat: 49.2, lng: -122.4, cid: "77" }));
+  eq("15 after the listing is changed, the old listing's scans are not in the report", await gridReportLines(1, s.id), []);
   const moved = await beginScan(1, s.id, { keyword: "roof repair", size: 3, spacing: 2 });
   const pin2 = pinInput.parse({ name: "Grid Co North", lat: 49.2, lng: -122.4, cid: "77" });
   await finishScan(moved.id, buildScan({ keyword: "roof repair", size: 3, spacing: 2, pin: pin2, domain: "grid.example" }, gridPoints(pin2, 3, 2), gridPoints(pin2, 3, 2).map(() => [listing("Grid Co North", 1, "77")])), 0.018);
-  eq("11 a scan centred on a different listing is not compared with the old one", await raiseGridAlert(s.id, moved.id), null);
+  eq("15b a scan centred on the new listing is not compared with the old one's", await raiseGridAlert(s.id, moved.id), null);
+  eq("15c ...and it is the one the report now shows, with nothing before it", (await gridReportLines(1, s.id)).map((l) => [l.keyword, l.top3, l.previous]), [["roof repair", 9, null]]);
 
   console.log(failed ? `\n${failed} FAILED` : "\nall passed");
   await pool.end();

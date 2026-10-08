@@ -74,6 +74,8 @@ export function OpportunitiesView({ domain, status, market, onTrack }: { domain:
   const max = prices?.opportunitiesMax ?? null, small = prices?.opportunitiesSmall ?? null;
   const canPay = max == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= max;
   const d = saved.data?.page ?? null;
+  // A new set of rows (looked up again) starts at the first page; a page that is no longer among them is closed.
+  useEffect(() => { setPage(0); setPicked(new Set()); setOpenPage((k) => (k && d?.pages?.some((p) => p.key === k) ? k : null)); }, [d?.fetchedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   // Older saved copies (before every row was kept) have no `rows`: they are simply looked up again when asked.
   const rows = d?.rows ?? [];
   const list: Kw[] = useMemo(() => {
@@ -84,7 +86,9 @@ export function OpportunitiesView({ domain, status, market, onTrack }: { domain:
   }, [rows, tab, openPage]);
   const pages = d?.pages ?? [];
   const total = tab === "pages" && !openPage ? pages.length : list.length;
-  const from = page * PER_PAGE, shownRows = list.slice(from, from + PER_PAGE), shownPages = pages.slice(from, from + PER_PAGE);
+  // Never past the end, whatever happened to the list.
+  const lastPage = Math.max(0, Math.ceil(total / PER_PAGE) - 1), at = Math.min(page, lastPage);
+  const from = at * PER_PAGE, shownRows = list.slice(from, from + PER_PAGE), shownPages = pages.slice(from, from + PER_PAGE);
   const chosen = list.filter((r) => picked.has(r.keyword));
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const count = (t: Tab) => (d ? (t === "within" ? d.summary.withinCount : t === "falling" ? d.summary.fallingCount : t === "pages" ? d.summary.pages : d.summary.homeCount) : 0);
@@ -175,8 +179,8 @@ export function OpportunitiesView({ domain, status, market, onTrack }: { domain:
           )}
           {total > PER_PAGE && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="opp-paging">
-              <button type="button" className="g-pill g-pill--sm" disabled={page === 0} onClick={() => { setPage(page - 1); setPicked(new Set()); }} data-testid="button-opp-prev">← Previous</button>
-              <button type="button" className="g-pill g-pill--sm" disabled={from + PER_PAGE >= total} onClick={() => { setPage(page + 1); setPicked(new Set()); }} data-testid="button-opp-next">Next →</button>
+              <button type="button" className="g-pill g-pill--sm" disabled={at === 0} onClick={() => { setPage(at - 1); setPicked(new Set()); }} data-testid="button-opp-prev">← Previous</button>
+              <button type="button" className="g-pill g-pill--sm" disabled={from + PER_PAGE >= total} onClick={() => { setPage(at + 1); setPicked(new Set()); }} data-testid="button-opp-next">Next →</button>
               <span className="g-text-2">{fmtNum(from + 1)}–{fmtNum(Math.min(total, from + PER_PAGE))} of {fmtNum(total)} · paging is free</span>
             </div>
           )}

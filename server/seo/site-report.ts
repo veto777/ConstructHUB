@@ -189,7 +189,7 @@ export function reportHighlights(r: SiteReport): [string, string][] {
 
 /** One repeating grid in words: where it stands and, when there is a comparable scan before it, where it stood. */
 export const gridLine = (g: GridReportLine) =>
-  `in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
+  `scanned ${String(g.at).slice(0, 10)}: in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked} on ${String(g.previous.at).slice(0, 10)})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
 export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length;
 
 // ── PDF ────────────────────────────────────────────────────────────────────

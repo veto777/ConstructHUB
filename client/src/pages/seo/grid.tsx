@@ -52,7 +52,9 @@ export default function SeoLocalGridPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site?.id}/grid`;
-  const q = useQuery<Data>({ queryKey: [key], enabled: !!site });
+  // Asked again every half minute and when the window is looked at again, so a scan started by the schedule or in
+  // another tab is noticed without reloading.
+  const q = useQuery<Data>({ queryKey: [key], enabled: !!site, refetchInterval: 30_000, refetchOnWindowFocus: true, staleTime: 10_000 });
   const [query, setQuery] = useState("");
   /** What the business search returned, and for which site — a late answer for another site is never offered here. */
   const [found, setFound] = useState<{ siteId: number; listings: Listing[] } | null>(null);
@@ -110,7 +112,7 @@ export default function SeoLocalGridPage() {
   const opened = useQuery<State>({ queryKey: [`${key}/${openId}`], enabled: !!site && openId != null && openId !== activeId, refetchInterval: (query) => (query.state.data?.status === "running" ? 3000 : false) });
   const view = openId != null && openId === activeId ? active : opened;
   // The watching itself failing is said on its own line, whatever scan happens to be open.
-  const watchingFailed = activeId != null && active.isError && !active.data;
+  const watchingFailed = activeId != null && active.isError;
   const isRunning = active.data?.status === "running" || scan.isPending;
   const shown: Scan | null = openId != null && view.data?.status === "done" ? view.data.scan : null;
   // When the running scan ends, the history and what is left of the SEO data are both out of date.

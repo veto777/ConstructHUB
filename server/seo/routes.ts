@@ -679,7 +679,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
-    const key = cacheKey("opportunities", [domain, input.locationCode, input.languageCode]);
+    // "v2": copies saved before every row was kept have another shape and are simply not found.
+    const key = cacheKey("opportunities:v2", [domain, input.locationCode, input.languageCode]);
     const saved = input.refresh ? null : await cached<Opportunities>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });

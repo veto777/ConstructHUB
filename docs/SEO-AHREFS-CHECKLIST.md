@@ -290,6 +290,22 @@ Verdict: "Audit #12 is only partly resolved"; coverage about 56% (49-63). No HIG
 11 LOW  "a point that returns nothing is not charged"    FIXED: "a search that fails is not charged (one that works but finds no businesses is)".
 12 MED  clean-up and index creation not atomic           FIXED: each is one DO block under a table lock.
 
+## Codex audit #14 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-14.md)
+Verdict: "Audit #13 is partly resolved. Repeating grids are useful, but their scheduling and alert lifecycle are not yet reliable"; coverage about 57% (50-64). No cross-account disclosure. What was done:
+ 1 HIGH a finished scheduled scan could be bought again    FIXED: the period's scan is tied to the watch (run_scan_id) before anything is bought - a pass that finds it finished closes the period without buying; a lease with a token decides who may record the outcome; the next date is counted from the watch's anchor (a late run or a 28-day month never moves it). Real Postgres 11-13.
+ 2 MED  alert creation failures were forgotten             FIXED: the comparison owed for a scan (alert_scan_id) is set in the same statement that closes the period and cleared only when made; retried every pass. Real Postgres 14.
+ 3 MED  "clear change" could be missing-data noise          FIXED: only points both scans checked are compared (four fifths of the square must be shared); a collapse is not cancelled by a small contrary signal; a baseline with too little in common is passed over for the one before. Unit tests with the auditor's two examples.
+ 4 MED  stopping / changing a watch                        FIXED: a stopped watch's lease answers false - nothing more is bought or alerted (real Postgres 14b); no alert about a listing the site is no longer pinned to; the report shows only scans of the current listing (15-15c).
+ 5 MED  five-watch limit bypassable across processes       FIXED: count and insert under a lock on the site's row (8c); a scan must have been run once before it can repeat (8).
+ 6 MED  idle grid page never learned of other scans        FIXED: asked again every half minute and on window focus; a watching problem is shown whenever there is one.
+ 7 MED  "You" in the rivals table could contradict the grid FIXED: one function decides which listing is the business at a point, used by both.
+ 8 MED  refresh could strand Opportunities on an empty page FIXED: a new set of rows starts at page one; the page number is clamped; a drilled-into page that is gone is closed.
+ 9 MED  concurrent start-up could fail the index steps     FIXED: the table lock is taken before looking; the look is scoped to this schema and table.
+10 LOW  tracker tile's Search Console coverage             FIXED: both windows' coverage stated together.
+11 LOW  old Opportunities cache could not be refreshed     FIXED: new cache key ("v2"); old copies are simply not found.
+ Also: report grid lines carry their scan dates.
+ NOT DONE: our own reservation for a grid stays 1.25x while retries can cost us up to 2x (the customer is unaffected).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -330,3 +346,4 @@ Verdict: "Audit #12 is only partly resolved"; coverage about 56% (49-63). No HIG
 - 10/8 slice 19 (repeating grids): real Postgres grid check now 18/18 (watches per account, five per site, alert raised once and worded, report lines, a different listing not compared); ledger 44/44, places+alerts 20/20, AI + lists 13/13. Browser: "Every month" set on a scan -> "repeats every month - next on Nov 8"; alerts page shows "Local grid better ... 25 of 25 points, was 5 of 25"; PDF read back with pdftotext.
 - 10/8 audit #13 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 20/20, AI + lists 15/15, grid 18/18. Browser, live: Opportunities for jameshardie.com (500 of 7,217 keywords, 245 within reach paged 50 at a time, "Export all 245", 54 losing ground with places lost, 67 pages, the home page opened to its 13 searches; charged 29c = the stated maximum) and stand-alone for a domain with no report (skagitroofing.net: 6 keywords, 6c, the four home-page searches listed).
 - 10/8 slice 21 (named lost links): real Postgres places+alerts check now 24/24 (a strong site lost alerts and is named; a weak one does not; losses collected against another snapshot are ignored). Browser, live: "Refresh now" (201, charged 31c) -> "Sites that stopped linking since Sep 7 - the 25 strongest of 113" with the pages that linked.
+- 10/8 audit #14 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler all passing (crash after the scan was saved -> period closed with 0 lookups; a due watch -> one scan, next date 14 days from its anchor though it ran 2 days late; a second pass buys nothing; another worker's lease left alone; an owed comparison made later; a stopped watch owes nothing). Real scheduler pass on the screenshots database: 58 s, 25 of 25 points, next date two months from the anchor, lease cleared, second pass bought nothing.
