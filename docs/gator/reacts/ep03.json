@@ -1,0 +1,158 @@
+{
+ "id": "ep03",
+ "music": "sneaking-around",
+ "open": {
+  "id": "host-open",
+  "in": 1.3,
+  "out": 5.0,
+  "caption": "Alright. Site walk. Let's see who's getting written up today."
+ },
+ "verdict": {
+  "after": 3,
+  "line": {
+   "id": "host-twenty-years",
+   "in": 0.6,
+   "out": 3.9,
+   "caption": "Twenty years. Never seen it done that wrong."
+  }
+ },
+ "signOff": {
+  "id": "host-write-up",
+  "in": 1.35,
+  "out": 2.55,
+  "caption": "That's a write-up."
+ },
+ "ownerAcceptedRisk": {
+  "by": "the owner of ConstructHUB",
+  "date": "2026-10-08",
+  "quote": "Do what I am asking you to do!"
+ },
+ "clips": [
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 634.37,
+   "out": 637.337,
+   "impact": 635.45,
+   "crop": {
+    "x": 656,
+    "y": 0,
+    "w": 608,
+    "h": 1080
+   },
+   "panel": "bl",
+   "reaction": "_deliver/reaction-shocked-02-spit-take.mp4",
+   "peak": 1.3,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-1034 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  },
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 8.5,
+   "out": 12.4,
+   "impact": 10.9,
+   "crop": {
+    "x": 656,
+    "y": 0,
+    "w": 608,
+    "h": 1080
+   },
+   "panel": "tr",
+   "reaction": "_deliver/reaction-annoyed-15-watch.mp4",
+   "peak": 1.0,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-0008 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  },
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 80.8,
+   "out": 83.6,
+   "impact": 82.2,
+   "crop": {
+    "x": 656,
+    "y": 0,
+    "w": 608,
+    "h": 1080
+   },
+   "panel": "tl",
+   "reaction": "_deliver/reaction-deadpan-20-glance.mp4",
+   "peak": 2.0,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-0120 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none (green caption 'Not a forklift certified moment' burned in))",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  },
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 598.8,
+   "out": 602.85,
+   "impact": 602.0,
+   "crop": {
+    "x": 646,
+    "y": 0,
+    "w": 628,
+    "h": 1080
+   },
+   "panel": "br",
+   "reaction": "_deliver/reaction-annoyed-10-facepalm.mp4",
+   "peak": 1.7,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-0958 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: faint 'sif' text at the right edge)",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  },
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 400.5,
+   "out": 404.267,
+   "impact": 403.2,
+   "crop": {
+    "x": 656,
+    "y": 0,
+    "w": 608,
+    "h": 1080
+   },
+   "panel": "tl",
+   "reaction": "_deliver/reaction-deadpan-18-sip.mp4",
+   "peak": 1.1,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-0639 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  },
+  {
+   "file": "_sources/4HmTgOLTQsE.mp4",
+   "in": 87.3,
+   "out": 91.47,
+   "impact": 90.75,
+   "crop": {
+    "x": 656,
+    "y": 0,
+    "w": 608,
+    "h": 1080
+   },
+   "panel": "tr",
+   "reaction": "_deliver/reaction-annoyed-16-slow-turn.mp4",
+   "peak": 1.7,
+   "rights": {
+    "kind": "third-party",
+    "record": "clip A-0125 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: @oshaisthissafe (MONDAYS V.1))",
+    "source": "https://youtu.be/4HmTgOLTQsE",
+    "channel": "Adam the Site Manager"
+   }
+  }
+ ]
+}

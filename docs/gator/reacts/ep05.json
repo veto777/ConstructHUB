@@ -1,0 +1,30 @@
+{
+  "id": "ep05",
+  "music": "sneaking-around",
+  "open": { "id": "host-open", "in": 1.3, "out": 5.0, "caption": "Alright. Site walk. Let's see who's getting written up today." },
+  "verdict": { "after": 4, "line": { "id": "host-twenty-years", "in": 0.6, "out": 3.9, "caption": "Twenty years. Never seen it done that wrong." } },
+  "signOff": { "id": "host-write-up", "in": 1.35, "out": 2.55, "caption": "That's a write-up." },
+  "ownerAcceptedRisk": { "by": "the owner of ConstructHUB", "date": "2026-10-08", "quote": "Do what I am asking you to do!" },
+  "clips": [
+    { "file": "_sources/4HmTgOLTQsE.mp4", "in": 654.8, "out": 658.667, "impact": 657.6,
+      "crop": { "x": 341, "y": 0, "w": 1238, "h": 1080 }, "panel": "tr",
+      "reaction": "_deliver/reaction-shocked-02-spit-take.mp4", "peak": 1.3,
+      "rights": { "kind": "third-party", "record": "clip A-1054 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)", "source": "https://youtu.be/4HmTgOLTQsE", "channel": "Adam the Site Manager" } },
+    { "file": "_sources/kF_a7SNAMPc.mp4", "in": 42.5, "out": 46.234, "impact": 45.5,
+      "crop": { "x": 0, "y": 0, "w": 608, "h": 1080 }, "panel": "tl",
+      "reaction": "_deliver/reaction-annoyed-16-slow-turn.mp4", "peak": 1.7,
+      "rights": { "kind": "third-party", "record": "clip B-39 from the compilation https://youtu.be/kF_a7SNAMPc; original creator unknown (visible handle: Mister Twist)", "source": "https://youtu.be/kF_a7SNAMPc", "channel": "Mister Twist" } },
+    { "file": "_sources/4HmTgOLTQsE.mp4", "in": 679.2, "out": 682.837, "impact": 681.7,
+      "crop": { "x": 520, "y": 0, "w": 880, "h": 1080 }, "panel": "tr",
+      "reaction": "_deliver/reaction-annoyed-15-watch.mp4", "peak": 1.0,
+      "rights": { "kind": "third-party", "record": "clip A-1116 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)", "source": "https://youtu.be/4HmTgOLTQsE", "channel": "Adam the Site Manager" } },
+    { "file": "_sources/kF_a7SNAMPc.mp4", "in": 48.233, "out": 53.834, "impact": 53.2,
+      "crop": { "x": 0, "y": 0, "w": 608, "h": 1080 }, "panel": "tr",
+      "reaction": "_deliver/reaction-annoyed-10-facepalm.mp4", "peak": 1.7,
+      "rights": { "kind": "third-party", "record": "clip B-48 from the compilation https://youtu.be/kF_a7SNAMPc; original creator unknown (visible handle: Mister Twist)", "source": "https://youtu.be/kF_a7SNAMPc", "channel": "Mister Twist" } },
+    { "file": "_sources/4HmTgOLTQsE.mp4", "in": 158.9, "out": 164.47, "impact": 163.3,
+      "crop": { "x": 317, "y": 0, "w": 1286, "h": 1080 }, "panel": "tl",
+      "reaction": "_deliver/reaction-deadpan-20-glance.mp4", "peak": 2.0,
+      "rights": { "kind": "third-party", "record": "clip A-0238 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)", "source": "https://youtu.be/4HmTgOLTQsE", "channel": "Adam the Site Manager" } }
+  ]
+}

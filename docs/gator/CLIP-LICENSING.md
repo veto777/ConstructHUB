@@ -11,6 +11,15 @@ crops out or covers another creator's watermark. Two reasons, both practical:
 - Our accounts are days old and already rate-limited once. The agencies below run automated matching and file
   takedowns for a living; a strike on a new TikTok or Instagram account costs reach for everything else we post.
 
+**Update 2026-10-08 (afternoon), the owner's order.** The owner ordered episodes from two YouTube compilations
+(`youtu.be/4HmTgOLTQsE`, `youtu.be/kF_a7SNAMPc`) after the risks above were explained to him three times ("Do what I
+am asking you to do!"). `reacts.ts` now has a fifth rights kind, **third-party**, accepted ONLY with the CLI flag
+`--owner-accepted-risk` AND an `ownerAcceptedRisk` record (who, date, his words) in the episode file — never by
+default. It still has **no step that removes, crops out or covers a watermark or handle**: the coordinator declined
+that part (it hides whose clip it is, which is a separate wrong from the copying), so the panel is placed away from
+the marks and every caption credits the channel. Episodes ep01–ep05 are built this way and wait for the owner's
+review; ep06 uses our own AI clips only. None goes to YouTube. Everything below still holds as the safe route.
+
 Read on 2026-10-08. **Prices marked "quote" are not published — ask before budgeting.** Where a figure comes
 from a press article rather than the vendor's own price list, it says so.
 

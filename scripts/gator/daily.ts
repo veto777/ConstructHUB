@@ -142,8 +142,10 @@ async function main() {
     // "I looked at its frames (and listened): it may be posted." Approving does not post: --schedule does.
     const id = args.flags.approve, no = mayApprove(q, id);
     if (no) throw new Error(no);
-    const dir = path.join(OUT, id), c = conceptById(id);
+    // A packaged edit (package.ts: an episode, a replay cut) is not a concept: its caption and files are in the queue already.
+    const dir = path.join(OUT, id), c = CONCEPTS.find((x) => x.id === id) ?? (q.state[id].caption && q.state[id].post ? null : conceptById(id))!;
     const caption: [string, string?] = typeof args.flags.caption === "string" ? (args.flags.caption.split("|").map((x) => x.trim()) as [string, string?]) : q.state[id].caption ?? [c.caption];
+    if (!q.order.includes(id)) q.order.push(id);
     const post = q.state[id].post ?? defaultPost(fs.readdirSync(dir), { talks: c.shots.some((x) => x.say), replay: fs.existsSync(path.join(dir, "replay-music.mp4")) && !c.shots.some((x) => x.say), linkedin: !!args.flags.linkedin });
     q.state[id] = { ...q.state[id], status: "approved", at: new Date().toISOString(), by: typeof args.flags.by === "string" ? args.flags.by : "a reviewer", caption, post };
     delete q.state[id].why;

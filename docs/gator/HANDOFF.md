@@ -1,8 +1,43 @@
 # Gator shorts — handoff (2026-10-08, about 09:30 Eastern)
 
 For whoever picks this stream up without having seen the conversation. Branch `gator-shorts`, worktree
-`/home/voiceban/ConstructHUB-gstyle-b`. Nothing of the previous producer is running; no Higgsfield job is
+`/home/voiceban/ConstructHUB-gstyle-b` (until the afternoon; now the tower — section 0). Nothing of the previous producer is running; no Higgsfield job is
 pending. **Two producers must never post or spend at the same time** — the ledgers below are the lock.
+
+## 0. State after the afternoon run of 2026-10-08 (the coordinator, "account c", on the tower)
+
+Worktree now: `/home/veto/ConstructHUB-gator` (tower). Env: `source scripts/gator/tower-env.sh` (node 20, every tool path kept
+inside the worktree, `ENCODE_SLOTS=4`), keys in `.env.gator` (`npx tsx --env-file=.env.gator …`), review-folder key
+`handoff/.fileloaded-key`, folder at `http://127.0.0.1:18150` (ssh tunnel, tmux `gator-fl`). Tests:
+`npx vitest run --config scripts/gator/vitest.gator.mjs` (the repo's vitest config needs node ≥ 21).
+
+- **Higgsfield has NO balance.** Every request answers "credit balance is too low" (refused = not charged). Section 8's
+  "paid for and not assembled" list was wrong: 10 reactions (shocked 03–07, annoyed 11–13, deadpan 21–22), 6 host lines
+  (check, meeting, gravity, seen-worse, lunch, sign-off), `selfie-attic` and `acc-ceiling-selfie` had FAILED the same way
+  and were never made. Spend is unchanged: **1023.264 credits = $63.95** of the $102.57 cap ($38.62 left under the
+  cap, $0 left in the account). Nothing more can be generated until the account is topped up.
+- New: `make.ts` paid calls run under a cross-process lock (`ledger.json.paid.lock`; cap check + reservation are one
+  step, after re-reading the ledger) — parallel producers cannot overspend; a talking shot can be retaken past a take
+  that failed uncharged.
+- **Uploaded to the review folder (36 files, all pending — see `REVIEW-README.txt` there):** reactions-sheet.jpg;
+  8 reactions (shocked-02, annoyed-09/10/15/16, deadpan-17/18/20); 6 host-line review copies; `reacts-ep01…ep06`;
+  `accident-v2-deck-ladder` (+replay); `cast-fail-beaver-cut`, `-raccoon-plank`, `-possum-paint` (+replays);
+  `style04-c-fail-wheelbarrow-replay`, `style05-c-cctv-ladder-replay`, `style05-d-cctv-shingles-replay` (+ -nomusic).
+  Rejected on review (not uploaded): reactions shocked-01, shocked-08, annoyed-14, deadpan-19; selfie-scaffold,
+  selfie-ladder; acc-scaffold-doorbell, acc-wheelbarrow-drive; fx-rooster-washer, fx-goat-drywall, fx-raccoon-buckets.
+- **"Gator Reacts"**: `reacts.ts` takes third-party clips only with `--owner-accepted-risk` + an `ownerAcceptedRisk`
+  record; no watermark removal (declined by the coordinator — `CLIP-LICENSING.md`). Episodes: `docs/gator/reacts/ep0N.json`;
+  clip lists of the two sources with in/out/impact/crop/overlays/graphic flags: `analysis/gator-shorts/_sources/clips-*.json`
+  (unused STRONG/OK clips remain for more episodes once more reactions exist — only 8 reactions, 1 shocked).
+- **Queue**: every postable new file is its own id (= its review-folder name without `.mp4`), packaged by
+  `scripts/gator/package.ts` into `analysis/gator-shorts/<id>/` and in `queue.json` as ready-for-review (not in `order`).
+  After the owner's review: `daily.ts --approve <id> --by "the owner"` (adds it to `order`; works for packaged ids),
+  then `GATOR_FILELOADED_KEY_FILE=handoff/.fileloaded-key GATOR_FILELOADED_URL=http://127.0.0.1:18150/api/p/gator-videos/files
+  npx tsx --env-file=.env.gator scripts/gator/daily.ts --schedule` (dry run) → `--go`. Tutorial slots stay empty.
+- Stock: 27 approved (9 days at 3 a day, scheduled to 2026-10-17) + 13 new distinct pending posts (6 episodes, deck-ladder,
+  3 cast fails, 3 replay edits) = 40 ≈ 13.3 days; 14 days needs 2 more (or count the 4 pending replay cuts separately: 44).
+- Next with credit: the missing shocked reactions (03–07: the pack has one shocked), selfie remakes (fall backwards
+  mid-word, phone in hand), and the nine stills-only concepts (chalk-line-snap, coffee-ran-out, …).
 
 ## 1. What is live and what is scheduled
 

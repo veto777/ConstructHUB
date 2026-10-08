@@ -8,7 +8,7 @@ import { LIVE_CONCEPTS } from "../../scripts/gator/concepts-live";
 import { plan as replayPlan } from "../../scripts/gator/replay";
 import { boardMd, byStyle, due, engagementRate, parseManual, percentiles, postedOf, rank, recommend, type Metrics, type Posted } from "../../scripts/gator/scoreboard";
 import { STYLES } from "../../scripts/gator/styles";
-import { peakOf, plan as replan, rightsRefusal, type Episode } from "../../scripts/gator/reacts";
+import { PANEL, PANEL_AT, creditsOf, peakOf, plan as replan, rightsRefusal, type Episode } from "../../scripts/gator/reacts";
 import { schedule, stylesMd, DOC as STYLES_DOC } from "../../scripts/gator/styles-doc";
 import { BAND, REFERENCE, analyse, compare, pitchCorrection } from "../../scripts/gator/voiceprint";
 import { END_TAG_SEC, H, LOGO_RECT, MAX_SEC, MIN_PX, W, ZONES, assFile, layoutBeat, wrapCaption, type Beat } from "../../scripts/gator/layout";
@@ -903,9 +903,50 @@ describe("gator reacts — only footage we may use", () => {
     expect(rightsRefusal({ file: "a.mp4", rights: { kind: "cc-by", record: "licence field read 2026-10-09", url: "http://x", attribution: "Title — Author" } })).toMatch(/address and the attribution/);
     expect(rightsRefusal({ file: "a.mp4", rights: { kind: "cc-by", record: "licence field read 2026-10-09", url: "https://www.youtube.com/watch?v=x", attribution: "Title — Author, CC BY" } })).toBeNull();
     expect(rightsRefusal({ file: "a.mp4", rights: { kind: "fair-use", record: "commentary" } })).toMatch(/not a kind of rights/);
-    // The tool has no override and no watermark step — in its code, not only in its manual.
+    // The tool has no watermark step and no blanket override — in its code, not only in its manual.
     const src = fs.readFileSync("scripts/gator/reacts.ts", "utf8").split("*/").slice(1).join("*/");
-    expect(src).not.toMatch(/delogo|inpaint|accepted-risk|--force/);
+    expect(src).not.toMatch(/delogo|removelogo|inpaint|--force/);
+    expect(fs.readFileSync("scripts/gator/reacts.ts", "utf8")).toMatch(/NO watermark-removal step/);
+  });
+  const tp = { kind: "third-party" as const, record: "from a YouTube fail compilation, unlicensed", source: "https://www.youtube.com/watch?v=abc123", channel: "Some Fails Channel" };
+  const risk = { by: "the owner", date: "2026-10-08", quote: "I accept the risk, cut them." };
+  it("third-party footage: refused without the flag, refused with the flag but no record, accepted with both", () => {
+    expect(rightsRefusal({ file: "a.mp4", rights: tp })).toMatch(/without a licence is not used.*--owner-accepted-risk/);
+    expect(rightsRefusal({ file: "a.mp4", rights: tp }, { record: risk })).toMatch(/--owner-accepted-risk/);                 // the record alone is not enough
+    expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true })).toMatch(/no complete "ownerAcceptedRisk"/);         // the flag alone is not enough
+    expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true, record: { by: "x", date: "today", quote: "ok go" } })).toMatch(/no complete/);
+    expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true, record: risk })).toBeNull();
+    expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, source: "https://example.com/v" } }, { flag: true, record: risk })).toMatch(/YouTube address/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, channel: "" } }, { flag: true, record: risk })).toMatch(/channel/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, record: "compilation clip, de-watermarked" } }, { flag: true, record: risk })).toMatch(/watermark removed is not used/);
+    // The consent never spills over to other refusals.
+    expect(rightsRefusal({ file: "a.mp4" }, { flag: true, record: risk })).toMatch(/no rights record/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "own-ai", record: "a third-party viral clip" } }, { flag: true, record: risk })).toMatch(/not used/);
+    // Through the planner: the episode's own record + the run's flag.
+    const ep: Episode = { id: "t", clips: [{ file: "x.mp4", in: 10, out: 14, impact: 12, crop: { x: 656, y: 0, w: 608, h: 1080 }, panel: "br", reaction: "react-shocked-01-jaw-drop", rights: tp }] };
+    expect(() => replan(ep, { "x.mp4": 60 })).toThrow(/without a licence/);
+    expect(() => replan(ep, { "x.mp4": 60 }, { flag: true })).toThrow(/ownerAcceptedRisk/);
+    expect(() => replan({ ...ep, ownerAcceptedRisk: risk }, { "x.mp4": 60 })).toThrow(/--owner-accepted-risk/);
+    const ok = replan({ ...ep, ownerAcceptedRisk: risk }, { "x.mp4": 60 }, { flag: true }).segments[0];
+    if (ok.kind !== "clip") throw new Error();
+    expect(ok.from).toBe(10); expect(ok.sec).toBeCloseTo(4, 6); expect(ok.impactAt).toBeCloseTo(2, 6);
+    expect(creditsOf({ ...ep, clips: [...ep.clips, { ...ep.clips[0], reaction: "r2" }, { file: "o.mp4", impact: 1, reaction: "r3", rights: own }] })).toEqual(["clips: Some Fails Channel (YouTube)"]);
+  });
+  it("clips from a source range with a crop; peaks and host lines from files with in/out; panels clear of the platform UI", () => {
+    const ep: Episode = { id: "t", open: { id: "host-open", in: 0.5, out: 4, caption: "Site walk." }, clips: [
+      { file: "src.mp4", in: 30, out: 34.5, impact: 32.2, reaction: "_deliver/reaction-shocked-01-jaw-drop.mp4", peak: 1.1, rights: own },
+      { file: "src.mp4", impact: 50, reaction: "react-annoyed-09-head-shake/videos/s1-still1-take1.mp4", rights: own }] };
+    const { segments } = replan(ep, { "src.mp4": 120, "host-open": 5 });
+    const [h, a, b] = segments;
+    if (h.kind !== "host" || a.kind !== "clip" || b.kind !== "clip") throw new Error();
+    expect(h.from).toBe(0.5); expect(h.sec).toBeCloseTo(3.5, 6); expect(h.caption).toBe("Site walk.");
+    expect(a.from).toBe(30); expect(a.sec).toBeCloseTo(4.5, 6); expect(a.impactAt).toBeCloseTo(2.2, 6); expect(a.reactionAt).toBeCloseTo(1.1, 6);
+    expect(b.from).toBe(48); expect(b.peak).toBe(peakOf("react-annoyed-09-head-shake")); expect(b.reactionAt + b.peak).toBeCloseTo(b.impactAt, 6);  // old pre/post defaults, peak looked up by the id the file sits under
+    expect(() => replan({ ...ep, clips: [{ ...ep.clips[0], impact: 40 }] }, { "src.mp4": 120, "host-open": 5 })).toThrow(/not inside in\/out/);
+    for (const at of Object.values(PANEL_AT)) {
+      expect(at.x).toBeGreaterThanOrEqual(0); expect(at.x + PANEL.w + 2 * PANEL.border).toBeLessThanOrEqual(1080);
+      expect(at.y).toBeGreaterThanOrEqual(200); expect(at.y + PANEL.h + 2 * PANEL.border).toBeLessThanOrEqual(1920 - 250);
+    }
   });
   it("the reaction's peak lands on the impact; host lines open, judge and sign off; no reaction twice", () => {
     const ep: Episode = { id: "t", open: "host-open", signOff: "host-sign-off", verdict: { after: 2, line: "host-write-up" }, clips: [
