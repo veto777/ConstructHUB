@@ -1,0 +1,119 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pricebook-template",
+  "title": "Start a price book item from a template",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pricebook",
+      "caption": "The price book",
+      "chapter": "Pick a template",
+      "narration": "A template gives you a price book item with the scope of work already written."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-from-template\"]",
+      "caption": "From template",
+      "narration": "On the Price book page, choose From template."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"template-re-roof\"]",
+      "caption": "Name, unit, first lines of the scope",
+      "narration": "Each template shows its name, its unit and the first lines of its scope."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"template-window-replacement\"]",
+      "caption": "Window replacement",
+      "narration": "Scroll to the one closest to the work you sell. We'll use Window replacement."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"template-window-replacement\"]",
+      "caption": "Pick it",
+      "narration": "Click it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-item-name\"]",
+      "caption": "Name and unit filled in",
+      "chapter": "Set your price",
+      "narration": "The Add SKU form opens with the name and the unit filled in."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-item-description\"]",
+      "caption": "Scope of work, written",
+      "narration": "The scope of work is written for you. Change any line to match how you work."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-item-flat-price\"]",
+      "caption": "Price is yours to set",
+      "narration": "The price is left empty. That part is yours."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-flat-price\"]",
+      "value": "685",
+      "caption": "Your price",
+      "narration": "Type what you charge for one window."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-item\"]",
+      "caption": "Add SKU",
+      "narration": "Then choose Add SKU."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-items\"]",
+      "value": "window",
+      "caption": "Find the new item",
+      "chapter": "The new item",
+      "narration": "The item is now in your Price Chart. Search to find it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Window replacement\") >> nth=0",
+      "caption": "Price and scope",
+      "narration": "It has your price, and its scope of work shows on every estimate built from it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Menu: Price book",
+      "narration": "You'll find Price book in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "Start a price book item from a template | ConstructHUB CRM",
+    "description": "A short walkthrough of price book templates in the ConstructHUB CRM. You will choose From template, pick a ready-written item, see its name, unit and scope of work filled in, set your own price and save it to your Price Chart.",
+    "tags": [
+      "price book",
+      "scope of work template",
+      "contractor pricing",
+      "estimating software",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "construction estimate"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Scope already written",
+    "accent": "scope",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}

@@ -1,0 +1,150 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pricebook-add",
+  "title": "Add a price book item",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pricebook",
+      "caption": "The price book",
+      "chapter": "Open Add SKU",
+      "narration": "Let's add a new item to your price book."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-item\"]",
+      "caption": "Add SKU",
+      "narration": "Choose Add SKU."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-name\"]",
+      "value": "Crown molding, supply & install",
+      "caption": "Name",
+      "narration": "Give the item a name your crew and your clients will recognise."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-item-code\"]",
+      "caption": "Code: automatic",
+      "narration": "Leave Code empty, and the item gets the next SKU number."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-item-unit\"]",
+      "value": "lf",
+      "caption": "Unit",
+      "chapter": "Unit and price",
+      "narration": "Pick the unit you sell it by. Crown molding is priced per linear foot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-item-pricing\"]",
+      "caption": "Pricing mode: Flat price",
+      "narration": "Pricing mode stays on Flat price: one price for each unit."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-flat-price\"]",
+      "value": "9.50",
+      "caption": "Price",
+      "narration": "Type the price for one unit."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-flat-cost\"]",
+      "value": "4.10",
+      "caption": "Cost (optional)",
+      "narration": "Cost is optional. It's what the item costs you."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-description\"]",
+      "value": "• Supply and install 4.5\" primed crown\n• Caulk joints and fill nail holes\n• Ready for paint",
+      "caption": "Scope of work",
+      "chapter": "Scope and save",
+      "narration": "Then write the scope of work. It shows on every estimate built from this item."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-item\"]",
+      "caption": "Add SKU",
+      "narration": "Choose Add SKU to save it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-items\"]",
+      "value": "crown",
+      "caption": "Find the new item",
+      "chapter": "Preview a quantity",
+      "narration": "The new item is in your Price Chart. Search to find it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Crown molding\") >> nth=0",
+      "caption": "Name, code, price, scope",
+      "narration": "It has its code, its price per foot and your scope of work."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Crown molding\") [data-testid^=\"input-qty-\"]",
+      "value": "64",
+      "caption": "Quantity",
+      "narration": "To check it, type a quantity."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Crown molding\") [data-testid^=\"button-preview-\"]",
+      "caption": "Preview",
+      "narration": "Then choose Preview."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Crown molding\") table",
+      "caption": "Total, cost, margin",
+      "narration": "Sixty-four feet comes to this total, with your cost and margin underneath."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Ready for estimates",
+      "narration": "The item is now ready to add to any new estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Menu: Price book",
+      "narration": "You'll find Price book in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to add a price book item | ConstructHUB CRM",
+    "description": "A short walkthrough of adding an item to the price book in the ConstructHUB CRM. You will name the item, pick its unit, set a price and an optional cost, write the scope of work, save it, and preview a quantity.",
+    "tags": [
+      "price book",
+      "add a price",
+      "contractor pricing",
+      "estimating software",
+      "scope of work",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "construction estimate"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Add a price once",
+    "accent": "price",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}
