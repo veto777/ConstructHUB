@@ -1,0 +1,158 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-client-view",
+  "title": "What your client does with an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "narration": "Send an estimate, and your client gets a link by email. Here is what they do with it.",
+      "chapter": "Send the estimate"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-1999\"]",
+      "caption": "Open the estimate",
+      "narration": "Open the estimate. This draft is for Imani Brewster, in Dallas.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send-estimate\"]",
+      "caption": "Send",
+      "narration": "Choose Send.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Sent, not opened yet",
+      "narration": "It is emailed to her. This line says when, and that it is not opened yet."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.link",
+      "input": {
+        "to": "imani.brewster@example.com"
+      },
+      "caption": "The client opens the emailed link",
+      "chapter": "What your client sees",
+      "narration": "Now your client. She opens the link in that email."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-total\"]",
+      "caption": "The estimate as a document",
+      "narration": "Your estimate opens as a document, with your company details and the total on top."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"prepared-for\"]",
+      "caption": "Prepared for",
+      "narration": "It is made out to her, with the job address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"estimate-document\"] table",
+      "caption": "The lines",
+      "narration": "Each line shows the quantity, the price and the line total."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"estimate-document\"]//*[normalize-space(text())=\"Subtotal\"]/../..",
+      "caption": "Subtotal, tax, total",
+      "narration": "Under the lines are the subtotal, the tax on this estimate, and the total."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-signature\"]",
+      "value": "Imani Brewster",
+      "caption": "Her full name",
+      "narration": "To approve, she types her full name. That is her signature.",
+      "chapter": "Approving"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-approve\"]",
+      "caption": "Approve this estimate",
+      "narration": "Then she chooses Approve this estimate.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Approved — thank you!\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Approved",
+      "narration": "The page thanks her, and says you have been notified."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-pay\"]",
+      "caption": "Pay",
+      "narration": "With online payments connected, she can pay from the same page."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/estimates",
+      "holdMs": 1200,
+      "caption": "Back in the CRM",
+      "chapter": "Back in your CRM",
+      "narration": "Back in your CRM, open the same estimate."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-1999\"]",
+      "caption": "Open E-1999",
+      "narration": "It is now marked approved.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(normalize-space(.),\"Approved by Imani Brewster\") and not(*[contains(normalize-space(.),\"Approved by Imani Brewster\")])]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "A signed contract",
+      "narration": "It was approved in her name, and it is now a signed contract."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Opened",
+      "narration": "This line shows when she opened it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Where to find it",
+      "narration": "You will find every estimate under Estimates, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "What your client sees when you send an estimate | ConstructHUB CRM",
+    "description": "Send an estimate from ConstructHUB CRM, then follow it to the client's side: the emailed link, the estimate laid out as a document, and approving by typing a name. Then see the approval land back in your CRM. The walkthrough uses a demo company and demo clients.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "estimates",
+      "estimate approval",
+      "e-signature",
+      "client portal",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your client approves",
+    "accent": "approves",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}
