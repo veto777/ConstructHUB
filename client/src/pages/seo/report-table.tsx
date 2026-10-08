@@ -196,7 +196,9 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   // A different report or target starts clean.
   useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); }, [table, target]);
 
-  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort, filters, limit, offset }), [domain, keyword, table, sort, filters, limit, offset]);
+  // Belt and braces with the remount: a sort the report does not have is never sent.
+  const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
+  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset }), [domain, keyword, table, sortKey, filters, limit, offset]);
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
