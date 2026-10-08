@@ -40,10 +40,11 @@ import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
+import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
-import { sendSiteReport } from "./site-report-send";
+import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
 import { takeBudget } from "../growth-limits";
 import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
 import { listingNamed } from "./dataforseo";
@@ -620,7 +621,23 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
   route("get", "/api/seo/lists", async (_req, res, user) => { res.json({ lists: await listsOf(user) }); });
-  route("post", "/api/seo/lists/items", async (req, res, user) => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); });
+  // One at a time per account, so two requests cannot both pass the list limits.
+  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); }));
+  // "Refresh numbers": today's volume, difficulty, CPC and intent for every keyword in the list, written back to it.
+  // One lookup per 200 keywords; always bought fresh (that is the point), and each batch is on the usage page.
+  route("post", "/api/seo/lists/:id/refresh", (req, res, user) => serial(`lists:${user}`, async () => {
+    if (!isConfigured()) return notReady(res);
+    const { list, items } = await listItems(user, id.parse(req.params.id));
+    const keywords = items.map((i: any) => i.keyword as string);
+    if (!keywords.length) return res.status(400).json({ message: "This list is empty." });
+    let updated = 0;
+    for (let i = 0; i < keywords.length; i += BULK_MAX) {
+      const chunk = keywords.slice(i, i + BULK_MAX);
+      const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
+      if (out.data.rows.length) updated += (await addToList(user, { listId: list.id, items: out.data.rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent })) })).total ? out.data.rows.length : 0;
+    }
+    res.json({ updated, total: keywords.length });
+  }));
   route("get", "/api/seo/lists/:id", async (req, res, user) => { res.json(await listItems(user, id.parse(req.params.id))); });
   route("post", "/api/seo/lists/:id/remove", async (req, res, user) => {
     res.json({ removed: await removeFromList(user, id.parse(req.params.id), removeInput.parse(req.body).keywords) });
@@ -652,6 +669,20 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ competitors: await trackedCompetitors(site.id) });
   });
 
+  // The link in every report email: no sign-in (the person clicking is the recipient, not the customer). The token
+  // proves the link came from an email we sent to that address for that account; using it stops all further reports.
+  app.get("/api/seo/report-unsubscribe", async (req, res) => {
+    const userId = Number(req.query.u), email = String(req.query.e ?? "").slice(0, 254), token = String(req.query.t ?? "");
+    const page = (title: string, body: string, status = 200) => res.status(status).type("html").send(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>` +
+      `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;color:#1a1a2e"><h1 style="font-size:22px">${title}</h1><p style="line-height:1.6;color:#444">${body}</p></div>`);
+    try {
+      if (!Number.isInteger(userId) || userId <= 0 || !validUnsubscribe(userId, email, token)) return page("This link is not valid", "It may have been cut off by your email program. Open the link from the newest report email, or reply to the person who sends you the reports.", 400);
+      await optOut(userId, email);
+      page("You won't get these reports any more", "Your address has been removed from this sender's SEO reports. Nothing else is needed.");
+    } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); page("Something went wrong", "Please try the link again in a minute.", 500); }
+  });
+
   // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
   const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
   route("get", "/api/seo/sites/:id/report", async (req, res, user) => {
@@ -660,7 +691,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!report) return res.status(404).json({ message: "Site not found" });
     const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
     res.setHeader("Cache-Control", "no-store");
-    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null });
+    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null, optedOut: await optedOut(user) });
   });
   route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);

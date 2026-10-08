@@ -24,9 +24,10 @@ import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
 
 export const REPORT_TTL_DAYS = 7;
 /** What one fresh report is reserved at before it runs (settled to the real cost after). */
-export const EXPLORER_ESTIMATE_USD = 0.33;
+/** Raised 2026-10-08 with the history going from 6 to 24 months: measured $0.1272 for 6 months and $0.192 for 60, i.e. about $0.0012 a month. */
+export const EXPLORER_ESTIMATE_USD = 0.36;
 /** What a report usually costs (measured 2026-10-07), for the price shown before it runs. */
-export const EXPLORER_TYPICAL_USD = 0.28;
+export const EXPLORER_TYPICAL_USD = 0.30;
 const KEYWORD_ROWS = 100, PAGE_ROWS = 20, COMPETITOR_ROWS = 10, LINK_ROWS = 20;
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -74,6 +75,9 @@ export function parseHistory(items: any[]): HistoryPoint[] {
     .filter((x): x is HistoryPoint => !!x)
     .sort((a, b) => a.month.localeCompare(b.month));
 }
+
+/** How many months of search history a report asks for. */
+export const HISTORY_MONTHS = 24;
 
 export const INTENTS = ["informational", "navigational", "commercial", "transactional"] as const;
 export type Intent = (typeof INTENTS)[number];
@@ -278,10 +282,12 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
   };
 
   const yearAgo = new Date(Date.now() - 366 * 864e5).toISOString().slice(0, 10);
+  // Two years of monthly search history (the source's default is six months).
+  const now = new Date(), historyFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - HISTORY_MONTHS, 1)).toISOString().slice(0, 10);
   const [overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors] = await Promise.all([
     required(call("/dataforseo_labs/google/domain_rank_overview/live", { ...labs, limit: 1 }).then((t) => taskItems(t)[0] ?? {})),
     required(call("/backlinks/summary/live", { ...links, internal_list_limit: 10 }).then((t) => t.result?.[0] ?? {})),
-    optional("history", () => list("/dataforseo_labs/google/historical_rank_overview/live", labs).then((r) => r.items)),
+    optional("history", () => list("/dataforseo_labs/google/historical_rank_overview/live", { ...labs, date_from: historyFrom }).then((r) => r.items)),
     optional("linkHistory", () => list("/backlinks/history/live", { target: input.domain, date_from: yearAgo, rank_scale: "one_thousand" }).then((r) => r.items)),
     optional("keywords", () => list("/dataforseo_labs/google/ranked_keywords/live", { ...labs, limit: KEYWORD_ROWS, item_types: ["organic"], order_by: ["ranked_serp_element.serp_item.etv,desc"] })),
     optional("pages", () => list("/dataforseo_labs/google/relevant_pages/live", { ...labs, limit: PAGE_ROWS, order_by: ["metrics.organic.etv,desc"] })),

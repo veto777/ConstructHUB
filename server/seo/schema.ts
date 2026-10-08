@@ -119,6 +119,7 @@ export const SEO_SCHEMA_DDL = [
   `CREATE INDEX IF NOT EXISTS seo_reservations_user ON seo_reservations(user_id, created_at DESC)`,
   // Places a rank check can be run from (server/seo/locations.ts).
   ...LOCATION_SCHEMA_DDL,
+  `CREATE INDEX IF NOT EXISTS seo_locations_loaded ON seo_locations(loaded_at DESC)`,
   // A keyword can be tracked in several places: the same keyword in Tampa and in Clearwater is two rows.
   `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_code integer`,
   `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_name text`,
@@ -127,7 +128,8 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_keywords DROP CONSTRAINT IF EXISTS seo_keywords_site_id_keyword_key`,
   // Every keyword carries the place it is checked from, so changing a site's default never moves a keyword's history.
   `UPDATE seo_keywords k SET location_code=s.location_code, location_name=CASE WHEN s.location_code=2840 THEN 'United States' ELSE k.location_name END
-     FROM seo_sites s WHERE s.id=k.site_id AND k.location_code IS NULL`,
+     FROM seo_sites s WHERE s.id=k.site_id AND k.location_code IS NULL
+      AND NOT EXISTS (SELECT 1 FROM seo_keywords x WHERE x.site_id=k.site_id AND x.keyword=k.keyword AND x.location_code=s.location_code)`,
   // The Google map pack: this business's place in it (1-3, null = not in it) and who was in it.
   `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_position integer`,
   `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_pack jsonb`,
@@ -155,6 +157,23 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS reconciled boolean NOT NULL DEFAULT false`,
   `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS refunded_cents integer NOT NULL DEFAULT 0`,
   `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS refund_key text`,
+  // The real outcome of a call that finished after its reservation was closed as abandoned, kept until it is applied.
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS late_actual_usd numeric(12,6)`,
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS late_customer_usd numeric(12,6)`,
+  // Rank runs: checks the source reported as failed, and a refund that still has to be made.
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS failed integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS refund_due integer NOT NULL DEFAULT 0`,
+  // Alerts: a delivery in progress holds a short lease; notified_at is set only once it went out.
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claimed_at timestamptz`,
+  // One list name per account, whatever the capitals.
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_keyword_lists_name ON seo_keyword_lists(user_id, lower(name))`,
+  // People who asked not to get an account's reports any more (server/seo/site-report-send.ts).
+  `CREATE TABLE IF NOT EXISTS seo_report_optouts (
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, email)
+  )`,
   // A rank run remembers what paid for it and how many checks were accepted, to refund the ones that never come back.
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,

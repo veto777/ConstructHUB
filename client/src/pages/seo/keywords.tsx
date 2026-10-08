@@ -101,7 +101,7 @@ export default function SeoKeywordsPage() {
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
       </nav>
       {mode === "bulk" && <BulkKeywords key={bulkSeed} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
-      {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} onAnalyse={(kws) => { setBulkSeed(kws.join("\n")); setMode("bulk"); }} />}
+      {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
       {mode === "one" && (<>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">

@@ -53,7 +53,7 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
           <ul className="space-y-2">
             {v.domains.map((d) => (
               <li key={d.domain} data-testid={`voice-${d.domain}`}>
-                <div className="flex items-baseline gap-2 text-[13px]">
+                <div className="flex items-center gap-2 text-[13px]">
                   <span className={`min-w-0 flex-1 truncate ${d.isSite ? "g-text font-medium" : "g-text"}`}>{d.domain}{d.isSite && <span className="g-text-2 font-normal"> · you</span>}</span>
                   <span className="g-text-2 text-[12px] tabular-nums">{d.top10} in top 10{d.averagePosition != null ? ` · avg ${d.averagePosition}` : ""}</span>
                   <span className="g-text w-12 text-right tabular-nums">{d.visibility}%</span>

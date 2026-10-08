@@ -34,10 +34,12 @@ export type SiteReport = {
   /** What the "since" comparisons look back to: the check nearest 30 days ago. */
   comparedWith: string | null;
   rankings: {
-    tracked: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null;
+    /** Keywords the site tracks, and how many of them the latest check covered. */
+    tracked: number; checked: number; device: string; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null;
     previousTop3: number | null; previousTop10: number | null; previousAverage: number | null;
     inMapPack: number; withMapPack: number;
-    improved: Mover[]; declined: Mover[];
+    /** The ten biggest moves each way; the counts are of all of them. */
+    improved: Mover[]; declined: Mover[]; improvedCount: number; declinedCount: number;
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[];
   } | null;
   search: { fetchedAt: string; authority: number | null; referringDomains: number | null; backlinks: number | null; organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null;
@@ -72,7 +74,8 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
   return {
     comparedWith: earlier,
     section: {
-      tracked: now.size, checkedOn: latest,
+      tracked: now.size, checked: now.size, device: primaryDevice, checkedOn: latest,
+      improvedCount: moved.filter((m) => m.by > 0).length, declinedCount: moved.filter((m) => m.by < 0).length,
       top3: ranked(now).filter((p) => p <= 3).length, top10: ranked(now).filter((p) => p <= 10).length, averagePosition: avg(ranked(now)),
       previousTop3: earlier ? ranked(before).filter((p) => p <= 3).length : null, previousTop10: earlier ? ranked(before).filter((p) => p <= 10).length : null, previousAverage: earlier ? avg(ranked(before)) : null,
       inMapPack: [...now.values()].filter((c) => c.local !== null).length, withMapPack: [...now.values()].filter((c) => c.hasPack).length,
@@ -98,6 +101,8 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
   const ranks = rankingsSection(checks, primary);
+  const { rows: [count] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
+  if (ranks) ranks.section.tracked = Math.max(ranks.section.checked, Number(count?.n ?? 0));
   const r = saved?.report;
   const a = audit?.audit ?? null;
   return {
@@ -133,7 +138,8 @@ export function reportHighlights(r: SiteReport): [string, string][] {
   const rows: [string, string][] = [];
   if (r.rankings) {
     const k = r.rankings;
-    rows.push(["Keywords in the top 10", `${k.top10} of ${k.tracked}${k.previousTop10 !== null ? signed(k.top10 - k.previousTop10) : ""}`]);
+    rows.push(["Keywords in the top 10", `${k.top10} of ${k.checked} checked${k.previousTop10 !== null ? signed(k.top10 - k.previousTop10) : ""}`]);
+    if (k.tracked > k.checked) rows.push(["Not covered by the latest check", `${k.tracked - k.checked} of ${k.tracked} tracked keywords`]);
     rows.push(["Keywords in the top 3", `${k.top3}${k.previousTop3 !== null ? signed(k.top3 - k.previousTop3) : ""}`]);
     if (k.averagePosition !== null) rows.push(["Average position", `${k.averagePosition}${k.previousAverage !== null && k.previousAverage !== k.averagePosition ? ` (was ${k.previousAverage})` : ""}`]);
     if (k.withMapPack > 0) rows.push(["In the Google map pack", `${k.inMapPack} of ${k.withMapPack} searches that show a map`]);
@@ -177,9 +183,9 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
 
     if (r.rankings) {
       const k = r.rankings;
-      heading(`Rankings on Google — checked ${day(k.checkedOn)}`);
-      if (k.improved.length) { line("Moved up", "#188038"); for (const m of k.improved) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
-      if (k.declined.length) { line("Moved down", "#c5221f"); for (const m of k.declined) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
+      heading(`Rankings on Google (${k.device}) — checked ${day(k.checkedOn)}`);
+      if (k.improved.length) { line(k.improvedCount > k.improved.length ? `Moved up — the ${k.improved.length} biggest of ${k.improvedCount}` : "Moved up", "#188038"); for (const m of k.improved) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
+      if (k.declined.length) { line(k.declinedCount > k.declined.length ? `Moved down — the ${k.declined.length} biggest of ${k.declinedCount}` : "Moved down", "#c5221f"); for (const m of k.declined) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
       if (!k.improved.length && !k.declined.length) line(r.comparedWith ? "No keyword changed position since the earlier check." : "This is the first check, so there is nothing to compare with yet.", soft);
       room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
       // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
@@ -187,7 +193,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(c, 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
-      if (k.tracked > k.keywords.length) line(`…and ${k.tracked - k.keywords.length} more tracked keywords.`, soft);
+      if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
     }
     if (r.search) {
       heading(`Search presence — analysed ${day(r.search.fetchedAt)}`);
@@ -196,7 +202,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Keywords the site ranks for", `${n(r.search.organicKeywords)}${signed(r.search.keywordsChange)}`);
       pair("Websites linking to it", `${n(r.search.referringDomains)}${signed(r.search.referringDomainsChange)}`);
       pair("Links in total", n(r.search.backlinks));
-      line("Changes in brackets are over the last six to twelve months of data. Visits are estimates from rankings, not analytics.", soft);
+      line("Changes in brackets are over the period the data covers (up to two years). Visits are estimates from rankings, not analytics.", soft);
     }
     if (r.audit) {
       heading(`Site health — crawled ${day(r.audit.scannedAt)}`);

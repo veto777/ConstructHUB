@@ -163,7 +163,11 @@ export async function settleBudget(r: BudgetReservation, actualUsd: number, cust
     await applySettlement(r.id, { actualUsd, customerUsd });
   } catch (e: any) {
     console.error(`[seo] settlement of ${r.id} did not complete (it will be retried): ${e?.message ?? e}`);
-    await pool.query("UPDATE seo_reservations SET actual_usd=$2, customer_usd=$3 WHERE id=$1 AND settled_at IS NULL", [r.id, actualUsd, customerUsd])
+    // Still open: leave the outcome on the row. Already closed as abandoned: keep it as a late outcome. Either way the reconciler applies it.
+    await pool.query(
+      `UPDATE seo_reservations SET actual_usd=CASE WHEN settled_at IS NULL THEN $2 ELSE actual_usd END, customer_usd=CASE WHEN settled_at IS NULL THEN $3 ELSE customer_usd END,
+              late_actual_usd=CASE WHEN settled_at IS NOT NULL AND reconciled THEN $2 ELSE late_actual_usd END, late_customer_usd=CASE WHEN settled_at IS NOT NULL AND reconciled THEN $3 ELSE late_customer_usd END
+        WHERE id=$1`, [r.id, actualUsd, customerUsd])
       .catch((w: any) => console.error(`[seo] could not record the outcome of ${r.id} either — the reconciler will close it at no charge to the customer: ${w?.message ?? w}`));
   }
 }
@@ -202,7 +206,7 @@ export async function applySettlement(id: string, outcome?: { actualUsd: number;
       const held = row.credit ? { ...row.credit, fromIncluded: 0, fromWallet: 0 } : null;
       const moved = await budgetDeps.settleCredits(held, retailCents(outcome.customerUsd), client);
       await ledger(outcome.actualUsd - Number(row.actual_usd ?? estimate));
-      await client.query("UPDATE seo_reservations SET reconciled=false, actual_usd=$2, customer_usd=$3, credit=$4 WHERE id=$1", [id, outcome.actualUsd, outcome.customerUsd, finalCredit(held, moved)]);
+      await client.query("UPDATE seo_reservations SET reconciled=false, late_actual_usd=NULL, late_customer_usd=NULL, actual_usd=$2, customer_usd=$3, credit=$4 WHERE id=$1", [id, outcome.actualUsd, outcome.customerUsd, finalCredit(held, moved)]);
       await client.query("COMMIT");
       console.warn(`[seo] reservation ${id} finished after it had been closed as abandoned; settled late`);
       return true;
@@ -234,7 +238,9 @@ export async function refundReservation(id: string, cents: number, key: string):
   try {
     await client.query("BEGIN");
     const { rows: [row] } = await client.query("SELECT * FROM seo_reservations WHERE id=$1 FOR UPDATE", [id]);
-    if (!row || !row.settled_at || !row.credit || row.refund_key === key) { await client.query("ROLLBACK"); return 0; }
+    // Not settled yet: the refund cannot be worked out. The caller keeps it as owed and tries again.
+    if (row && !row.settled_at) { await client.query("ROLLBACK"); throw new Error(`reservation ${id} is not settled yet`); }
+    if (!row || !row.credit || row.refund_key === key) { await client.query("ROLLBACK"); return 0; }
     // The row's credit is what the lookup took (and has not yet been refunded), split by where it came from.
     const fromIncluded = Number(row.credit.fromIncluded ?? 0), fromWallet = Number(row.credit.fromWallet ?? 0);
     const give = Math.min(Math.floor(cents), fromIncluded + fromWallet);
@@ -261,6 +267,12 @@ export const RESERVATION_STALE_MINUTES = 30;
 export async function reconcileReservations(): Promise<number> {
   const { rows } = await pool.query(
     "SELECT id FROM seo_reservations WHERE settled_at IS NULL AND created_at < now() - make_interval(mins => $1) ORDER BY created_at LIMIT 50", [RESERVATION_STALE_MINUTES]);
+  // Late outcomes that could not be applied when they arrived.
+  const { rows: late } = await pool.query("SELECT id, late_actual_usd, late_customer_usd FROM seo_reservations WHERE reconciled AND late_actual_usd IS NOT NULL ORDER BY created_at LIMIT 50");
+  for (const l of late) {
+    try { await applySettlement(l.id, { actualUsd: Number(l.late_actual_usd), customerUsd: Number(l.late_customer_usd ?? 0) }); }
+    catch (e: any) { console.error(`[seo] late settlement of ${l.id} failed again: ${e?.message ?? e}`); }
+  }
   let closed = 0;
   for (const { id } of rows) {
     try { if (await applySettlement(id)) { closed++; console.warn(`[seo] reconciled abandoned reservation ${id}`); } }

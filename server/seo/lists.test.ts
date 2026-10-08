@@ -55,11 +55,13 @@ describe("listItemsInput", () => {
 describe("usageRow", () => {
   const base = { id: "r1", label: "Keyword overview — roof repair", created_at: "2026-10-08T12:00:00Z", estimate_usd: "0.05" };
   it("a settled lookup shows what the customer paid, at their price", () => {
-    expect(usageRow({ ...base, settled_at: "2026-10-08T12:00:05Z", customer_usd: "0.04", credit: { fromIncluded: 20, fromWallet: 0 } }))
+    expect(usageRow({ ...base, settled_at: "2026-10-08T12:00:05Z", customer_usd: "0.04", credit: { fromIncluded: 16, fromWallet: 0 } }))
       .toEqual({ id: "r1", at: "2026-10-08T12:00:00Z", what: "Keyword overview — roof repair", status: "charged", cents: 16, fromIncluded: 16, fromPurchased: 0 });
   });
   it("a failed lookup is free", () => {
-    expect(usageRow({ ...base, settled_at: "2026-10-08T12:00:05Z", customer_usd: "0", credit: { fromIncluded: 20, fromWallet: 0 } })).toMatchObject({ status: "free", cents: 0 });
+    expect(usageRow({ ...base, settled_at: "2026-10-08T12:00:05Z", customer_usd: "0", credit: { fromIncluded: 0, fromWallet: 0 } })).toMatchObject({ status: "free", cents: 0 });
+    // the account could only cover 8c of a 20c lookup: 8c is what it was charged, and nothing is invented
+    expect(usageRow({ ...base, settled_at: "x", customer_usd: "0.05", credit: { fromIncluded: 8, fromWallet: 0 } })).toMatchObject({ cents: 8, fromIncluded: 8, fromPurchased: 0 });
   });
   it("splits a charge between included data and purchased credit", () => {
     expect(usageRow({ ...base, settled_at: "x", customer_usd: "0.05", credit: { fromIncluded: 8, fromWallet: 12 } })).toMatchObject({ cents: 20, fromIncluded: 8, fromPurchased: 12 });

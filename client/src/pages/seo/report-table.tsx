@@ -123,11 +123,11 @@ const HAS: Record<string, TableKey[]> = {
   volume: ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"],
   difficulty: ["keywords", "matchingTerms", "relatedTerms", "questions"],
   intent: ["keywords", "matchingTerms", "questions"],
-  contains: ["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "referringDomains", "anchors", "matchingTerms", "questions"],
+  contains: ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "referringDomains", "anchors", "bestByLinks", "matchingTerms", "questions"],
   follow: ["backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks"],
   everyLink: ["backlinks", "newBacklinks", "lostBacklinks"],
 };
-const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains" };
+const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains", competitors: "Domain contains", bestByLinks: "URL contains" };
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
 
 function csvOf(cols: Col[], rows: any[]): string {

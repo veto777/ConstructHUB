@@ -16,14 +16,14 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, us
 type Mover = { keyword: string; location: string | null; device: string; from: number | null; to: number | null };
 type Report = {
   domain: string; generatedAt: string; comparedWith: string | null;
-  rankings: { tracked: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
+  rankings: { tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[] } | null;
   search: { fetchedAt: string } | null;
   audit: { scannedAt: string | null; health: number | null; topIssues: { title: string; severity: string; count: number }[] } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
 };
 type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null };
-type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null };
+type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 const moverText = (m: Mover) => `${m.keyword}${m.location ? ` · ${m.location}` : ""}: ${m.from === null ? `now ${m.to}` : m.to === null ? `was ${m.from}, now not ranked` : `${m.from} → ${m.to}`}`;
@@ -49,7 +49,8 @@ export default function SeoReportsPage() {
   });
   const send = useMutation({
     mutationFn: () => api("POST", `${key}/send`, { recipients: list }),
-    onSuccess: (x: { sent: number; empty: boolean }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" } : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}` }),
+    onSuccess: (x: { sent: number; failed?: number; empty: boolean; optedOut?: string[] }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" }
+      : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't send the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const invalid = !list.length || tooMany || bad.length > 0;
@@ -82,12 +83,12 @@ export default function SeoReportsPage() {
             </section>
             {r.rankings && (
               <section className="rounded-lg border p-4" style={card} data-testid="report-rankings">
-                <h2 className="g-text mb-2 text-[16px] font-medium">Rankings <span className="g-text-2 text-[12px] font-normal">· checked {fmtDate(r.rankings.checkedOn)}</span></h2>
+                <h2 className="g-text mb-2 text-[16px] font-medium">Rankings <span className="g-text-2 text-[12px] font-normal">· {r.rankings.device ?? "desktop"} · checked {fmtDate(r.rankings.checkedOn)}</span></h2>
                 {!r.comparedWith && <p className="g-text-2 text-[13px]">This is the first check, so there is nothing to compare with yet. The next report shows what moved.</p>}
                 {r.comparedWith && r.rankings.improved.length === 0 && r.rankings.declined.length === 0 && <p className="g-text-2 text-[13px]">No keyword changed position since {fmtDate(r.comparedWith)}.</p>}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {r.rankings.improved.length > 0 && <div><h3 className="g-move g-move--up mb-1 text-[13px]">▲ Moved up</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.improved.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
-                  {r.rankings.declined.length > 0 && <div><h3 className="g-move g-move--down mb-1 text-[13px]">▼ Moved down</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.declined.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
+                  {r.rankings.improved.length > 0 && <div><h3 className="g-move g-move--up mb-1 text-[13px]">▲ Moved up{(r.rankings.improvedCount ?? 0) > r.rankings.improved.length ? ` — the ${r.rankings.improved.length} biggest of ${r.rankings.improvedCount}` : ""}</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.improved.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
+                  {r.rankings.declined.length > 0 && <div><h3 className="g-move g-move--down mb-1 text-[13px]">▼ Moved down{(r.rankings.declinedCount ?? 0) > r.rankings.declined.length ? ` — the ${r.rankings.declined.length} biggest of ${r.rankings.declinedCount}` : ""}</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.declined.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
                 </div>
                 <details className="mt-3 text-[13px]"><summary className="g-link cursor-pointer">All {fmtNum(r.rankings.keywords.length)} keywords in the report</summary>
                   <div className="overflow-x-auto"><table className="g-table mt-2"><thead><tr><th>Keyword</th><th className="num">Position</th><th className="num">Was</th><th className="num">Map pack</th><th className="num">Searches / mo</th></tr></thead>
@@ -121,9 +122,11 @@ export default function SeoReportsPage() {
               <textarea className="g-input mt-1 min-h-[96px] py-2" value={emails} onChange={(e) => setEmails(e.target.value)} placeholder={"you@yourcompany.com\nclient@theirs.com"} aria-invalid={bad.length > 0 || tooMany} data-testid="textarea-report-recipients" />
             </label>
             {(bad.length > 0 || tooMany) && <p className="mt-1 text-[12px]" style={{ color: "var(--g-red)" }} role="alert">{tooMany ? "Up to 5 addresses." : `Not an email address: ${bad.slice(0, 2).join(", ")}`}</p>}
+            <p className="g-text-2 mt-2 text-[12px]">Every email says you asked for it and has a link the recipient can use to stop them.</p>
+            {(d.optedOut?.length ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-optouts">Asked not to get your reports (they are skipped): {d.optedOut!.join(", ")}</p>}
             {d.schedule.frequency !== "off" && <p className="g-text-2 mt-2 text-[12px]" data-testid="text-report-next">Next report {fmtDate(d.schedule.nextSendAt)}{d.schedule.lastSentAt ? ` · last sent ${fmtDate(d.schedule.lastSentAt)}` : ""}</p>}
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button type="submit" disabled={save.isPending || (frequency !== "off" && invalid)} data-testid="button-report-save">{save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save schedule"}</Button>
+              <Button type="submit" disabled={save.isPending || (frequency !== "off" && invalid)} data-testid="button-report-save">{save.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden />}{save.isPending ? "Saving…" : "Save schedule"}</Button>
               <button type="button" className="g-pill" disabled={send.isPending || invalid} onClick={() => send.mutate()} data-testid="button-report-send">{send.isPending ? <Loader2 className="animate-spin" /> : <Send />} Send now</button>
             </div>
           </form>
