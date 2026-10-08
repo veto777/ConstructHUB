@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-discount-defaults",
+  "durationSec": 66,
+  "video": {
+    "key": "tutorials/crm-discount-defaults.f66d6294.mp4",
+    "bytes": 6358030,
+    "sha256": "f66d62948dc9be39e6f2d3c9a67bbf692dbd544c1b35b2eb730358906523ea93"
+  },
+  "captions": {
+    "key": "tutorials/crm-discount-defaults.11b54b30.vtt",
+    "bytes": 1188,
+    "sha256": "11b54b309e6acf75423dd38ea256190e1273adfef026c65632c77a35f2c03c3b"
+  },
+  "poster": {
+    "key": "tutorials/crm-discount-defaults.6f6c04e1.jpg",
+    "bytes": 101952,
+    "sha256": "6f6c04e12acf49dcce5bf0555317d123cc93f5c5d83ea731659b819971b53a5c"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:47:08.691Z",
+    "video": "669bf7bdc9eeb8b4f1d251966db31567",
+    "captions": "6ba55364d4163e4ab1df18e62926333d",
+    "poster": "f0fd5f87e4926399fdae9ca989f251d5"
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-discount-defaults",
+  "title": "Set the discounts every bid starts with",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Your standard offers",
+      "narration": "Decide once which discounts your estimates offer, so every bid starts the same way."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-bid-discounts\"] >> text=Bid discounts",
+      "caption": "Bid discounts",
+      "narration": "In Settings, scroll down to Bid discounts."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"default-discount-marketing\"]",
+      "caption": "Built-in offers",
+      "narration": "Four offers are built in. Each one shows its percent, and what the client must do to get it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-discount-military\"]",
+      "caption": "Switch one on",
+      "narration": "Switch on the ones you give. Each change is saved right away.",
+      "holdMs": 900
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-discount-label\"]",
+      "value": "Referral discount",
+      "caption": "Your own offer",
+      "chapter": "Add your own",
+      "narration": "To add your own offer, type its name."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-discount-pct\"]",
+      "value": "3",
+      "caption": "Percent",
+      "narration": "Then the percent."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-discount-conditions\"]",
+      "value": "Referred by a past client",
+      "caption": "Conditions",
+      "narration": "And, if you like, what qualifies."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-discount\"]",
+      "caption": "Add",
+      "narration": "Choose Add.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"default-discount-custom-\"]",
+      "caption": "Your offer is in the list",
+      "narration": "Your offer joins the list, already switched on. The bin beside it removes it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-bid-discounts\"] >> text=/The offers every sent estimate/",
+      "caption": "What happens next",
+      "chapter": "On your estimates",
+      "narration": "From now on, new estimates start with these offers when you send them."
+    },
+    {
+      "action": "wait",
+      "caption": "One estimate can differ",
+      "narration": "The Discounts button on a single estimate can still change them for that one bid.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "Bid discounts are in Settings, near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set default discounts for every estimate | ConstructHUB CRM",
+    "description": "Set your standard discount offers once in the ConstructHUB CRM. Switch the built-in offers on or off, add your own with a percent and a condition, and every new estimate starts with them when it is sent. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "estimate discounts",
+      "discount offers",
+      "contractor estimate",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Discounts, set once",
+    "accent": "once",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}
