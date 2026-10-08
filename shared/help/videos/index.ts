@@ -11,6 +11,7 @@ export { default as v_crm_notifications } from "./crm-notifications.json";
 export { default as v_crm_report_issue } from "./crm-report-issue.json";
 export { default as v_crm_reports } from "./crm-reports.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
+export { default as v_crm_search } from "./crm-search.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";
 export { default as v_crm_team_roles } from "./crm-team-roles.json";
 export { default as v_database_directory } from "./database-directory.json";
