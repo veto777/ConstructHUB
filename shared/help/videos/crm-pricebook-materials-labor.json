@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-pricebook-materials-labor",
+  "durationSec": 85,
+  "video": {
+    "key": "tutorials/crm-pricebook-materials-labor.b333ee53.mp4",
+    "bytes": 6358307,
+    "sha256": "b333ee53d284c70e610f5a0bd2acd986997cd7885a8d32d3751953970ef0219f"
+  },
+  "captions": {
+    "key": "tutorials/crm-pricebook-materials-labor.a12cdcae.vtt",
+    "bytes": 1452,
+    "sha256": "a12cdcaea2b702f8282b1e1054369846d1bb70cf52ad695e0297a8371375227d"
+  },
+  "poster": {
+    "key": "tutorials/crm-pricebook-materials-labor.2b26fb94.jpg",
+    "bytes": 74624,
+    "sha256": "2b26fb947503c2942ff16e396bb2e0a40e775d97cccf4e74a1328b4c6d661eb0"
+  },
+  "uploaded": {
+    "at": "2026-10-08T06:59:36.455Z",
+    "video": "5b39346428c7c2a0fdf16b1e0b3261b3",
+    "captions": "7c0b4a2b6dfc37dc1ae5042232f26659",
+    "poster": "b64620fa0325922e6d85e64a09c298a3"
+  }
+}
