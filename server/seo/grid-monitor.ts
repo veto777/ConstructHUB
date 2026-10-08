@@ -11,8 +11,9 @@
  *   lease_token
  *   run_scan_id    the scan bought for the period that is due. Written before the scan runs; if the process stops
  *                  after the scan was saved, the next pass finds it finished and closes the period WITHOUT buying again
- *   alert_scan_id  a finished scan whose comparison is still owed. Set in the same statement that closes the
- *                  period, cleared only when the comparison has been made — so an alert cannot be forgotten
+ *   seo_grid_owed  one row per finished scan whose comparison is still owed. Written in the same statement that
+ *                  closes the period and removed only when the comparison has been made — so an alert cannot be
+ *                  forgotten, a later scan cannot overwrite it, and stopping the watch removes what it owed
  */
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -54,6 +55,17 @@ export const GRID_WATCH_DDL = [
   `ALTER TABLE seo_grid_watches ADD COLUMN IF NOT EXISTS run_scan_id integer`,
   `ALTER TABLE seo_grid_watches ADD COLUMN IF NOT EXISTS alert_scan_id integer`,
   `UPDATE seo_grid_watches SET anchor_at = next_at WHERE anchor_at IS NULL`,
+  // Comparisons owed for finished scans: a queue, not a single slot. Gone with the watch that owed them.
+  `CREATE TABLE IF NOT EXISTS seo_grid_owed (
+     scan_id integer PRIMARY KEY,
+     watch_id integer NOT NULL REFERENCES seo_grid_watches(id) ON DELETE CASCADE,
+     site_id integer NOT NULL,
+     tries integer NOT NULL DEFAULT 0,
+     next_at timestamptz NOT NULL DEFAULT now(),
+     created_at timestamptz NOT NULL DEFAULT now()
+   )`,
+  `INSERT INTO seo_grid_owed(scan_id, watch_id, site_id) SELECT alert_scan_id, id, site_id FROM seo_grid_watches WHERE alert_scan_id IS NOT NULL ON CONFLICT (scan_id) DO NOTHING`,
+  `UPDATE seo_grid_watches SET alert_scan_id = NULL WHERE alert_scan_id IS NOT NULL`,
   // Alerts gain two kinds. The lock is taken BEFORE looking, so two servers starting together cannot both decide to
   // change the rule; the look is at this table's own rule, not any rule of that name in another schema.
   `DO $$ BEGIN
@@ -110,12 +122,13 @@ export async function saveWatch(userId: number, siteId: number, input: z.infer<t
     if (!base) throw new WatchError("Run this scan once first — a repeating scan is compared with the one before it.", 400);
     const { rows: [{ n }] } = await client.query("SELECT count(*)::int n FROM seo_grid_watches WHERE site_id=$1 AND NOT (lower(keyword)=$2 AND size=$3 AND spacing=$4)", [siteId, keyword, input.size, input.spacing]);
     if (n >= MAX_WATCHES) throw new WatchError(`Up to ${MAX_WATCHES} scans can repeat for one site. Stop one you no longer need.`, 403);
-    const first = nextDue(new Date(), input.every, new Date());
+    // The anchor is the moment the customer asked (a watch set on the 31st stays on the 31st); the first run is one period on.
+    const anchor = new Date(), first = nextDue(anchor, input.every, anchor);
     const { rows: [row] } = await client.query(
-      `INSERT INTO seo_grid_watches(user_id, site_id, keyword, size, spacing, every, next_at, anchor_at) VALUES($1,$2,$3,$4,$5,$6,$7,$7)
+      `INSERT INTO seo_grid_watches(user_id, site_id, keyword, size, spacing, every, next_at, anchor_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
        ON CONFLICT (site_id, lower(keyword), size, spacing) DO UPDATE SET every=EXCLUDED.every, next_at=LEAST(seo_grid_watches.next_at, EXCLUDED.next_at), anchor_at=LEAST(seo_grid_watches.anchor_at, EXCLUDED.anchor_at)
        RETURNING id, keyword, size, spacing::float8 AS spacing, every, next_at AS "nextAt"`,
-      [userId, siteId, keyword, input.size, input.spacing, input.every, first]);
+      [userId, siteId, keyword, input.size, input.spacing, input.every, first, anchor]);
     await client.query("COMMIT");
     return row;
   } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; } finally { client.release(); }
@@ -186,6 +199,8 @@ export async function raiseGridAlert(siteId: number, scanId: number): Promise<"g
   if (!center) return null;
   const pin = readPin(site.grid_pin);
   if (!pin || Math.abs(pin.lat - center.lat) > 0.0001 || Math.abs(pin.lng - center.lng) > 0.0001 || (pin.cid ?? null) !== (center.cid ?? null)) return null;
+  // Without Google's id on either side, the same place is not enough: the name must be the same listing's too.
+  if ((pin.cid ?? null) === null && pin.name !== center.name) return null;
   const { rows: earlier } = await pool.query(
     `SELECT id, scan, created_at FROM seo_grid_scans
       WHERE site_id=$1 AND status='done' AND id<>$2 AND created_at < $3 AND keyword=$4 AND size=$5 AND spacing=$6
@@ -209,16 +224,29 @@ export async function raiseGridAlert(siteId: number, scanId: number): Promise<"g
 
 // ── The scheduler ───────────────────────────────────────────────────────────
 
-/** Comparisons still owed for finished scans. A watch that was stopped is gone, and with it what it owed. */
+/**
+ * Make the comparisons still owed for finished scans. Each is its own row, tried again later and later until it is
+ * made, so one that keeps failing neither blocks the others nor is overwritten by the next scan. The watch is held
+ * (FOR SHARE) for the length of the comparison: stopping it either happened already — its owed rows went with it and
+ * nothing is said — or waits until this comparison is finished.
+ */
 export async function raiseOwedGridAlerts(): Promise<number> {
-  const { rows } = await pool.query("SELECT id, site_id, alert_scan_id FROM seo_grid_watches WHERE alert_scan_id IS NOT NULL ORDER BY id LIMIT 10");
+  const { rows } = await pool.query("SELECT scan_id, watch_id, site_id FROM seo_grid_owed WHERE next_at <= now() ORDER BY next_at, scan_id LIMIT 10");
   let done = 0;
-  for (const w of rows) {
+  for (const o of rows) {
+    const client = await pool.connect();
     try {
-      await raiseGridAlert(w.site_id, w.alert_scan_id);
-      await pool.query("UPDATE seo_grid_watches SET alert_scan_id=NULL WHERE id=$1 AND alert_scan_id=$2", [w.id, w.alert_scan_id]);
-      done++;
-    } catch (e: any) { console.error(`[seo] grid comparison for scan ${w.alert_scan_id} failed (it will be tried again): ${e?.message ?? e}`); }
+      await client.query("BEGIN");
+      const { rows: [watch] } = await client.query("SELECT id FROM seo_grid_watches WHERE id=$1 FOR SHARE", [o.watch_id]);
+      if (watch) await raiseGridAlert(o.site_id, o.scan_id);
+      await client.query("DELETE FROM seo_grid_owed WHERE scan_id=$1", [o.scan_id]);
+      await client.query("COMMIT");
+      if (watch) done++;
+    } catch (e: any) {
+      await client.query("ROLLBACK").catch(() => {});
+      await pool.query("UPDATE seo_grid_owed SET tries = tries + 1, next_at = now() + least(tries + 1, 36) * interval '10 minutes' WHERE scan_id=$1", [o.scan_id]).catch(() => {});
+      console.error(`[seo] grid comparison for scan ${o.scan_id} failed (it will be tried again): ${e?.message ?? e}`);
+    } finally { client.release(); }
   }
   return done;
 }
@@ -244,15 +272,20 @@ export async function runDueGridWatches(): Promise<number> {
       /** Only the holder of the lease records anything; a watch that was stopped, or taken over, answers false. */
       const mine = async (sql: string, args: unknown[] = []) => ((await pool.query(`UPDATE seo_grid_watches SET ${sql} WHERE id=$1 AND lease_token=$2`, [w.id, token, ...args])).rowCount ?? 0) > 0;
       const backOff = (interval: string) => mine(`lease_until = now() + interval '${interval}', run_scan_id = NULL`).catch(() => false);
-      /** The period is done: the next one is due on the anchored date, and the comparison for this scan is owed. One statement. */
-      const closePeriod = (scanId: number) => mine("next_at = $3, lease_until = NULL, lease_token = NULL, run_scan_id = NULL, alert_scan_id = $4", [nextDue(new Date(w.anchor_at ?? w.next_at), w.every, new Date()), scanId]);
+      /** The period is done: the next one is due on the anchored date, and the comparison for this scan goes on the owed list. One statement. */
+      const closePeriod = async (scanId: number) => ((await pool.query(
+        `WITH closed AS (UPDATE seo_grid_watches SET next_at = $3, lease_until = NULL, lease_token = NULL, run_scan_id = NULL WHERE id=$1 AND lease_token=$2 RETURNING id, site_id),
+              owed AS (INSERT INTO seo_grid_owed(scan_id, watch_id, site_id) SELECT $4, id, site_id FROM closed ON CONFLICT (scan_id) DO NOTHING RETURNING 1)
+         SELECT count(*)::int AS n FROM closed`, [w.id, token, nextDue(new Date(w.anchor_at ?? w.next_at), w.every, new Date()), scanId])).rows[0]?.n ?? 0) > 0;
+      /** A scan that is finished stays tied to its period until the period is closed — whatever else goes wrong. */
+      let bought = false;
       let scanId: number | null = null;
       try {
         // A scan was already bought for this period (the process stopped before the period was closed): finish the
         // paperwork, do not buy again.
         if (w.run_scan_id) {
           const { rows: [prior] } = await pool.query("SELECT status, created_at > now() - interval '12 minutes' AS recent FROM seo_grid_scans WHERE id=$1 AND site_id=$2", [w.run_scan_id, w.site_id]);
-          if (prior?.status === "done") { if (await closePeriod(w.run_scan_id)) done++; continue; }
+          if (prior?.status === "done") { bought = true; if (await closePeriod(w.run_scan_id)) done++; continue; }
           if (prior?.status === "running" && prior.recent) continue; // still going somewhere: leave it under this lease
           await mine("run_scan_id = NULL");
         }
@@ -266,8 +299,12 @@ export async function runDueGridWatches(): Promise<number> {
         // The scan is tied to the period BEFORE anything is bought. If the watch was stopped meanwhile, nothing is bought.
         if (!(await mine("run_scan_id = $3", [scanId]))) { await failScan(scanId, "The scan was interrupted before it finished. Lookups it had not made were not charged.").catch(() => {}); continue; }
         await runGridScan(w.user_id, site, pin, { keyword: w.keyword, size: w.size, spacing: w.spacing }, scanId, { allowanceOnly: true, label: `Local grid — "${String(w.keyword).slice(0, 80)}", ${w.size} × ${w.size} points (${w.every})` });
+        bought = true; // saved and charged: from here on nothing may untie it from the period
         if (await closePeriod(scanId)) done++;
       } catch (e: any) {
+        // The scan for this period exists and is paid for; only closing the period failed (the database, most likely).
+        // The tie is kept, so the next pass closes the period without buying again.
+        if (bought) { console.error(`[seo] repeating grid ${w.id}: its scan is done but the period could not be closed yet (it will be closed on a later pass, without buying again): ${e?.message ?? e}`); continue; }
         if (scanId !== null) await failScan(scanId, e instanceof SeoBudgetError ? "This month's included SEO data had run out, so the repeating scan was skipped." : e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : "The repeating scan could not be completed; it will be tried again.").catch(() => {});
         // Out of included data: nothing more is likely today. Anything else is tried again when the lease runs out.
         if (e instanceof SeoBudgetError) { console.warn(`[seo] repeating grid ${w.id} skipped: ${e.message}`); await backOff("1 day"); }
@@ -281,23 +318,29 @@ export async function runDueGridWatches(): Promise<number> {
 
 export type GridReportLine = { keyword: string; size: number; spacing: number; at: string; top3: number; checked: number; score: number | null; previous: { top3: number; checked: number; score: number | null; at: string } | null };
 /**
- * For the scheduled report: the newest scan of each repeating search with the comparable one before it — only scans of
+ * For the scheduled report: the newest scan of each repeating search with a comparable one before it — only scans of
  * the listing the site is pinned to NOW (after a change of listing, the old one's results are not reported as this
- * business's). Saved rows only.
+ * business's). When there is an earlier scan, BOTH sets of figures are over the points the two scans both checked
+ * (the same rule the alert uses), so a point that failed to load cannot pass for a change. Saved rows only.
  */
 export async function gridReportLines(userId: number, siteId: number): Promise<GridReportLine[]> {
-  const same = (a: string, b: string) => `abs((${a}.scan->'center'->>'lat')::float8 - (${b}->>'lat')::float8) < 0.0001 AND abs((${a}.scan->'center'->>'lng')::float8 - (${b}->>'lng')::float8) < 0.0001 AND (${a}.scan->'center'->>'cid') IS NOT DISTINCT FROM (${b}->>'cid')`;
-  const { rows } = await pool.query(
-    `SELECT s.keyword, s.size, s.spacing::float8 AS spacing, s.created_at AS at, s.top3, s.checked, s.avg_rank::float8 AS score,
-            (SELECT jsonb_build_object('top3', p.top3, 'checked', p.checked, 'score', p.avg_rank::float8, 'at', p.created_at) FROM seo_grid_scans p
-              WHERE p.site_id=s.site_id AND p.status='done' AND p.created_at < s.created_at AND p.keyword=s.keyword AND p.size=s.size AND p.spacing=s.spacing
-                AND ${same("p", "st.grid_pin")} AND ((st.grid_pin->>'cid') IS NOT NULL OR (p.scan->'center'->>'name') = (st.grid_pin->>'name'))
-              ORDER BY p.created_at DESC LIMIT 1) AS previous
-       FROM seo_grid_watches w
-       JOIN seo_sites st ON st.id=w.site_id AND st.grid_pin IS NOT NULL
-       JOIN LATERAL (SELECT * FROM seo_grid_scans x WHERE x.site_id=w.site_id AND x.status='done' AND x.keyword=w.keyword AND x.size=w.size AND x.spacing=w.spacing AND x.created_at > now() - interval '45 days'
-                       AND ${same("x", "st.grid_pin")} AND ((st.grid_pin->>'cid') IS NOT NULL OR (x.scan->'center'->>'name') = (st.grid_pin->>'name'))
-                     ORDER BY x.created_at DESC LIMIT 1) s ON true
-      WHERE w.site_id=$1 AND w.user_id=$2 ORDER BY w.created_at LIMIT ${MAX_WATCHES}`, [siteId, userId]);
-  return rows.map((r: any) => ({ ...r, at: new Date(r.at).toISOString() }));
+  const same = `abs((x.scan->'center'->>'lat')::float8 - (st.grid_pin->>'lat')::float8) < 0.0001 AND abs((x.scan->'center'->>'lng')::float8 - (st.grid_pin->>'lng')::float8) < 0.0001
+                AND (x.scan->'center'->>'cid') IS NOT DISTINCT FROM (st.grid_pin->>'cid') AND ((st.grid_pin->>'cid') IS NOT NULL OR (x.scan->'center'->>'name') = (st.grid_pin->>'name'))`;
+  const { rows: watches } = await pool.query(`SELECT keyword, size, spacing::float8 AS spacing FROM seo_grid_watches WHERE site_id=$1 AND user_id=$2 ORDER BY created_at LIMIT ${MAX_WATCHES}`, [siteId, userId]);
+  const lines: GridReportLine[] = [];
+  for (const w of watches) {
+    const { rows } = await pool.query(
+      `SELECT x.scan, x.created_at, x.top3, x.checked, x.avg_rank::float8 AS score FROM seo_grid_scans x JOIN seo_sites st ON st.id=x.site_id AND st.grid_pin IS NOT NULL
+        WHERE x.site_id=$1 AND x.user_id=$2 AND x.status='done' AND x.keyword=$3 AND x.size=$4 AND x.spacing=$5 AND ${same}
+        ORDER BY x.created_at DESC LIMIT 6`, [siteId, userId, w.keyword, w.size, w.spacing]);
+    const newest = rows[0];
+    if (!newest || new Date(newest.created_at).getTime() < Date.now() - 45 * 864e5) continue;
+    const at = new Date(newest.created_at).toISOString();
+    const usable = rows.slice(1).map((r: any) => ({ r, c: compareScans(newest.scan?.points ?? [], r.scan?.points ?? []) }))
+      .find(({ r, c }: any) => c.common >= Math.max((newest.scan?.points ?? []).length, (r.scan?.points ?? []).length) * 0.8);
+    lines.push(usable
+      ? { keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: usable.c.now.top3, checked: usable.c.common, score: usable.c.now.avgRank, previous: { top3: usable.c.before.top3, checked: usable.c.common, score: usable.c.before.avgRank, at: new Date(usable.r.created_at).toISOString() } }
+      : { keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: newest.top3, checked: newest.checked, score: newest.score, previous: null });
+  }
+  return lines;
 }

@@ -309,6 +309,22 @@ Verdict: "Audit #13 is partly resolved. Repeating grids are useful, but their sc
  Also: report grid lines carry their scan dates.
  NOT DONE: our own reservation for a grid stays 1.25x while retries can cost us up to 2x (the customer is unaffected).
 
+## Codex audit #15 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-15.md)
+Verdict: "Audit #14 is partly resolved"; coverage about 57% (50-64). No cross-account disclosure or unsafe link found. What was done:
+ 1 HIGH a failed period-close could re-buy a finished grid   FIXED: once the scan is saved and charged nothing unties it from its period; a failed close is logged and the next pass closes it without buying. Real Postgres 16-16b (the close statement made to fail once).
+ 2 MED  owed comparisons could be overwritten / starved     FIXED: a queue (seo_grid_owed), one row per scan, each with its own retry time. Real Postgres 14-14b.
+ 3 MED  monthly anchor was the first due date               FIXED: the anchor is the moment the watch was set (17).
+ 4 MED  stopping a watch did not fence a comparison under way FIXED: the watch is held for the length of the comparison and its owed rows go with it (14c).
+ 5 MED  an old listing could alert after re-pinning (no id) FIXED: the name must match too.
+ 6 MED  "lost since the last snapshot" not established      FIXED in words and logic: the section is "Lost backlinks seen since <date>" - links still being found after that date and now gone; the lookup is always made (no shortcut from an unrelated count).
+ 7 MED  a lost link shown as the whole site leaving          FIXED: "sites with a lost link ... the site may still link to you from other pages".
+ 8 MED  net gains hid strong losses                         FIXED: the two questions are asked separately (both alerts can be raised); a strong loss is a followed link from a site that is not spam. Real Postgres 7h-7j.
+ 9 MED  partial failures / stale loss data                  FIXED: a failed loss lookup is recorded and shown as failed (not charged), never left as the old list; the refresh says so. NOT DONE: one snapshot per day is still the unit (a second refresh the same day replaces the first).
+10 MED  first-snapshot price and affordability              FIXED: the page gets this site's own maximum (a first snapshot has one lookup fewer) and shows it on the button.
+11 MED  report compared grid scores over different points   FIXED: the report uses the same shared-points comparison as the alert.
+12 LOW  alert promised more names than the page keeps       FIXED: it says the page keeps the 25 strongest.
+ Also (open since #12): second tries on a grid are rationed to a quarter of the points, so our own cost stays inside the 1.25x reservation. Unit test.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -351,3 +367,4 @@ Verdict: "Audit #13 is partly resolved. Repeating grids are useful, but their sc
 - 10/8 slice 21 (named lost links): real Postgres places+alerts check now 24/24 (a strong site lost alerts and is named; a weak one does not; losses collected against another snapshot are ignored). Browser, live: "Refresh now" (201, charged 31c) -> "Sites that stopped linking since Sep 7 - the 25 strongest of 113" with the pages that linked.
 - 10/8 audit #14 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler all passing (crash after the scan was saved -> period closed with 0 lookups; a due watch -> one scan, next date 14 days from its anchor though it ran 2 days late; a second pass buys nothing; another worker's lease left alone; an owed comparison made later; a stopped watch owes nothing). Real scheduler pass on the screenshots database: 58 s, 25 of 25 points, next date two months from the anchor, lease cleared, second pass bought nothing.
 - 10/8 slice 23 (Action plan): 264 unit tests incl. the white-label route rule (the four new routes added to its list); real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler passing, tasks 9/9.
+- 10/8 audit #15 fixes: 264 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 27/27, AI + lists 15/15, grid + scheduler all passing (incl. a period-close made to fail once: 9 lookups, then 0 on the next pass), tasks 9/9. Browser: "Refresh now - up to $0.31", the reworded lost-backlinks section, report grid lines over shared points.

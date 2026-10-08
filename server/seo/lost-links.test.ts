@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lostLinksRequest, parseLostLink } from "./dataforseo";
-import { namedLosses, STRONG_LINK } from "./alerts";
+import { isStrongLoss, namedLosses, STRONG_LINK } from "./alerts";
 import { estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 
 describe("lost linking sites, named", () => {
@@ -27,5 +27,11 @@ describe("lost linking sites, named", () => {
     expect(named[0]).toMatchObject({ domain: "site13.example", authority: 65 });
     expect(named.filter((l) => (l.authority ?? 0) >= STRONG_LINK)).toHaveLength(8);
     expect(namedLosses(undefined)).toEqual([]);
+    // A strong loss is a followed link from a real site: a nofollow link or a spammy site is no loss, whatever its authority.
+    const row = { domain: "a.example", authority: 60, from: null, to: null, lastSeen: null };
+    expect(isStrongLoss(row)).toBe(true);
+    expect(isStrongLoss({ ...row, follow: false })).toBe(false);
+    expect(isStrongLoss({ ...row, spam: 80 })).toBe(false);
+    expect(isStrongLoss({ ...row, authority: 12 })).toBe(false);
   });
 });

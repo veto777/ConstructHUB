@@ -98,7 +98,8 @@ async function main() {
   let lookups = 0;
   const realRequest = gridDeps.request;
   gridDeps.request = (async () => { lookups++; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.002, result: [{ items: [{ type: "local_pack", title: "A", cid: "50" }, { type: "local_pack", title: "Grid Co", cid: "12" }] }] }] }; }) as any;
-  const watchRow = async () => (await pool.query("SELECT next_at, anchor_at, lease_until, lease_token, run_scan_id, alert_scan_id FROM seo_grid_watches WHERE id=$1", [w.id])).rows[0];
+  const watchRow = async () => (await pool.query("SELECT next_at, anchor_at, lease_until, lease_token, run_scan_id FROM seo_grid_watches WHERE id=$1", [w.id])).rows[0];
+  const owedFor = async () => (await pool.query("SELECT scan_id FROM seo_grid_owed WHERE watch_id=$1 ORDER BY scan_id", [w.id])).rows.map((r) => r.scan_id);
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
   // (a) the process stopped after the scan was saved and before the period was closed: the watch is due, its lease has run out, its scan is done
   const bought = await scanAt("roof repair", 2, 0);
@@ -107,7 +108,7 @@ async function main() {
   const ran = await runDueGridWatches();
   const afterCrash = await watchRow();
   eq("11 a period whose scan was already bought is closed without buying again", [ran, lookups, afterCrash.run_scan_id, afterCrash.lease_token, new Date(afterCrash.next_at) > new Date()], [1, 0, null, null, true]);
-  eq("11b ...and its comparison was owed and has been made", [afterCrash.alert_scan_id, (await listAlerts(1, s.id)).some((a: any) => a.items?.[0]?.scanId === bought)], [null, true]);
+  eq("11b ...and its comparison was owed and has been made", [await owedFor(), (await listAlerts(1, s.id)).some((a: any) => a.items?.[0]?.scanId === bought)], [[], true]);
   // (b) an ordinary due watch: one scan, tied to the period, the next date counted from the anchor
   const anchor = new Date(Date.now() - 9 * 864e5); // weekly, anchored nine days ago: it is two days late
   await pool.query("UPDATE seo_grid_watches SET next_at = $2, anchor_at = $2 WHERE id=$1", [w.id, anchor]);
@@ -123,12 +124,45 @@ async function main() {
   // (d) a comparison that was owed when the process stopped is made later, and a stopped watch owes nothing
   const owed = await scanAt("roof repair", 9, 0);
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
-  await pool.query("UPDATE seo_grid_watches SET lease_until = NULL, lease_token = NULL, next_at = now() + interval '5 days', alert_scan_id = $2 WHERE id=$1", [w.id, owed]);
-  eq("14 an owed comparison is made on a later pass and then cleared", [await raiseOwedGridAlerts(), (await watchRow()).alert_scan_id, (await listAlerts(1, s.id)).length], [1, null, 1]);
+  await pool.query("UPDATE seo_grid_watches SET lease_until = NULL, lease_token = NULL, next_at = now() + interval '5 days' WHERE id=$1", [w.id]);
+  const owedToo = await scanAt("roof repair", 9, 0);
+  await pool.query("DELETE FROM seo_grid_owed"); await pool.query("INSERT INTO seo_grid_owed(scan_id, watch_id, site_id) VALUES($2,$1,$3),($4,$1,$3)", [w.id, owed, s.id, owedToo]);
+  eq("14 two comparisons can be owed at once (the second does not overwrite the first)", await owedFor(), [owed, owedToo].sort((x, y) => x - y));
+  eq("14a owed comparisons are made on a later pass and then cleared", [await raiseOwedGridAlerts(), await owedFor(), (await listAlerts(1, s.id)).length >= 1], [2, [], true]);
+  // one that keeps failing waits longer each time and does not block the others
+  await pool.query("INSERT INTO seo_grid_owed(scan_id, watch_id, site_id) VALUES(987654,$1,-1),($2,$1,$3)", [w.id, owed, s.id]);
+  await pool.query("ALTER TABLE seo_grid_scans ADD COLUMN IF NOT EXISTS tmp_never integer");
+  const realQuery = pool.query.bind(pool); let failOnce = true;
+  (pool as any).query = (async (sql: any, args: any[]) => { if (failOnce && typeof sql === "string" && /FROM seo_sites WHERE id=\$1/.test(sql) && args?.[0] === -1) { failOnce = false; throw new Error("the database hiccuped"); } return realQuery(sql, args); }) as any;
+  const madeNow = await raiseOwedGridAlerts();
+  (pool as any).query = realQuery;
+  const stuck = (await pool.query("SELECT tries, next_at > now() AS later FROM seo_grid_owed WHERE scan_id=987654")).rows[0];
+  eq("14b one that fails is kept, waits before its next try, and the other was still made", [madeNow, stuck, (await owedFor()).includes(owed)], [1, { tries: 1, later: true }, false]);
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [s.id]);
-  await pool.query("UPDATE seo_grid_watches SET alert_scan_id = $2 WHERE id=$1", [w.id, owed]);
+  await pool.query("DELETE FROM seo_grid_owed"); await pool.query("INSERT INTO seo_grid_owed(scan_id, watch_id, site_id) VALUES($2,$1,$3)", [w.id, owed, s.id]);
   await deleteWatch(1, s.id, w.id);
-  eq("14b stopping the watch cancels what it owed", [await raiseOwedGridAlerts(), (await listAlerts(1, s.id)).length], [0, 0]);
+  eq("14c stopping the watch removes what it owed: nothing is said afterwards", [(await pool.query("SELECT count(*)::int n FROM seo_grid_owed")).rows[0].n, await raiseOwedGridAlerts(), (await listAlerts(1, s.id)).length], [0, 0, 0]);
+  // the scan was bought and saved but the period could not be closed (the database failed at that moment): not bought again
+  await scanAt("roof repair", 1, 3);
+  const w2 = await saveWatch(1, s.id, watchInput.parse({ keyword: "roof repair", size: 3, spacing: 2, every: "weekly" }));
+  await pool.query("UPDATE seo_grid_watches SET next_at = now() - interval '1 minute', anchor_at = now() - interval '7 days' WHERE id=$1", [w2.id]);
+  let failClose = true; lookups = 0;
+  (pool as any).query = (async (sql: any, args: any[]) => { if (failClose && typeof sql === "string" && /WITH closed AS/.test(sql)) { failClose = false; throw new Error("the database hiccuped while closing the period"); } return realQuery(sql, args); }) as any;
+  const firstPass = await runDueGridWatches();
+  (pool as any).query = realQuery;
+  const held = (await pool.query("SELECT run_scan_id, lease_token IS NOT NULL AS leased FROM seo_grid_watches WHERE id=$1", [w2.id])).rows[0];
+  const boughtScan = (await pool.query("SELECT status FROM seo_grid_scans WHERE id=$1", [held.run_scan_id])).rows[0]?.status;
+  eq("16 closing the period failed after the scan was saved: the scan stays tied to the period", [firstPass, lookups, held.run_scan_id !== null, boughtScan], [0, 9, true, "done"]);
+  await pool.query("UPDATE seo_grid_watches SET lease_until = now() - interval '1 minute' WHERE id=$1", [w2.id]); // the lease runs out
+  lookups = 0;
+  eq("16b the next pass closes the period without buying again", [await runDueGridWatches(), lookups, (await pool.query("SELECT run_scan_id, next_at > now() AS moved FROM seo_grid_watches WHERE id=$1", [w2.id])).rows[0]], [1, 0, { run_scan_id: null, moved: true }]);
+  await deleteWatch(1, s.id, w2.id);
+  // a watch set on the 31st stays on the 31st: the anchor is the day it was set, not its first due date
+  await scanAt("anchored", 1, 1);
+  const anchored = await saveWatch(1, s.id, watchInput.parse({ keyword: "anchored", size: 3, spacing: 2, every: "monthly" }));
+  const an = (await pool.query("SELECT anchor_at, next_at, anchor_at < now() + interval '1 minute' AS anchored_now, next_at > now() + interval '27 days' AS due_next_month FROM seo_grid_watches WHERE id=$1", [anchored.id])).rows[0];
+  eq("17 the anchor is when the watch was set; the first run is a period later", [an.anchored_now, an.due_next_month], [true, true]);
+  await deleteWatch(1, s.id, anchored.id);
   gridDeps.request = realRequest;
 
   // A different listing in the same search is not comparable, and is not reported as this business.

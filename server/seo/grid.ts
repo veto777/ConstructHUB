@@ -26,7 +26,8 @@ export const GRID_STALE_MINUTES = 12;
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 /**
  * What is held while a scan of `points` points runs. The customer pays only for points that returned
- * (at most points x GRID_POINT_USD), so this always covers their charge; a second try at a point that timed out is ours.
+ * (at most points x GRID_POINT_USD), so this always covers their charge; a second try at a point that timed out is
+ * ours, and second tries are rationed to a quarter of the points so that our own cost stays inside this too.
  */
 export const gridEstimateUsd = (points: number) => round6(points * GRID_POINT_USD * 1.25);
 
@@ -204,12 +205,16 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
   const cells = gridPoints(input.pin, input.size, input.spacing);
   const results: (MapListing[] | null)[] = new Array(cells.length).fill(null);
   let known = 0, customerUsd = 0, unknownTries = 0, next = 0;
+  // Second tries are rationed to a quarter of the points, so the most this can cost us is 1.25 x the points — exactly
+  // what was reserved (gridEstimateUsd). The customer pays for points that returned either way.
+  let retriesLeft = Math.floor(cells.length * 0.25);
   let firstError: unknown = null;
   const worker = async () => {
     for (;;) {
       const i = next++;
       if (i >= cells.length) return;
       for (let attempt = 1; attempt <= 2 && results[i] === null; attempt++) {
+        if (attempt === 2 && retriesLeft-- <= 0) break;
         try {
           const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]));
           known += r.costUsd; customerUsd += r.costUsd; results[i] = r.listings;

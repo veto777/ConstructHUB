@@ -279,7 +279,7 @@ export async function scheduleWeeklyRuns(): Promise<void> {
 
 /** Buy the summary + top backlinks for a site and store today's snapshot. */
 /** `automatic`: the monthly job — included data only, never purchased credit. */
-export async function snapshotBacklinks(site: SiteRow, automatic = false): Promise<{ id: number; takenOn: string; costUsd: number }> {
+export async function snapshotBacklinks(site: SiteRow, automatic = false): Promise<{ id: number; takenOn: string; costUsd: number; /** The lost-backlinks part did not load (the rest did). */ lostFailed: boolean }> {
   // With an earlier snapshot to compare with, the linking sites lost since then are named too (one more lookup).
   const { rows: [before] } = await pool.query("SELECT taken_on::text AS taken_on FROM seo_backlink_snapshots WHERE site_id=$1 AND taken_on < current_date ORDER BY taken_on DESC LIMIT 1", [site.id]);
   const estimate = estimateBacklinkSnapshotUsd(BACKLINK_ROWS) + (before ? estimateLostLinksUsd() : 0);
@@ -294,27 +294,29 @@ export async function snapshotBacklinks(site: SiteRow, automatic = false): Promi
       if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) listUnknown = true;
       console.warn(`[seo] backlinks list failed for ${site.domain}: ${e?.message}`);
     }
-    // Lost linking sites since the last snapshot — skipped when the source itself counts none lost.
-    let changes: { since: string; lost: LostLink[]; lostTotal: number | null } | null = null, lostCost = 0;
-    if (before && summary.data.lostReferringDomains !== 0) {
+    // Lost backlinks seen since the last snapshot. Always asked for when there is an earlier snapshot (the summary's own
+    // "lost" count covers a different period, so it cannot say there are none); a failure is recorded as a failure.
+    let changes: { since: string; lost: LostLink[]; lostTotal: number | null; failed?: true } | null = null, lostCost = 0;
+    if (before) {
       try { const l = await seoJobDeps.lostLinks({ target: site.domain, since: before.taken_on, limit: LOST_LINK_ROWS }); lostCost = l.costUsd; delivered += l.costUsd; changes = { since: before.taken_on, lost: l.data.items, lostTotal: l.data.total }; }
       catch (e: any) {
         lostCost = typeof e?.costUsd === "number" ? e.costUsd : 0;
         if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) listUnknown = true;
         console.warn(`[seo] lost links failed for ${site.domain}: ${e?.message}`);
+        changes = { since: before.taken_on, lost: [], lostTotal: null, failed: true };
       }
-    } else if (before) changes = { since: before.taken_on, lost: [], lostTotal: 0 };
+    }
     return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null, listFailed: !list, changes }, costUsd: summary.costUsd + (list?.costUsd ?? 0) + lostCost, customerUsd: delivered, costUnknown: listUnknown };
   }, { allowanceOnly: automatic, label: `Backlink snapshot — ${site.domain} (${automatic ? "monthly" : "refresh"})` });
   const { rows: [row] } = await pool.query(
     `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd,changes) VALUES($1,$2,current_date,$3,$4,$5,$6)
      ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd,
-       changes=coalesce(EXCLUDED.changes, seo_backlink_snapshots.changes)
+       changes=EXCLUDED.changes
      RETURNING id, taken_on`,
     [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount, listFailed: out.data.listFailed }), JSON.stringify(out.data.backlinks), out.costUsd, out.data.changes ? JSON.stringify(out.data.changes) : null]);
   await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
   await raiseLinkAlerts(site.id).catch((e: any) => console.error(`[seo] link alerts for ${site.domain} failed: ${e?.message ?? e}`));
-  return { id: row.id, takenOn: String(row.taken_on).slice(0, 10), costUsd: out.costUsd };
+  return { id: row.id, takenOn: String(row.taken_on).slice(0, 10), costUsd: out.costUsd, lostFailed: out.data.changes?.failed === true };
 }
 
 async function runDueBacklinkSnapshots(): Promise<void> {

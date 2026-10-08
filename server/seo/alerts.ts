@@ -94,7 +94,7 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
   return {
     kind: "seo.links_change", title: a.title, severity: a.kind === "links_lost" ? "warning" : "info",
     body: `Sites linking to ${a.domain}: ${i.from ?? "?"} on ${i.since ?? "the last snapshot"}, ${i.to ?? "?"} now.` +
-      (Array.isArray(i.lost) && i.lost.length ? `\nNo longer linking: ${i.lost.slice(0, 5).map((l: any) => `${l.domain}${l.authority != null ? ` (authority ${l.authority})` : ""}`).join(", ")}${i.lost.length > 5 ? ", …" : ""}.` : ""),
+      (Array.isArray(i.lost) && i.lost.length ? `\nLinks lost from: ${i.lost.slice(0, 5).map((l: any) => `${l.domain}${l.authority != null ? ` (authority ${l.authority})` : ""}`).join(", ")}${i.lost.length > 5 ? ", …" : ""}.` : ""),
     actionLabel: "See the links", actionUrl: "/seo/backlinks",
   };
 }
@@ -171,18 +171,23 @@ export function linkChange(now: number | null | undefined, before: number | null
 }
 
 /** After a backlink snapshot: compare with the snapshot before it. */
-/** A lost link from a site at least this strong (0–100) is worth an alert on its own. */
+/** A lost link from a site at least this strong (0–100) is worth an alert on its own… */
 export const STRONG_LINK = 30;
-type LostRow = { domain: string; authority: number | null; from: string | null; to: string | null; lastSeen: string | null };
-/** The lost linking sites worth naming in an alert: strongest first, at most ten. Pure. */
+/** …unless the site looks like spam (a spam score this high) or the link was nofollow: those are no loss. */
+export const SPAM_LIMIT = 50;
+type LostRow = { domain: string; authority: number | null; spam?: number | null; follow?: boolean; from: string | null; to: string | null; lastSeen: string | null };
+/** The lost backlinks worth naming in an alert: strongest site first, at most ten. Pure. */
 export function namedLosses(lost: unknown): LostRow[] {
   return (Array.isArray(lost) ? lost : []).filter((l): l is LostRow => !!l && typeof l.domain === "string")
     .sort((a, b) => (b.authority ?? -1) - (a.authority ?? -1)).slice(0, 10)
-    .map((l) => ({ domain: l.domain, authority: l.authority ?? null, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
+    .map((l) => ({ domain: l.domain, authority: l.authority ?? null, spam: l.spam ?? null, follow: l.follow !== false, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
 }
+/** Is this lost link one that mattered: a followed link from a real site with some authority? Pure. */
+export const isStrongLoss = (l: LostRow) => (l.authority ?? 0) >= STRONG_LINK && l.follow !== false && (l.spam ?? 0) < SPAM_LIMIT;
 /**
- * After a snapshot: alert when the count of linking sites moved enough (linkChange), or — new with named losses —
- * when a strong site stopped linking even though the count barely moved. Either way the alert names the sites lost.
+ * After a snapshot, two questions asked separately: did the count of linking sites move enough (linkChange)? and was a
+ * link from a strong site lost? A month can gain sites overall and still lose one that mattered — then both are said.
+ * Returns the kind of the first alert raised, or null.
  */
 export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
   const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled FROM seo_sites WHERE id=$1", [siteId]);
@@ -193,18 +198,18 @@ export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
   const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
   // Named losses belong to this comparison only when they were collected since the snapshot it is compared with.
   const lost = latest.changes?.since === previous.taken_on ? namedLosses(latest.changes?.lost) : [];
-  const strong = lost.filter((l) => (l.authority ?? 0) >= STRONG_LINK);
-  if (!change && !strong.length) return null;
-  const kind = change ? change.kind : "links_lost";
-  const title = change
-    ? `${site.domain} ${change.kind === "links_lost" ? "lost" : "gained"} ${plural(change.by, "linking site")}`
-    : `${site.domain} lost ${strong.length === 1 ? `a link from ${strong[0].domain}` : `links from ${strong.length} strong sites`}`;
-  const items = [{ from: previous.summary?.referringDomains ?? null, to: latest.summary?.referringDomains ?? null, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null,
-    lost: kind === "links_lost" ? lost : [], lostTotal: kind === "links_lost" ? latest.changes?.lostTotal ?? null : null }];
-  const id = await saveAlert(site.user_id, siteId, kind, latest.taken_on, title, items);
-  if (!id) return null;
-  await deliverAlert(id);
-  return kind;
+  const strong = lost.filter(isStrongLoss);
+  const counts = { from: previous.summary?.referringDomains ?? null, to: latest.summary?.referringDomains ?? null, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null };
+  let raised: string | null = null;
+  const raise = async (kind: "links_lost" | "links_gained", title: string, names: LostRow[]) => {
+    const id = await saveAlert(site.user_id, siteId, kind, latest.taken_on, title, [{ ...counts, lost: names, lostShown: names.length, lostTotal: names.length ? latest.changes?.lostTotal ?? null : null }]);
+    if (id) { await deliverAlert(id); raised ??= kind; }
+  };
+  if (change) await raise(change.kind, `${site.domain} ${change.kind === "links_lost" ? "lost" : "gained"} ${plural(change.by, "linking site")}`, change.kind === "links_lost" ? lost : []);
+  // A strong link lost is said even when the count rose, or barely moved. (When the count fell, the alert above already names it.)
+  if (strong.length && change?.kind !== "links_lost")
+    await raise("links_lost", `${site.domain} lost ${strong.length === 1 ? `a link from ${strong[0].domain}` : `links from ${strong.length} strong sites`}`, strong);
+  return raised;
 }
 
 export async function listAlerts(userId: number, siteId: number | null, limit = 100) {

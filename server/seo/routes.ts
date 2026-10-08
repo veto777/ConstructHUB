@@ -505,6 +505,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       snapshot: latest ? { id: latest.id, takenOn: latest.taken_on, summary: latest.summary, backlinks: latest.backlinks, changes: latest.changes ?? null } : null,
       previous: previous ? { takenOn: previous.taken_on, summary: previous.summary } : null,
       nextSnapshotAt: site.next_backlinks_at,
+      // What a refresh can cost for this site today: the first snapshot has nothing to compare with, so it has one lookup fewer.
+      refreshCents: retailCents(estimateBacklinkSnapshotUsd(100) + (rows.some((r: any) => r.taken_on < new Date().toISOString().slice(0, 10)) ? estimateLostLinksUsd() : 0)),
     });
   });
 
@@ -513,7 +515,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
     const snap = await once(`backlinks:${user}:${site.id}`, () => snapshotBacklinks(site));
-    res.status(201).json({ id: snap.id, takenOn: snap.takenOn, usage: await planUsage(user, ent) });
+    res.status(201).json({ id: snap.id, takenOn: snap.takenOn, lostFailed: snap.lostFailed, usage: await planUsage(user, ent) });
   });
 
   // ── Site Explorer: any domain, one report ──────────────────────────────────
