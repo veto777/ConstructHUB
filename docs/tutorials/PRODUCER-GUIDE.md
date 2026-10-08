@@ -589,6 +589,11 @@ git add docs/tutorials/social-schedule.json && git commit      #    the ledger i
 - **Rows that reload** take the ring's element with them; the recorder puts the ring back.
 - **A dialog's bottom button** can sit in the caption strip and cannot scroll up; the recorder warns
   ("is in the caption area"). Keep that step's line short.
+- **The brand name is written "ConstructHUB"** in narration — the pronunciation lexicon makes the voice
+  say "con-STRUCT hub"; any other spelling, or phoneme markup in a script, stops the narration.
+- **A frame of the bare "ConstructHUB … Privacy Policy · Terms of Use" page, or a blank page**, fails
+  `check.ts` (it reads every frame). The recorder holds the picture through page loads; if a video
+  still has one, `deflash.ts` repairs it (`VIDEO-PIPELINE.md`).
 - **Chapters closer than 10 s** are dropped by YouTube; `mux.ts` warns and `check.ts` fails under three.
 - **The picture stopping early** while the voice plays on is caught by `check.ts` (stream lengths).
 - **Recording databases are schemas today.** The dev role cannot create databases on this box, so a
