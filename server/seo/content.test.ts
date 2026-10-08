@@ -13,6 +13,8 @@ describe("contentInput", () => {
     expect(contentInput.safeParse({ query: "siding", sinceDays: 45 }).success).toBe(false);
     expect(contentInput.safeParse({ query: "siding", minAuthority: 0 }).success).toBe(false);
     expect(contentInput.safeParse({ query: "siding", extra: 1 }).success).toBe(false);
+    expect(contentInput.safeParse({ query: "siding", exclude: "not a site" }).success).toBe(false);
+    expect(contentInput.safeParse({ query: "siding", exclude: "https://www.angi.com/x" }).success).toBe(true);
   });
 });
 

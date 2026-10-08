@@ -62,7 +62,7 @@ describe("pageRows", () => {
     expect(pagesSummary(pageRows([page(`${H}/`, [`${H}/a`]), page(`${H}/a`), page(`${H}/b`)], [])).linksMeasured).toBe(true);
     const spa = [page(`${H}/`, [`${H}/a`, `${H}/b`]), ...["a", "b", "c", "d", "e"].map((x) => page(`${H}/${x}`))];
     const r = pageRows(spa, []);
-    expect(r.every((x) => x.inlinks === null && x.depth === null)).toBe(true);
+    expect(r.every((x) => x.inlinks === null && x.depth === null && x.outlinks === null)).toBe(true);
     expect(pagesSummary(r)).toMatchObject({ pages: 6, linksMeasured: false, orphans: null, deep: null, averageDepth: null, indexable: 6 });
   });
   it("counts an address saved twice once", () => {

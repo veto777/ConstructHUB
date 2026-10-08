@@ -79,8 +79,8 @@ function Mentions({ status, domain: initial }: { status: SeoStatus | undefined; 
     queryFn: async () => { try { return await api("POST", "/api/seo/ai/mentions", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/ai/mentions", body),
-    onSuccess: (data: unknown) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/ai/mentions", v.body),
+    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't look that up", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const price = status?.prices?.aiMentions ?? null, page = saved.data?.page ?? null;
@@ -99,7 +99,7 @@ function Mentions({ status, domain: initial }: { status: SeoStatus | undefined; 
         <Empty testId="ai-mentions-not-run">
           <h3>AI mentions of {asked.domain}</h3>
           <p>Not looked up yet.{!can(status, price) && " You don't have enough SEO data left — add credit above."}</p>
-          <Button className="mt-2" disabled={run.isPending || !status?.configured || !can(status, price)} onClick={() => run.mutate()} data-testid="button-ai-mentions-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking…</> : `Look it up${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+          <Button className="mt-2" disabled={run.isPending || !status?.configured || !can(status, price)} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-ai-mentions-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking…</> : `Look it up${price != null ? ` — about ${money(price)}` : ""}`}</Button>
         </Empty>
       )}
       {page && (
@@ -169,7 +169,7 @@ export default function SeoAiPage() {
   const unsaved = showRun && !!lastRun && !lastRun.saved;
   const shown: PromptHistory | null = showRun && lastRun ? { prompt: lastRun.prompt, lastAt: lastRun.at, runId: lastRun.runId, latest: lastRun.answers.map((a) => ({ ...a, at: lastRun.at })), history: savedShown?.prompt === lastRun.prompt ? savedShown.history : [] } : savedShown;
   // Answers belong together only when they came from the same ask (older rows have no run id: those go by the minute).
-  const isFresh = (a: { at: string; runId?: string | null }) => !!shown && (shown.runId && a.runId ? a.runId === shown.runId : Date.parse(shown.lastAt) - Date.parse(a.at) < 60_000);
+  const isFresh = (a: { at: string; runId?: string | null }) => !!shown && (shown.runId ? a.runId === shown.runId : Date.parse(shown.lastAt) - Date.parse(a.at) < 60_000);
   const freshAnswers = shown ? shown.latest.filter(isFresh) : [];
   const namesIt = !!shown && !!d?.businessName && shown.prompt.toLowerCase().includes(d.businessName.toLowerCase());
   const toggle = (e: Engine) => setEngines((x) => (x.includes(e) ? x.filter((y) => y !== e) : [...x, e]));
@@ -238,7 +238,7 @@ export default function SeoAiPage() {
                 <tbody>{d.prompts.map((p) => (
                   <tr key={p.prompt}>
                     <td className="max-w-[420px]"><button type="button" className="g-link text-left" aria-current={shown?.prompt === p.prompt ? "true" : undefined} onClick={() => { setOpenPrompt(p.prompt); window.scrollTo({ top: 0, behavior: "smooth" }); }}>{p.prompt}</button></td>
-                    {ENGINES.map((e) => { const a = p.latest.find((x) => x.engine === e.key); return <td key={e.key}>{!a ? <span className="g-text-2">not asked</span> : a.mentioned ? <span style={{ color: "var(--g-green)" }}>Named{a.listedAt ? ` #${a.listedAt}` : ""}</span> : <span style={{ color: "var(--g-red)" }}>Not named</span>}</td>; })}
+                    {ENGINES.map((e) => { const a = p.latest.find((x) => x.engine === e.key); return <td key={e.key}>{!a ? <span className="g-text-2">not asked</span> : <>{a.mentioned ? <span style={{ color: "var(--g-green)" }}>Named{a.listedAt ? ` #${a.listedAt}` : ""}</span> : <span style={{ color: "var(--g-red)" }}>Not named</span>}{(p.runId ? a.runId !== p.runId : false) && <span className="g-text-2 text-[12px]"> · {fmtDate(a.at)}</span>}</>}</td>; })}
                     <td className="num g-text-2">{fmtDate(p.lastAt)}</td>
                   </tr>
                 ))}</tbody>

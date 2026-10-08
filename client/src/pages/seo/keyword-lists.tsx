@@ -106,8 +106,8 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
     queryFn: async () => { try { return await api("POST", "/api/seo/keywords/bulk", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/keywords/bulk", body),
-    onSuccess: (data: unknown) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/keywords/bulk", v.body),
+    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't analyse those keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
@@ -131,7 +131,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
           <Empty testId="bulk-not-run">
             <h3>{asked.length} keyword{asked.length === 1 ? "" : "s"} ready to analyse</h3>
             <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
-            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate()} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
           </Empty>
         )}
         {page && (

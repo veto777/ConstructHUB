@@ -214,24 +214,24 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     return p;
   };
   /** Save a paid result. A failed save must not cost the customer the data they just paid for: they still get the response. */
-  const keep = async (what: string, save: () => Promise<void>) => {
-    try { await save(); } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
+  const keep = async (what: string, save: () => Promise<void>): Promise<boolean> => {
+    try { await save(); return true; } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); return false; }
   };
   /**
    * Buy a cacheable result once. The first request runs it; anyone asking for the same thing meanwhile waits and
    * gets the same result marked `reused` (they bought nothing). The saved copy is checked again inside, so a
    * request arriving just after another finished does not buy it a second time.
    */
-  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean }> => {
+  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean; /** false: bought and returned, but it could not be kept — reopening it will not be free. */ saved: boolean }> => {
     const flight = `${kind}:${user}:${key}`;
     const waiting = inflight.has(flight);
     const out = await once(flight, async () => {
-      if (!skipSaved) { const again = await cached<T>(user, key, maxAgeHours); if (again) return { data: again, bought: false }; }
+      if (!skipSaved) { const again = await cached<T>(user, key, maxAgeHours); if (again) return { data: again, bought: false, saved: true }; }
       const o = await withBudget(user, estimateUsd, fetch, { label });
-      await keep(`${kind} for account ${user}`, () => saveCached(user, key, kind, o.data, o.costUsd));
-      return { data: o.data, bought: true };
+      const saved = await keep(`${kind} for account ${user}`, () => saveCached(user, key, kind, o.data, o.costUsd));
+      return { data: o.data, bought: true, saved };
     });
-    return { data: out.data, reused: waiting || !out.bought };
+    return { data: out.data, reused: waiting || !out.bought, saved: out.saved };
   };
   /** Requests for one key run one after another (keyword imports: the plan limit is counted, then inserted). */
   const queues = new Map<string, Promise<unknown>>();
@@ -551,7 +551,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<ReportPage>(user, key, `report:${input.table}`, CACHE_HOURS, REPORT_ESTIMATE_USD, () => fetchReportPage(full), false, `${REPORT_NAMES[input.table] ?? input.table} — ${target}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Keywords Explorer: one keyword's overview ───────────────────────────────
@@ -568,7 +568,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
-    res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Content gap / Link intersect (Site Explorer) ────────────────────────────
@@ -588,7 +588,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<GapPage>(user, key, `gap:${input.kind}`, CACHE_HOURS, gapEstimateUsd(input.kind, competitors.length, limit),
       () => fetchGap({ kind: input.kind, target, competitors, limit, offset, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `${content ? "Content gap" : "Link intersect"} — ${target} vs ${competitors.join(", ")}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Dashboard: every tracked site with its saved numbers (never a vendor call) ──
@@ -638,7 +638,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<BulkPage>(user, key, "keywords-bulk", CACHE_HOURS, bulkEstimateUsd(keywords.length),
       () => fetchBulkKeywords({ keywords, locationCode: input.locationCode, languageCode: input.languageCode }), false, `Bulk keyword analysis — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
@@ -684,7 +684,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (peek) return res.status(404).json({ code: "no_report", message: "Not searched yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<ContentPage>(user, key, "content", CACHE_HOURS, CONTENT_ESTIMATE_USD, () => fetchContent(input), false, `Content explorer — "${search.query}"${search.offset ? ` (results ${search.offset + 1}–${search.offset + search.limit})` : ""}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Batch analysis: headline numbers for up to 100 websites. Saved for a day; `peek` never buys. ──
@@ -698,7 +698,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<BatchPage>(user, key, "batch", CACHE_HOURS, batchEstimateUsd(domains.length), () => fetchBatch(domains), input.refresh, `Batch analysis — ${domains.length} website${domains.length === 1 ? "" : "s"}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, rejected });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved, rejected });
   });
 
   // ── AI visibility ───────────────────────────────────────────────────────────
@@ -750,7 +750,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<AiMentionsPage>(user, key, "ai-mentions", 7 * 24, AI_MENTIONS_ESTIMATE_USD, () => fetchAiMentions({ domain, platform: input.platform }), false, `AI mentions — ${domain} (${input.platform === "google" ? "Google AI Overviews" : "ChatGPT"})`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Rank tracker competitors: share of voice, who else is seen on these keywords, map-pack leaders. Saved checks only. ──

@@ -20,7 +20,7 @@ export const contentInput = z.object({
   minAuthority: z.number().int().min(1).max(100).optional(),
   kind: z.enum(CONTENT_KINDS).optional(),
   /** Leave out one site (usually the customer's own). */
-  exclude: z.string().max(253).optional(),
+  exclude: z.string().max(253).refine((v) => !!normalizeDomain(v), "Enter the website to leave out like example.com").optional(),
   limit: z.union([z.literal(25), z.literal(50)]).default(25),
   offset: z.number().int().min(0).max(950).default(0),
   peek: z.boolean().default(false),

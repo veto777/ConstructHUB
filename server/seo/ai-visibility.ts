@@ -302,7 +302,7 @@ export async function trackedPrompts(siteId: number): Promise<{ id: number; prom
 }
 /** Turn monthly re-asking on or off for a question. Returns null when the site already tracks the most allowed. */
 export async function setTracked(userId: number, siteId: number, input: z.infer<typeof trackInput>): Promise<boolean> {
-  if (!input.on) { await pool.query("DELETE FROM seo_ai_tracked WHERE site_id=$1 AND user_id=$2 AND lower(prompt)=lower($3)", [siteId, userId, input.prompt]); return true; }
+  if (!input.on) { await pool.query("DELETE FROM seo_ai_tracked WHERE site_id=$1 AND user_id=$2 AND lower(btrim(regexp_replace(prompt, '\\s+', ' ', 'g')))=lower($3)", [siteId, userId, input.prompt]); return true; }
   const { rows: [{ n, has }] } = await pool.query("SELECT count(*)::int n, bool_or(lower(prompt)=lower($2)) AS has FROM seo_ai_tracked WHERE site_id=$1", [siteId, input.prompt]);
   if (!has && n >= MAX_TRACKED_PROMPTS) return false;
   await pool.query(

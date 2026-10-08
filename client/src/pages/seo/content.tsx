@@ -35,13 +35,13 @@ export default function SeoContentPage() {
   useEffect(() => { setOffset(0); }, [query, f]);
   const body = useMemo(() => ({ query: query ?? "", sort: f.sort, ...(f.sinceDays ? { sinceDays: f.sinceDays } : {}), ...(f.minAuthority ? { minAuthority: f.minAuthority } : {}), ...(f.kind ? { kind: f.kind } : {}), ...(f.excludeOwn && site ? { exclude: site.domain } : {}), limit, offset }), [query, f, site, offset]);
   const queryKey = ["/api/seo/content", body];
-  const saved = useQuery<{ page: Page } | null>({
+  const saved = useQuery<{ page: Page; saved?: boolean } | null>({
     queryKey, enabled: !!query, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/content", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/content", body),
-    onSuccess: (data: unknown) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/content", v.body),
+    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't run the search", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const price = status.data?.prices?.contentSearch ?? null, hold = status.data?.holds?.contentSearch ?? price;
@@ -74,22 +74,24 @@ export default function SeoContentPage() {
       </div>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-content-cost">Each new page of results costs about {price != null ? money(price) : "—"} of your SEO data; a search you have run reopens free for a day. English-language pages.</p>
 
-      {!query && <Empty testId="content-intro"><h3>Find who writes about your trade</h3><p>Search a topic your customers care about — "roof replacement cost", "james hardie vs vinyl siding" — to see the pages already written about it. Use it to plan a better page of your own, and to find blogs, local news and directories worth asking for a mention. Sort by <b>Strongest sites first</b> to find the ones a link from would help most.</p></Empty>}
+      {!query && <Empty testId="content-intro"><h3>Find who writes about your trade</h3><p>Search a topic your customers care about — "roof replacement cost", "james hardie vs vinyl siding" — to see the pages already written about it. Use it to plan a better page of your own, and to find blogs, local news and directories worth asking for a mention. Sort by <b>Strongest sites first</b> to see the best-known sites first — authority is one sign of a link worth having, alongside how relevant and local the site is.</p></Empty>}
       {query && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved search…</p>}
       {query && saved.isError && <div className="g-callout" role="alert" data-testid="content-error"><h3>Couldn't check for a saved search</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {query && saved.isSuccess && !page && (
         <Empty testId="content-not-run">
           <h3>Pages about "{query}"</h3>
           <p>{offset ? "This page of results hasn't been opened yet." : "Not searched yet with these settings."}{!canPay && " You don't have enough SEO data left — add credit above."}</p>
-          <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate()} data-testid="button-content-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `${offset ? "Load these results" : "Run the search"}${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+          {offset > 0 && <button type="button" className="g-pill mr-2 mt-2" onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-content-back">← Back to the previous results</button>}
+          <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `${offset ? "Load these results" : "Run the search"}${price != null ? ` — about ${money(price)}` : ""}`}</Button>
         </Empty>
       )}
       {page && (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-            <span className="g-text-2" data-testid="text-content-meta">{page.total != null ? `${fmtNum(page.total)} pages found` : `${fmtNum(page.rows.length)} pages`} · showing {fmtNum(page.offset + 1)}–{fmtNum(page.offset + page.rows.length)} · as of {fmtDate(page.fetchedAt)}</span>
+            <span className="g-text-2" data-testid="text-content-meta">{page.total != null ? `${fmtNum(page.total)} matches across the web` : `${fmtNum(page.rows.length)} pages`} · showing {fmtNum(page.offset + 1)}–{fmtNum(page.offset + page.rows.length)} · as of {fmtDate(page.fetchedAt)}</span>
             <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!page.rows.length} onClick={exportCsv} data-testid="button-content-export"><Download /> Export</button>
           </div>
+          {saved.data?.saved === false && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="content-unsaved">These results could not be kept, so opening this search again will not be free. Export them now if you need them.</p>}
           {page.rows.length === 0 ? <Empty testId="content-empty"><h3>No pages found</h3><p>Try fewer words, or loosen the filters.</p></Empty> : (
             <ul className="space-y-2" data-testid="list-content">
               {page.rows.map((r) => (
@@ -109,7 +111,7 @@ export default function SeoContentPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <button type="button" className="g-pill g-pill--sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-content-prev">← Previous</button>
             <button type="button" className="g-pill g-pill--sm" disabled={page.sourceRows < limit || (page.total != null && page.offset + page.sourceRows >= page.total) || offset + limit > 950} onClick={() => setOffset(offset + limit)} data-testid="button-content-next">Next →</button>
-            <span className="g-text-2">A page you haven't opened yet costs about {price != null ? money(price) : "—"}.</span>
+            <span className="g-text-2">A page you haven't opened yet costs about {price != null ? money(price) : "—"}. A page that matches in several places is listed once per page of results.</span>
           </div>
         </>
       )}

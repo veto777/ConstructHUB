@@ -24,7 +24,7 @@ export type PageRow = {
   /** Clicks from the first page crawled (0 = that page); null = no link to it was found, or links could not be measured. */
   depth: number | null;
   /** Other crawled pages of the site that link to it (null when links could not be measured) / pages of the site it links to. */
-  inlinks: number | null; outlinks: number;
+  inlinks: number | null; outlinks: number | null;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number;
   images: number; imagesNoAlt: number; kb: number | null;
   /** Issue keys (as on the Issues tab) this page is listed under. */
@@ -88,7 +88,7 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
     const whyNot = !known ? null : p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : null;
     return {
       url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: !known ? null : whyNot === null, whyNot, canonicalElsewhere: known && p.status < 300 && canonicalElsewhere,
-      depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: out[i].size,
+      depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: measured ? out[i].size : null,
       title: p.title || null, titleLength: (p.title ?? "").trim().length, descriptionLength: (p.description ?? "").trim().length, h1: Array.isArray(p.h1) ? p.h1.length : 0,
       words: p.words, images: p.images, imagesNoAlt: p.imagesNoAlt, kb: typeof p.bytes === "number" ? Math.round(p.bytes / 1024) : null,
       issues: [...new Set(issuesOf.get(key) ?? [])],

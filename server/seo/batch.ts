@@ -76,7 +76,7 @@ export async function fetchBatch(domains: string[]): Promise<{ data: BatchPage; 
       domain, authority: rank === null ? null : Math.max(0, Math.min(100, Math.round(rank / 10))),
       referringDomains: num(rds?.get(domain)?.referring_domains), backlinks: num(links?.get(domain)?.backlinks),
       // No row for a site means the source has no number for it — that is "unknown", not zero.
-      traffic: organic ? Math.round(num(organic.etv) ?? 0) : null, keywords: organic ? num(organic.count) : null,
+      traffic: organic && num(organic.etv) !== null ? Math.round(num(organic.etv) as number) : null, keywords: organic ? num(organic.count) : null,
     };
   });
   return { data: { rows, missing, fetchedAt: new Date().toISOString() }, costUsd, customerUsd, costUnknown };

@@ -10,7 +10,7 @@ import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
 
-type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number;
+type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number | null;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
 type Summary = { pages: number; indexable: number; notIndexable: number; canonicalElsewhere?: number; errors: number; redirected: number; linksMeasured?: boolean; orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
 type Data = { jobId: string; scannedAt: string | null; summary: Summary; pages: Row[] };
@@ -116,7 +116,7 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
                   {isOpen && (
                     <tr><td /><td colSpan={COLS.length} className="text-[13px]">
                       <p className="g-text"><b className="font-medium">Title:</b> {r.title ?? <span className="g-text-2">none</span>}</p>
-                      <p className="g-text-2 mt-1">{r.h1} main heading{r.h1 === 1 ? "" : "s"} (H1) · links to {fmtNum(r.outlinks)} other page{r.outlinks === 1 ? "" : "s"} of the site · {fmtNum(r.images)} image{r.images === 1 ? "" : "s"}{r.imagesNoAlt ? `, ${fmtNum(r.imagesNoAlt)} without a description (alt text)` : ""}</p>
+                      <p className="g-text-2 mt-1">{r.h1} main heading{r.h1 === 1 ? "" : "s"} (H1) · {r.outlinks == null ? "its links to other pages could not be measured" : `its source links to ${fmtNum(r.outlinks)} other crawled page${r.outlinks === 1 ? "" : "s"}`} · {fmtNum(r.images)} image{r.images === 1 ? "" : "s"}{r.imagesNoAlt ? `, ${fmtNum(r.imagesNoAlt)} without a description (alt text)` : ""}</p>
                       {r.issues.length > 0 ? <><p className="g-text mt-2 font-medium">Listed under</p><ul className="g-text list-disc pl-5">{r.issues.map((k) => <li key={k}>{issueTitles[k] ?? k}</li>)}</ul></> : <p className="g-text-2 mt-2">No issue lists this page.</p>}
                     </td></tr>
                   )}

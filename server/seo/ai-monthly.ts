@@ -30,8 +30,13 @@ export async function runDueAiChecks(): Promise<number> {
       if (!site || !engines.length) { await later(t.id, "1 day"); continue; }
       const out = await withBudget(t.user_id, askEstimateUsd(engines), () => askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name }),
         { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
-      await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, randomUUID());
-      await later(t.id, "30 days");
+      // Paid: the month moves on now, before anything else can fail — a saving problem must never buy the same answers again.
+      await pool.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [t.id]);
+      const runId = randomUUID();
+      for (let attempt = 1; ; attempt++) {
+        try { await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, runId); break; }
+        catch (e: any) { if (attempt >= 3) { console.error(`[seo] monthly AI answers for site ${t.site_id} were paid for but could not be saved: ${e?.message ?? e}`); break; } await new Promise((r) => setTimeout(r, 500 * attempt)); }
+      }
       done++;
     } catch (e: any) {
       // Out of included data: nothing more this month is likely, so look again tomorrow rather than every hour.
