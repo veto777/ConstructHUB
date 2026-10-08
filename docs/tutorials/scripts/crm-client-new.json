@@ -1,0 +1,145 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-new",
+  "title": "Add a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Add a client",
+      "narration": "This is Clients in the ConstructHUB CRM. Let's add someone new."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-new-client\"]",
+      "caption": "New client",
+      "narration": "Choose New client.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-client-name\"]",
+      "value": "Naomi Brooks",
+      "caption": "Client name",
+      "narration": "Type the client's name. It's the only thing you must fill in."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-client-email\"]",
+      "value": "naomi.brooks@example.com",
+      "caption": "Email",
+      "narration": "Add their email. You'll need it to send them an estimate."
+    },
+    {
+      "action": "type",
+      "selector": "#c-phone",
+      "value": "(718) 555-0112",
+      "caption": "Phone",
+      "narration": "Then their phone number."
+    },
+    {
+      "action": "type",
+      "selector": "#c-addr",
+      "value": "64 Alder Row",
+      "caption": "Service address",
+      "chapter": "Address and notes",
+      "narration": "Service address is where the work will be."
+    },
+    {
+      "action": "type",
+      "selector": "#c-city",
+      "value": "Brooklyn",
+      "caption": "City",
+      "narration": "Add the city,"
+    },
+    {
+      "action": "type",
+      "selector": "#c-state",
+      "value": "NY",
+      "caption": "State",
+      "narration": "and the state."
+    },
+    {
+      "action": "type",
+      "selector": "#c-notes",
+      "value": "Wants oak floors in the front room. Call before 6.",
+      "caption": "Notes",
+      "narration": "Notes are for your team. Write what the client asked for."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-client\"]",
+      "caption": "Create client",
+      "narration": "Then choose Create client.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Naomi Brooks\")",
+      "caption": "On the list, with a portal",
+      "chapter": "The new client and their portal",
+      "narration": "Naomi is on your list, and her private portal was created automatically."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Naomi Brooks\")",
+      "caption": "Open the client",
+      "narration": "Click her name to open her page.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-intake-notes\"]",
+      "caption": "Intake notes",
+      "narration": "Your notes are here, as intake notes. Only your team sees them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-copy-portal\"]",
+      "caption": "Copy portal link",
+      "narration": "Copy portal link copies the link to her portal, ready to send to her."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "See what the client sees",
+      "narration": "And See what the client sees opens the portal the way she sees it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find Clients in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to add a client | ConstructHUB CRM",
+    "description": "A short walkthrough of adding a client in the ConstructHUB CRM. You will fill in the New client form, find the new client on your list, and see where their private portal link is on their page.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "add a client",
+      "client management",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "client portal"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Add a client",
+    "accent": "client",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}
