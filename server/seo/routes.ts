@@ -38,6 +38,7 @@ import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
+import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
@@ -756,6 +757,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     res.json({ site: siteView(site), ...(await siteAudit(user, site.domain)) });
+  });
+
+  // Site Audit → Pages: every page of the newest crawl with indexability, click depth and internal links. Saved crawl only.
+  route("get", "/api/seo/sites/:id/audit/pages", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const pages = await auditPages(user, site.domain);
+    if (!pages) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
+    res.json(pages);
   });
 
   // Rank tracker history: one summary per check date for a device, optionally one tag. Saved checks only.

@@ -1,0 +1,123 @@
+/**
+ * Site audit → Pages: every crawled page with whether Google can index it, how
+ * many clicks it is from the home page, how many of your own pages link to it,
+ * and its title, description and text. From the saved crawl
+ * (GET /api/seo/sites/:id/audit/pages) — free.
+ */
+import { Fragment, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
+import { apiErrorMessage } from "@/lib/queryClient";
+import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
+
+type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean; whyNot: string | null; depth: number | null; inlinks: number; outlinks: number;
+  title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
+type Summary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; orphans: number; deep: number; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
+type Data = { jobId: string; scannedAt: string | null; summary: Summary; pages: Row[] };
+
+const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolean; count: (s: Summary) => number; hint: string }[] = [
+  { key: "all", label: "All pages", test: () => true, count: (s) => s.pages, hint: "" },
+  { key: "notIndexable", label: "Can't be indexed", test: (r) => !r.indexable, count: (s) => s.notIndexable, hint: "Google will not show these pages in results. Fine for a thank-you page; a problem for a service page." },
+  { key: "errors", label: "Errors", test: (r) => r.status >= 400, count: (s) => s.errors, hint: "These addresses return an error. Restore the page or redirect it to the closest one that works." },
+  { key: "redirected", label: "Redirected", test: (r) => r.redirected, count: (s) => s.redirected, hint: "Links on your site point to an address that forwards somewhere else. Link straight to the final address." },
+  { key: "orphans", label: "No links to it", test: (r, i) => i > 0 && r.inlinks === 0, count: (s) => s.orphans, hint: "No crawled page of your site links to these. Visitors and Google can only find them from a sitemap or another site — add a link from a related page." },
+  { key: "deep", label: "4+ clicks deep", test: (r) => (r.depth ?? 0) >= 4, count: (s) => s.deep, hint: "Pages far from the home page are crawled less often and rank worse. Link to the important ones from the menu or a service page." },
+  { key: "thin", label: "Little text", test: (r) => r.status < 400 && r.words < 200, count: (s) => s.thin, hint: "Under 200 words. A page that should rank for a service needs enough to answer what the customer is asking." },
+  { key: "noTitle", label: "No title", test: (r) => r.status < 400 && r.titleLength === 0, count: (s) => s.noTitle, hint: "The title is the blue line in Google's results. Every page needs its own." },
+  { key: "noDescription", label: "No description", test: (r) => r.status < 400 && r.descriptionLength === 0, count: (s) => s.noDescription, hint: "The description is the text under the title in Google's results. Without one Google picks a sentence itself." },
+];
+type SortKey = "path" | "status" | "depth" | "inlinks" | "words" | "titleLength" | "descriptionLength" | "kb";
+const COLS: { key: SortKey; label: string; num?: boolean; title?: string }[] = [
+  { key: "path", label: "Page" }, { key: "status", label: "Status", num: true }, { key: "depth", label: "Clicks deep", num: true, title: "Clicks from the first page crawled" },
+  { key: "inlinks", label: "Links to it", num: true, title: "Other pages of your site that link to it" }, { key: "words", label: "Words", num: true },
+  { key: "titleLength", label: "Title", num: true, title: "Characters in the title (aim for 30–60)" }, { key: "descriptionLength", label: "Description", num: true, title: "Characters in the description (aim for 70–160)" }, { key: "kb", label: "Size", num: true },
+];
+const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
+const lengthNote = (n: number, lo: number, hi: number) => (n === 0 ? "missing" : n < lo ? "short" : n > hi ? "long" : "");
+
+export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: Record<string, string> }) {
+  const q = useQuery<Data>({ queryKey: [`/api/seo/sites/${site.id}/audit/pages`], refetchOnMount: "always" });
+  const [filter, setFilter] = useState("all");
+  const [text, setText] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "depth", dir: 1 });
+  const [open, setOpen] = useState<string | null>(null);
+  const [shown, setShown] = useState(100);
+  const d = q.data;
+  const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
+  const rows = useMemo(() => {
+    if (!d) return [];
+    const needle = text.trim().toLowerCase();
+    const picked = d.pages.filter((r, i) => active.test(r, i) && (!needle || r.path.toLowerCase().includes(needle) || (r.title ?? "").toLowerCase().includes(needle)));
+    const val = (r: Row) => (sort.key === "path" ? r.path : (r[sort.key] ?? (sort.dir === 1 ? Infinity : -Infinity)));
+    return [...picked].sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : a.path.localeCompare(b.path)) * sort.dir; });
+  }, [d, active, text, sort]);
+  const exportCsv = () => {
+    const lines = [["URL", "Status", "Can be indexed", "Why not", "Clicks deep", "Links to it", "Links from it", "Words", "Title", "Title length", "Description length", "H1 headings", "Images", "Images without alt text", "Size (KB)", "Issues"],
+      ...rows.map((r) => [r.url, r.status, r.indexable ? "yes" : "no", r.whyNot, r.depth, r.inlinks, r.outlinks, r.words, r.title, r.titleLength, r.descriptionLength, r.h1, r.images, r.imagesNoAlt, r.kb, r.issues.map((k) => issueTitles[k] ?? k).join("; ")])];
+    const blob = new Blob([lines.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `pages-${site.domain}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  if (q.isLoading) return <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the crawled pages…</p>;
+  if (q.isError) return <div className="g-callout" role="alert" data-testid="audit-pages-error"><h3>Couldn't load the pages</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
+  if (!d || d.pages.length === 0) return <Empty testId="audit-pages-empty"><h3>No pages to show</h3><p>The crawl did not save any pages for {site.domain}. Run a new crawl.</p></Empty>;
+  const s = d.summary;
+  return (
+    <div data-testid="audit-pages">
+      <div className="g-tiles mb-4">
+        <Tile label="Can be indexed" value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} hint={s.notIndexable ? `${fmtNum(s.notIndexable)} can't — check they are meant not to` : "Every crawled page can appear in Google"} testId="tile-pages-indexable" />
+        <Tile label="Average clicks from home" value={s.averageDepth ?? "—"} hint={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
+        <Tile label="Pages nothing links to" value={fmtNum(s.orphans)} hint="Among the pages crawled" testId="tile-pages-orphans" />
+        <Tile label="Pages with little text" value={fmtNum(s.thin)} hint="Under 200 words" testId="tile-pages-thin" />
+      </div>
+      <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Show pages">
+        {FILTERS.map((f) => { const n = f.count(s); return (
+          <button key={f.key} type="button" className="g-pill g-pill--sm" aria-pressed={filter === f.key} disabled={n === 0 && f.key !== "all"} style={filter === f.key ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined}
+            onClick={() => { setFilter(f.key); setShown(100); setOpen(null); }} data-testid={`filter-pages-${f.key}`}>{f.label} <span className="tabular-nums">({fmtNum(n)})</span></button>
+        ); })}
+      </div>
+      {active.hint && <p className="g-text-2 mb-2 text-[13px]" data-testid="text-pages-hint">{active.hint}</p>}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <label className="min-w-0 flex-1 sm:max-w-xs"><span className="sr-only">Find a page by address or title</span><input className="g-input w-full !py-1.5" value={text} onChange={(e) => { setText(e.target.value); setShown(100); }} placeholder="Find a page…" data-testid="input-pages-search" /></label>
+        <span className="g-text-2 text-[13px]" data-testid="text-pages-count">{fmtNum(rows.length)} page{rows.length === 1 ? "" : "s"}</span>
+        <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportCsv} disabled={!rows.length} data-testid="button-pages-export"><Download /> Export</button>
+      </div>
+      {rows.length === 0 ? <Empty testId="audit-pages-none"><h3>No page matches</h3><p>Clear the search box or choose another filter.</p></Empty> : (
+        <div className="overflow-x-auto">
+          <table className="g-table w-full" data-testid="table-audit-pages">
+            <thead><tr><th aria-label="Show details" className="w-12" />{COLS.map((c) => (
+              <th key={c.key} className={c.num ? "num" : undefined} aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined} title={c.title}>
+                <button type="button" className="g-text-2 whitespace-nowrap" onClick={() => setSort((x) => ({ key: c.key, dir: x.key === c.key ? (x.dir === 1 ? -1 : 1) : 1 }))}>{c.label}{sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}</button>
+              </th>
+            ))}</tr></thead>
+            <tbody>
+              {rows.slice(0, shown).map((r) => { const isOpen = open === r.url; const tl = lengthNote(r.titleLength, 30, 60), dl = lengthNote(r.descriptionLength, 70, 160); return (
+                <Fragment key={r.url}>
+                  <tr>
+                    <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${r.path}`} onClick={() => setOpen(isOpen ? null : r.url)}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
+                    <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{!r.indexable && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Can't be indexed: {r.whyNot}</span>}</td>
+                    <td className="num" data-label="Status" style={r.status >= 400 ? { color: "var(--g-red)" } : undefined}>{r.status || "—"}{r.redirected ? " ↪" : ""}</td>
+                    <td className="num" data-label="Clicks deep">{r.depth ?? <span className="g-text-2" title="No crawled page links to it">—</span>}</td>
+                    <td className="num" data-label="Links to it">{fmtNum(r.inlinks)}</td>
+                    <td className="num" data-label="Words">{fmtNum(r.words)}</td>
+                    <td className="num" data-label="Title">{r.titleLength}{tl && <span className="g-text-2 text-[12px]"> {tl}</span>}</td>
+                    <td className="num" data-label="Description">{r.descriptionLength}{dl && <span className="g-text-2 text-[12px]"> {dl}</span>}</td>
+                    <td className="num g-text-2" data-label="Size">{r.kb == null ? "—" : `${fmtNum(r.kb)} KB`}</td>
+                  </tr>
+                  {isOpen && (
+                    <tr><td /><td colSpan={COLS.length} className="text-[13px]">
+                      <p className="g-text"><b className="font-medium">Title:</b> {r.title ?? <span className="g-text-2">none</span>}</p>
+                      <p className="g-text-2 mt-1">{r.h1} main heading{r.h1 === 1 ? "" : "s"} (H1) · links to {fmtNum(r.outlinks)} other page{r.outlinks === 1 ? "" : "s"} of the site · {fmtNum(r.images)} image{r.images === 1 ? "" : "s"}{r.imagesNoAlt ? `, ${fmtNum(r.imagesNoAlt)} without a description (alt text)` : ""}</p>
+                      {r.issues.length > 0 ? <><p className="g-text mt-2 font-medium">Listed under</p><ul className="g-text list-disc pl-5">{r.issues.map((k) => <li key={k}>{issueTitles[k] ?? k}</li>)}</ul></> : <p className="g-text-2 mt-2">No issue lists this page.</p>}
+                    </td></tr>
+                  )}
+                </Fragment>
+              ); })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {rows.length > shown && <button type="button" className="g-pill mt-3" onClick={() => setShown(shown + 200)} data-testid="button-pages-more">Show more ({fmtNum(rows.length - shown)} left)</button>}
+    </div>
+  );
+}
