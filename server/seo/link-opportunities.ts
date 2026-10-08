@@ -12,7 +12,7 @@
  */
 import { createHash } from "node:crypto";
 import { pool } from "../db";
-import { auditDomainKey, newestCrawl, type UnreadableCrawl } from "./audit";
+import { auditDomainKey, newestCrawl, readNewestCrawl, WELL_FORMED_SQL, type UnreadableCrawl } from "./audit";
 import { linksMeasurable, sameUrlKey, type RawPage } from "./audit-pages";
 
 export const LINK_OPP_MAX = 200, LINK_OPP_PER_TARGET = 10;
@@ -179,7 +179,7 @@ type Result = LinkOpportunities & { jobId: string; scannedAt: string | null; che
 /** Worked out once per crawl and exact set of rank-check facts used (hashed), the last few looked at. */
 const worked = new Map<string, Result>();
 /** null = no finished crawl of the site yet. */
-export async function linkOpportunities(userId: number, site: { id: number; domain: string }): Promise<Result | UnreadableCrawl | null> {
+export async function linkOpportunities(userId: number, site: { id: number; domain: string }, tries = 0): Promise<Result | UnreadableCrawl | null> {
   // The newest finished crawl, whatever it is (a broken one is said); worked-out results are kept by its row version.
   const newest = await newestCrawl(userId, site.domain);
   if (!newest) return null;
@@ -197,8 +197,9 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
   const cacheKey = `${userId}:${newest.id}:${newest.v}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
   const kept = worked.get(cacheKey);
   if (kept) return kept;
-  const { rows: [job] } = await pool.query(`SELECT id, completed_at, ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, userId]);
-  if (!job) return null;
+  // Read at the version checked; a crawl changed meanwhile is looked up again (a few times at most).
+  const { rows: [job] } = await pool.query(`SELECT id, completed_at, ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2 AND xmin::text=$3 AND ${WELL_FORMED_SQL}`, [newest.id, userId, newest.v]);
+  if (!job) { if (tries >= 2) throw new Error("The newest crawl kept changing while it was read; try again."); return linkOpportunities(userId, site, tries + 1); }
   const result: Result = { ...findLinkOpportunities(job.pages as OppPage[], targets as OppTarget[]), jobId: job.id, scannedAt: job.completed_at ? new Date(job.completed_at).toISOString() : null, checkedOn };
   worked.set(cacheKey, result);
   if (worked.size > 20) worked.delete(worked.keys().next().value as string);
@@ -220,8 +221,6 @@ export async function linkResolverFor(userId: number, domain: string, db: { quer
   const { rows: [t] } = await db.query("SELECT to_regclass('sitescan_jobs') IS NOT NULL AS ok");
   if (!t?.ok) return aliasesOf([]);
   // The newest finished crawl only: a broken one gives no aliases (an older crawl's would be out of date).
-  const newest = await newestCrawl(userId, domain, db);
-  if (!newest?.readable) return aliasesOf([]);
-  const { rows: [job] } = await db.query(`SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2`, [newest.id, userId]);
-  return aliasesOf((job?.pages ?? []) as OppPage[]);
+  const got = await readNewestCrawl(userId, domain, `${ALIAS_PAGES_SQL} AS pages`, db);
+  return aliasesOf((got?.row?.pages ?? []) as OppPage[]);
 }

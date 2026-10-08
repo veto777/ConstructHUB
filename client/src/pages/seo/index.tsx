@@ -108,7 +108,7 @@ export default function SeoOverviewPage() {
           <CompetingPages site={site} />
           <SerpGroupsPanel site={site} />
           {o?.searchConsole && <GscBreakdownView site={site} />}
-          <CompetitorPanel site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
+          <CompetitorPanel key={site.id} site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (
             <p className="g-text-2 mb-4 flex flex-wrap items-center gap-2 text-[13px]" data-testid="volumes-missing">

@@ -26,13 +26,13 @@ type Run = { id: string; status: string; error: string | null; createdAt: string
 type Audit = {
   jobId: string; scannedAt: string | null; url: string | null; health: number | null; healthChange: number | null;
   crawled: number; pageCap: number | null; notCrawled: number; blockedByRobots: number;
-  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded?: number };
+  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded?: number; unusual?: number };
   totals: Record<Severity, { issues: number; affected: number }>;
   scores: { overall: number | null; categories: Record<string, number | null> } | null;
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
-type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number; unreadable?: boolean }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; latestKey?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number; unreadable?: boolean }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -46,6 +46,7 @@ const STATUS = [
   { key: "clientError", label: "Not found / blocked (4xx)", color: "#e8710a" },
   { key: "serverError", label: "Server error (5xx)", color: "var(--g-red)" },
   { key: "failed", label: "Couldn't be checked", color: "var(--g-text-2)" },
+  { key: "unusual", label: "Unusual answer (1xx, or above 599)", color: "#9334e6" },
 ] as const;
 const healthColor = (h: number) => (h >= 90 ? "var(--g-green)" : h >= 70 ? "#e8710a" : "var(--g-red)");
 const healthWord = (h: number) => (h >= 90 ? "Good" : h >= 70 ? "Needs work" : "Poor");
@@ -176,6 +177,12 @@ export default function SeoAuditPage() {
       {/* Said whatever else is on the page, even with one crawl or none left. */}
       {site && d?.atMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-at-missing">That crawl is no longer available, so {a ? "the newest crawl is shown" : "there is no crawl to show"}.</p>}
       {site && d?.vsMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-vs-missing">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown){a?.comparedWith ? ", so the crawl before it is used" : a ? ", and there is no earlier crawl to compare with" : ""}.</p>}
+      {/* Every finished crawl as a dated list — whatever is shown above, and however many have a score. */}
+      {site && d && trend.length > 0 && (
+        <details className="mb-3 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">Every crawl ({trend.length}), as a list</summary>
+          <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h, i, all) => <li key={h.jobId}>{fmtDate(h.at)}{all.filter((x) => fmtDate(x.at) === fmtDate(h.at)).length > 1 ? ` ${new Date(h.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
+        </details>
+      )}
       {site && a && (
         <>
           <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">
@@ -191,10 +198,10 @@ export default function SeoAuditPage() {
             <section className="rounded-lg border p-4" style={card} data-testid="audit-crawled">
               <h2 className="g-text text-[16px] font-medium">Pages crawled <span className="tabular-nums">{fmtNum(total)}</span></h2>
               <div className="my-3 flex h-3 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>
-                {total > 0 && STATUS.map((s) => a.statuses[s.key] > 0 && <div key={s.key} style={{ width: `${(a.statuses[s.key] / total) * 100}%`, background: s.color }} />)}
+                {total > 0 && STATUS.map((s) => (a.statuses[s.key] ?? 0) > 0 && <div key={s.key} style={{ width: `${((a.statuses[s.key] ?? 0) / total) * 100}%`, background: s.color }} />)}
               </div>
               <ul className="space-y-1 text-[13px]">
-                {STATUS.map((s) => <li key={s.key} className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden /><span className="g-text-2">{s.label}</span><span className="g-text ml-auto tabular-nums">{fmtNum(a.statuses[s.key])}</span></li>)}
+                {STATUS.filter((s) => s.key !== "unusual" || (a.statuses.unusual ?? 0) > 0).map((s) => <li key={s.key} className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden /><span className="g-text-2">{s.label}</span><span className="g-text ml-auto tabular-nums">{fmtNum((a.statuses[s.key] ?? 0))}</span></li>)}
               </ul>
               {(a.statuses.excluded ?? 0) > 0 && <p className="g-text-2 mt-2 text-[12px]">{fmtNum(a.statuses.excluded)} more address{a.statuses.excluded === 1 ? " was" : "es were"} found but not audited (files such as PDFs, or links that leave the site). They don't affect the health score.</p>}
               {(a.notCrawled > 0 || a.blockedByRobots > 0) && <p className="g-text-2 mt-2 text-[12px]">{a.notCrawled > 0 ? `${fmtNum(a.notCrawled)} more pages were found but not crawled (the crawl stops at ${fmtNum(a.pageCap)}). ` : ""}{a.blockedByRobots > 0 ? `${fmtNum(a.blockedByRobots)} blocked by robots.txt.` : ""}</p>}
@@ -232,9 +239,6 @@ export default function SeoAuditPage() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
-                  <details className="mt-2 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">Every crawl, as a list</summary>
-                    <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h) => <li key={h.jobId}>{fmtDate(h.at)}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
-                  </details>
                 </section>
               )}
               {a.scores && (
@@ -305,9 +309,9 @@ export default function SeoAuditPage() {
           </nav>
           {a.latest === false && (view === "pages" || view === "links" || view === "outgoing") && <p className="g-text-2 mb-2 text-[12px]" role="note">This view is the newest crawl ({fmtDate(crawls[0]?.at ?? null)}), not the crawl of {fmtDate(shownDate)} shown above.</p>}
           {/* These read the newest crawl; keyed by it, so a crawl that finishes while one is open is read again at once. */}
-          {view === "pages" && <AuditPages key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
-          {view === "links" && site && <LinkOpportunitiesView key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} />}
-          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} />}
+          {view === "pages" && <AuditPages key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "links" && site && <LinkOpportunitiesView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} />}
+          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} />}
           {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">

@@ -60,7 +60,7 @@ describe("auditSummary", () => {
   };
   it("counts statuses, totals and sorts errors first", () => {
     const s = auditSummary(report, pages);
-    expect(s.statuses).toEqual({ ok: 1, redirected: 1, clientError: 1, serverError: 1, failed: 1, excluded: 0 });
+    expect(s.statuses).toEqual({ ok: 1, redirected: 1, clientError: 1, serverError: 1, failed: 1, excluded: 0, unusual: 0 });
     expect(s.totals).toEqual({ error: { issues: 1, affected: 2 }, warning: { issues: 1, affected: 3 }, notice: { issues: 1, affected: 1 } });
     expect(s.issues.map((i) => i.key)).toEqual(["status", "thin", "llms"]);
     expect(s.health).toBe(40);
@@ -171,5 +171,14 @@ describe("pageChanges", () => {
     const before = [page("https://a.com"), page("https://a.com/kept"), page("https://a.com/old?x=1")];
     expect(pageChanges(now, before)).toEqual({ added: ["https://www.a.com/new"], removed: ["https://a.com/old?x=1"] });
     expect(pageChanges(now, now)).toEqual({ added: [], removed: [] });
+  });
+});
+
+describe("odd but readable crawls", () => {
+  it("an answer outside the usual classes is its own kind and an error page; area scores that are not scores are none", () => {
+    const s = auditSummary({ findings: [], scores: {} as any }, [page("https://a.com/", 200), page("https://a.com/x", 999), page("https://a.com/y", 101)]);
+    expect([s.statuses.ok, s.statuses.serverError, s.statuses.unusual, s.health, s.scores]).toEqual([1, 0, 2, 33, null]);
+    const g = groupFindings([{ id: "x", category: { bad: 1 } as any, severity: "warning", title: "X", urls: ["u"], why: { no: 1 } as any, fix: null as any }]);
+    expect([g.get("x")!.category, g.get("x")!.why, g.get("x")!.fix]).toEqual(["technical", "", ""]);
   });
 });

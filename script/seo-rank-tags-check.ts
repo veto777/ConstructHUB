@@ -4,6 +4,7 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { rankTags } from "../server/seo/rank-tags";
 import { buildSiteReport } from "../server/seo/site-report";
+import { latestChecks } from "../server/seo/voice";
 let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else { n++; console.log("PASS ", m); } };
 (async () => {
   await ensureSeoSchema();
@@ -31,6 +32,9 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   ok(siding.top10Change === -1 && siding.ranked === 0, "siding dropped out of the top 10");
   const m = await rankTags(site, "mobile");
   ok(m.device === "mobile" && m.now?.keywords === 1 && m.before === null && m.rows.find((r) => r.tag === "roofing")!.visibilityChange === null, "mobile: one old check, so no changes are claimed");
+  // Competitors by tag: the same newest check, only the keywords with that tag.
+  const all = await latestChecks(site.id, "desktop"), roof = await latestChecks(site.id, "desktop", "roofing");
+  ok(all.checks.length === 3 && all.tracked === 3 && roof.checks.length === 2 && roof.tracked === 2 && roof.checks.every((c) => c.keywordId !== c), `share of voice narrowed to a tag: ${all.checks.length} -> ${roof.checks.length}`);
   const rep = await buildSiteReport(1, site.id);
   const bt = rep?.rankings?.byTag ?? [];
   ok(bt.map((t) => t.tag).join() === "roofing,siding" && bt[0].keywords === 2, `the client report carries the tags: ${JSON.stringify(bt)}`);

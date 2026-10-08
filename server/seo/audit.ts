@@ -26,7 +26,7 @@ export type AuditSummary = {
   health: number | null; healthChange: number | null;
   crawled: number; pageCap: number | null; notCrawled: number; blockedByRobots: number;
   /** `failed`: could not be fetched. `excluded`: found but deliberately not audited (not a web page, or leaves the site). */
-  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded: number };
+  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded: number; /** 1xx, or above 599: an answer outside the usual classes (counted as an error in health). */ unusual?: number };
   totals: Record<AuditSeverity, { issues: number; affected: number }>;
   scores: AuditReport["scores"] | null;
   issues: AuditIssue[];
@@ -79,7 +79,7 @@ export function groupFindings(findings: Finding[] | undefined): Map<string, Grou
     if (g) {
       for (const i of items) if (!g.items.includes(i)) g.items.push(i);
       if (RANK[severity] < RANK[g.severity]) g.severity = severity;
-    } else groups.set(key, { key, title, category: f.category, severity, why: f.why ?? "", fix: f.fix ?? "", items: [...new Set(items)] });
+    } else groups.set(key, { key, title, category: typeof f.category === "string" ? f.category : "technical", severity, why: typeof f.why === "string" ? f.why : "", fix: typeof f.fix === "string" ? f.fix : "", items: [...new Set(items)] });
   }
   return groups;
 }
@@ -98,10 +98,18 @@ export function healthCounts(report: AuditReport, pages: AuditPage[]): { pages: 
   const failed = new Set(failedFetches(report).map((e) => e.url));
   const all = new Set<string>([...pages.map((p) => p.url), ...failed]);
   const bad = new Set<string>(failed);
-  for (const p of pages) if (p.status >= 400) bad.add(p.url);
+  // An error answer (4xx/5xx) or one outside the usual classes (1xx, above 599) is an error page.
+  for (const p of pages) if (p.status >= 400 || p.status < 200) bad.add(p.url);
   for (const f of Array.isArray(report.findings) ? report.findings : []) if (f?.severity === "critical") for (const u of Array.isArray(f.urls) ? f.urls : []) if (all.has(u)) bad.add(u);
   return { pages: all.size, errorPages: bad.size };
 }
+const safeScores = (s: unknown): AuditSummary["scores"] => {
+  if (!s || typeof s !== "object" || Array.isArray(s)) return null;
+  const o = s as { overall?: unknown; categories?: unknown };
+  if (!o.categories || typeof o.categories !== "object" || Array.isArray(o.categories)) return null;
+  const cats = Object.entries(o.categories as Record<string, unknown>).filter(([, v]) => v === null || typeof v === "number") as [string, number | null][];
+  return { overall: typeof o.overall === "number" ? o.overall : null, categories: Object.fromEntries(cats) };
+};
 export function healthScore(report: AuditReport, pages: AuditPage[]): number | null {
   const c = healthCounts(report, pages);
   return c.pages ? Math.round(((c.pages - c.errorPages) / c.pages) * 100) : null;
@@ -158,9 +166,10 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   const totals = { error: { issues: 0, affected: 0 }, warning: { issues: 0, affected: 0 }, notice: { issues: 0, affected: 0 } };
   for (const i of issues) { totals[i.severity].issues++; totals[i.severity].affected += i.count; }
   const health = healthScore(report, pages), prevHealth = previous ? healthScore(previous.report, previous.pages) : null;
-  const statuses = { ok: 0, redirected: 0, clientError: 0, serverError: 0, failed: failedFetches(report).length, excluded: excludedCount(report) };
+  const statuses = { ok: 0, redirected: 0, clientError: 0, serverError: 0, failed: failedFetches(report).length, excluded: excludedCount(report), unusual: 0 };
   for (const p of pages) {
-    if (p.status >= 500) statuses.serverError++;
+    if (p.status < 200 || p.status > 599) statuses.unusual++;
+    else if (p.status >= 500) statuses.serverError++;
     else if (p.status >= 400) statuses.clientError++;
     else if (p.redirects > 0 || (p.status >= 300 && p.status < 400)) statuses.redirected++;
     else statuses.ok++;
@@ -169,7 +178,8 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     scannedAt: report.scannedAt ?? null, url: report.url ?? null,
     health, healthChange: health !== null && prevHealth !== null ? health - prevHealth : null,
     crawled: pages.length, pageCap: report.coverage?.pageCap ?? null, notCrawled: report.remaining ?? 0, blockedByRobots: report.blocked ?? 0,
-    statuses, totals, scores: report.scores ?? null, issues, fixed, notRechecked,
+    // The area scores only when they are what the crawler writes (a number or null per area); else none, never a crash.
+    statuses, totals, scores: safeScores(report.scores), issues, fixed, notRechecked,
   };
 }
 
@@ -220,6 +230,21 @@ export async function newestCrawl(user: number, domain: string, db: { query: typ
       WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC, id LIMIT 1`, [user, bare(domain)]);
   return j ? { id: j.id, v: j.v, readable: !!j.readable, at: j.completed_at ? new Date(j.completed_at).toISOString() : null } : null;
 }
+/**
+ * The newest finished crawl's row, read in the same step as its check: `columns` are taken only if the row is still the
+ * version that was checked AND passes the evidence test; if it changed in between, the newest crawl is looked up again
+ * (up to three times). Returns the crawl (as newestCrawl) and its row, or the crawl alone when it cannot be read.
+ */
+export async function readNewestCrawl(user: number, domain: string, columns: string, db: { query: typeof pool.query } = pool): Promise<{ crawl: NonNullable<Awaited<ReturnType<typeof newestCrawl>>>; row: any | null } | null> {
+  for (let i = 0; i < 3; i++) {
+    const crawl = await newestCrawl(user, domain, db);
+    if (!crawl) return null;
+    if (!crawl.readable) return { crawl, row: null };
+    const { rows: [row] } = await db.query(`SELECT ${columns} FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2 AND xmin::text=$3 AND ${WELL_FORMED_SQL}`, [crawl.id, user, crawl.v]);
+    if (row) return { crawl, row };
+  }
+  throw new Error("The newest crawl kept changing while it was read; try again.");
+}
 /** What a view reading the newest crawl answers when that crawl cannot be read. */
 export type UnreadableCrawl = { unreadable: true; jobId: string; scannedAt: string | null };
 /** A finished crawl that can be read (the one evidence test, everywhere a crawl is read). */
@@ -244,6 +269,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   /** The crawl shown and the one it is compared with (by default the newest and the one before it). */
   audit: (AuditSummary & { jobId: string; latest: boolean; /** When this crawl finished (the date the pickers use). */ completedAt: string | null; comparedWith: AuditComparison | null }) | null;
   /** The newest finished crawl (the Pages, links and outgoing views read it). */ latestId: string | null;
+  /** The newest finished crawl, readable or not, and its row version: changes whenever what those views read changes. */ latestKey: string | null;
   /** Every finished crawl of the site, newest first (up to CRAWL_LIST), for the pickers. */ crawls: CrawlChoice[];
   /** A chosen crawl that is not this account's finished crawl of this site (or, for `vs`, not older than the one shown): the default was used and the page says so. */
   atMissing?: boolean; vsMissing?: boolean;
@@ -254,7 +280,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   const d = bare(domain);
   const [{ rows: recent }, { rows: open }, { rows: list }] = await Promise.all([
     pool.query(
-      `SELECT id, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages, ${WELL_FORMED_SQL} AS well_formed FROM sitescan_jobs
+      `SELECT id, xmin::text AS v, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages, ${WELL_FORMED_SQL} AS well_formed FROM sitescan_jobs
         WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
     pool.query(
       `SELECT id, status, error, created_at, ${CRAWLED_SQL} AS crawled, page_cap FROM sitescan_jobs
@@ -308,7 +334,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   }).reverse();
   const locationId = Number(done[0]?.location_id) > 0 ? Number(done[0].location_id) : null;
   return {
-    locationId, audit, history, latestId: done[0]?.id ?? null, ...(newestUnreadable ? { newestUnreadable } : {}), ...(atMissing ? { atMissing } : {}), ...(vsMissing ? { vsMissing } : {}),
+    locationId, audit, history, latestId: done[0]?.id ?? null, latestKey: recent[0] ? `${recent[0].id}:${recent[0].v}` : null, ...(newestUnreadable ? { newestUnreadable } : {}), ...(atMissing ? { atMissing } : {}), ...(vsMissing ? { vsMissing } : {}),
     crawls: list.map((r: any) => ({ jobId: r.id, at: r.completed_at ? new Date(r.completed_at).toISOString() : null, pageCap: r.page_cap == null ? null : Number(r.page_cap), readable: !!r.readable })),
     ...(previousUnreadable ? { previousUnreadable } : {}),
     running: newest && (newest.status === "queued" || newest.status === "running") ? run(newest) : null,
@@ -320,7 +346,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
 /** How many crawls of a site the dashboard's health trend shows. */
 export const HEALTH_TREND = 6;
 /** The version of the health worked out per crawl (seo_crawl_health.v): a new formula works every crawl out again. */
-const HEALTH_V = 5; // 5: any three-digit status a server can send (audit #48) — kept scores are worked out again
+const HEALTH_V = 6; // 6: 1xx and above-599 answers count as error pages (audit #49) — kept scores are worked out again
 /**
  * One crawl's health. `readable` false = the stored crawl could not be read (its score is not known — never zero).
  * `pages` = the pages the score is out of; `errorPages` = the distinct ones with an error.
@@ -403,7 +429,7 @@ export async function auditEvidence(user: number, domain: string, crawlIds: stri
   const [{ rows: [latest] }, { rows: [newest] }] = await Promise.all([
     // The newest finished crawl only, and only if it can be read: a broken newest crawl is no evidence at all (never an
     // older crawl's verdicts in its place) — the plan then says its tasks were not checked.
-    newestCrawl(user, d).then((n) => (n?.readable ? pool.query(`SELECT id::text AS id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2`, [n.id, user]) : { rows: [] as any[] })),
+    readNewestCrawl(user, d, `id::text AS id, completed_at, report, ${PAGES_SQL} AS pages`).then((g) => ({ rows: g?.row ? [g.row] : [] as any[] })),
     pool.query(`SELECT status, created_at FROM sitescan_jobs WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
   ]);
   const wanted = [...new Set(crawlIds)].filter((id) => typeof id === "string" && id && id !== latest?.id);

@@ -4,7 +4,7 @@
  * keywords, and who leads the map pack. Read from the result pages the weekly
  * check already saved (GET /api/seo/sites/:id/voice) — free.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, X } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
@@ -22,9 +22,17 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
   const { toast } = useToast();
   const [input, setInput] = useState("");
   const [device, setDevice] = useState("");
-  const key = `/api/seo/sites/${site.id}/voice${device ? `?device=${device}` : ""}`;
-  const q = useQuery<Voice>({ queryKey: [key], refetchOnMount: "always" });
-  const done = () => { void qc.invalidateQueries({ queryKey: [key] }); };
+  // One tag's keywords only (a service, a town), or all of them.
+  const [tag, setTag] = useState("");
+  useEffect(() => { setDevice(""); setTag(""); }, [site.id]);
+  const params = new URLSearchParams({ ...(device ? { device } : {}), ...(tag ? { tag } : {}) }).toString();
+  const key = `/api/seo/sites/${site.id}/voice${params ? `?${params}` : ""}`;
+  // The answer for the previous choice stays on screen (marked as loading) while another tag loads, so the choice keeps its focus.
+  const q = useQuery<Voice & { tag?: string | null; tags?: string[] }>({ queryKey: [key], refetchOnMount: "always",
+    // Only this site's earlier answer may stand in (never another site's while it loads).
+    placeholderData: (prev, prevQuery) => (typeof prevQuery?.queryKey[0] === "string" && prevQuery.queryKey[0].startsWith(`/api/seo/sites/${site.id}/voice`) ? prev : undefined) });
+  // Following or dropping a competitor changes every tag's view, so all of them are read again.
+  const done = () => { void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith(`/api/seo/sites/${site.id}/voice`) }); };
   const add = useMutation({
     mutationFn: (domain: string) => api("POST", `/api/seo/sites/${site.id}/tracked-competitors`, { domain }),
     onSuccess: () => { setInput(""); done(); },
@@ -45,13 +53,21 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
     <section className="mb-5" data-testid="rank-competitors">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
         <h2 className="g-text text-[16px] font-medium">Competitors</h2>
+        {(v.tags?.length ?? 0) > 0 && (
+          <label className="flex items-center gap-1 text-[12px]"><span className="g-text-2">Keywords</span>
+            <select className="g-select min-w-0 max-w-[12rem]" value={tag} onChange={(e) => setTag(e.target.value)} aria-describedby={q.isPlaceholderData ? `voice-loading-${site.id}` : undefined} data-testid="select-voice-tag">
+              <option value="">All</option>
+              {v.tags!.map((t) => <option key={t} value={t}>Tagged {t}</option>)}
+            </select></label>
+        )}
+        {q.isPlaceholderData && <span id={`voice-loading-${site.id}`} className="g-text-2 text-[12px]" role="status"><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Loading {tag ? `"${tag}"` : "all keywords"}…</span>}
         {v.keywords > 0 && <span className="g-text-2 text-[12px]" data-testid="text-voice-coverage">{fmtNum(v.keywords)}{v.tracked != null && v.tracked > v.keywords ? ` of your ${fmtNum(v.tracked)}` : ""} tracked keyword{v.keywords === 1 ? "" : "s"}, checked {fmtDate(v.checkedOn)}</span>}
         {(v.devices?.length ?? 0) > 1 && <span className="flex gap-1" role="group" aria-label="Device">{v.devices!.map((d) => <button key={d} type="button" className="g-pill g-pill--sm" aria-pressed={v.device === d} style={v.device === d ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => setDevice(d)}>{d === "desktop" ? "Desktop" : "Mobile"}</button>)}</span>}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border p-4" style={card} data-testid="voice-share">
           <h3 className="g-text text-[14px] font-medium">Share of voice</h3>
-          <p className="g-text-2 mb-3 text-[12px]">An estimate of the share of clicks each site wins on these keywords, from where it ranks: 100% would mean first place for all of them.{v.keywords === 0 ? " Follow your competitors now; the figures appear after the next check." : ""}</p>
+          <p className="g-text-2 mb-3 text-[12px]">A visibility index from where each site ranks on these keywords — not a count of real clicks: 100% would mean first place for all of them.{v.keywords === 0 ? (tag ? ` None of the keywords tagged "${tag}" was in the newest check yet; the figures appear after the next check.` : " Follow your competitors now; the figures appear after the next check.") : ""}</p>
           <ul className="space-y-2">
             {v.domains.map((d) => (
               <li key={d.domain} data-testid={`voice-${d.domain}`}>

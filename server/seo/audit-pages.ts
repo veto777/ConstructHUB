@@ -6,7 +6,7 @@
  * (sitescan_jobs.state); free.
  */
 import { pool } from "../db";
-import { groupFindings, newestCrawl, type UnreadableCrawl } from "./audit";
+import { groupFindings, newestCrawl, readNewestCrawl, type UnreadableCrawl } from "./audit";
 
 export type RawPage = {
   url: string; status: number; redirects: number; title: string | null; description: string | null; h1: string[]; links: string[];
@@ -85,7 +85,8 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
     const key = sameUrlKey(p.url);
     const canonicalElsewhere = !!p.canonical && sameUrlKey(p.canonical) !== key;
     const known = Number.isInteger(p.status) && p.status >= 100;
-    const whyNot = !known ? null : p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : null;
+    // The same rule as the health score: an answer outside the usual classes (1xx, above 599) is an error.
+    const whyNot = !known ? null : p.status >= 400 || p.status < 200 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : null;
     return {
       url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: !known ? null : whyNot === null, whyNot, canonicalElsewhere: known && p.status < 300 && canonicalElsewhere,
       depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: measured ? out[i].size : null,
@@ -110,13 +111,13 @@ export function linksMeasurable(pages: RawPage[]): boolean {
 }
 
 export function pagesSummary(rows: PageRow[]): PagesSummary {
-  const ok = rows.filter((r) => r.status < 400);
+  const ok = rows.filter((r) => r.status >= 200 && r.status < 400);
   const depths = rows.map((r) => r.depth).filter((d): d is number => d !== null);
   const measured = rows.length === 0 || rows.some((r) => r.inlinks !== null);
   return {
     pages: rows.length, indexable: rows.filter((r) => r.indexable === true).length, notIndexable: rows.filter((r) => r.indexable === false).length,
     canonicalElsewhere: rows.filter((r) => r.canonicalElsewhere).length,
-    errors: rows.filter((r) => r.status >= 400).length, redirected: rows.filter((r) => r.redirected).length,
+    errors: rows.filter((r) => r.status >= 400 || (r.status >= 100 && r.status < 200)).length, redirected: rows.filter((r) => r.redirected).length,
     linksMeasured: measured,
     orphans: measured ? rows.filter((r, i) => i > 0 && r.inlinks === 0).length : null, deep: measured ? rows.filter((r) => (r.depth ?? 0) >= DEEP_CLICKS).length : null,
     averageDepth: measured && depths.length ? Math.round((depths.reduce((a, b) => a + b, 0) / depths.length) * 10) / 10 : null,
@@ -151,13 +152,16 @@ const worked = new Map<string, PagesResult>();
 export async function auditPages(user: number, domain: string): Promise<PagesResult | UnreadableCrawl | null> {
   // Which crawl first (cheap), then its pages only when they are not already worked out. The newest finished crawl,
   // whatever it is: one that cannot be read is said (never an older one in its place). Kept by the crawl's row version.
-  const newest = await newestCrawl(user, domain);
-  if (!newest) return null;
-  if (!newest.readable) return { unreadable: true, jobId: newest.id, scannedAt: newest.at };
-  const kept = worked.get(`${user}:${newest.id}:${newest.v}`);
+  const peek = await newestCrawl(user, domain);
+  if (!peek) return null;
+  if (!peek.readable) return { unreadable: true, jobId: peek.id, scannedAt: peek.at };
+  const kept = worked.get(`${user}:${peek.id}:${peek.v}`);
   if (kept) return kept;
-  const { rows: [job] } = await pool.query(`SELECT id, completed_at, report->'findings' AS findings, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, user]);
-  if (!job) return null;
+  // Read at the version checked (looked up again if it changed meanwhile).
+  const got = await readNewestCrawl(user, domain, `id, completed_at, report->'findings' AS findings, ${PAGES_SQL} AS pages`);
+  if (!got) return null;
+  if (!got.row) return { unreadable: true, jobId: got.crawl.id, scannedAt: got.crawl.at };
+  const newest = got.crawl, job = got.row;
   const rows = pageRows((job.pages as RawPage[]).slice(0, PAGE_CAP), Array.isArray(job.findings) ? job.findings : []);
   const result = { jobId: job.id, scannedAt: job.completed_at, summary: pagesSummary(rows), pages: rows };
   worked.set(`${user}:${newest.id}:${newest.v}`, result);

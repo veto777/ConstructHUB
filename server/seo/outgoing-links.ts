@@ -9,7 +9,7 @@
  * — an unchecked link is "not checked", never "fine".
  */
 import { pool } from "../db";
-import { auditDomainKey, newestCrawl, type UnreadableCrawl } from "./audit";
+import { auditDomainKey, readNewestCrawl, type UnreadableCrawl } from "./audit";
 
 export const OUTGOING_DOMAINS = 500, OUTGOING_EXAMPLES = 3;
 export type OutPage = { url: string; status: number; links: string[]; evidence?: { target: string; anchor: string }[] };
@@ -97,12 +97,10 @@ const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object('url', p->>'url
 /** null = no finished crawl of the site yet. */
 export async function siteOutgoingLinks(userId: number, site: { id: number; domain: string }): Promise<(OutgoingLinks & { jobId: string; scannedAt: string | null }) | UnreadableCrawl | null> {
   // The newest finished crawl, whatever it is (a broken one is said, never an older one in its place).
-  const newest = await newestCrawl(userId, site.domain);
-  if (!newest) return null;
-  if (!newest.readable) return { unreadable: true, jobId: newest.id, scannedAt: newest.at };
-  const { rows: [job] } = await pool.query(
-    `SELECT id, completed_at, ${PAGES_SQL} AS pages, CASE WHEN jsonb_typeof(state->'linkChecks')='array' THEN state->'linkChecks' ELSE '[]'::jsonb END AS checks
-       FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2`, [newest.id, userId]);
-  if (!job) return null;
+  // Checked and read at the same version of the crawl.
+  const got = await readNewestCrawl(userId, site.domain, `id, completed_at, ${PAGES_SQL} AS pages, CASE WHEN jsonb_typeof(state->'linkChecks')='array' THEN state->'linkChecks' ELSE '[]'::jsonb END AS checks`);
+  if (!got) return null;
+  if (!got.row) return { unreadable: true, jobId: got.crawl.id, scannedAt: got.crawl.at };
+  const job = got.row;
   return { ...outgoingLinks(job.pages as OutPage[], job.checks as LinkCheck[], auditDomainKey(site.domain)), jobId: job.id, scannedAt: job.completed_at ? new Date(job.completed_at).toISOString() : null };
 }

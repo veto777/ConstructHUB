@@ -1230,9 +1230,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
     const device = (devices.includes(String(req.query.device)) ? String(req.query.device) : devices[0]) as "desktop" | "mobile";
-    const [competitors, { checks, checkedOn, tracked }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device)]);
+    // ?tag=: the same, on the keywords carrying that tag only (one of the site's own tags; anything else is refused).
+    const { rows: tagRows } = await pool.query("SELECT DISTINCT unnest(tags) AS tag FROM seo_keywords WHERE site_id=$1 ORDER BY 1", [site.id]);
+    const tags = tagRows.map((t: any) => String(t.tag));
+    const tag = typeof req.query.tag === "string" && req.query.tag !== "" ? req.query.tag : null;
+    if (tag !== null && !tags.includes(tag)) return void res.status(400).json({ message: "This site has no keywords with that tag." });
+    const [competitors, { checks, checkedOn, tracked }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device, tag)]);
     const voice = shareOfVoice(checks, site.domain, competitors, (e) => listingNamed(e, site.business_name));
-    res.json({ device, devices, checkedOn, tracked, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
+    res.json({ device, devices, tag, tags, checkedOn, tracked, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
   });
   // One at a time per account, so two requests cannot both take the last place.
   route("post", "/api/seo/sites/:id/tracked-competitors", (req, res, user) => serial(`follow:${user}`, async () => {
