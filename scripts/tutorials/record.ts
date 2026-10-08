@@ -218,6 +218,14 @@ function redactFromLoad(css: string) {
   if (!add()) { new MutationObserver((_m, o) => { if (add()) o.disconnect(); }).observe(document, { childList: true }); document.addEventListener("DOMContentLoaded", add); }
 }
 
+/** On a busy box Chromium now and then answers "Unable to capture screenshot": the page is fine — ask again. */
+export async function screenshot(page: Pick<Page, "screenshot" | "waitForTimeout">, file: string, attempts = 5): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try { await page.screenshot({ path: file }); return; }
+    catch (e) { if (attempt >= attempts) throw e; await page.waitForTimeout(400 * attempt); }
+  }
+}
+
 /** Width and height of a JPEG, from its SOF marker. */
 function jpegSize(b: Buffer): { width: number; height: number } | null {
   for (let i = 2; i + 9 < b.length;) {
@@ -308,6 +316,31 @@ export class Player {
     this.pos = to;
   }
 
+  /**
+   * Requests the page has in flight (not the long-lived ones: an event stream or a socket never ends).
+   * `quiet()` waits for what a click or a choice set off to come back — on a loaded box that takes
+   * anything from 50 ms to 2 s, and a fixed pause was either too short (the next step pointed at a
+   * page that was not there yet; producers padded every step with holdMs 1200) or wasted time.
+   */
+  private inflight = new Set<unknown>();
+  private lastNet = 0;
+  watchNetwork() {
+    const done = (r: unknown) => { if (this.inflight.delete(r)) this.lastNet = Date.now(); };
+    this.page.on("request", (r) => { if (["xhr", "fetch", "document", "script"].includes(r.resourceType())) { this.inflight.add(r); this.lastNet = Date.now(); } });
+    this.page.on("requestfinished", done); this.page.on("requestfailed", done);
+    this.page.on("framenavigated", (f) => { if (f === this.page.mainFrame()) this.inflight.clear(); });
+    return this;
+  }
+  /** Until nothing has been in flight for `calmMs` (at most `maxMs`; a request older than that is a stream, not an answer). */
+  async quiet(calmMs = 350, maxMs = 3500) {
+    const from = Date.now();
+    await sleep(60); // let the click's own request start
+    while (Date.now() - from < maxMs) {
+      if (!this.inflight.size && Date.now() - Math.max(this.lastNet, from) >= calmMs) return;
+      if (!this.inflight.size && this.lastNet < from && Date.now() - from >= calmMs) return;
+      await sleep(50);
+    }
+  }
   /** A card is up / the page is pushed in: both are undone before the next step does anything. */
   punched = false;
   async clearStage() {
@@ -496,6 +529,8 @@ export class Player {
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         // The click has done its job; a ring left behind would sit on whatever the click put there (a dialog, a new page).
         this.ringOffSoon();
+        // …and what it asked the server for is back before the step is counted as done.
+        await this.quiet();
         break;
       case "type":
         await sleep(250);
@@ -555,6 +590,7 @@ export class Player {
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         await sleep(250);
         await this.ring(target);
+        await this.quiet();
         break;
       }
     }
@@ -707,7 +743,7 @@ async function main() {
     if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
       throw new Error(`the browser window of "${name}" is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
     page.on("pageerror", (e) => console.warn(`  page error (${name}): ${e.message}`));
-    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport, now), cdp: null, shownAtMs: null };
+    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport, now).watchNetwork(), cdp: null, shownAtMs: null };
     // A page that loads whole is blank, then plain text, then the app: none of that is filmed. The
     // moment the main frame asks for a new document, the capture holds what is on screen until the
     // new page has drawn.
@@ -861,11 +897,11 @@ async function main() {
     if (script.thumbnail?.step === i) {
       // The thumbnail's screenshot: this frame, full resolution, the cursor off, and where its ring is.
       const ring = await page.evaluate(() => (window as any).__tut.shot(true));
-      await page.screenshot({ path: path.join(dir, "thumb-shot.png") });
+      await screenshot(page, path.join(dir, "thumb-shot.png"));
       await page.evaluate(() => (window as any).__tut.shot(false));
       fs.writeFileSync(path.join(dir, "thumb-shot.json"), JSON.stringify({ step: i, zoom, viewport: script.viewport, ring }, null, 2) + "\n");
     }
-    if (args.flags.shots) await page.screenshot({ path: path.join(shotsDir, `${String(i).padStart(2, "0")}.png`) });
+    if (args.flags.shots) await screenshot(page, path.join(shotsDir, `${String(i).padStart(2, "0")}.png`));
     // A dry run also lists what can be pointed at on this screen: every visible data-testid, with its tag and
     // text; what can be dragged (⇄); and every file input, hidden ones too (⬆) — an `upload` step's target.
     if (dry) fs.writeFileSync(path.join(shotsDir, `${String(i).padStart(2, "0")}.txt`), `[${current!.name}] ` + await page.evaluate(() => {

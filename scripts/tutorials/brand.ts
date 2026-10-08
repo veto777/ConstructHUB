@@ -66,7 +66,7 @@ export async function renderStill(html: string, out: string, width = 1280, opts:
     // On a busy box Chromium now and then answers "Unable to capture screenshot": the page is fine, ask again.
     for (let attempt = 0; ; attempt++) {
       try { await page.screenshot(out.endsWith(".jpg") ? { path: out, type: "jpeg", quality: 90 } : { path: out, type: "png", omitBackground: !!opts.transparent }); break; }
-      catch (e) { if (attempt >= 3) throw e; await page.waitForTimeout(700 * (attempt + 1)); }
+      catch (e) { if (attempt >= 6) throw e; await page.waitForTimeout(700 * (attempt + 1)); }
     }
   } finally { await browser.close(); fs.rmSync(file, { force: true }); }
 }

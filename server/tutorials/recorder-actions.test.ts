@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, redactCss } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, redactCss, screenshot } from "../../scripts/tutorials/record";
 import { CARD_SAFE, cardHtml } from "../../scripts/tutorials/card";
 import { lastFrameSeekSec } from "../../scripts/tutorials/lib";
 import { tutorialCardSchema } from "@shared/help/step-script";
@@ -284,6 +284,48 @@ describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
     expect(lastFrameSeekSec(1, 30)).toBe(0);
     expect(() => lastFrameSeekSec(0, 30)).toThrow();
     expect(read("scripts/tutorials/check.ts")).not.toMatch(/seconds \* 1000 - 60\]/);
+  });
+});
+
+describe("under load", () => {
+  it("a refused screenshot is asked for again, and only gives up after several tries", async () => {
+    let calls = 0;
+    const page = { screenshot: async () => { if (++calls < 3) throw new Error("Page.captureScreenshot: Unable to capture screenshot"); return Buffer.alloc(0); }, waitForTimeout: async () => {} } as any;
+    await screenshot(page, "/dev/null");
+    expect(calls).toBe(3);
+    const dead = { screenshot: async () => { calls++; throw new Error("Unable to capture screenshot"); }, waitForTimeout: async () => {} } as any;
+    calls = 0;
+    await expect(screenshot(dead, "/dev/null", 4)).rejects.toThrow(/Unable to capture/);
+    expect(calls).toBe(4);
+  });
+
+  it("a click waits for what it asked the server for, instead of a fixed pause", async () => {
+    const handlers: Record<string, ((x: any) => void)[]> = {};
+    const page = { on: (e: string, f: (x: any) => void) => { (handlers[e] ??= []).push(f); }, mainFrame: () => "main" } as any;
+    const player = new Player(page, { width: 1024, height: 576 }, () => 0).watchNetwork();
+    const emit = (e: string, x: any) => handlers[e].forEach((f) => f(x));
+    const req = { resourceType: () => "fetch" }, image = { resourceType: () => "image" };
+    // Nothing in flight: back after the calm time, long before the limit.
+    let t = Date.now(); await player.quiet(120, 2000); expect(Date.now() - t).toBeLessThan(700);
+    // An image does not count; a fetch does, until it finishes.
+    emit("request", image); emit("request", req);
+    setTimeout(() => emit("requestfinished", req), 400);
+    t = Date.now(); await player.quiet(120, 3000);
+    expect(Date.now() - t).toBeGreaterThanOrEqual(480); expect(Date.now() - t).toBeLessThan(1500);
+    // A request that never ends (an event stream) cannot hold a recording for ever.
+    emit("request", { resourceType: () => "fetch" });
+    t = Date.now(); await player.quiet(120, 600); expect(Date.now() - t).toBeLessThan(1200);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src.match(/await this\.quiet\(\)/g)!.length).toBeGreaterThanOrEqual(2); // after a click and after a choice
+  });
+
+  it("produce.ts keeps the capture until mux and check have passed, tries those again, and can finish a kept capture", () => {
+    const src = read("scripts/tutorials/produce.ts");
+    expect(src.indexOf('twice("check"')).toBeGreaterThan(src.indexOf('twice("mux"'));
+    expect(src.indexOf('fs.rmSync(path.join(out, f)')).toBeGreaterThan(src.indexOf('twice("check"')); // deleted only after the check
+    expect(src.match(/fs\.rmSync\(path\.join\(out, f\)/g)).toHaveLength(1);
+    expect(src).toMatch(/args\.flags\["from-raw"\]/);
+    expect(src).toMatch(/--from-raw: .* is not there/);
   });
 });
 
