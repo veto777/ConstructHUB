@@ -4,7 +4,7 @@
  * and "Refresh numbers" buy data, and both show the price first.
  */
 import { MarketPicker } from "./market";
-import { DEFAULT_MARKET, marketLabel, type SeoMarket } from "@shared/seo-markets";
+import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -163,7 +163,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
 }
 
 /** The account's keyword lists: open one, tidy it, track it, export it, or get fresh numbers for it. */
-export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void }) {
+export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; /** `from` is the list's own country: its numbers belong to it. */ onTrack?: (rows: KwRow[], from: SeoMarket) => void; onOpen?: (keyword: string, from: SeoMarket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [openId, setOpenId] = useState<number | null>(null);
@@ -189,6 +189,8 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
     onError: (e) => toast({ title: "Couldn't delete the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const all = lists.data?.lists ?? [], rows = items.data?.items ?? [];
+  /** The country the open list's numbers are for. */
+  const listMarket: SeoMarket = findMarket(items.data?.list.locationCode ?? 2840, items.data?.list.languageCode ?? "en") ?? DEFAULT_MARKET;
   const chosen = rows.filter((r) => picked.has(r.keyword));
   // One lookup per 200 keywords.
   const batches = Array.from({ length: Math.ceil(rows.length / MAX_BULK) }, (_, i) => Math.min(MAX_BULK, rows.length - i * MAX_BULK));
@@ -231,7 +233,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
                   <h3 className="g-text text-[17px] font-medium">{items.data.list.name}</h3>
                   <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {fmtNum(rows.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month in total</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen, listMarket); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
@@ -239,7 +241,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
                   </span>
                 </div>
                 {rows.length === 0 ? <Empty testId="list-empty"><h3>This list is empty</h3><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
-                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} onOpen={onOpen} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
+                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} onOpen={onOpen ? (k) => onOpen(k, listMarket) : undefined} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
               </>
             )}
           </div>

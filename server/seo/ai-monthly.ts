@@ -41,8 +41,10 @@ type Tracked = { id: number; user_id: number; site_id: number; prompt: string };
 async function openRun(t: Tracked, runId: string): Promise<void> {
   await pool.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, run_id, state, tracked_id, next_at) VALUES($1,$2,$3,NULL,$4,'asking',$5, now())", [t.user_id, t.site_id, t.prompt, runId, t.id]);
 }
-/** The ask failed and nothing came back: the run is closed, and the question may be asked again when its lease runs out. */
+/** The ask certainly bought nothing (refused before it was sent, or the source said no): the run is closed, and the question may be asked again when its lease runs out. */
 const closeRun = (runId: string) => pool.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1 AND state='asking'", [runId]);
+/** An error after which we cannot say whether the source did the work (and billed it). Such a run is NOT closed. */
+const outcomeUnknown = (e: any) => e?.costUnknown === true || e?.code === "timeout" || e?.code === "upstream" || e?.parked === false;
 /** After a paid ask, in one step: the month moves on and the answers go on the waiting list. */
 async function parkPaidAnswers(t: Tracked, answers: unknown, costUsd: number, runId: string): Promise<void> {
   const client = await pool.connect();
@@ -59,8 +61,7 @@ async function parkPaidAnswers(t: Tracked, answers: unknown, costUsd: number, ru
 export async function runDueAiChecks(): Promise<number> {
   await fileWaitingAiAnswers().catch((e) => console.error("[seo] filing waiting AI answers failed", e?.message ?? e));
   if (!isConfigured()) return 0;
-  // Leased for an hour first: a failed call leaves the question due again when the lease runs out. Once an
-  // ask is paid for, the month moves on together with putting its answers on the waiting list (parkPaidAnswers).
+  // Leased for an hour first: a failed call leaves the question due again when the lease runs out.
   const { rows: due } = await pool.query(
     `UPDATE seo_ai_tracked SET next_at = now() + interval '1 hour'
       WHERE id IN (SELECT id FROM seo_ai_tracked WHERE next_at <= now() ORDER BY next_at LIMIT 3 FOR UPDATE SKIP LOCKED)
@@ -69,12 +70,15 @@ export async function runDueAiChecks(): Promise<number> {
   let done = 0;
   for (const t of due) {
     try {
-      // An earlier ask for this question was started and never finished (the process stopped mid-ask): it may have been
-      // paid for. It is not bought again on our own — the month moves on and the loss is recorded for a person to see.
-      const { rows: unsure } = await pool.query("DELETE FROM seo_ai_unsaved WHERE tracked_id=$1 AND state='asking' RETURNING run_id, created_at", [t.id]);
+      // An earlier ask for this question was started and its outcome is unknown (the process stopped mid-ask, the source
+      // timed out, or the answers could not be put away): it may have been paid for. It is not bought again on our own —
+      // in ONE statement the unfinished run is cleared and the month moves on, and the loss is recorded for a person to see.
+      const { rows: unsure } = await pool.query(
+        `WITH gone AS (DELETE FROM seo_ai_unsaved WHERE tracked_id=$1 AND state='asking' RETURNING run_id, created_at),
+              moved AS (UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1 AND EXISTS (SELECT 1 FROM gone) RETURNING id)
+         SELECT gone.run_id, gone.created_at, (SELECT count(*) FROM moved) AS moved FROM gone`, [t.id]);
       if (unsure.length) {
         console.error(`[seo] monthly AI question ${t.id} (site ${t.site_id}): an ask started ${new Date(unsure[0].created_at).toISOString()} never finished (run ${unsure[0].run_id}); not asking again this month`);
-        await pool.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [t.id]);
         continue;
       }
       // No SEO tools on the account, or the site is gone: look again tomorrow, spend nothing.
@@ -86,32 +90,33 @@ export async function runDueAiChecks(): Promise<number> {
       await openRun(t, runId); // if this cannot be written, nothing is bought
       let out;
       try {
-        out = await withBudget(t.user_id, askEstimateUsd(engines), () => askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name }),
-          { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
+        out = await withBudget(t.user_id, askEstimateUsd(engines), async () => {
+          const r = await askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name });
+          // Put away BEFORE it is charged: the month moves on and the answers go on the waiting list in one step. If that
+          // cannot be done, this throws — the customer pays nothing for answers we could not keep, and the run stays
+          // "unfinished" so the question is not bought again.
+          let parked = false, lastError: unknown = null;
+          for (let attempt = 1; attempt <= 3 && !parked; attempt++) {
+            try { await parkPaidAnswers(t, r.data.answers, r.costUsd, runId); parked = true; }
+            catch (e) { lastError = e; await new Promise((res) => setTimeout(res, 500 * attempt)); }
+          }
+          if (!parked) throw Object.assign(new Error(`answers could not be put on the waiting list: ${(lastError as any)?.message ?? lastError}`), { costUsd: r.costUsd, costUnknown: r.costUnknown, parked: false });
+          return r;
+        }, { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
       } catch (e) {
-        // A known failure (refused, out of data, the source said no): nothing to keep; the run is closed.
-        await closeRun(runId).catch(() => {});
+        // Only a failure that certainly bought nothing closes the run; anything ambiguous leaves it for the branch above.
+        if (!outcomeUnknown(e)) await closeRun(runId).catch(() => {});
         throw e;
       }
-      // Paid. In one step the month moves on and the answers go on the waiting list, so from here on a saving
-      // problem can neither buy the same answers again nor lose them: fileWaitingAiAnswers keeps trying.
-      let parked = false;
-      for (let attempt = 1; attempt <= 3 && !parked; attempt++) {
-        try { await parkPaidAnswers(t, out.data.answers, out.costUsd, runId); parked = true; }
-        catch (e: any) { if (attempt === 3) console.error(`[seo] monthly AI answers for site ${t.site_id} could not be put on the waiting list: ${e?.message ?? e}`); else await new Promise((r) => setTimeout(r, 500 * attempt)); }
-      }
-      try {
-        // Filing takes the run off the waiting list and (if parking never worked) moves the month on, all in one transaction.
-        await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, runId, parked ? {} : { advanceTrackedId: t.id });
-      } catch (e: any) {
-        // Not parked and not filed: the 'asking' row stays, so the next pass will not buy this question again.
-        console.error(`[seo] monthly AI answers for site ${t.site_id} were paid for and ${parked ? "are waiting to be filed" : "COULD NOT BE KEPT (database unavailable); the question will not be asked again this month"}: ${e?.message ?? e}`);
-      }
+      // Charged, and the answers are safely parked. Filing them takes them off the waiting list; if it fails they
+      // stay there and fileWaitingAiAnswers keeps trying.
+      await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, runId)
+        .catch((e: any) => console.error(`[seo] monthly AI answers for site ${t.site_id} are paid for and waiting to be filed: ${e?.message ?? e}`));
       done++;
     } catch (e: any) {
       // Out of included data: nothing more this month is likely, so look again tomorrow rather than every hour.
       if (e instanceof SeoBudgetError) { console.warn(`[seo] monthly AI question for site ${t.site_id} skipped: ${e.message}`); await later(t.id, "1 day"); }
-      else console.error(`[seo] monthly AI question for site ${t.site_id} failed (it will be tried again in an hour): ${e?.message ?? e}`);
+      else console.error(`[seo] monthly AI question for site ${t.site_id} failed${outcomeUnknown(e) ? " with an unknown outcome (it will not be bought again this month)" : " (it will be tried again in an hour)"}: ${e?.message ?? e}`);
     }
   }
   return done;

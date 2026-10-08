@@ -256,6 +256,22 @@ Verdict: "Audit #10 is only partly resolved"; coverage about 59% (53-65). No cro
 12 LOW  inherited property accepted as a sort           FIXED: own properties only.
  Also: the duplicate "couldn't check" alert in report tables removed.
 
+## Codex audit #12 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-12.md)
+Verdict: "Audit #11 is only partly resolved"; coverage about 57% (50-64). No cross-account disclosure found. Rule adopted for everything bought in the background: SAVED FIRST, CHARGED SECOND. What was done:
+ 1 HIGH grid retries could be charged / exceed the hold  FIXED: three sums kept apart - what returned (the customer's charge, never more than points x price, always under the hold), what the source billed us, and an allowance for tries whose cost we never learned. Unit test with timeouts and retries.
+ 2 HIGH a grid could be charged and its results lost     FIXED: the results are written inside the charged call; if they cannot be written the lookup counts as failed and the customer pays nothing. A late result cannot overwrite a failed scan.
+ 3 HIGH AI recovery could still re-buy / lose answers    FIXED: clearing an unfinished run and moving the month on are one statement; a timeout or other ambiguous failure no longer clears the run (so it is not bought again); the answers are parked inside the charged call - not parked means not charged.
+ 4 HIGH the new unique index could fail on duplicates    FIXED: duplicates are reduced to the first copy before the index is made, only while it does not exist. (Production had none: checked before deploying.) Real Postgres check.
+ 5 MED  lists still mixed countries into the tracker     FIXED: a list's own country travels with its keywords to the tracker and when a keyword is opened. Legacy lists: production had none.
+ 6 MED  late business search pinned to another site      FIXED: search results and the pin carry the site they were made for.
+ 7 MED  fallback matching unreliable                     PARTLY: the listing's own website is kept and matched; each point records how the business was recognised and the page says when it was not by Google's id; a business counts once per point. An exact identity without Google's id is not possible.
+ 8 MED  history compared different listings / areas      FIXED: compared only with an earlier scan of the same search, square and listing in the same place; both denominators are shown.
+ 9 MED  lifecycle across restart, tabs and processes     FIXED: one running scan per site is a unique index; stale scans are closed, not just shown; failed scans stay in the history with the reason; the running scan is watched independently of the one on screen. NOT DONE: the hold of a scan killed by a restart waits for the 30-minute reconciler (no reservation id on the scan row).
+10 MED  wording overstated                               FIXED: "local finder", not the map pack; "Position score" with its rule always shown.
+11 MED  Search Console "last 28 days" when stale         FIXED: the end date and both windows' coverage are in the email, the PDF and the tile.
+12 LOW  orange cells' contrast                           FIXED: dark text on orange and amber; red darkened.
+13 LOW  points past the date line                        FIXED: longitudes wrap, latitudes are clamped; tested.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -292,3 +308,4 @@ Verdict: "Audit #10 is only partly resolved"; coverage about 59% (53-65). No cro
 - 10/8 slice 15 (local grid): in the browser against live data - business found by name and pinned; 5x5 at 5 miles (23 of 25 checked before retries were added; 2 timeouts) and 7x7 at 3 miles in the background (start answered in 61 ms, finished in 83 s, a reload mid-scan picked it up, 49 of 49 checked, charged 40c against a 48c hold). 0 page errors.
 - 10/8 audit #11 fixes in the browser, live: keyword overview bought (201); "site:..." refused with a plain message; Canada (French) lookup and the Questions list returned French questions ("comment poser une toiture..."); "Save to a list" offered only a new list, the United States list shown disabled with its country. Real Postgres: ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13.
 - 10/8 slice 17 (Opportunities): run in the browser for alpineexteriorswa.com - 10 within reach (3,230 searches a month), 3 losing ground (5 -> 11, 5 -> 14, 7 -> 11), 1 page for 13 keywords, 100% on the home page; charged 6c against a 29c hold. 0 page errors.
+- 10/8 audit #12 fixes: real Postgres - ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13, grid lifecycle 10/10 (script/seo-grid-check.ts: the one-running-scan rule created over old duplicates, a second start returns the first, the database refuses a third, stale scans closed, failed scans kept, late results refused). Browser, live: a 25-point scan in the background (42 s, 25 of 25, charged 20c against a 25c hold) while an older scan was opened - the running note and the disabled button stayed, then the new scan appeared in the history.

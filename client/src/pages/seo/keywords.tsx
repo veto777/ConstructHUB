@@ -67,8 +67,8 @@ export default function SeoKeywordsPage() {
   const marketNow = useRef(marketKey(market));
   marketNow.current = marketKey(market);
   const unsaved = (d: { saved?: boolean }) => { if (d.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this keyword again will not be free.", variant: "destructive" }); };
-  /** Numbers from another country are not the site's numbers: the keyword is tracked without them. */
-  const siteMarket = !!site && site.locationCode === market.locationCode && site.languageCode === market.languageCode;
+  /** Numbers from another country are not the site's numbers: the keyword is tracked without them. `m` is where the numbers came from (a list has its own country). */
+  const inSiteMarket = (m: { locationCode: number; languageCode: string }) => !!site && site.locationCode === m.locationCode && site.languageCode === m.languageCode;
 
   // A keyword looked up in the last week opens without spending.
   const saved = useQuery<{ overview: Overview } | null>({
@@ -101,15 +101,16 @@ export default function SeoKeywordsPage() {
     onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
-    mutationFn: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) =>
-      api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: rows.map((r) => r.keyword), ...(siteMarket ? { volumes: rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
-    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}`, description: siteMarket ? undefined : `The numbers here are for ${market.label}, not the country this site is tracked in, so they were not copied. Use "Get search volumes" in the rank tracker.` }); },
+    mutationFn: (v: { rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]; from: SeoMarket }) =>
+      api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: v.rows.map((r) => r.keyword), ...(inSiteMarket(v.from) ? { volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
+    onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}`, description: inSiteMarket(v.from) ? undefined : `Those numbers are for ${v.from.label}, not the country this site is tracked in, so they were not copied. Use "Get search volumes" in the rank tracker.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const submit = () => { const k = input.trim(); if (!k) return; setOverview(null); setKeyword(k.toLowerCase()); lookup.mutate({ keyword: k, market: marketKey(market), body: mk }); };
   /** From a list or a bulk analysis: open one keyword's overview (the saved copy if there is one; nothing is bought). */
-  const openKeyword = (k: string) => { setMode("one"); setInput(k); setOverview(null); setKeyword(k.toLowerCase()); };
+  /** A keyword from a list opens in the list's own country. */
+  const openKeyword = (k: string, from?: SeoMarket) => { if (from && marketKey(from) !== marketKey(market)) setMarket(from); setMode("one"); setInput(k); setOverview(null); setKeyword(k.toLowerCase()); };
   const configured = !!status.data?.configured;
   const affordable = canAfford(status.data, "keywordOverview");
   const price = status.data?.prices ? money(status.data.prices.keywordOverview) : "";
@@ -122,8 +123,8 @@ export default function SeoKeywordsPage() {
       <nav className="g-tabs" aria-label="Keywords explorer views">
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
       </nav>
-      {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={changeMarket} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
-      {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
+      {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={changeMarket} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} onOpen={(k) => openKeyword(k)} />}
+      {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows, from) => track.mutate({ rows, from }) : undefined} onOpen={openKeyword} />}
       {mode === "one" && (<>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">
@@ -151,7 +152,7 @@ export default function SeoKeywordsPage() {
             <span className="g-text-2 text-[12px]">as of {fmtDate(o.fetchedAt)}</span>
             <button type="button" className="g-pill g-pill--sm" disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: marketKey(market), body: mk })} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>
             <span className="ml-auto"><AddToList market={market} rows={[{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty, intent: o.intent }]} label="Save to a list" /></span>
-            {site && <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate([{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }])} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
+            {site && <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate({ rows: [{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }], from: market })} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
           </div>
           <div className="g-tiles mb-4">
             <Stat label="Search volume" value={fmtNum(o.volume)} hint={peak ? `Peak ${fmtNum(peak.volume)} in ${monthLabel(peak.month)}` : "per month"} />
@@ -209,7 +210,7 @@ export default function SeoKeywordsPage() {
           <nav className="g-tabs" aria-label="Keyword ideas">
             {IDEAS.map(([k, label]) => <a key={k} href={`#${k}`} aria-current={ideas === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setIdeas(k); }} data-testid={`tab-ideas-${k}`}>{label}</a>)}
           </nav>
-          <ReportView key={`${ideas}:${o.keyword}:${marketKey(market)}`} market={market} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
+          <ReportView key={`${ideas}:${o.keyword}:${marketKey(market)}`} market={market} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
           {!site && <p className="g-text-2 mt-2 text-[13px]">Add a site above to track keywords from these lists.</p>}
         </div>
       )}

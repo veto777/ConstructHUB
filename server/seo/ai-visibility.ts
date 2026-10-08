@@ -67,7 +67,14 @@ export const AI_SCHEMA_DDL = [
   `ALTER TABLE seo_ai_unsaved ALTER COLUMN answers DROP NOT NULL`,
   `ALTER TABLE seo_ai_unsaved ADD COLUMN IF NOT EXISTS state text NOT NULL DEFAULT 'paid'`,
   `ALTER TABLE seo_ai_unsaved ADD COLUMN IF NOT EXISTS tracked_id integer`,
-  // One answer per assistant per run, enforced by the database: filing a run twice cannot double it.
+  // One answer per assistant per run, enforced by the database: filing a run twice cannot double it. Rows that would
+  // break the rule (the same run filed twice before the rule existed — identical copies) are reduced to the first
+  // one, and only while the rule is not there yet, so creating it can never fail on existing data.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_ai_checks_run_engine') THEN
+       DELETE FROM seo_ai_checks a USING seo_ai_checks b WHERE a.run_id IS NOT NULL AND a.run_id = b.run_id AND a.engine = b.engine AND a.id > b.id;
+     END IF;
+   END $$`,
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_checks_run_engine ON seo_ai_checks(run_id, engine) WHERE run_id IS NOT NULL`,
 ];
 
