@@ -22,6 +22,7 @@ import { JobcamPanel } from "@/components/jobcam/project-panel";
 import {
   CrmPage, StatusPill, EmptyState, ErrorCard, SectionTitle, crmTable, statusTone,
 } from "@/components/crm-ui";
+import { confirmAction } from "@/components/confirm-dialog";
 
 // Cents → "$1,250.50" / "-$200.00": currency style puts the sign before the $.
 const money = (c?: number | null) =>
@@ -172,8 +173,14 @@ export default function CrmProjectPage() {
     patchChild("daily-logs", draft.id, body, "daily log", "Log updated", logsKey)
       .then((ok) => ok && setLogEdit(null));
   };
-  const deleteLog = (logId: string) => {
-    if (!window.confirm("Delete this daily log? This can't be undone.")) return;
+  const deleteLog = (logId: string) => confirmAction({
+    id: "delete-daily-log",
+    title: "Delete this daily log?",
+    description: "The log entry is permanently removed from this project. This can't be undone.",
+    confirmLabel: "Delete log",
+    onConfirm: () => runDeleteLog(logId),
+  });
+  const runDeleteLog = (logId: string) => {
     setDeletingLog(logId);
     apiRequest("DELETE", `/api/crm/daily-logs/${logId}`)
       .then(() => {

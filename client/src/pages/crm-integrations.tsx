@@ -17,6 +17,7 @@ import {
 import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, SectionTitle,
 } from "@/components/crm-ui";
+import { confirmAction } from "@/components/confirm-dialog";
 
 /**
  * Integrations hub — every connection and API in one directory. HOVER lives
@@ -339,7 +340,13 @@ export default function CrmIntegrationsPage() {
                 )}
                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                   onClick={() => {
-                    if (window.confirm("Disconnect HOVER? Completed jobs will stop flowing in.")) hoverDisconnect.mutate();
+                    confirmAction({
+                      id: "hover-disconnect",
+                      title: "Disconnect HOVER?",
+                      description: "Completed HOVER jobs stop flowing in. Measurements already imported stay where they are. You can connect HOVER again at any time.",
+                      confirmLabel: "Disconnect",
+                      onConfirm: () => hoverDisconnect.mutate(),
+                    });
                   }}
                   disabled={hoverDisconnect.isPending} data-testid="button-hover-disconnect">
                   <Unplug className="h-4 w-4 mr-2" /> Disconnect
@@ -407,9 +414,13 @@ export default function CrmIntegrationsPage() {
               <div className="flex justify-end">
                 <Button size="sm" variant="outline" data-testid="button-rotate-lead-token"
                   onClick={() => {
-                    if (window.confirm("Rotate the lead form link? Every embedded copy and shared link of the old form will stop working.")) {
-                      rotateLeadToken.mutate();
-                    }
+                    confirmAction({
+                      id: "rotate-lead-token",
+                      title: "Rotate the lead form link?",
+                      description: "You get a new link and embed code. Every embedded copy and shared link of the old form stops working straight away. This can't be undone — the old link can't be brought back, so the form has to be re-embedded wherever it is used.",
+                      confirmLabel: "Rotate link",
+                      onConfirm: () => rotateLeadToken.mutate(),
+                    });
                   }}
                   disabled={rotateLeadToken.isPending}>
                   {rotateLeadToken.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
@@ -557,9 +568,13 @@ export default function CrmIntegrationsPage() {
                       </div>
                       <Button size="sm" variant="ghost"
                         onClick={() => {
-                          if (window.confirm(`Revoke the API key "${k.name}"? Anything using it stops working immediately. This can't be undone.`)) {
-                            revokeKey.mutate(k.id);
-                          }
+                          confirmAction({
+                            id: "revoke-api-key",
+                            title: `Revoke the API key "${k.name}"?`,
+                            description: "Anything using this key stops working immediately. This can't be undone — a revoked key can't be re-enabled, so you would create a new key and update whatever used the old one.",
+                            confirmLabel: "Revoke key",
+                            onConfirm: () => revokeKey.mutate(k.id),
+                          });
                         }}
                         disabled={revokeKey.isPending} data-testid={`button-revoke-api-key-${k.id}`}>
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -649,9 +664,13 @@ export default function CrmIntegrationsPage() {
                         </StatusPill>
                         <Button size="sm" variant="ghost"
                           onClick={() => {
-                            if (window.confirm(`Delete the webhook to ${w.url}? It stops receiving events. This can't be undone.`)) {
-                              deleteHook.mutate(w.id);
-                            }
+                            confirmAction({
+                              id: "delete-webhook",
+                              title: "Delete this webhook?",
+                              description: `${w.url} stops receiving events straight away. This can't be undone — to send events there again you would add the webhook again, with a new signing secret.`,
+                              confirmLabel: "Delete webhook",
+                              onConfirm: () => deleteHook.mutate(w.id),
+                            });
                           }}
                           disabled={deleteHook.isPending} data-testid={`button-delete-webhook-${w.id}`}>
                           <Trash2 className="h-4 w-4 text-destructive" />

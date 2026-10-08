@@ -324,7 +324,8 @@ test.describe("HOVER integration @serial", () => {
       }, { timeout: 15_000 })
       .toBe(1);
 
-    await page.getByTestId("button-hover-disconnect").click(); // confirm auto-accepted
+    await page.getByTestId("button-hover-disconnect").click();
+    await page.getByTestId("button-confirm-hover-disconnect").click();
     await expect(page.getByTestId("button-connect-hover")).toBeVisible({ timeout: 15_000 });
     expect(stub.deletedWebhooks.length).toBe(1);
     const status = await (await page.request.get("/api/crm/integrations/hover/status")).json();

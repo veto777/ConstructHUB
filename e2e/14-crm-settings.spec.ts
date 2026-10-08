@@ -134,6 +134,7 @@ test.describe("/crm/integrations", () => {
     await expect(keyRow).toBeVisible();
     const keyId = (await keyRow.getAttribute("data-testid"))!.replace("row-api-key-", "");
     await page.getByTestId(`button-revoke-api-key-${keyId}`).click();
+    await page.getByTestId("button-confirm-revoke-api-key").click();
     await expect(page.getByText("API key revoked", { exact: true })).toBeVisible();
     await expect(keyRow).toHaveCount(0);
 
@@ -147,6 +148,7 @@ test.describe("/crm/integrations", () => {
     await expect(hookRow).toBeVisible();
     const hookId = (await hookRow.getAttribute("data-testid"))!.replace("row-webhook-", "");
     await page.getByTestId(`button-delete-webhook-${hookId}`).click();
+    await page.getByTestId("button-confirm-delete-webhook").click();
     await expect(page.getByText("Webhook deleted", { exact: true })).toBeVisible();
     await expect(hookRow).toHaveCount(0);
 

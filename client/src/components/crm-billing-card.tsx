@@ -11,6 +11,7 @@ import { InvoicesPanel } from "@/pages/settings/billing/invoices-panel";
 import { useBillingPortal } from "@/pages/settings/billing/use-billing-portal";
 import type { CrmSubscriptionInfo } from "@/components/crm-plans";
 import { inNativeApp } from "@/lib/app-shell";
+import { confirmAction } from "@/components/confirm-dialog";
 
 /**
  * CRM → Settings → "CRM subscription & invoices": the account's CRM plan (its
@@ -67,7 +68,13 @@ export function CrmBillingCard() {
           <div className="ml-auto flex flex-wrap gap-2">
             {sub?.jobcamAddon && sub.hasLiveSubscription && (
               <Button variant="outline" size="sm" disabled={removeJobcam.isPending} data-testid="button-crm-remove-jobcam"
-                onClick={() => { if (window.confirm("Remove the JobCam add-on? Your team can no longer open JobCam or upload. Photos and videos already stored are kept, and the unused part of this billing period is credited to your account.")) removeJobcam.mutate(); }}>
+                onClick={() => confirmAction({
+                  id: "remove-jobcam-addon",
+                  title: "Remove the JobCam add-on?",
+                  description: "Your team can no longer open JobCam or upload. Photos and videos already stored are kept, share links already sent keep working, and the unused part of this billing period is credited to your account.",
+                  confirmLabel: "Remove add-on",
+                  onConfirm: () => removeJobcam.mutate(),
+                })}>
                 Remove JobCam add-on
               </Button>
             )}

@@ -15,6 +15,7 @@ import { TagPicker } from "./tag-picker";
 import { UploadTray } from "./upload-tray";
 import { useJobcamQueue } from "./use-queue";
 import { cn } from "@/lib/utils";
+import { confirmAction } from "@/components/confirm-dialog";
 
 export type FeedFilters = {
   tags: string[]; mode: "and" | "or"; starred: boolean; kind: "" | "photo" | "video"; q: string; from: string; to: string;
@@ -172,7 +173,16 @@ function JobcamFeedInner({ projectId, customerId, compact = false, title, descri
           <GooglePill size="sm" icon={Eye} label="Show to client" onClick={() => bulk.mutate({ ids: [...selected], action: "client_show" })} testId="jobcam-bulk-client-show" />
           <GooglePill size="sm" icon={EyeOff} label="Hide from client" onClick={() => bulk.mutate({ ids: [...selected], action: "client_hide" })} testId="jobcam-bulk-client-hide" />
           {onShare && <GooglePill size="sm" icon={Share2} label="Share these" onClick={() => onShare([...selected])} testId="jobcam-bulk-share" />}
-          <GooglePill size="sm" variant="danger" icon={Trash2} label="Delete" onClick={() => { if (window.confirm(`Delete ${selected.size} item(s)?`)) bulk.mutate({ ids: [...selected], action: "delete" }); }} testId="jobcam-bulk-delete" />
+          <GooglePill size="sm" variant="danger" icon={Trash2} label="Delete" onClick={() => {
+            const ids = [...selected];
+            confirmAction({
+              id: "jobcam-bulk-delete",
+              title: `Delete ${ids.length} ${ids.length === 1 ? "item" : "items"}?`,
+              description: "The selected photos and videos are removed from the project and from every shared link. Items you aren't allowed to delete are skipped. This can't be undone.",
+              confirmLabel: ids.length === 1 ? "Delete item" : `Delete ${ids.length} items`,
+              onConfirm: () => bulk.mutate({ ids, action: "delete" }),
+            });
+          }} testId="jobcam-bulk-delete" />
           <button type="button" onClick={() => setSelected(new Set(items.map((m) => m.id)))} className="ml-auto text-xs text-primary" data-testid="jobcam-bulk-all">Select all loaded</button>
           {bulk.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
         </div>

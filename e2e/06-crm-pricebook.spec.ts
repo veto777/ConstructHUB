@@ -72,7 +72,8 @@ test.describe("/crm/pricebook", () => {
     await expect(page.getByTestId(`pb-item-${skuId}`)).toContainText(`E2E SKU ${stamp} v2`);
     await expect(previewTotal).toContainText("$300.00");
 
-    await page.getByTestId(`button-delete-item-${skuId}`).click(); // confirm auto-accepted
+    await page.getByTestId(`button-delete-item-${skuId}`).click();
+    await page.getByTestId("button-confirm-delete-item").click();
     await expect(page.getByText("SKU deleted", { exact: true })).toBeVisible();
     await expect(page.getByTestId(`pb-item-${skuId}`)).toHaveCount(0);
 

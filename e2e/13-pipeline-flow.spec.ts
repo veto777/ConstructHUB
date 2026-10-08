@@ -118,7 +118,14 @@ test("pipeline: client → estimate → approve → invoice → payment → void
   const inv2 = page.locator('[data-testid^="invoice-"]', { hasText: "Flow estimate 2" });
   await expect(inv2).toBeVisible();
   const inv2Id = (await inv2.getAttribute("data-testid"))!.replace("invoice-", "");
-  await page.getByTestId(`button-void-invoice-${inv2Id}`).click(); // window.confirm auto-accepted
+  // The in-product confirm: Cancel leaves the invoice alone, Confirm voids it.
+  await page.getByTestId(`button-void-invoice-${inv2Id}`).click();
+  await expect(page.getByTestId("dialog-confirm-void-invoice")).toContainText("can't be undone");
+  await page.getByTestId("button-cancel-void-invoice").click();
+  await expect(page.getByTestId("dialog-confirm-void-invoice")).toHaveCount(0);
+  await expect(page.getByTestId(`button-void-invoice-${inv2Id}`)).toBeVisible();
+  await page.getByTestId(`button-void-invoice-${inv2Id}`).click();
+  await page.getByTestId("button-confirm-void-invoice").click();
   await expect(page.getByText("Invoice voided", { exact: true })).toBeVisible();
   await expect(page.locator(`[data-testid="invoice-${inv2Id}"]`)).toContainText("void");
 

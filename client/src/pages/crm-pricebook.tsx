@@ -23,6 +23,7 @@ import {
   Pencil, Trash2, Search,
 } from "lucide-react";
 import { CrmPage, CrmPageHeader, EmptyState, SectionTitle, crmTable } from "@/components/crm-ui";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const money = (c?: number | null) =>
   c === null || c === undefined ? "—" : `$${(c / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
@@ -545,9 +546,13 @@ export default function CrmPriceBookPage() {
                         </Button>
                         <Button size="sm" variant="ghost"
                           onClick={() => {
-                            if (window.confirm(`Delete "${i.name}"? It stays on estimates that already use it.`)) {
-                              delItem.mutate(i.id);
-                            }
+                            confirmAction({
+                              id: "delete-item",
+                              title: `Delete "${i.name}"?`,
+                              description: "It is removed from the price book and can no longer be added to new estimates. Estimates that already use it keep it. This can't be undone here — to bring it back you would add it again.",
+                              confirmLabel: "Delete item",
+                              onConfirm: () => delItem.mutate(i.id),
+                            });
                           }}
                           disabled={delItem.isPending}
                           data-testid={`button-delete-item-${i.id}`}>
@@ -695,9 +700,13 @@ export default function CrmPriceBookPage() {
                                 </Button>
                                 <Button size="sm" variant="ghost" disabled={delMat.isPending} data-testid={`button-delete-mat-${m.id}`}
                                   onClick={() => {
-                                    if (window.confirm(`Remove "${m.name}" from the price book? SKUs already built on it keep pricing it.`)) {
-                                      delMat.mutate(m.id);
-                                    }
+                                    confirmAction({
+                                      id: "delete-material",
+                                      title: `Remove "${m.name}" from the price book?`,
+                                      description: "It can no longer be picked for new SKUs. SKUs already built on it keep pricing it. This can't be undone here — to bring it back you would add it again.",
+                                      confirmLabel: "Remove material",
+                                      onConfirm: () => delMat.mutate(m.id),
+                                    });
                                   }}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
@@ -762,7 +771,13 @@ export default function CrmPriceBookPage() {
                         </Button>
                         <Button size="sm" variant="ghost" disabled={delLab.isPending} data-testid={`button-delete-lab-${l.id}`}
                           onClick={() => {
-                            if (window.confirm(`Remove "${l.name}"? SKUs already built on it keep pricing it.`)) delLab.mutate(l.id);
+                            confirmAction({
+                              id: "delete-labor-rate",
+                              title: `Remove "${l.name}"?`,
+                              description: "This labor rate can no longer be picked for new SKUs. SKUs already built on it keep pricing it. This can't be undone here — to bring it back you would add it again.",
+                              confirmLabel: "Remove labor rate",
+                              onConfirm: () => delLab.mutate(l.id),
+                            });
                           }}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

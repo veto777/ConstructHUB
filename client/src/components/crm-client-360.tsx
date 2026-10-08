@@ -30,6 +30,7 @@ import {
   CreditCard, FileText, Pencil, Trash2, ExternalLink, History,
 } from "lucide-react";
 import { SectionTitle, EmptyState } from "@/components/crm-ui";
+import { confirmAction } from "@/components/confirm-dialog";
 
 const when = (d?: string | null) => (d ? new Date(d).toLocaleString() : null);
 
@@ -155,7 +156,13 @@ export function CustomerNotes({ customerId, canManage, meMemberId, meRole }: {
                           <Pencil className="h-3 w-3 mr-1" /> Edit
                         </Button>
                         <Button size="sm" variant="ghost" className="h-7 text-xs"
-                          onClick={() => { if (window.confirm("Delete this note?")) remove.mutate(n.id); }}
+                          onClick={() => confirmAction({
+                            id: "delete-note",
+                            title: "Delete this note?",
+                            description: "The note is permanently removed from this client's record. This can't be undone.",
+                            confirmLabel: "Delete note",
+                            onConfirm: () => remove.mutate(n.id),
+                          })}
                           disabled={remove.isPending}
                           data-testid={`button-delete-note-${n.id}`}>
                           <Trash2 className="h-3 w-3 mr-1" /> Delete
