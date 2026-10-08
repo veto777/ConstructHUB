@@ -11,4 +11,5 @@ export { default as v_crm_integrations } from "./crm-integrations.json";
 export { default as v_crm_migrate_assisted } from "./crm-migrate-assisted.json";
 export { default as v_crm_migrate } from "./crm-migrate.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
+export { default as v_crm_scheduled_exports } from "./crm-scheduled-exports.json";
 export { default as v_database_directory } from "./database-directory.json";
