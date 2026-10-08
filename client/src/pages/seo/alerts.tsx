@@ -24,9 +24,9 @@ const KIND: Record<Kind, { label: string; good: boolean }> = {
   rank_drop: { label: "Rankings fell", good: false }, rank_gain: { label: "Rankings improved", good: true },
   links_lost: { label: "Links lost", good: false }, links_gained: { label: "Links gained", good: true },
   grid_down: { label: "Local grid worse", good: false }, grid_up: { label: "Local grid better", good: true },
-  kw_new: { label: "New searches", good: true }, kw_lost: { label: "Searches lost", good: false },
+  kw_new: { label: "Searches newly seen", good: true }, kw_lost: { label: "Searches no longer seen", good: false },
 };
-const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better", kw_new: "New searches", kw_lost: "Searches lost" };
+const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better", kw_new: "Newly seen", kw_lost: "No longer seen" };
 const WHAT: Record<RankItem["what"], (i: RankItem) => string> = {
   dropped: (i) => `fell from ${i.from} to ${i.to}`,
   lost: (i) => `dropped out of the results (was ${i.from})`,
@@ -98,12 +98,12 @@ export default function SeoAlertsPage() {
             ) : a.kind === "kw_new" || a.kind === "kw_lost" ? (
               (a.items as unknown as KwItem[]).map((i, n) => (
                 <div key={n}>
-                  <p className="g-text-2 text-[13px]">Compared with the snapshot of {fmtDate(i.since)}.</p>
+                  <p className="g-text-2 text-[13px]">In our search data, compared with the snapshot of {fmtDate(i.since)}. It is the data's view, not Google's own — track a search in the rank tracker to check Google itself.</p>
                   <table className="g-table mt-2">
                     <thead><tr><th>Keyword</th><th className="num">{a.kind === "kw_new" ? "Position now" : "Position before"}</th><th className="num">Volume / mo</th></tr></thead>
                     <tbody>{i.keywords.slice(0, 20).map((k) => <tr key={k.keyword}><td>{k.keyword}</td><td className="num">{(a.kind === "kw_new" ? k.position : k.was) ?? "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody>
                   </table>
-                  {i.keywords.length + (i.more ?? 0) > 20 && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(i.keywords.length + (i.more ?? 0) - 20)} more — the full list is in the keyword watch above.</p>}
+                  {i.keywords.length + (i.more ?? 0) > 20 && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(i.keywords.length + (i.more ?? 0) - 20)} more — every one is listed in the keyword watch at the top of this page ("Show all").</p>}
                 </div>
               ))
             ) : a.kind === "grid_down" || a.kind === "grid_up" ? (

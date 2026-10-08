@@ -63,7 +63,7 @@ export type ReportFilters = z.infer<typeof reportFilters>;
  */
 export const SCOPED_TABLES: ReadonlySet<ReportTable> = new Set<ReportTable>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
 /** A path on the site: starts with "/", no spaces, no backslash and no "#" (a fragment is a place on a page, not a page). */
-export const scopePath = z.string().trim().min(1).max(300).regex(/^\/[^\s\\#]*$/, "Start the path with / and leave out spaces, # and \\");
+export const scopePath = z.string().trim().min(1).max(300).regex(/^\/(?!\/)[^\s\\#]*$/, "Start the path with one / and leave out spaces, # and \\");
 export class TooManyFilters extends Error { constructor() { super("Too many filters at once — remove one and try again."); } }
 
 export const reportInput = z.object({
@@ -158,14 +158,17 @@ export function effectiveReport<T extends ReportInput>(input: T): T {
  */
 export function canonicalScope(path: string | undefined, exact: boolean): { path: string; exact: boolean } | null {
   if (!path) return null;
-  const p = path.includes("?") ? path : path.replace(/\/+$/, "") || "/";
+  // A "?" with nothing after it is no query: "/p?" is "/p".
+  const q = path.replace(/\?$/, "");
+  const p = q.includes("?") ? q : q.replace(/\/+$/, "") || "/";
   if (p === "/" && !exact) return null;
   return { path: p, exact };
 }
 const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
  * The ONE condition that narrows a report, as a pattern on a whole address (checked against the source 2026-10-08):
- *   - the host is the site itself, with or without "www" — never a sub-domain, never a host that merely ends the same;
+ *   - the host is the site itself, with or without "www", in any letter case, with or without its scheme's own port
+ *     (:80, :443) — never a sub-domain, never a host that merely ends the same, never another port;
  *   - a section is the path itself and everything under it ("/blog", "/blog/x", "/blog?p=2" — not "/blogging");
  *   - one page is the path with or without its last slash, or — when it has a query — exactly as written.
  * Keyword reports are matched on the ranking page's address; link reports on the address linked to.
@@ -173,7 +176,8 @@ const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export function scopeClauses(input: { table: ReportTable; target: string; path?: string; exactPage?: boolean }): Clause[] {
   const scope = SCOPED_TABLES.has(input.table) ? canonicalScope(input.path, !!input.exactPage) : null;
   if (!scope) return [];
-  const host = `^https?://(www\\.)?${reEscape(input.target.replace(/^www\./, ""))}`;
+  // The scheme and host are matched without regard to case (hosts are case-insensitive); the path keeps its case.
+  const host = `^(?i:https?://(www\\.)?${reEscape(input.target.toLowerCase().replace(/^www\./, ""))})(:(80|443))?`;
   const base = scope.path.includes("?") || scope.path !== "/" ? reEscape(scope.path) : "";
   const tail = scope.exact ? (scope.path.includes("?") ? "$" : "/?$") : "(/|\\?|$)";
   const field = input.table === "keywords" || input.table === "paidKeywords" ? "ranked_serp_element.serp_item.url" : input.table === "pages" ? "page_address" : input.table === "bestByLinks" ? "url" : "url_to";
@@ -531,7 +535,7 @@ export const reportCacheKey = (i: ReportInput & { target: string }) =>
   cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, COUNTRY_TABLES.has(i.table) ? i.locationCode : 2840, COUNTRY_TABLES.has(i.table) ? i.languageCode : "en", Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b)),
     // Only when narrowed, so pages saved before sections existed are still found.
     // "v2": the rule for what a section or page matches changed (exact boundaries), so pages saved under the first rule are not reused.
-    ...(effectiveReport(i).path ? ["scope-v2", effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
+    ...(effectiveReport(i).path ? ["scope-v3", effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
 
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(

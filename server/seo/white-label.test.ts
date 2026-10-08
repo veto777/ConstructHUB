@@ -60,6 +60,8 @@ function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCoun
     if (/status IN \('done','failed'\)/.test(sql)) return many(db.scans.filter((x) => x.status !== "running").map((x) => ({ id: x.id, keyword: x.keyword ?? "roofer", size: 3, spacing: 2, status: x.status, error: x.error, center: null, avgRank: null, points: 9, checked: 0, found: 0, top3: 0, at: "2026-10-01T00:00:00Z" })));
     return many([]);
   }
+  // Keyword watch: the claim on the site is free, so a snapshot goes on to ask the provider.
+  if (/^UPDATE seo_sites SET kw_snapshot_claim = now\(\)/.test(sql)) return { rows: [], rowCount: 1 };
   // Rendering checks: started, failed in the background with the error's own text, read back by the page.
   if (/seo_render_runs/.test(sql)) {
     if (/^INSERT INTO seo_render_runs/.test(sql)) { const id = db.renders.length + 1; db.renders.push({ id, status: "running", urls: JSON.parse(params[2]), result: null, error: null, created_at: "2026-10-01T00:00:00Z" }); return many([{ id }]); }
@@ -276,6 +278,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "GET /api/seo/sites/:id/audit/pages": [{ url: "/api/seo/sites/1/audit/pages" }],
   "GET /api/seo/sites/:id/rank-history": [{ url: "/api/seo/sites/1/rank-history" }],
   "GET /api/seo/sites/:id/rank-competing": [{ url: "/api/seo/sites/1/rank-competing" }],
+  "GET /api/seo/sites/:id/serp-groups": [{ url: "/api/seo/sites/1/serp-groups" }],
   "GET /api/seo/sites/:id/ai/summary": [{ url: "/api/seo/sites/1/ai/summary" }],
   "GET /api/seo/sites/:id/keyword-watch": [{ url: "/api/seo/sites/1/keyword-watch" }],
   "POST /api/seo/sites/:id/keyword-watch": [{ url: "/api/seo/sites/1/keyword-watch", body: { watch: true } }],
@@ -319,7 +322,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(79);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(80);
   });
 
   for (const mode of Object.keys(PROVIDER)) {

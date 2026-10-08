@@ -183,21 +183,28 @@ export function scopePathOf(raw: string, domain: string): { path: string } | { e
   const site = domain.toLowerCase().replace(/^www\./, "");
   const bad = { error: "Enter a path on this site, such as /blog/ — no spaces." };
   if (!v) return bad;
-  const asUrl = /^https?:\/\//i.test(v) ? v : new RegExp(`^(www\\.)?${site.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(/|$)`, "i").test(v) ? `https://${v}` : null;
+  // An address in any of the ways one is pasted: with its scheme, without it ("//host/…"), or starting with the site's own name.
+  const asUrl = /^https?:\/\//i.test(v) ? v : v.startsWith("//") ? `https:${v}` : new RegExp(`^(www\\.)?${site.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([:/]|$)`, "i").test(v) ? `https://${v}` : null;
   if (asUrl) {
     let u: URL; try { u = new URL(asUrl); } catch { return bad; }
     const host = u.hostname.toLowerCase().replace(/^www\./, "");
     if (host !== site) return { error: `That address is on ${u.hostname}, not ${domain}. Open that site in Site explorer to look at its pages${host.endsWith(`.${site}`) ? " — a sub-domain is its own site here" : ""}.` };
+    // What cannot be matched is said, not quietly dropped: another port is another site to a browser, and a sign-in is not part of an address.
+    if (u.port) return { error: `That address is on port ${u.port}. Only the site's ordinary address can be looked at here — leave the port out if the page is the same.` };
+    if (u.username || u.password) return { error: "Leave the user name and password out of the address." };
     v = u.pathname + u.search;
   } else {
     v = v.split("#")[0];
     if (!v.startsWith("/")) v = `/${v}`;
   }
-  return /^\/[^\s\\#]*$/.test(v) && v.length <= 300 ? { path: v } : bad;
+  // A "?" with nothing after it is no query (the server reads it the same way).
+  v = v.replace(/\?$/, "");
+  return /^\/(?!\/)[^\s\\#]*$/.test(v) && v.length <= 300 ? { path: v } : bad;
 }
 /** The one spelling of a scope (the server's rule, server/seo/reports.ts canonicalScope): no last slash unless there is a query; the section "/" is the whole site. */
 export function canonicalScope(path: string, exact: boolean): { path: string; exact: boolean } | null {
-  const p = path.includes("?") ? path : path.replace(/\/+$/, "") || "/";
+  const q = path.replace(/\?$/, "");
+  const p = q.includes("?") ? q : q.replace(/\/+$/, "") || "/";
   return p === "/" && !exact ? null : { path: p, exact };
 }
 const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains", competitors: "Domain contains", bestByLinks: "URL contains" };
@@ -221,7 +228,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
   onExplore?: (domain: string) => void;
   /** Keyword tables: track the ticked keywords (the page supplies the site). */
-  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => void;
+  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => void | Promise<unknown>;
   trackLabel?: string;
 }) {
   const qc = useQueryClient();
@@ -237,12 +244,11 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState<25 | 50 | 100>(50);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** A tracking request is on its way: the button waits, and the ticks are cleared only when it has succeeded. */
+  const [tracking, setTracking] = useState(false);
   // A different report or target starts clean.
   useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); setScopeDraft({ text: "", exact: false }); setScope(null); setScopeError(null); }, [table, target]);
   const scoped = !!domain && SCOPED.has(table);
-  // The ticks belong to the rows on screen: another page of rows starts with none, so the number on the button is what is sent.
-  useEffect(() => { setPicked(new Set()); }, [offset, limit, sortKeyOf(table, sort)]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Belt and braces with the remount: a sort the report does not have is never sent.
   const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
   const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
@@ -252,6 +258,10 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
+  const rowsOf = saved.data?.page?.fetchedAt ?? null;
+  // The ticks belong to the rows on screen: another page of rows starts with none, so the number on the button is what is sent.
+  // ("rowsOf" changes when the rows themselves are replaced under the same page — a fresh purchase, a refresh.)
+  useEffect(() => { setPicked(new Set()); }, [offset, limit, sortKeyOf(table, sort), rowsOf]); // eslint-disable-line react-hooks/exhaustive-deps
   const run = useMutation({
     mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/report", v.body),
     onSuccess: (data: { page: Page; saved?: boolean }, v) => {
@@ -388,7 +398,13 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
             </span>
             <span className="flex flex-wrap items-center gap-2">
               {trackable && extraAction && page.rows.some((r) => picked.has(r.keyword)) && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
-              {trackable && onTrack && page.rows.some((r) => picked.has(r.keyword)) && <Button size="sm" onClick={() => onTrack(page.rows.filter((r) => picked.has(r.keyword)))} data-testid="button-track-picked">{trackLabel ?? "Track"} ({page.rows.filter((r) => picked.has(r.keyword)).length})</Button>}
+              {trackable && onTrack && page.rows.some((r) => picked.has(r.keyword)) && (
+                <Button size="sm" disabled={tracking} aria-busy={tracking} data-testid="button-track-picked" onClick={() => {
+                  const out = onTrack(page.rows.filter((r) => picked.has(r.keyword)));
+                  // The page says when tracking has finished (it returns a promise): the ticks go only on success; on failure they stay for another try.
+                  if (out && typeof (out as Promise<unknown>).then === "function") { setTracking(true); (out as Promise<unknown>).then(() => setPicked(new Set()), () => {}).finally(() => setTracking(false)); }
+                }}>{tracking ? "Tracking…" : `${trackLabel ?? "Track"} (${page.rows.filter((r) => picked.has(r.keyword)).length})`}</Button>
+              )}
               <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={download} data-testid="button-export-csv"><Download /> Export CSV</button>
             </span>
           </div>

@@ -52,6 +52,7 @@ import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from ".
 import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
+import { serpGroups } from "./serp-groups";
 import { aiSummary } from "./ai-summary";
 import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
 import { searchLocations, locationByCode } from "./locations";
@@ -1253,18 +1254,28 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     await setKeywordWatch(user, site.id, watchSetting.parse(req.body).watch);
     res.json(await keywordWatchView(user, await ownedSite(user, req.params.id)));
   });
-  // Take a snapshot now. One at a time per site; saved before it is charged.
-  route("post", "/api/seo/sites/:id/keyword-watch/snapshot", (req, res, user) => serial(`kwsnap:${user}`, async () => {
+  // Take today's snapshot — or get it back if it has been taken (one a day, never rewritten; nothing is bought twice).
+  // One at a time per site by a claim in the database, shared with the monthly schedule. Saved before it is charged.
+  route("post", "/api/seo/sites/:id/keyword-watch/snapshot", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     if (!isConfigured()) return notReady(res);
     const out = await takeKeywordSnapshot(site as any, false);
-    res.status(201).json(out);
-  }));
+    res.status(out.reused ? 200 : 201).json(out);
+  });
 
   // Tracked keywords for which Google has shown different pages of the site from check to check. Saved checks only.
   route("get", "/api/seo/sites/:id/rank-competing", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     res.json(await competingPages(user, site.id));
+  });
+
+  // Tracked keywords whose saved first-page results largely coincide (Google reads them as one question). Saved checks only.
+  route("get", "/api/seo/sites/:id/serp-groups", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const q = historyInput.parse(req.query || {});
+    const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
+    const device = (q.device && devices.includes(q.device) ? q.device : devices[0]) as "desktop" | "mobile";
+    res.json(await serpGroups(user, site.id, device));
   });
 
   // One tracked keyword's position at every saved check.
