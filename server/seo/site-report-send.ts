@@ -39,7 +39,8 @@ export async function optedOut(userId: number): Promise<string[]> {
 export function reportEmail(r: SiteReport, opts: { brandName?: string | null; senderName?: string | null; unsubscribe?: string | null } = {}): { subject: string; html: string; text: string } {
   const k = r.rankings;
   const intro = k
-    ? `${k.top10} of ${k.checked} checked keywords are in Google's top 10${k.previousTop10 !== null && k.previousTop10 !== k.top10 ? ` (${k.top10 > k.previousTop10 ? "up" : "down"} from ${k.previousTop10})` : ""}. ${k.improvedCount} moved up and ${k.declinedCount} moved down. The full report is attached.`
+    // The same rule as the highlights: a change only on the keywords in both checks, said with their number.
+    ? `${k.top10} of ${k.checked} checked keywords are in Google's top 10${k.compared && k.top10Change != null ? (k.top10Change ? ` (${k.top10Change > 0 ? "up" : "down"} ${Math.abs(k.top10Change)} on the ${k.compared} in both checks)` : ` (no change on the ${k.compared} in both checks)`) : r.comparedWith && k.compared === 0 ? " (no keyword was in both checks, so nothing is compared)" : ""}. ${k.improvedCount} moved up and ${k.declinedCount} moved down. The full report is attached.`
     : "The full report is attached.";
   const who = opts.brandName || opts.senderName;
   const { html, text } = emailLayout({

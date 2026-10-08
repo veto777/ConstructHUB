@@ -184,6 +184,26 @@ const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
                               FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) p
                              WHERE jsonb_typeof(p)='object'), '[]'::jsonb)`;
 const CRAWLED_SQL = `CASE WHEN jsonb_typeof(state->'pages')='array' THEN jsonb_array_length(state->'pages') ELSE 0 END`;
+/**
+ * Whether a finished crawl's saved result is what the crawler writes — everything the health score rests on (shared by
+ * the dashboard, Site audit, its comparisons and the client report). Anything else is "could not be read", never a
+ * clean crawl and never replaced by an older one.
+ */
+const WELL_FORMED_SQL = `-- Everything the score rests on, as a finished crawl writes it (server/sitescan): a report with a list of
+              -- findings (each one an object) and, if any, a list of errors; pages each with an address and a numeric
+              -- status. An empty list is a real empty list; anything else is "could not be read", never a clean crawl.
+              (jsonb_typeof(report)='object' AND jsonb_typeof(report->'findings')='array'
+               -- each finding: an object with a text severity, and its pages (if any) a list of addresses
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object'
+                     OR (f->>'severity') IS DISTINCT FROM 'critical' AND (f->>'severity') IS DISTINCT FROM 'warning' AND (f->>'severity') IS DISTINCT FROM 'info'
+                     OR (f ? 'urls' AND (jsonb_typeof(f->'urls')<>'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(f->'urls') u WHERE jsonb_typeof(u)<>'string'))))
+               -- each error (a page that could not be fetched counts against the score): an object with an address
+               AND (report->'errors' IS NULL OR (jsonb_typeof(report->'errors')='array'
+                     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'errors') e WHERE jsonb_typeof(e)<>'object' OR jsonb_typeof(e->'url') IS DISTINCT FROM 'string'
+                     -- a failed fetch (counts against the score) or one of the crawler's own exclusions; anything else is not known
+                     OR NOT (e->'message' IS NULL OR e->>'message' ~* '^Request failed' OR e->>'message' ~* 'excluded'))))
+               AND jsonb_typeof(state->'pages')='array'
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'status') IS DISTINCT FROM 'number'))`;
 const DONE_SQL = `status='completed' AND jsonb_typeof(report)='object'`;
 
 export type AuditRun = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
@@ -208,29 +228,35 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   /** Every finished crawl of the site, newest first (up to CRAWL_LIST), for the pickers. */ crawls: CrawlChoice[];
   /** A chosen crawl that is not this account's finished crawl of this site (or, for `vs`, not older than the one shown): the default was used and the page says so. */
   atMissing?: boolean; vsMissing?: boolean;
+  /** The newest finished crawl could not be read (its saved result is not what the crawler writes): nothing older is shown in its place unless picked. */
+  newestUnreadable?: { jobId: string; at: string | null };
   history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
   const d = bare(domain);
-  const [{ rows: done }, { rows: open }, { rows: list }] = await Promise.all([
+  const [{ rows: recent }, { rows: open }, { rows: list }] = await Promise.all([
     pool.query(
-      `SELECT id, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages FROM sitescan_jobs
-        WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
+      `SELECT id, completed_at, report, page_cap, profile->>'id' AS location_id, ${PAGES_SQL} AS pages, ${WELL_FORMED_SQL} AS well_formed FROM sitescan_jobs
+        WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
     pool.query(
       `SELECT id, status, error, created_at, ${CRAWLED_SQL} AS crawled, page_cap FROM sitescan_jobs
         WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
     pool.query(
-      `SELECT id, completed_at, page_cap FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC, id LIMIT ${CRAWL_LIST}`, [user, d]),
+      `SELECT id, completed_at, page_cap FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 AND ${WELL_FORMED_SQL} ORDER BY completed_at DESC, id LIMIT ${CRAWL_LIST}`, [user, d]),
   ]);
+  // Only crawls saved as the crawler writes them are read. The newest finished crawl, if broken, is said — and nothing
+  // older is shown in its place unless the customer picks it.
+  const done = recent.filter((j: any) => j.well_formed);
+  const newestUnreadable = recent[0] && !recent[0].well_formed ? { jobId: String(recent[0].id), at: recent[0].completed_at ? new Date(recent[0].completed_at).toISOString() : null } : null;
   const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: r.error, createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
   const newest = open[0];
   // One crawl, only if it is this account's finished crawl of this site (and, when `before` is given, older than it).
   const load = async (id: string, before?: Date) => (await pool.query(
-    `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$3 AND user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2
+    `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$3 AND user_id=$1 AND status='completed' AND ${WELL_FORMED_SQL} AND ${HOST_SQL}=$2
        ${before ? "AND completed_at < $4" : ""}`, before ? [user, d, id, before] : [user, d, id])).rows[0] ?? null;
   // The crawl shown: the one chosen, else the newest.
-  let cur = done[0] ?? null, atMissing = false;
-  if (opts.at && cur && opts.at !== cur.id) { const c = await load(opts.at); if (c) cur = c; else atMissing = true; }
+  let cur = newestUnreadable ? null : done[0] ?? null, atMissing = false;
+  if (opts.at && opts.at !== cur?.id) { const c = await load(opts.at); if (c) cur = c; else atMissing = true; }
   // No finished crawl at all: a crawl asked for is not available, and that is said too.
-  if (!cur && opts.at) atMissing = true;
+  if (!cur && opts.at && !atMissing) atMissing = true;
   // The crawl it is compared with: the one chosen (older than the one shown), else the one just before it.
   let prev: any = null, chosen = false, vsMissing = !cur && !!opts.vs;
   if (cur) {
@@ -238,14 +264,14 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
     if (!prev) {
       const i = done.findIndex((j: any) => j.id === cur.id);
       prev = i >= 0 && done[i + 1] ? done[i + 1] : (await pool.query(
-        `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND completed_at < $3 ORDER BY completed_at DESC LIMIT 1`,
+        `SELECT id, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND ${WELL_FORMED_SQL} AND ${HOST_SQL}=$2 AND completed_at < $3 ORDER BY completed_at DESC LIMIT 1`,
         [user, d, cur.completed_at])).rows[0] ?? null;
     }
   }
   const audit = cur ? (() => {
     const s = auditSummary(cur.report, cur.pages, prev ? { report: prev.report, pages: prev.pages } : null);
     const ch = prev ? pageChanges(cur.pages, prev.pages) : null;
-    return { jobId: cur.id as string, latest: cur.id === done[0]?.id, ...s, completedAt: cur.completed_at ? new Date(cur.completed_at).toISOString() : null, comparedWith: prev && ch ? { jobId: prev.id as string, at: prev.completed_at ? new Date(prev.completed_at).toISOString() : null, chosen,
+    return { jobId: cur.id as string, latest: !newestUnreadable && cur.id === done[0]?.id, ...s, completedAt: cur.completed_at ? new Date(cur.completed_at).toISOString() : null, comparedWith: prev && ch ? { jobId: prev.id as string, at: prev.completed_at ? new Date(prev.completed_at).toISOString() : null, chosen,
       addedPages: ch.added.length, removedPages: ch.removed.length, added: ch.added.slice(0, PAGE_CHANGE_LIST), removed: ch.removed.slice(0, PAGE_CHANGE_LIST), capsDiffer: Number(prev.page_cap) !== Number(cur.page_cap) } : null };
   })() : null;
   const history = done.flatMap((j: any) => {
@@ -256,7 +282,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   }).reverse();
   const locationId = Number(done[0]?.location_id) > 0 ? Number(done[0].location_id) : null;
   return {
-    locationId, audit, history, latestId: done[0]?.id ?? null, ...(atMissing ? { atMissing } : {}), ...(vsMissing ? { vsMissing } : {}),
+    locationId, audit, history, latestId: done[0]?.id ?? null, ...(newestUnreadable ? { newestUnreadable } : {}), ...(atMissing ? { atMissing } : {}), ...(vsMissing ? { vsMissing } : {}),
     crawls: list.map((r: any) => ({ jobId: r.id, at: r.completed_at ? new Date(r.completed_at).toISOString() : null, pageCap: r.page_cap == null ? null : Number(r.page_cap) })),
     running: newest && (newest.status === "queued" || newest.status === "running") ? run(newest) : null,
     lastFailed: newest && newest.status === "failed" ? run(newest) : null,
@@ -267,7 +293,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
 /** How many crawls of a site the dashboard's health trend shows. */
 export const HEALTH_TREND = 6;
 /** The version of the health worked out per crawl (seo_crawl_health.v): a new formula works every crawl out again. */
-const HEALTH_V = 2; // 2: the strict evidence test (audit #44/#45) — every crawl worked out under 1 is worked out again
+const HEALTH_V = 3; // 3: the crawler's own severities and error messages only (audit #46) — kept scores are worked out again
 /**
  * One crawl's health. `readable` false = the stored crawl could not be read (its score is not known — never zero).
  * `pages` = the pages the score is out of; `errorPages` = the distinct ones with an error.
@@ -296,19 +322,7 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   if (missing.length) {
     const { rows } = await pool.query(
       `SELECT id::text AS id, xmin::text AS fp, report, ${PAGES_SQL} AS pages,
-              -- Everything the score rests on, as a finished crawl writes it (server/sitescan): a report with a list of
-              -- findings (each one an object) and, if any, a list of errors; pages each with an address and a numeric
-              -- status. An empty list is a real empty list; anything else is "could not be read", never a clean crawl.
-              (jsonb_typeof(report)='object' AND jsonb_typeof(report->'findings')='array'
-               -- each finding: an object with a text severity, and its pages (if any) a list of addresses
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object'
-                     OR jsonb_typeof(f->'severity') IS DISTINCT FROM 'string'
-                     OR (f ? 'urls' AND (jsonb_typeof(f->'urls')<>'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(f->'urls') u WHERE jsonb_typeof(u)<>'string'))))
-               -- each error (a page that could not be fetched counts against the score): an object with an address
-               AND (report->'errors' IS NULL OR (jsonb_typeof(report->'errors')='array'
-                     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'errors') e WHERE jsonb_typeof(e)<>'object' OR jsonb_typeof(e->'url') IS DISTINCT FROM 'string')))
-               AND jsonb_typeof(state->'pages')='array'
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'status') IS DISTINCT FROM 'number')) AS well_formed
+              ${WELL_FORMED_SQL} AS well_formed
          FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
     for (const r of rows) {
       // The version read now (it may have changed since the list above; then it is worked out again next time).

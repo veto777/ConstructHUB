@@ -48,7 +48,7 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
         )}
       </div>
       {!d && q.isFetching && <p className="g-text-2 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading {device ?? "tags"}…</p>}
-      {!d && q.isError && <p className="g-text-2 text-[13px]" role="alert">Couldn't load {device ?? "the tags"}: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>}
+      {q.isError && <p className="g-text-2 text-[13px]" role="alert" data-testid="text-tags-error">Couldn't {d ? "refresh" : "load"} {device ?? "the tags"}: {apiErrorMessage(q.error)}{d ? " — what is shown is from the last time it loaded." : ""} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>}
       {d && (<>
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-tags-basis">
         {d.deviceFallback ? "This site does not track that device. " : ""}{d.now ? <>Each keyword's newest saved day on {d.device} ({spanWords(d.now)}){d.before ? ` against its own saved day before (${spanWords(d.before)})` : " — none has a day before it to compare with"} (a later check on the same day replaces the earlier one). Changes count only keywords with both — the figure under each change says how many; a keyword checked once is counted apart as new, never as a gain. A keyword can carry more than one tag, so the tags add up to more than all keywords. Visibility is an index, not a share of real clicks: 100 would mean every keyword first; weighted by search volume where every keyword has one, otherwise each keyword counts once.</> : "No check of these keywords on this device yet."}

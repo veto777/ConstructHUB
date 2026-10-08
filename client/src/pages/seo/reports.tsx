@@ -21,6 +21,7 @@ type Report = {
   search: { fetchedAt: string } | null;
   searchConsole?: { clicks: number } | null;
   audit: { scannedAt: string | null; health: number | null; topIssues: { title: string; severity: string; count: number }[] } | null;
+  auditUnreadable?: string | null;
   alerts: { title: string; kind: string; createdAt: string }[];
   work?: { unavailable?: boolean; since?: string | null; days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number; today?: string; overdue?: { title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number } | null;
 };
@@ -120,6 +121,7 @@ export default function SeoReportsPage() {
                 )}
               </section>
             )}
+            {r.auditUnreadable !== undefined && !r.audit && <p className="g-text-2 text-[13px]" role="note" data-testid="report-audit-unreadable">Site health: the newest crawl{r.auditUnreadable ? ` (${fmtDate(r.auditUnreadable)})` : ""} could not be read, so no health score is reported.</p>}
             {r.audit && r.audit.topIssues.length > 0 && (
               <section className="rounded-lg border p-4" style={card} data-testid="report-audit">
                 <h2 className="g-text mb-2 text-[16px] font-medium">What to fix first <span className="g-text-2 text-[12px] font-normal">· crawled {fmtDate(r.audit.scannedAt)}</span></h2>

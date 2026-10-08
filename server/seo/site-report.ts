@@ -79,6 +79,8 @@ export type SiteReport = {
   } | null;
   search: { fetchedAt: string; authority: number | null; referringDomains: number | null; backlinks: number | null; organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null;
     trafficChange: number | null; keywordsChange: number | null; referringDomainsChange: number | null } | null;
+  /** The newest crawl could not be read: no health is reported (never an older crawl's in its place). */
+  auditUnreadable?: string | null;
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
@@ -236,6 +238,7 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
       keywordsChange: lastChange(Array.isArray(r.history) ? r.history.map((h: any) => h.keywords) : undefined),
       referringDomainsChange: lastChange(Array.isArray(r.linkHistory) ? r.linkHistory.map((h: any) => h.referringDomains) : undefined),
     } : null,
+    ...(audit?.newestUnreadable ? { auditUnreadable: audit.newestUnreadable.at ?? "" } : {}),
     audit: a ? {
       scannedAt: a.scannedAt, health: a.health, healthChange: a.healthChange, crawled: a.crawled,
       errors: a.totals.error.affected, warnings: a.totals.warning.affected, notices: a.totals.notice.affected,
@@ -349,7 +352,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
       // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
       const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
-      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
@@ -359,7 +362,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
         // weighting of each figure is said in lines under the table.
         const tcols = [0, width * 0.36, width * 0.5, width * 0.66, width * 0.82];
         const head = ["Tag", "Keywords", "In both / new", "In the top 10", "Visibility index"];
-        const tline = (cells: string[], bold = false) => { const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: i === 0 })); doc.x = 48; doc.y = y + 14; };
+        const tline = (cells: string[], bold = false) => { if (doc.y + 16 > doc.page.height - 60) doc.addPage(); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
         const trow = (cells: string[]) => { if (doc.y + 16 > doc.page.height - 60) { doc.addPage(); tline(head, true); } tline(cells); };
         // A change that was measured is shown even when it is zero ("±0" is written "0"); none measured is "(—)" written "(-)".
         const chg = (v: number | null) => (v === null ? " (-)" : v === 0 ? " (0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
@@ -368,7 +371,9 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
           t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""}`]);
         const once = k.byTag.filter((t) => t.visibility !== null && !t.weighted).map((t) => t.tag);
         const mixed = k.byTag.filter((t) => r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted).map((t) => `${t.tag} (change ${t.changeWeighted ? "by search volume" : "each keyword once"})`);
-        line(`Visibility index weighting: by search volume${once.length ? `, except each keyword counted once for ${once.join(", ")} (some keywords have no volume)` : ""}.${mixed.length ? ` The change is weighted differently for ${mixed.join(", ")}.` : ""}`, soft);
+        // At most five names, then how many more: the note never outgrows the table.
+        const names = (xs: string[]) => (xs.length > 5 ? `${xs.slice(0, 5).join(", ")} and ${xs.length - 5} more` : xs.join(", "));
+        line(`Visibility index weighting: by search volume${once.length ? `, except each keyword counted once for ${names(once)} (some keywords have no volume)` : ""}.${mixed.length ? ` The change is weighted differently for ${names(mixed)}.` : ""}`, soft);
         if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
         line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (\"In both\"); (-) means none was in both, (0) a measured no change. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first.`, soft);
       }
@@ -390,6 +395,10 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Websites linking to it", `${n(r.search.referringDomains)}${signed(r.search.referringDomainsChange)}`);
       pair("Links in total", n(r.search.backlinks));
       line("Changes in brackets are over the period the data covers (up to two years). Visits are estimates from rankings, not analytics.", soft);
+    }
+    if (r.auditUnreadable !== undefined && !r.audit) {
+      heading("Site health");
+      line(`The newest crawl${r.auditUnreadable ? ` (${day(r.auditUnreadable)})` : ""} could not be read, so no health score is reported. A new crawl will put it right.`, soft);
     }
     if (r.audit) {
       heading(`Site health — crawled ${day(r.audit.scannedAt)}`);

@@ -4,12 +4,13 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { ensureSiteScanSchema } from "../server/sitescan/schema";
 import { siteAudit } from "../server/seo/audit";
+import { buildSiteReport } from "../server/seo/site-report";
 let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else { n++; console.log("PASS ", m); } };
 const H = "https://compare.example";
 (async () => {
   await ensureSeoSchema(); await ensureSiteScanSchema();
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://compare.example%'");
-  const report = (urls: string[]) => ({ findings: urls.length === 0 ? [] : [{ id: "missing-title", category: "content", severity: "error", title: "Missing title", urls, why: "w", fix: "f" }] });
+  const report = (urls: string[]) => ({ findings: urls.length === 0 ? [] : [{ id: "missing-title", category: "content", severity: "critical", title: "Missing title", urls, why: "w", fix: "f" }] });
   const job = async (user: number, paths: string[], broken: string[], ago: number, cap = 150, url = `${H}/`) => {
     const id = randomUUID();
     await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,$4,$5,'completed',$6, now() - $7::int * interval '1 hour')`,
@@ -44,6 +45,17 @@ const H = "https://compare.example";
   const none = await siteAudit(1, "nocrawl.example", { at: randomUUID(), vs: randomUUID() });
   ok(none.audit === null && none.atMissing === true && none.vsMissing === true, "with no crawl at all, crawls asked for are still said to be unavailable");
   ok(def.crawls.map((c) => c.jobId).join() === [newest, middle, oldest].join() && def.crawls[2].pageCap === 100, "the pickers list this account's crawls of this site, newest first, with their page limits");
+  // A newer crawl saved in a form the crawler never writes (a severity it never uses): said, and nothing older shown in its place.
+  const broken = await job(1, ["/"], [], 0);
+  await pool.query(`UPDATE sitescan_jobs SET report='{"findings":[{"id":"x","category":"content","severity":"error","title":"X","urls":["https://compare.example/"]}]}'::jsonb WHERE id=$1`, [broken]);
+  const ub = await siteAudit(1, "compare.example");
+  ok(ub.newestUnreadable?.jobId === broken && ub.audit === null && ub.crawls[0].jobId === newest, "a broken newest crawl is said; no older score takes its place; the readable ones can still be picked");
+  const picked = await siteAudit(1, "compare.example", { at: newest });
+  ok(picked.audit?.jobId === newest && picked.audit.latest === false, "an earlier crawl picked is shown as not the newest");
+  const { rows: [s1] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'compare.example') RETURNING id");
+  const rep = await buildSiteReport(1, s1.id);
+  ok(rep?.audit === null && typeof rep?.auditUnreadable === "string", "the client report says the newest crawl could not be read, with no older score");
+  await pool.query("DELETE FROM seo_sites WHERE id=$1", [s1.id]);
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://compare.example%' OR url LIKE 'https://elsewhere.example%'");
   console.log(`audit compare checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

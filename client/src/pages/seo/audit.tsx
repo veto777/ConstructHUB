@@ -32,7 +32,7 @@ type Audit = {
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
-type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null }[]; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null }[]; newestUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -154,7 +154,15 @@ export default function SeoAuditPage() {
           <p>{d.lastFailed.error || "The crawl stopped before it completed."} Started {fmtDate(d.lastFailed.createdAt)}.{a ? " The results below are from the crawl before it." : ""}</p>
         </div>
       )}
-      {site && d && !a && !running && (
+      {site && d?.newestUnreadable && (
+        <div className="g-callout mb-4" role="alert" data-testid="audit-unreadable">
+          <h3>The newest crawl could not be read</h3>
+          <p>The crawl that finished {fmtDate(d.newestUnreadable.at)} was not saved in a form we can read, so no score or issues are taken from it. Run a new crawl{(d.crawls?.length ?? 0) > 0 ? ", or look at an earlier one" : ""}.</p>
+          {a ? <p className="mt-1 text-[13px]">Shown below: the crawl of {fmtDate(a.completedAt ?? a.scannedAt)}, an earlier crawl you picked.</p>
+            : (d.crawls?.length ?? 0) > 0 && <button type="button" className="g-pill mt-2" onClick={() => choose({ at: d.crawls![0].jobId, vs: null })} data-testid="button-audit-earlier">Show the crawl of {fmtDate(d.crawls![0].at)}</button>}
+        </div>
+      )}
+      {site && d && !a && !running && !d.newestUnreadable && (
         <Empty testId="audit-empty">
           <h3>No crawl of {site.domain} yet</h3>
           <p>A crawl reads up to 150 pages of the site and checks each for broken pages, redirects, missing titles and descriptions, thin content, slow pages, and whether Google and AI assistants can read it.</p>
@@ -241,14 +249,16 @@ export default function SeoAuditPage() {
             </div>
           )}
 
-          {crawls.length > 1 && (
+          {(crawls.length > 1 || !!d?.newestUnreadable) && (
             <section className="mb-4 rounded-lg border p-4" style={card} data-testid="audit-compare">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">Showing</span>
                   <select className="g-select min-w-0 max-w-full" value={a.latest === false ? a.jobId : ""} data-testid="select-audit-at"
                     onChange={(e) => choose({ at: e.target.value || null, vs: null })}>
-                    <option value="">The newest crawl ({fmtDate(crawls[0].at)})</option>
-                    {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i + 1)}</option>)}
+                    {d?.newestUnreadable ? <><option value="">The newest crawl ({fmtDate(d.newestUnreadable.at)}, could not be read)</option>
+                      {crawls.map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i)}</option>)}</>
+                      : <><option value="">The newest crawl ({fmtDate(crawls[0].at)})</option>
+                      {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i + 1)}</option>)}</>}
                   </select></label>
                 {earlier.length > 0 && (
                   <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">compared with</span>
