@@ -17,7 +17,7 @@
  */
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
-import { mentionsInput as webMentionsInput, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
+import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -803,14 +803,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { rows } = await pool.query("SELECT location_name FROM seo_keywords WHERE site_id=$1 AND location_name IS NOT NULL GROUP BY location_name ORDER BY count(*) DESC, location_name LIMIT 20", [site.id]);
     return defaultPlaces(rows.map((r: any) => r.location_name));
   };
-  /** A saved check as shown: each row read for the places (free to change, so worked out on every read). */
-  const mentionsView = (page: MentionsPage, places: string[]) => ({ ...page, rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places) })) });
+  /** A saved check as shown: each row read for the places (free to change, so worked out on every read) and with the
+   *  customer's own verdict on that website for this name, if they gave one. */
+  const mentionsView = async (siteId: number, user: number, page: MentionsPage, places: string[]) => {
+    const { rows: marks } = await pool.query("SELECT domain, verdict FROM seo_mention_marks WHERE site_id=$1 AND user_id=$2 AND name_key=$3", [siteId, user, mentionNameKey(page.name)]);
+    const mark = new Map(marks.map((m: any) => [m.domain, m.verdict as "mine" | "not_mine"]));
+    return { ...page, rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places), mark: mark.get(r.domain) ?? null })) };
+  };
   route("get", "/api/seo/sites/:id/mentions", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
     const places = await placesOf(site);
     const page = name ? await cached<MentionsPage>(user, mentionsKey(site.domain, name), MENTIONS_CACHE_HOURS) : null;
-    res.json({ name, places, page: page ? mentionsView(page, places) : null, rows: MENTIONS_ROWS });
+    res.json({ name, places, page: page ? await mentionsView(site.id, user, page, places) : null, rows: MENTIONS_ROWS });
   });
   // The places a mention is read for. Spends nothing.
   route("post", "/api/seo/sites/:id/mentions/places", async (req, res, user) => {
@@ -819,6 +824,16 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     await pool.query("UPDATE seo_sites SET mention_places=$3 WHERE id=$1 AND user_id=$2", [site.id, user, places]);
     res.json({ places });
   });
+  // The customer's verdict on one website for one name: "mine", "not_mine", or null to take it back. Spends nothing.
+  route("post", "/api/seo/sites/:id/mentions/marks", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const m = markInput.parse(req.body);
+    if (m.verdict) await pool.query(
+      `INSERT INTO seo_mention_marks(site_id, user_id, name_key, domain, verdict) VALUES($1,$2,$3,$4,$5)
+       ON CONFLICT (site_id, name_key, domain) DO UPDATE SET verdict=excluded.verdict, marked_at=now()`, [site.id, user, mentionNameKey(m.name), m.domain, m.verdict]);
+    else await pool.query("DELETE FROM seo_mention_marks WHERE site_id=$1 AND user_id=$2 AND name_key=$3 AND domain=$4", [site.id, user, mentionNameKey(m.name), m.domain]);
+    res.json({ domain: m.domain, verdict: m.verdict });
+  });
   // Check for mentions of the name — or reopen the saved check (free for a week). The price on the button is the very
   // figure set aside. A second try buys only the link check that did not load. One at a time per saved answer.
   route("post", "/api/seo/sites/:id/mentions", async (req, res, user) => {
@@ -826,10 +841,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = webMentionsInput.parse(req.body);
     const key = mentionsKey(site.domain, input.name);
     const places = await placesOf(site);
-    const view = (page: MentionsPage) => mentionsView(page, places);
+    const view = (page: MentionsPage) => mentionsView(site.id, user, page, places);
     if (input.peek) {
       const kept = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
-      return kept ? res.json({ page: view(kept), reused: true }) : res.status(404).json({ code: "no_report", message: "Not checked yet." });
+      return kept ? res.json({ page: await view(kept), reused: true }) : res.status(404).json({ code: "no_report", message: "Not checked yet." });
     }
     await serial(`mentions:${user}:${key}`, async () => {
       // The name is remembered for the site whatever happens next (it is the customer's own choice, not data bought).
@@ -837,17 +852,20 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       if (input.retryMissing) {
         const now = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
         if (!now) return res.status(409).json({ code: "retry_unavailable", message: "The saved check is no longer there, so there is nothing to complete. Run the check again — the price is on the button." });
-        if (now.linksChecked) return res.json({ page: view(now), reused: true });
+        if (now.linksChecked) return res.json({ page: await view(now), reused: true });
         if (!isConfigured()) return notReady(res);
         const out = await buyOnce<MentionsPage>(user, key, "mentions-retry", MENTIONS_CACHE_HOURS, MENTIONS_RETRY_USD,
           async () => { const o = await checkLinks(now); if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown }); return o; }, true, `Mentions — ${site.domain} (link check, second try)`);
-        return res.status(201).json({ page: view(out.data), reused: false, saved: out.saved });
+        return res.status(201).json({ page: await view(out.data), reused: false, saved: out.saved });
       }
-      const saved = input.refresh ? null : await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
-      if (saved) return res.json({ page: view(saved), reused: true });
+      // "Check again" says which answer it is replacing: if a newer one was saved meanwhile (a second click, another tab),
+      // that one is the answer — read now, inside the queue, so overlapping refreshes buy once.
+      const current = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
+      const stale = !input.refresh ? false : !current || !input.replaces || !(new Date(current.fetchedAt) > new Date(input.replaces));
+      if (current && !stale) return res.json({ page: await view(current), reused: true });
       if (!isConfigured()) return notReady(res);
       const out = await buyOnce<MentionsPage>(user, key, "mentions", MENTIONS_CACHE_HOURS, MENTIONS_ESTIMATE_USD, () => fetchMentions(input.name, site.domain), input.refresh, `Mentions — "${input.name}"`);
-      return res.status(out.reused ? 200 : 201).json({ page: view(out.data), reused: out.reused, saved: out.saved });
+      return res.status(out.reused ? 200 : 201).json({ page: await view(out.data), reused: out.reused, saved: out.saved });
     });
   });
 

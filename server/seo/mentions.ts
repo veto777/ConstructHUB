@@ -37,10 +37,21 @@ export const mentionsInput = z.object({
   refresh: z.boolean().default(false),
   /** Ask again only for the link check when it did not load; the mentions already bought are kept and not bought again. */
   retryMissing: z.boolean().default(false),
+  /** With refresh: when the saved answer the page was showing was fetched. A newer saved answer (another request bought
+   *  it meanwhile) is returned instead of buying again. */
+  replaces: z.string().datetime().optional(),
 }).strict();
 /** The places a mention is read for (towns, a county, a street): words that show it is this business. Free to change. */
 export const placesInput = z.array(z.string().trim().min(2).max(40)).max(MAX_PLACES);
 
+/** How a name is compared for the customer's marks: case and spacing do not matter. */
+export const nameKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+export const markInput = z.object({
+  name: z.string().trim().min(3).max(80),
+  domain: z.string().trim().min(3).max(253).transform((d) => d.toLowerCase().replace(/^www\./, "")).refine((d) => /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(d), "Not a website"),
+  /** null = take the mark back. */
+  verdict: z.enum(["mine", "not_mine"]).nullable(),
+}).strict();
 export type MentionRow = {
   url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null;
   /** true = the link database has a link from this website to the site; false = none found; null = the link check did not load. */
@@ -50,6 +61,7 @@ export type MentionsPage = {
   name: string; domain: string; rows: MentionRow[];
   /** Pages the source has with the name (not websites; it counts every page). */ total: number | null;
   /** false = the link check did not load: "links to you" is unknown for every row. */ linksChecked: boolean;
+  /** When the link check that is shown was made (a second try is later than the search). */ linksCheckedAt?: string | null;
   /** The link check had more rows than one lookup returns: a website not among them is unknown, not "no link". */ linksPartial?: boolean;
   fetchedAt: string;
 };
@@ -70,10 +82,24 @@ export function mentionLinksRequest(domain: string, websites: string[]): Record<
   return { target: domain, include_subdomains: true, backlinks_status_type: "live", limit: MENTIONS_ROWS, filters: ["domain", "in", websites] };
 }
 
-/** One result as a row; null without a usable address, or when it is the site itself (any sub-domain of it). */
+/**
+ * Whether a host is the site's own: the tracked host or a sub-domain of it — or, for a tracked sub-domain
+ * ("branch.example.com"), the domain above it ("example.com") and its other sub-domains, taken as the same business.
+ */
+export function ownHost(host: string, domain: string): boolean {
+  const h = host.toLowerCase().replace(/^www\./, ""), d = domain.toLowerCase().replace(/^www\./, "");
+  if (h === d || h.endsWith(`.${d}`)) return true;
+  const parent = d.split(".").slice(1).join(".");
+  // Not when the "domain above" is a country's own suffix (example.co.uk is not a sub-domain of co.uk).
+  if (d.split(".").length <= 2 || !parent.includes(".") || /^(co|com|org|net|gov|edu|ac|ltd|plc|nom|or|ne|go)\.[a-z]{2}$/.test(parent)) return false;
+  return h === parent || h.endsWith(`.${parent}`);
+}
+/** One result as a row; null without a usable address, or when it is the business's own site (see ownHost). */
 export function parseMention(item: any, domain: string): Omit<MentionRow, "linksToYou"> | null {
   const url = safeHttpUrl(item?.url), site = safeDomain(item?.main_domain) ?? safeDomain(item?.domain);
-  if (!url || !site || site === domain || site.endsWith(`.${domain}`)) return null;
+  if (!url || !site) return null;
+  // Judged on the page's own host as well as the website it is filed under.
+  if (ownHost(site, domain) || ownHost(new URL(url).hostname, domain)) return null;
   const c = item?.content_info ?? {};
   const rank = num(item?.domain_rank), published = typeof c.date_published === "string" ? c.date_published.slice(0, 10) : null;
   return {
@@ -102,7 +128,7 @@ export async function fetchMentions(name: string, domain: string): Promise<{ dat
   const seen = new Set<string>(), rows: Omit<MentionRow, "linksToYou">[] = [];
   for (const i of taskItems(task)) { const r = parseMention(i, target); if (r && !seen.has(r.domain)) { seen.add(r.domain); rows.push(r); } }
   const page: MentionsPage = { name, domain: target, rows: rows.map((r) => ({ ...r, linksToYou: null })), total: num((task.result?.[0] as any)?.total_count), linksChecked: false, fetchedAt: new Date().toISOString() };
-  if (!rows.length) return { data: { ...page, linksChecked: true }, costUsd, costUnknown: false, customerUsd: costUsd };
+  if (!rows.length) return { data: { ...page, linksChecked: true, linksCheckedAt: null }, costUsd, costUnknown: false, customerUsd: costUsd };
   const links = await checkLinks(page);
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
   return { data: links.data, costUsd: r6(costUsd + links.costUsd), costUnknown: links.costUnknown, customerUsd: r6(costUsd + (links.data.linksChecked ? links.costUsd : 0)) };
@@ -111,14 +137,14 @@ export async function fetchMentions(name: string, domain: string): Promise<{ dat
 /** The link check for a saved page of mentions. Never throws: a failure leaves the rows' "links to you" unknown. */
 export async function checkLinks(page: MentionsPage): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean }> {
   const websites = [...new Set(page.rows.map((r) => r.domain))];
-  if (!websites.length) return { data: { ...page, linksChecked: true }, costUsd: 0, costUnknown: false };
+  if (!websites.length) return { data: { ...page, linksChecked: true, linksCheckedAt: null }, costUsd: 0, costUnknown: false };
   try {
     const task: DfsTask = assertOk(await mentionsDeps.request("POST", "/backlinks/referring_domains/live", [mentionLinksRequest(page.domain, websites)]), { treatNoResultsAsEmpty: true });
     const items = taskItems(task), total = num((task.result?.[0] as any)?.total_count);
     const linking = linkingWebsites(items, websites);
     const partial = total !== null ? total > items.length : items.length >= MENTIONS_ROWS;
     return {
-      data: { ...page, linksChecked: true, ...(partial ? { linksPartial: true } : {}), rows: page.rows.map((r) => ({ ...r, linksToYou: linking.has(r.domain) ? true : partial ? null : false })) },
+      data: { ...page, linksChecked: true, linksCheckedAt: new Date().toISOString(), ...(partial ? { linksPartial: true } : {}), rows: page.rows.map((r) => ({ ...r, linksToYou: linking.has(r.domain) ? true : partial ? null : false })) },
       costUsd: typeof task.cost === "number" ? task.cost : 0, costUnknown: false,
     };
   } catch (e: any) {

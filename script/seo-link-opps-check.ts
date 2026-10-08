@@ -45,6 +45,13 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
   const again = await addTasks(1, site.id, [taskInput.parse({ kind: "page", title: "Link", target: it.from, facts: { linkTo: it.to }, source: `link-pair:${it.pair}` })]);
   const stored = (await pool.query("SELECT source FROM seo_tasks WHERE id=$1", [old.id])).rows[0].source;
   ok(again.added === 0 && again.already === 1 && stored === "link-opp:9:/blog/a", `today's link is the one already planned under the old identity: ${JSON.stringify(again)}, stored ${stored}`);
+  // A stored task whose identity string is today's pair for /blog/a -> /siding, but whose own pages are another link,
+  // does not stop that link being planned (the pair is worked out from the addresses, not taken from the string).
+  const { pairOf } = await import("../server/seo/link-opportunities");
+  const realPair = pairOf("linkopps.example/blog/a", "linkopps.example/siding");
+  await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES(1,$1,'page','stale',$2,$3,$4)", [site.id, `${H}/about-1`, JSON.stringify({ linkTo: `${H}/about-2` }), `link-pair:${realPair}`]);
+  const unblocked = await addTasks(1, site.id, [taskInput.parse({ kind: "page", title: "Link", target: `${H}/blog/a`, facts: { linkTo: `${H}/siding` }, source: `link-pair:${realPair}` })]);
+  ok(unblocked.added === 1, `a stale stored identity does not block a different link: ${JSON.stringify(unblocked)}`);
   // Two requests at once for the same link (one written another way): one task.
   const both = await Promise.all([1, 2].map((n) => addTasks(1, site.id, [taskInput.parse({ kind: "page", title: "Link", target: n === 1 ? `${H}/siding/` : "http://www.linkopps.example/siding", facts: { linkTo: `${H}/roofing` }, source: `link-pair:x${n}` })])));
   ok(both.reduce((s2, r) => s2 + r.added, 0) === 1, `two requests for one link at once add one task: ${JSON.stringify(both)}`);

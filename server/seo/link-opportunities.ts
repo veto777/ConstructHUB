@@ -33,7 +33,7 @@ export const MIN_PHRASE = 6;
 export const BOILERPLATE_SHARE = 0.5, BOILERPLATE_MIN_PAGES = 5;
 /** Crawls saved before the redirect-alias cap was raised and marked kept at most this many per page. */
 const LEGACY_ALIAS_CAP = 20;
-export type OppPage = { url: string; status: number; noindex: boolean; title: string | null; text: string; links: string[]; /** Addresses that redirected to this page in the crawl. */ redirects?: string[]; /** More redirected here than were kept. */ redirectsCut?: boolean; canonical?: string | null };
+export type OppPage = { url: string; status: number; noindex: boolean; title: string | null; text: string; links: string[]; /** Addresses that redirected to this page in the crawl. */ redirects?: string[]; /** More redirected here than were kept; null/absent = a crawl from before this was recorded. */ redirectsCut?: boolean | null; canonical?: string | null };
 export type OppTarget = {
   keywordId: number; keyword: string; volume: number | null; position: number | null; /** The site's page that ranks, in the keyword's newest check. */ url: string | null;
   /** The newest check of the keyword: its day, the device the position is from, the place it was checked from. */ checkedOn: string | null; device: string | null; place: string | null;
@@ -111,7 +111,7 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   // Identities whose aliases may not all be known: a page — or a copy of it, anywhere along its chain — that had more
   // addresses redirect to it than the crawl keeps (marked), or a list as long as an older crawl's cap (20), which may
   // have been cut without being marked.
-  const aliasesIncomplete = new Set(pages.filter((p) => p.redirectsCut || (Array.isArray(p.redirects) && p.redirects.length >= LEGACY_ALIAS_CAP)).map((p) => resolve(p.url)));
+  const aliasesIncomplete = new Set(pages.filter((p) => p.redirectsCut === true || ((p.redirectsCut === null || p.redirectsCut === undefined) && Array.isArray(p.redirects) && p.redirects.length >= LEGACY_ALIAS_CAP)).map((p) => resolve(p.url)));
   let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0, aliasesCut = 0;
   const known: (OppTarget & { url: string })[] = [];
   for (const t of targets) {
@@ -170,7 +170,7 @@ const TEXT_PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'noindex', COALESCE(p->'noindex' = 'true'::jsonb, false), 'title', p->>'title',
     'text', left(COALESCE(p->>'text', ''), ${LINK_OPP_TEXT}),
     'canonical', CASE WHEN jsonb_typeof(p->'canonical')='string' THEN p->>'canonical' END,
-    'redirects', ${strings("redirects", 100)}, 'redirectsCut', COALESCE(p->'redirectsCut' = 'true'::jsonb, false),
+    'redirects', ${strings("redirects", 100)}, 'redirectsCut', CASE WHEN jsonb_typeof(p->'redirectsCut')='boolean' THEN p->'redirectsCut' END,
     'links', ${strings("links", LINK_OPP_LINKS)}) ORDER BY ord)
   FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
  WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;

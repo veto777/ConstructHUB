@@ -158,6 +158,17 @@ export const SEO_SCHEMA_DDL = [
   // Unlinked mentions (server/seo/mentions.ts): the name searched last and the places a mention is read for.
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_name text`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_places text[]`,
+  // The customer's own verdict on a website that uses the name: "mine" (it writes about this business) or "not_mine"
+  // (another business with the name). Per site, name and website.
+  `CREATE TABLE IF NOT EXISTS seo_mention_marks (
+     site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
+     user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name_key text NOT NULL,
+     domain text NOT NULL,
+     verdict text NOT NULL CHECK (verdict IN ('mine','not_mine')),
+     marked_at timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (site_id, name_key, domain)
+   )`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alert_drop integer NOT NULL DEFAULT 3`,
   // What changed between checks (server/seo/alerts.ts). `source` is what raised it (a rank run id, a snapshot date).
   `CREATE TABLE IF NOT EXISTS seo_alerts (

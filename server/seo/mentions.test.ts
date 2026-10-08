@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { checkLinks, defaultPlaces, fetchMentions, linkingWebsites, mentionsDeps, mentionsInput, mentionsRequest, mentionLinksRequest, parseMention, placeIn, MENTIONS_ROWS } from "./mentions";
+import { checkLinks, ownHost, defaultPlaces, fetchMentions, linkingWebsites, mentionsDeps, mentionsInput, mentionsRequest, mentionLinksRequest, parseMention, placeIn, MENTIONS_ROWS } from "./mentions";
 
 const item = (main_domain: string, title: string, snippet: string, o: Record<string, unknown> = {}) => ({ url: `https://${main_domain}/post`, main_domain, domain_rank: 420, content_info: { main_title: title, snippet, date_published: "2025-04-24 10:00:00 +00:00" }, ...o });
 const ok = (items: unknown[], cost = 0.02, total: number | null = items.length) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ total_count: total, items }] }] });
@@ -58,5 +58,12 @@ describe("unlinked mentions", () => {
     mentionsDeps.request = (async (_m: string, path: string) => { calls.push(path); return ok([], 0.02, 0); }) as any;
     const out = await fetchMentions("Nobody Named This", "x.com");
     expect([calls.length, out.data.rows, out.data.linksChecked]).toEqual([1, [], true]);
+  });
+  it("the business's own site: its host and sub-domains, and for a tracked sub-domain the domain above it — never a country suffix", () => {
+    expect([ownHost("blog.alpine.example", "alpine.example"), ownHost("alpine.example", "branch.alpine.example"), ownHost("shop.alpine.example", "branch.alpine.example")]).toEqual([true, true, true]);
+    expect([ownHost("other.co.uk", "example.co.uk"), ownHost("notalpine.example", "alpine.example"), ownHost("example.com", "a.b")]).toEqual([false, false, false]);
+    // A result filed under another website but served from the site's own host is still the site's own.
+    expect(parseMention({ url: "https://branch.alpine.example/news", main_domain: "alpine.example", content_info: {} }, "branch.alpine.example")).toBeNull();
+    expect(parseMention({ url: "https://www.alpine.example/x", main_domain: "feed.example", content_info: {} }, "alpine.example")).toBeNull();
   });
 });

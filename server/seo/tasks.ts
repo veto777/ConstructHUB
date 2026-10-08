@@ -153,17 +153,30 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
     // (old "link-opp:" ones included) is compared with the new one by its two pages — through the aliases of the
     // site's newest crawl, read now, under the same lock as the insert. Stored tasks are never rewritten, so a later
     // crawl that knows more aliases compares them afresh.
+    // The pair is worked out HERE from the task's two addresses (never taken from what the page sent), and decides alone:
+    // a stored task whose source string is the same but whose pages now resolve to another pair does not block this one.
     let pairs = new Set<string>(), linkPair = (_f: unknown, _t: unknown) => "";
+    const allSources = new Set<string>();
     if (tasks.some((t) => t.source?.startsWith("link-pair:"))) {
       const resolve = await linkResolverFor(userId, site.domain, client);
       linkPair = (from, to) => pairOf(resolve(String(from ?? "")), resolve(String(to ?? "")));
-      pairs = new Set((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND (source LIKE 'link-opp:%' OR source LIKE 'link-pair:%') AND target IS NOT NULL", [siteId])).rows
-        .filter((r: any) => typeof r.link_to === "string").map((r: any) => linkPair(r.target, r.link_to)));
+      const { rows: links } = await client.query("SELECT source, target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND (source LIKE 'link-opp:%' OR source LIKE 'link-pair:%')", [siteId]);
+      for (const r of links) allSources.add(r.source);
+      pairs = new Set(links.filter((r: any) => r.target && typeof r.link_to === "string").map((r: any) => linkPair(r.target, r.link_to)));
     }
     const fresh = tasks.filter((t) => {
       if (!t.source) return true;
+      if (t.source.startsWith("link-pair:")) {
+        const pr = linkPair(t.target, t.facts.linkTo);
+        if (pairs.has(pr)) return false;
+        pairs.add(pr);
+        // Stored under the pair as it is now; if an older task already holds that string for what is now another pair, a
+        // distinct suffix keeps both (the plan's rule is one task per source string).
+        t.source = allSources.has(`link-pair:${pr}`) ? `link-pair:${pr}:${Date.now().toString(36)}` : `link-pair:${pr}`;
+        allSources.add(t.source);
+        return true;
+      }
       if (known.has(t.source)) return false;
-      if (t.source.startsWith("link-pair:")) { const pr = linkPair(t.target, t.facts.linkTo); if (pairs.has(pr)) return false; pairs.add(pr); }
       known.add(t.source); return true;
     });
     const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);

@@ -474,6 +474,9 @@ export async function crawl(
           continue;
         }
         const page = parsePage(r);
+        // Saved with an explicit "not cut": a crawl that records the cut says so on every page, which is how a page
+        // from an older crawl (no such field; its alias list was capped at 20 unmarked) is told apart.
+        page.redirectsCut = false;
         state.pages.push(page);
         visited.add(r.url);
         for (const redirect of r.redirects) visited.add(redirect);

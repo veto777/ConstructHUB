@@ -81,7 +81,11 @@ describe("keyword watch", () => {
     const kw = (keyword: string, o: Partial<SnapshotKeyword>): SnapshotKeyword => ({ keyword, position: 5, volume: 100, traffic: 10, path: null, ...o });
     // The same page given as a path, as a full address, and with www: one row, its address on the site's host.
     const p1 = pagesChanged([kw("a", { path: "/roofing", url: "https://www.alpine.example/roofing/" })], [kw("a", { path: "https://alpine.example/roofing" })], "alpine.example");
-    expect(p1.map((x) => [x.path, x.url, x.movedIn, x.movedOut])).toEqual([["/roofing", "https://alpine.example/roofing", 0, 0]]);
+    expect(p1.map((x) => [x.path, x.movedIn, x.movedOut])).toEqual([["/roofing", 0, 0]]);
+    // Its address is rebuilt as the source wrote it (scheme and host); another port is another page.
+    expect(p1[0].url).toMatch(/^https:\/\/(www\.)?alpine\.example\/roofing$/);
+    const ports = pagesChanged([kw("p", { path: "/a", url: "http://alpine.example:8080/a" }), kw("q", { path: "/a", url: "https://alpine.example/a" })], [], "alpine.example");
+    expect(ports.map((x) => x.url).sort()).toEqual(["http://alpine.example:8080/a", "https://alpine.example/a"]);
     // A page on another host is shown and planned with its own host, never glued onto the site's.
     const p2 = pagesChanged([kw("b", { path: "/shop", url: "https://store.alpine.example/shop" })], [], "alpine.example");
     expect([p2[0].path, p2[0].url]).toEqual(["store.alpine.example/shop", "https://store.alpine.example/shop"]);

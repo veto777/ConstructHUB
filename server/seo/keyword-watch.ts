@@ -121,19 +121,24 @@ export const pageKey = (path: string | null): string | null => {
 };
 const bareHost = (h: string) => h.toLowerCase().replace(/^www\./, "");
 /** Host and path of a keyword's page: from its full address when given, else from the path (which may itself be one). */
-function pageOf(k: SnapshotKeyword, siteHost: string): { key: string; host: string; path: string; cut: boolean } | null {
+/**
+ * Which page a keyword ranks with. Identity: host (www folded) with its port when it has one, and the path — so
+ * http and https of one address are deliberately ONE page (as everywhere else in the product), while another port is
+ * another page. `origin` is the address's own scheme, host and port, used to rebuild its full address unchanged.
+ */
+function pageOf(k: SnapshotKeyword, siteHost: string): { key: string; host: string; origin: string | null; path: string; cut: boolean } | null {
   // Older snapshots kept only the first 300 characters of the path (full address or not): such an address may be
   // incomplete — decided before anything is read from it.
   const cut = !k.url && String(k.path ?? "").length === 300;
   for (const full of [k.url, /^https?:\/\//i.test(String(k.path ?? "")) ? k.path : null]) {
     if (!full) continue;
-    try { const u = new URL(full); const path = pageKey(u.pathname + u.search)!; const host = bareHost(u.hostname); return { key: `${host}${path}`, host, path, cut }; } catch { /* not an address */ }
+    try { const u = new URL(full); const path = pageKey(u.pathname + u.search)!; const host = bareHost(u.hostname) + (u.port ? `:${u.port}` : ""); return { key: `${host}${path}`, host, origin: u.origin, path, cut }; } catch { /* not an address */ }
   }
   const path = pageKey(k.path);
   if (path === null) return null;
   // A full address was given but could not be used: the host is not known, so the path is never put on the site's host.
-  if (k.urlRejected) return { key: `?${path}`, host: "", path, cut };
-  return { key: `${siteHost}${path}`, host: siteHost, path, cut };
+  if (k.urlRejected) return { key: `?${path}`, host: "", origin: null, path, cut };
+  return { key: `${siteHost}${path}`, host: siteHost, origin: siteHost ? `https://${siteHost}` : null, path, cut };
 }
 /** Pure: keywords grouped by page in two snapshots of the same market. `siteHost` is the site's own host (for paths). */
 export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], siteHost = ""): PageChange[] {
@@ -145,7 +150,7 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
     let row = pages.get(k);
     if (!row) {
       const shown = pg ? (pg.host === host ? pg.path : `${pg.host}${pg.path}`) : null;
-      row = { id: createHash("sha256").update(k).digest("hex").slice(0, 16), path: shown, url: pg && pg.host ? `https://${pg.host}${pg.path}` : null, cut: !!pg?.cut,
+      row = { id: createHash("sha256").update(k).digest("hex").slice(0, 16), path: shown, url: pg?.origin ? `${pg.origin}${pg.path}` : null, cut: !!pg?.cut,
         before: side(), after: side(), added: 0, gone: 0, movedIn: 0, movedOut: 0, pageNewlyGiven: 0, pageNoLongerGiven: 0 };
       pages.set(k, row);
     }
