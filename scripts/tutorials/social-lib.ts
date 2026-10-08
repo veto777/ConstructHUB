@@ -489,7 +489,7 @@ export function cameraExpr(cam: { start: Shot; keys: readonly Keyframe[] }, l: L
 export const isRingOrange = (r: number, g: number, b: number): boolean => r >= 212 && g >= 82 && g <= 152 && b <= 78 && r - g >= 78;
 
 /** The first video (Database Directory, 1280×720) was recorded with the ring in the surface accent, #1a73e8. */
-export const isRingBlue = (r: number, g: number, b: number): boolean => r <= 80 && g >= 85 && g <= 150 && b >= 195;
+export const isRingBlue = (r: number, g: number, b: number): boolean => r <= 110 && g >= 85 && g <= 170 && b >= 175 && b - r >= 100;
 
 /**
  * The highlight ring in one RGB24 frame: a hollow orange rectangle — two thin horizontal bars of the
@@ -497,9 +497,13 @@ export const isRingBlue = (r: number, g: number, b: number): boolean => r <= 80 
  * "bars" are thick and are ignored. Returns the ring's box (what it surrounds), or null.
  */
 export function findRing(rgb: Uint8Array | Buffer, width: number, height: number, isRing: (r: number, g: number, b: number) => boolean = isRingOrange): Box | null {
+  return findRings(rgb, width, height, isRing)[0] ?? null;
+}
+/** Every hollow rectangle of the ring's colour in the frame, the largest first. */
+export function findRings(rgb: Uint8Array | Buffer, width: number, height: number, isRing: (r: number, g: number, b: number) => boolean = isRingOrange): Box[] {
   const isRingOrange = isRing; // every test below is against the ring colour asked for
   type Bar = { x0: number; x1: number; y0: number; y1: number; open: boolean };
-  const MIN_RUN = 36, MAX_THICK = 13, SLACK = 30;
+  const MIN_RUN = 36, MAX_THICK = 13, SLACK = 30, BRIDGE = Math.round(8 + (44 * width) / 1920);
   const bars: Bar[] = [], open: Bar[] = [];
   for (let y = 0; y < height; y++) {
     const runs: [number, number][] = [];
@@ -508,8 +512,14 @@ export function findRing(rgb: Uint8Array | Buffer, width: number, height: number
     for (let x = 0; x <= width; x++) {
       const on = x < width && isRingOrange(rgb[row + x * 3], rgb[row + x * 3 + 1], rgb[row + x * 3 + 2]);
       if (on && from < 0) from = x;
-      if (!on && from >= 0) { if (x - from >= MIN_RUN) runs.push([from, x - 1]); from = -1; }
+      if (!on && from >= 0) {
+        // The pointer often rests across the ring's edge: a short break in a run is bridged.
+        const last = runs[runs.length - 1];
+        if (last && from - last[1] <= BRIDGE) last[1] = x - 1; else runs.push([from, x - 1]);
+        from = -1;
+      }
     }
+    for (let i = runs.length - 1; i >= 0; i--) if (runs[i][1] - runs[i][0] + 1 < MIN_RUN) runs.splice(i, 1);
     for (const b of open) b.open = false;
     for (const [x0, x1] of runs) {
       const b = open.find((o) => o.y1 === y - 1 && Math.abs(o.x0 - x0) <= SLACK && Math.abs(o.x1 - x1) <= SLACK);
@@ -534,7 +544,7 @@ export function findRing(rgb: Uint8Array | Buffer, width: number, height: number
     }
     return n ? hit / n : 0;
   };
-  let best: Box | null = null;
+  const found: Box[] = [];
   for (const top of thin) for (const bottom of thin) {
     if (bottom.y0 - top.y1 < 18 || Math.abs(top.x0 - bottom.x0) > 10 || Math.abs(top.x1 - bottom.x1) > 10) continue;
     const inset = Math.min(26, Math.floor((bottom.y0 - top.y1) / 4)), y0 = top.y1 + inset, y1 = bottom.y0 - inset;
@@ -549,9 +559,22 @@ export function findRing(rgb: Uint8Array | Buffer, width: number, height: number
     }
     if (inAll && inOrange / inAll > 0.3) continue;
     const box = { x: Math.max(0, x0 - 20), y: top.y0, w: Math.min(width, x1 + 20) - Math.max(0, x0 - 20) + 1, h: bottom.y1 - top.y0 + 1 };
-    if (!best || box.w * box.h > best.w * best.h) best = box;
+    found.push(box);
   }
-  return best;
+  return found.sort((a, b) => b.w * b.h - a.w * a.h);
+}
+
+/**
+ * From every hollow rectangle seen in every sample, the ring: the largest one that is not a FIXTURE.
+ * A fixture is a rectangle of the ring's colour that stays in the same place across three steps or
+ * more — a focused field's outline, an outlined button — while the ring moves with every step.
+ */
+export function pickRings(samples: readonly { ms: number; boxes: readonly Box[] }[], stepOf: (ms: number) => number): RingSample[] {
+  const place = (b: Box) => `${Math.round(b.x / 10)}:${Math.round(b.y / 10)}:${Math.round(b.w / 10)}:${Math.round(b.h / 10)}`;
+  const seenIn = new Map<string, Set<number>>();
+  for (const s of samples) for (const b of s.boxes) { const k = place(b); if (!seenIn.has(k)) seenIn.set(k, new Set()); seenIn.get(k)!.add(stepOf(s.ms)); }
+  const fixture = (b: Box) => (seenIn.get(place(b))?.size ?? 0) >= 3;
+  return samples.map((s) => ({ ms: s.ms, box: s.boxes.find((b) => !fixture(b)) ?? null }));
 }
 
 export type RingSample = { ms: number; box: Box | null };

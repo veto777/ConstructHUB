@@ -32,7 +32,7 @@ import { LOUDNESS, measureLoudness } from "./mux";
 import { renderStill } from "./brand";
 import { coverHtml, endHtml, frameHtml, hookHtml, type HookSpec } from "./social-brand";
 import {
-  CUT_NAMES, LAYOUTS, assFile, cameraExpr, cameraKeyframes, captionEvents, cropOf, findGaps, findRing, isRingBlue, planCut, shotAt, stepFocus,
+  CUT_NAMES, LAYOUTS, assFile, cameraExpr, cameraKeyframes, captionEvents, cropOf, findGaps, findRings, isRingBlue, pickRings, planCut, shotAt, stepFocus,
   type Box, type CutName, type CutPlan, type FocusStep, type Layout, type RingSample,
 } from "./social-lib";
 import { buildSocialText, type SocialEntry } from "./social-text";
@@ -78,8 +78,9 @@ async function decodeAudio(file: string): Promise<Int16Array> {
 }
 
 /** Look at the master RING_FPS times a second between two moments and report where the recorder's ring is. */
-async function scanRing(file: string, fromS: number, toS: number, size: { width: number; height: number }): Promise<{ orange: RingSample[]; blue: RingSample[] }> {
-  const frameBytes = size.width * size.height * 3, samples: RingSample[] = [], blue: RingSample[] = [];
+type Seen = { ms: number; boxes: Box[] };
+async function scanRing(file: string, fromS: number, toS: number, size: { width: number; height: number }): Promise<{ orange: Seen[]; blue: Seen[] }> {
+  const frameBytes = size.width * size.height * 3, samples: Seen[] = [], blue: Seen[] = [];
   let pending = Buffer.alloc(0), n = 0;
   await new Promise<void>((resolve, reject) => {
     const child = spawn("flock", ["-x", ENCODE_LOCK, "nice", "-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-threads", "4",
@@ -88,8 +89,8 @@ async function scanRing(file: string, fromS: number, toS: number, size: { width:
       pending = pending.length ? Buffer.concat([pending, d]) : d;
       while (pending.length >= frameBytes) {
         const ms = Math.round((fromS + n / RING_FPS) * 1000), frame = pending.subarray(0, frameBytes);
-        samples.push({ ms, box: findRing(frame, size.width, size.height) });
-        blue.push({ ms, box: findRing(frame, size.width, size.height, isRingBlue) });
+        samples.push({ ms, boxes: findRings(frame, size.width, size.height) });
+        blue.push({ ms, boxes: findRings(frame, size.width, size.height, isRingBlue) });
         pending = pending.subarray(frameBytes); n++;
       }
     });
@@ -164,7 +165,8 @@ export async function makeSocial(helpKey: string, folder: string, opts: { only?:
     else {
       // The ring is the brand orange; the first video's was blue. Whichever colour marks more steps is this master's.
       const scan = await scanRing(master, m(timings.trimStartMs) / 1000, m(timings.endMs) / 1000, src);
-      const per = (samples: RingSample[]) => timings.steps.map((s) => ({ step: s.index, ...stepFocus(samples, m(s.startMs), m(s.endMs)) }));
+      const stepOf = (ms: number) => timings.steps.findIndex((s) => ms >= m(s.startMs) && ms < m(s.endMs));
+      const per = (seen: Seen[]) => { const samples: RingSample[] = pickRings(seen, stepOf); return timings.steps.map((s) => ({ step: s.index, ...stepFocus(samples, m(s.startMs), m(s.endMs)) })); };
       const orange = per(scan.orange), blue = per(scan.blue), count = (f: { box: Box | null }[]) => f.filter((x) => x.box).length;
       const main = count(blue) > count(orange) * 2 ? blue : orange;
       focus = {
@@ -175,7 +177,7 @@ export async function makeSocial(helpKey: string, folder: string, opts: { only?:
           // A field being typed in can lose its ring when its list reloads: its own blue focus outline says where it is.
           if ((action === "type" || action === "select") && main !== blue && blue[i].box) return { ...blue[i], guess: "the field's focus outline" };
           // "Look here" with no ring found is nearly always the selected item of the menu (orange on orange): show the whole menu.
-          if (action === "highlight" || action === "hover") return { step: f.step, box: { x: 0, y: 0, w: Math.round(src.width * 0.24), h: src.height }, ringOffMs: null, guess: "the menu" };
+          if (action === "highlight" && main !== blue) return { step: f.step, box: { x: 0, y: 0, w: Math.round(src.width * 0.24), h: src.height }, ringOffMs: null, guess: "the menu" };
           return f;
         }),
       };

@@ -7,7 +7,8 @@
  *
  * Plays the step script in headless Chromium, films it from Chromium's own screencast, and writes
  *   raw.mkv       the screen capture at device pixels (with a pre-roll that mux.ts cuts off)
- *   timings.json  where every step starts and ends in it
+ *   timings.json  where every step starts and ends in it — and what it pointed at (the target's box,
+ *                 when its ring left, the pointer's path), which social.ts uses to frame the phone cuts
  *
  * Run narrate.ts FIRST: each step is held for its measured narration clip plus a short pad, so the
  * picture and the voice line up without editing. (--no-narration estimates the lengths from the
@@ -140,10 +141,26 @@ export const CAPTION_SAFE = (height: number) => Math.round(height * 0.17);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
+type TargetBox = { x: number; y: number; width: number; height: number };
+
 class Player {
   private pos: { x: number; y: number };
-  constructor(private page: Page, private viewport: { width: number; height: number }) {
+  constructor(private page: Page, private viewport: { width: number; height: number }, private now: () => number = () => Date.now()) {
     this.pos = { x: Math.round(viewport.width * 0.93), y: Math.round(viewport.height * 0.55) };
+  }
+
+  // What a step pointed at, for the social cuts (social.ts crops the recording around it): the target's
+  // box where it came to rest, when its ring was taken away, and the pointer's path. Reset per step.
+  private aimed: TargetBox | null = null;
+  private ringOffAt: number | null = null;
+  private path: [number, number, number][] = [];
+  beginStep() { this.aimed = null; this.ringOffAt = null; this.path = []; }
+  /** The step's record. The box is read again at the end when the ring is still on its element (it may have moved). */
+  async endStep(): Promise<{ target: TargetBox | null; ringOffMs: number | null; cursor: [number, number, number][] }> {
+    const round = (b: TargetBox): TargetBox => ({ x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10, width: Math.round(b.width * 10) / 10, height: Math.round(b.height * 10) / 10 });
+    const still = this.ringed ? await this.ringed.boundingBox({ timeout: 300 }).catch(() => null) : null;
+    const box = still ?? this.aimed;
+    return { target: box ? round(box) : null, ringOffMs: this.ringOffAt, cursor: this.path };
   }
 
   /** Move the pointer along a slightly bowed path, slow–fast–slow, so it glides instead of jumping. */
@@ -157,6 +174,7 @@ class Player {
     for (let i = 1; i <= n; i++) {
       const t = ease(i / n), arc = Math.sin(Math.PI * t) * bow;
       await this.page.mouse.move(from.x + dx * t + nx * arc, from.y + dy * t + ny * arc);
+      if (i % 6 === 0 || i === n) this.path.push([this.now(), Math.round(from.x + dx * t + nx * arc), Math.round(from.y + dy * t + ny * arc)]);
       const due = started + (duration * i) / n;
       if (due > Date.now()) await sleep(due - Date.now());
     }
@@ -165,6 +183,7 @@ class Player {
 
   private ringed: Locator | null = null;
   async ring(target: Locator | null) {
+    if (!target && this.ringed) this.ringOffAt = this.now();
     this.ringed = target;
     if (target) await target.evaluate((el) => (window as any).__tut?.ring(el));
     else await this.page.evaluate(() => (window as any).__tut?.ring(null)).catch(() => {});
@@ -198,6 +217,7 @@ class Player {
       last = box;
     }
     if (!last) throw new Error("target has no box");
+    this.aimed = last;
     const wide = last.width > 320;
     const point = {
       x: Math.round(last.x + (wide ? Math.min(last.width * 0.3, 220) : last.width / 2)),
@@ -455,7 +475,7 @@ async function main() {
   await sleep(1500);
   const syncStartMs = await flash();
 
-  const player = new Player(page, script.viewport);
+  const player = new Player(page, script.viewport, now);
   const steps: StepTiming[] = [];
   let trimStartMs = 0;
   for (let i = 0; i < script.steps.length; i++) {
@@ -464,7 +484,7 @@ async function main() {
     if (i === 0 && step.action === "goto") { await player.play(step, base); trimStartMs = now(); }
     else if (i === 0) trimStartMs = now();
     const startMs = now();
-    if (!(i === 0 && step.action === "goto")) await player.play(step, base);
+    if (!(i === 0 && step.action === "goto")) { player.beginStep(); await player.play(step, base); }
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
     const until = dry ? now() + 350 : Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
@@ -490,8 +510,10 @@ async function main() {
       }
       return `${location.pathname}${location.search}\n${rows.join("\n")}\n`;
     }));
+    // Where the step pointed (social.ts frames the phone cuts around it). Never worth failing a recording for.
+    const pointed = i === 0 && step.action === "goto" ? { target: null, ringOffMs: null, cursor: [] } : await player.endStep().catch(() => ({ target: null, ringOffMs: null, cursor: [] as [number, number, number][] }));
     const endMs = now();
-    steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs });
+    steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs, target: pointed.target, ringOffMs: pointed.ringOffMs, cursor: pointed.cursor });
     console.log(`  step ${String(i).padStart(2)} ${step.action.padEnd(9)} ${(startMs / 1000).toFixed(2)}s → ${(endMs / 1000).toFixed(2)}s  ${step.caption}`);
   }
   await sleep(700);

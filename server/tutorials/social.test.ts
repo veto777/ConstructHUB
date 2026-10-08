@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import {
   CAP_MARGIN_MS, CUT_NAMES, LAYOUTS, MAX_PHRASE_WORDS, MAX_SPEED, SAFE_AREA, assFile, cameraExpr, cameraKeyframes, captionEvents, captionInkHeight, chunkCaption, cropOf,
-  findGaps, findRing, inside, isRingBlue, keptEndMs, maxCropW, overlaps, planCut, safeRect, shotAt, shotFor, stepFocus, textWidth, wordTimes, type CutStepInput,
+  findGaps, findRing, findRings, inside, isRingBlue, keptEndMs, maxCropW, overlaps, pickRings, planCut, safeRect, shotAt, shotFor, stepFocus, textWidth, wordTimes, type CutStepInput,
 } from "../../scripts/tutorials/social-lib";
 import { PLATFORM_RULES, SOCIAL_PLATFORMS, buildSocialText, lintPost, sameThing } from "../../scripts/tutorials/social-text";
 import { socialKey } from "../../scripts/tutorials/social-upload";
@@ -271,6 +271,22 @@ describe("finding the recorder's ring in a frame", () => {
     ring(c, 100, 100, 300, 60, [26, 115, 232], 3);
     expect(findRing(c, W, H)).toBeNull();
     expect(findRing(c, W, H, isRingBlue)).toMatchObject({ y: 100, h: 60 });
+  });
+  it("still finds a ring the pointer is resting across", () => {
+    const b = frame();
+    ring(b, 300, 120, 220, 70);
+    fill(b, 400, 180, 14, 14, [17, 17, 17]); // the pointer's arrow, over the bottom edge
+    expect(findRing(b, W, H)).toMatchObject({ y: 120, h: 70 });
+  });
+  it("takes the rectangle that moves with the steps, not one that stays put (a focused field's outline)", () => {
+    const outline = { x: 390, y: 358, w: 300, h: 48 }, a = { x: 600, y: 500, w: 90, h: 30 }, c = { x: 100, y: 200, w: 120, h: 40 };
+    const seen = [
+      { ms: 0, boxes: [{ x: 379, y: 356, w: 323, h: 52 }, outline] }, { ms: 250, boxes: [{ x: 379, y: 356, w: 323, h: 52 }, outline] },
+      { ms: 1000, boxes: [outline, a] }, { ms: 1250, boxes: [outline, a] }, { ms: 2000, boxes: [outline, c] }, { ms: 2250, boxes: [outline] }, { ms: 3000, boxes: [{ ...outline, x: 392 }] },
+    ];
+    const picked = pickRings(seen, (ms) => Math.floor(ms / 1000));
+    expect(picked.map((p) => p.box?.x ?? null)).toEqual([379, 379, 600, 600, 100, null, null]);
+    expect(findRings(frame(), W, H)).toEqual([]);
   });
   it("turns the samples of a step into its target and the moment a click's ring left", () => {
     const box = { x: 100, y: 100, w: 200, h: 60 };
