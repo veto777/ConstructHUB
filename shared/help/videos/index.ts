@@ -8,6 +8,7 @@ export { default as v_crm_client_notes } from "./crm-client-notes.json";
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_create_menu } from "./crm-create-menu.json";
+export { default as v_crm_follow_ups } from "./crm-follow-ups.json";
 export { default as v_crm_home } from "./crm-home.json";
 export { default as v_crm_lead_new } from "./crm-lead-new.json";
 export { default as v_crm_pipeline } from "./crm-pipeline.json";

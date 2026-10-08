@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-follow-ups",
+  "durationSec": 56,
+  "video": {
+    "key": "tutorials/crm-follow-ups.586e8aa4.mp4",
+    "bytes": 5643797,
+    "sha256": "586e8aa44405111350a8bc8f8b84bf0301bba0b5d9a035eff64ceb74ddd151a5"
+  },
+  "captions": {
+    "key": "tutorials/crm-follow-ups.41681cf3.vtt",
+    "bytes": 1167,
+    "sha256": "41681cf3991c94cb84192cd553503242b953153c60debc03bb2027053d6a8dea"
+  },
+  "poster": {
+    "key": "tutorials/crm-follow-ups.6abc3b53.jpg",
+    "bytes": 114171,
+    "sha256": "6abc3b53e042d16b79dc562c9b01740833f96c8002ae2f8349220f87d56fa54f"
+  },
+  "uploaded": {
+    "at": "2026-10-08T02:15:57.810Z",
+    "video": "65371dd24f7d08d6d3a10bb5a9e8fe16",
+    "captions": "81ecdf526f6c2b504ed0fd04fd3fd14f",
+    "poster": "6b2122ac03c3ac80913cc81819f16ceb"
+  }
+}
