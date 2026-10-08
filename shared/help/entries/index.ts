@@ -3,7 +3,10 @@
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_estimate_quick } from "./crm/crm-estimate-quick";
 export { default as e_crm_estimate_tracking } from "./crm/crm-estimate-tracking";
+export { default as e_crm_google_calendar } from "./crm/crm-google-calendar";
+export { default as e_crm_invoice_client_view } from "./crm/crm-invoice-client-view";
 export { default as e_crm_invoice_receipt } from "./crm/crm-invoice-receipt";
 export { default as e_crm_jobcam_upload } from "./crm/crm-jobcam-upload";
 export { default as e_crm_payment_link } from "./crm/crm-payment-link";
 export { default as e_crm_project_edit } from "./crm/crm-project-edit";
+export { default as e_crm_sms_setup } from "./crm/crm-sms-setup";

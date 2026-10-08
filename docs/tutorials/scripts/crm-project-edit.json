@@ -18,13 +18,13 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"card-project-demo-project-p-1998\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\")",
       "caption": "The job's card",
       "narration": "Find the job's card. This one is a tile backsplash in Estimating, with no value yet."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"button-edit-project-demo-project-p-1998\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\") [data-testid^=\"button-edit-project-\"]",
       "caption": "The pencil",
       "narration": "Click the pencil on the card.",
       "holdMs": 700
@@ -66,14 +66,14 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"card-project-demo-project-p-1998\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\")",
       "caption": "The card, updated",
       "chapter": "See the result",
       "narration": "The card has moved to Proposal Sent, and it now shows the value."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"button-edit-project-demo-project-p-1998\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\") [data-testid^=\"button-edit-project-\"]",
       "caption": "Open it again",
       "narration": "Open the pencil again any time.",
       "holdMs": 700
