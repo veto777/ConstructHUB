@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-approved",
+  "title": "When a client approves an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "The approved estimate",
+      "narration": "Here's what changes in the CRM when a client approves an estimate."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-approved\"]",
+      "caption": "Tick Approved",
+      "narration": "On Estimates, tick Approved to see the ones your clients have accepted."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-1997\"]",
+      "caption": "Open E-1997",
+      "narration": "Open one.",
+      "holdMs": 1500
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//div[contains(@class,\"font-medium\") and contains(.,\"signed contract\")]/..",
+      "caption": "Approved by, signed contract",
+      "narration": "The banner names who approved it. The estimate is now a signed contract."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=It can no longer be edited or deleted.",
+      "caption": "Locked",
+      "narration": "It can no longer be edited or deleted."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Sent and opened",
+      "narration": "You still see when it was sent and when the client opened it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-customer\"]",
+      "caption": "The client's page",
+      "chapter": "On the client's page",
+      "narration": "Click the client's name to go to their page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"estimate-demo-estimate-e-1997\"]",
+      "caption": "Approved, by whom, when",
+      "narration": "Under Estimates, the estimate shows who approved it, and when."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"project-demo-project-p-1994\"]",
+      "caption": "Project: Approved",
+      "narration": "Their project has moved to Approved by itself."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-convert-demo-estimate-e-1997\"]",
+      "caption": "Create invoice",
+      "narration": "When you're ready to bill, Create invoice turns the approved estimate into an invoice."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-back-clients\"]",
+      "caption": "All clients",
+      "narration": "Back on the client list,",
+      "chapter": "Job Won on the client list"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-bid-won\"]",
+      "caption": "Job Won",
+      "narration": "the client is now counted under Job Won."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Menu: Estimates",
+      "narration": "You'll find Estimates in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "What happens when a client approves an estimate | ConstructHUB CRM",
+    "description": "A short walkthrough of an approved estimate in the ConstructHUB CRM. You will see the approval banner, why a signed estimate is locked, how the project moves to Approved by itself, where Create invoice appears, and the client under Job Won.",
+    "tags": [
+      "approved estimate",
+      "signed estimate",
+      "e-signature",
+      "contractor estimate",
+      "estimating software",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "They said yes",
+    "accent": "yes",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}
