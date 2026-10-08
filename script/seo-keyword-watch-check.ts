@@ -98,6 +98,15 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   ok(stood.reused === true && stood.id === 0 && calls === 0 && (await site()).kw_snapshot_claim === null, "a leased occurrence whose date has moved buys nothing");
   await pool.query("UPDATE seo_sites SET kw_watch=false, next_kw_snapshot_at = NULL WHERE id=$1", [s.id]);
   answer = { keywords: [["brand new", 1], ["second", 2]] }; await takeKeywordSnapshot(await site(), false);   // the day has its snapshot again for what follows
+  // 5d. On a day that already has its snapshot, a leased occurrence whose date moved meanwhile leaves the date alone;
+  // the occurrence that still holds its lease moves it a month on from the day's snapshot.
+  await pool.query("UPDATE seo_sites SET kw_watch=true, next_kw_snapshot_at = current_date - 1 WHERE id=$1", [s.id]);
+  const before5d = (await pool.query("SELECT next_kw_snapshot_at::text AS t FROM seo_sites WHERE id=$1", [s.id])).rows[0].t;
+  calls = 0; const r5d = await takeKeywordSnapshot(await site(), true, "2026-01-01 00:00:00+00");
+  ok(r5d.reused && calls === 0 && (await pool.query("SELECT next_kw_snapshot_at::text AS t FROM seo_sites WHERE id=$1", [s.id])).rows[0].t === before5d, "a displaced occurrence on a day with a snapshot does not move the schedule");
+  await takeKeywordSnapshot(await site(), true, before5d);
+  ok((await pool.query("SELECT (next_kw_snapshot_at = current_date + interval '1 month') AS moved FROM seo_sites WHERE id=$1", [s.id])).rows[0].moved === true && calls === 0, "the occurrence that holds its lease moves it a month on, buying nothing");
+  await pool.query("UPDATE seo_sites SET kw_watch=false, next_kw_snapshot_at = NULL WHERE id=$1", [s.id]);
   // 6. The schedule: off = nothing; on with a snapshot from today = a month on; due = bought once; switched off before its turn = nothing.
   calls = 0;
   ok((await runDueKeywordSnapshots()) === 0 && calls === 0, "not watched: the scheduler takes nothing");

@@ -9,6 +9,7 @@ import {
   findingsFor,
   scoresFor,
   scoreExplanation,
+  missingPageScope,
   type CrawlState,
 } from "./audit";
 import { pageSpeed, businessSchema } from "./providers";
@@ -235,10 +236,19 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         // How the site answered for addresses that have no page (see the "soft-404" finding): one outcome per
         // address asked; `asked: 0` with the reason when none was (robots.txt, no answer, or a crawl resumed from
         // before the check existed — "not_measured").
+        // `probes` names the part of the site each address stood for, so "fixed" can be judged part by part;
+        // `answered` counts the ones that got an answer (one not allowed or unanswered stays in the list).
         missingPageProbe: {
           asked: state.missingPages?.length ?? 0,
+          answered: (state.missingPages ?? []).filter((m) => m.status > 0)
+            .length,
           outcomes: (state.missingPages ?? []).map((m) => m.outcome),
-          ...(state.missingPages?.length
+          probes: (state.missingPages ?? []).map((m) => ({
+            part: missingPageScope(m.url),
+            outcome: m.outcome,
+            ...(m.note ? { note: m.note } : {}),
+          })),
+          ...(state.missingPages?.some((m) => m.status > 0)
             ? {}
             : {
                 reason:
@@ -250,8 +260,8 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         notes: [
           "Scores are heuristic audit indicators, not search rankings.",
           "HTML-only crawl; JavaScript is not executed.",
-          state.missingPages?.length
-            ? `${state.missingPages.length} address${state.missingPages.length === 1 ? "" : "es"} with no page ${state.missingPages.length === 1 ? "was" : "were"} asked for, to see how the site answers for a missing page.`
+          state.missingPages?.some((m) => m.status > 0)
+            ? `${state.missingPages.length} address${state.missingPages.length === 1 ? "" : "es"} with no page ${state.missingPages.length === 1 ? "was" : "were"} looked at, to see how the site answers for a missing page: ${state.missingPages.map((m) => `${missingPageScope(m.url)} ${m.status > 0 ? `answered ${m.status}` : (m.note ?? "no answer")}`).join("; ")}.`
             : state.missingPages === undefined
               ? "How the site answers for a missing page was not measured in this crawl."
               : state.missingPagesNote === "robots"

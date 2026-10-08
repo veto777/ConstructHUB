@@ -408,6 +408,27 @@ export function platformSteps(platform: Platform, id: string) {
           : 1
   ];
 }
+/**
+ * The part of the site a made-up address stands for: "/" for the one at the top, "/services/" for the one in a
+ * section. It is the identity of what is checked (the address itself is new in every crawl), so a later crawl can
+ * say whether THAT part of the site now answers honestly.
+ */
+export function missingPageScope(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    return path.slice(0, path.lastIndexOf("/") + 1) || "/";
+  } catch {
+    return "/";
+  }
+}
+/** Where a missing-page fix lives: the site's address plus that part ("https://x.com/services/"). */
+export function missingPageFixPage(url: string): string {
+  try {
+    return new URL(url).origin + missingPageScope(url);
+  } catch {
+    return url;
+  }
+}
 export type Fix = {
   key: string;
   findingId: string;
@@ -597,6 +618,7 @@ export function fixesFor(
           };
         if (f.id === "soft-404")
           evidence = {
+            partOfSite: missingPageScope(url),
             asked: (state.missingPages ?? []).map((m) => ({
               address: m.url,
               answered: m.status,
@@ -638,6 +660,12 @@ export function fixesFor(
         if (f.id === "mobile")
           code =
             '<meta name="viewport" content="width=device-width, initial-scale=1">';
+        // The made-up address is new in every crawl; the fix is about the part of the site it stood for, so the same
+        // answer in the next crawl is "still present", not a new fix beside an orphaned old one.
+        if (f.id === "soft-404") {
+          add(missingPageFixPage(url), evidence, undefined, code);
+          continue;
+        }
         add(url, evidence, undefined, code);
       }
   }
@@ -677,12 +705,20 @@ export function reconcileFixes(
         checked = state.pages.some((p) => p.url === f.page && p.status === 200);
       // Fixed only when addresses with no page were asked for again in this crawl and EVERY one was answered "not found"
       // (404/410) or as a noindexed page. An answer that proves nothing (sign-in, bot check, error) is not a fix.
-      if (f.findingId === "soft-404")
+      // Fixed only when THIS crawl asked again in the same part of the site (the top, or the same section) and got
+      // "not found" (404/410) or a noindexed page there. Not asked, no answer, or an answer that proves nothing (a
+      // sign-in, a bot check, an error) leaves it "not checked".
+      if (f.findingId === "soft-404") {
+        const part = missingPageFixPage(f.page);
+        const again = (state.missingPages ?? []).filter(
+          (m) => missingPageFixPage(m.url) === part,
+        );
         checked =
-          !!state.missingPages?.length &&
-          state.missingPages.every(
+          again.length > 0 &&
+          again.every(
             (m) => m.outcome === "not_found" || m.outcome === "noindex",
           );
+      }
       if (f.findingId === "broken-links")
         checked =
           !!page &&

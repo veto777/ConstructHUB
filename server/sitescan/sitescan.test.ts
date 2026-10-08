@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterAll, beforeAll } from "vitest";
 import { makeSafeFetch, publicIP, siteUrl, type PageResponse } from "./http";
 import { robotsRules } from "./robots";
-import { enrichFindings, fixesFor } from "./guidance";
+import { enrichFindings, fixesFor, reconcileFixes } from "./guidance";
 import { crawl, emptyState, parsePage, findingsFor, scoresFor, classifyMissingPage, MISSING_PAGE_PREFIX } from "./audit";
 import {
   pageSpeed,
@@ -320,6 +320,14 @@ it("reads what a site answers for an address that has no page", () => {
   expect(read({ url: "https://accounts.other.test/" })).toBe("undetermined: sent on to accounts.other.test");
   expect(read({ headers: { "content-type": "application/json; charset=utf-8" }, body: "{}" })).toBe("undetermined: answered with application/json, not a page");
   expect(read({ body: "<html><title>Just a moment...</title><script src='/cdn-cgi/challenge-platform/x.js'></script></html>" })).toBe("undetermined: answered with what looks like a bot check");
+  // An ordinary page that happens to load reCAPTCHA for its contact form is still an ordinary page.
+  const longText = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ");
+  expect(read({ body: `<html><head><title>Roofing</title><script src="https://www.google.com/recaptcha/api.js"></script></head><body><p>${longText}</p></body></html>` })).toBe("ok_as_page");
+  // A sign-in form at the address itself, an empty answer, and an answer that is not marked as a page prove nothing.
+  expect(read({ body: '<html><title>Members</title><body><form><input type="password" name="p"></form></body></html>' })).toBe("undetermined: answered with a sign-in form");
+  expect(read({ status: 204, body: "" })).toBe("undetermined: answered with an empty response");
+  expect(read({ body: "   " })).toBe("undetermined: answered with an empty response");
+  expect(read({ headers: {}, body: "nothing to see" })).toBe("undetermined: answered with something that is not marked as a page");
 });
 it("asks each crawl for made-up addresses that have no page, and reports only what their answers show", async () => {
   const html = "<html><head><title>Fixture</title></head><body><h1>Fixture</h1></body></html>";
@@ -373,13 +381,48 @@ it("asks each crawl for made-up addresses that have no page, and reports only wh
     (url: string) => response(url, "", 500),
     () => response("https://fixture.test/login", html),
   ]) expect(findingsFor(await site(answer).run()).map((f) => f.id)).not.toContain("soft-404");
+  // Every address meant to be asked stays in the record with what came of it: no answer, a timeout, a redirect the
+  // crawl does not follow, or robots.txt forbidding it.
   const dead = await site(() => { throw new Error("connection reset"); }).run();
-  expect([dead.missingPages, dead.missingPagesNote, findingsFor(dead).map((f) => f.id).includes("soft-404")]).toEqual([[], "no_answer", false]);
+  expect([dead.missingPages!.map((m) => `${m.outcome}: ${m.note}`), dead.missingPagesNote, findingsFor(dead).map((f) => f.id).includes("soft-404")]).toEqual([["undetermined: no answer", "undetermined: no answer"], "no_answer", false]);
+  const half = await site((url) => { if (url.includes("/services/")) throw new Error("Request timed out"); return response(url, "Not found", 404); }).run();
+  expect(half.missingPages!.map((m) => m.note ?? m.outcome)).toEqual(["not_found", "no answer: the request timed out"]);
+  expect(half.missingPagesNote).toBeUndefined();
   const barred = site((url) => response(url, html), "User-agent: *\nDisallow: /not-a-page\nDisallow: /services/not-a-page");
   const b = await barred.run();
-  expect([b.missingPages, b.missingPagesNote, barred.probes(), findingsFor(b).map((f) => f.id).includes("soft-404")]).toEqual([[], "robots", [], false]);
+  expect([b.missingPages!.map((m) => m.note), b.missingPagesNote, barred.probes(), findingsFor(b).map((f) => f.id).includes("soft-404")]).toEqual([["not asked: robots.txt does not allow it", "not asked: robots.txt does not allow it"], "robots", [], false]);
   // A crawl saved before this check existed says nothing either.
   expect(findingsFor({ ...ok, missingPages: undefined }).map((f) => f.id)).not.toContain("soft-404");
+});
+it("a missing-page fix is about a part of the site, judged again only where it was asked again", async () => {
+  const html = "<html><head><title>Fixture</title></head><body><h1>Fixture</h1></body></html>";
+  const sitemap = "<urlset>" + ["/services/roofing", "/services/siding", "/services/gutters"].map((p) => `<url><loc>https://fixture.test${p}</loc></url>`).join("") + "</urlset>";
+  const run = (missing: (url: string, allowed?: (u: string) => boolean) => PageResponse | Promise<PageResponse>, map = sitemap) =>
+    crawl("https://fixture.test/", 2, emptyState("https://fixture.test/"), undefined, async (url: string, allowed?: (u: string) => boolean) => {
+      if (url.endsWith("robots.txt")) return response(url, "");
+      if (url.endsWith("sitemap.xml")) return response(url, map);
+      if (url.endsWith("llms.txt")) return response(url, "", 404);
+      if (url.includes(MISSING_PAGE_PREFIX)) return missing(url, allowed);
+      return response(url, html);
+    }, async () => {});
+  const fixesOf = (st: Awaited<ReturnType<typeof run>>) => fixesFor(findingsFor(st), st, null).filter((f) => f.findingId === "soft-404");
+  // Two crawls with new made-up addresses, the same answers: the same two fixes ("still present"), named by part.
+  const first = await run((url) => response(url, html));
+  const a = fixesOf(first);
+  expect(a.map((f) => f.page)).toEqual(["https://fixture.test/", "https://fixture.test/services/"]);
+  const second = await run((url) => response(url, html));
+  const b = reconcileFixes(fixesOf(second), a, second);
+  expect(b.map((f) => [f.page, f.verification])).toEqual([["https://fixture.test/", "still present"], ["https://fixture.test/services/", "still present"]]);
+  // The top now answers 404 but the section times out: the top is fixed, the section is not checked.
+  const third = await run((url) => { if (url.includes("/services/")) throw new Error("Request timed out"); return response(url, "Not found", 404); });
+  const c = reconcileFixes(fixesOf(third), b, third);
+  expect(c.map((f) => [f.page, f.verification])).toEqual([["https://fixture.test/", "fixed"], ["https://fixture.test/services/", "not checked"]]);
+  // A crawl whose sitemap no longer has that section never asks there: not checked, never fixed.
+  const fourth = await run((url) => response(url, "Not found", 404), "<urlset></urlset>");
+  expect(reconcileFixes(fixesOf(fourth), b, fourth).find((f) => f.page.endsWith("/services/"))!.verification).toBe("not checked");
+  // A redirect the crawl does not follow (to another site) is said, not dropped.
+  const away = await run((url, allowed) => { allowed?.("https://elsewhere.test/landing"); throw new Error("Redirect excluded by crawl policy"); });
+  expect(away.missingPages!.map((m) => m.note)).toEqual(["sent on to https://elsewhere.test/landing, which this crawl does not follow", "sent on to https://elsewhere.test/landing, which this crawl does not follow"]);
 });
 it("discovers nested sitemaps, applies bot exclusions and reports each audit category", async () => {
   const state = await crawl("https://fixture.test/", 3, undefined, undefined, async url => response(url,

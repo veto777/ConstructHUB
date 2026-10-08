@@ -6,6 +6,7 @@
  * crawl is one of the plan's monthly Site Scans.
  */
 import { pool } from "../db";
+import { missingPageScope } from "../sitescan/guidance";
 
 export type AuditSeverity = "error" | "warning" | "notice";
 export type AuditPage = { url: string; status: number; redirects: number };
@@ -125,7 +126,17 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     // addresses that have no page. It was re-checked only if THIS crawl asked and EVERY answer was "not found"
     // (404/410) or a noindexed page. Not asked (robots.txt), no answer, or an answer that proves nothing (a sign-in, a
     // bot check, a server error) leaves the question open — it is then "not re-checked", never "fixed".
-    if (g.key === "soft-404") { const o = (report as { coverage?: { missingPageProbe?: { outcomes?: unknown } | null } }).coverage?.missingPageProbe?.outcomes; return Array.isArray(o) && o.length > 0 && o.every((x) => x === "not_found" || x === "noindex"); }
+    // Judged part by part: every part of the site the issue was raised for (the top, or a section) must have been asked
+    // again in THIS crawl and answered honestly there. A crawl that did not reach that section again proves nothing.
+    if (g.key === "soft-404") {
+      const probes = (report as { coverage?: { missingPageProbe?: { probes?: unknown } | null } }).coverage?.missingPageProbe?.probes;
+      if (!Array.isArray(probes)) return false;
+      const parts = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u).map(missingPageScope);
+      return parts.length > 0 && parts.every((part) => {
+        const again = probes.filter((p: any) => p?.part === part);
+        return again.length > 0 && again.every((p: any) => p.outcome === "not_found" || p.outcome === "noindex");
+      });
+    }
     // A PageSpeed issue is re-checked only when that very page was MEASURED again for the same device (the measurement
     // is optional and can fail or be switched off; then the issue simply stops being listed).
     const speed = g.key.match(/^psi-(mobile|desktop)$/);

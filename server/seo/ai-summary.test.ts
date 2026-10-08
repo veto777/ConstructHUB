@@ -33,8 +33,39 @@ describe("AI visibility added up", () => {
     expect(s.byMonth).toEqual([{ month: "2026-08", answers: 1, mentioned: 1, cited: 0, questions: 1 }, { month: "2026-10", answers: 2, mentioned: 1, cited: 1, questions: 2 }]);
   });
   it("nothing saved is nothing claimed; odd saved shapes are ignored", () => {
-    expect(summariseAi([], { now })).toEqual({ nowDays: 120, now: { answers: 0, mentioned: 0, cited: 0, questions: 0, first: 0 }, byEngine: [], byMonth: [], businesses: [], sources: [] });
+    expect(summariseAi([], { now })).toEqual({ nowDays: 120, now: { answers: 0, mentioned: 0, cited: 0, questions: 0, first: 0 }, byEngine: [], byMonth: [], trend: { months: [], answers: [], questions: [], you: [], names: [] }, compare: null, businesses: [], sources: [] });
     const s = summariseAi([a("q", "chatgpt", "2026-10-01", { businesses: "not a list" as any, sources: [{ nothing: 1 }, null, { domain: 5 }] as any })], { now });
     expect([s.businesses, s.sources]).toEqual([[], []]);
+  });
+  it("names over time, and two months compared only over the questions both asked the same assistant", () => {
+    const rows = [
+      // August: q1 on ChatGPT and Gemini, plus a question never asked again.
+      a("q1", "chatgpt", "2026-08-05", { businesses: ["Topside Roofing", "Skyline"], sources: [{ domain: "yelp.com", ours: false }] }),
+      a("q1", "gemini", "2026-08-05", { businesses: ["Topside Roofing"] }),
+      a("only in august", "chatgpt", "2026-08-06", { businesses: ["Skyline", "Bay Gutters"] }),
+      // September: q1 on ChatGPT only.
+      a("q1", "chatgpt", "2026-09-05", { mentioned: true, businesses: ["Skyline"] }),
+      // October: q1 on both, plus a new question.
+      a("q1", "chatgpt", "2026-10-02", { mentioned: true, listedAt: 1, cited: true, businesses: ["Alpine Exteriors", "Skyline", "Peak Siding"], sources: [{ domain: "alpine.example", ours: true }, { domain: "homeadvisor.com", ours: false }] }),
+      a("q1", "gemini", "2026-10-02", { businesses: ["Topside Roofing", "Peak Siding"], sources: [{ domain: "yelp.com", ours: false }] }),
+      a("new in october", "perplexity", "2026-10-03", { businesses: ["Bay Gutters"] }),
+    ];
+    const s = summariseAi(rows, { now, businessName: "Alpine Exteriors", rivals: ["homeadvisor.com"] });
+    expect(s.trend.months).toEqual(["2026-08", "2026-09", "2026-10"]);
+    expect([s.trend.answers, s.trend.questions, s.trend.you]).toEqual([[3, 1, 3], [2, 1, 2], [0, 1, 1]]);
+    expect(s.trend.names).toEqual([
+      { name: "Skyline", counts: [2, 1, 1] }, { name: "Topside Roofing", counts: [2, 0, 1] }, { name: "Bay Gutters", counts: [1, 0, 1] }, { name: "Peak Siding", counts: [0, 0, 2] },
+    ]);
+    // Default: October against September (the latest month sharing a pair) — only q1 on ChatGPT is in both.
+    expect(s.compare).toMatchObject({ from: "2026-09", to: "2026-10", options: ["2026-09", "2026-08"], pairs: 1, questions: 1, you: { before: 1, after: 1 }, cited: { before: 0, after: 1 } });
+    expect(s.compare!.names).toEqual([{ name: "Peak Siding", before: 0, after: 1 }, { name: "Skyline", before: 1, after: 1 }]);
+    // Against August: q1 on both assistants; the question asked only in August and the one new in October do not count.
+    const v = summariseAi(rows, { now, businessName: "Alpine Exteriors", rivals: ["homeadvisor.com"], vs: "2026-08" }).compare!;
+    expect([v.from, v.pairs, v.questions, v.you, v.cited]).toEqual(["2026-08", 2, 1, { before: 0, after: 1 }, { before: 0, after: 1 }]);
+    expect(v.names).toEqual([{ name: "Peak Siding", before: 0, after: 2 }, { name: "Topside Roofing", before: 2, after: 1 }, { name: "Skyline", before: 1, after: 1 }]);
+    expect(v.sources).toEqual([{ domain: "homeadvisor.com", before: 0, after: 1, rival: true }, { domain: "yelp.com", before: 1, after: 1, rival: false }]);
+    // A month that shares nothing, or one not on record, falls back to the default; a single month has nothing to compare.
+    expect(summariseAi(rows, { now, vs: "2026-01" }).compare!.from).toBe("2026-09");
+    expect(summariseAi([rows[0]], { now }).compare).toBeNull();
   });
 });

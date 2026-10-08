@@ -138,13 +138,14 @@ describe("what counts as broken, and what counts as fixed", () => {
     const soft = { id: "soft-404", category: "technical", severity: "warning", title: "Addresses with no page are answered like real pages", urls: ["https://x/not-a-page-0123456789"], why: "", fix: "" };
     const before = { report: { findings: [soft] }, pages: [page("https://x/")] };
     const now = (coverage?: unknown) => auditSummary({ findings: [], ...(coverage === undefined ? {} : { coverage }) } as any, [page("https://x/")], before);
-    const probe = (...outcomes: string[]) => ({ missingPageProbe: { asked: outcomes.length, outcomes } });
+    // Each answer with the part of the site it was asked in: the first at the top ("/"), any further one in "/services/".
+    const probe = (...outcomes: string[]) => ({ missingPageProbe: { asked: outcomes.length, outcomes, probes: outcomes.map((outcome, i) => ({ part: i ? "/services/" : "/", outcome })) } });
     // Asked again and answered "not found" — or as a noindexed page, the way a client-routed app can: fixed.
     expect(now(probe("not_found", "not_found")).fixed.map((f) => f.key)).toEqual(["soft-404"]);
     expect(now(probe("noindex")).fixed.map((f) => f.key)).toEqual(["soft-404"]);
     // Not asked (robots.txt, not measured), no answer, or an answer that proves nothing (a sign-in, a bot check, a server
     // error) — even next to an honest one: not re-checked, never "fixed".
-    for (const c of [{ missingPageProbe: { asked: 0, outcomes: [], reason: "robots" } }, { missingPageProbe: { asked: 0, outcomes: [], reason: "not_measured" } }, probe("undetermined"), probe("not_found", "undetermined"), { missingPageProbe: null }, {}, undefined])
+    for (const c of [{ missingPageProbe: { asked: 0, outcomes: [], reason: "robots" } }, { missingPageProbe: { asked: 0, outcomes: [], reason: "not_measured" } }, probe("undetermined"), { missingPageProbe: { asked: 2, outcomes: ["not_found", "undetermined"], probes: [{ part: "/", outcome: "undetermined" }, { part: "/", outcome: "not_found" }] } }, { missingPageProbe: { asked: 1, outcomes: ["not_found"] } }, { missingPageProbe: { asked: 1, outcomes: ["not_found"], probes: [{ part: "/services/", outcome: "not_found" }] } }, { missingPageProbe: null }, {}, undefined])
       expect([now(c).fixed.map((f) => f.key), now(c).notRechecked.map((f) => f.key)], JSON.stringify(c)).toEqual([[], ["soft-404"]]);
     // Still there: listed as an issue with the address that was asked for.
     const still = auditSummary({ findings: [soft], coverage: probe("ok_as_page") } as any, [page("https://x/")], before);

@@ -22,6 +22,10 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   ok(out.businesses.length === 1 && out.businesses[0].name === "Skyline", `the customer's own name is not an "other": ${JSON.stringify(out.businesses)}`);
   ok(out.sources.find((x) => x.domain === "yelp.com")?.directory === "Yelp" && out.sources.find((x) => x.ours)?.domain === "aisum.example", "sources flagged");
   ok(!out.truncated, "not truncated");
+  // Like for like from the database: only "siding contractor" on ChatGPT was answered in both months.
+  ok(out.compare?.pairs === 1 && out.compare.you.before === 1 && out.compare.you.after === 0 && out.compare.options.length === 1, `like for like over the one shared question: ${JSON.stringify(out.compare)}`);
+  ok(out.trend.months.length === 2 && out.trend.you.join() === "1,1" && out.trend.answers.join() === "1,3", `names over time: ${JSON.stringify(out.trend)}`);
+  ok((await aiSummary(1, s.id, { rivals: [], vs: "1999-01" })).compare?.from === out.compare?.from, "an unknown month falls back to the default");
   ok((await aiSummary(2, s.id, { rivals: [] })).now.answers === 1, "another account sees only its own rows");
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [s.id]);
   console.log("ai summary checks passed:", n); await pool.end();

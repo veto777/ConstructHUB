@@ -176,8 +176,12 @@ export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, l
   try {
     const { rows: [today] } = await pool.query("SELECT id, taken_on::text AS taken_on, jsonb_array_length(keywords) AS n FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 AND taken_on = $3::date", [site.id, site.user_id, day]);
     if (today) {
-      // Already taken this day: the watch's month runs from it, and nothing is bought.
-      await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = $2::date + interval '1 month' WHERE id=$1 AND kw_watch AND (next_kw_snapshot_at IS NULL OR next_kw_snapshot_at < $2::date + interval '1 month')", [site.id, day]);
+      // Already taken this day: the watch's month runs from it, and nothing is bought. The date is moved only by the
+      // claim's owner — and, for the monthly occurrence, only while the date is still the one it leased.
+      await pool.query(
+        `UPDATE seo_sites SET next_kw_snapshot_at = $2::date + interval '1 month'
+          WHERE id=$1 AND kw_watch AND kw_snapshot_claim_token=$3 AND ($4::text IS NULL OR next_kw_snapshot_at::text = $4::text)
+            AND (next_kw_snapshot_at IS NULL OR next_kw_snapshot_at < $2::date + interval '1 month')`, [site.id, day, token, automatic ? (lease ?? null) : null]);
       return { id: today.id, takenOn: String(today.taken_on).slice(0, 10), keywords: today.n, reused: true };
     }
     if (automatic) {
@@ -203,8 +207,11 @@ export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, l
            ON CONFLICT (site_id, taken_on) DO NOTHING RETURNING id, taken_on::text AS taken_on`,
           [site.id, site.user_id, day, site.location_code ?? 2840, site.language_code ?? "en", JSON.stringify(o.data.keywords), o.data.total, o.data.fetched, o.costUsd]);
         if (!row) { await client.query("ROLLBACK"); throw fail("the day's snapshot already exists"); }
-        // Whoever took it, the watch's month starts again from this snapshot.
-        await client.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 month' WHERE id=$1 AND kw_watch", [site.id]);
+        // The watch's month starts again from this snapshot — for the monthly occurrence only while the date is still
+        // the one it leased (the row is locked and this is the claim's owner, so nothing can move it in between).
+        await client.query(
+          "UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 month' WHERE id=$1 AND kw_watch AND kw_snapshot_claim_token=$2 AND ($3::text IS NULL OR next_kw_snapshot_at::text = $3::text)",
+          [site.id, token, automatic ? (lease ?? null) : null]);
         await client.query("COMMIT");
         return { data: { id: row.id as number, takenOn: String(row.taken_on).slice(0, 10), keywords: o.data.keywords.length, reused: false }, costUsd: o.costUsd, costUnknown: false };
       } catch (e: any) {

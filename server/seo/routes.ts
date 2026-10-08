@@ -1010,7 +1010,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // The saved answers added up: named / used as a source now and month by month, other businesses named, websites drawn on. Saved rows only.
   route("get", "/api/seo/sites/:id/ai/summary", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json(await aiSummary(user, site.id, { rivals: await trackedCompetitors(site.id), businessName: site.business_name ?? null, domain: site.domain }));
+    // ?vs=YYYY-MM: the earlier month to compare like for like with the newest (anything else is ignored: the default month).
+    const vs = typeof req.query.vs === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(req.query.vs) ? req.query.vs : null;
+    res.json(await aiSummary(user, site.id, { rivals: await trackedCompetitors(site.id), businessName: site.business_name ?? null, domain: site.domain, vs }));
   });
   // Ask the chosen assistants one question. One purchase per identical question in flight; an assistant that
   // fails is not charged; the answers are saved so the history builds up.
