@@ -188,8 +188,8 @@ The films that say what ConstructHUB is are not tutorials: their facts and scrip
 `shared/help/entries/start-here/` (keys start `brand-`; the group leads `/tutorials`, in the order
 `START_HERE_ORDER` in `shared/help/registry.ts` gives). They are made on the same line. Two things
 differ: a tour may cross both apps — a `goto` opens a `/crm…` path on the CRM host and any other path
-on the main host, whatever the base — and a seeded row may be opened by its fixed `demo-` id
-(`/crm/clients/demo-client-hadley`). The Hadley job (Austin, TX) carries three demo photos for these
+on the main host, whatever the base. Their scripts find the demo clients and jobs by name, never by
+id. The Hadley job (Austin, TX) carries three demo photos for these
 films. Nothing in a brand film names a competitor or states a competitor's price without the owner's
 sign-off recorded in `VIDEO-SCRIPTS.md`.
 

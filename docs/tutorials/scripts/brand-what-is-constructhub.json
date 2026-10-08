@@ -63,7 +63,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"card-project-demo-project-p-1997\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
       "caption": "One job",
       "narration": "Open a job, and its estimate, schedule and invoices are together."
     },

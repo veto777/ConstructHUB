@@ -24,15 +24,21 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"card-project-demo-project-p-1997\"]",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
       "caption": "The Hadley job",
       "narration": "This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled."
     },
     {
       "action": "goto",
-      "url": "/crm/clients/demo-client-hadley",
-      "caption": "The client's page",
-      "narration": "Open the client, and the whole job is on one page."
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "narration": "Every client has a page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Caleb & Nora Hadley",
+      "narration": "Open the Hadleys, and the whole job is in one place."
     },
     {
       "action": "highlight",
@@ -42,7 +48,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"estimate-demo-estimate-e-1998\"]",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-1998\")",
       "caption": "The estimate",
       "chapter": "Estimate and signature",
       "narration": "The estimate went out by email. You can see when they opened it, and when they approved."
@@ -80,19 +86,25 @@
     },
     {
       "action": "goto",
-      "url": "/crm/clients/demo-client-hadley",
+      "url": "/crm/clients",
       "caption": "Back to the client",
       "narration": "On site, the crew shoots photos with JobCam."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Caleb & Nora Hadley",
+      "narration": "Back on the Hadleys' page,"
     },
     {
       "action": "highlight",
       "selector": "[data-testid=\"section-customer-jobcam\"]",
       "caption": "JobCam",
-      "narration": "Each shot is filed to this client's job."
+      "narration": "each shot is filed to this client's job."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"button-convert-demo-estimate-e-1998\"]",
+      "selector": "[data-testid^=\"button-convert-\"]",
       "caption": "Create invoice",
       "chapter": "Invoice and payment",
       "narration": "When the work is done, choose Create invoice on the approved estimate."
@@ -156,6 +168,6 @@
     "headline": "Lead to paid",
     "accent": "paid",
     "kicker": "CRM in 2 minutes",
-    "step": 17
+    "step": 19
   }
 }

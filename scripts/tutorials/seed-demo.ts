@@ -173,7 +173,8 @@ async function main() {
   ];
   // Lists show the newest client first. Each new client is filed just behind one of the original
   // eight (`after`), so the first row stays what it was and every screenful mixes the three states.
-  for (const c of newClients) {
+  // A template that already holds these people (under whatever ids it gives them) is left as it is.
+  for (const c of newClients.filter((x) => !customers.some((have) => have.display_name === x.name))) {
     const [anchorRow] = await q(`select created_at from crm_customers where org_id = $1 and display_name like '%' || $2 || '%' and id not like 'demo-client-%' order by created_at limit 1`, [orgId, c.after]);
     if (!anchorRow) throw new Error(`no original client matching "${c.after}"`);
     await q(`insert into crm_customers (id, org_id, display_name, company_name, email, phone, address_line1, address_line2, city, state, postal_code, tags, owner_member_id, portal_token, created_at, updated_at)
@@ -230,6 +231,7 @@ async function main() {
   ];
   const projectsOldest = await oldest("crm_projects");
   for (const [i, p] of newProjects.entries()) {
+    if (projects.some((have) => have.number === p.number)) continue; // already there, under the id its template gave it
     const at = before(projectsOldest, newProjects.length - i);
     await q(`insert into crm_projects (id, org_id, customer_id, number, name, status, city, state, trades, contract_value_cents, project_manager_member_id, sales_member_id, stage_changed_at, completed_at, created_at, updated_at)
              values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) on conflict (id) do nothing`,
