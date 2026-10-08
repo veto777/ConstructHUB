@@ -5,6 +5,8 @@
  *   tsx scripts/tutorials/db.ts fresh <name>     drop + copy of constructhub_tut_template
  *   tsx scripts/tutorials/db.ts drop  <name>
  *   tsx scripts/tutorials/db.ts template [--rebuild]   build the template (schema, demo owner, demo seed)
+ *   tsx scripts/tutorials/db.ts reseed           apply scripts/tutorials/seed-demo.ts to the EXISTING template —
+ *                                                safe while producers are recording (see TEMPLATE_LOCK)
  *   tsx scripts/tutorials/db.ts list | mode
  *
  * SAFETY (not configurable):
@@ -28,10 +30,20 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import pg from "pg";
-import { ROOT, parseArgs, readEnvFile, run } from "./lib";
+import { ROOT, WORK_DIR, parseArgs, readEnvFile, run, withLock } from "./lib";
 
 export const TUT_NAME = /^constructhub_tut_[a-z0-9_]+$/;
 export const TEMPLATE = "constructhub_tut_template";
+/**
+ * Copies of the template hold this lock shared (any number at once); changing the template holds it
+ * exclusively. It is a courtesy between working copies that have this code. What actually protects a
+ * copy is the database: `fresh` reads the template with pg_dump (one snapshot) and `reseed` writes
+ * it in one transaction of rows only — no table is created, renamed or dropped — so a copy taken at
+ * any moment holds the template as it was before the reseed or as it is after, never half of it.
+ * (Do not swap templates by renaming schemas: a pg_dump that is running prints the schema's NEW name
+ * in its foreign keys.) `template --rebuild` drops the template and is NOT safe beside a producer.
+ */
+const TEMPLATE_LOCK = path.join(WORK_DIR, "template.lock");
 /** Where the dev role and password live. Read-only, at run time. */
 const DEV_ENV_FILE = process.env.TUTORIAL_DEV_ENV || "/home/voiceban/ConstructHUB-gstyle/.env";
 const ALLOWED_HOST = "127.0.0.1", ALLOWED_PORT = "5432";
@@ -138,6 +150,9 @@ function renameSchema(from: string, to: string) {
 export async function fresh(name: string): Promise<void> {
   assertName(name);
   if (name === TEMPLATE) throw new Error("the template is built with `db.ts template`, not `fresh`");
+  await withLock(TEMPLATE_LOCK, () => copyTemplate(name), { shared: true });
+}
+async function copyTemplate(name: string): Promise<void> {
   if (!(await exists(TEMPLATE))) throw new Error(`${TEMPLATE} does not exist — run: npx tsx scripts/tutorials/db.ts template`);
   await drop(name);
   if ((await dbMode()) === "database") { await query(base().database, null, `create database "${name}" template "${TEMPLATE}"`); return; }
@@ -167,6 +182,20 @@ export async function seedDemo(name: string): Promise<string> {
   return (await run(path.join(ROOT, "node_modules/.bin/tsx"), [path.join(ROOT, "scripts/tutorials/seed-demo.ts")], { env: { ...process.env, DATABASE_URL: await databaseUrl(name) }, cwd: ROOT })).stdout.trim();
 }
 
+/**
+ * Apply the demo seed to the template that exists: new demo rows reach every copy made from now on,
+ * also copies made by a working copy whose own seed-demo.ts is older. One transaction (seed-demo.ts).
+ */
+export async function reseedTemplate(): Promise<string> {
+  if (!(await exists(TEMPLATE))) throw new Error(`${TEMPLATE} does not exist — run: npx tsx scripts/tutorials/db.ts template`);
+  return withLock(TEMPLATE_LOCK, async () => {
+    const out = await seedDemo(TEMPLATE);
+    const [database, schema] = await locate(TEMPLATE);
+    await query(database, schema, "analyze");
+    return out;
+  });
+}
+
 /** Every recording database that exists now. */
 export async function list(): Promise<string[]> {
   const mode = await dbMode();
@@ -182,7 +211,8 @@ export async function list(): Promise<string[]> {
  * rest), the demo owner as user 1 (the dev bypass signs every request in as user 1), then the CRM
  * demo seed and scripts/tutorials/seed-demo.ts.
  */
-async function buildTemplate(rebuild: boolean): Promise<void> {
+const buildTemplate = (rebuild: boolean): Promise<void> => withLock(TEMPLATE_LOCK, () => buildTemplateLocked(rebuild));
+async function buildTemplateLocked(rebuild: boolean): Promise<void> {
   const { startApp } = await import("./app");
   if (await exists(TEMPLATE)) {
     if (!rebuild) throw new Error(`${TEMPLATE} already exists — pass --rebuild to replace it (no producer may be running)`);
@@ -233,7 +263,8 @@ async function main() {
   if (cmd === "mode") { console.log(await dbMode()); return; }
   if (cmd === "list") { console.log((await list()).join("\n")); return; }
   if (cmd === "template") { await buildTemplate(!!args.flags.rebuild); return; }
-  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | list | mode");
+  if (cmd === "reseed") { console.log(await reseedTemplate()); console.log(`${TEMPLATE} reseeded at ${new Date().toISOString()}`); return; }
+  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | reseed | list | mode");
   assertName(name);
   if (cmd === "drop" && name === TEMPLATE && !args.flags.rebuild) throw new Error("dropping the template takes --rebuild on `template`, not `drop`");
   const t = Date.now();

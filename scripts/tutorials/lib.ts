@@ -208,8 +208,8 @@ export type Timings = {
  * Hold an exclusive `flock` on a file while `fn` runs. The lock belongs to a small child process
  * (`flock … cat`) and is released when its stdin closes — so it is released even if this process dies.
  */
-export async function withLock<T>(file: string, fn: () => Promise<T>, opts: { wait?: boolean } = {}): Promise<T> {
-  const child = spawn("flock", [...(opts.wait === false ? ["-n"] : []), "-x", file, "sh", "-c", "echo locked; cat >/dev/null"], { stdio: ["pipe", "pipe", "inherit"] });
+export async function withLock<T>(file: string, fn: () => Promise<T>, opts: { wait?: boolean; shared?: boolean } = {}): Promise<T> {
+  const child = spawn("flock", [...(opts.wait === false ? ["-n"] : []), opts.shared ? "-s" : "-x", file, "sh", "-c", "echo locked; cat >/dev/null"], { stdio: ["pipe", "pipe", "inherit"] });
   await new Promise<void>((resolve, reject) => {
     child.once("error", reject);
     child.stdout.once("data", () => resolve());
