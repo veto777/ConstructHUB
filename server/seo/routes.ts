@@ -58,6 +58,8 @@ export const SEO_PRICES = {
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
   backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** Search volumes for a site's tracked keywords (one lookup covers up to 1,000). */
+  searchVolumes: retailCents(estimateAdsVolumeUsd(1)),
   /** Bulk keyword analysis: a flat part plus so much per 100 keywords. */
   bulkBase: retailCents(LABS_TASK_USD),
   bulkPer100: retailCents(100 * LABS_ITEM_USD),

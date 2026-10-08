@@ -77,14 +77,42 @@ export async function ensureLocations(): Promise<number> {
 
 export type LocationOption = { code: number; label: string; kind: string };
 
+const STATES: Record<string, string> = {
+  al: "alabama", ak: "alaska", az: "arizona", ar: "arkansas", ca: "california", co: "colorado", ct: "connecticut", de: "delaware", dc: "district of columbia", fl: "florida",
+  ga: "georgia", hi: "hawaii", id: "idaho", il: "illinois", in: "indiana", ia: "iowa", ks: "kansas", ky: "kentucky", la: "louisiana", me: "maine", md: "maryland",
+  ma: "massachusetts", mi: "michigan", mn: "minnesota", ms: "mississippi", mo: "missouri", mt: "montana", ne: "nebraska", nv: "nevada", nh: "new hampshire", nj: "new jersey",
+  nm: "new mexico", ny: "new york", nc: "north carolina", nd: "north dakota", oh: "ohio", ok: "oklahoma", or: "oregon", pa: "pennsylvania", ri: "rhode island", sc: "south carolina",
+  sd: "south dakota", tn: "tennessee", tx: "texas", ut: "utah", vt: "vermont", va: "virginia", wa: "washington", wv: "west virginia", wi: "wisconsin", wy: "wyoming",
+};
+
+/**
+ * What a person types for a place, as the start of its name and (when given) the start of its state:
+ * "Tampa", "tampa, fl", "Tampa FL", "bellingham, wash", "33602". Pure, for tests.
+ */
+export function parsePlaceQuery(q: string): { name: string; state: string | null } {
+  const clean = String(q ?? "").toLowerCase().replace(/[%_\\]/g, "").replace(/\s+/g, " ").trim();
+  let name = clean, state: string | null = null;
+  const comma = clean.indexOf(",");
+  if (comma >= 0) { name = clean.slice(0, comma).trim(); state = clean.slice(comma + 1).replace(/,/g, " ").trim() || null; }
+  else {
+    // "tampa fl": a trailing two-letter state after at least one other word
+    const m = clean.match(/^(.+) ([a-z]{2})$/);
+    if (m && STATES[m[2]]) { name = m[1]; state = m[2]; }
+  }
+  if (state) state = STATES[state] ?? state;
+  return { name, state };
+}
+
 /** Places whose name starts with what was typed: cities first, then states, counties, towns, metro areas, ZIP codes. */
 export async function searchLocations(q: string, limit = 12): Promise<LocationOption[]> {
-  const term = q.trim().toLowerCase().replace(/[%_\\]/g, "");
-  if (term.length < 2) return [];
+  const { name, state } = parsePlaceQuery(q);
+  if (name.length < 2) return [];
   await ensureLocations();
+  // Stored as "Tampa,Florida,United States": the name is the part before the first comma, the state follows it.
   const { rows } = await pool.query(
-    `SELECT code, name, type FROM seo_locations WHERE lower(name) LIKE $1 || '%'
-      ORDER BY array_position($2::text[], type), length(name), name LIMIT $3`, [term, [...LOCATION_TYPES], limit]);
+    `SELECT code, name, type FROM seo_locations
+      WHERE lower(name) LIKE $1 || '%' AND ($4::text IS NULL OR lower(name) LIKE '%,' || $4 || '%')
+      ORDER BY array_position($2::text[], type), length(name), name LIMIT $3`, [name, [...LOCATION_TYPES], limit, state]);
   return rows.map((r: any) => ({ code: r.code, label: locationLabel(r.name), kind: locationTypeLabel(r.type) }));
 }
 

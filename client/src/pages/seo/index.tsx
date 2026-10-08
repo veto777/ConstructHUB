@@ -42,6 +42,11 @@ export default function SeoOverviewPage() {
     onSuccess: (r: { serps: number; reused: boolean }) => { invalidate(); toast({ title: r.reused ? "A check is already running" : "Rank check started", description: r.reused ? "Results arrive over the next few minutes." : `${r.serps} search result page${r.serps === 1 ? "" : "s"} queued. Results arrive over the next few minutes.` }); },
     onError: (e) => toast({ title: "Couldn't start the check", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const volumes = useMutation({
+    mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/keywords/volumes`),
+    onSuccess: (r: { updated: number }) => { invalidate(); toast({ title: r.updated ? `Search volume added for ${r.updated} keyword${r.updated === 1 ? "" : "s"}` : "No search volume found for these keywords" }); },
+    onError: (e) => toast({ title: "Couldn't get search volumes", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const remove = useMutation({
     mutationFn: (id: number) => api("DELETE", `/api/seo/keywords/${id}`),
     onSuccess: invalidate,
@@ -87,6 +92,12 @@ export default function SeoOverviewPage() {
           </div>
           <RankHistoryPanel site={site} />
           <AddKeywords site={site} onAdded={invalidate} />
+          {o.rows.some((r) => r.searchVolume == null) && (
+            <p className="g-text-2 mb-4 flex flex-wrap items-center gap-2 text-[13px]" data-testid="volumes-missing">
+              {o.rows.filter((r) => r.searchVolume == null).length} of your keywords have no monthly search volume yet.
+              <button type="button" className="g-pill g-pill--sm" disabled={volumes.isPending || !configured} onClick={() => volumes.mutate()} data-testid="button-get-volumes">{volumes.isPending ? <Loader2 className="animate-spin" /> : null} Get search volumes{status.data?.prices?.searchVolumes ? ` · about ${money(status.data.prices.searchVolumes)}` : ""}</button>
+            </p>
+          )}
           <TrackingSettings site={site} onSaved={invalidate} />
           {o.rows.length === 0 ? (
             <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href="/seo/keywords" className="g-link">research keywords</Link> and track the ones with volume.</p></Empty>

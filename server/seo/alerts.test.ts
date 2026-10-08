@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { alertMessage, describeChange, linkChange, rankChanges, type CheckPair } from "./alerts";
-import { locationLabel, locationTypeLabel, usableLocations } from "./locations";
+import { locationLabel, locationTypeLabel, parsePlaceQuery, usableLocations } from "./locations";
 
 const pair = (keyword: string, previous: number | null, position: number | null, extra: Partial<CheckPair> = {}): CheckPair =>
   ({ keywordId: 1, keyword, device: "desktop", location: null, position, previous, local: null, previousLocal: null, ...extra });
@@ -61,6 +61,17 @@ describe("locations", () => {
     expect(locationLabel("Florida,United States")).toBe("Florida");
     expect(locationTypeLabel("Postal Code")).toBe("ZIP code");
     expect(locationTypeLabel("City")).toBe("City");
+  });
+  it("reads a place the way people type it", () => {
+    expect(parsePlaceQuery("Tampa")).toEqual({ name: "tampa", state: null });
+    expect(parsePlaceQuery("tampa, fl")).toEqual({ name: "tampa", state: "florida" });
+    expect(parsePlaceQuery("Tampa FL")).toEqual({ name: "tampa", state: "florida" });
+    expect(parsePlaceQuery("bellingham, wash")).toEqual({ name: "bellingham", state: "wash" });
+    expect(parsePlaceQuery("  New   York ,NY ")).toEqual({ name: "new york", state: "new york" });
+    expect(parsePlaceQuery("33602")).toEqual({ name: "33602", state: null });
+    // "la" alone is a name, not Louisiana; wildcards are dropped
+    expect(parsePlaceQuery("la")).toEqual({ name: "la", state: null });
+    expect(parsePlaceQuery("ta%m_pa")).toEqual({ name: "tampa", state: null });
   });
   it("keeps the kinds we offer, once each, and drops malformed rows", () => {
     expect(usableLocations([

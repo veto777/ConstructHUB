@@ -385,7 +385,7 @@ export default function SeoExplorerPage() {
                     <td className="num" data-label="Traffic">{fmtNum(k.traffic)}</td>
                     <td className="num" data-label="Difficulty">{kd(k.difficulty)}</td>
                     <td className="num" data-label="CPC">{k.cpc == null ? "—" : `$${k.cpc.toFixed(2)}`}</td>
-                    <td data-label="Intent">{k.intent ? cap(k.intent) : "—"}</td>
+                    <td data-label="Intent" className="whitespace-nowrap">{k.intent ? cap(k.intent) : "—"}</td>
                     <td data-label="Page" className="max-w-[240px] truncate">{k.url ? <a href={k.url} className="g-link" target="_blank" rel="noreferrer">{stripUrl(k.url).replace(report.domain, "") || "/"}</a> : "—"}</td>
                   </tr>
                 ))}</tbody>

@@ -101,7 +101,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
       </form>
       {draft.length > 0 && (
         <ul className="mb-2 flex flex-wrap gap-1.5" aria-label="Competitors to compare" data-testid="list-gap-competitors">
-          {draft.map((d) => <li key={d} className="g-chip g-chip--sm">{d} <button type="button" className="ml-1 align-middle" aria-label={`Remove ${d}`} onClick={() => setDraft(draft.filter((x) => x !== d))}><X className="h-3 w-3" /></button></li>)}
+          {draft.map((d) => <li key={d} className="g-chip g-chip--sm" style={{ textTransform: "none" }}>{d} <button type="button" className="ml-1 align-middle" aria-label={`Remove ${d}`} onClick={() => setDraft(draft.filter((x) => x !== d))}><X className="h-3 w-3" /></button></li>)}
         </ul>
       )}
       {offers.length > 0 && draft.length < MAX && (
