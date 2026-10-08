@@ -2,5 +2,20 @@
 // One line per recorded walkthrough (its manifest file).
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
+export { default as v_crm_jobcam_project } from "./crm-jobcam-project.json";
+export { default as v_crm_jobcam_share } from "./crm-jobcam-share.json";
+export { default as v_crm_jobcam_timeline } from "./crm-jobcam-timeline.json";
+export { default as v_crm_message_send } from "./crm-message-send.json";
+export { default as v_crm_messages } from "./crm-messages.json";
+export { default as v_crm_project_costing } from "./crm-project-costing.json";
+export { default as v_crm_project_daily_log } from "./crm-project-daily-log.json";
+export { default as v_crm_project_new } from "./crm-project-new.json";
+export { default as v_crm_project_permits } from "./crm-project-permits.json";
+export { default as v_crm_project_punch_list } from "./crm-project-punch-list.json";
+export { default as v_crm_project_selections } from "./crm-project-selections.json";
+export { default as v_crm_project } from "./crm-project.json";
+export { default as v_crm_schedule_from_client } from "./crm-schedule-from-client.json";
+export { default as v_crm_schedule_views } from "./crm-schedule-views.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_database_directory } from "./database-directory.json";
+export { default as v_jobcam } from "./jobcam.json";
