@@ -24,6 +24,7 @@ import { SEO_SCHEMA_DDL } from "../server/seo/schema";
 import { JOBCAM_DDL } from "../server/jobcam/schema";
 import { YOUTUBE_DDL } from "../server/youtube/schema";
 import { YOUTUBE_CUSTOMER_DDL } from "../server/youtube/customer-schema";
+import { ANALYTICS_ATTRIBUTION_DDL } from "../server/analytics-attribution";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -85,6 +86,9 @@ const STATEMENTS = [
   // Customers' own YouTube channels, their videos and the daily upload counter
   // (server/youtube/customer-schema.ts; boot runs these too).
   ...YOUTUBE_CUSTOMER_DDL,
+  // Campaign attribution: landing / utm_* / referrer_host on ch_analytics_events,
+  // ch_signup_attribution, ch_analytics_meta (server/analytics-attribution.ts; boot runs these too).
+  ...ANALYTICS_ATTRIBUTION_DDL,
 ];
 
 const UTC_NAMES = /^(UTC|Etc\/UTC|UCT|Etc\/UCT|GMT|Etc\/GMT|Zulu|Etc\/Zulu|Universal|Etc\/Universal)$/i;

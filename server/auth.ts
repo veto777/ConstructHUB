@@ -28,6 +28,7 @@ import { resolveGoogleUrl } from "./google-url-resolver";
 import { GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
 import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
+import { recordSignupAttribution } from "./analytics-attribution";
 
 export { safeNextPath } from "./app-shell";
 
@@ -216,6 +217,8 @@ export async function setupAuth(app: Express) {
           // origin, not getBaseUrl(): in production that is the CRM portal host.
           void sendWelcomeEmail(newUser.id, appBaseUrl(req))
             .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
+          // First-touch campaign of this browser, if it accepted analytics (never blocks the login).
+          void recordSignupAttribution(newUser.id, req.headers?.cookie);
 
           done(null, newUser);
         } catch (err) {
@@ -452,6 +455,9 @@ export async function setupAuth(app: Express) {
           betaAt,
         })
         .returning();
+
+      // First-touch campaign of this browser, if it accepted analytics (never blocks the sign-up).
+      void recordSignupAttribution(newUser.id, req.headers.cookie);
 
       try {
         const baseUrl = getBaseUrl(req);

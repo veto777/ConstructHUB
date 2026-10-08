@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
       pageTestId="page-privacy-policy"
       title="Privacy Policy"
       titleTestId="heading-privacy-policy"
-      date="Effective Date: September 30, 2026 · Last updated: October 7, 2026"
+      date="Effective Date: September 30, 2026 · Last updated: October 8, 2026"
       dateTestId="text-effective-date"
       footer={copyrightNotice()}
     >
@@ -59,7 +59,7 @@ export default function PrivacyPolicyPage() {
 
           <h3 className="text-lg font-medium mt-4 mb-2">1.3 Cookies and Tracking Technologies</h3>
           <p className="mb-3">
-            We use cookies, local storage, and similar tracking technologies to maintain your session, remember your preferences, and analyze usage patterns. You may disable cookies through your browser settings, but some features of the platform may not function properly without them.
+            We use cookies, local storage, and similar tracking technologies to maintain your session, remember your preferences, and analyze usage patterns. If you accept analytics cookies, each page view is recorded on our own servers together with the site that referred you and any campaign tag on the link you followed (for example, which social media post it was), so we can measure our marketing; we do not use advertising trackers for this. You may disable cookies through your browser settings, but some features of the platform may not function properly without them.
           </p>
         
           <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-iphone-apps">1.4 The ConstructHUB iPhone Apps</h3>

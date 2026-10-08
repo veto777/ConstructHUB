@@ -436,6 +436,9 @@ export async function registerRoutes(
   try {
     const { ensureCrmSchema } = await import("./crm/schema-ensure");
     await ensureCrmSchema();
+    // Campaign attribution columns on ch_analytics_events + ch_signup_attribution (needs the table above).
+    const { ensureAnalyticsAttributionSchema } = await import("./analytics-attribution");
+    await ensureAnalyticsAttributionSchema();
     const { registerCrmRoutes } = await import("./crm/routes");
     registerCrmRoutes(app, getDevUser);
     const { registerAnalyticsRoutes } = await import("./analytics");
