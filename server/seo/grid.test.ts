@@ -99,29 +99,38 @@ describe("local grid", () => {
     const twice = rivalsOf([[L("B", 1, { cid: "7" }), L("B", 2, { cid: "7" }), L("C", 3, { cid: "8" })]], t);
     expect(twice.map((r) => [r.name, r.found, r.avgRank])).toEqual([["B", 1, 1], ["C", 1, 3]]);
   });
-  it("the customer pays for the points that returned; failed and repeated tries are ours", async () => {
+  it("the customer pays for the points that returned; failed and repeated tries are ours, and stay inside what was reserved", async () => {
     const real = gridDeps.request;
     const ok = (title: string) => ({ status_code: 20000, tasks: [{ status_code: 20000, status_message: "Ok.", cost: 0.002, result: [{ items: [{ type: "local_pack", title, cid: "9877668871764835558" }] }] }] });
     let calls = 0;
-    // 9 points: the first two time out once and then answer; the third times out twice.
     const tries = new Map<string, number>();
-    gridDeps.request = (async (_m: string, _p: string, body: any) => {
-      calls++;
-      const where = body[0].location_coordinate as string; const n = (tries.get(where) ?? 0) + 1; tries.set(where, n);
-      const index = [...tries.keys()].indexOf(where);
-      if ((index < 2 && n === 1) || index === 2) throw new DataForSeoError("timeout", "timed out");
-      return ok("Alpine Exteriors");
-    }) as any;
     try {
+      // 9 points: two time out once and then answer. A quarter of 9 is 2 second tries: both are allowed.
+      gridDeps.request = (async (_m: string, _p: string, body: any) => {
+        calls++;
+        const where = body[0].location_coordinate as string; const n = (tries.get(where) ?? 0) + 1; tries.set(where, n);
+        if ([...tries.keys()].indexOf(where) < 2 && n === 1) throw new DataForSeoError("timeout", "timed out");
+        return ok("Alpine Exteriors");
+      }) as any;
       const out = await fetchGrid({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com" });
-      expect(calls).toBe(9 + 3); // two retried once, one retried once and still failed
-      expect(out.data.summary).toMatchObject({ points: 9, checked: 8, found: 8 });
-      expect(out.customerUsd).toBeCloseTo(8 * GRID_POINT_USD, 6);
-      // Ours: the 8 that returned plus an allowance for the 4 tries whose cost we never learned.
-      expect(out.costUsd).toBeCloseTo(12 * GRID_POINT_USD, 6);
+      expect(calls).toBe(9 + 2);
+      expect(out.data.summary).toMatchObject({ points: 9, checked: 9, found: 9 });
+      expect(out.customerUsd).toBeCloseTo(9 * GRID_POINT_USD, 6);
+      // Ours: the 9 that returned plus an allowance for the 2 tries whose cost we never learned — inside the reservation.
+      expect(out.costUsd).toBeCloseTo(11 * GRID_POINT_USD, 6);
+      expect(out.costUsd).toBeLessThanOrEqual(gridEstimateUsd(9));
       // The allowance for what we never learned is already in the figure, so the ledger is told the cost is known and keeps it as it is.
       expect(out.costUnknown).toBe(false);
-      expect(out.customerUsd).toBeLessThanOrEqual(gridEstimateUsd(9));
+
+      // Every lookup times out: only two second tries are made (not nine), and the whole scan fails with its cost attached.
+      calls = 0; tries.clear();
+      gridDeps.request = (async () => { calls++; throw new DataForSeoError("timeout", "timed out"); }) as any;
+      const failed: any = await fetchGrid({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com" }).catch((e) => e);
+      expect(calls).toBe(9 + 2);
+      expect(failed).toBeInstanceOf(Error);
+      expect(failed.costUsd).toBeCloseTo(11 * GRID_POINT_USD, 6);
+      expect(failed.costUsd).toBeLessThanOrEqual(gridEstimateUsd(9));
+      expect(failed.costUnknown).toBe(false);
     } finally { gridDeps.request = real; }
   });
   it("the hold covers every point with room to spare", () => {
