@@ -134,13 +134,20 @@ export function summarise(points: GridPointResult[]): GridSummary {
   };
 }
 
+/** The one listing that counts as the business in a result: the pinned id wherever it is in the list; only without one, the first website / name match. */
+export const targetListing = (listings: MapListing[], t: GridTarget): MapListing | null =>
+  listings.find((l) => matchKind(l, t) === "id") ?? listings.find((l) => isTarget(l, t)) ?? null;
+
 /** Who shows up across the area: every business seen, by how many points it leads at. Ours is always in the list. A business counts once per point. */
 export function rivalsOf(perPoint: MapListing[][], target: GridTarget, keep = 10): GridRival[] {
   const seen = new Map<string, { l: MapListing; ours: boolean; ranks: number[] }>();
   for (const listings of perPoint) {
     const here = new Set<string>();
+    // The same single listing the grid itself counts as the business at this point — so "You" here and the number on
+    // the grid can never disagree. Any other listing that merely shares the website or name is listed as itself.
+    const us = targetListing(listings, target);
     for (const l of listings) {
-      const ours = isTarget(l, target);
+      const ours = l === us;
       const key = ours ? "ours" : l.cid ?? `${normalizeBusinessName(l.name)}|${l.domain ?? ""}`;
       if (here.has(key)) continue; // its best position at this point is the one already counted
       here.add(key);
@@ -163,8 +170,7 @@ export function buildScan(input: { keyword: string; size: number; spacing: numbe
   const points = cells.map((c, i): GridPointResult => {
     const listings = results[i];
     if (!listings) return { ...c, rank: null, failed: true, top: [] };
-    // The listing with the pinned id wherever it is in the list; only without one does the first website / name match count.
-    const hit = listings.find((l) => matchKind(l, target) === "id") ?? listings.find((l) => isTarget(l, target));
+    const hit = targetListing(listings, target);
     return { ...c, rank: hit?.rank ?? null, ...(hit ? { by: matchKind(hit, target)! } : {}), top: listings.slice(0, 3).map((l) => ({ name: l.name, rank: l.rank })) };
   });
   return {
@@ -258,9 +264,10 @@ export const GRID_SCHEMA_DDL = [
   // "running" row that would break the rule is closed first, so creating it can never fail on existing rows.
   // Done as ONE step under a lock (a DO block is a single transaction): no other writer can slip a second running row
   // in between the clean-up and the rule being made.
+  // The lock is taken BEFORE looking, so two servers starting together cannot both decide to create it.
   `DO $$ BEGIN
-     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_grid_scans_active') THEN
-       LOCK TABLE seo_grid_scans IN SHARE ROW EXCLUSIVE MODE;
+     LOCK TABLE seo_grid_scans IN SHARE ROW EXCLUSIVE MODE;
+     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'seo_grid_scans' AND indexname = 'seo_grid_scans_active') THEN
        UPDATE seo_grid_scans SET status='failed', error='${INTERRUPTED}' WHERE status='running' AND id NOT IN (SELECT max(id) FROM seo_grid_scans WHERE status='running' GROUP BY site_id);
        CREATE UNIQUE INDEX seo_grid_scans_active ON seo_grid_scans(site_id) WHERE status='running';
      END IF;

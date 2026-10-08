@@ -73,9 +73,10 @@ export const AI_SCHEMA_DDL = [
   // one, and only while the rule is not there yet, so creating it can never fail on existing data.
   // Clean-up and rule are ONE step under a lock (a DO block is a single transaction), so no other writer can add a
   // duplicate between them.
+  // The lock is taken BEFORE looking, so two servers starting together cannot both decide to create it.
   `DO $$ BEGIN
-     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_ai_checks_run_engine') THEN
-       LOCK TABLE seo_ai_checks IN SHARE ROW EXCLUSIVE MODE;
+     LOCK TABLE seo_ai_checks IN SHARE ROW EXCLUSIVE MODE;
+     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'seo_ai_checks' AND indexname = 'seo_ai_checks_run_engine') THEN
        DELETE FROM seo_ai_checks a USING seo_ai_checks b WHERE a.run_id IS NOT NULL AND a.run_id = b.run_id AND a.engine = b.engine AND a.id > b.id;
        CREATE UNIQUE INDEX seo_ai_checks_run_engine ON seo_ai_checks(run_id, engine) WHERE run_id IS NOT NULL;
      END IF;
