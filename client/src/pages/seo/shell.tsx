@@ -131,7 +131,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
           <PlanGate requiredPlan={gate.requiredPlan} message={gate.message} />
         ) : (
           <>
-            <nav className="g-tabs" aria-label="SEO sections">
+            <nav className="g-tabs sm:!flex-wrap sm:!overflow-visible" aria-label="SEO sections">
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
             </nav>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
