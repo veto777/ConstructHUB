@@ -1,0 +1,128 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-client-decline",
+  "title": "When a client declines",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "The client declines",
+      "narration": "Not every estimate is a yes. Here is what a decline looks like, on both sides."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com",
+        "estimate": "E-2000"
+      },
+      "caption": "The client's estimate",
+      "narration": "First, your client's screen. They have the estimate open."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-show-decline\"]",
+      "caption": "Decline, beside Approve",
+      "narration": "Next to the Approve button is Decline."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-show-decline\"]",
+      "caption": "Choose Decline",
+      "narration": "They choose it.",
+      "holdMs": 800
+    },
+    {
+      "action": "type",
+      "selector": "#why",
+      "value": "We are going with another bid this time.",
+      "caption": "A reason",
+      "narration": "They can say why. The reason is optional."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-decline\"]",
+      "caption": "Confirm decline",
+      "narration": "Then they choose Confirm decline.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Estimate declined",
+      "caption": "Estimate declined",
+      "narration": "The page says the estimate is declined, and that you have been notified."
+    },
+    {
+      "action": "session",
+      "url": "/crm/estimates",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "What you see",
+      "narration": "Now your screen, on the Estimates page.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-row-demo-estimate-e-2000\"]",
+      "caption": "Status: declined",
+      "narration": "The estimate's status has changed to declined."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-2000\"]",
+      "caption": "Open it",
+      "narration": "Open it.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//div[contains(@class,\"font-medium\") and starts-with(normalize-space(.),\"Declined \")]/..",
+      "caption": "When and why",
+      "narration": "A red box shows when it was declined, and the reason your client gave."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-edit-estimate\"]",
+      "caption": "Edit and resend",
+      "chapter": "Try again",
+      "narration": "A decline is not the end. Edit the estimate, then Resend, to put a new offer in front of them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Where to find it",
+      "narration": "Every estimate and its status is under Estimates, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "What happens when a client declines an estimate | ConstructHUB CRM",
+    "description": "See both sides of a declined estimate in the ConstructHUB CRM. The client chooses Decline and can say why; on your side the status changes to declined, with the date and the reason, and you can edit and resend. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor estimate",
+      "declined estimate",
+      "lost bid",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "When clients say no",
+    "accent": "no",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}
