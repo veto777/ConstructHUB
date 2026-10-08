@@ -174,8 +174,8 @@ export const CRM_EXTRA_SEAT_ANNUAL_CENTS = 17000;
 /** Self-serve ceiling on extra seats; above it is a sales conversation. */
 export const CRM_EXTRA_SEAT_MAX = 50;
 
-/** Free trial on the CRM, in days. Housecall Pro gives 14; we match it. */
-export const CRM_TRIAL_DAYS = 14;
+/** Free trial on the CRM, in days. Owner decision 2026-10-08: 7 (was 14, set without sign-off). */
+export const CRM_TRIAL_DAYS = 7;
 
 export const isCrmPlanKey = (value: unknown): value is CrmPlanKey =>
   typeof value === "string" && (CRM_PLAN_KEYS as readonly string[]).includes(value);

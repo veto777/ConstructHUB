@@ -17,7 +17,7 @@ export type PurchaseReview = {
   product: string;
   /** "$79/mo", already formatted. */
   price: string;
-  /** e.g. "14-day free trial for a first CRM subscription. Cancel any time." */
+  /** e.g. "7-day free trial for a first CRM subscription. Cancel any time." */
   note?: string;
   included: readonly string[];
   notIncluded: readonly string[];

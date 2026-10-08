@@ -3,7 +3,7 @@
  *
  *   GET  /api/crm/billing/plans         the CRM price book (public)
  *   GET  /api/crm/billing/subscription  this account's CRM subscription
- *   POST /api/crm/billing/checkout      start one (Stripe Checkout, 14-day trial once)
+ *   POST /api/crm/billing/checkout      start one (Stripe Checkout, one free trial of CRM_TRIAL_DAYS)
  *   POST /api/crm/billing/change        change plan / interval / extra seats / the JobCam add-on in place
  *
  * One account, one Stripe customer, up to two subscriptions: the platform plan
