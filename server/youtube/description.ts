@@ -380,8 +380,8 @@ export function keyHash(s: string): number {
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return h >>> 0;
 }
-const pick = <T>(list: readonly T[], helpKey: string, salt: string): T => list[keyHash(`${salt}:${helpKey}`) % list.length];
-const rotate = <T>(list: readonly T[], helpKey: string, salt: string): T[] => {
+export const pick = <T>(list: readonly T[], helpKey: string, salt: string): T => list[keyHash(`${salt}:${helpKey}`) % list.length];
+export const rotate = <T>(list: readonly T[], helpKey: string, salt: string): T[] => {
   const n = list.length ? keyHash(`${salt}:${helpKey}`) % list.length : 0;
   return [...list.slice(n), ...list.slice(0, n)];
 };
@@ -401,7 +401,7 @@ export function plain(text: string, opts: { timestamps?: boolean } = {}): string
   return t;
 }
 /** Sentences: a full stop, "!" or "?" followed by a space and a capital ("Washington, D.C." stays whole). */
-const sentences = (text: string): string[] => plain(text).split(/(?<=[.!?]["')]?)\s+(?=["'(]?[A-Z0-9])/).map((s) => s.trim()).filter(Boolean);
+export const sentences = (text: string): string[] => plain(text).split(/(?<=[.!?]["')]?)\s+(?=["'(]?[A-Z0-9])/).map((s) => s.trim()).filter(Boolean);
 const words = (text: string): string[] => text.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter((w) => w.length > 2);
 const endStop = (s: string) => (/[.!?]["')]?$/.test(s) ? s : `${s}.`);
 const noStop = (s: string) => s.replace(/[.:;,]+$/, "");
