@@ -49,7 +49,13 @@ const H = "https://compare.example";
   const broken = await job(1, ["/"], [], 0);
   await pool.query(`UPDATE sitescan_jobs SET report='{"findings":[{"id":"x","category":"content","severity":"error","title":"X","urls":["https://compare.example/"]}]}'::jsonb WHERE id=$1`, [broken]);
   const ub = await siteAudit(1, "compare.example");
-  ok(ub.newestUnreadable?.jobId === broken && ub.audit === null && ub.crawls[0].jobId === newest, "a broken newest crawl is said; no older score takes its place; the readable ones can still be picked");
+  ok(ub.newestUnreadable?.jobId === broken && ub.audit === null && ub.crawls[0].jobId === broken && ub.crawls[0].readable === false && ub.crawls[1].jobId === newest && ub.crawls[1].readable, "a broken newest crawl is said; no older score takes its place; it is listed as unreadable and the readable ones can be picked");
+  // Shown: the crawl after a broken one has no default change (never a jump to an older one called "the crawl before").
+  const after = await job(1, ["/", "/a"], [], 0);
+  await pool.query("UPDATE sitescan_jobs SET completed_at = now() + interval '1 minute' WHERE id=$1", [after]);
+  const gap = await siteAudit(1, "compare.example");
+  ok(gap.audit?.jobId === after && gap.audit.comparedWith === null && gap.previousUnreadable?.jobId === broken && gap.history.some((h) => h.jobId === broken && h.unreadable), "a broken crawl in between: no default change, said, and a gap in the history");
+  await pool.query("DELETE FROM sitescan_jobs WHERE id=$1", [after]);
   const picked = await siteAudit(1, "compare.example", { at: newest });
   ok(picked.audit?.jobId === newest && picked.audit.latest === false, "an earlier crawl picked is shown as not the newest");
   const { rows: [s1] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'compare.example') RETURNING id");

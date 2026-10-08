@@ -81,6 +81,8 @@ export type SiteReport = {
     trafficChange: number | null; keywordsChange: number | null; referringDomainsChange: number | null } | null;
   /** The newest crawl could not be read: no health is reported (never an older crawl's in its place). */
   auditUnreadable?: string | null;
+  /** Site health could not be looked up just now (not "no crawl"): said; a scheduled send fails and is tried again. */
+  auditUnavailable?: boolean;
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
@@ -205,7 +207,7 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
               c.position, c.local_position AS local, (jsonb_typeof(c.local_pack)='array' AND jsonb_array_length(c.local_pack)>0) AS "hasPack", k.tags
          FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id WHERE c.site_id=$1 AND c.checked_on >= current_date - 120`, [site.id]),
     pool.query(`SELECT report FROM seo_domain_reports WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$4 ORDER BY created_at DESC LIMIT 1`, [userId, site.domain, site.location_code, site.language_code]),
-    siteAudit(userId, site.domain).catch(() => null),
+    siteAudit(userId, site.domain).catch((e) => { if (opts.strict) throw e; return "unavailable" as const; }),
     reportDeps.searchConsole(userId, site.domain).catch(() => null),
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
@@ -227,7 +229,9 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
   const { rows: [count] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
   if (ranks) ranks.section.tracked = Math.max(ranks.section.checked, Number(count?.n ?? 0));
   const r = saved?.report;
-  const a = audit?.audit ?? null;
+  const auditUnavailable = audit === "unavailable";
+  const auditRead = audit === "unavailable" ? null : audit;
+  const a = auditRead?.audit ?? null;
   return {
     domain: site.domain, generatedAt: new Date().toISOString(), comparedWith: ranks?.comparedWith ?? null,
     rankings: ranks?.section ?? null,
@@ -238,7 +242,8 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
       keywordsChange: lastChange(Array.isArray(r.history) ? r.history.map((h: any) => h.keywords) : undefined),
       referringDomainsChange: lastChange(Array.isArray(r.linkHistory) ? r.linkHistory.map((h: any) => h.referringDomains) : undefined),
     } : null,
-    ...(audit?.newestUnreadable ? { auditUnreadable: audit.newestUnreadable.at ?? "" } : {}),
+    ...(auditRead?.newestUnreadable ? { auditUnreadable: auditRead.newestUnreadable.at ?? "" } : {}),
+    ...(auditUnavailable ? { auditUnavailable: true } : {}),
     audit: a ? {
       scannedAt: a.scannedAt, health: a.health, healthChange: a.healthChange, crawled: a.crawled,
       errors: a.totals.error.affected, warnings: a.totals.warning.affected, notices: a.totals.notice.affected,
@@ -309,7 +314,8 @@ export function reportHighlights(r: SiteReport): [string, string][] {
 /** One repeating grid in words: where it stands and, when there is a comparable scan before it, where it stood. */
 export const gridLine = (g: GridReportLine) =>
   `scanned ${String(g.at).slice(0, 10)}: in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked} on ${String(g.previous.at).slice(0, 10)})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
-export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length && !r.work;
+// A crawl that could not be read, or site health that could not be looked up, is news too: the report says so.
+export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && r.auditUnreadable === undefined && !r.auditUnavailable && !r.searchConsole && !(r.grids ?? []).length && !r.work;
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
@@ -367,13 +373,18 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
         // A change that was measured is shown even when it is zero ("±0" is written "0"); none measured is "(—)" written "(-)".
         const chg = (v: number | null) => (v === null ? " (-)" : v === 0 ? " (0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
         room(32); tline(head, true);
-        for (const t of k.byTag) trow([t.tag, n(t.keywords), r.comparedWith ? `${n(t.compared)} / ${n(t.newSince)}` : "-", `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
-          t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""}`]);
-        const once = k.byTag.filter((t) => t.visibility !== null && !t.weighted).map((t) => t.tag);
-        const mixed = k.byTag.filter((t) => r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted).map((t) => `${t.tag} (change ${t.changeWeighted ? "by search volume" : "each keyword once"})`);
-        // At most five names, then how many more: the note never outgrows the table.
-        const names = (xs: string[]) => (xs.length > 5 ? `${xs.slice(0, 5).join(", ")} and ${xs.length - 5} more` : xs.join(", "));
-        line(`Visibility index weighting: by search volume${once.length ? `, except each keyword counted once for ${names(once)} (some keywords have no volume)` : ""}.${mixed.length ? ` The change is weighted differently for ${names(mixed)}.` : ""}`, soft);
+        // Every row is numbered and carries its own weighting marker; a tag name cut to fit is given in full under the table.
+        const cut: string[] = [];
+        k.byTag.forEach((t, idx) => {
+          const label = `${idx + 1}. ${t.tag}`;
+          doc.font("Helvetica").fontSize(9);
+          if (doc.widthOfString(pdfSafe(label)) > tcols[1] - 6) cut.push(`${idx + 1}. ${t.tag}`);
+          const mark = t.visibility === null ? "" : ` ${t.weighted ? "v" : "o"}${r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted ? (t.changeWeighted ? "/v" : "/o") : ""}`;
+          trow([label, n(t.keywords), r.comparedWith ? `${n(t.compared)} / ${n(t.newSince)}` : "-", `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
+            t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""}${mark}`]);
+        });
+        line("Visibility index weighting: v = by search volume, o = each keyword counted once (some keywords have no volume); a second letter after \"/\" is the change's own weighting when it differs.", soft);
+        if (cut.length) line(`Tag names cut to fit, in full: ${cut.join("; ")}.`, soft);
         if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
         line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (\"In both\"); (-) means none was in both, (0) a measured no change. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first.`, soft);
       }
@@ -395,6 +406,10 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Websites linking to it", `${n(r.search.referringDomains)}${signed(r.search.referringDomainsChange)}`);
       pair("Links in total", n(r.search.backlinks));
       line("Changes in brackets are over the period the data covers (up to two years). Visits are estimates from rankings, not analytics.", soft);
+    }
+    if (r.auditUnavailable) {
+      heading("Site health");
+      line("Site health could not be looked up when this report was made, so it is left out of this report (it is not \"no crawl\").", soft);
     }
     if (r.auditUnreadable !== undefined && !r.audit) {
       heading("Site health");

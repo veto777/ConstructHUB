@@ -893,6 +893,19 @@ Verdict: five new defects, none HIGH.
  5 Site audit and the report skipped the evidence test ......... FIXED (one test for the dashboard, Site audit, its comparisons and the report; a broken newest crawl is said everywhere and no older score takes its place unless picked - real Postgres 18/18)
  NOT DONE: as audit #43.
 
+## Codex audit #47 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-47.md)
+
+Verdict: seven new defects, none HIGH.
+
+ 1 the evidence test still let damaged evidence through ........ FIXED (exact exclusion texts; a message must be text; findings need an id and a list of pages; statuses whole numbers 100-599. Formula version 4. Checked read-only on the live database: its one finished crawl still reads)
+ 2 a broken crawl in between vanished from comparisons ......... FIXED (every finished crawl stays in the history - a broken one as a gap - and in the pickers, listed "could not be read" and not choosable; when the crawl just before is broken no change is shown by default, an older one can be picked - real Postgres)
+ 3 a report whose only news was an unreadable crawl was "empty" . FIXED (it is news: page, PDF and email carry it)
+ 4 site health that could not be looked up vanished ............ FIXED (said as "could not be looked up"; a scheduled send fails and is tried again)
+ 5 the PDF's weighting note could not name every tag ........... FIXED (numbered rows, each with its own weighting marker; names cut to fit are given in full under the table)
+ 6 detail views could read a crawl the summary would not ........ FIXED (Pages, Internal links and Outgoing links read crawls with the same evidence test)
+ 7 By tag hid a failed refresh over "no keywords" ............... FIXED
+ NOT DONE: as audit #43.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -972,3 +985,4 @@ Verdict: five new defects, none HIGH.
 - 10/8 audit #44 fixes: 404 tests across server/seo and the crawler's suites; nineteen real-Postgres scripts passing (fixtures now save a report as the crawler does). Browser (vb11, commit checked): report By tag with in-both / new counts and weighting, PDF downloaded; health tile still reading the real crawls; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #45 fixes: 405 tests across server/seo and the crawler's suites; nineteen real-Postgres scripts passing. Browser (vb11, commit checked): rank tracker and report by tag, the report PDF downloaded, the health tile still reading the real crawls under the version-2 test; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #46 fixes: 405 tests; nineteen real-Postgres scripts passing (audit compare 18/18 with a broken newest crawl on Site audit and in the report). PDF stress render with 60 long tags. Browser (vb11, commit checked): Site audit pickers, health tile, rank tracker and report by tag, PDF downloaded - the real crawls still read under version 3; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #47 fixes: 405 tests; nineteen real-Postgres scripts passing (audit compare 19/19 with a broken crawl in between; link-opportunity and outgoing fixtures now save a report as the crawler does). Live database checked read-only: 1 of 1 finished crawls reads. Browser (vb11, commit checked): Site audit pickers and comparisons, groups, report by tag and PDF, health tile; 1440 and 390 px, no overflow, no page errors.

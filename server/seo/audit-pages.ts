@@ -6,7 +6,7 @@
  * (sitescan_jobs.state); free.
  */
 import { pool } from "../db";
-import { groupFindings, auditDomainKey } from "./audit";
+import { groupFindings, auditDomainKey, DONE_SQL } from "./audit";
 
 export type RawPage = {
   url: string; status: number; redirects: number; title: string | null; description: string | null; h1: string[]; links: string[];
@@ -151,7 +151,7 @@ const worked = new Map<string, PagesResult>();
 export async function auditPages(user: number, domain: string): Promise<PagesResult | null> {
   // Which crawl first (cheap), then its pages only when they are not already worked out.
   const { rows: [newest] } = await pool.query(
-    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, auditDomainKey(domain)]);
+    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, auditDomainKey(domain)]);
   if (!newest) return null;
   const kept = worked.get(`${user}:${newest.id}`);
   if (kept) return kept;

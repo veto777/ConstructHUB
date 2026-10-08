@@ -32,7 +32,7 @@ type Audit = {
   issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
-type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null }[]; newestUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -157,9 +157,9 @@ export default function SeoAuditPage() {
       {site && d?.newestUnreadable && (
         <div className="g-callout mb-4" role="alert" data-testid="audit-unreadable">
           <h3>The newest crawl could not be read</h3>
-          <p>The crawl that finished {fmtDate(d.newestUnreadable.at)} was not saved in a form we can read, so no score or issues are taken from it. Run a new crawl{(d.crawls?.length ?? 0) > 0 ? ", or look at an earlier one" : ""}.</p>
+          <p>The crawl that finished {fmtDate(d.newestUnreadable.at)} was not saved in a form we can read, so no score or issues are taken from it. Run a new crawl{d.crawls?.some((c) => c.readable !== false) ? ", or look at an earlier one" : ""}.</p>
           {a ? <p className="mt-1 text-[13px]">Shown below: the crawl of {fmtDate(a.completedAt ?? a.scannedAt)}, an earlier crawl you picked.</p>
-            : (d.crawls?.length ?? 0) > 0 && <button type="button" className="g-pill mt-2" onClick={() => choose({ at: d.crawls![0].jobId, vs: null })} data-testid="button-audit-earlier">Show the crawl of {fmtDate(d.crawls![0].at)}</button>}
+            : (() => { const ok = d.crawls?.find((c) => c.readable !== false); return ok ? <button type="button" className="g-pill mt-2" onClick={() => choose({ at: ok.jobId, vs: null })} data-testid="button-audit-earlier">Show the crawl of {fmtDate(ok.at)}</button> : null; })()}
         </div>
       )}
       {site && d && !a && !running && !d.newestUnreadable && (
@@ -256,23 +256,23 @@ export default function SeoAuditPage() {
                   <select className="g-select min-w-0 max-w-full" value={a.latest === false ? a.jobId : ""} data-testid="select-audit-at"
                     onChange={(e) => choose({ at: e.target.value || null, vs: null })}>
                     {d?.newestUnreadable ? <><option value="">The newest crawl ({fmtDate(d.newestUnreadable.at)}, could not be read)</option>
-                      {crawls.map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i)}</option>)}</>
+                      {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId} disabled={c.readable === false}>Crawl of {crawlWord(c, i + 1)}{c.readable === false ? " (could not be read)" : ""}</option>)}</>
                       : <><option value="">The newest crawl ({fmtDate(crawls[0].at)})</option>
-                      {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, i + 1)}</option>)}</>}
+                      {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId} disabled={c.readable === false}>Crawl of {crawlWord(c, i + 1)}{c.readable === false ? " (could not be read)" : ""}</option>)}</>}
                   </select></label>
                 {earlier.length > 0 && (
                   <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">compared with</span>
                     <select className="g-select min-w-0 max-w-full" value={cmp?.chosen ? cmp.jobId : ""} data-testid="select-audit-vs"
                       onChange={(e) => choose({ at, vs: e.target.value || null })}>
-                      <option value="">The crawl before it ({fmtDate(earlier[0].at)})</option>
-                      {earlier.slice(1).map((c) => <option key={c.jobId} value={c.jobId}>Crawl of {crawlWord(c, crawls.indexOf(c))}</option>)}
+                      <option value="">The crawl before it ({fmtDate(earlier[0].at)}{earlier[0].readable === false ? ", could not be read" : ""})</option>
+                      {earlier.slice(1).map((c) => <option key={c.jobId} value={c.jobId} disabled={c.readable === false}>Crawl of {crawlWord(c, crawls.indexOf(c))}{c.readable === false ? " (could not be read)" : ""}</option>)}
                     </select></label>
                 )}
                 {q.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
               </div>
               {crawls.length >= 100 && <p className="g-text-2 mt-1 text-[12px]">The newest 100 crawls are listed.</p>}
               {a.latest === false && <p className="mt-2 text-[13px]" role="note" data-testid="audit-older-note">You are looking at the crawl of {fmtDate(shownDate)}, not the newest. Its issues, health and counts are shown; Pages, Internal links and Outgoing links read the newest crawl. <button type="button" className="g-link" onClick={() => choose({ at: null, vs: null })}>Show the newest crawl</button></p>}
-              {!cmp && <p className="g-text-2 mt-2 text-[13px]">No earlier crawl to compare this one with.</p>}
+              {!cmp && <p className="g-text-2 mt-2 text-[13px]" data-testid="audit-no-compare">{d?.previousUnreadable ? `The crawl just before (${fmtDate(d.previousUnreadable.at)}) could not be read, so no change is shown. Pick an earlier crawl above to compare with.` : "No earlier crawl to compare this one with."}</p>}
               {cmp && (
                 <div className="mt-2 text-[13px]">
                   <p className="g-text-2">Every change, fixed issue and health move on this page is the crawl of {fmtDate(shownDate)} against {before}{cmp.chosen && cmp.at ? "" : cmp.at ? ` (${fmtDate(cmp.at)})` : ""}.</p>

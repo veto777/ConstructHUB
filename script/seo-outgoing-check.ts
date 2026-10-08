@@ -12,7 +12,7 @@ const H = "https://outgo.example";
   const { rows: [site] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'outgo.example') RETURNING id, domain");
   const page = (p: string, links: string[], evidence: object[] = []) => ({ url: `${H}${p}`, status: 200, links: [`${H}/`, ...links], linkEvidence: evidence });
   const job = (user: number, pages: object[], checks: object[], ago: number) => pool.query(
-    `INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,150,$4,'completed','{}'::jsonb, now() - $5::int * interval '1 hour')`,
+    `INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,150,$4,'completed','{"findings":[]}'::jsonb, now() - $5::int * interval '1 hour')`,
     [randomUUID(), user, `${H}/`, JSON.stringify({ pages, linkChecks: checks }), ago]);
   await job(1, [page("/", ["https://supplier.example/a"], [{ target: "https://supplier.example/a", anchor: "Our supplier" }]), page("/b", ["https://gone.example/x"]), ...Array.from({ length: 4 }, (_, i) => page(`/f${i}`, []))], [{ url: "https://gone.example/x", status: 404 }], 2);
   await job(2, [page("/", ["https://someone-else.example/"])], [], 0);   // another account's newer crawl of the same domain

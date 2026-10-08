@@ -35,7 +35,8 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
     return null;
   }
   // No keywords at all: nothing to show. Keywords but no tags: all keywords, and how to break them down.
-  if (shell.all.keywords === 0) return null;
+  // (A failed refresh is still said, even over an earlier "no keywords".)
+  if (shell.all.keywords === 0 && !q.isError) return null;
   const list = d ? [...d.rows, { ...d.all, tag: "" }] : [];
   return (
     <section className="mb-5" data-testid="rank-tags" aria-busy={q.isFetching}>

@@ -12,7 +12,7 @@
  */
 import { createHash } from "node:crypto";
 import { pool } from "../db";
-import { auditDomainKey } from "./audit";
+import { auditDomainKey, DONE_SQL } from "./audit";
 import { linksMeasurable, sameUrlKey, type RawPage } from "./audit-pages";
 
 export const LINK_OPP_MAX = 200, LINK_OPP_PER_TARGET = 10;
@@ -181,7 +181,7 @@ const worked = new Map<string, Result>();
 /** null = no finished crawl of the site yet. */
 export async function linkOpportunities(userId: number, site: { id: number; domain: string }): Promise<Result | null> {
   const { rows: [newest] } = await pool.query(
-    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(site.domain)]);
+    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(site.domain)]);
   if (!newest) return null;
   // Each tracked keyword's NEWEST check day (within 35 days) — and on that day the device where the site ranked better.
   // A keyword that did not rank in its newest check is not looked for, however it ranked before.
@@ -219,6 +219,6 @@ export async function linkResolverFor(userId: number, domain: string, db: { quer
   const { rows: [t] } = await db.query("SELECT to_regclass('sitescan_jobs') IS NOT NULL AS ok");
   if (!t?.ok) return aliasesOf([]);
   const { rows: [job] } = await db.query(
-    `SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(domain)]);
+    `SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(domain)]);
   return aliasesOf((job?.pages ?? []) as OppPage[]);
 }

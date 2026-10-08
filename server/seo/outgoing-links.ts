@@ -9,7 +9,7 @@
  * — an unchecked link is "not checked", never "fine".
  */
 import { pool } from "../db";
-import { auditDomainKey } from "./audit";
+import { auditDomainKey, DONE_SQL } from "./audit";
 
 export const OUTGOING_DOMAINS = 500, OUTGOING_EXAMPLES = 3;
 export type OutPage = { url: string; status: number; links: string[]; evidence?: { target: string; anchor: string }[] };
@@ -98,7 +98,7 @@ const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object('url', p->>'url
 export async function siteOutgoingLinks(userId: number, site: { id: number; domain: string }): Promise<(OutgoingLinks & { jobId: string; scannedAt: string | null }) | null> {
   const { rows: [job] } = await pool.query(
     `SELECT id, completed_at, ${PAGES_SQL} AS pages, CASE WHEN jsonb_typeof(state->'linkChecks')='array' THEN state->'linkChecks' ELSE '[]'::jsonb END AS checks
-       FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`,
+       FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`,
     [userId, auditDomainKey(site.domain)]);
   if (!job) return null;
   return { ...outgoingLinks(job.pages as OutPage[], job.checks as LinkCheck[], auditDomainKey(site.domain)), jobId: job.id, scannedAt: job.completed_at ? new Date(job.completed_at).toISOString() : null };

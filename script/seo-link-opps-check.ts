@@ -23,7 +23,7 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
     page("/roofing", "Roofing", [`${H}/`], { redirects: [`${H}/old-roofing`] }),
     page("/blog/a", "We install vinyl siding and metal roofing."), page("/blog/b", "Metal roofing explained.", [`${H}/old-roofing`]), ...Array.from({ length: 6 }, (_, i) => page(`/about-${i}`, "Family company."))];
   const job = async (user: number, ps: object[], ago: number) => pool.query(
-    `INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,150,$4,'completed','{}'::jsonb, now() - $5::int * interval '1 hour')`,
+    `INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,150,$4,'completed','{"findings":[]}'::jsonb, now() - $5::int * interval '1 hour')`,
     [randomUUID(), user, `${H}/`, JSON.stringify({ pages: ps }), ago]);
   await job(1, pages, 2);
   // Another account's newer crawl of the same domain says no page mentions anything: it must not be read.
