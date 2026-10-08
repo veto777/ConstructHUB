@@ -6,18 +6,21 @@
  * a "denied" or unanswered browser sends nothing and stores nothing.
  *
  *   POST /api/analytics/consent  {granted}  — answer the banner (sets cookies)
- *   POST /api/analytics/events   {events:[{type,path,referrer}]}  — batched
+ *   POST /api/analytics/events   {events:[{type,path,referrer,landing,utm}]}  — batched
  *   GET  /api/admin/analytics    — platform-admin rollup (visitors, IPs, trail)
+ *   GET  /api/admin/analytics?view=campaigns — visits and sign-ups by campaign
+ *        tag and referring site (server/analytics-attribution.ts)
  */
 import type { Express } from "express";
 import { randomUUID } from "crypto";
 import { analyticsPath } from "@shared/analytics-path";
 import { z } from "zod";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { chAnalyticsEvents, users } from "@shared/schema";
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { requirePlatformAdmin } from "./crm/admin";
 import { allow } from "./crm/client-auth";
+import { campaignReport, consentedVisitorId, isMintedVisitorId, landingColumns } from "./analytics-attribution";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -28,32 +31,13 @@ const clientIp = (req: any) =>
   String(req.headers["cf-connecting-ip"] || req.headers["x-forwarded-for"] || req.ip || "")
     .split(",")[0].trim().slice(0, 60);
 
-function parseCookies(req: any): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const part of String(req.headers.cookie || "").split(";")) {
-    const i = part.indexOf("=");
-    if (i > 0) {
-      try {
-        out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
-      } catch {
-        // Malformed % escapes — treat the cookie as absent, never 500.
-      }
-    }
-  }
-  return out;
-}
-
 const secureFlag = process.env.NODE_ENV === "production" ? "; Secure" : "";
 // ch_consent must stay JS-readable (the banner reads it from document.cookie);
 // ch_vid never needs to be — HttpOnly keeps it out of script reach.
 const consentOpts = `Path=/; Max-Age=31536000; SameSite=Lax${secureFlag}`;
 const vidOpts = `Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly${secureFlag}`;
 
-/** The server only ever mints UUID visitor ids — anything else is forged. */
-const MINTED_VID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-export function isMintedVisitorId(vid: string): boolean {
-  return MINTED_VID.test(vid);
-}
+export { isMintedVisitorId };
 
 /** Drop the query string / fragment — invite tokens etc. must never land in
  *  the admin rollup. */
@@ -86,11 +70,11 @@ export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void
   });
 
   app.post("/api/analytics/events", async (req: any, res) => {
-    const cookies = parseCookies(req);
     // Consent is the gate, enforced server-side — a hand-crafted POST from a
     // browser that declined records nothing. The visitor id must be one the
     // server minted, not a client-invented string.
-    if (cookies.ch_consent !== "granted" || !cookies.ch_vid || !isMintedVisitorId(cookies.ch_vid)) {
+    const visitorId = consentedVisitorId(req.headers.cookie);
+    if (!visitorId) {
       return res.json({ ok: true, recorded: 0 });
     }
     const parsed = z.object({
@@ -98,6 +82,15 @@ export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void
         type: z.string().max(24).optional(),
         path: z.string().min(1).max(300),
         referrer: z.string().max(300).nullable().optional(),
+        // First page view of a page load, with the three campaign tags the
+        // browser read off its address bar. Unknown keys are stripped by zod;
+        // the values are sanitized again in landingColumns().
+        landing: z.boolean().optional(),
+        utm: z.object({
+          source: z.string().max(200).nullable().optional(),
+          medium: z.string().max(200).nullable().optional(),
+          campaign: z.string().max(200).nullable().optional(),
+        }).nullable().optional(),
       })).min(1).max(20),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ ok: false });
@@ -118,8 +111,11 @@ export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void
 
     const ip = anonymizeIp(clientIp(req));
     const ua = String(req.headers["user-agent"] || "").slice(0, 300);
-    await db.insert(chAnalyticsEvents).values(parsed.data.events.map((e) => ({
-      visitorId: String(cookies.ch_vid).slice(0, 64),
+    const siteHost = String(req.hostname || "");
+    await db.insert(chAnalyticsEvents).values(parsed.data.events.map((e, i) => ({
+      // Only the first event of a batch can be a landing (one page load, one landing).
+      ...landingColumns(i === 0 ? e : {}, siteHost),
+      visitorId: visitorId.slice(0, 64),
       userId,
       type: e.type?.slice(0, 24) || "pageview",
       path: stripQuery(e.path).slice(0, 300) || "/",
@@ -133,6 +129,14 @@ export function registerAnalyticsRoutes(app: Express, getDevUser: GetUser): void
   app.get("/api/admin/analytics", async (req: any, res) => {
     const admin = await requirePlatformAdmin(req, res, getDevUser);
     if (!admin) return;
+
+    // Campaigns: ?view=campaigns&since=YYYY-MM-DD&until=YYYY-MM-DD[&source=instagram]
+    if (req.query?.view === "campaigns") {
+      const report = await campaignReport(pool, {
+        since: req.query.since, until: req.query.until, days: req.query.days, source: req.query.source,
+      });
+      return res.json(report);
+    }
 
     const since7d = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     const since24h = new Date(Date.now() - 24 * 3600 * 1000);

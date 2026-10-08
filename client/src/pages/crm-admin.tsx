@@ -25,6 +25,7 @@ import {
 import { GoogleSectionHeader, GoogleStat } from "@/components/google";
 import { DataSourceCard, type SeoStatus } from "@/pages/seo/shell";
 import { InfoTip } from "@/components/info-tip";
+import { AdminCampaigns } from "@/components/admin-campaigns";
 import { confirmAction } from "@/components/confirm-dialog";
 
 /**
@@ -870,6 +871,9 @@ export default function CrmAdminPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Campaigns: visits and sign-ups by campaign tag and referring site ── */}
+      <AdminCampaigns enabled={isAdmin && gateOpen} />
 
       {/* ── Hub assistant, Gabe (counts only; Gabe never stores what anyone asked) ── */}
       <div className="space-y-3" data-testid="section-admin-hub">

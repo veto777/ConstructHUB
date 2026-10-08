@@ -1575,7 +1575,33 @@ export const chAnalyticsEvents = pgTable("ch_analytics_events", {
   referrer: text("referrer"),
   ip: text("ip"),
   userAgent: text("user_agent"),
+  // Campaign attribution (server/analytics-attribution.ts): set on the first
+  // page view of a page load that came from outside the site. The three
+  // sanitized campaign tags and the referring HOST — never a query string.
+  landing: boolean("landing").notNull().default(false),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  referrerHost: text("referrer_host"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** First-touch campaign of the browser that created an account (set once at sign-up; server/analytics-attribution.ts). */
+export const chSignupAttribution = pgTable("ch_signup_attribution", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  referrerHost: text("referrer_host"),
+  touchedAt: timestamp("touched_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Analytics bookkeeping — `attribution_started` holds the date campaign tags began being recorded. */
+export const chAnalyticsMeta = pgTable("ch_analytics_meta", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /**

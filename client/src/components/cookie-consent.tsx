@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
 import { analyticsPath } from "@shared/analytics-path";
+import { utmFromSearch } from "@shared/campaign-attribution";
 import { isClientPortal, isPortal } from "@/lib/site";
 import { inNativeApp } from "@/lib/app-shell";
 
@@ -23,9 +24,21 @@ function readCookie(name: string): string | null {
   return null;
 }
 
+// How this page load arrived: the three campaign tags (utm_source / utm_medium /
+// utm_campaign) read off the address bar once, before any in-app navigation
+// drops them. Nothing else in the query string is read. Held in memory only —
+// it is sent with the first page view, and only once analytics is accepted.
+const landingUtm = typeof window === "undefined" ? null : utmFromSearch(window.location.search);
+let landingSent = false;
+
 function sendPageview(path: string) {
+  const landing = !landingSent;
+  landingSent = true;
   const body = JSON.stringify({
-    events: [{ type: "pageview", path, referrer: analyticsPath(document.referrer) || null }],
+    events: [{
+      type: "pageview", path, referrer: analyticsPath(document.referrer) || null,
+      ...(landing ? { landing: true, ...(landingUtm ? { utm: landingUtm } : {}) } : {}),
+    }],
   });
   // sendBeacon survives navigation; fetch is the fallback.
   try {
