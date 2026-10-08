@@ -93,7 +93,8 @@ export type CoverSpec = HookSpec & {
 export function coverHtml(l: Layout, c: CoverSpec): string {
   const vertical = l.name === "vertical";
   const W = vertical ? 700 : 640, H = vertical ? 470 : 420;
-  const cropW = Math.min(c.shotSize.width, Math.max(900, (c.ring?.width ?? 0) * 2.2)), cropH = (cropW * H) / W, k = W / cropW;
+  // 900 pixels of a 1920-wide screenshot (as the thumbnail shows), the same share of a smaller one.
+  const cropW = Math.min(c.shotSize.width, Math.max((900 * c.shotSize.width) / 1920, (c.ring?.width ?? 0) * 2.2)), cropH = (cropW * H) / W, k = W / cropW;
   const cx = c.ring ? c.ring.x + c.ring.width / 2 : c.shotSize.width / 2, cy = c.ring ? c.ring.y + c.ring.height / 2 : c.shotSize.height / 2;
   const x0 = Math.max(0, Math.min(c.shotSize.width - cropW, cx - cropW * 0.4)), y0 = Math.max(0, Math.min(c.shotSize.height - cropH, cy - cropH * 0.5));
   const ring = c.ring ? `<div class="ring" style="left:${(c.ring.x - x0) * k - 10}px;top:${(c.ring.y - y0) * k - 10}px;width:${c.ring.width * k + 20}px;height:${c.ring.height * k + 20}px"></div>` : "";
