@@ -6,6 +6,7 @@
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ExternalLink, Loader2, Plus, RefreshCw, Search } from "lucide-react";
@@ -152,7 +153,9 @@ export default function SeoExplorerPage() {
   const trackedSite = report ? (sites.data ?? []).find((s) => s.domain === report.domain) ?? null : null;
   const tracked = !!trackedSite;
   const busy = analyse.isPending || (saved.isLoading && !!domain && !report);
-  const notFoundYet = !!domain && !report && saved.isError && !analyse.isPending;
+  const savedMissing = saved.isError && isNotRunYet(saved.error);
+  const notFoundYet = !!domain && !report && savedMissing && !analyse.isPending;
+  const savedFailed = !!domain && !report && saved.isError && !savedMissing && !analyse.isPending;
 
   const positions = useMemo(() => {
     if (!report) return [];
@@ -202,6 +205,7 @@ export default function SeoExplorerPage() {
         </Panel>
       )}
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
+      {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.</p></Empty>}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
         <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>

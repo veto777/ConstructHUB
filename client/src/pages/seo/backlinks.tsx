@@ -39,7 +39,7 @@ export default function SeoBacklinksPage() {
             <Tile label="Referring domains" value={<>{fmtNum(s.referringDomains)} {diff(s.referringDomains, p?.referringDomains)}</>} hint={`+${fmtNum(s.newReferringDomains)} new · −${fmtNum(s.lostReferringDomains)} lost`} testId="tile-domains" />
             <Tile label="Spam score" value={s.spamScore ?? "—"} hint={`${fmtNum(s.brokenBacklinks)} broken backlinks`} testId="tile-spam" />
           </div>
-          {d.snapshot.backlinks.length === 0 ? <Empty>No live backlinks were found for {site.domain}.</Empty> : (
+          {d.snapshot.backlinks.length === 0 ? <Empty>{(s as { listFailed?: boolean }).listFailed ? <>The list of linking pages didn't load for this snapshot — the totals above are still right. Refresh to try again.</> : <>No live backlinks were found for {site.domain}.</>}</Empty> : (
             <table className="g-table" data-testid="table-backlinks">
               <thead><tr><th>Linking page</th><th>Anchor</th><th>Links to</th><th className="num">Domain rank</th><th className="num">Spam</th><th>Follow</th><th className="num">First seen</th></tr></thead>
               <tbody>

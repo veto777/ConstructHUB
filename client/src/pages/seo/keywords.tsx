@@ -8,6 +8,7 @@
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
 import { useEffect, useState } from "react";
+import { isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Loader2, Plus, Search } from "lucide-react";
@@ -18,6 +19,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelecte
 import { ReportView, type TableKey } from "./report-table";
 
 type Overview = {
+  missing?: string[];
   keyword: string; fetchedAt: string;
   volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competition: string | null;
   bidLow: number | null; bidHigh: number | null; results: number | null;
@@ -54,7 +56,7 @@ export default function SeoKeywordsPage() {
   // A keyword looked up in the last week opens without spending.
   const saved = useQuery<{ overview: Overview } | null>({
     queryKey: ["/api/seo/keyword", keyword], enabled: !!keyword && !overview, retry: false,
-    queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true }); } catch { return null; } },
+    queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   useEffect(() => { if (saved.data?.overview && !overview) setOverview(saved.data.overview); }, [saved.data, overview]);
 
@@ -66,6 +68,11 @@ export default function SeoKeywordsPage() {
       void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
     },
     onError: (e) => toast({ title: "Couldn't look that keyword up", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const refresh = useMutation({
+    mutationFn: () => api("POST", "/api/seo/keyword", { keyword: overview?.keyword, refresh: true }),
+    onSuccess: (data: { overview: Overview }) => { setOverview(data.overview); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
     mutationFn: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) =>
@@ -99,13 +106,15 @@ export default function SeoKeywordsPage() {
       </p>
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and today's results…" : "Opening the saved overview…"}</p>}
       {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who holds the top ten today — and hundreds of related searches you can track.</p></Empty>}
-      {!o && !busy && keyword && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
+      {!o && !busy && keyword && saved.isError && <div className="g-callout" role="alert" data-testid="keywords-saved-error"><h3>Couldn't check for a saved overview</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
+      {!o && !busy && keyword && !saved.isError && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
 
       {o && (
         <div data-testid="keyword-overview">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="g-text text-[20px] font-medium">"{o.keyword}"</h2>
             <span className="g-text-2 text-[12px]">as of {fmtDate(o.fetchedAt)}</span>
+            <button type="button" className="g-pill g-pill--sm" disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate()} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>
             {site && <button type="button" className="g-pill g-pill--sm ml-auto" disabled={track.isPending} onClick={() => track.mutate([{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }])} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
           </div>
           <div className="g-tiles mb-4">
@@ -138,7 +147,8 @@ export default function SeoKeywordsPage() {
             </section>
           </div>
           <section className="mb-5" data-testid="panel-keyword-serp">
-            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks today</h3>
+            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks <span className="g-text-2 text-[12px] font-normal">· Google's top results as of {fmtDate(o.fetchedAt)}</span></h3>
+            {(o.missing?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-keyword-missing">{o.missing!.includes("results") ? "The top results didn't load this time." : "Site authority didn't load this time."} Refresh to try again.</p>}
             {o.serp.length ? (
               <table className="g-table">
                 <thead><tr><th className="num w-10">#</th><th>Page</th><th className="num">Site authority</th><th></th></tr></thead>

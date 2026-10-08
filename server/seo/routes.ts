@@ -1,7 +1,9 @@
 /**
  * /api/seo/* — ConstructHUB SEO's API. Session auth through the platform's
- * getDevUser (an agency member acts as the workspace owner), plan-gated like
- * Site Scan (server/seo/plan.ts).
+ * getDevUser, plan-gated like Site Scan (server/seo/plan.ts). Every row is
+ * scoped to the signed-in account. Agency delegation is NOT wired here:
+ * /api/seo is outside registerAgencyAccess's allowlist (server/agency/
+ * middleware.ts), so an agency member sees their own SEO data, not a client's.
  *
  * White-label: the customer buys plan units — tracked keywords (a standing
  * count), keyword searches and backlink refreshes per month (shared/plans.ts
@@ -35,6 +37,8 @@ import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
+import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
+import { rankHistory, keywordHistory } from "./rank-history";
 
 /**
  * What each lookup costs the customer, in cents (wholesale estimate x SEO_MARKUP).
@@ -52,6 +56,16 @@ export const SEO_PRICES = {
   rankChecksPer100: retailCents(estimateRankCheckUsd(Array.from({ length: 100 }, (_, i) => `k${i}`), "desktop", 10).usd),
 };
 
+/**
+ * What is set aside while a lookup runs (the most it can cost), in cents. A
+ * lookup needs this much available to start; the unused part comes straight back.
+ */
+export const SEO_HOLDS = {
+  explorerReport: retailCents(EXPLORER_ESTIMATE_USD),
+  reportPage: retailCents(REPORT_ESTIMATE_USD),
+  keywordOverview: retailCents(KEYWORD_OVERVIEW_ESTIMATE_USD),
+};
+
 const SUGGESTION_LIMIT = 50;
 const GAP_LIMIT = 100;
 const MAX_KEYWORDS_PER_SITE = 1000;
@@ -67,7 +81,7 @@ const siteInput = z.object({
 const keywordsInput = z.object({
   keywords: z.array(z.string().trim().min(1).max(200)).min(1).max(500),
   tags: z.array(z.string().trim().min(1).max(40)).max(10).default([]),
-  volumes: z.array(z.object({ keyword: z.string(), searchVolume: z.number().nullable(), cpc: z.number().nullable(), difficulty: z.number().nullable() })).max(500).optional(),
+  volumes: z.array(z.object({ keyword: z.string(), searchVolume: z.number().min(0).max(1e12).transform(Math.round).nullable(), cpc: z.number().min(0).max(1e6).nullable(), difficulty: z.number().min(0).max(100).transform(Math.round).nullable() })).max(500).optional(),
 }).strict();
 const researchInput = z.object({
   seed: z.string().trim().min(1).max(200),
@@ -90,6 +104,8 @@ const keywordOverviewInput = z.object({
   peek: z.boolean().default(false),
   refresh: z.boolean().default(false),
 }).strict();
+const historyInput = z.object({ device: z.enum(["desktop", "mobile"]).optional(), tag: z.string().trim().min(1).max(40).optional() }).strict();
+const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
 
 /** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
@@ -125,6 +141,33 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       }
     });
 
+  /**
+   * One purchase at a time per account per exact request: a second identical
+   * request made while the first is still running waits for it and shares its
+   * result instead of buying the same data again. (One app process serves
+   * production; the saved copy covers every later request.)
+   */
+  const inflight = new Map<string, Promise<any>>();
+  const once = <T>(key: string, run: () => Promise<T>): Promise<T> => {
+    const running = inflight.get(key);
+    if (running) return running;
+    const p = run().finally(() => inflight.delete(key));
+    inflight.set(key, p);
+    return p;
+  };
+  /** Save a paid result. A failed save must not cost the customer the data they just paid for: they still get the response. */
+  const keep = async (what: string, save: () => Promise<void>) => {
+    try { await save(); } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
+  };
+  /** Requests for one key run one after another (keyword imports: the plan limit is counted, then inserted). */
+  const queues = new Map<string, Promise<unknown>>();
+  const serial = <T>(key: string, run: () => Promise<T>): Promise<T> => {
+    const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(run);
+    const tail = next.catch(() => {}).finally(() => { if (queues.get(key) === tail) queues.delete(key); });
+    queues.set(key, tail);
+    return next;
+  };
+
   const notReady = (res: any) => res.status(503).json({ configured: false, code: "seo_not_ready", message: SEO_NOT_READY_MESSAGE });
 
   /** This account's plan units: keywords tracked (standing) and the two monthly meters. */
@@ -150,7 +193,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.setHeader("Cache-Control", "no-store");
     // The customer's SEO data credit and what each lookup costs them (shared/seo-credits.ts).
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
-    const body: Record<string, unknown> = { configured: isConfigured(), usage, credits, prices: SEO_PRICES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
+    const body: Record<string, unknown> = { configured: isConfigured(), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
       body.admin = { vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
@@ -228,7 +271,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const primary = devices[0];
     const latestPositions = rows.map((r) => r.positions[primary]?.position ?? null);
     const ranked = latestPositions.filter((p): p is number => p !== null);
-    const moved = rows.map((r) => { const p = r.positions[primary]; return p && p.position !== null && p.previous !== null ? p.previous - p.position : 0; });
+    // Entering the tracked results counts as improved and dropping out of them as declined.
+    const moved = rows.map((r) => {
+      const p = r.positions[primary];
+      if (!p || !p.previousOn) return 0;
+      if (p.position !== null && p.previous !== null) return p.previous - p.position;
+      return p.position !== null ? 1 : p.previous !== null ? -1 : 0;
+    });
     const summary = {
       tracked: rows.length,
       checked: ranked.length + latestPositions.filter((p, i) => p === null && rows[i].positions[primary]).length,
@@ -242,11 +291,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     res.json({
       site: siteView({ ...site, keyword_count: keywords.length }), devices, summary, rows, runs, searchConsole: gsc,
-      nextCheck: { serps: estimate.serps, nextAt: site.next_rank_check_at ?? null },
+      nextCheck: { serps: estimate.serps, priceCents: retailCents(estimate.usd), nextAt: site.next_rank_check_at ?? null },
     });
   });
 
-  route("post", "/api/seo/sites/:id/keywords", async (req, res, user, ent) => {
+  // One import at a time per account, so two at once cannot both pass the plan's keyword limit.
+  route("post", "/api/seo/sites/:id/keywords", (req, res, user, ent) => serial(`keywords:${user}`, async () => {
     const site = await ownedSite(user, req.params.id);
     const input = keywordsInput.parse(req.body);
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
@@ -273,12 +323,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       const r = await pool.query(
         `INSERT INTO seo_keywords(site_id,user_id,keyword,tags,search_volume,cpc,difficulty,volume_checked_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,CASE WHEN $5::int IS NULL THEN NULL ELSE now() END)
-         ON CONFLICT(site_id,keyword) DO UPDATE SET tags=(SELECT array(SELECT DISTINCT unnest(seo_keywords.tags || EXCLUDED.tags)))`,
+         ON CONFLICT(site_id,keyword) DO UPDATE SET tags=(SELECT array(SELECT DISTINCT unnest(seo_keywords.tags || EXCLUDED.tags)))
+         RETURNING (xmax = 0) AS inserted`,
         [site.id, user, keyword, input.tags, v?.searchVolume ?? null, v?.cpc ?? null, v?.difficulty ?? null]);
-      added += r.rowCount ?? 0;
+      if (r.rows[0]?.inserted) added++;
     }
-    res.status(201).json({ added, total: n + unique.length });
-  });
+    res.status(201).json({ added, total: n + added });
+  }));
 
   route("delete", "/api/seo/keywords/:id", async (req, res, user) => {
     await pool.query("DELETE FROM seo_keywords WHERE id=$1 AND user_id=$2", [id.parse(req.params.id), user]);
@@ -385,12 +436,15 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     if (!input.refresh) {
-      const saved = await latestReport(user, domain, input.locationCode);
+      const saved = await latestReport(user, domain, input.locationCode, input.languageCode);
       if (saved?.fresh) return res.json({ report: saved.report, fresh: true, reused: true, usage: await planUsage(user, ent) });
     }
     if (!isConfigured()) return notReady(res);
-    const out = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
-    await saveReport(user, out.data, out.costUsd);
+    const out = await once(`explorer:${user}:${domain}:${input.locationCode}:${input.languageCode}`, async () => {
+      const o = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }));
+      await keep(`explorer report ${domain}`, () => saveReport(user, o.data, o.costUsd));
+      return o;
+    });
     res.status(201).json({ report: out.data, fresh: true, reused: false, usage: await planUsage(user, ent) });
   });
 
@@ -408,8 +462,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
-    const out = await withBudget(user, REPORT_ESTIMATE_USD, () => fetchReportPage(full));
-    await saveCached(user, key, `report:${input.table}`, out.data, out.costUsd);
+    const out = await once(`report:${user}:${key}`, async () => {
+      const o = await withBudget(user, REPORT_ESTIMATE_USD, () => fetchReportPage(full));
+      await keep(`report ${input.table} ${target}`, () => saveCached(user, key, `report:${input.table}`, o.data, o.costUsd));
+      return o;
+    });
     res.status(201).json({ page: out.data, reused: false });
   });
 
@@ -425,8 +482,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     }
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
     if (!isConfigured()) return notReady(res);
-    const out = await withBudget(user, KEYWORD_OVERVIEW_ESTIMATE_USD, () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }));
-    await saveCached(user, key, "keyword-overview", out.data, out.costUsd);
+    const out = await once(`keyword:${user}:${key}`, async () => {
+      const o = await withBudget(user, KEYWORD_OVERVIEW_ESTIMATE_USD, () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }));
+      await keep(`keyword overview ${keyword}`, () => saveCached(user, key, "keyword-overview", o.data, o.costUsd));
+      return o;
+    });
     res.status(201).json({ overview: out.data, reused: false });
   });
 
@@ -434,8 +494,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/dashboard", async (_req, res, user) => {
     const { rows: sites } = await pool.query(
       `SELECT s.*, (SELECT count(*)::int FROM seo_keywords k WHERE k.site_id=s.id) AS keyword_count,
-              (SELECT report FROM seo_domain_reports r WHERE r.user_id=s.user_id AND r.domain=s.domain ORDER BY r.created_at DESC LIMIT 1) AS report
+              (SELECT report FROM seo_domain_reports r WHERE r.user_id=s.user_id AND r.domain=s.domain AND r.location_code=s.location_code AND r.language_code=s.language_code ORDER BY r.created_at DESC LIMIT 1) AS report
          FROM seo_sites s WHERE s.user_id=$1 ORDER BY s.created_at`, [user]);
+    const audits = await auditHealthByDomain(user, sites.map((s: any) => s.domain));
     const cards = [];
     for (const s of sites) {
       const { rows: [rank] } = await pool.query(
@@ -445,6 +506,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       const r = s.report;
       cards.push({
         site: siteView(s),
+        audit: audits.get(auditDomainKey(s.domain)) ?? null,
         rank: { top3: rank?.top3 ?? 0, top10: rank?.top10 ?? 0, ranked: rank?.ranked ?? 0, checked: rank?.checked ?? 0, checkedOn: rank?.checked_on ?? null },
         report: r ? {
           fetchedAt: r.fetchedAt, authority: r.links?.authority ?? null, backlinks: r.links?.backlinks ?? null, referringDomains: r.links?.referringDomains ?? null,
@@ -456,6 +518,38 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       });
     }
     res.json({ cards, configured: isConfigured() });
+  });
+
+  // Site Audit: the newest crawl of the site's domain, its change since the crawl before, the health
+  // trend and any crawl in progress. Reads Site Scan's crawls (sitescan_jobs) — no SEO data spent.
+  route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.json({ site: siteView(site), ...(await siteAudit(user, site.domain)) });
+  });
+
+  // Rank tracker history: one summary per check date for a device, optionally one tag. Saved checks only.
+  route("get", "/api/seo/sites/:id/rank-history", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const q = historyInput.parse(req.query || {});
+    const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
+    const device = (q.device && devices.includes(q.device) ? q.device : devices[0]) as "desktop" | "mobile";
+    const { rows: tags } = await pool.query("SELECT DISTINCT unnest(tags) AS tag FROM seo_keywords WHERE site_id=$1 ORDER BY 1", [site.id]);
+    res.json({ device, devices, tag: q.tag ?? null, tags: tags.map((t: any) => t.tag), days: await rankHistory(site.id, device, q.tag ?? null) });
+  });
+
+  // One tracked keyword's position at every saved check.
+  route("get", "/api/seo/keywords/:id/history", async (req, res, user) => {
+    const h = await keywordHistory(user, id.parse(req.params.id));
+    if (!h) return res.status(404).json({ message: "Keyword not found" });
+    res.json(h);
+  });
+
+  // Replace a tracked keyword's tags (used to group keywords in the rank tracker).
+  route("post", "/api/seo/keywords/:id/tags", async (req, res, user) => {
+    const tags = [...new Set(tagsInput.parse(req.body).tags)];
+    const { rowCount } = await pool.query("UPDATE seo_keywords SET tags=$3 WHERE id=$1 AND user_id=$2", [id.parse(req.params.id), user, tags]);
+    if (!rowCount) return res.status(404).json({ message: "Keyword not found" });
+    res.json({ ok: true, tags });
   });
 
   // Competitors: keywords a competitor ranks for that this site does not. One keyword search of the plan.

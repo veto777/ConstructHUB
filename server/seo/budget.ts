@@ -75,10 +75,12 @@ export class SeoBudgetError extends Error {
   }
 }
 
-export type BudgetReservation = { userId: number; month: string; estimateUsd: number; credit: CreditReservation | null };
+export type BudgetReservation = { userId: number; month: string; estimateUsd: number; credit: CreditReservation | null; /** Set by settleBudget: a reservation settles once. */ settled?: boolean };
+/** `allowanceOnly`: spend the month's included SEO data only, never credit the customer bought (automatic jobs). */
+export type BudgetOptions = { allowanceOnly?: boolean };
 
 /** Reserve `estimateUsd` for this account, or throw SeoBudgetError. */
-export async function reserveBudget(userId: number, estimateUsd: number): Promise<BudgetReservation> {
+export async function reserveBudget(userId: number, estimateUsd: number, opts: BudgetOptions = {}): Promise<BudgetReservation> {
   const month = monthKey();
   const cap = monthlyBudgetUsd();
   const client = await pool.connect();
@@ -108,7 +110,7 @@ export async function reserveBudget(userId: number, estimateUsd: number): Promis
   // from this month's allowance and then purchased credit (server/seo/credits.ts).
   const reservation: BudgetReservation = { userId, month, estimateUsd, credit: null };
   try {
-    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd));
+    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), opts);
   } catch (e) {
     // Nothing will run: give the wholesale reservation back before refusing.
     await pool.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd-$3), requests=greatest(0,requests-1), updated_at=now() WHERE user_id=$1 AND month=$2", [userId, month, estimateUsd]).catch(() => {});
@@ -121,11 +123,18 @@ export async function reserveBudget(userId: number, estimateUsd: number): Promis
   return reservation;
 }
 
-/** Replace the reservation with what DataForSEO actually charged (`cost` on the task). Every settlement is one log line. */
-export async function settleBudget(r: BudgetReservation, actualUsd: number): Promise<void> {
-  console.info(`[seo] cost user=${r.userId} month=${r.month} estimate=${usd(r.estimateUsd)} actual=${usd(actualUsd)} charged=${retailCents(actualUsd)}c`);
-  // The customer is charged for what the call really cost, at their price.
-  await budgetDeps.settleCredits(r.credit, retailCents(actualUsd)).catch((e: any) => console.error(`[seo] credit settle failed user=${r.userId}: ${e?.message ?? e}`));
+/**
+ * Replace the reservation with what the call really cost. `actualUsd` is our
+ * own (wholesale) cost; the customer is charged `customerUsd` at their price —
+ * the same amount unless the call failed, when they are charged nothing.
+ * A reservation settles exactly once: a second call is ignored, so an error
+ * after settling can never refund the same reservation twice.
+ */
+export async function settleBudget(r: BudgetReservation, actualUsd: number, customerUsd = actualUsd): Promise<void> {
+  if (r.settled) return;
+  r.settled = true;
+  console.info(`[seo] cost user=${r.userId} month=${r.month} estimate=${usd(r.estimateUsd)} actual=${usd(actualUsd)} charged=${retailCents(customerUsd)}c`);
+  await budgetDeps.settleCredits(r.credit, retailCents(customerUsd)).catch((e: any) => console.error(`[seo] credit settle failed user=${r.userId}: ${e?.message ?? e}`));
   const delta = round6(actualUsd - r.estimateUsd);
   if (delta === 0) return;
   await pool.query(
@@ -136,19 +145,27 @@ export async function settleBudget(r: BudgetReservation, actualUsd: number): Pro
 /** Nothing was charged (request refused before DataForSEO ran it): give the estimate back. */
 export const releaseBudget = (r: BudgetReservation) => settleBudget(r, 0);
 
-/** Run a metered call: reserve the estimate, settle to the reported cost, release on a failure that cost nothing. */
-export async function withBudget<T>(userId: number, estimateUsd: number, call: () => Promise<{ data: T; costUsd: number }>): Promise<{ data: T; costUsd: number }> {
-  const r = await reserveBudget(userId, estimateUsd);
+/**
+ * Run a metered call: reserve the estimate, then settle to the reported cost.
+ * A call that fails costs the customer nothing — they got nothing. Our own
+ * ledger keeps what the source says it charged, or the whole estimate when it
+ * never answered (timeout, gateway error) and the cost is unknown.
+ */
+export async function withBudget<T>(userId: number, estimateUsd: number, call: () => Promise<{ data: T; costUsd: number }>, opts: BudgetOptions = {}): Promise<{ data: T; costUsd: number }> {
+  const r = await reserveBudget(userId, estimateUsd, opts);
+  let out: { data: T; costUsd: number };
   try {
-    const out = await call();
-    await settleBudget(r, out.costUsd);
-    return out;
+    out = await call();
   } catch (e: any) {
-    // A task DataForSEO charged and then failed carries its cost; anything else cost nothing.
-    const charged = typeof e?.costUsd === "number" ? e.costUsd : 0;
-    await settleBudget(r, charged).catch(() => {});
+    const reported = typeof e?.costUsd === "number" ? e.costUsd : 0;
+    const unknown = e?.code === "timeout" || e?.code === "upstream";
+    const ours = reported > 0 ? reported : unknown ? estimateUsd : 0;
+    await settleBudget(r, ours, 0).catch((s: any) => console.error(`[seo] settle after a failed call did not complete user=${userId}: ${s?.message ?? s}`));
     throw e;
   }
+  // The data is in hand: a ledger error here must not lose a result that was paid for.
+  await settleBudget(r, out.costUsd).catch((s: any) => console.error(`[seo] settle did not complete user=${userId} cost=${usd(out.costUsd)}: ${s?.message ?? s}`));
+  return out;
 }
 
 export type BudgetStatus = {

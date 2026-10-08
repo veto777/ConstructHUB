@@ -93,6 +93,7 @@ const SeoOverviewPage = lazyPage(() => import("@/pages/seo"));
 const SeoDashboardPage = lazyPage(() => import("@/pages/seo/dashboard"));
 const SeoKeywordsPage = lazyPage(() => import("@/pages/seo/keywords"));
 const SeoExplorerPage = lazyPage(() => import("@/pages/seo/explorer"));
+const SeoAuditPage = lazyPage(() => import("@/pages/seo/audit"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
@@ -217,6 +218,7 @@ function DashboardRouter() {
       <Route path="/seo" component={SeoDashboardPage} />
       <Route path="/seo/rank-tracker" component={SeoOverviewPage} />
       <Route path="/seo/explorer" component={SeoExplorerPage} />
+      <Route path="/seo/audit" component={SeoAuditPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
@@ -416,7 +418,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/audit": "Site audit", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",

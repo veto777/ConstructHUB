@@ -34,6 +34,8 @@ export type SeoStatus = {
   usage: SeoUsage;
   credits: SeoCreditsInfo;
   prices: SeoPrices;
+  /** The most a lookup can cost: what must be available for it to start. */
+  holds?: Partial<SeoPrices>;
   packs: number[];
   resetsAt: string;
   /** Platform admins only: the real state of the data source. */
@@ -60,7 +62,10 @@ export const money = (cents: number | null | undefined) => cents == null ? "—"
 export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => status?.prices ? `about ${money(status.prices[key])}` : "";
 /** Enough credit for this lookup? (true while the status is loading, so buttons are not disabled for nothing) */
 export const canAfford = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
-  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= status.prices[key];
+  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices[key]);
+
+/** A saved-copy check that answered 404: not run yet — as opposed to a check that failed. */
+export const isNotRunYet = (e: unknown) => /^404:/.test(String((e as { message?: unknown } | null)?.message ?? ""));
 
 export const useSeoStatus = () => useQuery<SeoStatus>({ queryKey: ["/api/seo/status"] });
 export const useSeoSites = () => useQuery<SeoSite[]>({ queryKey: ["/api/seo/sites"] });
@@ -79,6 +84,7 @@ const TABS = [
   { href: "/seo/explorer", label: "Site explorer" },
   { href: "/seo/keywords", label: "Keywords explorer" },
   { href: "/seo/rank-tracker", label: "Rank tracker" },
+  { href: "/seo/audit", label: "Site audit" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
 ];
@@ -252,7 +258,7 @@ function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
   const [serpDepth, setDepth] = useState(10);
   const m = useMutation({
     mutationFn: () => api("POST", "/api/seo/sites", { domain, devices, serpDepth }),
-    onSuccess: (site: SeoSite) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); onDone(site.id); },
+    onSuccess: (site: SeoSite) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); onDone(site.id); },
     onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
   });
   return (
@@ -273,7 +279,9 @@ function AddSiteForm({ onDone }: { onDone: (id?: number) => void }) {
 }
 
 /** Position movement since the previous check: a glyph and the number, never colour alone. */
-export function Move({ now, before }: { now: number | null; before: number | null }) {
+export function Move({ now, before, hadBefore }: { now: number | null; before: number | null; /** There was an earlier check, so a missing position means "not ranked then". */ hadBefore?: boolean }) {
+  if (hadBefore && now != null && before == null) return <span className="g-move g-move--up" aria-label="Newly ranked since the last check">new</span>;
+  if (hadBefore && now == null && before != null) return <span className="g-move g-move--down" aria-label={`No longer ranked — was ${before}`}>lost</span>;
   if (now == null || before == null) return null;
   const d = before - now;
   if (d === 0) return <span className="g-move g-move--flat" aria-label="No change">·</span>;

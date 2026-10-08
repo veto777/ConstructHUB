@@ -56,7 +56,7 @@ export class SeoCreditShort extends Error {
   }
 }
 
-export type CreditReservation = { userId: number; month: string; fromIncluded: number; fromWallet: number; allowanceCents: number };
+export type CreditReservation = { userId: number; month: string; fromIncluded: number; fromWallet: number; allowanceCents: number } & { /** Never draws on purchased credit (automatic jobs). */ allowanceOnly?: boolean };
 
 /** This account's allowance and purchased credit right now. */
 export async function creditStatus(userId: number, allowanceCents: number): Promise<SeoCredits> {
@@ -73,7 +73,7 @@ export async function creditStatus(userId: number, allowanceCents: number): Prom
  * SeoCreditShort and take nothing. One transaction with the account's rows locked,
  * so two lookups at once cannot both spend the last dollar.
  */
-export async function reserveCredits(userId: number, allowanceCents: number, cents: number): Promise<CreditReservation | null> {
+export async function reserveCredits(userId: number, allowanceCents: number, cents: number, opts: { allowanceOnly?: boolean } = {}): Promise<CreditReservation | null> {
   if (allowanceCents === UNLIMITED || cents <= 0) return null;
   const month = monthKey();
   const client: PoolClient = await pool.connect();
@@ -83,7 +83,7 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
     await client.query(`INSERT INTO seo_credit_wallets(user_id) VALUES($1) ON CONFLICT DO NOTHING`, [userId]);
     const { rows: [u] } = await client.query(`SELECT included_cents FROM seo_credit_usage WHERE user_id=$1 AND month=$2 FOR UPDATE`, [userId, month]);
     const { rows: [w] } = await client.query(`SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [userId]);
-    const left = Math.max(0, allowanceCents - Number(u.included_cents)), wallet = Number(w.balance_cents);
+    const left = Math.max(0, allowanceCents - Number(u.included_cents)), wallet = opts.allowanceOnly ? 0 : Number(w.balance_cents);
     const split = splitCharge(cents, left, wallet);
     if (split.short > 0) {
       await client.query("ROLLBACK");
@@ -94,7 +94,7 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
       [userId, month, split.fromIncluded, split.fromWallet]);
     if (split.fromWallet) await client.query(`UPDATE seo_credit_wallets SET balance_cents=balance_cents-$2, updated_at=now() WHERE user_id=$1`, [userId, split.fromWallet]);
     await client.query("COMMIT");
-    return { userId, month, fromIncluded: split.fromIncluded, fromWallet: split.fromWallet, allowanceCents };
+    return { userId, month, fromIncluded: split.fromIncluded, fromWallet: split.fromWallet, allowanceCents, allowanceOnly: !!opts.allowanceOnly };
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
@@ -125,8 +125,10 @@ export async function settleCredits(r: CreditReservation | null, actualCents: nu
       dWallet = -Math.min(back, r.fromWallet);
       dIncluded = -(back + dWallet);
     } else {
-      const split = splitCharge(delta, Math.max(0, r.allowanceCents - Number(u?.included_cents ?? 0)), Number(w?.balance_cents ?? 0));
+      const split = splitCharge(delta, Math.max(0, r.allowanceCents - Number(u?.included_cents ?? 0)), r.allowanceOnly ? 0 : Number(w?.balance_cents ?? 0));
       dIncluded = split.fromIncluded; dWallet = split.fromWallet;
+      // The call cost more than was reserved and the account cannot cover the rest: we absorb it, on the record.
+      if (split.short > 0) console.warn(`[seo] credit short on settle user=${r.userId} month=${r.month} unpaid=${split.short}c`);
     }
     await client.query(
       `UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents+$3), wallet_cents=greatest(0,wallet_cents+$4), updated_at=now() WHERE user_id=$1 AND month=$2`,

@@ -253,10 +253,19 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
   const links = { target: input.domain, include_subdomains: true, backlinks_status_type: "live", rank_scale: "one_thousand" };
   let costUsd = 0;
   const call = async (path: string, body: Record<string, unknown>): Promise<DfsTask> => {
-    const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
-    costUsd += cost(task);
-    return task;
+    try {
+      const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+      costUsd += cost(task);
+      return task;
+    } catch (e: any) {
+      // A task the source charged for and then failed still counts toward what this report cost us.
+      costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+      throw e;
+    }
   };
+  // A required call that fails waits for the others to finish, so the error carries everything that was spent.
+  let failure: unknown = null;
+  const required = <T>(p: Promise<T>): Promise<T> => p.catch((e) => { failure ??= e; return undefined as unknown as T; });
   const optional = async <T>(label: ReportSection, run: () => Promise<T>): Promise<T | null> => {
     try { return await run(); } catch (e: any) { console.warn(`[seo] explorer ${input.domain}: ${label} unavailable — ${e?.message ?? e}`); return null; }
   };
@@ -267,8 +276,8 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
 
   const yearAgo = new Date(Date.now() - 366 * 864e5).toISOString().slice(0, 10);
   const [overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors] = await Promise.all([
-    call("/dataforseo_labs/google/domain_rank_overview/live", { ...labs, limit: 1 }).then((t) => taskItems(t)[0] ?? {}),
-    call("/backlinks/summary/live", { ...links, internal_list_limit: 10 }).then((t) => t.result?.[0] ?? {}),
+    required(call("/dataforseo_labs/google/domain_rank_overview/live", { ...labs, limit: 1 }).then((t) => taskItems(t)[0] ?? {})),
+    required(call("/backlinks/summary/live", { ...links, internal_list_limit: 10 }).then((t) => t.result?.[0] ?? {})),
     optional("history", () => list("/dataforseo_labs/google/historical_rank_overview/live", labs).then((r) => r.items)),
     optional("linkHistory", () => list("/backlinks/history/live", { target: input.domain, date_from: yearAgo, rank_scale: "one_thousand" }).then((r) => r.items)),
     optional("keywords", () => list("/dataforseo_labs/google/ranked_keywords/live", { ...labs, limit: KEYWORD_ROWS, item_types: ["organic"], order_by: ["ranked_serp_element.serp_item.etv,desc"] })),
@@ -277,6 +286,7 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
     optional("referringDomains", () => list("/backlinks/referring_domains/live", { ...links, limit: LINK_ROWS, order_by: ["rank,desc"] }).then((r) => r.items)),
     optional("anchors", () => list("/backlinks/anchors/live", { ...links, limit: LINK_ROWS, order_by: ["backlinks,desc"] }).then((r) => r.items)),
   ]);
+  if (failure) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure)), { costUsd });
   return { data: buildDomainReport(input, { overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors }), costUsd };
 }
 
@@ -297,10 +307,10 @@ export const EXPLORER_SCHEMA_DDL = [
 ];
 
 /** This account's newest report for the domain, with whether it is still inside the free window. */
-export async function latestReport(userId: number, domain: string, locationCode: number): Promise<{ report: DomainReport; fresh: boolean } | null> {
+export async function latestReport(userId: number, domain: string, locationCode: number, languageCode?: string): Promise<{ report: DomainReport; fresh: boolean } | null> {
   const { rows: [row] } = await pool.query(
     `SELECT report, (created_at > now() - make_interval(days => $4)) AS fresh FROM seo_domain_reports
-      WHERE user_id=$1 AND domain=$2 AND location_code=$3 ORDER BY created_at DESC LIMIT 1`, [userId, domain, locationCode, REPORT_TTL_DAYS]);
+      WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND ($5::text IS NULL OR language_code=$5) ORDER BY created_at DESC LIMIT 1`, [userId, domain, locationCode, REPORT_TTL_DAYS, languageCode ?? null]);
   return row ? { report: row.report, fresh: row.fresh === true } : null;
 }
 

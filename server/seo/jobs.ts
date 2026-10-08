@@ -29,6 +29,7 @@ const RUN_WINDOW_MS = 90 * 60_000;
 const TASK_GETS_PER_TICK = 300;
 const TASK_GET_CONCURRENCY = 10;
 export const BACKLINK_ROWS = 100;
+export const WEEKLY_SKIPPED_MESSAGE = "This month's included SEO data is used up, so the automatic weekly check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.";
 
 export type SiteRow = { id: number; user_id: number; domain: string; location_code: number; language_code: string; devices: DeviceSet; serp_depth: number; next_rank_check_at?: Date; next_backlinks_at?: Date; last_rank_check_at?: Date | null; last_backlinks_at?: Date | null; created_at?: Date };
 
@@ -40,7 +41,15 @@ export async function enqueueRankRun(site: SiteRow, trigger: "weekly" | "manual"
     "SELECT id FROM seo_rank_runs WHERE site_id=$1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1", [site.id]);
   if (open) return { id: open.id, reused: true };
   const id = randomUUID();
-  await pool.query("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger) VALUES($1,$2,$3,$4)", [id, site.id, site.user_id, trigger]);
+  try {
+    await pool.query("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger) VALUES($1,$2,$3,$4)", [id, site.id, site.user_id, trigger]);
+  } catch (e: any) {
+    // seo_rank_runs_one_active: another request queued this site's run between the check and the insert.
+    if (e?.code !== "23505") throw e;
+    const { rows: [other] } = await pool.query("SELECT id FROM seo_rank_runs WHERE site_id=$1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1", [site.id]);
+    if (!other) throw e;
+    return { id: other.id, reused: true };
+  }
   return { id, reused: false };
 }
 
@@ -69,9 +78,10 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     let reservation;
     try {
-      reservation = await reserveBudget(run.user_id, estimate.usd);
+      // The automatic weekly check spends the month's included data only — never credit the customer bought.
+      reservation = await reserveBudget(run.user_id, estimate.usd, { allowanceOnly: run.trigger === "weekly" });
     } catch (e) {
-      if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", e.message); return true; }
+      if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", run.trigger === "weekly" && e.code === "seo_credits" ? WEEKLY_SKIPPED_MESSAGE : e.message); return true; }
       throw e;
     }
     const posted: PostedRankTask[] = [];
@@ -182,20 +192,21 @@ export async function scheduleWeeklyRuns(): Promise<void> {
 }
 
 /** Buy the summary + top backlinks for a site and store today's snapshot. */
-export async function snapshotBacklinks(site: SiteRow): Promise<{ id: number; takenOn: string; costUsd: number }> {
+/** `automatic`: the monthly job — included data only, never purchased credit. */
+export async function snapshotBacklinks(site: SiteRow, automatic = false): Promise<{ id: number; takenOn: string; costUsd: number }> {
   const estimate = estimateBacklinkSnapshotUsd(BACKLINK_ROWS);
   const out = await withBudget(site.user_id, estimate, async () => {
     const summary = await seoJobDeps.backlinksSummary({ target: site.domain });
     let list: Awaited<ReturnType<typeof backlinksList>> | null = null;
     try { list = await seoJobDeps.backlinksList({ target: site.domain, limit: BACKLINK_ROWS }); }
     catch (e: any) { summary.costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0; console.warn(`[seo] backlinks list failed for ${site.domain}: ${e?.message}`); }
-    return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null }, costUsd: summary.costUsd + (list?.costUsd ?? 0) };
-  });
+    return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null, listFailed: !list }, costUsd: summary.costUsd + (list?.costUsd ?? 0) };
+  }, { allowanceOnly: automatic });
   const { rows: [row] } = await pool.query(
     `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd) VALUES($1,$2,current_date,$3,$4,$5)
      ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd
      RETURNING id, taken_on`,
-    [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount }), JSON.stringify(out.data.backlinks), out.costUsd]);
+    [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount, listFailed: out.data.listFailed }), JSON.stringify(out.data.backlinks), out.costUsd]);
   await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
   return { id: row.id, takenOn: String(row.taken_on).slice(0, 10), costUsd: out.costUsd };
 }
@@ -208,7 +219,7 @@ async function runDueBacklinkSnapshots(): Promise<void> {
     try {
       const ent = await getEntitlements(site.user_id);
       if (!seoIncluded(ent)) continue;
-      await snapshotBacklinks(site);
+      await snapshotBacklinks(site, true);
     } catch (e) {
       if (!(e instanceof SeoBudgetError)) void recordFailure("job", "SEO backlink snapshot", e);
       else console.warn(`[seo] backlink snapshot for ${site.domain} skipped: ${e.message}`);

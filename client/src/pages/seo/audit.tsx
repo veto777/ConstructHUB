@@ -1,0 +1,276 @@
+/**
+ * /seo/audit — Site Audit: health score, what the crawl found by severity, and
+ * each issue with its change since the previous crawl. Reads the crawls Site
+ * Scan runs (GET /api/seo/sites/:id/audit), so opening it never spends SEO
+ * data; "Run new crawl" starts a Site Scan (POST /api/sitescan), one of the
+ * plan's monthly scans.
+ */
+import { Fragment, useState } from "react";
+import { Link } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ChevronDown, ChevronRight, Download, Loader2, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { apiErrorMessage } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+
+type Severity = "error" | "warning" | "notice";
+type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; why: string; fix: string; items: string[] };
+type Run = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
+type Audit = {
+  jobId: string; scannedAt: string | null; url: string | null; health: number | null; healthChange: number | null;
+  crawled: number; pageCap: number | null; notCrawled: number; blockedByRobots: number;
+  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number };
+  totals: Record<Severity, { issues: number; affected: number }>;
+  scores: { overall: number | null; categories: Record<string, number | null> } | null;
+  issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[];
+};
+type AuditData = { audit: Audit | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+
+const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
+  error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
+  warning: { label: "Warning", plural: "Warnings", color: "#e8710a" },
+  notice: { label: "Notice", plural: "Notices", color: "var(--g-blue)" },
+};
+const CATEGORY: Record<string, string> = { technical: "Technical", performance: "Performance", local: "Local", content: "Content", "ai-readiness": "AI readiness" };
+const STATUS = [
+  { key: "ok", label: "Working (2xx)", color: "var(--g-green)" },
+  { key: "redirected", label: "Redirected (3xx)", color: "var(--g-blue)" },
+  { key: "clientError", label: "Not found / blocked (4xx)", color: "#e8710a" },
+  { key: "serverError", label: "Server error (5xx)", color: "var(--g-red)" },
+  { key: "failed", label: "Couldn't be checked", color: "var(--g-text-2)" },
+] as const;
+const healthColor = (h: number) => (h >= 90 ? "var(--g-green)" : h >= 70 ? "#e8710a" : "var(--g-red)");
+const healthWord = (h: number) => (h >= 90 ? "Good" : h >= 70 ? "Needs work" : "Poor");
+
+function HealthRing({ value }: { value: number | null }) {
+  const r = 52, c = 2 * Math.PI * r, v = value ?? 0;
+  return (
+    <svg viewBox="0 0 128 128" className="h-32 w-32 shrink-0" role="img" aria-label={value == null ? "No health score yet" : `Health score ${value} out of 100`}>
+      <circle cx="64" cy="64" r={r} fill="none" stroke="var(--g-divider)" strokeWidth="10" />
+      {value != null && <circle cx="64" cy="64" r={r} fill="none" stroke={healthColor(v)} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(v / 100) * c} ${c}`} transform="rotate(-90 64 64)" />}
+      <text x="64" y="62" textAnchor="middle" dominantBaseline="middle" fontSize="30" fill="var(--g-text)">{value ?? "—"}</text>
+      <text x="64" y="86" textAnchor="middle" fontSize="11" fill="var(--g-text-2)">{value == null ? "no data" : healthWord(v)}</text>
+    </svg>
+  );
+}
+
+/** Change in affected pages: fewer is better, so a drop is green. */
+function Change({ issue }: { issue: Issue }) {
+  if (issue.change === null) return <span className="g-text-2">—</span>;
+  if (issue.isNew) return <span className="g-chip g-chip--sm" style={{ color: "var(--g-red)" }}>New</span>;
+  if (issue.change === 0) return <span className="g-move g-move--flat" aria-label="No change">·</span>;
+  return issue.change < 0
+    ? <span className="g-move g-move--up" aria-label={`${-issue.change} fewer than the last crawl`}>▼{-issue.change}</span>
+    : <span className="g-move g-move--down" aria-label={`${issue.change} more than the last crawl`}>▲{issue.change}</span>;
+}
+
+/** Quoted, and a cell from the open web is never allowed to run as a spreadsheet formula. */
+const csvCell = (s: string) => `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+function downloadCsv(name: string, rows: string[][]) {
+  const blob = new Blob([rows.map((r) => r.map(csvCell).join(",")).join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
+const tooltipStyle = { fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" };
+
+export default function SeoAuditPage() {
+  const status = useSeoStatus();
+  const sites = useSeoSites();
+  const [site, onSite] = useSelectedSite(sites.data);
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const key = `/api/seo/sites/${site?.id}/audit`;
+  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+  const [severity, setSeverity] = useState<Severity | "all">("all");
+  const [category, setCategory] = useState("all");
+  const [open, setOpen] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const start = useMutation({
+    mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1 }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: "Crawl started", description: "Results appear here when it finishes — usually a few minutes." }); },
+    onError: (e) => toast({ title: "Couldn't start the crawl", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const d = q.data, a = d?.audit ?? null, running = d?.running ?? null;
+  const issues = (a?.issues ?? []).filter((i) => (severity === "all" || i.severity === severity) && (category === "all" || i.category === category));
+  const categories = [...new Set((a?.issues ?? []).map((i) => i.category))];
+  const total = a ? a.crawled + a.statuses.failed : 0;
+  const trend = (d?.history ?? []).filter((h) => h.health !== null);
+  const exportAll = () => a && downloadCsv(`site-audit-${site?.domain}.csv`, [["Severity", "Issue", "Category", "Affected", "Page or entry"], ...a.issues.flatMap((i) => i.items.map((u) => [SEVERITY[i.severity].label, i.title, CATEGORY[i.category] ?? i.category, String(i.count), u]))]);
+
+  return (
+    <SeoShell
+      title="Site audit" description="Crawls your site and lists what is broken, what to improve and how — with a health score you can watch improve." site={site} onSite={onSite} sites={sites} status={status}
+      actions={site && (
+        <Button className="w-full sm:w-auto" disabled={!!running || start.isPending || !d} onClick={() => start.mutate()} data-testid="button-run-audit" title="Uses one of your plan's monthly Site Scans. Crawls up to 150 pages.">
+          {running || start.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+          {running ? "Crawling…" : a ? "Run new crawl" : "Run first crawl"}
+        </Button>
+      )}
+    >
+      {!site && sites.isSuccess && <Empty testId="audit-empty-sites"><h3>No sites yet</h3><p>Add your site above, then run a crawl to see its health score and issues.</p></Empty>}
+      {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the audit…</p>}
+      {site && q.isError && <div className="g-callout" role="alert" data-testid="audit-error"><h3>Couldn't load the audit</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {running && (
+        <div className="g-callout mb-4" role="status" data-testid="audit-running">
+          <h3 className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Crawling {site?.domain}</h3>
+          <p>{running.status === "queued" ? "Waiting to start." : `${fmtNum(running.crawled)} of up to ${fmtNum(running.pageCap)} pages checked so far.`} This page updates by itself.</p>
+        </div>
+      )}
+      {d && !running && d.lastFailed && (
+        <div className="g-callout mb-4" role="alert" data-testid="audit-failed">
+          <h3>The last crawl didn't finish</h3>
+          <p>{d.lastFailed.error || "The crawl stopped before it completed."} Started {fmtDate(d.lastFailed.createdAt)}.{a ? " The results below are from the crawl before it." : ""}</p>
+        </div>
+      )}
+      {site && d && !a && !running && (
+        <Empty testId="audit-empty">
+          <h3>No crawl of {site.domain} yet</h3>
+          <p>A crawl reads up to 150 pages of the site and checks each for broken pages, redirects, missing titles and descriptions, thin content, slow pages, and whether Google and AI assistants can read it.</p>
+          <p className="mt-2">It uses one of your plan's monthly Site Scans and no SEO data credit.</p>
+        </Empty>
+      )}
+      {site && a && (
+        <>
+          <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">
+            <section className="flex items-center gap-4 rounded-lg border p-4" style={card} data-testid="audit-health">
+              <HealthRing value={a.health} />
+              <div className="min-w-0">
+                <h2 className="g-text text-[16px] font-medium">Health score</h2>
+                <p className="g-text-2 text-[13px]">The share of crawled pages with no errors.</p>
+                {a.healthChange !== null && a.healthChange !== 0 && <p className="mt-1 text-[13px]"><span className={`g-move ${a.healthChange > 0 ? "g-move--up" : "g-move--down"}`}>{a.healthChange > 0 ? "▲" : "▼"}{Math.abs(a.healthChange)}</span> <span className="g-text-2">since the crawl before</span></p>}
+                <p className="g-text-2 mt-1 text-[12px]">Crawled {fmtDate(a.scannedAt)}</p>
+              </div>
+            </section>
+            <section className="rounded-lg border p-4" style={card} data-testid="audit-crawled">
+              <h2 className="g-text text-[16px] font-medium">Pages crawled <span className="tabular-nums">{fmtNum(total)}</span></h2>
+              <div className="my-3 flex h-3 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>
+                {total > 0 && STATUS.map((s) => a.statuses[s.key] > 0 && <div key={s.key} style={{ width: `${(a.statuses[s.key] / total) * 100}%`, background: s.color }} />)}
+              </div>
+              <ul className="space-y-1 text-[13px]">
+                {STATUS.map((s) => <li key={s.key} className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden /><span className="g-text-2">{s.label}</span><span className="g-text ml-auto tabular-nums">{fmtNum(a.statuses[s.key])}</span></li>)}
+              </ul>
+              {(a.notCrawled > 0 || a.blockedByRobots > 0) && <p className="g-text-2 mt-2 text-[12px]">{a.notCrawled > 0 ? `${fmtNum(a.notCrawled)} more pages were found but not crawled (the crawl stops at ${fmtNum(a.pageCap)}). ` : ""}{a.blockedByRobots > 0 ? `${fmtNum(a.blockedByRobots)} blocked by robots.txt.` : ""}</p>}
+            </section>
+            <section className="rounded-lg border p-4" style={card} data-testid="audit-totals">
+              <h2 className="g-text mb-2 text-[16px] font-medium">Issues found</h2>
+              <ul className="space-y-2">
+                {(Object.keys(SEVERITY) as Severity[]).map((s) => (
+                  <li key={s}>
+                    <button type="button" className="flex w-full items-baseline gap-2 text-left" onClick={() => setSeverity(severity === s ? "all" : s)} aria-pressed={severity === s} data-testid={`button-severity-${s}`}>
+                      <span className="text-[24px] leading-7 tabular-nums" style={{ color: SEVERITY[s].color }}>{fmtNum(a.totals[s].issues)}</span>
+                      <span className="g-text text-[14px]">{SEVERITY[s].plural}</span>
+                      <span className="g-text-2 ml-auto text-[12px] tabular-nums">{fmtNum(a.totals[s].affected)} affected</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="g-text-2 mt-2 text-[12px]">Errors lower the health score. Warnings and notices are improvements.</p>
+            </section>
+          </div>
+
+          {(trend.length > 1 || a.scores) && (
+            <div className="mb-4 grid gap-4 lg:grid-cols-3">
+              {trend.length > 1 && (
+                <section className="rounded-lg border p-4 lg:col-span-2" style={card} data-testid="audit-trend">
+                  <h2 className="g-text mb-2 text-[16px] font-medium">Health score over time</h2>
+                  <div className="h-44">
+                    <ResponsiveContainer>
+                      <LineChart data={trend} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                        <CartesianGrid stroke="var(--g-divider)" vertical={false} />
+                        <XAxis dataKey="at" tickFormatter={(v) => fmtDate(String(v))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={32} />
+                        <Tooltip labelFormatter={(v) => fmtDate(String(v))} formatter={(v: number) => [v, "Health score"]} contentStyle={tooltipStyle} />
+                        <Line type="monotone" dataKey="health" stroke="var(--g-green)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+              )}
+              {a.scores && (
+                <section className={`rounded-lg border p-4 ${trend.length > 1 ? "" : "lg:col-span-3"}`} style={card} data-testid="audit-scores">
+                  <h2 className="g-text mb-2 text-[16px] font-medium">By area</h2>
+                  <ul className="space-y-2 text-[13px]">
+                    {Object.entries(a.scores.categories).map(([k, v]) => (
+                      <li key={k}>
+                        <div className="flex"><span className="g-text">{CATEGORY[k] ?? k}</span><span className="g-text ml-auto tabular-nums">{v == null ? "not measured" : v}</span></div>
+                        <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>{v != null && <div className="h-full" style={{ width: `${v}%`, background: healthColor(v) }} />}</div>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="g-text-2 mt-2 text-[12px]">Our own 0–100 rating of each area. Not a Google ranking.</p>
+                </section>
+              )}
+            </div>
+          )}
+
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <nav className="g-tabs !mb-0" aria-label="Issue severity">
+              {(["all", "error", "warning", "notice"] as const).map((s) => <a key={s} href={`#${s}`} aria-current={severity === s ? "page" : undefined} onClick={(e) => { e.preventDefault(); setSeverity(s); }} data-testid={`tab-audit-${s}`}>{s === "all" ? `All issues (${a.issues.length})` : `${SEVERITY[s].plural} (${a.totals[s].issues})`}</a>)}
+            </nav>
+            <label className="ml-auto flex items-center gap-2 text-[13px]"><span className="g-text-2">Area</span>
+              <select className="g-select" value={category} onChange={(e) => setCategory(e.target.value)} data-testid="select-audit-category">
+                <option value="all">All areas</option>
+                {categories.map((c) => <option key={c} value={c}>{CATEGORY[c] ?? c}</option>)}
+              </select>
+            </label>
+            <button type="button" className="g-pill g-pill--sm" onClick={exportAll} data-testid="button-audit-export"><Download /> Export</button>
+            <Link href="/site-scan" className="g-pill g-pill--sm" data-testid="link-audit-fixplan">Step-by-step fix plan</Link>
+          </div>
+          {issues.length === 0 ? (
+            <Empty testId="audit-no-issues"><h3>{a.issues.length ? "No issues match these filters" : "No issues found"}</h3><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
+          ) : (
+            <table className="g-table" data-testid="table-audit-issues">
+              <thead><tr><th aria-label="Show details" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num">Since last crawl</th></tr></thead>
+              <tbody>
+                {issues.map((i) => {
+                  const isOpen = open === i.key, shown = isOpen && !showAll ? i.items.slice(0, 25) : i.items;
+                  return (
+                    <Fragment key={i.key}>
+                      <tr data-testid={`row-issue-${i.key}`}>
+                        <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${i.title}`} onClick={() => { setOpen(isOpen ? null : i.key); setShowAll(false); }} data-testid={`button-issue-${i.key}`}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
+                        <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
+                        <td data-label="Area" className="g-text-2">{CATEGORY[i.category] ?? i.category}</td>
+                        <td className="num" data-label="Affected">{fmtNum(i.count)}</td>
+                        <td className="num" data-label="Since last crawl"><Change issue={i} /></td>
+                      </tr>
+                      {isOpen && (
+                        <tr data-testid={`detail-issue-${i.key}`}>
+                          <td />
+                          <td colSpan={4}>
+                            {i.why && <p className="g-text text-[13px]"><b className="font-medium">Why it matters:</b> {i.why}</p>}
+                            {i.fix && <p className="g-text mt-1 text-[13px]"><b className="font-medium">How to fix:</b> {i.fix}</p>}
+                            <ul className="mt-2 space-y-0.5 text-[13px]">
+                              {shown.map((u) => <li key={u} className="truncate">{/^https?:\/\//.test(u) ? <a href={u} className="g-link" target="_blank" rel="noreferrer">{u}</a> : <span className="g-text">{u}</span>}</li>)}
+                            </ul>
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              {!showAll && i.items.length > 25 && <button type="button" className="g-pill g-pill--sm" onClick={() => setShowAll(true)}>Show all {fmtNum(i.items.length)}</button>}
+                              {i.count > i.items.length && <span className="g-text-2 text-[12px]">Showing the first {fmtNum(i.items.length)} of {fmtNum(i.count)}.</span>}
+                              <button type="button" className="g-pill g-pill--sm" onClick={() => downloadCsv(`${i.key}-${site.domain}.csv`, [["Issue", "Page or entry"], ...i.items.map((u) => [i.title, u])])}><Download /> Export this list</button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {a.fixed.length > 0 && (
+            <section className="mt-6" data-testid="audit-fixed">
+              <h2 className="g-text mb-2 text-[16px] font-medium">Fixed since the crawl before</h2>
+              <ul className="g-text-2 space-y-1 text-[13px]">
+                {a.fixed.map((f) => <li key={f.key}><span className="g-move g-move--up">✓</span> {f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </SeoShell>
+  );
+}
