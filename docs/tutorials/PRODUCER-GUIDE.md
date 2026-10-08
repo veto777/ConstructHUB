@@ -298,6 +298,13 @@ only at `example.com`; a phone only `555-01xx`; nothing shaped like a key or a t
 takes a `{{PLACEHOLDER}}`, and every placeholder is `"redact": true`. A key's *name*, a search and a
 demo address are typed as they are — no xpath detours.
 
+**Chapters are checked before anything is filmed.** `record.ts` works out from the lines' own lengths
+where each chapter would start and refuses the script when fewer than three would be 10 s apart (a dry
+run warns) — move the mark to a later step. **An outside link's address** (the status-bar bubble,
+bottom-left) is drawn only in a script that sets `"showLinkAddress": true`. **Disk:** `produce.ts` will
+not start with under 8 GB free; delete finished productions' `raw.mkv`, `narration/` and `steps/`
+(never masters, captions, thumbnails, contact sheets or cuts).
+
 **Dialogs.** `press` `Escape` is sent to the topmost open dialog (after a click inside one, focus used
 to be on the page and the key did nothing). A target in the caption strip is brought up by moving its
 dialog; where the dialog is a full-screen wrapper with a panel in it (the JobCam share sheet), the
@@ -492,8 +499,12 @@ npx tsx scripts/tutorials/youtube-schedule.ts --lint-all    # REPORT: every scri
   key` while the old cut is still scheduled (it would go public at its time), `! key: …` once the old
   cut is public. `--replace` refuses any file that is not the merged master. A video that is not in the
   ledger — held, or simply not scheduled yet — needs nothing: its first upload takes the new master.
-- **Held videos** (`youtube: { hold: true }` on the help entry — the overview films) are listed as
-  `⏸ key: held for owner approval` and never planned; `--release key` plans them for that run.
+- **Held videos** are listed as `⏸ key: held for owner approval (reason)` and never planned;
+  `--release key` plans them for that run. Two kinds: the overview films (`youtube: { hold: true }` on
+  their help entries — the owner releases them), and **tutorial cuts that must not go out as they
+  are**, each with its reason and what releases it in `shared/help/holds.ts`. A cut that must not be
+  *shown in the app* either has its manifest moved to `docs/tutorials/held-manifests/` (its README says
+  why). Re-record, delete the line, done.
 - **A new cut of a posted video** is reported ("the mp4 … is NOT the file that was uploaded") and not
   re-uploaded. `--replace <helpKey>` uploads the new file into the same slot (or the next free one if
   the old one is already public) and prints the old video id: **delete that one by hand in YouTube

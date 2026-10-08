@@ -2,14 +2,14 @@
   "helpKey": "brand-vs-jobber",
   "durationSec": 50,
   "video": {
-    "key": "tutorials/brand-vs-jobber.80d4385e.mp4",
-    "bytes": 8888394,
-    "sha256": "80d4385e42a6e30793acd3edf8013babfb15226be62942ad380f0ca96362b143"
+    "key": "tutorials/brand-vs-jobber.1002c839.mp4",
+    "bytes": 8834705,
+    "sha256": "1002c83918e18d612556cc1e752cb6dc0ade897c94413a85f961281791031624"
   },
   "captions": {
-    "key": "tutorials/brand-vs-jobber.461ace60.vtt",
+    "key": "tutorials/brand-vs-jobber.9616502f.vtt",
     "bytes": 1422,
-    "sha256": "461ace605cbedaa9a4812d992f9f931738af76f22221ec09da3503dd01965052"
+    "sha256": "9616502f5d29d65c32f8ed7303b42fc1b0401673b2eddd94fb1cccc81f0a5888"
   },
   "poster": {
     "key": "tutorials/brand-vs-jobber.550d40ff.jpg",
@@ -17,9 +17,9 @@
     "sha256": "550d40ff049917d9502c42863a75ca7c60a182e6e5f8b23e8c1fbfe0b3b51613"
   },
   "uploaded": {
-    "at": "2026-10-08T05:48:04.766Z",
-    "video": "7e813161187cb62d471489d08f77978c",
-    "captions": "2e049fa2fb7ce394218dc9ab81991818",
+    "at": "2026-10-08T12:39:32.804Z",
+    "video": "7bb2de4718960fc910d6138352f4fb85",
+    "captions": "71e3451b98e66acdcac0100eee8b2a48",
     "poster": "a16fa529b0610c3847c19ef375f62c49"
   }
 }

@@ -373,6 +373,9 @@ Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse w
 | `steps[].card` | `card`: `kicker`, `headline`, `accent`, `stat` or two `columns`, `footnote`, `mascot` (`scripts/tutorials/card.ts`). A card that shows a price needs a dated footnote. |
 | `steps[].dialog` | `click`: `accept` / `dismiss` the page's own `window.confirm`. |
 | `steps[].punch` | `highlight` / `hover`: push in on the target (1.1–1.8) for that step. |
+| `hideSelectors` | Plain CSS selectors not drawn (space kept) on every page — a mark that may not appear in a film. |
+| `before` | Fixture helpers run before the camera starts (`auth.unfinishedSetup`). |
+| `showLinkAddress` | Draw an outside link's address bottom-left while the pointer is on it (off by default). |
 | `youtube.sources`, `youtube.names` | Overview films: where another company's figures were read (label, url, date), and the companies named — printed in the description. |
 | `steps[].files` | `upload`: demo files under `scripts/tutorials/assets/` (`photos/site-02.jpg`). |
 | `steps[].to` | `drag`: the selector to drop on. |
