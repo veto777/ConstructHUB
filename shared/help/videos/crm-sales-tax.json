@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-sales-tax",
+  "durationSec": 73,
+  "video": {
+    "key": "tutorials/crm-sales-tax.0e04b39e.mp4",
+    "bytes": 5937046,
+    "sha256": "0e04b39ea7dea61eb075f8075ba595c3f0d42e5b91b00936e2a98a02a2d4491d"
+  },
+  "captions": {
+    "key": "tutorials/crm-sales-tax.9379d91b.vtt",
+    "bytes": 1659,
+    "sha256": "9379d91bd66f9ffddbd08f89ab97bb26522c043e45ac437ab9c089eafd7a2062"
+  },
+  "poster": {
+    "key": "tutorials/crm-sales-tax.85108a5d.jpg",
+    "bytes": 89903,
+    "sha256": "85108a5d921c5982d0a980b732bc59b80567412c48fca791a433ae172ec65da8"
+  },
+  "uploaded": {
+    "at": "2026-10-08T03:29:25.916Z",
+    "video": "cb7a49c4879ba47c661a50865be47498",
+    "captions": "053ba0d1c0728c010650f754a25c04c6",
+    "poster": "8ef29b81480cb12c5c426bd678b9ecd4"
+  }
+}
