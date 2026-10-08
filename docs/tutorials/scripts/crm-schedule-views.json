@@ -1,0 +1,138 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-schedule-views",
+  "title": "Month, week and agenda",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "caption": "The Schedule",
+      "chapter": "Month",
+      "narration": "The Schedule can show a month, a week, or a list. Here is how to switch."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"event-demo-appt-05\"]",
+      "caption": "Month view",
+      "narration": "It opens on Month. Every visit sits on its day."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-cal-next\"]",
+      "caption": "Next month",
+      "narration": "The arrows move one month forward or back."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-cal-today\"]",
+      "caption": "Today",
+      "narration": "Today brings you back to this month."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-week\"]",
+      "caption": "Week",
+      "chapter": "Week",
+      "narration": "Choose Week to see seven days side by side."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"event-demo-appt-05\"]",
+      "caption": "A visit in the week",
+      "narration": "Each visit shows its start time and its title."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-cal-next\"]",
+      "caption": "Next week",
+      "narration": "Here the arrows move a week at a time."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-cal-today\"]",
+      "caption": "Today",
+      "narration": "And Today comes back to this week."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-agenda\"]",
+      "caption": "Agenda",
+      "chapter": "Agenda",
+      "narration": "Choose Agenda for a list of what is coming, day by day."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"appt-demo-appt-08\"]",
+      "caption": "A visit in the list",
+      "narration": "Each visit shows its time, its project and the crew."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-days-30\"]",
+      "caption": "7d, 14d, 30d",
+      "narration": "These buttons set how far ahead the list looks: 7, 14 or 30 days."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-calendar-scope\"]",
+      "caption": "Whose calendar",
+      "chapter": "One person's calendar",
+      "narration": "This list chooses whose calendar you see. It starts on My calendar."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-calendar-scope\"]",
+      "value": "Marco Delgado",
+      "caption": "Marco Delgado",
+      "narration": "Pick a name to see one person's visits. We'll choose Marco Delgado."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"appt-demo-appt-07\"]",
+      "caption": "Marco's visits",
+      "narration": "Now the list is the visits Marco booked or is going to."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-month\"]",
+      "caption": "Back to Month",
+      "narration": "The same choice applies in Month and Week."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "caption": "Menu: Schedule",
+      "narration": "You'll find Schedule in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to switch month, week and agenda views | ConstructHUB CRM",
+    "description": "A short walkthrough of the three Schedule views in the ConstructHUB CRM. You will move between months and weeks, jump back to today, read the agenda list for the next 7, 14 or 30 days, and look at one team member's calendar.",
+    "tags": [
+      "contractor scheduling",
+      "crew schedule",
+      "job scheduling software",
+      "crew calendar",
+      "contractor calendar",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See your whole week",
+    "accent": "week",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}
