@@ -110,7 +110,7 @@ export const SEO_HOLDS = {
 /** Report names as the customer sees them (usage history). */
 const REPORT_NAMES: Record<string, string> = {
   keywords: "Organic keywords", paidKeywords: "Paid keywords", pages: "Top pages", competitors: "Organic competitors", backlinks: "Backlinks", newBacklinks: "New backlinks",
-  lostBacklinks: "Lost backlinks", brokenBacklinks: "Broken backlinks", referringDomains: "Referring domains", anchors: "Anchors", bestByLinks: "Best pages by links",
+  lostBacklinks: "Lost backlinks", brokenBacklinks: "Broken backlinks", referringDomains: "Referring domains", anchors: "Anchors", bestByLinks: "Best pages by links", referringIps: "Referring IPs", linkCompetitors: "Sites with similar links", subdomains: "Subdomains", ads: "Ads",
   matchingTerms: "Matching terms", relatedTerms: "Related terms", questions: "Questions",
 };
 const removeInput = z.object({ keywords: z.array(z.string().min(1).max(200)).min(1).max(1000) }).strict();

@@ -15,6 +15,7 @@ describe("report requests", () => {
   it("every table has a default sort, and an unknown sort falls back to it", () => {
     for (const t of [...DOMAIN_TABLES, ...KEYWORD_TABLES]) {
       expect(Object.keys(SORTS[t]).length, t).toBeGreaterThan(0);
+      if (t === "ads") continue; // Google's ad library has its own order and no paging: the request carries neither
       const req = reportRequest({ ...base({ table: t, sort: "nonsense" }), target: "x" });
       expect((req.body.order_by as string[])[0], t).toBe(SORTS[t][defaultSort(t)]);
       expect(req.body.limit).toBe(50);

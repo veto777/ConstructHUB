@@ -16,7 +16,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, type SeoStatus } fro
 
 export type TableKey =
   | "keywords" | "paidKeywords" | "pages" | "competitors" | "backlinks" | "newBacklinks" | "lostBacklinks" | "brokenBacklinks"
-  | "referringDomains" | "anchors" | "bestByLinks" | "matchingTerms" | "relatedTerms" | "questions";
+  | "referringDomains" | "anchors" | "bestByLinks" | "referringIps" | "linkCompetitors" | "subdomains" | "ads" | "matchingTerms" | "relatedTerms" | "questions";
 type Filters = {
   positionMin?: number; positionMax?: number; volumeMin?: number; volumeMax?: number; difficultyMin?: number; difficultyMax?: number;
   intent?: string; contains?: string; follow?: "followed" | "nofollow"; everyLink?: boolean;
@@ -99,7 +99,42 @@ const COLS: Record<TableKey, Col[]> = {
     { key: "brokenBacklinks", label: "Broken", num: true, cell: (r) => fmtNum(r.brokenBacklinks), csv: (r) => r.brokenBacklinks },
     { key: "firstSeen", label: "First seen", num: true, cell: (r) => fmtDate(r.firstSeen), csv: (r) => r.firstSeen },
   ],
+  referringIps: [
+    { key: "ip", label: "IP address", cell: (r) => r.ip, csv: (r) => r.ip },
+    { key: "referringDomains", label: "Linking sites on it", num: true, cell: (r) => fmtNum(r.referringDomains), csv: (r) => r.referringDomains },
+    { key: "backlinks", label: "Links", num: true, cell: (r) => fmtNum(r.backlinks), csv: (r) => r.backlinks },
+    { key: "authority", label: "Authority", num: true, cell: (r) => r.authority ?? "—", csv: (r) => r.authority },
+    { key: "firstSeen", label: "First seen", num: true, cell: (r) => fmtDate(r.firstSeen), csv: (r) => r.firstSeen },
+  ],
+  linkCompetitors: [
+    { key: "domain", label: "Site", cell: (r) => <Ext href={`https://${r.domain}`}>{r.domain}</Ext>, csv: (r) => r.domain },
+    { key: "shared", label: "Linking sites in common", num: true, cell: (r) => fmtNum(r.shared), csv: (r) => r.shared },
+    { key: "authority", label: "Authority", num: true, cell: (r) => r.authority ?? "—", csv: (r) => r.authority },
+    { key: "explore", label: "", num: true, cell: (r, c) => (c.onExplore ? <button type="button" className="g-link" onClick={() => c.onExplore!(r.domain)}>Explore</button> : null), csv: () => null },
+  ],
+  subdomains: [
+    { key: "subdomain", label: "Subdomain", cell: (r) => <Ext href={`https://${r.subdomain}`}>{r.subdomain}</Ext>, csv: (r) => r.subdomain },
+    { key: "traffic", label: "Traffic", num: true, cell: (r) => fmtNum(r.traffic), csv: (r) => r.traffic },
+    { key: "keywords", label: "Keywords", num: true, cell: (r) => fmtNum(r.keywords), csv: (r) => r.keywords },
+    { key: "top3", label: "In top 3", num: true, cell: (r) => fmtNum(r.top3), csv: (r) => r.top3 },
+    { key: "top10", label: "In top 10", num: true, cell: (r) => fmtNum(r.top10), csv: (r) => r.top10 },
+    { key: "trafficValue", label: "Traffic value", num: true, cell: (r) => usd0(r.trafficValue), csv: (r) => r.trafficValue },
+  ],
+  ads: [
+    { key: "advertiser", label: "Advertiser", cell: (r) => <>{r.advertiser}{r.verified && <span className="g-text-2 text-[12px]"> · verified by Google</span>}</>, csv: (r) => r.advertiser },
+    { key: "format", label: "Kind", cell: (r) => (r.format ? cap(r.format) : "—"), csv: (r) => r.format },
+    { key: "firstShown", label: "First shown", num: true, cell: (r) => fmtDate(r.firstShown), csv: (r) => r.firstShown },
+    { key: "lastShown", label: "Last shown", num: true, cell: (r) => fmtDate(r.lastShown), csv: (r) => r.lastShown },
+    { key: "url", label: "", num: true, cell: (r) => (r.url ? <Ext href={r.url}>See the ad</Ext> : null), csv: (r) => r.url },
+  ],
   matchingTerms: ideaCols, relatedTerms: ideaCols, questions: ideaCols,
+};
+/** A line under the title of the reports that need a word of explanation. */
+export const REPORT_NOTE: Partial<Record<TableKey, string>> = {
+  referringIps: "The servers the linking sites sit on. Many linking sites on one address usually means one owner — a network of sites, not independent recommendations.",
+  linkCompetitors: "Sites that many of the same websites link to. They draw on the same sources of links as this site — whether or not they sell the same thing.",
+  subdomains: "The parts of this site with their own name (blog.example.com), with the search traffic each brings.",
+  ads: "The Google Ads this site has run, from Google's public ad library. \"See the ad\" opens Google's own page for it.",
 };
 
 const SORT_LABELS: Record<TableKey, [string, string][]> = {
@@ -114,6 +149,10 @@ const SORT_LABELS: Record<TableKey, [string, string][]> = {
   referringDomains: [["authority", "Strongest sites"], ["links", "Most links"], ["newest", "Newest"]],
   anchors: [["links", "Most backlinks"], ["domains", "Most domains"]],
   bestByLinks: [["links", "Most backlinks"], ["domains", "Most domains"]],
+  referringIps: [["domains", "Most linking sites"], ["links", "Most links"]],
+  linkCompetitors: [["shared", "Most shared linking sites"], ["authority", "Strongest sites"]],
+  subdomains: [["traffic", "Most traffic"], ["keywords", "Most keywords"]],
+  ads: [["newest", "Most recently shown"]],
   matchingTerms: [["volume", "Highest volume"], ["difficulty", "Easiest"], ["cpc", "Highest CPC"]],
   relatedTerms: [["volume", "Highest volume"], ["difficulty", "Easiest"]],
   questions: [["volume", "Highest volume"], ["difficulty", "Easiest"]],

@@ -25,6 +25,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
+import { safeDomain, safeHttpUrl } from "./dataforseo";
 import { parseExplorerKeyword, parseExplorerPage, parseCompetitors, parseReferringDomain, parseAnchor, INTENTS, type Intent } from "./explorer";
 
 export const CACHE_HOURS = 24;
@@ -35,7 +36,7 @@ export const REPORT_TYPICAL_USD = 0.025;
 export const KEYWORD_OVERVIEW_ESTIMATE_USD = 0.05;
 export const KEYWORD_OVERVIEW_TYPICAL_USD = 0.04;
 
-export const DOMAIN_TABLES = ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "referringDomains", "anchors", "bestByLinks"] as const;
+export const DOMAIN_TABLES = ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "referringDomains", "anchors", "bestByLinks", "referringIps", "linkCompetitors", "subdomains", "ads"] as const;
 export const KEYWORD_TABLES = ["matchingTerms", "relatedTerms", "questions"] as const;
 export type DomainTable = (typeof DOMAIN_TABLES)[number];
 export type KeywordTable = (typeof KEYWORD_TABLES)[number];
@@ -93,6 +94,11 @@ export const SORTS: Record<ReportTable, Record<string, string>> = {
   referringDomains: { authority: "rank,desc", links: "backlinks,desc", newest: "first_seen,desc" },
   anchors: { links: "backlinks,desc", domains: "referring_domains,desc" },
   bestByLinks: { links: "backlinks,desc", domains: "referring_domains,desc" },
+  referringIps: { domains: "referring_domains,desc", links: "backlinks,desc" },
+  linkCompetitors: { shared: "intersections,desc", authority: "rank,desc" },
+  subdomains: { traffic: "metrics.organic.etv,desc", keywords: "metrics.organic.count,desc" },
+  // Google's ad library returns its own order (most recently shown first); there is nothing to choose.
+  ads: { newest: "" },
   matchingTerms: { volume: "keyword_info.search_volume,desc", difficulty: "keyword_properties.keyword_difficulty,asc", cpc: "keyword_info.cpc,desc" },
   relatedTerms: { volume: "keyword_data.keyword_info.search_volume,desc", difficulty: "keyword_data.keyword_properties.keyword_difficulty,asc" },
   questions: { volume: "keyword_info.search_volume,desc", difficulty: "keyword_properties.keyword_difficulty,asc" },
@@ -142,6 +148,15 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
       return { path: "/backlinks/referring_domains/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("domain")), order_by: [sort] } };
     case "anchors":
       return { path: "/backlinks/anchors/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("anchor")), order_by: [sort] } };
+    case "referringIps":
+      return { path: "/backlinks/referring_networks/live", body: { ...links, network_address_type: "ip", backlinks_status_type: "live", order_by: [sort] } };
+    case "linkCompetitors":
+      return { path: "/backlinks/competitors/live", body: { target: input.target, rank_scale: "one_thousand", exclude_large_domains: true, limit: input.limit, offset: input.offset, order_by: [sort] } };
+    case "subdomains":
+      return { path: "/dataforseo_labs/google/subdomains/live", body: { ...labs, target: input.target, order_by: [sort] } };
+    case "ads":
+      // The ad library has no paging of its own: ask for as many as the page reaches, and cut the page out of them.
+      return { path: "/serp/google/ads_search/live/advanced", body: { target: input.target, location_code: input.locationCode, depth: Math.min(120, input.offset + input.limit) } };
     case "bestByLinks":
       return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("url")), order_by: [sort] } };
     case "matchingTerms":
@@ -193,6 +208,33 @@ export function parseLinkedPage(i: any): LinkedPageRow | null {
   return url ? { url, backlinks: num(i.backlinks), referringDomains: num(i.referring_domains), authority: auth(i.rank), brokenBacklinks: num(i.broken_backlinks), firstSeen: day(i.first_seen) } : null;
 }
 
+export type ReferringIpRow = { ip: string; referringDomains: number | null; backlinks: number | null; authority: number | null; firstSeen: string | null };
+export function parseReferringIp(i: any): ReferringIpRow | null {
+  const ip = str(i?.network_address);
+  return ip && /^[0-9a-f.:/]+$/i.test(ip) ? { ip, referringDomains: num(i.referring_domains), backlinks: num(i.backlinks), authority: auth(i.rank), firstSeen: day(i.first_seen) } : null;
+}
+export type LinkCompetitorRow = { domain: string; shared: number | null; authority: number | null };
+/** Sites that many of the same websites link to — the target itself is left out. */
+export function parseLinkCompetitor(i: any, target: string): LinkCompetitorRow | null {
+  const domain = safeDomain(i?.target);
+  return domain && domain !== target ? { domain, shared: num(i.intersections), authority: auth(i.rank) } : null;
+}
+export type SubdomainRow = { subdomain: string; traffic: number; keywords: number; top3: number; top10: number; trafficValue: number | null };
+export function parseSubdomain(i: any): SubdomainRow | null {
+  const subdomain = safeDomain(i?.subdomain), o = i?.metrics?.organic;
+  if (!subdomain || !o) return null;
+  const top3 = (num(o.pos_1) ?? 0) + (num(o.pos_2_3) ?? 0);
+  return { subdomain, traffic: Math.round(num(o.etv) ?? 0), keywords: num(o.count) ?? 0, top3, top10: top3 + (num(o.pos_4_10) ?? 0), trafficValue: num(o.estimated_paid_traffic_cost) === null ? null : Math.round(o.estimated_paid_traffic_cost) };
+}
+export type AdRow = { advertiser: string; format: string | null; verified: boolean; firstShown: string | null; lastShown: string | null; url: string | null };
+/** One ad from Google's public ad library. The link goes to Google's own page for that ad. */
+export function parseAd(i: any): AdRow | null {
+  const advertiser = str(i?.title);
+  if (!advertiser || i?.type !== "ads_search") return null;
+  const url = safeHttpUrl(i.url);
+  return { advertiser: advertiser.slice(0, 160), format: str(i.format), verified: i.verified === true, firstShown: day(i.first_shown), lastShown: day(i.last_shown), url: url && /^https:\/\/adstransparency\.google\.com\//.test(url) ? url : null };
+}
+
 export type KeywordIdeaRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent: Intent | null; competition: string | null };
 /** A keyword_suggestions row, or the `keyword_data` of a related_keywords row. */
 export function parseKeywordIdea(i: any): KeywordIdeaRow | null {
@@ -216,6 +258,10 @@ export function parseReportRows(table: ReportTable, items: any[], target: string
     case "referringDomains": return keep(items.map(parseReferringDomain));
     case "anchors": return keep(items.map(parseAnchor));
     case "bestByLinks": return keep(items.map(parseLinkedPage));
+    case "referringIps": return keep(items.map(parseReferringIp));
+    case "linkCompetitors": return keep(items.map((i) => parseLinkCompetitor(i, target)));
+    case "subdomains": return keep(items.map(parseSubdomain));
+    case "ads": return keep(items.map(parseAd));
     case "matchingTerms": case "relatedTerms": case "questions": return keep(items.map(parseKeywordIdea));
   }
 }
@@ -226,10 +272,14 @@ export type ReportPage = { table: ReportTable; target: string; rows: unknown[]; 
 export async function fetchReportPage(input: ReportInput & { target: string }): Promise<{ data: ReportPage; costUsd: number }> {
   const { path, body } = reportRequest(input);
   const task: DfsTask = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+  const all = parseReportRows(input.table, taskItems(task), input.target);
+  // The ad library was asked for everything up to this page; the page is the tail of that.
+  const ads = input.table === "ads";
+  const rows = ads ? all.slice(input.offset, input.offset + input.limit) : all;
   return {
     data: {
-      table: input.table, target: input.target, rows: parseReportRows(input.table, taskItems(task), input.target),
-      sourceRows: taskItems(task).length, total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
+      table: input.table, target: input.target, rows,
+      sourceRows: ads ? rows.length : taskItems(task).length, total: ads ? (all.length < input.offset + input.limit ? all.length : null) : num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
       sort: input.sort && SORTS[input.table][input.sort] ? input.sort : defaultSort(input.table), fetchedAt: new Date().toISOString(),
     },
     costUsd: typeof task.cost === "number" ? task.cost : 0,
