@@ -1,4 +1,5 @@
 import AgencyPage from "@/pages/agency";
+import { SocialLinks } from "@/components/social-links";
 import GoogleProfilePage from "@/pages/google-profile";
 import InvitePage from "@/pages/invite";
 import { PaymentNeededBanner } from "@/components/payment-needed-banner";
@@ -742,6 +743,7 @@ function AppContent() {
               <CrmPlanGate><PortalRouter /></CrmPlanGate>
               {/* Help and "Report an issue" under every CRM page (they sell nothing, so the iPhone app keeps them too). */}
               <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
+                <SocialLinks tone="app" className="basis-full" testId="social-crm-footer" />
                 <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
                 <span className="mx-2 text-border">&middot;</span>
                 <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
@@ -809,6 +811,7 @@ function AppContent() {
             </div>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
             <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 md:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
+              <SocialLinks tone="app" className="basis-full" testId="social-dashboard-footer" />
               <Link href="/tutorials" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-help">Help</Link>
               <span className="mx-2 text-border">&middot;</span>
               <Link href={reportIssueHref()} className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-report-issue">Report an issue</Link>

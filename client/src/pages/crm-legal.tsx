@@ -1,3 +1,4 @@
+import { SocialLinks } from "@/components/social-links";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CrmLogo } from "@/components/crm-logo";
 
@@ -41,6 +42,7 @@ function LegalShell({ title, children, testid, updated }: { title: string; child
             {" · "}
             <a href="/crm-privacy" className="text-primary hover:underline">Privacy Policy</a>
           </p>
+          <SocialLinks tone="app" className="!justify-start pt-1 -ml-2.5 sm:-ml-2" label={null} testId="social-crm-legal" />
         </div>
       </div>
     </div>

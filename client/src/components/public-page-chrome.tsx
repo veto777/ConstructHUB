@@ -17,6 +17,7 @@ import { Link } from "wouter";
 import { SiteNavBar } from "@/components/site-nav";
 import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
+import { SocialLinks } from "@/components/social-links";
 
 function useSignedOut(): boolean {
   const { data: user, isLoading } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -101,6 +102,7 @@ export function PublicPageFooter() {
           <span aria-hidden className="opacity-40">·</span>
           <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
         </div>
+        <SocialLinks tone="navy" className="mt-3" testId="social-public-footer" />
         <p className="mt-2">{copyrightNotice()}</p>
       </footer>
     );
@@ -127,6 +129,7 @@ export function PublicPageFooter() {
         <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors">Privacy</a>
       </div>
       <FooterGuides className="mt-2" />
+      <SocialLinks tone="navy" className="mt-3" testId="social-public-footer" />
       <p className="mt-2">{copyrightNotice()}</p>
     </footer>
   );

@@ -23,6 +23,7 @@ import { featurePriceSummary, type FeaturePriceSummary } from "./feature-pages/p
 import type { FeaturePricing } from "./feature-pages/types";
 import { DFY_PATH, EXTERNAL_DFY_PAGES, READY_DFY_PAGES, dfyPageBySlug, dfyPagePath } from "./dfy-pages";
 import { ROUTE_META } from "./route-meta";
+import { SOCIAL_URLS } from "./social-links";
 
 /** The canonical origin: every page on every marketing domain names this one (server/site-context.ts PRIMARY_DOMAIN). */
 export const SITE_ORIGIN = "https://constructhub.us";
@@ -120,7 +121,7 @@ export type JsonLd = { "@type": string } & Record<string, unknown>;
 const ORG_ID = `${SITE_ORIGIN}/#organization`;
 
 export function organizationJsonLd(): JsonLd {
-  return { "@type": "Organization", "@id": ORG_ID, name: SITE_NAME, url: `${SITE_ORIGIN}/`, logo: LOGO, email: SITE_EMAIL };
+  return { "@type": "Organization", "@id": ORG_ID, name: SITE_NAME, url: `${SITE_ORIGIN}/`, logo: LOGO, email: SITE_EMAIL, sameAs: [...SOCIAL_URLS] };
 }
 
 export function websiteJsonLd(): JsonLd {

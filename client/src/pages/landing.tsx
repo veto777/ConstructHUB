@@ -20,7 +20,7 @@ import {
   MapPin, CheckCircle2,
   Eye, Globe, GraduationCap,
   Grid3X3, ShieldAlert, Crosshair, Briefcase,
-  Megaphone, Package, Phone,
+  Megaphone, Package, Phone, CirclePlay,
 } from "lucide-react";
 import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
@@ -32,6 +32,7 @@ import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-ass
 import { callAssistantPricing } from "@shared/plan-copy";
 import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 import { FooterGuides } from "@/components/public-page-chrome";
+import { SocialLinks } from "@/components/social-links";
 import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
 
 
@@ -540,6 +541,26 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* See it in action — the walkthrough videos and the social accounts; a slim band, so the sign-up call below stays in reach. */}
+      <section className="py-10 sm:py-12 px-4 sm:px-6 lg:px-8" data-testid="section-see-it-in-action" aria-labelledby="see-it-in-action-title">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center md:justify-between gap-6 text-center md:text-left">
+          <div className="min-w-0">
+            <h2 id="see-it-in-action-title" className="font-display font-semibold text-[1.6rem] sm:text-[1.9rem] leading-[1.1] tracking-[-0.02em]">
+              See it <em className="text-mkt-orange">in action</em>
+            </h2>
+            <p className="mt-2 text-[15px] text-mkt-ink-soft leading-relaxed max-w-md">
+              Short, narrated walkthroughs of the tools — here and on our channels.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center gap-x-5 gap-y-3 shrink-0">
+            <Link href="/tutorials" data-testid="link-strip-tutorials" className={`${BTN_OUTLINE} ${BTN_LG} w-full sm:w-auto`}>
+              <CirclePlay className="h-5 w-5" aria-hidden="true" /> Watch tutorials
+            </Link>
+            <SocialLinks tone="paper" label="Follow us" testId="social-landing-strip" />
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="relative bg-mkt-navy text-mkt-navy-ink py-24 lg:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
         <div className="absolute inset-0 mkt-grid-paper-panel [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_70%)] opacity-70 dark:opacity-40" aria-hidden />
@@ -563,7 +584,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative border-t border-mkt-navy-rule py-10 px-4 sm:px-6 lg:px-8 bg-mkt-navy text-mkt-navy-ink">
+      {/* Phones: room under the last row (the follow links) for the fixed Gabe launcher, as on the other public footers. */}
+      <footer className="relative border-t border-mkt-navy-rule pt-10 pb-24 sm:pb-10 px-4 sm:px-6 lg:px-8 bg-mkt-navy text-mkt-navy-ink">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <CHLogo height={30} className="opacity-70" />
@@ -587,6 +609,7 @@ export default function LandingPage() {
             <p className="text-[13px] text-mkt-navy-muted">{copyrightNotice()}</p>
           </div>
           <FooterGuides className="mt-4 text-[13px] text-mkt-navy-muted" />
+          <SocialLinks tone="navy" className="mt-4" testId="social-landing-footer" />
         </div>
       </footer>
     </div>

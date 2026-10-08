@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { PublicPageHeader } from "@/components/public-page-chrome";
+import { SocialLinks } from "@/components/social-links";
+import { YOUTUBE_CHANNEL_URL } from "@shared/social-links";
 import { Link, useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -674,6 +676,19 @@ export default function AuthPage() {
                 <a href={privacyHref} target="_blank" rel="noopener noreferrer" className={INLINE_LINK}>Privacy Policy</a>.
               </p>
             )}
+
+            {/* The walkthrough videos and the social accounts: a quiet line under the form, never above it. */}
+            <div className="space-y-1 text-center text-[13px] text-mkt-ink-soft" data-testid="auth-social">
+              {mode === "signup" && (
+                <p>
+                  New here?{" "}
+                  <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className={INLINE_LINK} data-testid="link-signup-youtube-tour">
+                    Watch a 1-minute walkthrough on YouTube
+                  </a>
+                </p>
+              )}
+              <SocialLinks tone="paper" testId="social-auth" />
+            </div>
 
             {/* Not in the apps: "home" there is this screen (the marketing site is not part of the apps). */}
             {!isPortal() && !app && (

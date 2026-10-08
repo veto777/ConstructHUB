@@ -15,6 +15,8 @@
  * is HTML-escaped here, so callers pass plain strings.
  */
 
+import { SOCIAL_LINKS } from "@shared/social-links";
+
 export type EmailMessage = { subject: string; html: string; text: string };
 
 export type LayoutRow = [label: string, value: string];
@@ -35,6 +37,8 @@ export type EmailLayoutOptions = {
   cta?: LayoutCta | null;
   /** A plain link shown under the button ("View invoice", "Download PDF"). */
   secondary?: LayoutCta[];
+  /** "Follow us" links under the card (the welcome email: the official social accounts). */
+  follow?: LayoutCta[];
   /** Small print above the footer. */
   note?: string | null;
   footer?: string | null;
@@ -128,6 +132,7 @@ export function emailLayout(opts: EmailLayoutOptions): { html: string; text: str
   const logo = `${base.replace(/\/+$/, "")}/chub-logo-square-text.png`;
   const cta = opts.cta && safeUrl(opts.cta.url) ? { label: opts.cta.label, url: safeUrl(opts.cta.url)! } : null;
   const secondary = (opts.secondary ?? []).filter((link) => safeUrl(link.url)).map((link) => ({ label: link.label, url: safeUrl(link.url)! }));
+  const follow = (opts.follow ?? []).filter((link) => safeUrl(link.url)).map((link) => ({ label: link.label, url: safeUrl(link.url)! }));
   const intro = paragraphs(opts.intro);
   const footer = opts.footer ?? `You're receiving this because you have a ${BRAND} account. Questions? Reply to this email or write to support@constructhub.us.`;
 
@@ -152,6 +157,7 @@ ${secondary.length ? `<p style="text-align:center;margin:0 0 12px;font-size:13px
 ${opts.note ? `<p style="color:${MUTED};font-size:12px;line-height:1.6;margin:12px 0 0;border-top:1px solid #f1f5f9;padding-top:12px;">${esc(opts.note)}</p>` : ""}
 </div>
 </div>
+${follow.length ? `<p style="color:${MUTED};font-size:12px;line-height:1.8;text-align:center;margin:18px 0 0;">Follow ${BRAND}: ${follow.map((link) => `<a href="${esc(link.url)}" style="color:${MUTED};font-weight:600;text-decoration:underline;margin:0 6px;">${esc(link.label)}</a>`).join("")}</p>` : ""}
 <p style="color:#9ca3af;font-size:11px;line-height:1.6;text-align:center;margin:18px 0 0;">${esc(footer)}</p>
 </div>
 </body></html>`;
@@ -172,6 +178,11 @@ ${opts.note ? `<p style="color:${MUTED};font-size:12px;line-height:1.6;margin:12
   for (const link of secondary) textParts.push(`${link.label}: ${link.url}`);
   if (secondary.length) textParts.push("");
   if (opts.note) textParts.push(opts.note, "");
+  if (follow.length) {
+    textParts.push(`Follow ${BRAND}:`);
+    for (const link of follow) textParts.push(`${link.label}: ${link.url}`);
+    textParts.push("");
+  }
   textParts.push(footer);
   return { html, text: textParts.join("\n") };
 }
@@ -280,6 +291,7 @@ export function welcomeEmail(input: { displayName: string | null; email: string;
       { label: "Notification settings", url: `${base}/settings?tab=notifications` },
     ],
     note: "Every invoice, receipt and plan change is emailed to this address and kept under Settings → Billing & Plans.",
+    follow: SOCIAL_LINKS.map((link) => ({ label: link.name, url: link.url })),
   });
   return { subject, html, text };
 }
