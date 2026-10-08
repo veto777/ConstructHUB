@@ -8,6 +8,7 @@ export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_estimate_client_view } from "./crm-estimate-client-view.json";
 export { default as v_crm_estimate_draft } from "./crm-estimate-draft.json";
+export { default as v_crm_estimate_options } from "./crm-estimate-options.json";
 export { default as v_crm_payments } from "./crm-payments.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_team_activity } from "./crm-team-activity.json";
