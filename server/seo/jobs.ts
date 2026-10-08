@@ -306,17 +306,23 @@ export async function snapshotBacklinks(site: SiteRow, automatic = false): Promi
         changes = { since: before.taken_on, lost: [], lostTotal: null, failed: true };
       }
     }
-    return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null, listFailed: !list, changes }, costUsd: summary.costUsd + (list?.costUsd ?? 0) + lostCost, customerUsd: delivered, costUnknown: listUnknown };
+    const costUsd = summary.costUsd + (list?.costUsd ?? 0) + lostCost;
+    // Saved BEFORE it is charged: if the snapshot cannot be written this throws, the lookup counts as failed and the
+    // customer pays nothing — so a snapshot is never paid for and then missing (and bought again on the next try).
+    let row: any;
+    try {
+      ({ rows: [row] } = await pool.query(
+        `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd,changes) VALUES($1,$2,current_date,$3,$4,$5,$6)
+         ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd,
+           changes=EXCLUDED.changes
+         RETURNING id, taken_on`,
+        [site.id, site.user_id, JSON.stringify({ ...summary.data, totalCount: list?.data.totalCount ?? null, listFailed: !list }), JSON.stringify(list?.data.items ?? []), costUsd, changes ? JSON.stringify(changes) : null]));
+    } catch (e: any) { throw Object.assign(new Error(`backlink snapshot for ${site.domain} could not be saved: ${e?.message ?? e}`), { costUsd, costUnknown: listUnknown, notSaved: true }); }
+    return { data: { id: row.id as number, takenOn: String(row.taken_on).slice(0, 10), changes }, costUsd, customerUsd: delivered, costUnknown: listUnknown };
   }, { allowanceOnly: automatic, label: `Backlink snapshot — ${site.domain} (${automatic ? "monthly" : "refresh"})` });
-  const { rows: [row] } = await pool.query(
-    `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd,changes) VALUES($1,$2,current_date,$3,$4,$5,$6)
-     ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd,
-       changes=EXCLUDED.changes
-     RETURNING id, taken_on`,
-    [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount, listFailed: out.data.listFailed }), JSON.stringify(out.data.backlinks), out.costUsd, out.data.changes ? JSON.stringify(out.data.changes) : null]);
   await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
   await raiseLinkAlerts(site.id).catch((e: any) => console.error(`[seo] link alerts for ${site.domain} failed: ${e?.message ?? e}`));
-  return { id: row.id, takenOn: String(row.taken_on).slice(0, 10), costUsd: out.costUsd, lostFailed: out.data.changes?.failed === true };
+  return { id: out.data.id, takenOn: out.data.takenOn, costUsd: out.costUsd, lostFailed: out.data.changes?.failed === true };
 }
 
 async function runDueBacklinkSnapshots(): Promise<void> {
