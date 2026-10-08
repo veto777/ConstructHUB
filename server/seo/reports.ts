@@ -33,8 +33,8 @@ export const KEYWORD_OVERVIEW_TTL_DAYS = 7;
 /** Wholesale estimates reserved before a call (settled to the real cost after). */
 export const REPORT_ESTIMATE_USD = 0.03;
 export const REPORT_TYPICAL_USD = 0.025;
-export const KEYWORD_OVERVIEW_ESTIMATE_USD = 0.05;
-export const KEYWORD_OVERVIEW_TYPICAL_USD = 0.04;
+export const KEYWORD_OVERVIEW_ESTIMATE_USD = 0.065;
+export const KEYWORD_OVERVIEW_TYPICAL_USD = 0.05;
 
 export const DOMAIN_TABLES = ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "referringDomains", "anchors", "bestByLinks", "referringIps", "linkCompetitors", "subdomains", "ads"] as const;
 export const KEYWORD_TABLES = ["matchingTerms", "relatedTerms", "questions"] as const;
@@ -300,9 +300,38 @@ export type KeywordOverview = {
   /** Average authority and links of the pages ranking today. */
   topAvg: { authority: number | null; backlinks: number | null; referringDomains: number | null };
   serp: SerpRow[];
-  /** Sections that did not load this time: "results" (the top ten) and/or "authority". */
+  /** What the page ranking first earns from search in all (absent on overviews saved before 2026-10-08; null when it did not load or there is no first page). */
+  potential?: KeywordPotential | null;
+  /** Sections that did not load this time: "results" (the top ten), "authority" and/or "potential". */
   missing?: string[];
 };
+
+export type KeywordPotential = {
+  /** The page ranking first today. */
+  url: string;
+  /** Estimated monthly visits that page gets from search, across every keyword it ranks for. */
+  traffic: number;
+  /** How many keywords it ranks for. */
+  keywords: number;
+  /** The keyword that sends that page the most visits — the broader topic to aim at. */
+  parentTopic: string | null; parentVolume: number | null;
+};
+/** Read "everything the first page ranks for" (one row asked for, ordered by visits). */
+export function parsePotential(result: any, url: string): KeywordPotential | null {
+  const o = result?.metrics?.organic, top = Array.isArray(result?.items) ? result.items[0] : null;
+  if (num(o?.etv) === null && !top) return null;
+  return {
+    url, traffic: Math.round(num(o?.etv) ?? 0), keywords: num(o?.count) ?? num(result?.total_count) ?? 0,
+    parentTopic: str(top?.keyword_data?.keyword), parentVolume: num(top?.keyword_data?.keyword_info?.search_volume),
+  };
+}
+/** The request for it: the first page's own keywords, the biggest earner first. */
+export function potentialRequest(url: string, loc: { location_code: number; language_code: string }): Record<string, unknown> | null {
+  const safe = safeHttpUrl(url);
+  if (!safe) return null;
+  const u = new URL(safe);
+  return { ...loc, target: u.hostname.replace(/^www\./, ""), limit: 1, order_by: ["ranked_serp_element.serp_item.etv,desc"], filters: ["ranked_serp_element.serp_item.relative_url", "=", u.pathname + u.search] };
+}
 
 export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], input: { keyword: string; locationCode: number; fetchedAt?: string }): KeywordOverview {
   const idea = parseKeywordIdea(item) ?? { keyword: input.keyword, volume: null, cpc: null, difficulty: null, intent: null, competition: null };
@@ -326,7 +355,7 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
   };
 }
 
-/** Overview + today's top results + their authority: three calls. */
+/** Overview + today's top results, then their authority and what the first page earns: four calls. */
 export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; costUnknown?: boolean }> {
   let costUsd = 0;
   const call = async (path: string, body: Record<string, unknown>) => {
@@ -353,10 +382,17 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
   if (!serp) missing.push("results");
   const serpItems = serp ? taskItems(serp) : [];
   const domains = [...new Set(serpItems.filter((s) => s?.type === "organic" && typeof s.domain === "string").slice(0, 10).map((s) => String(s.domain).replace(/^www\./, "")))];
-  const ranks = domains.length
-    ? await call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => { missing.push("authority"); return []; })
-    : [];
-  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), missing }, costUsd, costUnknown };
+  const first = serpItems.find((s) => s?.type === "organic" && typeof s.url === "string");
+  const potentialBody = first ? potentialRequest(String(first.url), loc) : null;
+  const [ranks, potential] = await Promise.all([
+    domains.length
+      ? call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => { missing.push("authority"); return []; })
+      : [],
+    potentialBody
+      ? call("/dataforseo_labs/google/ranked_keywords/live", potentialBody).then((t) => parsePotential(t.result?.[0], String(first.url))).catch(() => { missing.push("potential"); return null; })
+      : null,
+  ]);
+  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), potential, missing }, costUsd, costUnknown };
 }
 
 // ── Saved pages ────────────────────────────────────────────────────────────

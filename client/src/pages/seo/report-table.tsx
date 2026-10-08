@@ -173,7 +173,12 @@ function csvOf(cols: Col[], rows: any[]): string {
   return [used.map((c) => esc(c.label)).join(","), ...rows.map((r) => used.map((c) => esc(c.csv(r))).join(","))].join("\n");
 }
 
-export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction }: {
+/** Reports that differ by country; link reports are the same everywhere, so they are not bought again per country. */
+const BY_COUNTRY: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "competitors", "subdomains", "ads", "matchingTerms", "relatedTerms", "questions"]);
+
+export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction, market }: {
+  /** The country to look at (United States when absent). */
+  market?: { locationCode: number; languageCode: string };
   /** Keyword tables: something else to do with the ticked rows (e.g. add them to a list). */
   extraAction?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null }[], clear: () => void) => ReactNode;
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
@@ -196,7 +201,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
 
   // Belt and braces with the remount: a sort the report does not have is never sent.
   const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
-  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset }), [domain, keyword, table, sortKey, filters, limit, offset]);
+  const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
+  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang]);
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,

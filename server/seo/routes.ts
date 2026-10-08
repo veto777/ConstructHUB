@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -148,6 +149,8 @@ const explorerInput = z.object({
   refresh: z.boolean().default(false),
 }).strict();
 const id = z.coerce.number().int().positive();
+/** Explorer lookups run only for the countries on the list (shared/seo-markets.ts). */
+const marketOk = (i: { locationCode: number; languageCode: string }) => !!findMarket(i.locationCode, i.languageCode);
 const keywordOverviewInput = z.object({
   keyword: z.string().trim().min(1).max(200),
   locationCode: z.number().int().positive().default(2840),
@@ -508,6 +511,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     const locationCode = Number(req.query.locationCode) > 0 ? Math.floor(Number(req.query.locationCode)) : 2840;
     const languageCode = /^[a-z]{2}$/.test(String(req.query.languageCode ?? "")) ? String(req.query.languageCode) : "en";
+    if (!marketOk({ locationCode, languageCode })) return res.status(400).json({ message: "That country isn't available." });
     const saved = await latestReport(user, domain, locationCode, languageCode);
     if (!saved) return res.status(404).json({ code: "no_report", message: "No report for that domain yet." });
     res.json({ report: saved.report, fresh: saved.fresh, configured: isConfigured() });
@@ -517,6 +521,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // (or with refresh) one keyword search of the plan buys a new one.
   route("post", "/api/seo/explorer", async (req, res, user, ent) => {
     const input = explorerInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     if (!input.refresh) {
@@ -541,6 +546,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // `peek` asks for that only. Anything else is one vendor call on the account's credit.
   route("post", "/api/seo/report", async (req, res, user) => {
     const input = reportInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const forKeyword = isKeywordTable(input.table);
     const target = forKeyword ? cleanKeyword(input.keyword ?? "") : normalizeDomain(input.domain ?? "");
     if (!target) return res.status(400).json({ message: forKeyword ? "Enter a keyword." : "Enter a domain like example.com" });
@@ -557,6 +563,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // ── Keywords Explorer: one keyword's overview ───────────────────────────────
   route("post", "/api/seo/keyword", async (req, res, user) => {
     const input = keywordOverviewInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a keyword." });
     const key = cacheKey("keyword-overview", [keyword, input.locationCode, input.languageCode]);
@@ -575,6 +582,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Up to three competitors against one domain. Saved for a day; `peek` returns the saved copy or 404.
   route("post", "/api/seo/gap", async (req, res, user) => {
     const input = gapInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const target = normalizeDomain(input.domain);
     if (!target) return res.status(400).json({ message: "Enter a domain like example.com" });
     const competitors = [...new Set(input.competitors.map((c) => normalizeDomain(c)).filter((c): c is string => !!c && c !== target))];
@@ -629,6 +637,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Volume, difficulty, CPC and intent for up to 200 keywords in one lookup. Saved for a day; `peek` never buys.
   route("post", "/api/seo/keywords/bulk", async (req, res, user) => {
     const input = bulkInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const keywords = cleanKeywords(input.keywords);
     if (!keywords.length) return res.status(400).json({ message: "Enter at least one keyword." });
     const key = cacheKey("keywords-bulk", [[...keywords].sort(), input.locationCode, input.languageCode]);

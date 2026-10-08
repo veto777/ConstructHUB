@@ -30,7 +30,9 @@ function downloadCsv(name: string, rows: (string | number | null)[][]) {
   URL.revokeObjectURL(a.href);
 }
 
-export function GapView({ kind, domain, status, suggestions, onExplore, onTrack }: {
+export function GapView({ kind, domain, status, suggestions, onExplore, onTrack, market }: {
+  /** Content gap only: the country to compare in (United States when absent). Links are the same everywhere. */
+  market?: { locationCode: number; languageCode: string };
   kind: GapKind; domain: string; status: SeoStatus | undefined;
   /** Likely competitors to offer (the report's organic competitors). */
   suggestions: string[];
@@ -49,7 +51,8 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
   // A different report or site starts clean.
   useEffect(() => { setDraft([]); setApplied([]); setInput(""); setOffset(0); setPicked(new Set()); }, [kind, domain]);
 
-  const body = useMemo(() => ({ kind, domain, competitors: applied, ...(kind === "links" ? { limit, offset } : {}) }), [kind, domain, applied, offset]);
+  const loc = market && kind === "content" ? market.locationCode : undefined, lang = market && kind === "content" ? market.languageCode : undefined;
+  const body = useMemo(() => ({ kind, domain, competitors: applied, ...(kind === "links" ? { limit, offset } : {}), ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [kind, domain, applied, offset, loc, lang]);
   const queryKey = ["/api/seo/gap", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: applied.length > 0, retry: false, staleTime: 5 * 60_000,
