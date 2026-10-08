@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-google-calendar",
+  "durationSec": 56,
+  "video": {
+    "key": "tutorials/crm-google-calendar.3a6ba5c9.mp4",
+    "bytes": 6183344,
+    "sha256": "3a6ba5c915a2af27f306c1b202ff64659e4b040b56e54afe7f5f03a62134eea0"
+  },
+  "captions": {
+    "key": "tutorials/crm-google-calendar.01d42e8e.vtt",
+    "bytes": 1256,
+    "sha256": "01d42e8e421480f197ad05d8a35a5d8bcb1b29d05a0de44b2c6106348edf9754"
+  },
+  "poster": {
+    "key": "tutorials/crm-google-calendar.eb4b3686.jpg",
+    "bytes": 101039,
+    "sha256": "eb4b36863182366e7d10976a46edc45788aa665c634de069eeb5273bd6e7bd09"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:58:25.282Z",
+    "video": "0032d08be77ee2e32bfe39ae194d44b3",
+    "captions": "d092225721e7c25162e1e6216e1be56c",
+    "poster": "d2ba87c4deedf65fee57842b559bc98f"
+  }
+}

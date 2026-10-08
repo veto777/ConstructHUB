@@ -24,7 +24,7 @@
     },
     {
       "action": "scroll",
-      "selector": "[data-testid=\"member-demo-member-owen\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Owen Brooks\")",
       "caption": "Owen Brooks",
       "narration": "Owen is a project manager. The switches show what he can do."
     },
@@ -49,7 +49,7 @@
     },
     {
       "action": "select",
-      "selector": "[data-testid=\"select-role-demo-member-priya\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"select-role-\"]",
       "value": "office",
       "caption": "Change a role",
       "chapter": "Change a role or one permission",
@@ -57,19 +57,19 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"select-role-demo-member-priya\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"select-role-\"]",
       "caption": "Team member updated",
       "narration": "The CRM says Team member updated, and her role is now office."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"switch-seeCosts-demo-member-owen\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Owen Brooks\") [data-testid^=\"switch-seeCosts-\"]",
       "caption": "One permission",
       "narration": "You can also change one thing for one person. Let's let Owen see costs and margins."
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"select-role-demo-member-owen\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Owen Brooks\") [data-testid^=\"select-role-\"]",
       "caption": "Still a project manager",
       "narration": "The switch is on, and Owen is still a project manager."
     },

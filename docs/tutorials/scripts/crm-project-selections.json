@@ -1,0 +1,147 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-selections",
+  "title": "Selections and allowances",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open selections",
+      "narration": "Selections track what a client still has to choose on a job. Here is how."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Oyelaran\") a",
+      "caption": "Open the project",
+      "narration": "Open the job from the Pipeline. We'll use the Oyelaran kitchen.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Selections\"]",
+      "caption": "Selections tab",
+      "narration": "Choose the Selections tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-sel-name\"]",
+      "value": "Backsplash tile",
+      "caption": "Selection",
+      "chapter": "Add a selection",
+      "narration": "Type what the client has to choose.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Category\")) > input",
+      "value": "Tile",
+      "caption": "Category",
+      "narration": "Give it a category.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Allowance $\")) > input",
+      "value": "600",
+      "caption": "Allowance",
+      "narration": "Type the allowance you priced for it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-sel\"]",
+      "caption": "Add",
+      "narration": "Click the plus button.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"sel-row-\"]:has-text(\"Backsplash tile\")",
+      "caption": "On the list",
+      "narration": "The selection is on the list with its allowance."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"sel-row-\"]:has-text(\"Backsplash tile\") [data-testid^=\"button-edit-sel-\"]",
+      "caption": "Update",
+      "chapter": "Record the choice",
+      "narration": "When the client decides, choose Update.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-sel-chosen\"]",
+      "value": "White subway tile, matte",
+      "caption": "Chosen option",
+      "narration": "Type what they chose.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-sel-actual\"]",
+      "value": "680",
+      "caption": "Actual cost",
+      "narration": "Type what it really costs.",
+      "holdMs": 1200
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-sel-status\"]",
+      "value": "chosen",
+      "caption": "Status",
+      "narration": "Set the status to chosen.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-sel\"]",
+      "caption": "Save",
+      "narration": "Then choose Save.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"sel-row-\"]:has-text(\"Backsplash tile\")",
+      "caption": "Over the allowance",
+      "narration": "The line shows the choice, the actual cost, and how far it is over the allowance."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to track client selections and allowances | ConstructHUB CRM",
+    "description": "A short walkthrough of the Selections tab in the ConstructHUB CRM. You will add a selection with its allowance, record what the client chose and what it cost, and see the amount over the allowance.",
+    "tags": [
+      "client selections",
+      "construction allowances",
+      "selection sheet",
+      "project management",
+      "remodeling selections",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Track client selections",
+    "accent": "selections",
+    "kicker": "CRM Tutorial",
+    "step": 13
+  }
+}

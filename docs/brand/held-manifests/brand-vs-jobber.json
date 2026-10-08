@@ -1,0 +1,25 @@
+{
+  "helpKey": "brand-vs-jobber",
+  "durationSec": 50,
+  "video": {
+    "key": "tutorials/brand-vs-jobber.1002c839.mp4",
+    "bytes": 8834705,
+    "sha256": "1002c83918e18d612556cc1e752cb6dc0ade897c94413a85f961281791031624"
+  },
+  "captions": {
+    "key": "tutorials/brand-vs-jobber.9616502f.vtt",
+    "bytes": 1422,
+    "sha256": "9616502f5d29d65c32f8ed7303b42fc1b0401673b2eddd94fb1cccc81f0a5888"
+  },
+  "poster": {
+    "key": "tutorials/brand-vs-jobber.550d40ff.jpg",
+    "bytes": 79280,
+    "sha256": "550d40ff049917d9502c42863a75ca7c60a182e6e5f8b23e8c1fbfe0b3b51613"
+  },
+  "uploaded": {
+    "at": "2026-10-08T12:39:32.804Z",
+    "video": "7bb2de4718960fc910d6138352f4fb85",
+    "captions": "71e3451b98e66acdcac0100eee8b2a48",
+    "poster": "a16fa529b0610c3847c19ef375f62c49"
+  }
+}

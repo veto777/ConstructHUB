@@ -1,0 +1,40 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-payment-reverse",
+  "title": "Reverse a payment",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/crm/clients", "caption": "Clients", "chapter": "Find the payment",
+      "narration": "A payment was recorded by mistake. Here's how to reverse it." },
+    { "action": "type", "selector": "[data-testid=\"input-search-clients\"]", "value": "Oyelaran", "caption": "Search for the client",
+      "narration": "On Clients, search for the client." },
+    { "action": "click", "selector": "[data-testid^=\"client-\"] a:has-text(\"Tunde Oyelaran\")", "caption": "Open the client",
+      "narration": "Click the name to open their page." },
+    { "action": "highlight", "selector": "[data-testid=\"client-payment-demo-pay-05\"]", "caption": "The payment",
+      "narration": "Under Payments, a payment you recorded has a Reverse button." },
+    { "action": "click", "selector": "[data-testid=\"button-reverse-payment-demo-pay-05\"]", "caption": "Reverse", "chapter": "Reverse it",
+      "narration": "Choose Reverse." },
+    { "action": "highlight", "selector": "[data-testid=\"dialog-reverse-payment\"] p", "caption": "Nothing is deleted",
+      "narration": "Nothing is deleted. The payment stays in the history, marked reversed." },
+    { "action": "type", "selector": "[data-testid=\"input-reverse-reason\"]", "value": "Entered twice by mistake", "caption": "Reason",
+      "narration": "Type the reason. It's kept with the payment." },
+    { "action": "click", "selector": "[data-testid=\"button-confirm-reverse\"]", "caption": "Reverse payment",
+      "narration": "Then choose Reverse payment." },
+    { "action": "highlight", "selector": "[data-testid=\"client-payment-demo-pay-05\"]", "caption": "Marked reversed, with the reason", "chapter": "What the record keeps",
+      "narration": "The payment is still listed, now marked reversed, with who reversed it and why." },
+    { "action": "highlight", "selector": "[data-testid=\"text-collected\"]", "caption": "Collected to date",
+      "narration": "Collected to date no longer counts it." },
+    { "action": "highlight", "selector": "[data-testid=\"link-portal-nav-payments\"]", "caption": "Menu: Payments",
+      "narration": "The Payments page in the menu lists every payment, with the same Reverse button." }
+  ],
+  "youtube": {
+    "title": "How to reverse a payment recorded by mistake | ConstructHUB CRM",
+    "description": "A short walkthrough of reversing a recorded payment in the ConstructHUB CRM. You will open the client, choose Reverse on the payment, give a reason, and see that the payment stays in the history marked reversed while the collected total updates.",
+    "tags": ["reverse a payment", "payment mistake", "contractor payments", "invoicing software", "contractor CRM", "ConstructHUB", "ConstructHUB CRM", "CRM tutorial", "bookkeeping"],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Undo a payment", "accent": "undo", "kicker": "CRM Tutorial", "step": 3 }
+}

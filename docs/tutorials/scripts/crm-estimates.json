@@ -1,0 +1,121 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimates",
+  "title": "Find and filter estimates",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "The list",
+      "narration": "This is Estimates. Every estimate across your company is in this one list."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-row-demo-estimate-e-2000\"]",
+      "caption": "Number, client, title, status, total",
+      "narration": "Each row shows the number, the client, the title, the status and the total."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-approved\"]",
+      "caption": "Tick Approved",
+      "chapter": "Filter by status",
+      "narration": "To narrow the list, tick a status. Approved shows the ones your clients have accepted."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-count-summary\"]",
+      "caption": "3 of 6",
+      "narration": "The count shows how many match: three of six."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-sent\"]",
+      "caption": "Add Sent",
+      "narration": "Tick a second status to add it. Now the list has Approved and Sent."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-all\"]",
+      "caption": "All",
+      "narration": "All brings everything back."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-sort\"]",
+      "value": "Largest first",
+      "caption": "Sort",
+      "chapter": "Sort and search",
+      "narration": "Sort puts the newest, the oldest or the largest estimates first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-date-range\"]",
+      "caption": "Date range",
+      "narration": "The date lists keep only today, the last seven days, the last thirty, or a range you choose."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search\"]",
+      "value": "Halvorsen",
+      "caption": "Search",
+      "narration": "Or search by estimate number or client name.",
+      "holdMs": 1500
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-2000\"]",
+      "caption": "Open the estimate",
+      "chapter": "Open an estimate",
+      "narration": "Click the number to open the estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Sent, opened, valid until",
+      "narration": "This line shows when it was sent, whether the client has opened it, and how long it's valid."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-all-estimates\"]",
+      "caption": "Back to the list",
+      "narration": "Estimates takes you back to the list."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Menu: Estimates",
+      "narration": "You'll find Estimates in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to find and filter estimates | ConstructHUB CRM",
+    "description": "A short walkthrough of the Estimates list in the ConstructHUB CRM. You will filter by status, sort, narrow by date, search by number or client name, and open an estimate to see when it was sent and whether the client has opened it.",
+    "tags": [
+      "contractor estimate",
+      "estimate tracking",
+      "estimating software",
+      "construction estimate",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "sales follow up"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Find any estimate",
+    "accent": "estimate",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

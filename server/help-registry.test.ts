@@ -131,7 +131,9 @@ describe("help registry", () => {
     expect(crmUrls).toContain("/crm/jobcam");
     expect(crmUrls.filter((u) => !featureRoutes.has(u)), "CRM pages with no help entry").toEqual([]);
     expect(crm).toContain('marketingUrl("/tutorials');
-    for (const f of HELP_FEATURES) expect(isCrmRoute(f.route), `${f.key} group`).toBe(f.group === "CRM");
+    // "Start here" holds the overview films: one of them tours the CRM, so that group may point at either app.
+    for (const f of HELP_FEATURES.filter((x) => x.group !== "Start here")) expect(isCrmRoute(f.route), `${f.key} group`).toBe(f.group === "CRM");
+    expect(HELP_GROUPS[0]).toBe("Start here");
     // The owner's list, by name.
     for (const k of ["call-assistant", "social-media", "site-scan", "seo", "cloudflare", "search-console", "ip-tracker", "vpn-shield", "competitor-intel", "jobcam", "google-reviews"])
       expect(HELP_FEATURES.some((f) => f.key === k), k).toBe(true);
@@ -215,6 +217,8 @@ describe("help registry", () => {
         expect(groupDir(e!.group), `${e!.key} is filed under the wrong group`).toBe(d);
         // A CRM entry added this way is one walkthrough's worth: its key says so.
         if (d === "crm") expect(e!.key, f).toMatch(/^crm-[a-z0-9-]+$/);
+        // The overview films are brand pieces, not one feature's walkthrough: their keys say so.
+        if (d === "start-here") expect(e!.key, f).toMatch(/^brand-[a-z0-9-]+$/);
       }
     }
     expect(helpEntry("crm-create-estimate")?.route).toBe("/crm/estimates/new");
@@ -295,9 +299,20 @@ describe("tutorial step scripts", () => {
       expect(f).toBe(`${script.helpKey}.json`);
       expect(helpEntry(script.helpKey), script.helpKey).toBeTruthy();
       expect(VOICE_PERSONA_IDS).toContain(script.narrator);
-      // A script never carries a real credential: typed secrets are {{PLACEHOLDERS}} filled at record time, and blurred.
-      for (const s of script.steps.filter((x) => x.action === "type" && /key|token|password|email/i.test(x.selector ?? "")))
-        { expect(s.value, f).toMatch(/^\{\{[A-Z_]+\}\}$/); expect(s.redact, f).toBe(true); }
+      // A script never carries a real credential, and the rule is about the VALUE being typed — not about what the
+      // field's selector happens to be called (a key's NAME, a client's example.com address and a search are fine):
+      //   · a {{PLACEHOLDER}} (filled from the environment at record time) is always blurred;
+      //   · anything else must be demo text: no email outside example.com, no phone outside 555-01xx,
+      //     nothing shaped like a key or a token; and a password field only ever takes a placeholder.
+      for (const s of script.steps.filter((x) => x.action === "type")) {
+        const sel = s.selector ?? "", value = s.value ?? "", where = `${f}: "${value.slice(0, 24)}" typed into ${sel}`;
+        if (/\{\{(?!DATE)[A-Z0-9_]+\}\}/.test(value)) { expect(s.redact, `${where} — a placeholder is blurred`).toBe(true); continue; }
+        expect(/password/i.test(sel) || /type=["']?password/i.test(sel), `${where} — a password is a {{PLACEHOLDER}}`).toBe(false);
+        for (const email of value.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g) ?? []) expect(email, where).toMatch(/@([a-z0-9-]+\.)*example\.com$/i);
+        for (const phone of value.match(/\(?\b\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\b/g) ?? []) expect(phone.replace(/\D/g, ""), where).toMatch(/^\d{3}55501\d\d$/);
+        expect(/\b(sk|pk|rk|whsec|ghp|gho|xox[abp])[_-][A-Za-z0-9_-]{8,}|\bAKIA[A-Z0-9]{12,}|\beyJ[A-Za-z0-9_-]{10,}\.|\bBearer\s+\S{12,}/.test(value), `${where} — looks like a key or a token`).toBe(false);
+        expect(/\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/.test(value), `${where} — a long random-looking string`).toBe(false);
+      }
     }
   });
 
@@ -314,7 +329,28 @@ describe("tutorial step scripts", () => {
       const said = [script.title, script.youtube!.title, script.youtube!.description, ...script.youtube!.tags, ...script.steps.map((s) => s.narration)].join(" ");
       // Nothing about how the video was made, and no price: prices live in the plan model, not in a recording.
       expect(said, f).not.toMatch(/higgsfield|kokoro|playwright|ffmpeg|\bAI voice\b/i);
-      expect(script.steps.map((s) => s.narration).join(" "), `${f} narrates a price`).not.toMatch(/\$\s?\d/);
+      // A tutorial never says or shows a price. An overview film (a `brand-` script) may — the owner asked for
+      // named, dated price comparisons — but only with its sources in the script (they go into the description),
+      // and a spoken amount belongs to a card that shows it with its dated footnote.
+      // An amount of money: "$189", "189 dollars", "ninety-four dollars". (Not the word alone — "type the amount in dollars" names a unit.)
+      const AMOUNT = /\$\s?\d|\b(?:\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|[a-z]+teen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)(?:[\s-]+(?:and\s+)?(?:one|two|three|four|five|six|seven|eight|nine))?\s+dollars?\b/i;
+      const priced = (t: string) => AMOUNT.test(t);
+      const cardText = (s: (typeof script.steps)[number]) => s.card ? JSON.stringify(s.card) : "";
+      if (!script.helpKey.startsWith("brand-")) expect(priced(script.steps.map((s) => s.narration + cardText(s)).join(" ")), `${f} narrates a price`).toBe(false);
+      else if (script.steps.some((s) => priced(s.narration) || priced(cardText(s)))) {
+        expect(script.youtube!.sources?.length ?? 0, `${f}: a film that names a price lists where it was read (youtube.sources)`).toBeGreaterThan(0);
+        expect(script.steps.some((s) => s.action === "card" && /constructhub\.us\/pricing/.test(s.card?.footnote ?? "")), `${f}: our own price is sourced on a card too`).toBe(true);
+        for (const s of script.steps.filter((x) => priced(x.narration))) {
+          expect(s.action, `${f}: "${s.narration.slice(0, 40)}…" says an amount — it belongs on a card`).toBe("card");
+          expect(s.card?.footnote ?? "", `${f}: the card under a spoken amount carries the dated footnote`).toMatch(/\b20\d\d\b/);
+        }
+      }
+      // A film that names another company says whose trademark the name is, and never judges them.
+      if (script.youtube?.names?.length) {
+        const all = script.steps.map((s) => s.narration + " " + cardText(s)).join(" ");
+        expect(all, `${f}: a comparison states facts, not opinions of the other company`).not.toMatch(/rip-?off|scam|overpriced|greedy|they hide|nobody uses|terrible|worse|junk|\bcheapest\b|#1|\bbest\b/i);
+        expect(all, `${f}: a comparison says the plans differ`).toMatch(/different features|features differ|not the same features|tools we (do not|don.t) have/i);
+      }
       // Demo identities only: typed emails are example.com, typed phones are 555-01xx.
       for (const s of script.steps.filter((x) => x.action === "type" && x.value)) {
         for (const email of s.value!.match(/[\w.+-]+@[\w.-]+/g) ?? []) expect(email, f).toMatch(/@(?:[\w-]+\.)*example\.com$/);

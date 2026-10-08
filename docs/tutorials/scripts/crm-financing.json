@@ -1,0 +1,139 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-financing",
+  "title": "Offer financing",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Add your lender's link",
+      "narration": "If you offer financing through a lender, you can put their link in front of your clients."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-financing\"] >> text=Financing links",
+      "caption": "Financing links",
+      "narration": "In Settings, at the end of Payments, find Financing links."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-financing-label\"]",
+      "value": "Apply for financing",
+      "caption": "The label",
+      "narration": "Type the words your client will see."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-financing-url\"]",
+      "value": "https://example.com/apply-for-financing",
+      "caption": "The lender's link",
+      "narration": "Then paste the link your lender gave you."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-financing\"]",
+      "caption": "Add link",
+      "narration": "Choose Add link.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"pill-primary-financing-0\"]",
+      "caption": "Primary",
+      "narration": "It is saved and marked Primary. The primary link is the one your clients see."
+    },
+    {
+      "action": "wait",
+      "caption": "Up to ten links",
+      "narration": "You can keep up to ten links, and choose which one is primary.",
+      "holdMs": 300
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com"
+      },
+      "caption": "The client's portal",
+      "chapter": "What your client sees",
+      "narration": "Now your client's screen. This is their portal."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"financing-link-0\"]",
+      "caption": "Financing in the portal",
+      "narration": "Under Financing, they find your link, with an Apply button."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"action-estimate-\"]",
+      "caption": "Open the estimate",
+      "narration": "It is on the estimate too. They open the one you sent.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"badge-financing-available\"]",
+      "caption": "Financing available",
+      "narration": "The estimate is marked Financing available."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-financing\"]",
+      "caption": "Finance this project",
+      "narration": "And further down is the link itself: Finance this project."
+    },
+    {
+      "action": "session",
+      "url": "/crm/settings",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "When they click",
+      "narration": "Back on your screen, in Settings.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Financing interest",
+      "caption": "Financing interest alert",
+      "narration": "Under Notifications, Financing interest alerts you when a client clicks the financing option."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "Financing links are in Settings, near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to offer financing on your estimates | ConstructHUB CRM",
+    "description": "Add your lender's link in ConstructHUB CRM Settings and your clients see a financing option in their portal and on your estimates. You are alerted when a client clicks it. Recorded in a demo workspace with a made-up client and an example link.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor financing",
+      "customer financing",
+      "financing link",
+      "estimates",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Offer financing",
+    "accent": "financing",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

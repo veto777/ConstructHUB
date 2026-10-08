@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-create-menu",
+  "durationSec": 62,
+  "video": {
+    "key": "tutorials/crm-create-menu.625812c5.mp4",
+    "bytes": 4249095,
+    "sha256": "625812c58c420f6c5ae0b18fec63c00cfaa5a700f09fb655a2ffca26ad7f6e8b"
+  },
+  "captions": {
+    "key": "tutorials/crm-create-menu.aef7f029.vtt",
+    "bytes": 1180,
+    "sha256": "aef7f02902ea06e6ecfb41c856e6c7189f1d8bc783708baa050da41d67e3ac6d"
+  },
+  "poster": {
+    "key": "tutorials/crm-create-menu.966e24d6.jpg",
+    "bytes": 93014,
+    "sha256": "966e24d64018d0a730417aed770132af1e1032a8314277e9467051e21113bd3b"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:09:34.471Z",
+    "video": "13e1b6d7d5cf8985a1c924dfd323775f",
+    "captions": "8a905181ccb3227cb5c45ba8a58638da",
+    "poster": "fb880a69de4f71ddc088a29855cf3305"
+  }
+}

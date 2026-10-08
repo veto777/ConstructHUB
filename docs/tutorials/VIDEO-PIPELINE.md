@@ -18,6 +18,9 @@ npx tsx scripts/tutorials/produce.ts <helpKey> --slot N --no-upload   # ~4 min; 
 npx tsx scripts/tutorials/upload.ts <helpKey>                          # the inspected files → R2, then the manifest
 ```
 
+`produce.ts <helpKey> --from-raw` finishes a capture that is already in the out folder (mux → thumbnail
+→ check) without recording again: the capture is kept until those have passed.
+
 `produce.ts` runs: fresh recording database `constructhub_tut_slot<N>` → the app for that slot on
 port 8180+N → warm-up → `narrate.ts` → `record.ts` → `mux.ts` → `thumbnail.ts` → `check.ts` →
 (`upload.ts`, unless `--no-upload`) → app stopped by its listening pid → database dropped → raw
@@ -37,14 +40,16 @@ orange with the mascot.
 
 | Piece | Where |
 | --- | --- |
-| One command per video | `scripts/tutorials/produce.ts <helpKey> [--slot 1-4] [--no-upload] [--keep-raw]` |
+| One command per video | `scripts/tutorials/produce.ts <helpKey> [--slot 1-8] [--no-upload] [--keep-raw] [--no-fixtures]` |
 | Recording databases: `template`, `reseed` (new demo rows into the existing template, one transaction — safe beside running producers), `fresh <name>`, `drop <name>`, `list`, `mode` — names must match `/^constructhub_tut_[a-z0-9_]+$/`, server must be 127.0.0.1:5432 (5433 is production) | `scripts/tutorials/db.ts` |
 | The demo workspace: "Aspire Interiors" (Sarasota FL), owner "Demo Account" | `scripts/seed-crm-demo.ts` + `scripts/tutorials/seed-demo.ts` (a CRM plan, six team members, a week of appointments around today, message threads, six JobCam colour cards, payments in several states, and — since 2026-10-07 — four clients in New York and four in Texas with their own jobs, documents, visits and messages: the list is "Demo data" in `PRODUCER-GUIDE.md`; moves every date forward to today on each fresh copy) |
 | The app for a slot: dev server on 8180+N, signed in as user 1, environment built from nothing (no SMTP, SignalWire, Stripe, Google, HOVER, R2 or voice keys; `EMAIL_FORCE_SINK=1`; `SEO_JOBS_DISABLED=true`; no edge or GBP worker); `up N` / `down N` for operating by hand | `scripts/tutorials/app.ts` |
 | Machine-wide locks under `/tmp/claude-1000/constructhub-tutorials/`: `tts.lock` (one voice request at a time, 250 ms pause, shared clip cache `tts-cache/`), `encode.lock` (one ffmpeg at a time, `nice -n 10`, `-threads 4`), `slot<N>.lock` | `scripts/tutorials/lib.ts` (`withLock`, `run`) |
+| Tutorial fixtures: stand-ins for Stripe, HOVER, Google Calendar, texting and the recipient's inbox, in a recording slot only (gate, registry, providers); the fixture rows; the demo files an `upload` step may use | `server/tutorials/fixtures/`, `scripts/tutorials/seed-fixtures.ts`, `scripts/tutorials/assets/` + `gen-assets.ts` — **`docs/tutorials/FIXTURES.md`** |
 | Intro card, end card and the YouTube thumbnail (our artwork, bundled Anton font) | `scripts/tutorials/brand.ts`, `thumbnail.ts`, `assets/` |
 | One manifest file per video + one file per new help entry, collected through generated indexes (`merge=union`) | `shared/help/videos/`, `shared/help/entries/<group>/`, `scripts/tutorials/gen-index.ts` |
 | YouTube metadata per video; the scheduler that posts three a day through YouTube's own scheduled publishing, with its ledger, order and calendar | `youtube.json` from `mux.ts`; `scripts/tutorials/youtube-schedule.ts`, `server/youtube/schedule.ts`, `docs/tutorials/youtube-{schedule,order}.json`, `youtube-calendar.md` — see "Publishing to YouTube" in `PRODUCER-GUIDE.md` |
+| Phone cuts of a master (9:16 ≤ 59 s and 4:5, action-follow crop, burned-in word captions, covers, per-platform post text), their hosting in R2 and the Blotato cross-poster with its allowlist, denylist and ledger | `scripts/tutorials/social.ts`, `social-lib.ts`, `social-brand.ts`, `social-text.ts`, `social-upload.ts`, `social-post.ts`, `social-post-lib.ts`, `docs/tutorials/social-schedule.json` — see "Social cuts" and "Posting to social" in `PRODUCER-GUIDE.md` |
 
 **Recording databases are schemas today.** The intended design is `CREATE DATABASE <name> TEMPLATE
 constructhub_tut_template`. The dev role (`constructhub_dev`) has no CREATEDB on vb11 and
@@ -76,11 +81,31 @@ text; nothing new is recorded that way. The 1080p master is also the in-app file
 | Step-script type (zod) and its JSON Schema twin | `shared/help/step-script.ts`, `shared/help/step-script.schema.json` |
 | Step scripts | `docs/tutorials/scripts/` — `database-directory`, `crm-clients`, `crm-create-estimate`, `crm-schedule` (recorded), `cloudflare.connections` (example, not recorded) |
 | The tools | `scripts/tutorials/` (`npx tsc -p scripts/tutorials/tsconfig.json` type-checks them) |
-| Tests that keep all of it honest | `server/help-registry.test.ts`, `server/tutorials/media.test.ts`, `server/tutorials/production-line.test.ts` |
+| Tests that keep all of it honest | `server/help-registry.test.ts`, `server/tutorials/media.test.ts`, `server/tutorials/production-line.test.ts`, `server/tutorials/recorder-actions.test.ts`, `server/tutorials/fixtures/fixtures.test.ts` |
 
-What does **not** exist yet: demo Cloudflare / Google connections, a Stripe test account and a HOVER
-sandbox for the demo workspace (owner inputs), any Higgsfield integration, YouTube credentials, a
-drag action and a file-upload action in the recorder, and the other videos.
+What does **not** exist yet: fixtures for the platform providers (Google Business Profile, Google Ads,
+Search Console beyond its skeleton, Cloudflare, SEO data, Site Scan), a signed-out second session (the
+slot signs every visitor of the CRM in as the demo owner), any Higgsfield integration, YouTube
+credentials, and the other videos.
+
+## Connected accounts without accounts — the tutorial fixtures
+
+The demo workspace has no Stripe, HOVER, Google or carrier account and the owner will not create any
+(2026-10-08). In a recording slot, and only there, `server/tutorials/fixtures/` stands in for those
+providers at the narrowest seam the feature code already has — the Stripe client, HOVER's base URLs,
+the calendar's `fetch`, the carrier's `fetch`, the email sink — so the real pages and the real server
+logic run. `FIXTURES.md` is the reference: the safety gate (the app refuses to boot with fixtures
+anywhere but a slot; the production build cannot enable them), what each fixture simulates, the helper
+actions, and what must never be fixtured (government data, a real company or person, a provider's own
+screens, results).
+
+**Adding a platform provider** follows one recipe (`FIXTURES.md` → "Adding a provider"), and
+`providers/search-console.ts` is the worked skeleton — property `gatorbuilders-demo.example`, 28 days
+of fixed performance rows, a `fetch` that answers Search Console's endpoints — written and tested but
+not wired in: (1) pass its `fetch` where `SearchConsoleClient` / `gscToken` take one, (2) write the
+`edge_connections` row for the demo owner in an `onBoot` hook, (3) add the seam to the test's list,
+(4) operate the page, then script it. Google Business Profile, Google Ads and Cloudflare get the same
+four steps; none is built.
 
 ## The five stages
 
@@ -111,6 +136,11 @@ e2e suite lives in `e2e/`).
   screencast — every frame, at device pixels, copied as JPEG into `raw.mkv` (Playwright's
   `recordVideo` and an emulated device scale both film at CSS size, which would make the 1080p an
   upscale) — and plays the steps in order.
+- **Whole-page loads are not filmed blank.** When the page on camera asks for a new document (a link
+  out of the app, Back, the redirect through checkout), the recorder stops writing frames — the video
+  holds the last picture — until the new page has drawn. Only the session on camera is filmed.
+- **A target in a dialog's bottom row** would sit under the captions and a dialog cannot scroll: the
+  recorder moves the dialog (or bottom sheet) up just enough, before the ring is drawn.
 - **Cursor overlay and highlight rings:** a headless capture does not show the mouse pointer. The
   recorder injects (`context.addInitScript`) a small overlay: a cursor element that follows
   `mousemove`, a ripple on every click, and a ring that tracks its target element frame by frame
@@ -120,7 +150,13 @@ e2e suite lives in `e2e/`).
   the recorder only — it never ships in the app. A target in the bottom 17% of the page — where
   captions are drawn — is scrolled up first; one that cannot scroll is reported.
 - **Per-step behaviour** (`action` in the script): `goto` · `highlight` (ring, no click) · `hover` ·
-  `click` · `type` · `select` · `press` · `scroll` · `wait` · `back`. `selector` is a Playwright selector
+  `click` · `type` · `select` · `press` · `scroll` · `wait` · `back` · `upload` (demo files from
+  `scripts/tutorials/assets/`) · `drag` (pointer drag; the carried card is drawn) · `session` (another
+  person's browser: the homeowner, or a team member really signed in) · `fixture` (a fixture helper of
+  the slot app) · `wait-for` (text / selector, with a timeout) · `scroll-to` (bring a card of a long page under the
+  header) · `card` (a full-screen brand card, overview films only) — `PRODUCER-GUIDE.md` has the table.
+  A click may answer the page's own confirm box (`dialog`), a highlight may push in on its target
+  (`punch`), and a script's `redactSelectors` are blurred from page load, before they first paint. `selector` is a Playwright selector
   (`[data-testid="…"]`, `role=button[name="…"]`, `label:has-text("…") input`, `text=…`).
   `narration` is what the voice says, and it is also the captions track (`captions.vtt`);
   `caption` is the step's short label (the recorder's log and `timings.json`; it is not drawn on
@@ -154,8 +190,9 @@ e2e suite lives in `e2e/`).
   `{{PLACEHOLDER}}` values (the example uses `{{DEMO_CLOUDFLARE_EMAIL}}`,
   `{{DEMO_CLOUDFLARE_GLOBAL_KEY}}`, `{{DEMO_ZONE_NAME}}`) that the recorder fills from its
   environment at record time, and mark those steps `redact: true` (the test suite enforces both).
-  Do not stub API responses to fake a connected account, and never record against production or
-  a real client's data.
+  Do not stub API responses in the recorder or the page to fake a connected account — a connected
+  account in a recording comes from the tutorial fixtures (`FIXTURES.md`), behind their gate, at the
+  provider seam, or not at all — and never record against production or a real client's data.
 - The CRM renders only on its own host name: the recorder maps `portal.constructhub.us` (and
   `client.constructhub.us`) to 127.0.0.1 for its browser, and `produce.ts` browses
   `http://portal.constructhub.us:<port>` for a CRM entry.
@@ -260,6 +297,62 @@ R2 is the app's object store in production (env `R2_ENDPOINT`, `R2_ACCESS_KEY_ID
 - Upload, then build, `rsync` and restart as in `HANDOFF.md`. Check `/tutorials` and the feature's
   "i" panel on a desktop and on an iPhone (not yet done for the first video — see below).
 
+## Pronunciation, the fallback flash, and repairing finished masters (2026-10-08)
+
+The owner watched the videos and reported two defects. Both are now refused by the line, and
+finished masters are repaired without recording again.
+
+**"con-STRUCT hub", not "CON-struct hub" — the pronunciation lexicon** (`scripts/tutorials/lexicon.ts`).
+The engine's text front end reads "construct" as a noun or a verb from the sentence around it:
+"Welcome to ConstructHUB" came out right, "in the ConstructHUB CRM" came out as the noun — in all 15
+lines that said the name. Respellings ("Construct Hub", "construct hub", "Konstruct Hub",
+"kun-struckt hub", "Con struct Hub") were each measured wrong in at least one of four test sentences.
+What is right in every one is inline phoneme markup, which the engine passes through:
+`[Construct](/kənstɹˈʌkt/) Hub`. Measured (syllable length, first-vowel quality, pitch — the numbers
+are in the file's header) and still heard as "Construct Hub" by a speech recogniser.
+
+- The lexicon is applied **at narration time only** (`narrate.ts` → `spokenText`). The script, the
+  captions, `narration.json`, titles and descriptions keep the spelling "ConstructHUB".
+- The clip cache is keyed on the lexicon's version for a line it changes (and on the old key for a
+  line it leaves alone), so a new version speaks every affected line again and nothing else.
+- A brand name in a spelling the lexicon does not know ("Con struct HUB", "ConstruktHub"), or phoneme
+  markup typed into a script, stops `narrate.ts` and fails `check.ts`. Write "ConstructHUB".
+- Heard and right as written, no entry needed: CRM, JobCam, HOVER, CHUB, SKU, API, CSV, SMS, ZIP, PDF,
+  PNG, JPG, D.C., "dot U S", e-signature. A new term: say it through `narrate.ts`, listen or
+  transcribe, add an entry only if it is wrong, bump `LEXICON_VERSION`.
+
+**The static fallback page** ("ConstructHUB … Privacy Policy · Terms of Use"). A browser showed
+`client/index.html`'s crawler fallback on every full page load until the app mounted — in the product,
+and so in recordings with a whole-page load (Preview, Back, a link out of the app).
+
+- The product no longer shows it to a browser that runs the app (`client/index.html`: a mark set
+  before first paint hides it and shows the app's own loading state; `server/boot-fallback.test.ts`,
+  `e2e/boot-fallback.spec.ts`). Without JavaScript and in the HTML source it is unchanged.
+- The recorder holds the previous frame through a page load (since `video-fixtures`).
+- `check.ts` reads **every frame** of the finished video (`flash.ts`) and fails on a single frame of
+  the fallback — compared with the fallback as this machine draws it at the recording's size — or on a
+  page that is one flat colour for more than 200 ms, between the two cards.
+
+**Repairing a finished master** — nothing is recorded again, the old files are not touched:
+
+```bash
+npx tsx scripts/tutorials/deflash.ts <folder>/walkthrough.mp4          # picture only → <folder>/deflash/
+npx tsx scripts/tutorials/remaster.ts <helpKey> --out-dir <folder>     # + lexicon lines → <folder>/remaster/
+npx tsx scripts/tutorials/remaster.ts --all [--first k,k] [--upload]   # every producer checkout on this box
+```
+
+`deflash.ts` holds the last good frame over each span: same frame count, same length, sound copied,
+one encode at the master's settings. `remaster.ts` does that and, when a line's spoken text changes
+under the lexicon, rebuilds the narration track from the clips the master was made of (each checked
+against the sha256 in `narration.json`) with the new clip in its place: a longer clip extends its step
+by holding the step's last frame, a shorter one leaves silence; captions and YouTube chapters are
+timed again. A video with neither defect is left alone. The result is a whole out-folder with a
+`remaster.json` and a `span-NN@….jpg` strip per repaired span (old above new) — **look at them**.
+`--upload` puts the new files in R2 (`upload.ts --manifest-dir`: create-only, new hashed names) and
+writes the manifest into a staging folder, never into a checkout, with a `remaster-report.json`; an
+integrator applies the manifests. `--all` skips a folder a producer may still be writing (no
+`video.json`, or changed in the last 15 minutes).
+
 ## Step scripts
 
 Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse with
@@ -274,7 +367,21 @@ Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse w
 | `youtube` | `title` (≤ 70), `description`, `tags` (≤ 12), `playlist`, `category`. |
 | `thumbnail` | `headline` (2–5 words), `accent`, `kicker`, `step`. |
 | `narrator` | Persona id; `"janice"` by default. |
-| `steps[].action` | `goto` · `highlight` · `hover` · `click` · `type` · `select` · `press` · `scroll` · `wait` · `back`. |
+| `redactSelectors` | Plain CSS selectors blurred on every page of the recording from page load (a key shown right after "Create"). |
+| `steps[].action` | `goto` · `highlight` · `hover` · `click` · `type` · `select` · `press` · `scroll` · `wait` · `back` · `upload` · `drag` · `session` · `fixture` · `wait-for` · `scroll-to` · `card`. |
+| `steps[].offset` | `scroll-to`: px under the top of the window where the target comes to rest (default 84). |
+| `steps[].card` | `card`: `kicker`, `headline`, `accent`, `stat` or two `columns`, `footnote`, `mascot` (`scripts/tutorials/card.ts`). A card that shows a price needs a dated footnote. |
+| `steps[].dialog` | `click`: `accept` / `dismiss` the page's own `window.confirm`. |
+| `steps[].punch` | `highlight` / `hover`: push in on the target (1.1–1.8) for that step. |
+| `hideSelectors` | Plain CSS selectors not drawn (space kept) on every page — a mark that may not appear in a film. |
+| `before` | Fixture helpers run before the camera starts (`auth.unfinishedSetup`). |
+| `showLinkAddress` | Draw an outside link's address bottom-left while the pointer is on it (off by default). |
+| `youtube.sources`, `youtube.names` | Overview films: where another company's figures were read (label, url, date), and the companies named — printed in the description. |
+| `steps[].files` | `upload`: demo files under `scripts/tutorials/assets/` (`photos/site-02.jpg`). |
+| `steps[].to` | `drag`: the selector to drop on. |
+| `steps[].session` | `session`: `owner`, `client` or `member:<Display Name>`; opens at `url`, or at the address a `fixture` hands over. |
+| `steps[].fixture`, `input`, `open` | `fixture`: the helper (`stripe.settle`, `email.link`, …), what it takes, and whether to open the address it answers with. |
+| `steps[].text`, `state`, `timeoutMs` | `wait-for`: text to wait for (and/or `selector`), `visible` or `hidden`, up to how long. |
 | `steps[].chapter` | Starts a YouTube chapter with this name. |
 | `steps[].selector` | Playwright selector of the target (not for `goto`, `wait`, `press`). |
 | `steps[].url` | `goto` only: a root-relative path. |
@@ -325,12 +432,12 @@ permissions line, the "Connections" list heading and `tab-connection-work-queue`
 1. Produce the CRM plan (`CRM-VIDEO-PLAN.md`): four batches, one producer per slot.
 2. Grant the dev role CREATEDB (or pre-create the databases) so recording databases are real
    databases, as designed; then test `db.ts` in database mode.
-3. Owner inputs: a Stripe test-mode account and a HOVER sandbox for the demo workspace (three BLOCKED
-   videos), a demo Cloudflare account and a
-   demo Google account for the platform videos, and (only if wanted) Higgsfield.
-4. Recorder: a drag action (pipeline), a file-upload action (imports, logo), the client host with its
-   one-time code (the homeowner's side of an estimate).
+3. Owner inputs: only (if wanted) Higgsfield. No provider account is needed any more: the CRM's are
+   fixtured (`FIXTURES.md`); YouTube is connected and the scheduler posts (see `PRODUCER-GUIDE.md`).
+4. Platform fixtures, one provider at a time from the Search Console skeleton: Search Console, Google
+   Business Profile, Google Ads, Cloudflare, SEO data, Site Scan. And a signed-out second session, for
+   the invited team member's side.
 5. Deploy this branch and play a video on a real iPhone — Range/206 is implemented and tested, but
-   only desktop Chromium has played them. Listen to the narration once by ear: the tools measure
-   level and timing, not pronunciation.
+   only desktop Chromium has played them. Listen to a new brand or product term once by ear before
+   it goes in a script (the lexicon section says how).
 6. Re-record Database Directory in the house framing (it is still the 1280×720 original).

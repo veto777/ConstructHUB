@@ -1,0 +1,101 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-migrate-assisted",
+  "title": "Ask us to move your data for you",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/migrate",
+      "caption": "Import",
+      "chapter": "The hands-on option",
+      "narration": "Would you rather not move your data yourself? You can ask our team to do it."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=We'll pull it for you",
+      "caption": "A person moves your data",
+      "narration": "At the bottom of the Import page is the hands-on option. A person moves your data, and checks it with you."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-assisted-system\"]",
+      "caption": "Which system are you on?",
+      "narration": "First, say which system you are leaving."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-assisted-system\"]",
+      "value": "Something else",
+      "caption": "Something else",
+      "narration": "Pick it from the list. If yours is not there, choose Something else."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"textarea-assisted-note\"]",
+      "value": "Spreadsheets and paper files, about 300 clients.",
+      "caption": "A note",
+      "chapter": "Send the request",
+      "narration": "Add a note about what you have, like how many clients."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-request-assisted\"]",
+      "caption": "Request a hands-on migration",
+      "narration": "Then choose Request a hands-on migration.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-assisted-confirmation\"]",
+      "caption": "Request received",
+      "narration": "The request is emailed to our team, and the page confirms it was received."
+    },
+    {
+      "action": "wait",
+      "caption": "Keep your old account",
+      "narration": "Keep your old account active until everything has been checked.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-entity-customers\"]",
+      "caption": "Or import a file yourself",
+      "chapter": "Or do it yourself",
+      "narration": "If you have a spreadsheet, you can also import it yourself, higher up on this page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "You reach this page from Import, on the Clients page."
+    }
+  ],
+  "youtube": {
+    "title": "How to ask for a hands-on data migration | ConstructHUB CRM",
+    "description": "Switching to the ConstructHUB CRM from another system? On the Import page you can ask our team to move your data for you: say which system you are leaving, add a note, and send the request. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "switch CRM",
+      "data migration",
+      "import clients",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "We move your data",
+    "accent": "data",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

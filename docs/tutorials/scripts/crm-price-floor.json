@@ -1,0 +1,146 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-price-floor",
+  "title": "Stop bids going below your floor",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Turn on the lock",
+      "narration": "A price floor stops your team from bidding below the prices you set."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-price-lock\"] >> text=Price floor lock",
+      "caption": "Price floor lock",
+      "narration": "In Settings, scroll down to Price floor lock. Only the owner sees this card."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-price-lock\"]",
+      "caption": "Lock pricing",
+      "narration": "Switch on Lock pricing.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-price-lock\"] >> text=/The floor is each price-book/",
+      "caption": "What the floor is",
+      "narration": "The floor is the current price of each item in your price book."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-price-floor-bps\"]",
+      "caption": "Or a margin over cost",
+      "narration": "Or type a margin here, to set the floor at cost plus that percent."
+    },
+    {
+      "action": "session",
+      "url": "/crm/estimates/new",
+      "session": "member:Priya Shah",
+      "caption": "A sales rep's screen",
+      "chapter": "What a rep sees",
+      "narration": "Now a sales rep's screen. Priya is writing a new estimate."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder^=\"Search clients\"]",
+      "value": "Wrenhaven",
+      "caption": "Pick the client",
+      "narration": "She finds the client."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Wrenhaven Dental Studio\")",
+      "caption": "Wrenhaven Dental Studio",
+      "narration": "Wrenhaven Dental Studio, in White Plains.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-search\"]",
+      "value": "cabinet",
+      "caption": "Search the price book",
+      "narration": "And searches the price book for the work."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-row-\"]:has-text(\"Cabinet refinishing\") [data-testid^=\"button-add-\"]",
+      "caption": "Add the item",
+      "narration": "The item comes in at its price book price.",
+      "holdMs": 800
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-price-\"]",
+      "value": "3200",
+      "caption": "A lower price",
+      "narration": "To win the job, she types a lower price."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review\"]",
+      "caption": "Review",
+      "narration": "She chooses Review.",
+      "holdMs": 800
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send\"]",
+      "caption": "Send estimate",
+      "narration": "And then Send estimate.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "li[role=\"status\"]:has-text(\"Price lock\")",
+      "caption": "Refused",
+      "narration": "The CRM refuses. The message names the item, and the floor it cannot go below."
+    },
+    {
+      "action": "session",
+      "url": "/crm/pricebook",
+      "session": "owner",
+      "caption": "The owner is not locked",
+      "chapter": "You stay in control",
+      "narration": "Back on your own screen. As the owner, you can still change prices and discounts at any time.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "Price floor lock is in Settings, near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to stop bids going below your price floor | ConstructHUB CRM",
+    "description": "Protect your margin in the ConstructHUB CRM. Switch on Price floor lock in Settings and your team can price at or above your price book, never below. See what a sales rep sees when an estimate goes under the floor. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "price floor",
+      "protect margins",
+      "estimate pricing",
+      "sales team",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Lock prices",
+    "accent": "Lock",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

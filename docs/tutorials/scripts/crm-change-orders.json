@@ -1,0 +1,122 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-change-orders",
+  "title": "Write a change order",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the job",
+      "narration": "A client wants extra work in the middle of a job. Here's how to write a change order."
+    },
+    {
+      "action": "click",
+      "selector": "a:has-text(\"Kane — whole-house hardwood\")",
+      "caption": "Open the job",
+      "narration": "On the Pipeline, find the job and open it.",
+      "holdMs": 1500
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Revised contract\"]/..",
+      "caption": "Revised contract",
+      "narration": "Revised contract is the job's price, and it says how much of that is change orders."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=/Change orders/i]",
+      "caption": "Change orders tab",
+      "narration": "Choose the Change orders tab."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"co-row-\"]:has-text(\"CO-2001\")",
+      "caption": "An approved change order",
+      "narration": "This job already has one, and the client has approved it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-co-title\"]",
+      "value": "Add stair nosing, 14 treads",
+      "caption": "Title",
+      "chapter": "Add the change order",
+      "narration": "To add another, type a title that says what's changing."
+    },
+    {
+      "action": "type",
+      "selector": "xpath=//label[normalize-space()=\"Amount $\"]/following-sibling::input",
+      "value": "980",
+      "caption": "Amount",
+      "narration": "Type the amount."
+    },
+    {
+      "action": "type",
+      "selector": "xpath=//label[normalize-space()=\"+Days\"]/following-sibling::input",
+      "value": "1",
+      "caption": "Extra days",
+      "narration": "Days is how much longer the job will take. This one adds a day."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-co\"]",
+      "caption": "Add",
+      "narration": "Choose the plus button to add it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"co-row-\"]:has-text(\"stair nosing\")",
+      "caption": "A draft with its number",
+      "chapter": "Send it for approval",
+      "narration": "The change order gets its own number, and starts as a draft."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"co-row-\"]:has-text(\"stair nosing\") [data-testid^=\"button-send-co-\"]",
+      "caption": "Mark sent & copy link",
+      "narration": "Mark sent and copy link marks it sent, and copies the client's approval link for you to share."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=An approved CO adjusts the contract value and the schedule together.",
+      "caption": "Approved: contract and schedule adjust",
+      "narration": "Once the client approves, the contract value and the schedule adjust together."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "You'll find your jobs under Pipeline in the menu.",
+      "holdMs": 600
+    }
+  ],
+  "youtube": {
+    "title": "How to write a change order | ConstructHUB CRM",
+    "description": "A short walkthrough of change orders in the ConstructHUB CRM. You will open a job from the Pipeline, add a change order with its amount and extra days on the Change orders tab, and see where to mark it sent and copy the client's approval link.",
+    "tags": [
+      "change order",
+      "construction change order",
+      "contractor software",
+      "job costing",
+      "project management",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Extra work? Change order",
+    "accent": "change",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}

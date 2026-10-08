@@ -1,0 +1,118 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-messages",
+  "title": "Messages",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/inbox",
+      "caption": "Messages",
+      "chapter": "The inbox",
+      "narration": "Messages keeps every client conversation in one place. Here is how to answer one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"inbox-thread-list\"]",
+      "caption": "Threads",
+      "narration": "There is one thread per client, with the newest on top."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"thread-unread-\"]",
+      "caption": "Unread",
+      "narration": "A number on a thread means a message is waiting for you."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"thread-\"]:has-text(\"Luis Orozco\")",
+      "caption": "Open the thread",
+      "chapter": "Read and reply",
+      "narration": "Click the thread to open it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"message-demo-msg-04\"]",
+      "caption": "The client's message",
+      "narration": "Luis is asking about a lighter oak colour."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-inbox-reply\"]",
+      "value": "Yes. I will bring three lighter oak samples to our next visit.",
+      "caption": "Reply",
+      "narration": "Type your reply in the box under the conversation.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-inbox-send\"]",
+      "caption": "Send",
+      "narration": "Then send it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"message-\"]:has-text(\"lighter oak samples\")",
+      "caption": "Reply sent",
+      "narration": "Your reply is in his client portal, and a copy went to his email."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-inbox-activity\"]",
+      "caption": "Client activity",
+      "chapter": "Client activity",
+      "narration": "The Client activity tab shows what your clients are doing.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"activity-feed\"]",
+      "caption": "Activity feed",
+      "narration": "Payments are listed here, newest first."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-inbox-messages\"]",
+      "caption": "Messages tab",
+      "narration": "Choose Messages to go back to the threads.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Menu: Messages",
+      "narration": "You'll find Messages in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to answer client messages | ConstructHUB CRM",
+    "description": "A short walkthrough of Messages in the ConstructHUB CRM. You will open a thread with an unread message, reply to the client, and look at the Client activity tab.",
+    "tags": [
+      "client messages",
+      "client communication",
+      "customer inbox",
+      "contractor inbox",
+      "client portal",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Answer clients fast",
+    "accent": "fast",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

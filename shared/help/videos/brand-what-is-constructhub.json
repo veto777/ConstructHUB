@@ -1,0 +1,25 @@
+{
+  "helpKey": "brand-what-is-constructhub",
+  "durationSec": 61,
+  "video": {
+    "key": "tutorials/brand-what-is-constructhub.7e459284.mp4",
+    "bytes": 8412828,
+    "sha256": "7e459284003ee7913e9a3f5d327df807f06d791c5b6b60f121f2fed89cd9fdad"
+  },
+  "captions": {
+    "key": "tutorials/brand-what-is-constructhub.80624115.vtt",
+    "bytes": 1535,
+    "sha256": "80624115b0ebdbe42c688dca038204f3f244df406954c26259fc1aaddf93ec77"
+  },
+  "poster": {
+    "key": "tutorials/brand-what-is-constructhub.465c6b56.jpg",
+    "bytes": 61786,
+    "sha256": "465c6b565ea5fe29246d12dd262d986fc46ccec18301f7c50f750a1c7b0032db"
+  },
+  "uploaded": {
+    "at": "2026-10-08T06:10:58.175Z",
+    "video": "1183df61e1e7a0f06ad323431d982776",
+    "captions": "e47ca9e797c5524ca3e89e1f87b15ac9",
+    "poster": "3fbcffa87a6103b623c0ad209fa98c26"
+  }
+}

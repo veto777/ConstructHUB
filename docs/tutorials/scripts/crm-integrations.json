@@ -1,0 +1,113 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-integrations",
+  "title": "Integrations tour",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/integrations",
+      "caption": "Integrations",
+      "chapter": "Measurements and leads",
+      "narration": "Integrations is where the CRM connects to the other tools you use. Here is each card."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-hover\"]",
+      "caption": "HOVER measurements",
+      "narration": "First is HOVER, for measurements. Once connected, a completed job lands on the matching client."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"pill-hover-connected\"]",
+      "caption": "Status on every card",
+      "narration": "Every card shows its status. This one reads connected."
+    },
+    {
+      "action": "wait",
+      "caption": "Lead capture",
+      "narration": "Next comes Lead capture. It is a form for your website, and each submission becomes a client.",
+      "holdMs": 300
+    },
+    {
+      "action": "goto",
+      "url": "/crm/integrations#:~:text=Report%20an%20issue",
+      "caption": "The bottom of the page",
+      "chapter": "For your own software",
+      "narration": "At the bottom of the page are two tools for your own software."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-webhook-url\"]",
+      "caption": "Webhooks",
+      "narration": "A webhook tells another system when something happens, like an estimate being approved."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-api-key-name\"]",
+      "caption": "API keys",
+      "narration": "An API key gives a tool read-only access to your data. Create one only when a tool asks for it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-cladai\"]",
+      "caption": "CladAI: coming soon",
+      "chapter": "Payments and calendar",
+      "narration": "Above those, CladAI is marked coming soon. For now, its reports are imported by hand."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-stripe\"]",
+      "caption": "Stripe payments",
+      "narration": "With Stripe payments connected, clients pay invoices online, straight to your Stripe account."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-google-calendar\"]",
+      "caption": "Google Calendar",
+      "narration": "And Google Calendar pushes your schedule to a calendar of its own in Google."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-stripe-payments\"]",
+      "caption": "Open",
+      "narration": "Open, on a card, takes you to the page where that connection is set up."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "caption": "Where to find it",
+      "narration": "Integrations is near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "A tour of the Integrations page | ConstructHUB CRM",
+    "description": "What each card on the ConstructHUB CRM Integrations page connects: HOVER measurements, the lead capture form for your website, Stripe payments, Google Calendar, API keys and webhooks. Recorded in a demo workspace where the accounts are stand-ins.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "CRM integrations",
+      "HOVER",
+      "Stripe payments",
+      "Google Calendar",
+      "webhooks",
+      "API key",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Connect your tools",
+    "accent": "Connect",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

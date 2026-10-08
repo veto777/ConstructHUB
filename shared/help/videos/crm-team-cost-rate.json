@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-team-cost-rate",
+  "durationSec": 49,
+  "video": {
+    "key": "tutorials/crm-team-cost-rate.bd5ea7be.mp4",
+    "bytes": 4279875,
+    "sha256": "bd5ea7beeeca48bcb67b67455d9f9ec539a91c47c5ce02d75e1e8c806604c050"
+  },
+  "captions": {
+    "key": "tutorials/crm-team-cost-rate.01d66afd.vtt",
+    "bytes": 1105,
+    "sha256": "01d66afd1c50b81323d502945d7d9287940529ea0de70b01107f82da86a1d587"
+  },
+  "poster": {
+    "key": "tutorials/crm-team-cost-rate.4e2532c6.jpg",
+    "bytes": 91207,
+    "sha256": "4e2532c6ae379ab120350a889ada667345c4d25ada5f8a3af482680f245b7d3f"
+  },
+  "uploaded": {
+    "at": "2026-10-08T06:13:08.744Z",
+    "video": "1780e2ccf596626cec80d92895c06415",
+    "captions": "7aaa601b91e76d5b79f4ff0e974a7741",
+    "poster": "5309f34396159af3c829ca14437f63dc"
+  }
+}

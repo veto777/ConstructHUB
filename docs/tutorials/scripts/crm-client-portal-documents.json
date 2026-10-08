@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-portal-documents",
+  "title": "Signed contracts and reports in the portal",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Signed contracts",
+      "narration": "After a client signs, their paperwork stays in their portal. Here is where they find it."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "tunde.oyelaran@example.com"
+      },
+      "caption": "The client's portal",
+      "narration": "This is a client's screen. Tunde Oyelaran, in Albany, is signed in to his portal."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-contracts\"]",
+      "caption": "Signed contracts",
+      "narration": "He chooses Signed contracts.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-contracts\"] table",
+      "caption": "What he signed",
+      "narration": "Every estimate he approved is listed, with who signed it, when, and its value."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-contract-\"]",
+      "caption": "Open the contract",
+      "narration": "Choosing the name opens the signed document itself."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-reports\"]",
+      "caption": "Measurement reports",
+      "chapter": "Measurement reports",
+      "narration": "Next in the menu is Measurement reports.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-report-\"] >> nth=0",
+      "caption": "His property's report",
+      "narration": "It holds the measurement report for his property, with its date and roof size."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-report-pdf-\"]",
+      "caption": "3D model and PDF",
+      "narration": "From here he can open the 3D model, or the measurement PDF."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-estimates\"]",
+      "caption": "Estimates",
+      "chapter": "Everything else",
+      "narration": "Estimates keeps every estimate you sent him, with its status.",
+      "holdMs": 800
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-invoices\"]",
+      "caption": "Invoices and receipts",
+      "narration": "And invoices and receipts will collect here, once you send one.",
+      "holdMs": 800
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "narration": "Back in the CRM, you can check any client's portal with See what the client sees.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "That button is on each client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "Where clients find signed contracts and reports | ConstructHUB CRM",
+    "description": "What a client sees in their ConstructHUB CRM portal after they sign: the signed contract, the measurement report for their property with its PDF and 3D model, and every estimate and invoice you sent. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "client portal",
+      "signed contract",
+      "measurement report",
+      "customer portal",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Signed and stored",
+    "accent": "Signed",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pricebook-formulas",
+  "title": "Test a price book formula",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pricebook",
+      "caption": "Price book",
+      "chapter": "The formula tester",
+      "narration": "Some quantities come from a measurement and a little math. The Formulas tab lets you test that math."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=/Formulas/]",
+      "caption": "Formulas",
+      "narration": "In the Price book, open the Formulas tab.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-formula\"]",
+      "caption": "A sample formula",
+      "narration": "A sample formula is filled in. It takes the squares, adds the waste percent, and rounds up."
+    },
+    {
+      "action": "highlight",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"[SQUARES]\")) > input",
+      "caption": "Sample numbers",
+      "narration": "Underneath are sample numbers to test with. Thirty-two squares, and ten percent waste."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-test-formula\"]",
+      "caption": "Test",
+      "chapter": "Try your own numbers",
+      "narration": "Choose Test.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-formula-result\"]",
+      "caption": "The answer",
+      "narration": "The answer is thirty-six, and it names the symbols the formula used."
+    },
+    {
+      "action": "type",
+      "selector": "[role=\"tabpanel\"]:visible div:has(> label:text-is(\"[SQUARES]\")) > input",
+      "value": "45",
+      "caption": "Another case",
+      "narration": "Change a number to check another case."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-test-formula\"]",
+      "caption": "Test again",
+      "narration": "And test again. Forty-five squares come to fifty.",
+      "holdMs": 900
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-formula\"]",
+      "value": "ceil([SQUARES] * 3 * (1 + [WASTE]/100))",
+      "caption": "Your own formula",
+      "chapter": "Write your own",
+      "narration": "You can type your own formula. Symbols go in square brackets."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-test-formula\"]",
+      "caption": "Test it",
+      "narration": "This one counts three for every square, plus waste. Test it.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-formula-result\"]",
+      "caption": "The new answer",
+      "narration": "The tester works it out with the same sample numbers."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Available symbols/",
+      "caption": "Available symbols",
+      "narration": "The line underneath lists every symbol a formula may use, such as squares, linear feet and hours."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Where to find it",
+      "narration": "Formulas is the last tab of the Price book, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to test a price book formula | ConstructHUB CRM",
+    "description": "Check the math before you rely on it. The Formulas tab of the ConstructHUB CRM price book tests a formula with sample measurements: use the sample, change the numbers, or type your own formula with symbols such as squares and waste. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "price book",
+      "pricing formula",
+      "waste factor",
+      "estimating software",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Test your math",
+    "accent": "math",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

@@ -190,7 +190,18 @@ export type NarrationClip = { index: number; text: string; file: string; duratio
 export type NarrationIndex = { helpKey: string; persona: string; sampleRate: number; clips: NarrationClip[] };
 
 /** timings.json — where each step sits in raw.mkv (all times in ms since the recorder's clock started). */
-export type StepTiming = { index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number };
+export type StepTiming = {
+  index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number;
+  /**
+   * Since the social cuts (social.ts): what the step pointed at — the ringed element's box in CSS px
+   * (× zoom = video pixels) where it came to rest, or null for a step without a target; when its ring
+   * was taken away (a click drops it), on the recorder's clock; and the pointer's path as [ms, x, y].
+   * Absent in recordings made before that: social.ts then finds the ring in the frames.
+   */
+  target?: { x: number; y: number; width: number; height: number } | null;
+  ringOffMs?: number | null;
+  cursor?: [number, number, number][];
+};
 export type Timings = {
   helpKey: string; viewport: { width: number; height: number }; base: string; recordedAt: string;
   /** Device scale factor, and the capture's size in pixels (viewport × zoom). */
@@ -234,3 +245,20 @@ export function run(cmd: string, args: string[], opts: { nice?: boolean; quiet?:
     child.on("close", (code) => code === 0 ? resolve({ stdout, stderr }) : reject(new Error(`${cmd} exited ${code}\n${(stderr || stdout).slice(-2000)}`)));
   });
 }
+
+/**
+ * Where to seek to read a video's LAST picture frame, in seconds: half a frame before its timestamp,
+ * so the first frame at or after the seek point is the last one. Counted in frames, not taken from
+ * the file's length — the sound runs a few ms longer than the picture, and "length − 60 ms" landed
+ * past the last frame about one run in five (check.ts: "only N-1 of N frames could be read").
+ */
+export function lastFrameSeekSec(nbFrames: number, fps: number): number {
+  if (!Number.isInteger(nbFrames) || nbFrames < 1 || !(fps > 0)) throw new Error(`cannot place the last frame of ${nbFrames} frames at ${fps} fps`);
+  return Math.max(0, (nbFrames - 1.5) / fps);
+}
+
+/**
+ * The JobCam object store of every recording slot on this machine (the slot app's local mode,
+ * JOBCAM_LOCAL_ROOT): one folder, so the demo photos a seed writes are there for every working copy.
+ */
+export const JOBCAM_STORE = path.join(WORK_DIR, "jobcam-store");

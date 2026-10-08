@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-payment-reverse",
+  "durationSec": 47,
+  "video": {
+    "key": "tutorials/crm-payment-reverse.cad6d3d6.mp4",
+    "bytes": 4169425,
+    "sha256": "cad6d3d64276bc34f4749ee85de2ac441de702911f25d32fb909126daefb11da"
+  },
+  "captions": {
+    "key": "tutorials/crm-payment-reverse.9e12c7d1.vtt",
+    "bytes": 1027,
+    "sha256": "9e12c7d1ccee9a41cc14ad9d0f1719340db118db99d208e699ecc8fbbefa1602"
+  },
+  "poster": {
+    "key": "tutorials/crm-payment-reverse.057bba5a.jpg",
+    "bytes": 100084,
+    "sha256": "057bba5a6b5311993dfaeb120e2f105afc1a6c6f53049e7f0be3b365059eda40"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:40:36.538Z",
+    "video": "259ffd6ff6a91ffb94c6b40560abd7f9",
+    "captions": "2e9456d37c419d02d28c293334ce0586",
+    "poster": "f88e64d01536f973dd61382ae7e80f53"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-portal-signin",
+  "title": "How your client signs in to their portal",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "The email on file",
+      "narration": "Your clients sign in to their portal without a password. Here is what they do."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Hannah Lindqvist\") a",
+      "caption": "Open a client",
+      "narration": "Take one client. Here, Hannah Lindqvist, in Buffalo.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-email\"]",
+      "caption": "The address you have for her",
+      "narration": "Signing in works with the email address you have on file for her."
+    },
+    {
+      "action": "session",
+      "url": "/",
+      "session": "client",
+      "caption": "The portal's sign-in page",
+      "chapter": "Ask for a link",
+      "narration": "Now her screen. This is the portal's sign-in page."
+    },
+    {
+      "action": "type",
+      "selector": "form input",
+      "value": "hannah.lindqvist@example.com",
+      "caption": "Her email address",
+      "narration": "She types that email address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-request-link\"]",
+      "caption": "Email me a sign-in link",
+      "narration": "And chooses Email me a sign-in link.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-link-sent\"]",
+      "caption": "Check your inbox",
+      "narration": "The page tells her to check her inbox. The link works for thirty minutes."
+    },
+    {
+      "action": "fixture",
+      "fixture": "email.link",
+      "input": {
+        "to": "hannah.lindqvist@example.com"
+      },
+      "open": true,
+      "caption": "She opens the link",
+      "chapter": "Signed in",
+      "narration": "She opens the email, and chooses the link in it."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Welcome, Hannah Lindqvist/",
+      "caption": "Signed in",
+      "narration": "She is signed in, under her own name. There is no password to remember."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-portal-root\"] >> [data-testid=\"portal-nav-invoices\"]",
+      "caption": "Her documents",
+      "narration": "Her estimates, invoices, contracts, photos and messages are all in the menu."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "narration": "Back in the CRM, there is nothing for you to set up.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Every client you add under Clients gets a portal."
+    }
+  ],
+  "youtube": {
+    "title": "How clients sign in to their portal, no password | ConstructHUB CRM",
+    "description": "Clients of a contractor using the ConstructHUB CRM sign in to their portal with a link sent to their email address. No password is needed. This walkthrough shows the sign-in from the client's side. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "client portal",
+      "customer portal",
+      "passwordless sign in",
+      "sign-in link",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "No password needed",
+    "accent": "password",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}

@@ -1,25 +1,25 @@
 {
   "helpKey": "crm-schedule-views",
-  "durationSec": 62,
+  "durationSec": 74,
   "video": {
-    "key": "tutorials/crm-schedule-views.4a32b1d4.mp4",
-    "bytes": 4508713,
-    "sha256": "4a32b1d495aac24132d298c200c2c38ef533f3ada6dff743db3cfea1ca7c223e"
+    "key": "tutorials/crm-schedule-views.5673eca1.mp4",
+    "bytes": 5422598,
+    "sha256": "5673eca1c6bd49bc644d4253b05800f90be1ecd2514191e1d64fbaaf5acf6c1e"
   },
   "captions": {
-    "key": "tutorials/crm-schedule-views.61bdb974.vtt",
+    "key": "tutorials/crm-schedule-views.1db08a51.vtt",
     "bytes": 1500,
-    "sha256": "61bdb9749ed9c88cc6100f35b1ec9b8b56e56135f4d194c34107fc7e62c20f1d"
+    "sha256": "1db08a514ad2ab94e038f0ae7590c2c2e2364e738d1d7119309d6fb3fd5c2351"
   },
   "poster": {
-    "key": "tutorials/crm-schedule-views.2ad204aa.jpg",
-    "bytes": 71089,
-    "sha256": "2ad204aa9720a776f9bb4b44b1e6aff2cd4dca4487d47a08bc6e35909f067822"
+    "key": "tutorials/crm-schedule-views.5b048a87.jpg",
+    "bytes": 76085,
+    "sha256": "5b048a87ba0e8bb8fdb567c8f66c096687784c40c39e95b01484712f6163534c"
   },
   "uploaded": {
-    "at": "2026-10-08T00:23:11.105Z",
-    "video": "526323293719754d59fcac7c4dbfd5d5",
-    "captions": "67d1271912c1bd574a69a2410c6c0884",
-    "poster": "22dca310545d1d792211bbdfad8c84b5"
+    "at": "2026-10-08T01:14:58.378Z",
+    "video": "95f6003155cbbee3aeef0ee3e5c188f6",
+    "captions": "93e03090aa5dadd7df43d30cffd0c8b7",
+    "poster": "4400768012867fa55ce3d34490010ed4"
   }
 }

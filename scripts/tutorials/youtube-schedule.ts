@@ -7,6 +7,9 @@
  *   … --retry-thumbnails [--go]      set the thumbnail of every posted video that still lacks one
  *   … --reconcile [--dry]            ask YouTube what each posted video's real state is; update the ledger
  *   … --calendar                     write docs/tutorials/youtube-calendar.md
+ *   … --lint-all                     REPORT (not a test): build the description of every step script in this
+ *                                    checkout AND in every sibling worktree and list what breaks a rule, what is
+ *                                    under the length target, what has no help entry. Exit 2 when a rule is broken.
  *   … --print-description KEY        print the title, description and tags KEY would be uploaded with
  *   … --update-descriptions [KEY…] [--save DIR] [--go]
  *                                    rewrite title, description and tags of videos that are ALREADY posted or
@@ -36,6 +39,9 @@
  *                     customers' own uploads share it.
  *   --replace KEY     upload KEY's new file in place of the one already posted (same slot when it is
  *                     still ahead); the old video id is reported for deletion BY HAND. Repeatable.
+ *   --release KEY     the owner approved KEY: schedule it although its help entry says `youtube: { hold: true }`
+ *                     (the overview films). Without it a held video is listed as "held for owner approval"
+ *                     and never uploaded. Repeatable.
  *   --category N      force a YouTube category (default: youtube.json's categoryId, else 26 Howto & Style).
  *   --include-unmerged  dry run only: also show videos whose manifest is not in this checkout yet.
  *   --ledger FILE, --manifest-dir DIR   for tests and odd layouts.
@@ -53,16 +59,16 @@ import fs from "fs";
 import path from "path";
 import {
   DEFAULT_CATEGORY, DEFAULT_MAX_UPLOADS, DEFAULT_PER_DAY, calendarMarkdown, trackOf, type Track, easternLabel, findCandidates, planSchedule, readLedger, readOrder, reconcile, retryThumbnails,
-  runUploads, textTable, updateDescriptions, zoneTime, type Candidate, type Describe, type Plan,
+  runUploads, textTable, updateDescriptions, zoneTime, manifestShaIn, masterChangedLines, type Candidate, type Describe, type Plan,
 } from "../../server/youtube/schedule";
-import { TITLE_MAX, YT_DESCRIPTION_LIMIT, YT_TAGS_LIMIT, tagsCost } from "../../server/youtube/description";
-import { describeVideo, siblingWorktrees, type DescribeContext } from "../../server/youtube/description-sources";
-import { helpEntry } from "../../shared/help/registry";
+import { DESCRIPTION_TARGET_MIN, TITLE_MAX, YT_DESCRIPTION_LIMIT, YT_TAGS_LIMIT, lintDescription, similarity, tagsCost } from "../../server/youtube/description";
+import { describeVideo, scriptKeys, siblingWorktrees, type DescribeContext, type Described } from "../../server/youtube/description-sources";
+import { heldHelpKeys, helpEntry, holdReason } from "../../shared/help/registry";
 import type { Deps } from "../../server/youtube/client";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const BOOLEANS = ["go", "dry", "retry-thumbnails", "reconcile", "calendar", "include-unmerged", "help"];
-const VALUES = ["out-dir", "start", "per-day", "order", "max", "replace", "category", "ledger", "manifest-dir", "print-description", "save"];
+const BOOLEANS = ["go", "dry", "retry-thumbnails", "reconcile", "calendar", "include-unmerged", "help", "lint-all"];
+const VALUES = ["out-dir", "start", "per-day", "order", "max", "replace", "release", "category", "ledger", "manifest-dir", "print-description", "save"];
 /** Takes any number of help keys after it (none = every video in the ledger). */
 const LISTS = ["update-descriptions"];
 
@@ -116,6 +122,8 @@ function printPlan(plan: Plan, max: number, ledgerCount: number, tracks: Track[]
     if (plan.planned.length > max) console.log(`\nOne run uploads at most ${max} (--max): rows 1–${max} first, the rest on the next run.`);
   } else console.log("Nothing new to schedule.");
   console.log(`\nIn the ledger already: ${ledgerCount} video(s)${plan.alreadyPosted.length ? ` — of the videos found, left alone: ${plan.alreadyPosted.join(", ")}` : ""}`);
+  for (const k of plan.held) console.log(`⏸ ${k}: held for owner approval — not scheduled${holdReason(k) ? ` (${holdReason(k)})` : ""}. To post it: --release ${k}`);
+  for (const line of masterChangedLines(plan)) console.log(line);
   for (const h of plan.hashChanged)
     console.log(`! ${h.helpKey}: the mp4 in ${h.dir} is NOT the file that was uploaded as ${h.videoId} (${h.uploadedSha256.slice(0, 8)} → ${h.fileSha256.slice(0, 8)}). Not re-uploaded. To post the new cut: --replace ${h.helpKey}`);
   for (const p of plan.problems) console.log(`! ${p}`);
@@ -136,6 +144,28 @@ async function main() {
   const go = flags.has("go");
   if (go && flags.has("dry")) throw new Error("--go and --dry together make no sense");
   if (go && flags.has("include-unmerged")) throw new Error("--include-unmerged is for looking only: a video is uploaded after its manifest is merged");
+
+  if (flags.has("lint-all")) {
+    // Every script on this machine — unfinished ones in other people's folders included. A report: it is
+    // NOT part of `vitest` (server/youtube/description.test.ts lints this checkout only, deterministically).
+    const worktrees = siblingWorktrees(ROOT), d = describer(ledgerFile, orderFile, outDirs);
+    const all: Described[] = [], broken: string[] = [], none: string[] = [];
+    for (const k of scriptKeys(worktrees)) {
+      try { const x = await d.full(k); if (x) all.push(x); else none.push(k); } catch (e) { broken.push(`${k}: ${e instanceof Error ? e.message : e}`); }
+    }
+    for (const x of all) for (const bad of lintDescription(x)) broken.push(`${x.helpKey}: ${bad}`);
+    let worst = { s: 0, pair: "" };
+    for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) { const s = similarity(all[i].description, all[j].description); if (s > worst.s) worst = { s, pair: `${all[i].helpKey} ~ ${all[j].helpKey}` }; }
+    if (worst.s >= 0.6) broken.push(`too alike (${worst.s.toFixed(2)}): ${worst.pair}`);
+    const short = all.filter((x) => x.underTarget), noEntry = all.filter((x) => !x.input.entry);
+    console.log(`description lint: ${all.length} scripts in ${worktrees.length} worktree(s) · ${Math.min(...all.map((x) => x.length))}–${Math.max(...all.map((x) => x.length))} characters · ${all.filter((x) => x.variant === "brand").length} brand film(s) · most alike ${worst.s.toFixed(2)} (${worst.pair})`);
+    if (short.length) console.log(`\nUnder ${DESCRIPTION_TARGET_MIN} characters — sent as they are, never padded; add true material to the help entry or the script:\n${textTable(["helpKey", "characters", "script"], short.map((x) => [x.helpKey, String(x.length), x.scriptFile ? path.relative(path.dirname(ROOT), x.scriptFile) : "—"]))}`);
+    if (noEntry.length) console.log(`\nNo help entry found: ${noEntry.map((x) => x.helpKey).join(", ")}`);
+    if (none.length) console.log(`\nNo steps to build from: ${none.join(", ")}`);
+    if (broken.length) { console.log(`\n!!!! ${broken.length} RULE(S) BROKEN:\n${broken.map((b) => `!!!!   ${b}`).join("\n")}`); process.exitCode = 2; }
+    else console.log("\nNo rule broken.");
+    return;
+  }
 
   if (one("print-description")) {
     const d = await describer(ledgerFile, orderFile, outDirs).full(one("print-description")!);
@@ -207,7 +237,7 @@ async function main() {
   const ledger = readLedger(ledgerFile);
   const tracks = readOrder(orderFile);
   const { eligible, skipped } = findCandidates(outDirs, manifestDir, { includeUnmerged: flags.has("include-unmerged") });
-  const plan = planSchedule({ ledger, candidates: eligible, tracks, now: new Date(), start: one("start"), perDay, replace: values.replace ?? [] });
+  const plan = planSchedule({ ledger, candidates: eligible, tracks, now: new Date(), start: one("start"), perDay, replace: values.replace ?? [], held: heldHelpKeys(), release: values.release ?? [], manifestSha: manifestShaIn(manifestDir) });
 
   if (flags.has("calendar")) {
     const file = path.join(path.dirname(ledgerFile), "youtube-calendar.md");
@@ -222,6 +252,15 @@ async function main() {
   const waiting = skipped.filter((s) => !/another copy is used/.test(s.reason) && !ledger.videos.some((e) => e.helpKey === s.helpKey && e.videoId));
   if (waiting.length) console.log(`\nFound but not eligible:\n${textTable(["helpKey", "why", "where"], waiting.map((s) => [s.helpKey, s.reason, s.dir]))}`);
   if (plan.planned.length) console.log(`\nCategory: ${category ?? `youtube.json's categoryId, else ${DEFAULT_CATEGORY}`} · made for kids: no · uploaded private, published by YouTube at the time shown.`);
+
+  // A description that cannot reach the target from its own material is not an error and is not padded: it is flagged here.
+  if (plan.planned.length) {
+    const d = describer(ledgerFile, orderFile, outDirs);
+    for (const p of plan.planned.slice(0, max)) {
+      const x = await d.full(p.helpKey, p.candidate).catch(() => null);
+      if (x?.underTarget) console.log(`! ${p.helpKey}: its description is ${x.length} characters (target ${DESCRIPTION_TARGET_MIN}) — sent as it is, not padded. More true text in its help entry or script lengthens it.`);
+    }
+  }
 
   if (!go) { console.log("\nDRY RUN: nothing was uploaded and the ledger was not touched. Add --go to upload."); return; }
   if (!plan.planned.length) return;

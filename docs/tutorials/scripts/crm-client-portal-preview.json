@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-portal-preview",
+  "title": "See what the client sees",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open the preview",
+      "narration": "Every client has a portal. Before you send them there, look at it the way they will."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Halvorsen-Quist Properties\") a",
+      "caption": "Open the client",
+      "narration": "Open the client. Here, Halvorsen-Quist Properties in San Antonio.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "See what the client sees",
+      "narration": "Under their name is a button called See what the client sees."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "Open the preview",
+      "narration": "Choose it. Their portal opens in a new tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"banner-contractor-preview\"]",
+      "caption": "Contractor preview",
+      "chapter": "What the client finds",
+      "narration": "The banner says this is a contractor preview. It is read-only, so nothing you do here is sent."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-needs-action\"]",
+      "caption": "Needs your action",
+      "narration": "Home starts with what needs their action. Here, an estimate waiting for review."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-estimates\"]",
+      "caption": "Estimates",
+      "narration": "The menu on the left is the client's. Choose Estimates.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-estimate-\"]",
+      "caption": "What you sent",
+      "narration": "They see the estimate you sent, with its status and its total."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-messages\"]",
+      "caption": "Messages",
+      "narration": "Messages shows your conversation from their side.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-contact\"]",
+      "caption": "Contact us",
+      "narration": "And Contact us lists your office, and the person on their job.",
+      "holdMs": 700
+    },
+    {
+      "action": "back",
+      "caption": "Back to the CRM",
+      "chapter": "Send them their link",
+      "narration": "Close the preview, and you are back on the client's page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-copy-portal\"]",
+      "caption": "Copy portal link",
+      "narration": "Copy portal link copies this client's own portal link, to text or email to them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Both buttons are on every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to preview a client's portal | ConstructHUB CRM",
+    "description": "Check a client's portal before they do. In the ConstructHUB CRM, open a client and choose See what the client sees: a read-only preview of their home page, estimates, messages and your contact details. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "client portal",
+      "customer portal",
+      "portal preview",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See their portal",
+    "accent": "portal",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

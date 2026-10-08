@@ -7,8 +7,13 @@
  * a real recording is uploaded (docs/tutorials/VIDEO-PIPELINE.md) — never a placeholder link.
  */
 
-/** The Tutorials page groups features the way the sidebars group them. */
+/**
+ * The Tutorials page groups features the way the sidebars group them. "Start here" leads: the short
+ * films about what ConstructHUB is (one about the whole product, one tour per app). Its entries may
+ * live on either host — every other group is the main app's, except "CRM".
+ */
 export const HELP_GROUPS = [
+  "Start here",
   "Permits & Databases",
   "Google Business",
   "Google Ads",
@@ -48,6 +53,20 @@ export type HelpEntry = {
   group: HelpGroup;
   /** The feature this entry is a section of; sections are listed inside their feature's card. */
   parent?: string;
+  /**
+   * Publishing. `hold: true` — this video is NEVER scheduled by the tools on their own: not to YouTube
+   * (youtube-schedule.ts) and not to social (social-post.ts). Their dry runs list it as "held for owner
+   * approval"; it goes out only when a person names it with `--release <key>`. Set on the overview
+   * films ("Start here"): what they say about the company is the owner's to approve.
+   */
+  youtube?: { hold?: boolean };
+  /**
+   * Not shown anywhere in the app yet: no card on /tutorials, no "i" panel — the entry exists only so
+   * its step script, its YouTube description and its tests have something to belong to. For a film
+   * that waits for the owner's release (the named comparisons): remove this line, and commit the
+   * video's manifest, when it is released.
+   */
+  unlisted?: boolean;
   /** null until the walkthrough is recorded. */
   video: HelpVideo | null;
 };

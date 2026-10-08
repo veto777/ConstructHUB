@@ -1,0 +1,152 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-draft",
+  "title": "Save an estimate and finish it later",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates/new",
+      "caption": "New estimate",
+      "narration": "Not ready to send an estimate yet? Save it as a draft, and finish it later.",
+      "chapter": "Start the estimate"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-client-search\"]",
+      "value": "Wrenhaven",
+      "caption": "Search for the client",
+      "narration": "Start a new estimate as usual. Search for the client,"
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Wrenhaven Dental Studio\")",
+      "caption": "Pick the client",
+      "narration": "and pick them.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-search\"]",
+      "value": "LVP",
+      "caption": "Search the price book",
+      "narration": "Add the work you already know. Search your price book,"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-row-\"]:has-text(\"LVP, supply & install\") [data-testid^=\"button-add-\"]",
+      "caption": "Add",
+      "narration": "and choose Add.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-qty-\"]",
+      "value": "600",
+      "caption": "Quantity",
+      "narration": "Set the quantity."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review\"]",
+      "caption": "Review",
+      "narration": "Then choose Review.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-title\"]",
+      "value": "Reception flooring",
+      "caption": "Title",
+      "narration": "Give it a title, so you can find it again."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-draft\"]",
+      "caption": "Save as draft",
+      "narration": "Now, instead of Send estimate, choose Save as draft.",
+      "chapter": "Save as draft",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"step-done\"]",
+      "caption": "Saved",
+      "narration": "It is saved with its own number. Nothing has gone to the client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-view-estimates\"]",
+      "caption": "Estimates",
+      "narration": "Later, come back to the Estimates page.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"filter-status-draft\"]",
+      "caption": "Draft filter",
+      "narration": "Tick Draft to list only your drafts.",
+      "chapter": "Finish it later",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"doc-row-\"]:has-text(\"Reception flooring\") [data-testid^=\"doc-link-\"]",
+      "caption": "Open the draft",
+      "narration": "Open the one you saved.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-edit-estimate\"]",
+      "caption": "Edit",
+      "narration": "Edit lets you change the lines, the title or the message."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send-estimate\"]",
+      "caption": "Send",
+      "narration": "And when it is ready, choose Send.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tracking-strip\"]",
+      "caption": "Sent",
+      "narration": "Now it is sent, and this line shows when and to which address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Where to find it",
+      "narration": "Your drafts are always under Estimates, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "Save an estimate as a draft and send it later | ConstructHUB CRM",
+    "description": "Start an estimate in ConstructHUB CRM, save it as a draft instead of sending it, find it again with the Draft filter on the Estimates page, and send it when it is ready. The walkthrough uses a demo company and demo clients.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "estimates",
+      "draft estimate",
+      "save estimate",
+      "send estimate",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Save it for later",
+    "accent": "later",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}

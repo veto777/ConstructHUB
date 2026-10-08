@@ -1,0 +1,129 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pipeline",
+  "title": "Pipeline",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "The Pipeline",
+      "chapter": "Stages and groups",
+      "narration": "This is the Pipeline in the ConstructHUB CRM. Every job is a card, and every column is a stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "h2:has-text(\"Prospect\")",
+      "caption": "Prospect",
+      "narration": "The stages are in groups. Prospect comes first, with your leads."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"stage-col-lead\"]",
+      "caption": "The Lead stage",
+      "narration": "The number beside a stage is how many jobs are in it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ferrante\")",
+      "caption": "A card",
+      "chapter": "What a card shows",
+      "narration": "A card shows the job's name, its project number and its trades."
+    },
+    {
+      "action": "highlight",
+      "selector": "h2:has-text(\"Sales\")",
+      "caption": "Sales",
+      "narration": "Sales is next: Estimating, Proposal Sent and Approved."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Halvorsen-Quist\")",
+      "caption": "Contract value",
+      "narration": "When a job has a contract value, the card shows it."
+    },
+    {
+      "action": "highlight",
+      "selector": "h2:has-text(\"Production\")",
+      "caption": "Production",
+      "narration": "Production follows the work, from Scheduled through In Progress."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"stage-col-punch_list\"]",
+      "caption": "Later stages",
+      "narration": "Scroll sideways for the later stages, like Punch List and Complete."
+    },
+    {
+      "action": "highlight",
+      "selector": "h2:has-text(\"Billing\")",
+      "caption": "Billing",
+      "narration": "Billing holds the jobs that are invoiced and paid."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Oyelaran\") a",
+      "caption": "Open a job",
+      "chapter": "Open a job or move it",
+      "narration": "Click a job's name to open its project page.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Revised contract",
+      "caption": "The project page",
+      "narration": "The project page has the contract, the costs and the job's tabs."
+    },
+    {
+      "action": "back",
+      "caption": "Back to the board",
+      "narration": "Now back to the board."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ferrante\") [data-testid^=\"select-stage-\"]",
+      "caption": "The stage menu",
+      "narration": "The menu on each card moves the job to another stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-new-lead\"]",
+      "caption": "New lead",
+      "narration": "And New lead adds a job to the first stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "You'll find the Pipeline in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to read the pipeline board | ConstructHUB CRM",
+    "description": "A short walkthrough of the Pipeline in the ConstructHUB CRM. You will see how stages are grouped into Prospect, Sales, Production and Billing, what each job card shows, and how to open a job from the board.",
+    "tags": [
+      "sales pipeline",
+      "contractor CRM",
+      "construction CRM",
+      "job tracking",
+      "pipeline board",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Read the board",
+    "accent": "board",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-vs-housecall-pro",
+  "title": "Housecall Pro vs ConstructHUB CRM",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
+  "steps": [
+    {
+      "action": "card",
+      "card": {
+        "kicker": "List price · October 2026",
+        "headline": "$189 a month for 5 users?",
+        "accent": "$189",
+        "mascot": true,
+        "footnote": "Housecall Pro Essentials: $189 a month billed monthly, 5 users included — housecallpro.com/pricing, read 8 October 2026. Intro offers not shown."
+      },
+      "chapter": "The price",
+      "caption": "The hook",
+      "narration": "Still paying one hundred eighty-nine dollars a month for five users?"
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "List price · billed monthly · October 2026",
+        "headline": "5 seats. $94.",
+        "accent": "$94",
+        "columns": [
+          {
+            "title": "Housecall Pro",
+            "value": "$189",
+            "unit": "a month · Essentials · 5 users"
+          },
+          {
+            "title": "ConstructHUB CRM",
+            "value": "$94",
+            "unit": "a month · Essentials · 5 seats",
+            "us": true
+          }
+        ],
+        "footnote": "List prices billed monthly, October 2026: housecallpro.com/pricing · constructhub.us/pricing. Different features — check both."
+      },
+      "caption": "Five seats",
+      "narration": "ConstructHUB CRM Essentials. Five seats. Ninety-four dollars. About half, at list price."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "List price · billed monthly · October 2026",
+        "headline": "Same seats. About half.",
+        "accent": "About half",
+        "columns": [
+          {
+            "title": "Housecall Pro",
+            "lines": [
+              "1 user — $79 a month",
+              "5 users — $189 a month",
+              "8 users — $329 a month"
+            ]
+          },
+          {
+            "title": "ConstructHUB CRM",
+            "us": true,
+            "lines": [
+              "1 seat — $39 a month",
+              "5 seats — $94 a month",
+              "8 seats — $164 a month"
+            ]
+          }
+        ],
+        "footnote": "List prices billed monthly, October 2026: housecallpro.com/pricing · constructhub.us/pricing. Different features — check both."
+      },
+      "caption": "Every tier",
+      "narration": "One seat. Five seats. Eight seats. Same counts. About half the list price, every time."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "chapter": "What you get",
+      "caption": "Not the same features",
+      "narration": "Not the same features. They have tools we don't have. Check both lists."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "punch": 1.3,
+      "caption": "The pipeline",
+      "narration": "Here's what you get. Every job on one board, lead to paid."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates/demo-estimate-e-1998",
+      "caption": "Estimates",
+      "narration": "Estimates your client signs online."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/invoices",
+      "caption": "Invoices",
+      "narration": "Invoices, and payments online."
+    },
+    {
+      "action": "goto",
+      "url": "/databases?q=Houston",
+      "chapter": "Permit offices",
+      "caption": "Permit offices",
+      "narration": "And one thing that isn't on their pricing page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "punch": 1.25,
+      "caption": "Verified portal",
+      "narration": "A permit office directory. Checked links. Free to browse."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "ConstructHUB CRM · 14-day free trial",
+        "headline": "Run the whole job.",
+        "accent": "whole job",
+        "footnote": "constructhub.us/pricing — the CRM is a separate product with its own plans.",
+        "mascot": true
+      },
+      "caption": "Run the whole job",
+      "narration": "Try the CRM free for fourteen days. ConstructHUB. Run the whole job."
+    }
+  ],
+  "youtube": {
+    "title": "Housecall Pro vs ConstructHUB CRM: the price per seat (2026)",
+    "description": "Housecall Pro and ConstructHUB CRM side by side: the published list price for one, five and eight seats, month to month, as of October 2026. Same seat counts, about half the list price, and not the same features - check both lists.",
+    "tags": [
+      "housecall pro vs constructhub",
+      "housecall pro pricing",
+      "housecall pro alternative",
+      "contractor CRM pricing",
+      "CRM for contractors",
+      "field service software pricing",
+      "ConstructHUB CRM"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28,
+    "sources": [
+      {
+        "label": "Housecall Pro pricing page: Basic, Essentials and Max list prices and users included",
+        "url": "https://www.housecallpro.com/pricing/",
+        "read": "2026-10-08"
+      },
+      {
+        "label": "ConstructHUB CRM plans and list prices",
+        "url": "https://constructhub.us/pricing",
+        "read": "2026-10-08"
+      }
+    ],
+    "names": [
+      "Housecall Pro"
+    ]
+  },
+  "thumbnail": {
+    "headline": "Half the price?",
+    "accent": "Half",
+    "kicker": "vs Housecall Pro",
+    "step": 1
+  }
+}

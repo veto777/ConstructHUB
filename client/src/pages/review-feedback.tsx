@@ -828,7 +828,7 @@ export default function ReviewFeedbackPage() {
                   id="highlights"
                   value={highlights}
                   onChange={(e) => setHighlights(e.target.value)}
-                  placeholder="e.g., They replaced our roof with GAF shingles, finished in 2 days, cleaned up everything. Great communication throughout."
+                  placeholder="e.g., They replaced our roof with architectural shingles, finished in 2 days, cleaned up everything. Great communication throughout."
                   rows={4}
                   className="border-2"
                   data-testid="input-review-highlights"

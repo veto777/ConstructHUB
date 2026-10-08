@@ -1,0 +1,107 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-company-settings",
+  "title": "Company profile and logo",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Company profile",
+      "narration": "Your company profile is what clients see on your paperwork. Let's fill it in."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Appears on estimates, invoices and the client portal.",
+      "caption": "Where it shows",
+      "narration": "It appears on estimates, invoices and the client portal."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-company-name\"]",
+      "caption": "Company name",
+      "narration": "Start with your company name. Legal entity is next to it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-company-phone\"]",
+      "value": "(941) 555-0110",
+      "caption": "Phone",
+      "chapter": "Contact, logo and address",
+      "narration": "Check the email and phone your clients should use. We'll update the phone."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-company-logo-file\"]",
+      "caption": "Upload logo",
+      "narration": "Upload logo takes a PNG or JPG, up to two megabytes."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-company-address1\"]",
+      "caption": "Address",
+      "narration": "Add your street address, city, state and ZIP."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-company-license-number\"]",
+      "value": "DEMO-FL-2002",
+      "caption": "License",
+      "narration": "Then your license number, and the state it's from."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"textarea-company-description\"]",
+      "caption": "Description",
+      "narration": "Industry and Description say what your company does."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-company\"]",
+      "caption": "Save company profile",
+      "chapter": "Save it",
+      "narration": "Choose Save company profile."
+    },
+    {
+      "action": "wait",
+      "caption": "Saved",
+      "narration": "The CRM confirms: Company profile saved.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Menu: Settings",
+      "narration": "You'll find Company profile under Settings in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set up your company profile | ConstructHUB CRM",
+    "description": "A short walkthrough of the Company profile in the ConstructHUB CRM settings. You will check your company name, phone and address, see where the logo goes, add your license number, and save. The profile appears on estimates, invoices and the client portal.",
+    "tags": [
+      "company profile",
+      "contractor license",
+      "company logo",
+      "business settings",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your company on paper",
+    "accent": "company",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

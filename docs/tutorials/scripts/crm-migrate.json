@@ -1,0 +1,130 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-migrate",
+  "title": "Bring your clients from another system",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/migrate",
+      "caption": "Import",
+      "chapter": "Choose the file",
+      "narration": "Moving from another system? Bring your client list with you, from one spreadsheet file."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-entity-customers\"]",
+      "caption": "Clients first",
+      "narration": "Start with Clients. Estimates and invoices come after, and attach to those clients."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-migrate-file\"]",
+      "caption": "A CSV or TSV export",
+      "narration": "Export your list from the old system as a CSV file, then choose it here."
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid=\"input-migrate-file\"]",
+      "files": [
+        "clients-import.csv"
+      ],
+      "caption": "Choose the file",
+      "narration": "This demo file holds six clients.",
+      "holdMs": 600
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview\"]",
+      "caption": "Preview",
+      "chapter": "Check the columns",
+      "narration": "Choose Preview. Nothing is saved yet.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-preview-summary\"]",
+      "caption": "6 rows, all valid",
+      "narration": "Six rows were read, and all of them are valid."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-map-email\"]",
+      "caption": "The column mapping",
+      "narration": "The CRM guessed which column is the name, the email, the phone and the address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-map-companyName\"]",
+      "caption": "Fix a column",
+      "narration": "Open a list to fix one that looks wrong, or leave it on skip."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"table-preview\"]",
+      "caption": "The rows as they will be saved",
+      "narration": "Underneath, you see every client as it will be saved."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-run-import\"]",
+      "caption": "Import 6 rows",
+      "chapter": "Import and check",
+      "narration": "When it looks right, choose Import.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-import-summary\"]",
+      "caption": "6 created",
+      "narration": "Six created. A client you already have, by email or phone, is skipped, not doubled."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-view-clients\"]",
+      "caption": "View your clients",
+      "narration": "Choose View your clients.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Pemberton Row Lofts\")",
+      "caption": "The new clients",
+      "narration": "The new clients are in your list, each with its contact details and address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-import-clients\"]",
+      "caption": "Where to find it",
+      "narration": "To come back to the import page, choose Import, here on Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to import your clients from a spreadsheet | ConstructHUB CRM",
+    "description": "Move your client list into the ConstructHUB CRM from a CSV export. Choose the file, preview it, check which column is which, and import. Clients you already have are skipped instead of duplicated. Recorded in a demo workspace with made-up clients.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "import clients",
+      "CSV import",
+      "switch CRM",
+      "data migration",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Import your clients",
+    "accent": "Import",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

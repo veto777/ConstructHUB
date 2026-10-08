@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-client-question",
+  "title": "A client asks a question on an estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "The client asks",
+      "narration": "When a client has a question about an estimate, they can ask it right on the estimate."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com",
+        "estimate": "E-2000"
+      },
+      "caption": "The client's estimate",
+      "narration": "First, your client's screen. They have the estimate open."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-ask-question\"]",
+      "caption": "Questions about this estimate?",
+      "narration": "Near the bottom is a box for questions. It names the salesperson who will answer."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-ask-question\"]",
+      "value": "Can both units be done in the same week?",
+      "caption": "The question",
+      "narration": "They type their question."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-ask-question\"]",
+      "caption": "Send",
+      "narration": "And choose Send.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-question-sent\"]",
+      "caption": "Sent",
+      "narration": "The page says a reply will come by email, and that it is saved in their portal."
+    },
+    {
+      "action": "session",
+      "url": "/crm",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "It reaches Messages",
+      "narration": "Now your screen, in the CRM.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Unread count",
+      "narration": "The number beside Messages has gone up."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Open Messages",
+      "narration": "Open Messages.",
+      "holdMs": 900
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"thread-\"]:has-text(\"Halvorsen-Quist\")",
+      "caption": "Open the conversation",
+      "narration": "And open the conversation.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"message-\"]:has-text(\"About estimate\")",
+      "caption": "About estimate E-2000",
+      "chapter": "Answer it",
+      "narration": "The message says which estimate it is about, above the question."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-inbox-reply\"]",
+      "value": "Yes. Both units, Monday to Thursday.",
+      "caption": "Your answer",
+      "narration": "Type your answer underneath."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-inbox-send\"]",
+      "caption": "Send the reply",
+      "narration": "Then send. Your reply goes to their email, and shows in their portal.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Where to find it",
+      "narration": "Questions from estimates land under Messages, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "When a client asks a question on an estimate | ConstructHUB CRM",
+    "description": "See both sides of a question on an estimate in the ConstructHUB CRM. The client asks from the estimate page; the question lands in your Messages inbox marked with the estimate's number, and your reply goes to their email and their portal. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "contractor estimate",
+      "client questions",
+      "customer communication",
+      "CRM inbox",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Answer bid questions",
+    "accent": "Answer",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}

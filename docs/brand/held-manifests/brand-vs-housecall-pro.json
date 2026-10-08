@@ -1,0 +1,25 @@
+{
+  "helpKey": "brand-vs-housecall-pro",
+  "durationSec": 51,
+  "video": {
+    "key": "tutorials/brand-vs-housecall-pro.374c563e.mp4",
+    "bytes": 8433922,
+    "sha256": "374c563e8ea070b29b6d52f421633b8d9585f41f22189331d32bd99ac6137120"
+  },
+  "captions": {
+    "key": "tutorials/brand-vs-housecall-pro.822d52e7.vtt",
+    "bytes": 1432,
+    "sha256": "822d52e7a546c73fa6c6356f1622278cbba30765072ec67bedc2e3a4477afda4"
+  },
+  "poster": {
+    "key": "tutorials/brand-vs-housecall-pro.67148cac.jpg",
+    "bytes": 81171,
+    "sha256": "67148cac050544789322055b50eb0e25eb7a748acac1cc2da2215366273ea122"
+  },
+  "uploaded": {
+    "at": "2026-10-08T12:39:18.073Z",
+    "video": "78f98953b0d4cb21670a600d5668b1dd",
+    "captions": "ae5c4c206575f2c81af83f35562a4509",
+    "poster": "fa1fbda2e3d73a37b88a2c94504d819f"
+  }
+}

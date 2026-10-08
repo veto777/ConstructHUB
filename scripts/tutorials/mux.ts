@@ -26,7 +26,7 @@ import fs from "fs";
 import path from "path";
 import {
   decodeWav, encodeWav, flagNum, loadScript, outDir, parseArgs, run, sentencesOf, sha256, splitCaption,
-  type NarrationIndex, type Timings,
+  type NarrationIndex, type Pcm, type Timings,
 } from "./lib";
 import { endCardHtml, introCardHtml, renderStill } from "./brand";
 import { helpEntry } from "../../shared/help/registry";
@@ -60,6 +60,78 @@ export async function measureLoudness(file: string): Promise<{ lufs: number; tru
   return { lufs, truePeakDb };
 }
 
+
+/** One mono track: every clip at its time in the video (ms), at a sane level for the loudness pass to start from. */
+export function layNarration(clips: { pcm: Pcm; startMs: number; name: string }[], totalMs: number, rate: number): Int16Array {
+  const mix = new Float64Array(Math.ceil((totalMs / 1000) * rate));
+  for (const clip of clips) {
+    if (clip.pcm.sampleRate !== rate) throw new Error(`${clip.name}: unexpected sample rate`);
+    const start = Math.round((clip.startMs / 1000) * rate);
+    if (start + clip.pcm.samples.length > mix.length) throw new Error(`${clip.name} runs past the end of the video`);
+    for (let i = 0; i < clip.pcm.samples.length; i++) mix[start + i] += clip.pcm.samples[i];
+  }
+  let peak = 0;
+  for (const v of mix) peak = Math.max(peak, Math.abs(v));
+  if (peak === 0) throw new Error("The narration track is silent");
+  const gain = (32767 * Math.pow(10, -3 / 20)) / peak;
+  const samples = new Int16Array(mix.length);
+  for (let i = 0; i < mix.length; i++) samples[i] = Math.round(mix[i] * gain);
+  return samples;
+}
+
+/** Loudness, pass 1: measure a track, and give the `loudnorm` filter that makes pass 2 hit −14 LUFS without pumping. */
+export async function loudnormFilter(wav: string): Promise<string> {
+  const pass1 = (await run("ffmpeg", ["-hide_banner", "-nostats", "-threads", "4", "-i", wav,
+    "-af", `loudnorm=I=${LOUDNESS.I}:TP=${LOUDNESS.TP}:LRA=${LOUDNESS.LRA}:print_format=json`, "-f", "null", "-"], { nice: true })).stderr;
+  const m = JSON.parse(pass1.slice(pass1.lastIndexOf("{"), pass1.lastIndexOf("}") + 1)) as Record<string, string>;
+  return `loudnorm=I=${LOUDNESS.I}:TP=${LOUDNESS.TP}:LRA=${LOUDNESS.LRA}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+}
+
+export type Cue = { start: number; end: number; text: string };
+/**
+ * Captions: the narration as written (never the pronunciation lexicon's spelling), sentence by
+ * sentence, each for its share of its clip. `startOf(i)` is where step i's narration starts in the video.
+ */
+export function captionCues(clips: { index: number; text: string; durationMs: number }[], startOf: (index: number) => number, totalMs: number): Cue[] {
+  const cues: Cue[] = [];
+  for (const clip of clips) {
+    const pieces = sentencesOf(clip.text).flatMap((s) => splitCaption(s));
+    const chars = pieces.reduce((n, p) => n + p.length, 0);
+    let t = startOf(clip.index);
+    for (const p of pieces) {
+      const len = (clip.durationMs * p.length) / chars;
+      cues.push({ start: t, end: t + len, text: p });
+      t += len;
+    }
+  }
+  // A cue stays up a moment after the voice stops, but never into the next one.
+  cues.forEach((c, i) => { c.end = Math.min(c.end + 250, cues[i + 1]?.start ?? totalMs); });
+  return cues;
+}
+/** captions.vtt for the app's player, captions.srt for YouTube ("with timing"). */
+export function writeCaptions(dir: string, cues: Cue[]): void {
+  fs.writeFileSync(path.join(dir, "captions.vtt"), `WEBVTT\n\n${cues.map((c, i) => `${i + 1}\n${clock(c.start, ".")} --> ${clock(c.end, ".")}\n${wrap(c.text)}`).join("\n\n")}\n`);
+  fs.writeFileSync(path.join(dir, "captions.srt"), `${cues.map((c, i) => `${i + 1}\n${clock(c.start, ",")} --> ${clock(c.end, ",")}\n${wrap(c.text)}`).join("\n\n")}\n`);
+}
+
+export type Chapter = { at: string; ms: number; title: string };
+/** YouTube chapters from the step timings: first at 0:00, at least 10 s apart, three or more — or none. */
+export function chaptersOf(steps: { chapter?: string }[], title: string, startOf: (index: number) => number, totalMs: number, warn: (m: string) => void = () => {}): Chapter[] {
+  let chapters: Chapter[] = [];
+  steps.forEach((s, i) => {
+    if (i !== 0 && !s.chapter) return;
+    const ms = i === 0 ? 0 : startOf(i);
+    const prev = chapters[chapters.length - 1];
+    if (prev && ms - prev.ms < 10_000) { warn(`  ! chapter “${s.chapter}” starts ${((ms - prev.ms) / 1000).toFixed(1)} s after “${prev.title}” — YouTube needs 10 s; left out`); return; }
+    chapters.push({ at: chapterTime(ms), ms, title: s.chapter ?? title });
+  });
+  if (chapters.length && totalMs - chapters[chapters.length - 1].ms < 10_000) chapters.pop();
+  if (chapters.length < 3) { warn(`  ! only ${chapters.length} usable chapter(s) — YouTube needs three; none are written`); chapters = []; }
+  return chapters;
+}
+/** The description's chapter block, as YouTube reads it. */
+export const chapterLines = (chapters: Chapter[]): string[] => chapters.length ? ["", "Chapters", ...chapters.map((c) => `${c.at} ${c.title}`)] : [];
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/mux.ts <script.json> [--out DIR]");
@@ -74,7 +146,10 @@ async function main() {
     if (!clip || clip.text !== s.narration) throw new Error(`Step ${i}: narration.json is stale — run narrate.ts and record.ts again`);
     if (clip.durationMs !== timings.steps[i].narrationMs) throw new Error(`Step ${i}: recorded against a different clip — record again`);
   });
-  const cardMs = Math.round(flagNum(args, "card", 1.8) * 1000), endCardMs = Math.round(flagNum(args, "end", 4) * 1000);
+  // A film that opens on its own hook card (the overview films) gets a short title card and a short end card:
+  // its hook is spoken inside the first two seconds, and it ends on its own tagline.
+  const film = script.steps[0].action === "card";
+  const cardMs = Math.round(flagNum(args, "card", film ? 0.8 : 1.8) * 1000), endCardMs = Math.round(flagNum(args, "end", film ? 2.5 : 4) * 1000);
   if (cardMs > 2000) throw new Error("the intro card is 2 s at most");
   const crf = flagNum(args, "crf", 23);
   const { width, height } = timings.video ?? timings.viewport;
@@ -100,30 +175,15 @@ async function main() {
 
   // 2 ── One narration track: every clip at its step's time (silent under the two cards).
   const rate = narration.sampleRate;
-  const mix = new Float64Array(Math.ceil((totalMs / 1000) * rate));
-  for (const clip of narration.clips) {
-    const pcm = decodeWav(fs.readFileSync(at(clip.file)));
-    if (pcm.sampleRate !== rate) throw new Error(`${clip.file}: unexpected sample rate`);
-    const start = Math.round((out(timings.steps[clip.index].narrationStartMs) / 1000) * rate);
-    if (start + pcm.samples.length > mix.length) throw new Error(`${clip.file} runs past the end of the video`);
-    for (let i = 0; i < pcm.samples.length; i++) mix[start + i] += pcm.samples[i];
-  }
-  let peak = 0;
-  for (const v of mix) peak = Math.max(peak, Math.abs(v));
-  if (peak === 0) throw new Error("The narration track is silent");
-  const gain = (32767 * Math.pow(10, -3 / 20)) / peak; // a sane level for the loudness pass to start from
-  const samples = new Int16Array(mix.length);
-  for (let i = 0; i < mix.length; i++) samples[i] = Math.round(mix[i] * gain);
+  const samples = layNarration(narration.clips.map((clip) => ({ pcm: decodeWav(fs.readFileSync(at(clip.file))), startMs: out(timings.steps[clip.index].narrationStartMs), name: clip.file })), totalMs, rate);
   fs.writeFileSync(at("narration.wav"), encodeWav({ sampleRate: rate, samples }));
 
   // 3 ── Loudness, pass 1: measure, so pass 2 (in the encode) can hit −14 LUFS without pumping.
-  const pass1 = (await run("ffmpeg", ["-hide_banner", "-nostats", "-threads", "4", "-i", at("narration.wav"),
-    "-af", `loudnorm=I=${LOUDNESS.I}:TP=${LOUDNESS.TP}:LRA=${LOUDNESS.LRA}:print_format=json`, "-f", "null", "-"], { nice: true })).stderr;
-  const m = JSON.parse(pass1.slice(pass1.lastIndexOf("{"), pass1.lastIndexOf("}") + 1)) as Record<string, string>;
-  const loudnorm = `loudnorm=I=${LOUDNESS.I}:TP=${LOUDNESS.TP}:LRA=${LOUDNESS.LRA}:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+  const loudnorm = await loudnormFilter(at("narration.wav"));
 
   // 4 ── The two cards (our own artwork and type), then intro + capture + end → H.264/AAC.
-  const kicker = helpEntry(script.helpKey)?.group === "CRM" ? "CRM Tutorial" : "ConstructHUB Tutorial";
+  const group = helpEntry(script.helpKey)?.group;
+  const kicker = group === "Start here" ? "Start here" : group === "CRM" ? "CRM Tutorial" : "ConstructHUB Tutorial";
   await renderStill(introCardHtml(title, kicker), at("_intro.png"), width);
   await renderStill(endCardHtml(), at("_end.png"), width);
   const cardS = cardMs / 1000, endS = endCardMs / 1000, fade = 0.25;
@@ -153,21 +213,8 @@ async function main() {
 
   // 5 ── Captions: the narration, sentence by sentence, each for its share of the clip. VTT for the
   // app's player, SRT for YouTube ("with timing").
-  const cues: { start: number; end: number; text: string }[] = [];
-  for (const clip of narration.clips) {
-    const pieces = sentencesOf(clip.text).flatMap((s) => splitCaption(s));
-    const chars = pieces.reduce((n, p) => n + p.length, 0);
-    let t = out(timings.steps[clip.index].narrationStartMs);
-    for (const p of pieces) {
-      const len = (clip.durationMs * p.length) / chars;
-      cues.push({ start: t, end: t + len, text: p });
-      t += len;
-    }
-  }
-  // A cue stays up a moment after the voice stops, but never into the next one.
-  cues.forEach((c, i) => { c.end = Math.min(c.end + 250, cues[i + 1]?.start ?? totalMs); });
-  fs.writeFileSync(at("captions.vtt"), `WEBVTT\n\n${cues.map((c, i) => `${i + 1}\n${clock(c.start, ".")} --> ${clock(c.end, ".")}\n${wrap(c.text)}`).join("\n\n")}\n`);
-  fs.writeFileSync(at("captions.srt"), `${cues.map((c, i) => `${i + 1}\n${clock(c.start, ",")} --> ${clock(c.end, ",")}\n${wrap(c.text)}`).join("\n\n")}\n`);
+  const cues = captionCues(narration.clips, (i) => out(timings.steps[i].narrationStartMs), totalMs);
+  writeCaptions(dir, cues);
 
   // 6 ── Poster: the end of a step, when its ring and the cursor are where the narration put them.
   const posterStep = Math.min(Math.max(0, Math.round(flagNum(args, "poster-step", 1))), timings.steps.length - 1);
@@ -186,21 +233,12 @@ async function main() {
   const files = { video: measure("walkthrough.mp4", "mp4"), captions: measure("captions.vtt", "vtt"), poster: measure("poster.jpg", "jpg") };
 
   // 8 ── YouTube: chapters from the step timings (first at 0:00, at least 10 s apart, three or more).
-  let chapters: { at: string; ms: number; title: string }[] = [];
-  script.steps.forEach((s, i) => {
-    if (i !== 0 && !s.chapter) return;
-    const ms = i === 0 ? 0 : out(timings.steps[i].startMs);
-    const prev = chapters[chapters.length - 1];
-    if (prev && ms - prev.ms < 10_000) { console.warn(`  ! chapter “${s.chapter}” starts ${((ms - prev.ms) / 1000).toFixed(1)} s after “${prev.title}” — YouTube needs 10 s; left out`); return; }
-    chapters.push({ at: chapterTime(ms), ms, title: s.chapter ?? script.title });
-  });
-  if (chapters.length && totalMs - chapters[chapters.length - 1].ms < 10_000) chapters.pop();
-  if (chapters.length < 3) { if (script.youtube) console.warn(`  ! only ${chapters.length} usable chapter(s) — YouTube needs three; none are written`); chapters = []; }
+  const chapters = chaptersOf(script.steps, script.title, (i) => out(timings.steps[i].startMs), totalMs, script.youtube ? (m) => console.warn(m) : undefined);
   if (script.youtube) {
     const y = script.youtube, help = `https://constructhub.us/tutorials#help-${script.helpKey}`;
     const description = [
       y.description.trim(),
-      ...(chapters.length ? ["", "Chapters", ...chapters.map((c) => `${c.at} ${c.title}`)] : []),
+      ...chapterLines(chapters),
       "", "Try it: https://constructhub.us", `In the app: press the “i” beside ${title}, or open ${help}`, "More tutorials: https://constructhub.us/tutorials",
     ].join("\n");
     fs.writeFileSync(at("youtube.json"), JSON.stringify({

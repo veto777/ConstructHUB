@@ -1,0 +1,142 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-portal-message",
+  "title": "A client sends you a message",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/inbox",
+      "caption": "Messages",
+      "chapter": "The client writes",
+      "narration": "A client can write to you from their portal. Here is what happens when they do."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "ferrantes@example.com"
+      },
+      "caption": "The client's portal",
+      "narration": "First, your client's screen. Rosa and Stefan Ferrante are signed in to their portal."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-messages\"]",
+      "caption": "Messages",
+      "narration": "They choose Messages, and see the conversation so far.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-message-to\"]",
+      "caption": "To the office or one person",
+      "narration": "A message goes to the whole office, or to one person on their job."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-portal-message\"]",
+      "value": "Could we move the site visit to the afternoon?",
+      "caption": "Write the message",
+      "narration": "They write their question."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-portal-message-send\"]",
+      "caption": "Send",
+      "narration": "And send it.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"portal-message-\"]:has-text(\"afternoon\")",
+      "caption": "Sent",
+      "narration": "The portal says the message was sent, and that you were notified."
+    },
+    {
+      "action": "session",
+      "url": "/crm",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "chapter": "It reaches your inbox",
+      "narration": "Now your screen, in the CRM.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Unread count",
+      "narration": "The red number beside Messages went up by one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Open Messages",
+      "narration": "Open Messages.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"thread-\"]:has-text(\"Ferrante\")",
+      "caption": "The new message, waiting",
+      "narration": "Here is the new message. A timer shows how long the client has waited."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"thread-\"]:has-text(\"Ferrante\")",
+      "caption": "Open the conversation",
+      "chapter": "Answer it",
+      "narration": "Open it to read the whole conversation.",
+      "holdMs": 900
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-inbox-reply\"]",
+      "value": "Yes, 2 pm works. See you then.",
+      "caption": "Write your reply",
+      "narration": "Type your answer underneath."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-inbox-send\"]",
+      "caption": "Send the reply",
+      "narration": "Then send. Your reply shows in their portal, and goes to their email too.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-messages\"]",
+      "caption": "Where to find it",
+      "narration": "Every client message lands under Messages, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "What happens when a client messages you | ConstructHUB CRM",
+    "description": "See both sides of a client message in the ConstructHUB CRM. The client writes from their portal; the message lands in your Messages inbox with an unread count and a waiting timer, and your reply goes back to their portal and their email. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "client portal",
+      "client messages",
+      "customer communication",
+      "CRM inbox",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Client messages land here",
+    "accent": "here",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}

@@ -7,7 +7,8 @@
  *   · no SIGNALWIRE_* → every text goes to the log provider, SMS_OUTBOX_PATH in the slot dir
  *     (server/crm/sms.ts);
  *   · no Stripe, Google, HOVER, OpenAI, R2 or voice-engine credentials at all: the environment is
- *     built from nothing (below), not inherited — a producer's shell cannot leak a key into it;
+ *     built from nothing (below), not inherited — a producer's shell cannot leak a key into it.
+ *     Pages that need a connected account get a local stand-in instead (TUTORIAL_FIXTURES, below);
  *   · SEO_JOBS_DISABLED=true, and neither EDGE_SEARCH_WORKER_ENABLED nor GBP_CONTENT_WORKER_ENABLED.
  *
  * DEV_AUTH_BYPASS_USER1=true signs every request in as user 1 — in a recording database that is
@@ -18,10 +19,13 @@ import { spawn } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
-import { ROOT, WORK_DIR, run, sleep } from "./lib";
+import { JOBCAM_STORE, ROOT, WORK_DIR, run, sleep } from "./lib";
 import { databaseUrl } from "./db";
 
 export const SLOT_PORT = (slot: number) => 8180 + slot;
+/** Recording slots are 1–8 (ports 8181–8188). Slot 0 is the template build's own boot. */
+export const SLOT_MAX = 8;
+export const isSlot = (slot: number) => Number.isInteger(slot) && slot >= 1 && slot <= SLOT_MAX;
 export const slotDir = (slot: number) => { const d = path.join(WORK_DIR, `slot${slot}`); fs.mkdirSync(d, { recursive: true }); return d; };
 
 /** The pid listening on a TCP port of this machine, or null. */
@@ -66,7 +70,15 @@ export async function warmApp(port: number): Promise<number> {
   return ok;
 }
 
-export async function startApp(o: { slot: number; database: string; bootTimeoutMs?: number }): Promise<RunningApp> {
+/**
+ * `fixtures` (default: on for slots 1–8, off for the template's slot 0) starts the app with the
+ * tutorial fixtures: stand-ins for Stripe, HOVER, Google Calendar and texting, so their pages show
+ * a connected account (docs/tutorials/FIXTURES.md). The two variables below are all it takes — and
+ * the app REFUSES TO BOOT with them unless it is a non-production process on this slot's port
+ * against a recording database (server/tutorials/fixtures/gate.ts). No key of any real service is
+ * involved: the stand-ins answer on this machine.
+ */
+export async function startApp(o: { slot: number; database: string; bootTimeoutMs?: number; fixtures?: boolean }): Promise<RunningApp> {
   const port = SLOT_PORT(o.slot), dir = slotDir(o.slot);
   const busy = await listeningPid(port);
   if (busy) throw new Error(`port ${port} is already in use by pid ${busy} — slot ${o.slot} is taken (or a producer died: kill that pid)`);
@@ -86,6 +98,11 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     // The AI client is constructed at import; a placeholder keeps boot alive and can reach nothing.
     AI_INTEGRATIONS_OPENAI_API_KEY: "tutorial-recording-no-key", AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9/v1",
   };
+  const fixtures = o.fixtures ?? isSlot(o.slot);
+  // One JobCam object store for every slot (see lib.ts JOBCAM_STORE): demo photos are seeded there once.
+  fs.mkdirSync(JOBCAM_STORE, { recursive: true });
+  env.JOBCAM_LOCAL_ROOT = JOBCAM_STORE;
+  if (fixtures) { env.TUTORIAL_FIXTURES = "1"; env.TUTORIAL_SLOT = String(o.slot); }
   const fd = fs.openSync(log, "w");
   // cwd stays the repo root (the app resolves client/ and reference data from it); the email outbox it
   // appends to (tmp/email-outbox.jsonl) is therefore shared by the slots — append-only, never sent.
@@ -102,25 +119,36 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     if (Date.now() > deadline) { await stopPort(port); try { process.kill(-child.pid!, "SIGKILL"); } catch { /* gone */ } throw new Error(`the app for slot ${o.slot} did not answer on :${port} in time — see ${log}`); }
     await sleep(1000);
   }
+  if (fixtures) {
+    // The stand-ins' boot hooks (HOVER's connection and first sync) run on this call; a slot that
+    // was asked for fixtures and does not have them must not be recorded.
+    const ready = await fetch(`http://127.0.0.1:${port}/__tutorial/ready`, { signal: AbortSignal.timeout(120_000) }).then(async (r) => ({ status: r.status, body: await r.text() }), (e) => ({ status: 0, body: String(e) }));
+    if (ready.status !== 200) { await stopPort(port); throw new Error(`the tutorial fixtures of slot ${o.slot} are not ready (${ready.status}): ${ready.body.slice(0, 300)} — see ${log}`); }
+  }
   const pid = (await listeningPid(port))!;
   return { port, pid, log, stop: async () => { await stopPort(port); try { process.kill(-child.pid!, "SIGTERM"); } catch { /* the wrapper left with its child */ } } };
 }
 
 /**
  * For operating a flow by hand before writing its script:
- *   tsx scripts/tutorials/app.ts up <slot>     fresh database + app; prints where to browse
+ *   tsx scripts/tutorials/app.ts up <slot> [--no-fixtures] [--no-warm]   fresh database + app; prints where to browse
  *   tsx scripts/tutorials/app.ts down <slot>   stop the app (by its listening pid) and drop the database
  */
 async function main() {
   const [cmd, n] = process.argv.slice(2);
   const slot = Number(n);
-  if (!["up", "down"].includes(cmd ?? "") || !Number.isInteger(slot) || slot < 1 || slot > 4) throw new Error("Usage: tsx scripts/tutorials/app.ts <up|down> <slot 1-4>");
-  const { fresh, drop } = await import("./db");
+  if (!["up", "down"].includes(cmd ?? "") || !isSlot(slot)) throw new Error(`Usage: tsx scripts/tutorials/app.ts <up|down> <slot 1-${SLOT_MAX}> [--no-fixtures] [--no-warm]`);
+  const noFixtures = process.argv.includes("--no-fixtures");
+  const { fresh, drop, seedDemo, seedFixtures } = await import("./db");
   const database = `constructhub_tut_slot${slot}`;
   if (cmd === "down") { await stopPort(SLOT_PORT(slot)); await drop(database); console.log(`slot ${slot}: stopped and dropped`); return; }
   await fresh(database);
-  const app = await startApp({ slot, database });
-  await warmApp(app.port);
+  // The same two seeds produce.ts runs: today's dates, then (unless --no-fixtures) the connected-account rows.
+  await seedDemo(database);
+  if (!noFixtures) await seedFixtures(database);
+  const app = await startApp({ slot, database, fixtures: !noFixtures });
+  // --no-warm: for dry runs only (pages compile on first use, which a dry run does not mind).
+  if (!process.argv.includes("--no-warm")) await warmApp(app.port);
   console.log(`slot ${slot}: http://portal.constructhub.us:${app.port}/crm  (Chromium: --host-resolver-rules="MAP portal.constructhub.us 127.0.0.1") · pid ${app.pid} · log ${app.log}`);
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().then(() => process.exit(0), (e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });

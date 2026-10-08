@@ -1,0 +1,170 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-why-constructhub",
+  "title": "Why ConstructHUB?",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
+  "steps": [
+    {
+      "action": "card",
+      "card": {
+        "kicker": "Why ConstructHUB",
+        "headline": "Tired of guessing?",
+        "accent": "guessing",
+        "mascot": true
+      },
+      "chapter": "Permit offices",
+      "caption": "The hook",
+      "narration": "Software that makes you guess? No thanks."
+    },
+    {
+      "action": "goto",
+      "url": "/databases?q=Houston",
+      "caption": "Permit office directory",
+      "narration": "Start with the permit office. Type a city."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "punch": 1.25,
+      "caption": "Verified portal",
+      "narration": "Every link is checked."
+    },
+    {
+      "action": "card",
+      "card": {
+        "headline": "Checked. Or it says so.",
+        "accent": "Checked",
+        "columns": [
+          {
+            "title": "A guessed link",
+            "lines": [
+              "Looks official",
+              "Might be dead",
+              "Might be the wrong office"
+            ]
+          },
+          {
+            "title": "ConstructHUB",
+            "us": true,
+            "lines": [
+              "Verified — checked link",
+              "Unconfirmed — it says so",
+              "None on record — a web search"
+            ]
+          }
+        ]
+      },
+      "caption": "Checked links",
+      "narration": "Can't confirm it? It says so. Don't have it? You get a search. Never a guess."
+    },
+    {
+      "action": "goto",
+      "url": "/pricing",
+      "chapter": "Plain prices",
+      "caption": "Plans",
+      "narration": "Now the prices."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"card-plan-starter\"]",
+      "offset": 70,
+      "caption": "Every price",
+      "narration": "Every price is on one page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-plan-starter\"] ul:has([data-testid=\"text-not-included-starter\"])",
+      "caption": "Not included",
+      "narration": "And every plan lists what's not included."
+    },
+    {
+      "action": "card",
+      "card": {
+        "headline": "Buy one. Or both.",
+        "accent": "Or both",
+        "columns": [
+          {
+            "title": "Business tools",
+            "lines": [
+              "Permit office directory",
+              "County property records",
+              "Your Google listing & reviews"
+            ]
+          },
+          {
+            "title": "ConstructHUB CRM",
+            "us": true,
+            "lines": [
+              "Leads & pipeline",
+              "Estimates signed online",
+              "Schedule · invoices · payments"
+            ]
+          }
+        ],
+        "footnote": "Two separate products, each with its own plans — constructhub.us/pricing"
+      },
+      "caption": "Buy one or both",
+      "narration": "Two products. Buy one, or both. Nobody makes you buy both."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "chapter": "On the job",
+      "caption": "JobCam",
+      "narration": "Job photos live on the job, with the estimate and the invoice."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "Card & bank payments",
+        "headline": "We add no fee.",
+        "accent": "no fee",
+        "footnote": "Payments go to your own Stripe account. Stripe's own processing fees apply. JobCam is part of the top CRM plan, an add-on to the others."
+      },
+      "caption": "No fee on top",
+      "narration": "Card and bank payments go straight to your own Stripe account. We add no fee on top."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "constructhub.us",
+        "headline": "Run the whole job.",
+        "accent": "whole job",
+        "footnote": "Business tools and the CRM are separate products, each with its own plans.",
+        "mascot": true
+      },
+      "caption": "Run the whole job",
+      "narration": "ConstructHUB. Run the whole job."
+    }
+  ],
+  "youtube": {
+    "title": "Why ConstructHUB? Checked permit links, every price on one page",
+    "description": "Why contractors pick ConstructHUB: a permit office directory with checked links, every plan's price and its Not included list on one page, two products you buy separately, and job photos filed to the job.",
+    "tags": [
+      "why constructhub",
+      "contractor software",
+      "permit office lookup",
+      "contractor CRM",
+      "job site photos",
+      "software for contractors",
+      "ConstructHUB"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "No guessed links",
+    "accent": "guessed",
+    "kicker": "Why ConstructHUB",
+    "step": 3
+  }
+}

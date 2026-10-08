@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-estimate-draft",
+  "durationSec": 74,
+  "video": {
+    "key": "tutorials/crm-estimate-draft.2993c6ee.mp4",
+    "bytes": 5355898,
+    "sha256": "2993c6ee16c7c586f91f2149d0d1619e1e159963ce713c5d6c6c951592a676b1"
+  },
+  "captions": {
+    "key": "tutorials/crm-estimate-draft.eb5b5c2e.vtt",
+    "bytes": 1442,
+    "sha256": "eb5b5c2ea9dc52baef94c41eb1c023e74795951191ff6314e288aed683594858"
+  },
+  "poster": {
+    "key": "tutorials/crm-estimate-draft.b39c9d6f.jpg",
+    "bytes": 53018,
+    "sha256": "b39c9d6f2eb17ad85692469256755fd8ba8231f0b8ec209532ca8e243aa05206"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:59:02.109Z",
+    "video": "0732466ab12b0a23b2f53f84e2605a45",
+    "captions": "27048697c41161f494241cf673eba3b5",
+    "poster": "b9cc95cfac9fc51a8753baa7e7c2b026"
+  }
+}

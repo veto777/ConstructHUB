@@ -1,0 +1,147 @@
+/**
+ * EMAIL — tutorial fixture. Recording slots only (../gate.ts).
+ *
+ * Email in a slot is already a dev sink (EMAIL_FORCE_SINK=1 → tmp/email-outbox.jsonl; nothing is
+ * sent). Seam: `sinkToOutbox()` in server/email.ts hands each sunk message to `captured()` here,
+ * which keeps the last few IN MEMORY so the recorder can do what the recipient would do:
+ *
+ *   email.link    the link in the newest email to an address — the client's sign-in link, the
+ *                 "View estimate" button, an invoice, a change order, a team invitation, a photo
+ *                 gallery. The recorder opens it in the homeowner's (or the invitee's) session.
+ *                 Local-only, never logged: fixture routes sit outside /api, which is all the
+ *                 request log prints.
+ *   email.opened  marks a sent estimate or invoice as opened by the client at a believable time
+ *                 in the past, writing exactly what the public page's own open tracking writes.
+ *   email.count   how many emails an address has received (to wait for a send).
+ */
+import { defineProviderFixture, requireTutorialFixtures } from "../registry";
+import { FIXTURE_MARK } from "../gate";
+
+export type EmailFixture = { captured: (mail: { to?: unknown; subject?: unknown; html?: unknown; text?: unknown }) => void };
+
+type Kept = { at: number; to: string[]; subject: string; links: string[] };
+const kept: Kept[] = [];
+const KEEP = 60;
+
+function captured(mail: { to?: unknown; subject?: unknown; html?: unknown; text?: unknown }) {
+  const to = [mail.to].flat().filter(Boolean).map((t) => String(t).toLowerCase());
+  const body = `${typeof mail.html === "string" ? mail.html : ""}\n${typeof mail.text === "string" ? mail.text : ""}`;
+  const links = [...new Set([...body.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => m[0].replace(/&amp;/g, "&")))];
+  kept.push({ at: Date.now(), to, subject: String(mail.subject ?? ""), links });
+  if (kept.length > KEEP) kept.splice(0, kept.length - KEEP);
+}
+const forAddress = (to: string) => kept.filter((k) => k.to.some((t) => t.includes(to.toLowerCase())));
+
+/** A documentation-range address (RFC 5737): the "client's" IP on fixture open events. */
+const CLIENT_IP = "203.0.113.24";
+const CLIENT_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
+export const emailFixture = defineProviderFixture<EmailFixture>({
+  id: "email",
+  simulates: "The recipient's inbox: the links in the emails the slot sank (sign-in link, document links, invitations), and a client opening a sent estimate or invoice at a believable earlier time.",
+  seam: "server/email.ts — sinkToOutbox() (the existing dev sink) calls captured()",
+  adapter: () => ({ captured }),
+  actions: {
+    /** { to, match?, subject? } → { url, path }. `match` is a substring of the link; the newest email wins. */
+    link: async (input) => {
+      requireTutorialFixtures("reading an emailed link");
+      const to = String(input.to || "");
+      if (!to.endsWith("example.com")) throw new Error("`to` must be an example.com address");
+      const mails = forAddress(to).filter((k) => !input.subject || k.subject.toLowerCase().includes(String(input.subject).toLowerCase())).reverse();
+      for (const mail of mails) {
+        const url = mail.links.find((l) => (input.match ? l.includes(String(input.match)) : !/\.(png|jpe?g|gif|svg|webp)(\?|$)/i.test(l)));
+        if (url) { const u = new URL(url); return { url, path: `${u.pathname}${u.search}`, subject: mail.subject }; }
+      }
+      throw new Error(`no email to ${to} with ${input.match ? `a link containing "${input.match}"` : "a link"} has been sent in this slot`);
+    },
+    count: async (input) => ({ count: forAddress(String(input.to || "")).length }),
+    /**
+     * The client asks for their sign-in link, the way the page does it for them — the product's own
+     * request route, called on this machine — and the link from the email it sends comes back.
+     *   { to }                              the client portal's sign-in (POST /api/client/auth/request-link)
+     *   { to, invoice: "INV-1999" }         the email check in front of a document (POST /api/public/verify-access);
+     *   { to, estimate: "E-2000" }          the link returns the client to that document
+     * Use it to start a homeowner's session already signed in, when signing in is not what the video is about.
+     */
+    signIn: async (input, { orgId }) => {
+      requireTutorialFixtures("a client sign-in link");
+      const to = String(input.to || "").toLowerCase();
+      if (!to.endsWith("example.com")) throw new Error("`to` must be an example.com address");
+      const { pool } = await import("../../../db");
+      // Addressed as the browser would: documents live on the CRM host, the portal on the client host.
+      const call = (path: string, host: string, body: unknown) => fetch(`http://127.0.0.1:${process.env.PORT}${path}`, {
+        method: "POST", headers: { "content-type": "application/json", "x-forwarded-host": host }, body: JSON.stringify(body) });
+      const before = kept.length;
+      let r: Response;
+      if (input.invoice || input.estimate) {
+        const table = input.invoice ? "crm_invoices" : "crm_estimates";
+        const { rows: [doc] } = await pool.query(`select public_token from ${table} where org_id = $1 and number = $2`, [orgId, String(input.invoice || input.estimate)]);
+        if (!doc) throw new Error(`no document ${input.invoice || input.estimate}`);
+        r = await call("/api/public/verify-access", "portal.constructhub.us", { docType: input.invoice ? "invoice" : "estimate", token: doc.public_token, email: to });
+      } else r = await call("/api/client/auth/request-link", "client.constructhub.us", { email: to });
+      if (!r.ok) throw new Error(`the sign-in request answered ${r.status}`);
+      const mail = kept.slice(before).reverse().find((k) => k.to.includes(to));
+      const url = mail?.links.find((l) => l.includes("/api/client/auth/verify"));
+      if (!url) throw new Error(`no sign-in link was emailed to ${to} — is that the address on the client (or the one the document was sent to)?`);
+      const u = new URL(url);
+      return { url, path: `${u.pathname}${u.search}` };
+    },
+    /**
+     * { title?: "Add hallway closet", client?: "Joe & Mary Kane" }
+     * The client's page of a change order (/co/<token>) — the newest SENT one, or the one named. "Mark
+     * sent & copy link" emails nothing (the contractor pastes the link into their own message), so there
+     * is no email for `email.link` to open: this hands the recorder the same link the button copies.
+     * A draft is refused: a client can only have a link that was marked sent.
+     */
+    changeOrder: async (input, { orgId }) => {
+      requireTutorialFixtures("a change order's client link");
+      const { pool } = await import("../../../db");
+      const { rows: [co] } = await pool.query(
+        `select co.public_token, co.sent_at from crm_change_orders co left join crm_customers c on c.id = co.customer_id
+          where co.org_id = $1 and ($2::text is null or co.title = $2) and ($3::text is null or c.display_name = $3)
+          order by co.sent_at desc nulls last, co.created_at desc limit 1`,
+        [orgId, input.title ? String(input.title) : null, input.client ? String(input.client) : null]);
+      if (!co) throw new Error("no such change order in the demo workspace");
+      if (!co.sent_at) throw new Error("that change order has not been marked sent — the client has no link yet");
+      const path = `/co/${co.public_token}`;
+      return { path, url: `http://portal.constructhub.us:${process.env.PORT}${path}` };
+    },
+    /**
+     * { estimate?: "E-2000", invoice?: "INV-1999", minutesAgo?: 90, visits?: 1, seconds?: 150 }
+     * The same rows the public page writes on a real open (server/crm/portal.ts), dated in the past.
+     */
+    opened: async (input, { orgId }) => {
+      requireTutorialFixtures("marking a document opened");
+      const { pool } = await import("../../../db");
+      const minutes = Math.max(1, Math.min(60 * 24 * 60, Number(input.minutesAgo) || 90));
+      const visits = Math.max(1, Math.min(6, Math.round(Number(input.visits) || 1)));
+      const seconds = Math.max(10, Math.min(3600, Math.round(Number(input.seconds) || 150)));
+      if (input.estimate) {
+        const { rows: [est] } = await pool.query(`select id, sent_at, first_viewed_at from crm_estimates where org_id = $1 and number = $2`, [orgId, String(input.estimate)]);
+        if (!est) throw new Error(`no estimate ${input.estimate}`);
+        if (!est.sent_at) throw new Error(`${input.estimate} has not been sent — an unsent estimate cannot have been opened`);
+        await pool.query(
+          `update crm_estimates set first_viewed_at = coalesce(first_viewed_at, now() - make_interval(mins => $2)), last_viewed_at = now() - make_interval(mins => $3),
+             view_count = coalesce(view_count, 0) + $4, status = case when status = 'sent' then 'viewed' else status end where id = $1`,
+          [est.id, minutes, Math.max(1, Math.round(minutes / visits)), visits]);
+        for (let i = 0; i < visits; i++) {
+          const ago = Math.max(1, Math.round(minutes - (i * minutes) / visits));
+          await pool.query(`insert into crm_estimate_events (org_id, estimate_id, type, actor, ip, user_agent, meta, created_at) values ($1,$2,'viewed','client',$3,$4,$5::jsonb, now() - make_interval(mins => $6))`,
+            [orgId, est.id, CLIENT_IP, CLIENT_UA, JSON.stringify({ firstView: i === 0 && !est.first_viewed_at, fixture: FIXTURE_MARK.id }), ago]);
+          await pool.query(`insert into crm_engagement_sessions (id, org_id, doc_type, doc_id, started_at, last_ping_at, duration_secs, ip, user_agent, created_at)
+                             values ($1,$2,'estimate',$3, now() - make_interval(mins => $4), now() - make_interval(mins => $4) + make_interval(secs => $5), $5, $6, $7, now() - make_interval(mins => $4))`,
+            [`${FIXTURE_MARK.id}visit-${est.id}-${Date.now()}-${i}`, orgId, est.id, ago, Math.round(seconds / visits), CLIENT_IP, CLIENT_UA]);
+        }
+        return { estimate: input.estimate, visits };
+      }
+      if (input.invoice) {
+        const { rows: [inv] } = await pool.query(`select id, sent_at from crm_invoices where org_id = $1 and number = $2`, [orgId, String(input.invoice)]);
+        if (!inv) throw new Error(`no invoice ${input.invoice}`);
+        if (!inv.sent_at) throw new Error(`${input.invoice} has not been sent`);
+        await pool.query(`update crm_invoices set first_viewed_at = coalesce(first_viewed_at, now() - make_interval(mins => $2)), view_count = coalesce(view_count, 0) + $3 where id = $1`, [inv.id, minutes, visits]);
+        return { invoice: input.invoice, visits };
+      }
+      throw new Error("pass `estimate` or `invoice` (its number)");
+    },
+  },
+});

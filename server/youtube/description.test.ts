@@ -1,14 +1,15 @@
 /**
  * The YouTube description builder: its rules on made-up input, then a LINT over every step script
- * in this checkout — and, when they are on this machine, in the sibling worktrees where producers
- * record videos that are not merged yet. Reads files only; nothing here reaches Google.
+ * IN THIS CHECKOUT — and nothing else: no sibling worktree, no analysis/ output, so the result is the
+ * same on every machine. (The lint over every worktree on this machine, where producers record videos
+ * that are not merged yet, is a report: `youtube-schedule.ts --lint-all`.) Reads files only.
  */
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import {
   AREAS, BANNED, DESCRIPTION_MAX_BYTES, DESCRIPTION_TARGET_MAX, DESCRIPTION_TARGET_MIN, MAX_HASHTAGS, TAGS_BUDGET, TITLE_MAX,
-  areaFor, bannedIn, buildDescription, buildTags, chaptersIn, fitTitle, plain, relatedFor, similarity, tagsCost, utf8Bytes, validChapters,
+  BRAND_PRODUCTS, areaFor, bannedIn, buildDescription, buildTags, chaptersIn, fitTitle, lintDescription, plain, relatedFor, similarity, tagsCost, utf8Bytes, validChapters,
   type DescriptionInput,
 } from "./description";
 import { describeVideo, planTitles, scriptKeys, siblingWorktrees, type DescribeContext, type Described } from "./description-sources";
@@ -37,36 +38,9 @@ const input = (o: Partial<DescriptionInput> = {}): DescriptionInput => ({
 const hashtagsOf = (text: string) => text.match(/(?:^|\s)#[A-Za-z]\w*/g) ?? [];
 const timesOf = (text: string) => text.match(/\b\d{1,2}:\d{2}\b/g) ?? [];
 
-/** The rules every description must keep, whatever it was built from. */
+/** The rules every description must keep, whatever it was built from (the library's own list: the CLI's --lint-all uses the same). */
 function lint(d: { helpKey: string; title: string; description: string; tags: string[]; length: number; bytes: number }) {
-  const where = d.helpKey;
-  expect(d.length, where).toBe(d.description.length);
-  expect(d.length, `${where}: characters`).toBeLessThanOrEqual(DESCRIPTION_TARGET_MAX);
-  expect(d.bytes, `${where}: bytes`).toBe(utf8Bytes(d.description));
-  expect(d.bytes, `${where}: bytes`).toBeLessThanOrEqual(DESCRIPTION_MAX_BYTES);
-  expect(/[<>]/.test(d.description + d.title + d.tags.join("")), `${where}: angle brackets`).toBe(false);
-  expect(bannedIn(d.description), `${where}: banned phrases`).toEqual([]);
-  expect(bannedIn(d.title + " " + d.tags.join(" , ")), `${where}: banned phrases in the title or tags`).toEqual([]);
-  // Chapters: either none, or a list YouTube accepts — and no other time anywhere, which YouTube would read as a chapter.
-  const ch = chaptersIn(d.description);
-  if (ch.length) {
-    expect(ch.length, `${where}: chapters`).toBeGreaterThanOrEqual(3);
-    expect(ch[0].sec, `${where}: first chapter`).toBe(0);
-    for (let i = 1; i < ch.length; i++) expect(ch[i].sec - ch[i - 1].sec, `${where}: chapter ${i + 1}`).toBeGreaterThanOrEqual(10);
-    expect(d.description, where).toContain("\nCHAPTERS\n0:00 ");
-  } else expect(d.description, where).not.toContain("CHAPTERS");
-  expect(timesOf(d.description).length, `${where}: times outside the chapter list`).toBe(ch.length);
-  const tags = hashtagsOf(d.description);
-  expect(tags.length, `${where}: hashtags`).toBeGreaterThanOrEqual(3);
-  expect(tags.length, `${where}: hashtags`).toBeLessThanOrEqual(MAX_HASHTAGS);
-  // The only addresses: the site and YouTube's own watch links.
-  for (const url of d.description.match(/https?:\/\/[^\s)]+/g) ?? []) expect(url, where).toMatch(/^https:\/\/(constructhub\.us(\/|$)|www\.youtube\.com\/watch\?v=)/);
-  expect(d.description.slice(0, 200), `${where}: the opening`).toMatch(/ConstructHUB/);
-  expect(d.description, where).toContain("Try ConstructHUB: https://constructhub.us");
-  expect(d.title.length, `${where}: title`).toBeLessThanOrEqual(TITLE_MAX);
-  expect(tagsCost(d.tags), `${where}: tags`).toBeLessThanOrEqual(TAGS_BUDGET);
-  expect(new Set(d.tags.map((t) => t.toLowerCase())).size, `${where}: duplicate tags`).toBe(d.tags.length);
-  expect(d.description, where).not.toMatch(/\n{3,}/);
+  expect(lintDescription(d), d.helpKey).toEqual([]);
 }
 
 describe("the description builder", () => {
@@ -204,6 +178,72 @@ describe("the description builder", () => {
   });
 });
 
+/* ── The overview films ───────────────────────────────────────────────────── */
+
+describe("the brand description (\"Start here\" films)", () => {
+  const brandEntry = {
+    title: "What is ConstructHUB?", group: "Start here",
+    whatItIs: "ConstructHUB is two products for contractors: Business tools for finding work and looking after your Google listing, and a CRM for running the jobs you win.",
+    whatItDoes: "Business tools hold the permit office directory. The CRM holds clients, estimates and invoices.",
+    howToUse: ["Open constructhub.us and create an account.", "Choose Business tools, the CRM, or both."],
+    howItWorks: "Permit office links are checked.", needs: ["A ConstructHUB account."],
+  };
+  const film = (o: Partial<DescriptionInput> = {}): DescriptionInput => ({
+    helpKey: "brand-what-is-constructhub", title: "What is ConstructHUB? Business tools and a CRM for contractors", summary: null, entry: brandEntry,
+    steps: [{ caption: "The problem", narration: "Leads in one app. Estimates in another.", chapter: "The problem" }, { caption: "Two products", narration: "ConstructHUB is two products." },
+      { caption: "Directory", narration: "Business tools start with a directory of permit offices.", chapter: "Business tools" }, { caption: "CRM", narration: "The second product is the CRM.", chapter: "The CRM" }],
+    chapters: [{ at: "0:00", title: "The problem" }, { at: "0:12", title: "Business tools" }, { at: "0:34", title: "The CRM" }], durationSec: 72,
+    tags: ["what is constructhub", "contractor software"], track: null, related: [{ helpKey: "crm-clients", title: "How to find a client" }], ...o,
+  });
+
+  it("is a channel trailer, not a tutorial: what it is, the two products, links, chapters, what the film says, how to start", () => {
+    const d = buildDescription(film());
+    lint(d);
+    expect(d).toMatchObject({ variant: "brand", area: "brand", chapters: true, underTarget: false });
+    expect(d.description.split("\n")[0]).toBe(brandEntry.whatItIs);
+    for (const line of BRAND_PRODUCTS) expect(d.description).toContain(line);
+    const order = ["THE TWO PRODUCTS", "LINKS", "CHAPTERS", "WHAT THE FILM SAYS", "HOW TO START", "GOOD TO KNOW"].map((h) => d.description.indexOf(`\n${h}\n`));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(d.description).toContain("Plans for each product: https://constructhub.us/pricing");
+    expect(d.description).toContain("Permit office directory: https://constructhub.us/databases");
+    expect(d.description).toContain("https://constructhub.us/tutorials#help-brand-what-is-constructhub");
+    expect(d.description).toContain("▶ The problem\nLeads in one app. Estimates in another. ConstructHUB is two products.");
+    expect(d.description).toContain("1. Open constructhub.us and create an account.");
+    expect(d.description).toContain("sample data");
+    // None of the tutorial template: no "how to" hook, no keyword bank, no related list, no price, no length padding.
+    expect(d.description).not.toMatch(/STEP BY STEP|Search terms:|WHY CONTRACTORS|RELATED|IN THIS VIDEO|How to find a client|\$\s?\d/);
+    expect(d.description.length).toBeLessThan(DESCRIPTION_TARGET_MIN);
+    expect(d.notes.join(" ")).not.toMatch(/padding/);
+    expect(d.tags.slice(0, 2)).toEqual(["what is constructhub", "contractor software"]);
+    expect(d.tags).toContain("ConstructHUB");
+    expect(buildDescription(film()).sha256).toBe(d.sha256);
+  });
+
+  it("is chosen by the help group, or asked for; a CRM entry still gets the tutorial text", () => {
+    expect(buildDescription(film({ entry: null })).variant).toBe("tutorial");
+    expect(buildDescription(film({ entry: null, variant: "brand" })).variant).toBe("brand");
+    expect(buildDescription(input()).variant).toBe("tutorial");
+  });
+
+  it("keeps the banned words out, leaves a bad chapter list out, and drops the narration before it runs over", () => {
+    const d = buildDescription(film({ steps: [{ caption: "x", narration: "It is the best CRM. ConstructHUB is two products." }], chapters: [{ at: "0:00", title: "A" }, { at: "0:04", title: "B" }] }));
+    lint(d);
+    expect(d.description).not.toMatch(/the best CRM|CHAPTERS/);
+    expect(d.notes.join(" ")).toMatch(/left out/);
+    const long = buildDescription(film({ steps: Array.from({ length: 80 }, (_, i) => ({ caption: `c${i}`, narration: `Sentence number ${i} of a narration that goes on for far longer than any film's would.` })), chapters: null }));
+    lint(long);
+    expect(long.description).not.toContain("WHAT THE FILM SAYS");
+    expect(long.notes.join(" ")).toMatch(/narration is left out/);
+  });
+
+  it("the two films of this checkout get it", async () => {
+    const all = (await describeAll([ROOT], [])).filter((d) => d.helpKey.startsWith("brand-"));
+    expect(all.map((d) => d.helpKey)).toEqual(expect.arrayContaining(["brand-what-is-constructhub", "brand-tour-crm"]));
+    for (const d of all) { lint(d); expect(d.variant, d.helpKey).toBe("brand"); expect(d.description, d.helpKey).toContain("THE TWO PRODUCTS"); }
+  });
+});
+
 /* ── The lint over the real scripts ───────────────────────────────────────── */
 
 async function describeAll(worktrees: string[], outDirs: string[]): Promise<Described[]> {
@@ -219,8 +259,10 @@ function lintAll(all: Described[]) {
   const short: string[] = [];
   for (const d of all) {
     lint(d);
-    // 4,300 or more wherever the script and the entry hold enough; a shorter one must say so, and is reported, not padded.
-    if (d.length < DESCRIPTION_TARGET_MIN) { expect(d.underTarget, d.helpKey).toBe(true); short.push(`${d.helpKey} (${d.length})`); }
+    // 4,300 or more wherever the script and the entry hold enough. A shorter one is NOT a failure: it says so
+    // (`underTarget` + a note the scheduler's dry run prints) and is reported here — never padded.
+    if (d.variant === "brand") { expect(d.underTarget, d.helpKey).toBe(false); continue; } // a film has no length target
+    if (d.length < DESCRIPTION_TARGET_MIN) { expect(d.underTarget, d.helpKey).toBe(true); expect(d.notes.join(" "), d.helpKey).toMatch(/without padding/); short.push(`${d.helpKey} (${d.length})`); }
     else expect(d.underTarget, d.helpKey).toBe(false);
     if (/^(crm-|jobcam)/.test(d.helpKey)) expect(d.description, d.helpKey).toContain("separate product with its own plans");
   }
@@ -233,13 +275,26 @@ function lintAll(all: Described[]) {
   return { short, worst };
 }
 
+describe("good / better / best is the name of three options, not a claim", () => {
+  it("reads past the phrase, and past Best as a label where the text is about the three options — and nowhere else", () => {
+    expect(bannedIn("Add a Good, a Better and a Best option.\n▶ Good\n▶ Better\n▶ Best\n13. Best: the top option")).toEqual([]);
+    expect(bannedIn("▶ Best\nThe best CRM")).toEqual(["best"]);                       // no three options here
+    expect(bannedIn("Good, better and best.\nIt is the best CRM.")).toEqual(["best"]); // a claim is still a claim
+  });
+});
+
 describe("lint: every step script's description", () => {
   it("this checkout: every script builds a description that keeps all the rules, and no two are near-copies", async () => {
-    const all = await describeAll([ROOT], [path.join(ROOT, "analysis", "video-out")]);
+    // Only what is committed: this checkout's scripts and entries, no production folder (chapter times come
+    // from one, so the text is checked here in its chapter-less form; --lint-all checks the produced form).
+    const all = await describeAll([ROOT], []);
     expect(all.length).toBeGreaterThanOrEqual(5);
-    const { short } = lintAll(all);
-    expect(short, "scripts of this checkout that cannot reach the target").toEqual([]);
+    const { short, worst } = lintAll(all);
+    console.info(`description lint: ${all.length} scripts in this checkout · ${Math.min(...all.map((d) => d.length))}–${Math.max(...all.map((d) => d.length))} characters · most alike ${worst.s.toFixed(2)} (${worst.pair})`
+      + (short.length ? `\n  UNDER ${DESCRIPTION_TARGET_MIN}, reported and not padded: ${short.join(", ")}` : ""));
     for (const d of all) expect(d.input.entry, `${d.helpKey}: no help entry`).not.toBeNull();
+    // Short is allowed, but it is the exception: most scripts reach the target from their own material.
+    expect(short.length, `too many under the target: ${short.join(", ")}`).toBeLessThan(all.length / 4);
   });
 
   it("the Database Directory video is described as the permit directory it is, not as a CRM video", async () => {
@@ -254,17 +309,10 @@ describe("lint: every step script's description", () => {
     expect(d.tags).toEqual(expect.arrayContaining(["building permit lookup", "permit office lookup", "permit portal", "county building permits", "city building permits"]));
   });
 
-  it("the sibling worktrees too, when they are on this machine: videos that are produced but not merged yet", async () => {
-    const worktrees = siblingWorktrees(ROOT);
-    if (worktrees.length < 2) return; // a lone checkout (CI): the test above has covered everything there is
-    const outDirs = worktrees.map((w) => path.join(w, "analysis", "video-out")).filter((d) => fs.existsSync(d));
-    const all = await describeAll(worktrees, outDirs);
-    const { short, worst } = lintAll(all);
-    const noEntry = all.filter((d) => !d.input.entry).map((d) => d.helpKey);
-    console.info(`description lint: ${all.length} scripts in ${worktrees.length} worktrees · ${Math.min(...all.map((d) => d.length))}–${Math.max(...all.map((d) => d.length))} characters · most alike ${worst.s.toFixed(2)} (${worst.pair})`
-      + (short.length ? `\n  UNDER ${DESCRIPTION_TARGET_MIN} (not padded): ${short.join(", ")}` : "") + (noEntry.length ? `\n  no help entry found: ${noEntry.join(", ")}` : ""));
-    // A description is short only for want of material: with a help entry and a script of ordinary length it reaches the target.
-    for (const d of all) if (d.input.entry && d.input.steps.length >= 8) expect(d.underTarget, `${d.helpKey}: ${d.length}`).toBe(false);
+  it("never reads a sibling worktree: the same scripts are found whatever else is on the machine", () => {
+    const here = fs.readdirSync(path.join(ROOT, "docs", "tutorials", "scripts")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
+    expect(scriptKeys([ROOT])).toEqual(here);
+    expect(siblingWorktrees(ROOT)[0]).toBe(ROOT); // the CLI's --lint-all starts from here and adds the others
   });
 
   it("reads the planned titles for the related list", () => {

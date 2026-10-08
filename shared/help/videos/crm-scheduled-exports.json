@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-scheduled-exports",
+  "durationSec": 72,
+  "video": {
+    "key": "tutorials/crm-scheduled-exports.c5be620c.mp4",
+    "bytes": 6994131,
+    "sha256": "c5be620cbbfdd771ced79e65a86130da6ae4c0b4d8ff75b0cc6157266e0c0392"
+  },
+  "captions": {
+    "key": "tutorials/crm-scheduled-exports.c637e204.vtt",
+    "bytes": 1447,
+    "sha256": "c637e20402e83537d55c58996132c1bd222d3393e1416661272a3c19c39f95e4"
+  },
+  "poster": {
+    "key": "tutorials/crm-scheduled-exports.9a0aebca.jpg",
+    "bytes": 104827,
+    "sha256": "9a0aebca051cd5ddf7428c4244fb99635e758dd166bb18bce842c5a2d89d5cf3"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:52:06.171Z",
+    "video": "8769dbd1d9172ce3535ac0f7d0e76f7d",
+    "captions": "b69887c131277e8d21f87af4a421e6d6",
+    "poster": "0162a269dbb157fa358959a8f1f35795"
+  }
+}

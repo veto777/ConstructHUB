@@ -1,0 +1,150 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-budget",
+  "title": "Set a job's budget",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the job",
+      "narration": "Give a job a budget, and the CRM compares it with what you spend."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1996\") a",
+      "caption": "Open the job",
+      "narration": "Open the job from the Pipeline. Here, the Wrenhaven reception flooring job, in White Plains.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Budget\"]/..",
+      "caption": "Budget is zero",
+      "narration": "Its Budget box is still at zero."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"form-cost-entry\"]",
+      "caption": "The entry row",
+      "chapter": "Add budget lines",
+      "narration": "Budgets are set on the Costing tab, with this entry row."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-kind\"]",
+      "value": "Budget",
+      "caption": "Entry: Budget",
+      "narration": "Under Entry, choose Budget."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-code\"]",
+      "value": "09-300 · Flooring",
+      "caption": "Cost code",
+      "narration": "Pick a cost code. Cost codes sort a job's money by type of work, like Flooring."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-desc\"]",
+      "value": "Plank and underlayment",
+      "caption": "Notes",
+      "narration": "Add a note if you like."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-amount\"]",
+      "value": "5200",
+      "caption": "Amount",
+      "narration": "Type the budget for that code."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-cost\"]",
+      "caption": "Add",
+      "narration": "And click the plus button.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"cost-line-09-300\"]",
+      "caption": "The Flooring line",
+      "narration": "Flooring now has a line, with its budget."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-code\"]",
+      "value": "06-200 · Finish Carpentry",
+      "caption": "A second code",
+      "narration": "Add a line for every code you want to track. Next, Finish Carpentry."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-amount\"]",
+      "value": "900",
+      "caption": "Amount",
+      "narration": "Type its amount."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-cost\"]",
+      "caption": "Add",
+      "narration": "And add it.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"cost-line-06-200\"]",
+      "caption": "A line per code",
+      "chapter": "Read the numbers",
+      "narration": "Each code has its own line: budget, committed, actual and variance."
+    },
+    {
+      "action": "highlight",
+      "selector": "th:has-text(\"Variance\")",
+      "caption": "Variance",
+      "narration": "Variance is the budget minus the actual cost. Nothing is spent yet, so it equals the budget."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Budget\"]/..",
+      "caption": "The total budget",
+      "narration": "At the top, the Budget box adds your lines together."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Where to find it",
+      "narration": "Open any job from Pipeline, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set a budget for a job | ConstructHUB CRM",
+    "description": "Set a job's budget by cost code in the ConstructHUB CRM. Open the job, add a budget line for each cost code on the Costing tab, and read the Budget total and the Variance column. Recorded in a demo workspace with a made-up client.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "job costing",
+      "job budget",
+      "cost codes",
+      "construction budget",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Budget every job",
+    "accent": "Budget",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-quick-actions",
+  "title": "Quick actions on a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "caption": "Clients",
+      "narration": "A client's page in the ConstructHUB CRM has Quick actions, for the jobs you do most.",
+      "url": "/crm/clients",
+      "chapter": "Schedule an appointment"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Rafael Quintanilla\")",
+      "caption": "Open the client",
+      "narration": "Open a client. We'll use Rafael Quintanilla.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-quick-actions\"]",
+      "caption": "Quick actions",
+      "narration": "Quick actions sit right under the client's details."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-schedule-appointment\"]",
+      "caption": "Schedule appointment",
+      "narration": "Schedule appointment books a visit.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-title\"]",
+      "caption": "Title",
+      "narration": "Give it a title.",
+      "value": "Final walkthrough"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-start\"]",
+      "caption": "Starts",
+      "narration": "Set when it starts,",
+      "value": "{{DATE+3}}T09:00"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-end\"]",
+      "caption": "Ends",
+      "narration": "and when it ends.",
+      "value": "{{DATE+3}}T10:00"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-appointment\"]",
+      "caption": "Schedule",
+      "narration": "Then choose Schedule.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"appointment-\"]:has-text(\"Final walkthrough\")",
+      "caption": "On the page and the calendar",
+      "narration": "The visit is on this page, and on your calendar."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-quick-estimate\"]",
+      "caption": "New estimate",
+      "narration": "New estimate starts a bid for this client.",
+      "chapter": "Estimate and pipeline",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-estimate-title\"]",
+      "caption": "The estimate form",
+      "narration": "It opens for this client. Give it a title and add your lines."
+    },
+    {
+      "action": "press",
+      "caption": "Close",
+      "narration": "We'll close it for now.",
+      "value": "Escape"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-quick-pipeline\"]",
+      "caption": "Add to pipeline",
+      "narration": "Add to pipeline starts a new project for them.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-project-name\"]",
+      "caption": "Project name",
+      "narration": "Name the job,",
+      "value": "Hallway floor"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-project\"]",
+      "caption": "Create project",
+      "narration": "and choose Create project.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"project-\"]:has-text(\"Hallway floor\")",
+      "caption": "A new project",
+      "narration": "The project is on this page, and in the Lead column of your pipeline."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-take-payment\"]",
+      "caption": "Take a payment",
+      "narration": "And Take a payment opens the payment form for this client.",
+      "chapter": "Take a payment",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-take-invoice\"]",
+      "caption": "The invoice",
+      "narration": "Their open invoice is already picked."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-create-checkout-link\"]",
+      "caption": "Create payment link",
+      "narration": "Create payment link makes a secure link they can pay online."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-record-manual-payment\"]",
+      "caption": "Record a payment",
+      "narration": "Or record a check or cash they already gave you."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "We'll close this one too."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find Quick actions on every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to use quick actions on a client | ConstructHUB CRM",
+    "description": "A short walkthrough of Quick actions on a client's page in the ConstructHUB CRM. You will book a visit, start an estimate, add a project to your pipeline and open the payment form without leaving the client. The walkthrough uses a demo company and demo clients.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "client management",
+      "job scheduling",
+      "sales pipeline"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Four client shortcuts",
+    "accent": "shortcuts",
+    "step": 2,
+    "kicker": "CRM Tutorial"
+  }
+}

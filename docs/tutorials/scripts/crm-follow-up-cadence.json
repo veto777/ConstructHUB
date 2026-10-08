@@ -1,0 +1,124 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-follow-up-cadence",
+  "title": "Put a client on a follow-up rhythm",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "chapter": "Who is due today",
+      "narration": "Some clients need a regular check-in. A follow-up rhythm reminds you when it is time."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-follow-ups-due\"]",
+      "caption": "Due for follow-up",
+      "narration": "On Home, under Needs attention, Due for follow-up lists who to contact today."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-followup-done-\"]",
+      "caption": "Done",
+      "narration": "After you have been in touch, choose Done.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-team-activity\"] >> text=/followed up with/",
+      "caption": "Logged under Activity",
+      "narration": "The follow-up is logged under Activity, and the client leaves the list."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-manage-follow-ups\"]",
+      "caption": "Follow-ups",
+      "chapter": "Set the rhythm",
+      "narration": "To see everyone on a rhythm, choose Follow-ups.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"followup-row-\"]:has-text(\"Ferrante\")",
+      "caption": "Next due",
+      "narration": "This client stays on a weekly rhythm. The next date has moved on a week."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"select-add-follow-up-search\"]",
+      "value": "Brewster",
+      "caption": "Add a client",
+      "narration": "To add someone, search for the client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"select-add-follow-up-option-\"]:has-text(\"Imani Brewster\")",
+      "caption": "Imani Brewster",
+      "narration": "Choose their name. A new client starts on weekly.",
+      "holdMs": 800
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid^=\"followup-row-\"]:has-text(\"Imani Brewster\") [data-testid^=\"select-cadence-\"]",
+      "value": "Biweekly",
+      "caption": "Biweekly",
+      "narration": "Change it to Biweekly for a check-in every two weeks."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"followup-row-\"]:has-text(\"Ferrante\") [data-testid^=\"select-cadence-\"]",
+      "caption": "Open the list",
+      "chapter": "Take a client off",
+      "narration": "When a client no longer needs it, open their list.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "role=option[name=\"Off\"]",
+      "caption": "Off",
+      "narration": "And choose Off. They are taken off the rhythm.",
+      "holdMs": 900
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "Close the window. Whoever comes due next shows up under Needs attention.",
+      "holdMs": 600
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-home\"]",
+      "caption": "Where to find it",
+      "narration": "Follow-ups are on Home, at the top of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set a follow-up rhythm for a client | ConstructHUB CRM",
+    "description": "Keep in touch with clients on a weekly or biweekly rhythm in the ConstructHUB CRM. See who is due today on Home, mark a follow-up Done, add a client to a rhythm, change it, and take a client off. Recorded in a demo workspace with made-up clients.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "follow up with leads",
+      "client follow-up",
+      "sales follow-up",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Follow up on time",
+    "accent": "time",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}
