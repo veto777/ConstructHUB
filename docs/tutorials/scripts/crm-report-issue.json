@@ -1,0 +1,113 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-report-issue",
+  "title": "Report an issue from the CRM",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Any CRM page",
+      "chapter": "Open Report an issue",
+      "narration": "When something in the CRM doesn't work, you can tell us from the page you are on."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-crm-footer-report-issue\"]",
+      "caption": "Report an issue",
+      "narration": "At the bottom of the page, choose Report an issue."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-report-trying\"]",
+      "value": "Send an estimate to a client",
+      "caption": "What were you trying to do?",
+      "chapter": "Describe the problem",
+      "narration": "First, say what you were trying to do."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-report-happened\"]",
+      "value": "I chose Send estimate and the button kept spinning.",
+      "caption": "What happened instead?",
+      "narration": "Then say what happened instead: what you clicked, and what you saw."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Please leave out passwords",
+      "caption": "No passwords",
+      "narration": "Leave out passwords and card numbers. We never need them."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-report-page\"]",
+      "caption": "Which page?",
+      "narration": "Which page is filled in from where you came from. Change it if the problem is somewhere else."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"option-report-impact-broken\"]",
+      "caption": "How bad is it?",
+      "narration": "Pick how bad it is. A report that says you can't use the site is looked at first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-report-screenshot\"]",
+      "caption": "Screenshot",
+      "narration": "You can add one screenshot. It's optional."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-report-submit\"]",
+      "caption": "Send report",
+      "chapter": "Send it and follow it",
+      "narration": "Then choose Send report."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"report-confirmation\"]",
+      "caption": "Report number",
+      "narration": "You get a report number, and the issue desk reads every report."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-your-reports\"]",
+      "caption": "Your reports",
+      "narration": "Your reports shows its status. Our reply appears here too."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-crm-footer-report-issue\"]",
+      "caption": "Bottom of every page",
+      "narration": "You'll find Report an issue at the bottom of every CRM page."
+    }
+  ],
+  "youtube": {
+    "title": "How to report an issue from the CRM | ConstructHUB CRM",
+    "description": "A short walkthrough of Report an issue in the ConstructHUB CRM. You will say what you were trying to do and what happened, pick how bad it is, and send the report. Then you will see where its status and our reply appear.",
+    "tags": [
+      "report a problem",
+      "CRM support",
+      "get help",
+      "bug report",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Something broken? Tell us",
+    "accent": "broken?",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}
