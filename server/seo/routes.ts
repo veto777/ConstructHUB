@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { scanInput, locateInput, pinInput, readPin, savePin, saveScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
 import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
 import { randomUUID } from "node:crypto";
@@ -92,6 +93,9 @@ export const SEO_PRICES = {
   bulkPer100: retailCents(100 * LABS_ITEM_USD),
   /** One page of Link intersect (the most it costs, for up to three competitors). Content gap is competitorGap per competitor. */
   linkIntersect: retailCents(gapEstimateUsd("links", GAP_MAX_COMPETITORS, 50)),
+  /** Local grid: finding the business on Google Maps, and so much per 100 points scanned. */
+  gridLocate: retailCents(GRID_POINT_USD),
+  gridPer100: retailCents(100 * GRID_POINT_USD),
   /** Per 100 rank checks (one keyword on one device is one check, top 10). */
   rankChecksPer100: retailCents(estimateRankCheckUsd(Array.from({ length: 100 }, (_, i) => `k${i}`), "desktop", 10).usd),
 };
@@ -110,6 +114,8 @@ export const SEO_HOLDS = {
   aiPerplexity: retailCents(AI_ENGINES.perplexity.estimateUsd),
   aiMentions: retailCents(AI_MENTIONS_ESTIMATE_USD),
   contentSearch: retailCents(CONTENT_ESTIMATE_USD),
+  gridLocate: retailCents(gridEstimateUsd(1)),
+  gridPer100: retailCents(gridEstimateUsd(100)),
   /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
   batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
   batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD * 1.2 + LABS_ITEM_USD)),
@@ -577,6 +583,55 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<ReportPage>(user, key, `report:${input.table}`, CACHE_HOURS, REPORT_ESTIMATE_USD, () => fetchReportPage(full), false, `${REPORT_NAMES[input.table] ?? input.table} — ${target}`);
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Local grid: Google Maps positions across the service area ───────────────
+  // The saved pin and the scans so far. Spends nothing.
+  route("get", "/api/seo/sites/:id/grid", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
+  });
+  // Search Google Maps for the business, to choose the listing the grid is centred on. One small lookup.
+  route("post", "/api/seo/sites/:id/grid/locate", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = locateInput.parse(req.body);
+    if (!isConfigured()) return notReady(res);
+    const out = await once(`grid-locate:${user}:${site.id}:${input.query.toLowerCase()}`, () =>
+      withBudget(user, gridEstimateUsd(1), () => locateBusiness(input.query), { label: `Local grid — finding "${input.query.slice(0, 80)}" on Google Maps` }));
+    res.json({ listings: out.data as MapListing[] });
+  });
+  route("post", "/api/seo/sites/:id/grid/pin", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const pin = pinInput.parse(req.body);
+    await savePin(user, site.id, pin);
+    res.json({ pin });
+  });
+  // One scan: every point is one Google Maps lookup. Kept in the history; never reused, because positions move.
+  route("post", "/api/seo/sites/:id/grid/scan", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = scanInput.parse(req.body);
+    const keyword = cleanKeyword(input.keyword);
+    if (!keyword) return res.status(400).json({ message: "Enter a search to check." });
+    const pin = readPin((site as { grid_pin?: unknown }).grid_pin);
+    if (!pin) return res.status(400).json({ message: "Choose your business on Google Maps first." });
+    if (!isConfigured()) return notReady(res);
+    const points = input.size * input.size;
+    const flight = `grid:${user}:${site.id}:${keyword}:${input.size}:${input.spacing}`;
+    const waiting = inflight.has(flight);
+    const out = await once(flight, async () => {
+      const o = await withBudget(user, gridEstimateUsd(points), () => fetchGrid({ keyword, size: input.size, spacing: input.spacing, pin, domain: site.domain }),
+        { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` });
+      let id: number | null = null;
+      const kept = await keep(`local grid scan for site ${site.id}`, async () => { id = await saveScan(user, site.id, o.data as GridScan, o.costUsd); });
+      return { scan: o.data as GridScan, id, saved: kept };
+    });
+    res.status(waiting ? 200 : 201).json({ ...out, reused: waiting });
+  });
+  route("get", "/api/seo/sites/:id/grid/:scanId", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const scan = await getScan(user, site.id, id.parse(req.params.scanId));
+    if (!scan) return res.status(404).json({ message: "That scan is no longer there." });
+    res.json({ scan });
   });
 
   // ── Keywords Explorer: one keyword's overview ───────────────────────────────

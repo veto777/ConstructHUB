@@ -3,6 +3,7 @@ import { LIST_SCHEMA_DDL } from "./lists";
 import { REPORT_SCHEDULE_DDL } from "./site-report";
 import { VOICE_SCHEMA_DDL } from "./voice";
 import { AI_SCHEMA_DDL } from "./ai-visibility";
+import { GRID_SCHEMA_DDL } from "./grid";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -111,6 +112,7 @@ export const SEO_SCHEMA_DDL = [
   ...REPORT_SCHEMA_DDL,
   // AI visibility: saved answers from the assistants (server/seo/ai-visibility.ts).
   ...AI_SCHEMA_DDL,
+  ...GRID_SCHEMA_DDL,
   // Followed competitors and the saved result pages (server/seo/voice.ts).
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
