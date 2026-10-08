@@ -17,6 +17,7 @@
  */
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
+import { setMentionWatch, mentionWatchView } from "./mention-watch";
 import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
@@ -815,7 +816,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
     const places = await placesOf(site);
     const page = name ? await cached<MentionsPage>(user, mentionsKey(site.domain, name), MENTIONS_CACHE_HOURS) : null;
-    res.json({ name, places, page: page ? await mentionsView(site.id, user, page, places) : null, rows: MENTIONS_ROWS });
+    const watch = await mentionWatchView(user, site as any, name || "");
+    res.json({
+      name, places, page: page ? await mentionsView(site.id, user, page, places) : null, rows: MENTIONS_ROWS,
+      watch: { ...watch, latest: watch.latest ? { ...watch.latest, page: await mentionsView(site.id, user, watch.latest.page, places) } : null },
+    });
   });
   // The places a mention is read for. Spends nothing.
   route("post", "/api/seo/sites/:id/mentions/places", async (req, res, user) => {
@@ -823,6 +828,15 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const places = [...new Set(placesInput.parse(req.body?.places).map((p) => p.replace(/\s+/g, " ")))];
     await pool.query("UPDATE seo_sites SET mention_places=$3 WHERE id=$1 AND user_id=$2", [site.id, user, places]);
     res.json({ places });
+  });
+  // The monthly mentions watch (server/seo/mention-watch.ts): on or off. Spends nothing itself; the scheduler buys from
+  // the month's included data only.
+  route("post", "/api/seo/sites/:id/mentions/watch", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const { watch } = z.object({ watch: z.boolean() }).strict().parse(req.body);
+    if (watch && !((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim()) return res.status(400).json({ message: "Look for mentions of the business name once first, so the watch knows which name to follow." });
+    await setMentionWatch(user, site.id, watch);
+    res.json({ watch });
   });
   // The customer's verdict on one website for one name: "mine", "not_mine", or null to take it back. Spends nothing.
   route("post", "/api/seo/sites/:id/mentions/marks", async (req, res, user) => {

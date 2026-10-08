@@ -6,6 +6,7 @@ import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { GRID_SCHEMA_DDL } from "./grid";
 import { RENDER_SCHEMA_DDL } from "./render-check";
 import { KEYWORD_WATCH_DDL, KEYWORD_WATCH_ALERT_DDL } from "./keyword-watch";
+import { MENTION_WATCH_DDL, MENTION_WATCH_ALERT_DDL } from "./mention-watch";
 import { GRID_WATCH_DDL } from "./grid-monitor";
 import { TASK_SCHEMA_DDL } from "./tasks";
 import { pool } from "../db";
@@ -219,6 +220,9 @@ export const SEO_SCHEMA_DDL = [
   ...GRID_WATCH_DDL,
   // After the grid's: the alert kinds for the keyword watch (it replaces the same rule with the full list).
   ...KEYWORD_WATCH_ALERT_DDL,
+  ...MENTION_WATCH_DDL,
+  // Last of all: the mentions watch's alert kind (the full list again, so it holds whatever ran before it).
+  ...MENTION_WATCH_ALERT_DDL,
 ];
 
 export async function ensureSeoSchema() {

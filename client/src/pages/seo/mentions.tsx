@@ -13,7 +13,8 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
 type Page = { name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
-type View = { name: string; places: string[]; page: Page | null; rows: number };
+type Watch = { watch: boolean; nextAt: string | null; latest: { id: number; since: string; takenAt: string; page: Page } | null };
+type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
 /** Whether the words of `name` appear together, as whole words, in `text`. */
@@ -118,6 +119,7 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   const tabs: [typeof filter, string, number][] = [["prospects", "Likely you, no link", groups.prospects.length], ["yours", "Likely you", groups.yours.length], ["unsure", "Name only — check it is you", groups.unsure.length], ["linked", "Website links to you", groups.linked.length], ["notMine", "Marked not you", groups.notMine.length], ["all", "All", groups.all.length]];
   return (
     <div data-testid="mentions">
+      {q.data?.watch && <WatchPanel siteId={siteId} name={q.data.name} watch={q.data.watch} />}
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">Pages on other websites that use your business's exact name, and whether those websites link to you. A website that writes about you without linking is the easiest link to ask for. Other businesses can share your name, so each page is read for your places: a page that names one of them is more likely to be about you — not certain (a directory can list several businesses, and two can share a name in one town), so check before you ask.</p>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="flex min-w-0 flex-col text-[13px]"><span className="g-text-2 mb-1">Business name, exactly as written</span>
@@ -175,6 +177,32 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
           )}
           <p className="g-text-2 mt-2 text-[12px]">Read from each page's title and the excerpt the source returns, not the whole page — a page about you that doesn't name a town in its excerpt lands under "check it is you". "Links to you" means our link data has a link from that website to yours, from any of its pages; "no link found" can also be a link it hasn't crawled yet. Authority is the website's, 0-100.</p>
         </>
+      )}
+    </div>
+  );
+}
+
+/** The monthly watch: on or off, the next date, and the pages published since the check before it. */
+function WatchPanel({ siteId, name, watch }: { siteId: number; name: string; watch: Watch }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const set = useMutation({
+    mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/watch`, { watch: v.watch }),
+    onSuccess: (_d, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); toast({ title: v.watch ? "Mentions watch is on" : "Mentions watch is off", description: v.watch ? "Once a month, from your included SEO data, new pages that use the name are looked for; likely ones raise an alert." : "Checks already made are kept." }); },
+    onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const l = watch.latest;
+  return (
+    <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }} data-testid="mentions-watch">
+      <div className="flex flex-wrap items-center gap-3 text-[13px]">
+        <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={set.isPending && set.variables?.siteId === siteId ? set.variables.watch : watch.watch} disabled={set.isPending || !name} onChange={(e) => set.mutate({ siteId, watch: e.target.checked })} data-testid="checkbox-mentions-watch" /><span className="g-text">Watch for new mentions every month</span></label>
+        <span className="g-text-2">{!name ? "Look for mentions once first, so the watch knows which name to follow." : watch.watch ? `Following "${name}".${watch.nextAt ? ` Next: ${fmtDate(watch.nextAt)}.` : ""}` : "From your included SEO data only; when that has run out it waits, and is never charged to credit you bought."}</span>
+      </div>
+      {l && (
+        <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">
+          <p className="g-text-2">Pages published between {fmtDate(l.since)} and {fmtDate(l.takenAt)} that use "{l.page.name}": {fmtNum(l.page.rows.length)}{l.page.rows.length >= 50 ? " (the 50 newest)" : ""}. A page the source has no date for is not seen here.</p>
+          {l.page.rows.length > 0 && <ul className="mt-1 space-y-0.5">{l.page.rows.slice(0, 10).map((r) => <li key={r.url}><a href={r.url} className="g-link" target="_blank" rel="noreferrer">{r.domain}</a><span className="g-text-2"> — {r.title}{r.mark === "mine" ? " · you confirmed this website" : r.mark === "not_mine" ? " · marked not you" : r.place ? ` · names ${r.place}` : " · names none of your places"}{r.linksToYou === true ? " · links to you" : r.linksToYou === null ? " · link not known" : ""}</span></li>)}</ul>}
+        </div>
       )}
     </div>
   );

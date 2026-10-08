@@ -14,7 +14,8 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, us
 import { KeywordWatch, type KwPick } from "./keyword-watch";
 import { marketLabel } from "@shared/seo-markets";
 
-type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up" | "kw_new" | "kw_lost";
+type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up" | "kw_new" | "kw_lost" | "mention_new";
+type MentionItem = { checkId: number; name: string; since: string; takenOn: string; linksChecked?: boolean; pages: { domain: string; url: string; title: string; place: string | null; confirmed: boolean; linksToYou: boolean | null }[]; more?: number };
 type KwItem = { since: string; takenOn?: string; snapshotId?: number; beforeId?: number; locationCode?: number; languageCode?: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
 type GridItem = { keyword: string; size: number; spacing: number; top3: number; checked: number; score: number | null; wasTop3: number; wasChecked: number; wasScore: number | null; since: string };
 type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null };
@@ -26,8 +27,9 @@ const KIND: Record<Kind, { label: string; good: boolean }> = {
   links_lost: { label: "Links lost", good: false }, links_gained: { label: "Links gained", good: true },
   grid_down: { label: "Local grid worse", good: false }, grid_up: { label: "Local grid better", good: true },
   kw_new: { label: "Searches newly seen", good: true }, kw_lost: { label: "Searches no longer seen", good: false },
+  mention_new: { label: "New mentions", good: true },
 };
-const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better", kw_new: "Newly seen", kw_lost: "No longer seen" };
+const FILTER_LABEL: Record<Kind, string> = { rank_drop: "Rankings fell", rank_gain: "Rankings improved", links_lost: "Links lost", links_gained: "Links gained", grid_down: "Local grid worse", grid_up: "Local grid better", kw_new: "Newly seen", kw_lost: "No longer seen", mention_new: "New mentions" };
 const WHAT: Record<RankItem["what"], (i: RankItem) => string> = {
   dropped: (i) => `fell from ${i.from} to ${i.to}`,
   lost: (i) => `dropped out of the results (was ${i.from})`,
@@ -78,7 +80,7 @@ export default function SeoAlertsPage() {
     <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status}>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <nav className="g-tabs !mb-0" aria-label="Which alerts">
-          {(["all", "rank_drop", "rank_gain", "links_lost", "links_gained", "grid_down", "grid_up", "kw_new", "kw_lost"] as const).map((k) => <a key={k} href={`#${k}`} aria-current={kind === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setKind(k); }} data-testid={`tab-alerts-${k}`}>{k === "all" ? "All" : KIND[k].label}</a>)}
+          {(["all", "rank_drop", "rank_gain", "links_lost", "links_gained", "grid_down", "grid_up", "kw_new", "kw_lost", "mention_new"] as const).map((k) => <a key={k} href={`#${k}`} aria-current={kind === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setKind(k); }} data-testid={`tab-alerts-${k}`}>{k === "all" ? "All" : KIND[k].label}</a>)}
         </nav>
         {site && (
           <label className="flex items-center gap-2 text-[13px]"><span className="g-text-2">Show</span>
@@ -115,6 +117,16 @@ export default function SeoAlertsPage() {
                 <thead><tr><th>Keyword</th><th>Where</th><th>Device</th><th>What happened</th></tr></thead>
                 <tbody>{(a.items as RankItem[]).map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}</td></tr>)}</tbody>
               </table>
+            ) : a.kind === "mention_new" ? (
+              (a.items as unknown as MentionItem[]).map((i, n) => (
+                <div key={n}>
+                  <p className="g-text-2 text-[13px]">Pages published since {fmtDate(i.since)} that use "{i.name}", likely you — {i.pages.some((p) => p.confirmed) ? "a website you confirmed, or " : ""}naming one of your places. Check each one before asking for a link.{i.linksChecked === false ? " Whether their websites link to you could not be checked." : ""}</p>
+                  <ul className="mt-1 space-y-1 text-[13px]" aria-label="New pages that mention you">
+                    {i.pages.map((p) => <li key={p.url}><a href={p.url} className="g-link" target="_blank" rel="noreferrer">{p.domain}</a><span className="g-text-2"> — {p.title}{p.confirmed ? " · you confirmed this website" : p.place ? ` · names ${p.place}` : ""}{p.linksToYou === null ? " · link not known" : ""}</span></li>)}
+                  </ul>
+                  {(i.more ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(i.more!)} more than this alert keeps.</p>}
+                </div>
+              ))
             ) : a.kind === "kw_new" || a.kind === "kw_lost" ? (
               (a.items as unknown as KwItem[]).map((i, n) => <KwAlert key={n} kind={a.kind} item={i} domain={a.domain} onOpen={i.snapshotId && i.beforeId ? () => { onSite(a.siteId); setKwPick({ siteId: a.siteId, now: i.snapshotId!, before: i.beforeId!, fromAlert: Date.now() }); requestAnimationFrame(() => document.getElementById("keyword-watch")?.scrollIntoView({ behavior: "smooth", block: "start" })); } : undefined} />)
             ) : a.kind === "grid_down" || a.kind === "grid_up" ? (
@@ -123,7 +135,7 @@ export default function SeoAlertsPage() {
               (a.items as LinkItem[]).map((i, n) => <div key={n}><p className="g-text text-[13px]">Sites linking to {a.domain}: <b className="font-medium tabular-nums">{fmtNum(i.from)}</b> on {fmtDate(i.since)}, <b className="font-medium tabular-nums">{fmtNum(i.to)}</b> now{i.backlinksFrom != null && i.backlinksTo != null ? ` (total links ${fmtNum(i.backlinksFrom)} → ${fmtNum(i.backlinksTo)})` : ""}.</p>{(i.lost?.length ?? 0) > 0 && <ul className="g-text mt-1 list-disc pl-5 text-[13px]" aria-label="Sites a link was lost from">{i.lost!.map((l, k) => <li key={k}>{l.domain}{l.authority != null ? <span className="g-text-2"> · authority {l.authority}</span> : null}{l.from ? <> · <a href={l.from} className="g-link" target="_blank" rel="noreferrer">the page that linked</a></> : null}</li>)}{i.lostTotal != null && i.lostTotal > i.lost!.length ? <li className="g-text-2 list-none">{fmtNum(i.lostTotal)} sites had a lost link in all; the Backlinks page keeps the 25 strongest.</li> : null}</ul>}</div>)
             )}
             <p className="mt-2 text-[13px]">
-              <Link href={a.kind.startsWith("rank") ? "/seo/rank-tracker" : a.kind.startsWith("grid") ? "/seo/local-grid" : a.kind.startsWith("kw") ? `/seo/explorer?domain=${encodeURIComponent(a.domain)}` : "/seo/backlinks"} className="g-link" onClick={() => onSite(a.siteId)}>{a.kind.startsWith("rank") ? "Open the rank tracker" : a.kind.startsWith("grid") ? "Open the local grid" : a.kind.startsWith("kw") ? "Open Site explorer" : "Open backlinks"} for {a.domain}</Link>
+              <Link href={a.kind.startsWith("rank") ? "/seo/rank-tracker" : a.kind.startsWith("grid") ? "/seo/local-grid" : a.kind === "mention_new" ? `/seo/explorer?domain=${encodeURIComponent(a.domain)}&view=mentions` : a.kind.startsWith("kw") ? `/seo/explorer?domain=${encodeURIComponent(a.domain)}` : "/seo/backlinks"} className="g-link" onClick={() => onSite(a.siteId)}>{a.kind.startsWith("rank") ? "Open the rank tracker" : a.kind.startsWith("grid") ? "Open the local grid" : a.kind === "mention_new" ? "Open Site explorer → Mentions" : a.kind.startsWith("kw") ? "Open Site explorer" : "Open backlinks"} for {a.domain}</Link>
             </p>
           </li>
         ))}

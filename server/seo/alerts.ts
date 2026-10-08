@@ -75,7 +75,7 @@ export async function saveAlert(userId: number, siteId: number, kind: string, so
 }
 
 /** The bell / email text for a saved alert. Pure, for tests. */
-export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change" | "seo.grid_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
+export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change" | "seo.grid_change" | "seo.mention_new"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
   if (a.kind === "rank_drop" || a.kind === "rank_gain") {
     const items = (Array.isArray(a.items) ? a.items : []) as RankChange[];
     return {
@@ -93,6 +93,14 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
       kind: a.kind === "kw_new" ? "seo.rank_gain" : "seo.rank_drop", title: a.title, severity: a.kind === "kw_new" ? "info" : "warning",
       body: `In the search data, compared with the snapshot of ${i.since ?? "last month"}:\n` + list.slice(0, 5).map(line).join("\n") + (list.length + (Number(i.more) || 0) > 5 ? `\n…and ${list.length + (Number(i.more) || 0) - 5} more.` : ""),
       actionLabel: "See the keywords", actionUrl: "/seo/alerts",
+    };
+  }
+  if (a.kind === "mention_new") {
+    const pages = Array.isArray(i?.pages) ? i.pages : [];
+    return {
+      kind: "seo.mention_new", title: a.title, severity: "info",
+      body: `Published since ${i?.since ?? "the last check"} and using "${i?.name ?? ""}" (likely you — check each one):\n${pages.slice(0, 5).map((p: any) => `${p.domain}${p.title ? ` — ${String(p.title).slice(0, 80)}` : ""}`).join("\n")}${pages.length > 5 ? "\n…" : ""}`,
+      actionLabel: "See the mentions", actionUrl: `/seo/explorer?domain=${encodeURIComponent(a.domain)}&view=mentions`,
     };
   }
   if (a.kind === "grid_down" || a.kind === "grid_up")

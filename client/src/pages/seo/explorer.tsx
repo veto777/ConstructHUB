@@ -175,7 +175,8 @@ export default function SeoExplorerPage() {
   const [domain, setDomain] = useState<string | null>(() => new URLSearchParams(window.location.search).get("domain"));
   const [report, setReport] = useState<Report | null>(null);
   const [table, setTable] = useState<TableKey>("keywords");
-  const [view, setView] = useState<ViewKey>("overview");
+  // ?view=<report> opens that report (an alert links straight to Mentions); anything else is the overview.
+  const [view, setView] = useState<ViewKey>(() => { const v = new URLSearchParams(window.location.search).get("view"); return v && v in MENU_LABEL ? (v as ViewKey) : "overview"; });
   const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
   const [market, setMarket] = useMarket();
   const mk = { locationCode: market.locationCode, languageCode: market.languageCode };

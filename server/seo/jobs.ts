@@ -25,6 +25,7 @@ import { trackedCompetitors } from "./voice";
 import { runDueAiChecks } from "./ai-monthly";
 import { runDueGridWatches } from "./grid-monitor";
 import { runDueKeywordSnapshots } from "./keyword-watch";
+import { runDueMentionChecks } from "./mention-watch";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device, lostLinks, type LostLink } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -394,6 +395,7 @@ export async function seoTick(): Promise<void> {
       await sendDueReports().catch((e) => console.error("[seo] scheduled reports failed", e?.message ?? e));
       await runDueBacklinkSnapshots();
       await runDueKeywordSnapshots().catch((e) => console.error("[seo] keyword snapshots failed", e?.message ?? e));
+      await runDueMentionChecks().catch((e) => console.error("[seo] mentions watch failed", e?.message ?? e));
       // A scan takes a minute or two, so it is started here and left to finish on its own (it leases its watch, the
       // database allows one running scan per site, and it never runs two passes at once).
       void runDueGridWatches().catch((e) => console.error("[seo] repeating grids failed", e?.message ?? e));
