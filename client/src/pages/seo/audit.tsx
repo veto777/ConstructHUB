@@ -265,7 +265,7 @@ export default function SeoAuditPage() {
                               {!showAll && i.items.length > 25 && <button type="button" className="g-pill g-pill--sm" onClick={() => setShowAll(true)}>Show all {fmtNum(i.items.length)}</button>}
                               {i.count > i.items.length && <span className="g-text-2 text-[12px]">Showing the first {fmtNum(i.items.length)} of {fmtNum(i.count)}.</span>}
                               <button type="button" className="g-pill g-pill--sm" onClick={() => downloadCsv(`${i.key}-${site.domain}.csv`, [["Issue", "Page or entry"], ...i.items.map((u) => [i.title, u])])}><Download /> Export this list</button>
-                              <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawled: a.crawled, crawlAt: a.scannedAt }, source: `audit:${i.key}` }]} />
+                              <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt }, source: `audit:${i.key}` }]} />
                             </div>
                           </td>
                         </tr>

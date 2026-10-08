@@ -342,6 +342,21 @@ Verdict: "Audit #15 is partly resolved" (the grid period-close fix "is convincin
 10 LOW  a failed count shown as "none open"            FIXED: shown as unavailable.
  Also: "Plan" buttons carry the finding in their accessible name; the first-snapshot text uses the site's own price.
 
+## Codex audit #17 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-17.md)
+Verdict: "Audit #16 is partly resolved: six fixes hold, four remain partial"; coverage about 59% (52-66). No cross-account disclosure. What was done:
+ 1 HIGH audit resolution lacked task-specific evidence   FIXED: a task records the crawl it came from; the newest finished crawl is compared with THAT crawl (not the one before last) by the audit page's own rule - "no longer found" only when every page the issue was on was crawled again. No recorded crawl, a crawl that is gone, or an issue the origin crawl does not list under that name = "can't be checked automatically". Absence alone is never evidence. Unit test with each case.
+ 2 MED  concurrent status changes could pass the limit   FIXED: any change of status takes the site's row first, then reads the task's status as it is now. Real Postgres 5e.
+ 3 MED  planner pairings could break the source's rules  FIXED: every "service town" is checked (80 characters, ten words) before anything is set aside; the page names the pairing.
+ 4 MED  missing data shown as advice                     FIXED: a volume that did not load is "didn't load", not "too few searches"; counts that need a part that failed are unknown, not zero; with rankings unknown nothing becomes a "write a page" task; "no ranking found" is said to mean the keyword database has none in its first 100.
+ 5 MED  quote, affordability and reservation differed    FIXED: the page asks the server for the quote, which is the reservation itself; the rankings lookup asks for one row per search, so it cannot cost more than was reserved.
+ 6 MED  cached numbers under another country's label     FIXED: the site's country is part of the table's identity on the page; a table made for another country is not shown as this one's.
+ 7 MED  "Track" did not track from each town             FIXED in words: the button and the footnote say it is tracked for the country as a whole and how to track from a town; the selection is kept.
+ 8 MED  a failed scheduled backlink save lost the month  FIXED: the schedule is leased six hours and moves on a month only after the snapshot is saved; link alerts a snapshot calls for are owed (alerts_done) until raised.
+ 9 MED  fitting a task destroyed identity / destination  FIXED: a long source keeps a fingerprint of the whole; an address too long to keep becomes its site, never a shortened address.
+10 MED  closed history unreachable after 1,000           FIXED to 5,000 with an explicit end state (older ones are still counted). NOT DONE: cursor paging beyond that.
+11 MED  bulk action cleared cells that were not sent     FIXED: every selected finding is sent, fifty at a time.
+12 LOW  remembered inputs / comma in a town              FIXED: remembered on every deliberate look; a loading failure is said; "Bellingham, WA" is one town.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -388,3 +403,4 @@ Verdict: "Audit #15 is partly resolved" (the grid period-close fix "is convincin
 - 10/8 slice 25 (service-area planner): 270 unit tests incl. the white-label route rule (two new routes added). Browser: table built for 42 searches, cell names read out ("siding contractor bellingham: 320 searches a month; you rank 11, beyond page one, with your home page"), gaps selected and sent to the plan (8 added).
 - 10/8 audit #16 fixes: 270 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks all passing. Browser: plan opened for the named site with database counts; the audit task says "Not rechecked since it was added"; a live backlink refresh (201, charged 31c) with the snapshot saved inside the charged call.
 - 10/8 slice 27 (three parity items): 273 unit tests incl. the white-label rule (one new route). Browser: the rank tracker's "On the page" chips and summary; a site starred and moved to the top, order by name with the starred site still first; two months compared for jameshardie.com (Sep 2025 against Sep 2026, then from Oct 2024).
+- 10/8 audit #17 fixes: 273 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks passing (incl. two reopenings at once for one place). Browser: planner quote "Up to $0.14" (the reservation), an over-long pairing named and blocked; an audit task added today says "Not rechecked since it was added", one added before crawls were recorded says it can't be checked automatically.

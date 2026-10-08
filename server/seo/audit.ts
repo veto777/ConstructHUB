@@ -202,3 +202,32 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   return out;
 }
 export const auditDomainKey = bare;
+
+/** What the newest finished crawl says about the issues a given earlier crawl found (for the action plan). */
+export type CrawlVerdict = { /** Issues of that crawl the newest one still finds. */ present: Set<string>; /** Gone, and every page they were on was crawled again (with a Google profile attached where the check needs one). */ fixed: Set<string>; /** Gone from the list, but the newest crawl could not have found them again. */ notRechecked: Set<string> };
+export type AuditEvidence = { /** The newest finished crawl. */ latestId: string | null; scannedAt: string | null; /** A newer crawl than that one failed. */ newerFailed: boolean; byCrawl: Map<string, CrawlVerdict> };
+/**
+ * Compare the newest finished crawl of a domain against each of the named earlier crawls — the crawl a task came
+ * from, not merely the crawl before last — using the same rule as the audit page (auditSummary): an issue is "fixed"
+ * only when every page it was on was crawled again. A crawl that is not this account's, not of this domain, not
+ * finished, or not older than the newest one is simply absent from the answer.
+ */
+export async function auditEvidence(user: number, domain: string, crawlIds: string[]): Promise<AuditEvidence> {
+  const d = bare(domain);
+  const [{ rows: [latest] }, { rows: [newest] }] = await Promise.all([
+    pool.query(`SELECT id::text AS id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, d]),
+    pool.query(`SELECT status FROM sitescan_jobs WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
+  ]);
+  const out: AuditEvidence = { latestId: latest?.id ?? null, scannedAt: latest ? latest.report?.scannedAt ?? new Date(latest.completed_at).toISOString() : null, newerFailed: newest?.status === "failed", byCrawl: new Map() };
+  const ids = [...new Set(crawlIds)].filter((id) => typeof id === "string" && id && id !== latest?.id).slice(0, 25);
+  if (!latest || !ids.length) return out;
+  const { rows: origins } = await pool.query(
+    `SELECT id::text AS id, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND id::text = ANY($3::text[]) AND completed_at < $4`, [user, d, ids, latest.completed_at]);
+  for (const o of origins) {
+    try {
+      const sum = auditSummary(latest.report, latest.pages, { report: o.report, pages: o.pages });
+      out.byCrawl.set(o.id, { present: new Set(sum.issues.filter((i) => i.previous !== null && i.previous > 0).map((i) => i.key)), fixed: new Set(sum.fixed.map((i) => i.key)), notRechecked: new Set(sum.notRechecked.map((i) => i.key)) });
+    } catch { /* an unreadable old report proves nothing */ }
+  }
+  return out;
+}

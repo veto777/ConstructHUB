@@ -15,12 +15,12 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, Tile, useSelectedSite, useSeoSit
 type Kind = "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other";
 type Status = "todo" | "doing" | "done" | "dropped";
 type Counts = { todo: number; doing: number; done: number; dropped: number; doneRecently: number };
-type Task = { recheck?: "none" | "smaller" | "not_rechecked" | "failed"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
-type Data = { tasks: Task[]; counts: Counts; closedShown: number; max: number };
+type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
+type Data = { tasks: Task[]; counts: Counts; closedShown: number; closedMax?: number; max: number };
 const RECHECK: Record<NonNullable<Task["recheck"]>, string> = {
   none: "Not rechecked since it was added — run a new crawl in Site audit to see whether it is fixed.",
-  smaller: "A newer crawl did not list this, but it covered far fewer pages than the crawl this came from, so that proves nothing yet.",
-  not_rechecked: "The newest crawl could not re-check this (it crawled other pages, or had no Google profile attached).",
+  unverifiable: "This can't be checked automatically (the crawl it came from is not on record). Look in Site audit to see whether it is still listed.",
+  not_rechecked: "The newest crawl did not re-visit every page this was found on (or had no Google profile attached), so it cannot say whether it is fixed.",
   failed: "The newest crawl failed, so this has not been rechecked.",
 };
 
@@ -131,7 +131,7 @@ export default function SeoPlanPage() {
                         {(t.url || t.target) && facts(t) ? " · " : ""}{facts(t)}{(t.url || t.target || facts(t)) ? " · " : ""}added {fmtDate(t.createdAt)}
                       </p>
                       {t.recheck && !t.resolved && <p className="g-text-2 mt-1 text-[12px]" data-testid={`task-recheck-${t.id}`}>{RECHECK[t.recheck]}</p>}
-                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A crawl made after you added this{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} re-checked it and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
+                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A newer crawl{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} went back to every page this was found on and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
                       {noteFor === t.id ? (
                         <form className="mt-2 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); change.mutate({ siteId: site.id, id: t.id, patch: { note: note.trim() || null } }); }}>
                           <label className="min-w-0 flex-1"><span className="sr-only">Note for {t.title}</span><textarea className="g-input min-h-[64px] w-full py-2" value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} autoFocus data-testid={`input-task-note-${t.id}`} /></label>
@@ -152,7 +152,7 @@ export default function SeoPlanPage() {
               ))}
             </ul>
           )}
-          {showClosed && closedTotal > closed.length && <p className="g-text-2 mt-3 text-[13px]" data-testid="plan-more-closed">Showing the latest {fmtNum(closed.length)} of {fmtNum(closedTotal)}. <button type="button" className="g-link" disabled={q.isFetching} onClick={() => setClosedLimit((n) => Math.min(1000, n * 5))}>Show more</button></p>}
+          {showClosed && closedTotal > closed.length && <p className="g-text-2 mt-3 text-[13px]" data-testid="plan-more-closed">Showing the latest {fmtNum(closed.length)} of {fmtNum(closedTotal)}. {closed.length >= (q.data?.closedMax ?? 5000) ? `The page lists up to ${fmtNum(q.data?.closedMax ?? 5000)}; older ones are still counted above.` : <button type="button" className="g-link" disabled={q.isFetching} onClick={() => setClosedLimit((n) => Math.min(q.data?.closedMax ?? 5000, Math.max(n * 5, n + 100)))}>Show more</button>}</p>}
           <p className="g-text-2 mt-3 text-[12px]">The plan is yours to keep: nothing here spends SEO data. The numbers on a task are what they were when you added it — the screen it came from has today's.</p>
         </>
       )}

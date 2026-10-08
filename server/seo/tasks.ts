@@ -15,6 +15,8 @@ export const TASK_STATUSES = ["todo", "doing", "done", "dropped"] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 /** Tasks not yet done or dropped that one site may hold. */
 export const MAX_OPEN_TASKS = 300;
+/** The most done-and-dropped tasks one page of the plan lists (the counts are always of all of them). */
+export const MAX_CLOSED_SHOWN = 5000;
 export class TaskError extends SeoCustomerError {}
 
 /** A few facts carried from the finding (position, searches a month, authority…): short keys, plain values. */
@@ -62,7 +64,7 @@ export type Task = {
   /** Audit tasks: a crawl made AFTER the task was added, at least as wide as the one it came from, re-checked this issue and no longer finds it. (The customer still decides when it is done.) */
   resolved?: { on: string | null };
   /** Audit tasks: why nothing can be said yet — no crawl since it was added, the newer crawl covered too little or could not re-check this issue, or the newest crawl failed. */
-  recheck?: "none" | "smaller" | "not_rechecked" | "failed";
+  recheck?: "none" | "unverifiable" | "not_rechecked" | "failed";
 };
 /** A task row as the page gets it. Pure. */
 export function toTask(r: any): Task {
@@ -75,29 +77,33 @@ export function toTask(r: any): Task {
     createdAt: new Date(r.created_at).toISOString(), doneAt: r.done_at ? new Date(r.done_at).toISOString() : null,
   };
 }
-/** What the newest finished crawl says, for judging audit tasks. */
+/** What the crawls say, for judging audit tasks (server/seo/audit.ts auditEvidence). */
 export type CrawlEvidence = {
-  /** Issues that crawl found. */ issueKeys: ReadonlySet<string>;
-  /** Issues it could not re-check (other pages crawled, or no Google profile attached this time). */ notRechecked: ReadonlySet<string>;
-  scannedAt: string | null; /** Pages it crawled. */ crawled: number;
+  /** The newest finished crawl, or null when there is none. */ latestId: string | null; scannedAt: string | null;
   /** A newer crawl than that one failed: the picture is older than the customer may think. */ newerFailed: boolean;
+  /** For each earlier crawl a task came from: what the newest crawl says about THAT crawl's issues. */
+  byCrawl: ReadonlyMap<string, { present: ReadonlySet<string>; fixed: ReadonlySet<string>; notRechecked: ReadonlySet<string> }>;
 };
 /**
- * What can honestly be said about each open audit task. "No longer found" is claimed only when a crawl finished AFTER
- * the task was added, crawled at least four fifths as many pages as the crawl the task came from (when that is
- * recorded), re-checked this very issue, and does not list it. Anything less is "not rechecked", with the reason.
- * A task is never marked done here — the customer decides. Pure.
+ * What can honestly be said about each open audit task. "No longer found" is claimed only on positive evidence: the
+ * task records the crawl it came from, a NEWER crawl finished, and comparing the two shows the issue gone with every
+ * page it was on crawled again. Absence alone is never evidence — a task with no recorded crawl, a crawl that is
+ * gone, or an issue the origin crawl does not list under that name is "cannot be verified". A task is never marked
+ * done here; the customer decides. Pure.
  */
 export function markResolved(tasks: Task[], crawl: CrawlEvidence | null): Task[] {
   return tasks.map((t) => {
     if (t.kind !== "audit" || !t.source?.startsWith("audit:") || (t.status !== "todo" && t.status !== "doing")) return t;
-    const key = t.source.slice(6);
-    if (!crawl || !crawl.scannedAt || new Date(crawl.scannedAt).getTime() <= new Date(t.createdAt).getTime()) return { ...t, recheck: crawl?.newerFailed ? "failed" as const : "none" as const };
-    if (crawl.issueKeys.has(key)) return t; // still there: nothing to add
-    if (crawl.notRechecked.has(key)) return { ...t, recheck: "not_rechecked" as const };
-    const was = typeof t.facts.crawled === "number" ? t.facts.crawled : null;
-    if (was !== null && crawl.crawled < was * 0.8) return { ...t, recheck: "smaller" as const };
-    return { ...t, resolved: { on: crawl.scannedAt }, ...(crawl.newerFailed ? { recheck: "failed" as const } : {}) };
+    const key = t.source.slice(6), from = typeof t.facts.crawlId === "string" ? t.facts.crawlId : null;
+    const failed = crawl?.newerFailed ? { recheck: "failed" as const } : {};
+    if (!from) return { ...t, recheck: "unverifiable" as const };
+    if (!crawl?.latestId || crawl.latestId === from) return { ...t, recheck: crawl?.newerFailed ? "failed" as const : "none" as const };
+    const verdict = crawl.byCrawl.get(from);
+    if (!verdict) return { ...t, recheck: "unverifiable" as const };
+    if (verdict.present.has(key)) return { ...t, ...failed }; // still there
+    if (verdict.fixed.has(key)) return { ...t, resolved: { on: crawl.scannedAt }, ...failed };
+    if (verdict.notRechecked.has(key)) return { ...t, recheck: "not_rechecked" as const };
+    return { ...t, recheck: "unverifiable" as const }; // the origin crawl does not list it under this name
   });
 }
 
@@ -108,7 +114,7 @@ export type TaskCounts = { todo: number; doing: number; done: number; dropped: n
  * ones, and counts of everything — so a long history is neither silently cut nor miscounted.
  */
 export async function listTasks(userId: number, siteId: number, closedLimit = 100): Promise<{ tasks: Task[]; counts: TaskCounts; closedShown: number }> {
-  const limit = Math.min(1000, Math.max(1, Math.floor(closedLimit)));
+  const limit = Math.min(MAX_CLOSED_SHOWN, Math.max(1, Math.floor(closedLimit)));
   const [{ rows: open }, { rows: closed }, { rows: [c] }] = await Promise.all([
     pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${MAX_OPEN_TASKS + 50}`, [siteId, userId]),
     pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND NOT (${OPEN}) ORDER BY coalesce(done_at, updated_at) DESC, id DESC LIMIT $3`, [siteId, userId, limit]),
@@ -155,13 +161,20 @@ export async function updateTask(userId: number, taskId: number, patch: z.infer<
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows: [cur] } = await client.query("SELECT site_id, status FROM seo_tasks WHERE id=$1 AND user_id=$2", [taskId, userId]);
-    if (!cur) throw new TaskError("That task is no longer there.", 404);
-    const opening = (patch.status === "todo" || patch.status === "doing") && cur.status !== "todo" && cur.status !== "doing";
-    if (opening) {
-      await client.query("SELECT id FROM seo_sites WHERE id=$1 FOR UPDATE", [cur.site_id]);
-      const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [cur.site_id]);
-      if (n >= MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop one before reopening this.`, 403);
+    // Which site (not locked, only to know which row to lock)…
+    const { rows: [mine] } = await client.query("SELECT site_id FROM seo_tasks WHERE id=$1 AND user_id=$2", [taskId, userId]);
+    if (!mine) throw new TaskError("That task is no longer there.", 404);
+    if (patch.status !== undefined) {
+      // …then the site's row first, always, for any change of status — the same order addTasks takes its locks in — and
+      // only then the task's status as it is NOW. Two requests can no longer both believe there is room.
+      await client.query("SELECT id FROM seo_sites WHERE id=$1 FOR UPDATE", [mine.site_id]);
+      const { rows: [cur] } = await client.query("SELECT status FROM seo_tasks WHERE id=$1 AND user_id=$2 FOR UPDATE", [taskId, userId]);
+      if (!cur) throw new TaskError("That task is no longer there.", 404);
+      const opening = (patch.status === "todo" || patch.status === "doing") && cur.status !== "todo" && cur.status !== "doing";
+      if (opening) {
+        const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [mine.site_id]);
+        if (n >= MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop one before reopening this.`, 403);
+      }
     }
     const { rows: [row] } = await client.query(
       `UPDATE seo_tasks SET

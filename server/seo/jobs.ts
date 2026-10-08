@@ -314,31 +314,48 @@ export async function snapshotBacklinks(site: SiteRow, automatic = false): Promi
       ({ rows: [row] } = await pool.query(
         `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd,changes) VALUES($1,$2,current_date,$3,$4,$5,$6)
          ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd,
-           changes=EXCLUDED.changes
+           changes=EXCLUDED.changes, alerts_done=false
          RETURNING id, taken_on::text AS taken_on`,
         [site.id, site.user_id, JSON.stringify({ ...summary.data, totalCount: list?.data.totalCount ?? null, listFailed: !list }), JSON.stringify(list?.data.items ?? []), costUsd, changes ? JSON.stringify(changes) : null]));
     } catch (e: any) { throw Object.assign(new Error(`backlink snapshot for ${site.domain} could not be saved: ${e?.message ?? e}`), { costUsd, costUnknown: listUnknown, notSaved: true }); }
     return { data: { id: row.id as number, takenOn: String(row.taken_on).slice(0, 10), changes }, costUsd, customerUsd: delivered, costUnknown: listUnknown };
   }, { allowanceOnly: automatic, label: `Backlink snapshot — ${site.domain} (${automatic ? "monthly" : "refresh"})` });
   await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
-  await raiseLinkAlerts(site.id).catch((e: any) => console.error(`[seo] link alerts for ${site.domain} failed: ${e?.message ?? e}`));
+  await settleLinkAlerts(site.id);
   return { id: out.data.id, takenOn: out.data.takenOn, costUsd: out.costUsd, lostFailed: out.data.changes?.failed === true };
 }
 
 async function runDueBacklinkSnapshots(): Promise<void> {
+  // Alerts still owed for snapshots already taken (the alert step failed, or the process stopped before it): saved rows only.
+  const { rows: owed } = await pool.query("SELECT DISTINCT site_id FROM seo_backlink_snapshots WHERE alerts_done = false AND taken_on >= current_date - 3 LIMIT 10").catch(() => ({ rows: [] as any[] }));
+  for (const o of owed) await settleLinkAlerts(o.site_id);
   if (!isConfigured()) return;
+  // Leased for six hours, not moved on a month: if the snapshot cannot be bought or saved, it is tried again later
+  // today. The month moves on inside snapshotBacklinks, only after the snapshot is saved.
   const { rows: due } = await pool.query(
-    `UPDATE seo_sites SET next_backlinks_at=now()+interval '1 month' WHERE next_backlinks_at<=now() AND last_backlinks_at IS NOT NULL RETURNING *`);
+    `UPDATE seo_sites SET next_backlinks_at=now()+interval '6 hours' WHERE next_backlinks_at<=now() AND last_backlinks_at IS NOT NULL RETURNING *`);
   for (const site of due) {
     try {
       const ent = await getEntitlements(site.user_id);
-      if (!seoIncluded(ent)) continue;
+      if (!seoIncluded(ent)) { await pool.query("UPDATE seo_sites SET next_backlinks_at=now()+interval '1 day' WHERE id=$1", [site.id]); continue; }
       await snapshotBacklinks(site, true);
     } catch (e) {
       if (!(e instanceof SeoBudgetError)) void recordFailure("job", "SEO backlink snapshot", e);
-      else console.warn(`[seo] backlink snapshot for ${site.domain} skipped: ${e.message}`);
+      else {
+        // Out of included data: nothing more is likely today.
+        console.warn(`[seo] backlink snapshot for ${site.domain} skipped: ${e.message}`);
+        await pool.query("UPDATE seo_sites SET next_backlinks_at=now()+interval '1 day' WHERE id=$1", [site.id]).catch(() => {});
+      }
     }
   }
+}
+
+/** Raise the link alerts a site's newest snapshot calls for, and only then mark that snapshot as dealt with. */
+async function settleLinkAlerts(siteId: number): Promise<void> {
+  try {
+    await raiseLinkAlerts(siteId);
+    await pool.query("UPDATE seo_backlink_snapshots SET alerts_done = true WHERE site_id=$1 AND alerts_done = false", [siteId]);
+  } catch (e: any) { console.error(`[seo] link alerts for site ${siteId} failed (they will be tried again): ${e?.message ?? e}`); }
 }
 
 /** One scheduler pass; only one instance at a time across processes. */

@@ -15,8 +15,8 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
-import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, PLANNER_MAX_CELLS, type Planner } from "./planner";
-import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS } from "./tasks";
+import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
+import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
@@ -45,7 +45,7 @@ import { enqueueRankRun, postQueuedRun, snapshotBacklinks, type SiteRow } from "
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
-import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
+import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from "./audit";
 import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
@@ -688,7 +688,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const p = (site as { planner?: unknown }).planner as { services?: unknown; towns?: unknown } | null;
     const list = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : []);
-    res.json({ saved: p && list(p.services).length && list(p.towns).length ? { services: list(p.services), towns: list(p.towns) } : null });
+    // What a table of this many searches can cost — the very figure that is set aside when it runs (never a second sum).
+    const cells = Math.floor(Number(req.query.cells));
+    res.json({
+      saved: p && list(p.services).length && list(p.towns).length ? { services: list(p.services), towns: list(p.towns) } : null,
+      quoteCents: cells > 0 && cells <= PLANNER_MAX_CELLS ? retailCents(plannerEstimateUsd(cells)) : null,
+    });
   });
   route("post", "/api/seo/sites/:id/planner", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
@@ -697,15 +702,18 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!services.length || !towns.length) return res.status(400).json({ message: "Enter at least one service and one town." });
     if (services.length * towns.length > PLANNER_MAX_CELLS) return res.status(400).json({ message: `A table holds up to ${PLANNER_MAX_CELLS} searches — shorten a list.` });
     if ([...services, ...towns].some(hasOperator)) return res.status(400).json({ message: NO_OPERATORS });
+    // Every pairing must be a search the source accepts — checked before anything is set aside or bought.
+    const tooLong = plannerTooLong(services, towns);
+    if (tooLong) return res.status(400).json({ message: `"${tooLong}" is too long to look up (a search can be up to ${PLANNER_MAX_CHARS} characters and ${PLANNER_MAX_WORDS} words). Shorten that service or town.` });
+    const remember = () => pool.query("UPDATE seo_sites SET planner=$3 WHERE id=$1 AND user_id=$2", [site.id, user, JSON.stringify({ services, towns })]).catch(() => {});
     const key = cacheKey("planner", [site.domain, site.location_code, site.language_code, services, towns]);
     const saved = input.refresh ? null : await cached<Planner>(user, key, CACHE_HOURS);
-    if (saved) return res.json({ page: saved, reused: true });
+    if (saved) { if (!input.peek) await remember(); return res.json({ page: saved, reused: true }); }
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<Planner>(user, key, "planner", CACHE_HOURS, plannerEstimateUsd(services.length * towns.length),
       () => fetchPlanner({ domain: site.domain, locationCode: site.location_code, languageCode: site.language_code, services, towns }), input.refresh, `Service-area planner — ${site.domain} (${services.length} × ${towns.length})`);
-    // Remembered for next time (not worth failing the request over).
-    await pool.query("UPDATE seo_sites SET planner=$3 WHERE id=$1 AND user_id=$2", [site.id, user, JSON.stringify({ services, towns })]).catch(() => {});
+    await remember(); // for next time (not worth failing the request over)
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
@@ -714,10 +722,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const closed = Number(req.query.closed);
     const plan = await listTasks(user, site.id, Number.isFinite(closed) && closed > 0 ? closed : 100);
-    // Audit tasks: what the newest finished crawl can honestly say about each (server/seo/tasks.ts markResolved).
-    const a = plan.tasks.some((t) => t.kind === "audit" && (t.status === "todo" || t.status === "doing")) ? await siteAudit(user, site.domain).catch(() => null) : null;
-    const crawl = a?.audit ? { issueKeys: new Set(a.audit.issues.map((i) => i.key)), notRechecked: new Set(a.audit.notRechecked.map((i) => i.key)), scannedAt: a.audit.scannedAt, crawled: a.audit.crawled, newerFailed: !!a.lastFailed } : a?.lastFailed ? { issueKeys: new Set<string>(), notRechecked: new Set<string>(), scannedAt: null, crawled: 0, newerFailed: true } : null;
-    res.json({ tasks: markResolved(plan.tasks, crawl), counts: plan.counts, closedShown: plan.closedShown, max: MAX_OPEN_TASKS });
+    // Audit tasks: what the newest finished crawl says about the issues of the crawl EACH task came from.
+    const open = plan.tasks.filter((t) => t.kind === "audit" && (t.status === "todo" || t.status === "doing"));
+    const crawl = open.length ? await auditEvidence(user, site.domain, open.map((t) => t.facts.crawlId).filter((x): x is string => typeof x === "string")).catch(() => null) : null;
+    res.json({ tasks: crawl ? markResolved(plan.tasks, crawl) : plan.tasks, counts: plan.counts, closedShown: plan.closedShown, closedMax: MAX_CLOSED_SHOWN, max: MAX_OPEN_TASKS });
   });
   route("post", "/api/seo/sites/:id/tasks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
