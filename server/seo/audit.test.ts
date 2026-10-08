@@ -209,3 +209,20 @@ describe("changes rest on pages that were compared", () => {
     expect(crawlFailureWords(null)).toBeNull();
   });
 });
+
+describe("one evidence rule for a still-listed issue's change", () => {
+  it("PageSpeed: a page not measured again is not an improvement", () => {
+    const f = (urls: string[]) => urls.map((u) => ({ id: `psi-mobile-${u}`, category: "performance", severity: "warning", title: `mobile PageSpeed performance: 40`, urls: [u], why: "w", fix: "f" }));
+    const before = { report: { findings: f(["https://a.com/a", "https://a.com/b"]) }, pages: [page("https://a.com/a"), page("https://a.com/b")] };
+    const now = auditSummary({ findings: f(["https://a.com/c"]), psi: [{ url: "https://a.com/a", strategy: "mobile", score: 95 }] }, [page("https://a.com/a"), page("https://a.com/b"), page("https://a.com/c")], before);
+    const i = now.issues.find((x) => x.key === "psi-mobile")!;
+    expect([i.count, i.previous, i.change, i.notRechecked]).toEqual([1, 2, 0, 1]);
+  });
+  it("soft 404: the same part failing again with new made-up addresses is no change", () => {
+    const probe = (u: string) => ({ id: "soft-404", category: "technical", severity: "warning", title: "Soft 404", urls: [u], why: "w", fix: "f" });
+    const before = { report: { findings: [probe("https://a.com/zz-old-1")] }, pages: [page("https://a.com/")] };
+    const now = auditSummary({ findings: [probe("https://a.com/zz-new-9")] }, [page("https://a.com/")], before);
+    const i = now.issues.find((x) => x.key === "soft-404")!;
+    expect([i.count, i.previous, i.change, i.notRechecked]).toEqual([1, 1, 0, 0]);
+  });
+});

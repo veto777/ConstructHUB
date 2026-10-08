@@ -198,7 +198,8 @@ export async function deliverPendingAlerts(): Promise<number> {
  * running the check again the same day compares with the same earlier day, so
  * it must not tell the owner the same thing twice.
  */
-export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ drops: number; gains: number }> {
+/** `onDay`: the day the alert is filed under (the run's own day when settled later, so it is never made twice). */
+export async function raiseRankAlerts(siteId: number, runId: string, onDay?: string): Promise<{ drops: number; gains: number }> {
   const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled, alert_drop, current_date::text AS today FROM seo_sites WHERE id=$1", [siteId]);
   if (!site || site.alerts_enabled === false) return { drops: 0, gains: 0 };
   const { rows } = await pool.query(
@@ -213,7 +214,7 @@ export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ 
   const { drops, gains } = rankChanges(rows.filter((r: any) => r.in_run), site.alert_drop ?? DEFAULT_DROP);
   for (const [kind, items, verb] of [["rank_drop", drops, "fell"], ["rank_gain", gains, "improved"]] as const) {
     if (!items.length) continue;
-    const id = await saveAlert(site.user_id, siteId, kind, site.today, `${plural(items.length, "ranking")} ${verb} for ${site.domain}`, items);
+    const id = await saveAlert(site.user_id, siteId, kind, onDay ?? site.today, `${plural(items.length, "ranking")} ${verb} for ${site.domain}`, items);
     if (id) await deliverAlert(id);
   }
   return { drops: drops.length, gains: gains.length };

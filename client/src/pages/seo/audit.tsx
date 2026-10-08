@@ -107,6 +107,8 @@ export default function SeoAuditPage() {
   const q = useQuery<AuditData>({
     queryKey: [key, at, vs], enabled: !!site,
     queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchOnWindowFocus: "always",
+    // Choosing another crawl keeps this site's answer on screen (marked as loading) so the choices keep their focus.
+    placeholderData: (prev, pq) => (pq?.queryKey[0] === key ? prev : undefined),
     // While a crawl runs, every 6 seconds; otherwise every 5 minutes, so a crawl finished (or changed) elsewhere shows up.
     refetchInterval: (query) => (query.state.data?.running ? 6000 : 5 * 60_000) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
@@ -120,7 +122,10 @@ export default function SeoAuditPage() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: "Crawl started", description: "Results appear here when it finishes — usually a few minutes." }); },
     onError: (e) => toast({ title: "Couldn't start the crawl", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const d = q.data, a = d?.audit ?? null, running = d?.running ?? null;
+  // A choice that fails keeps the last answer for this site on screen (said), so another crawl can be chosen.
+  const [last, setLast] = useState<{ siteId: number; data: AuditData } | null>(null);
+  useEffect(() => { if (site && q.data && !q.isPlaceholderData) setLast({ siteId: site.id, data: q.data }); }, [q.data, q.isPlaceholderData, site?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const d = q.data ?? (q.isError && last && site && last.siteId === site.id ? last.data : undefined), a = d?.audit ?? null, running = d?.running ?? null;
   // A crawl that just finished changes the health score on the dashboard too.
   const wasRunning = useRef(false);
   useEffect(() => { if (wasRunning.current && !running) void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); wasRunning.current = !!running; }, [running, qc]);
@@ -153,7 +158,8 @@ export default function SeoAuditPage() {
     >
       {!site && sites.isSuccess && <Empty testId="audit-empty-sites"><h3>No sites yet</h3><p>Add your site above, then run a crawl to see its health score and issues.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the audit…</p>}
-      {site && q.isError && <div className="g-callout" role="alert" data-testid="audit-error"><h3>Couldn't load the audit</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {site && q.isError && <div className="g-callout" role="alert" data-testid="audit-error"><h3>Couldn't load {at || vs ? "that crawl" : "the audit"}</h3><p>{apiErrorMessage(q.error)}{d ? " What is shown below is the crawl shown before." : ""}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" className="g-pill" onClick={() => void q.refetch()}>Try again</button>{(at || vs) && <button type="button" className="g-pill" onClick={() => choose({ at: null, vs: null })}>Show the newest crawl</button>}</div></div>}
+      {site && q.isPlaceholderData && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="audit-switching"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" />Loading the crawl you chose…</p>}
       {running && (
         <div className="g-callout mb-4" role="status" data-testid="audit-running">
           <h3 className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Crawling {site?.domain}</h3>

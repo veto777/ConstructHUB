@@ -30,6 +30,26 @@ import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksLis
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
 import { raiseRankAlerts, raiseLinkAlerts } from "./alerts";
+
+/**
+ * Finished runs whose alerts were never saved (the process stopped, or saving failed): raised now, keyed by the day
+ * the run finished (the same calendar as when it is raised at once), so an alert that did get saved is not made twice.
+ * Ten at a time; the job loop's lock means one pass at a time.
+ */
+export async function settleRankAlertsDue(): Promise<number> {
+  const { rows } = await pool.query(
+    `SELECT id, site_id, finished_at::date::text AS day FROM seo_rank_runs
+      WHERE alerts_due AND status='done' AND finished_at < now() - interval '2 minutes' ORDER BY finished_at LIMIT 10`);
+  let n = 0;
+  for (const r of rows) {
+    try {
+      await raiseRankAlerts(r.site_id, r.id, r.day);
+      await pool.query("UPDATE seo_rank_runs SET alerts_due=false WHERE id=$1", [r.id]);
+      n++;
+    } catch (e: any) { console.error(`[seo] owed alerts for run ${r.id} failed again: ${e?.message ?? e}`); }
+  }
+  return n;
+}
 import { publicFailure } from "./public-errors";
 
 const TICK_MS = 60_000;
@@ -223,11 +243,13 @@ export async function collectRunningRuns(): Promise<void> {
         const refunded = undelivered ? await refundUnreturned(run, undelivered) : 0;
         const closingNote = refunded ? [errorNote, "their cost was refunded"].filter(Boolean).join(" — ") : errorNote;
         await pool.query(
-          "UPDATE seo_rank_runs SET status='done', tasks='[]'::jsonb, checked=checked+$2, error=$3, finished_at=now(), lease_until=NULL WHERE id=$1",
+          "UPDATE seo_rank_runs SET status='done', tasks='[]'::jsonb, checked=checked+$2, error=$3, finished_at=now(), lease_until=NULL, alerts_due=true WHERE id=$1",
           [run.id, written, closingNote]);
         if (failures.length) await pool.query("UPDATE seo_rank_runs SET failed=failed+$2 WHERE id=$1", [run.id, failures.length]).catch(() => {});
         // The run is complete: tell the owner what moved since the check before it.
-        await raiseRankAlerts(run.site_id, run.id).catch((e: any) => console.error(`[seo] alerts for run ${run.id} failed: ${e?.message ?? e}`));
+        // (Owed until saved: a failure here is settled by settleRankAlertsDue on a later tick.)
+        await raiseRankAlerts(run.site_id, run.id).then(() => pool.query("UPDATE seo_rank_runs SET alerts_due=false WHERE id=$1", [run.id]))
+          .catch((e: any) => console.error(`[seo] alerts for run ${run.id} failed (they will be tried again): ${e?.message ?? e}`));
       } else {
         await pool.query("UPDATE seo_rank_runs SET tasks=$2, checked=checked+$3, error=$4, failed=failed+$5, lease_until=NULL WHERE id=$1",
           [run.id, JSON.stringify(remaining), written, errorNote, failures.length]);
@@ -411,6 +433,7 @@ export async function seoTick(): Promise<void> {
       for (let i = 0; i < 10 && (await postQueuedRun()); i++) { /* post up to 10 queued runs per tick */ }
       await collectRunningRuns();
       await retryOwedRefunds().catch((e) => console.error("[seo] owed refunds failed", e?.message ?? e));
+      await settleRankAlertsDue().catch((e) => console.error("[seo] owed rank alerts failed", e?.message ?? e));
       await deliverPendingAlerts().catch((e) => console.error("[seo] alert delivery failed", e?.message ?? e));
       await runDueAiChecks().catch((e) => console.error("[seo] monthly AI questions failed", e?.message ?? e));
       await sendDueReports().catch((e) => console.error("[seo] scheduled reports failed", e?.message ?? e));

@@ -249,6 +249,9 @@ export const SEO_SCHEMA_DDL = [
   )`,
   // A rank run remembers what paid for it and how many checks were accepted, to refund the ones that never come back.
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
+  // A finished run owes its alerts until they are saved: set in the same statement that closes the run, cleared only
+  // once they are, so a crash or a failure in between is settled later (never silently dropped). Runs from before: none owed.
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS alerts_due boolean NOT NULL DEFAULT false`,
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,
   ...TASK_SCHEMA_DDL,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false`,

@@ -136,16 +136,46 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     return ANSWER_CHECKS.has(key) || (st >= 200 && st < 300);
   };
   const urlOf = (i: string) => i.match(/^https?:\/\/\S+/)?.[0] ?? null;
+  // One evidence rule per finding, for the change of an issue that is still listed AND for "fixed":
+  //  - sampled checks (a sample of links or images): never re-checked — a page read again need not be the same sample;
+  //  - "addresses with no page are answered like real pages" (soft 404): judged by the part of the site (the top, or a
+  //    section) the probe was for — THIS crawl must have asked there again and every answer been "not found" (404/410)
+  //    or a noindexed page; random probe addresses are never compared as pages;
+  //  - PageSpeed: that very page MEASURED again for the same device;
+  //  - everything else: reread() above.
+  const probes = (report as { coverage?: { missingPageProbe?: { probes?: unknown } | null } }).coverage?.missingPageProbe?.probes;
+  const measuredFor = (device: string) => new Set((Array.isArray(report.psi) ? report.psi : []).filter((p) => p?.strategy === device && typeof p.score === "number" && typeof p.url === "string").map((p) => p.url as string));
+  const itemRechecked = (key: string, u: string) => {
+    if (SAMPLED_CHECKS.has(key)) return false;
+    if (key === "soft-404") {
+      if (!Array.isArray(probes)) return false;
+      const part = missingPageScope(u), again = probes.filter((p: any) => p?.part === part);
+      return again.length > 0 && again.every((p: any) => p.outcome === "not_found" || p.outcome === "noindex");
+    }
+    const speed = key.match(/^psi-(mobile|desktop)$/);
+    if (speed) return measuredFor(speed[1]).has(u);
+    return reread(key, u);
+  };
   const issues: AuditIssue[] = [...now.values()].map((g) => {
     const b = before ? before.get(g.key) : undefined;
-    const prev = before ? b?.items.length ?? 0 : null;
+    const prevCount = before ? b?.items.length ?? 0 : null;
     // Pages it was on before that are not on the list now but were not looked at again (down, redirected, not
     // crawled): not counted as improvements — the change is on the pages that could be compared.
-    const stillAt = new Set(g.items.map(urlOf));
-    const unknown = b ? b.items.filter((i) => { const u = urlOf(i); return u !== null && !stillAt.has(u) && !reread(g.key, u); }).length : 0;
+    // (A soft 404 is compared by part of the site: each crawl asks fresh made-up addresses.)
+    const unit = (i: string) => { const u = urlOf(i); return u === null ? null : g.key === "soft-404" ? missingPageScope(u) : u; };
+    const stillAt = new Set(g.items.map(unit));
+    const local = g.category === "local" && !report.profile && previous?.report.profile;
+    const unknown = b ? [...new Set(b.items.map(unit))].filter((x) => x !== null && !stillAt.has(x)).filter((x) => {
+      if (local) return true;
+      const sample = b.items.find((i) => unit(i) === x)!;
+      return !itemRechecked(g.key, urlOf(sample)!);
+    }).length : 0;
+    const prevUnits = b ? (g.key === "soft-404" ? new Set(b.items.map(unit)).size : b.items.length) : 0;
+    const nowUnits = g.key === "soft-404" ? stillAt.size : g.items.length;
     return {
-      key: g.key, title: g.title, category: g.category, severity: g.severity, count: g.items.length,
-      previous: prev, change: prev === null ? null : g.items.length - (prev - unknown), notRechecked: unknown, isNew: prev === 0,
+      // (A soft 404 is counted in parts of the site, now and before, so the counts and the change agree.)
+      key: g.key, title: g.title, category: g.category, severity: g.severity, count: nowUnits,
+      previous: prevCount === null ? null : prevUnits, change: prevCount === null ? null : nowUnits - (prevUnits - unknown), notRechecked: unknown, isNew: prevCount === 0,
       why: g.why, fix: g.fix, items: g.items.slice(0, ITEM_CAP),
     };
   }).sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.count - a.count || a.title.localeCompare(b.title));
@@ -154,38 +184,12 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
-    // Checks that only look at a sample of links or images: a page crawled again does not mean the same link or image was
-    // looked at again, so their disappearance is never called a fix.
     if (SAMPLED_CHECKS.has(g.key)) return false;
-    // "Addresses with no page are answered like real pages" is found by asking, in each crawl, for a couple of
-    // addresses that have no page. It was re-checked only if THIS crawl asked and EVERY answer was "not found"
-    // (404/410) or a noindexed page. Not asked (robots.txt), no answer, or an answer that proves nothing (a sign-in, a
-    // bot check, a server error) leaves the question open — it is then "not re-checked", never "fixed".
-    // Judged part by part: every part of the site the issue was raised for (the top, or a section) must have been asked
-    // again in THIS crawl and answered honestly there. A crawl that did not reach that section again proves nothing.
-    if (g.key === "soft-404") {
-      const probes = (report as { coverage?: { missingPageProbe?: { probes?: unknown } | null } }).coverage?.missingPageProbe?.probes;
-      if (!Array.isArray(probes)) return false;
-      const parts = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u).map(missingPageScope);
-      return parts.length > 0 && parts.every((part) => {
-        const again = probes.filter((p: any) => p?.part === part);
-        return again.length > 0 && again.every((p: any) => p.outcome === "not_found" || p.outcome === "noindex");
-      });
-    }
-    // A PageSpeed issue is re-checked only when that very page was MEASURED again for the same device (the measurement
-    // is optional and can fail or be switched off; then the issue simply stops being listed).
-    const speed = g.key.match(/^psi-(mobile|desktop)$/);
-    if (speed) {
-      const measured = new Set((Array.isArray(report.psi) ? report.psi : []).filter((p) => p?.strategy === speed[1] && typeof p.score === "number" && typeof p.url === "string").map((p) => p.url as string));
-      const pagesOf = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
-      return pagesOf.length > 0 && pagesOf.every((u) => measured.has(u));
-    }
-    // Every page it was on must have been looked at again — and, for anything read from the page itself (content,
-    // indexing, tags), have answered normally (2xx) this time: a page now down or redirecting was not re-read, so its
-    // issue is "not re-checked", never "fixed". Checks of the answer itself (status, fetch, redirects, https) need only
-    // the page to have been asked again.
-    const urls = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
-    return urls.length === 0 || urls.every((u) => reread(g.key, u));
+    const urls = g.items.map(urlOf).filter((u): u is string => !!u);
+    // Soft 404s and PageSpeed need evidence about the very parts / pages they were raised for; others with no page
+    // (a rolled-up entry) are judged by the crawl having run.
+    if (!urls.length) return g.key !== "soft-404" && !/^psi-/.test(g.key);
+    return urls.every((u) => itemRechecked(g.key, u));
   };
   const brief = (g: Group) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length });
   const fixed = gone.filter(recheckable).map(brief), notRechecked = gone.filter((g) => !recheckable(g)).map(brief);
