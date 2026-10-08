@@ -36,7 +36,7 @@
  *   owner        filmed by the owner or his crews, with their say-so
  *   licensed     bought or licensed for commercial social use — `licensor` and `licence` (the reference) required
  *   cc-by        published under Creative Commons Attribution — `url` and `attribution` required (and credited)
- *   third-party  somebody else's video, NOT licensed — `source` (the https YouTube address) and `channel` required.
+ *   third-party  somebody else's video, NOT licensed — `source` (the https YouTube, Instagram or TikTok address) and `channel` required.
  *                Refused unless BOTH the run has --owner-accepted-risk AND the episode carries
  *                "ownerAcceptedRisk": { "by", "date" (YYYY-MM-DD), "quote" } — the owner's own words accepting the
  *                copyright / takedown / account-strike risk. Never a default. Such a run prints a warning, and
@@ -140,7 +140,7 @@ export function rightsRefusal(c: { file: string; rights?: unknown }, consent: Co
   if (r.kind === "third-party") {
     if (!consent.flag) return `${c.file}: somebody else's video without a licence is not used — unless the owner accepts the risk: run with --owner-accepted-risk AND put "ownerAcceptedRisk": { by, date, quote } in the episode`;
     if (!riskRecordOk(consent.record)) return `${c.file}: --owner-accepted-risk was given but the episode has no complete "ownerAcceptedRisk": { by, date (YYYY-MM-DD), quote } — both are needed`;
-    if (!/^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//.test(String(r.source ?? ""))) return `${c.file}: a third-party clip needs its source — the https YouTube address it came from`;
+    if (!/^https:\/\/(www\.|m\.)?(youtube\.com|youtu\.be|instagram\.com|tiktok\.com)\//.test(String(r.source ?? ""))) return `${c.file}: a third-party clip needs its source — the https YouTube / Instagram / TikTok address it came from`;
     return str(r, "channel") ? null : `${c.file}: a third-party clip needs the channel it came from (credited)`;
   }
   if (/third.?party|unlicen[cs]ed|scraped|found online/i.test(`${r.kind} ${r.record}`)) return `${c.file}: somebody else's video without a licence is not used under kind “${String(r.kind)}” — label it third-party (license it, ask its creator, or use our own — docs/gator/CLIP-LICENSING.md)`;

@@ -1,0 +1,87 @@
+{
+ "id": "trees-01-cut",
+ "format": "cutaway",
+ "music": "sneaking-around",
+ "accent": "whoosh",
+ "ownerAcceptedRisk": {
+  "by": "the owner of ConstructHUB",
+  "date": "2026-10-08",
+  "quote": "Do what I am asking you to do!"
+ },
+ "sequence": [
+  {
+   "fail": {
+    "file": "_sources/ig5-Dbu-hXrhOln.mp4",
+    "in": 23.6,
+    "out": 28.8,
+    "impact": 27.75,
+    "rights": {
+     "kind": "third-party",
+     "record": "clip T-23 from the Instagram compilation https://www.instagram.com/reel/Dbu-hXrhOln/; original creators unknown",
+     "source": "https://www.instagram.com/reel/Dbu-hXrhOln/",
+     "channel": "mason.olsenrhy (Instagram)"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-deadpan-57-dominoes-stare.mp4",
+   "sec": 2.2
+  },
+  {
+   "fail": {
+    "file": "_sources/ig5-Dbu-hXrhOln.mp4",
+    "in": 16.1,
+    "out": 21.2,
+    "impact": 20.2,
+    "rights": {
+     "kind": "third-party",
+     "record": "clip T-16 from the Instagram compilation https://www.instagram.com/reel/Dbu-hXrhOln/; original creators unknown",
+     "source": "https://www.instagram.com/reel/Dbu-hXrhOln/",
+     "channel": "mason.olsenrhy (Instagram)"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-annoyed-10-facepalm.mp4",
+   "sec": 1.6,
+   "lead": 0.5
+  },
+  {
+   "fail": {
+    "file": "_sources/ig5-Dbu-hXrhOln.mp4",
+    "in": 43.5,
+    "out": 49.0,
+    "impact": 48.0,
+    "rights": {
+     "kind": "third-party",
+     "record": "clip T-42 from the Instagram compilation https://www.instagram.com/reel/Dbu-hXrhOln/; original creators unknown",
+     "source": "https://www.instagram.com/reel/Dbu-hXrhOln/",
+     "channel": "mason.olsenrhy (Instagram)"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-deadpan-58-blower-turn.mp4",
+   "sec": 1.95
+  },
+  {
+   "fail": {
+    "file": "_sources/ig5-Dbu-hXrhOln.mp4",
+    "in": 9.0,
+    "out": 15.6,
+    "impact": 14.3,
+    "rights": {
+     "kind": "third-party",
+     "record": "clip T-08 from the Instagram compilation https://www.instagram.com/reel/Dbu-hXrhOln/; original creators unknown",
+     "source": "https://www.instagram.com/reel/Dbu-hXrhOln/",
+     "channel": "mason.olsenrhy (Instagram)"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-shocked-02-spit-take.mp4",
+   "sec": 1.5,
+   "lead": 0.5
+  }
+ ]
+}

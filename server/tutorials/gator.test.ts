@@ -916,7 +916,7 @@ describe("gator reacts — only footage we may use", () => {
     expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true })).toMatch(/no complete "ownerAcceptedRisk"/);         // the flag alone is not enough
     expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true, record: { by: "x", date: "today", quote: "ok go" } })).toMatch(/no complete/);
     expect(rightsRefusal({ file: "a.mp4", rights: tp }, { flag: true, record: risk })).toBeNull();
-    expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, source: "https://example.com/v" } }, { flag: true, record: risk })).toMatch(/YouTube address/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, source: "https://example.com/v" } }, { flag: true, record: risk })).toMatch(/YouTube \/ Instagram \/ TikTok address/);
     expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, channel: "" } }, { flag: true, record: risk })).toMatch(/channel/);
     expect(rightsRefusal({ file: "a.mp4", rights: { ...tp, record: "compilation clip, de-watermarked" } }, { flag: true, record: risk })).toMatch(/watermark removed is not used/);
     // The consent never spills over to other refusals.
