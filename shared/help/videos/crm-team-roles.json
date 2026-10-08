@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-team-roles",
+  "durationSec": 58,
+  "video": {
+    "key": "tutorials/crm-team-roles.580289e9.mp4",
+    "bytes": 5632405,
+    "sha256": "580289e9579186678b3527a59943e10c4cce810758ea1d29719aa1f2d47a7d78"
+  },
+  "captions": {
+    "key": "tutorials/crm-team-roles.4228ac0a.vtt",
+    "bytes": 1345,
+    "sha256": "4228ac0ac0784315b77fbec3bd7a9333b77d7dfe47a25a694683469230be1389"
+  },
+  "poster": {
+    "key": "tutorials/crm-team-roles.de29ca11.jpg",
+    "bytes": 88914,
+    "sha256": "de29ca116b3dc41707b7045224970ec10413e32dcf6f4773a35b116ce0f373ab"
+  },
+  "uploaded": {
+    "at": "2026-10-08T00:41:56.588Z",
+    "video": "a9d517be123b02e4266b76d9215fc857",
+    "captions": "e8790fea2b2a096147a097ea0178c59c",
+    "poster": "13242009caaa4e359f89bfe6ffd67af2"
+  }
+}

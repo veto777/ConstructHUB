@@ -3,3 +3,4 @@
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_report_issue } from "./crm/crm-report-issue";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
+export { default as e_crm_team_roles } from "./crm/crm-team-roles";
