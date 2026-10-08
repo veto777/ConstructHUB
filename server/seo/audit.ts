@@ -10,7 +10,7 @@ import { pool } from "../db";
 export type AuditSeverity = "error" | "warning" | "notice";
 export type AuditPage = { url: string; status: number; redirects: number };
 type Finding = { id: string; category: string; severity: string; title: string; urls?: string[]; why?: string; fix?: string };
-export type AuditReport = { scannedAt?: string; url?: string; remaining?: number; blocked?: number; errors?: { url: string; message?: string }[]; profile?: unknown; findings?: Finding[]; scores?: { overall: number | null; categories: Record<string, number | null> }; coverage?: { pageCap?: number } };
+export type AuditReport = { /** Every PageSpeed attempt of this crawl: a number in `score` means it was measured. */ psi?: { url?: string; strategy?: string; score?: number }[]; scannedAt?: string; url?: string; remaining?: number; blocked?: number; errors?: { url: string; message?: string }[]; profile?: unknown; findings?: Finding[]; scores?: { overall: number | null; categories: Record<string, number | null> }; coverage?: { pageCap?: number } };
 
 export type AuditIssue = {
   key: string; title: string; category: string; severity: AuditSeverity;
@@ -36,6 +36,8 @@ export type AuditSummary = {
 };
 
 export const ITEM_CAP = 500;
+/** Issues found by looking at a sample of links / images, not at every one (server/sitescan/audit.ts). */
+export const SAMPLED_CHECKS: ReadonlySet<string> = new Set(["oversized-images", "broken-links"]);
 const SEVERITY: Record<string, AuditSeverity> = { critical: "error", warning: "warning", info: "notice" };
 const RANK: Record<AuditSeverity, number> = { error: 0, warning: 1, notice: 2 };
 
@@ -116,6 +118,17 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
+    // Checks that only look at a sample of links or images: a page crawled again does not mean the same link or image was
+    // looked at again, so their disappearance is never called a fix.
+    if (SAMPLED_CHECKS.has(g.key)) return false;
+    // A PageSpeed issue is re-checked only when that very page was MEASURED again for the same device (the measurement
+    // is optional and can fail or be switched off; then the issue simply stops being listed).
+    const speed = g.key.match(/^psi-(mobile|desktop)$/);
+    if (speed) {
+      const measured = new Set((Array.isArray(report.psi) ? report.psi : []).filter((p) => p?.strategy === speed[1] && typeof p.score === "number" && typeof p.url === "string").map((p) => p.url as string));
+      const pagesOf = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
+      return pagesOf.length > 0 && pagesOf.every((u) => measured.has(u));
+    }
     // Every page it was on must have been looked at again (an entry such as "URL — score 41" starts with its page).
     const urls = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
     return urls.length === 0 || urls.every((u) => crawledNow.has(u));
@@ -205,28 +218,44 @@ export const auditDomainKey = bare;
 
 /** What the newest finished crawl says about the issues a given earlier crawl found (for the action plan). */
 export type CrawlVerdict = { /** Issues of that crawl the newest one still finds. */ present: Set<string>; /** Gone, and every page they were on was crawled again (with a Google profile attached where the check needs one). */ fixed: Set<string>; /** Gone from the list, but the newest crawl could not have found them again. */ notRechecked: Set<string> };
-export type AuditEvidence = { /** The newest finished crawl. */ latestId: string | null; scannedAt: string | null; /** A newer crawl than that one failed. */ newerFailed: boolean; byCrawl: Map<string, CrawlVerdict> };
+export type AuditEvidence = {
+  /** The newest finished crawl. */ latestId: string | null; scannedAt: string | null;
+  /** A crawl started after that one failed: the picture is older than the customer may think. */ newerFailed: boolean;
+  byCrawl: Map<string, CrawlVerdict>;
+  /** Crawls asked about that were left out because too many were asked for at once (their tasks say "not checked this time", not "no record"). */
+  skipped: Set<string>;
+};
+/** How many different origin crawls one look-up compares against. */
+export const EVIDENCE_MAX_CRAWLS = 60;
 /**
  * Compare the newest finished crawl of a domain against each of the named earlier crawls — the crawl a task came
  * from, not merely the crawl before last — using the same rule as the audit page (auditSummary): an issue is "fixed"
- * only when every page it was on was crawled again. A crawl that is not this account's, not of this domain, not
- * finished, or not older than the newest one is simply absent from the answer.
+ * only when the check that found it demonstrably ran again on everything it was found on. A crawl that is not this
+ * account's, not of this domain, not finished, or not older than the newest one is simply absent from the answer.
  */
 export async function auditEvidence(user: number, domain: string, crawlIds: string[]): Promise<AuditEvidence> {
   const d = bare(domain);
   const [{ rows: [latest] }, { rows: [newest] }] = await Promise.all([
     pool.query(`SELECT id::text AS id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, d]),
-    pool.query(`SELECT status FROM sitescan_jobs WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
+    pool.query(`SELECT status, created_at FROM sitescan_jobs WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
   ]);
-  const out: AuditEvidence = { latestId: latest?.id ?? null, scannedAt: latest ? latest.report?.scannedAt ?? new Date(latest.completed_at).toISOString() : null, newerFailed: newest?.status === "failed", byCrawl: new Map() };
-  const ids = [...new Set(crawlIds)].filter((id) => typeof id === "string" && id && id !== latest?.id).slice(0, 25);
+  const wanted = [...new Set(crawlIds)].filter((id) => typeof id === "string" && id && id !== latest?.id);
+  const ids = wanted.slice(0, EVIDENCE_MAX_CRAWLS);
+  const out: AuditEvidence = {
+    latestId: latest?.id ?? null, scannedAt: latest ? latest.report?.scannedAt ?? new Date(latest.completed_at).toISOString() : null,
+    // "Newer" by the clock: a failed crawl counts only if it was started after the newest finished one was completed.
+    newerFailed: newest?.status === "failed" && (!latest || new Date(newest.created_at).getTime() > new Date(latest.completed_at).getTime()),
+    byCrawl: new Map(), skipped: new Set(wanted.slice(EVIDENCE_MAX_CRAWLS)),
+  };
   if (!latest || !ids.length) return out;
   const { rows: origins } = await pool.query(
     `SELECT id::text AS id, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 AND id::text = ANY($3::text[]) AND completed_at < $4`, [user, d, ids, latest.completed_at]);
   for (const o of origins) {
     try {
       const sum = auditSummary(latest.report, latest.pages, { report: o.report, pages: o.pages });
-      out.byCrawl.set(o.id, { present: new Set(sum.issues.filter((i) => i.previous !== null && i.previous > 0).map((i) => i.key)), fixed: new Set(sum.fixed.map((i) => i.key)), notRechecked: new Set(sum.notRechecked.map((i) => i.key)) });
+      // "Still there" is by name: the origin crawl listed an issue of that key and the newest one does too.
+      const was = new Set(groupFindings(o.report?.findings).keys());
+      out.byCrawl.set(o.id, { present: new Set(sum.issues.map((i) => i.key).filter((k) => was.has(k))), fixed: new Set(sum.fixed.map((i) => i.key)), notRechecked: new Set(sum.notRechecked.map((i) => i.key)) });
     } catch { /* an unreadable old report proves nothing */ }
   }
   return out;

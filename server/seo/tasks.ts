@@ -64,7 +64,7 @@ export type Task = {
   /** Audit tasks: a crawl made AFTER the task was added, at least as wide as the one it came from, re-checked this issue and no longer finds it. (The customer still decides when it is done.) */
   resolved?: { on: string | null };
   /** Audit tasks: why nothing can be said yet — no crawl since it was added, the newer crawl covered too little or could not re-check this issue, or the newest crawl failed. */
-  recheck?: "none" | "unverifiable" | "not_rechecked" | "failed";
+  recheck?: "none" | "unverifiable" | "not_rechecked" | "failed" | "later" | "unavailable";
 };
 /** A task row as the page gets it. Pure. */
 export function toTask(r: any): Task {
@@ -83,14 +83,18 @@ export type CrawlEvidence = {
   /** A newer crawl than that one failed: the picture is older than the customer may think. */ newerFailed: boolean;
   /** For each earlier crawl a task came from: what the newest crawl says about THAT crawl's issues. */
   byCrawl: ReadonlyMap<string, { present: ReadonlySet<string>; fixed: ReadonlySet<string>; notRechecked: ReadonlySet<string> }>;
+  /** Crawls left out of this look-up because too many were asked about at once. */
+  skipped?: ReadonlySet<string>;
 };
 /**
  * What can honestly be said about each open audit task. "No longer found" is claimed only on positive evidence: the
- * task records the crawl it came from, a NEWER crawl finished, and comparing the two shows the issue gone with every
- * page it was on crawled again. Absence alone is never evidence — a task with no recorded crawl, a crawl that is
+ * task records the crawl it came from, a crawl finished AFTER the task was added, and comparing the two shows the
+ * issue gone with the check that found it run again on everything it was found on. Absence alone is never evidence — a task with no recorded crawl, a crawl that is
  * gone, or an issue the origin crawl does not list under that name is "cannot be verified". A task is never marked
  * done here; the customer decides. Pure.
  */
+/** When the crawls could not be read at all: every open audit task says so, instead of saying nothing. Pure. */
+export const markUnavailable = (tasks: Task[]): Task[] => tasks.map((t) => (t.kind === "audit" && t.source?.startsWith("audit:") && (t.status === "todo" || t.status === "doing") ? { ...t, recheck: "unavailable" as const } : t));
 export function markResolved(tasks: Task[], crawl: CrawlEvidence | null): Task[] {
   return tasks.map((t) => {
     if (t.kind !== "audit" || !t.source?.startsWith("audit:") || (t.status !== "todo" && t.status !== "doing")) return t;
@@ -98,6 +102,9 @@ export function markResolved(tasks: Task[], crawl: CrawlEvidence | null): Task[]
     const failed = crawl?.newerFailed ? { recheck: "failed" as const } : {};
     if (!from) return { ...t, recheck: "unverifiable" as const };
     if (!crawl?.latestId || crawl.latestId === from) return { ...t, recheck: crawl?.newerFailed ? "failed" as const : "none" as const };
+    // The recheck must have happened AFTER the task was added: a crawl that finished before that is not a recheck of it.
+    if (!crawl.scannedAt || new Date(crawl.scannedAt).getTime() <= new Date(t.createdAt).getTime()) return { ...t, recheck: crawl.newerFailed ? "failed" as const : "none" as const };
+    if (crawl.skipped?.has(from)) return { ...t, recheck: "later" as const };
     const verdict = crawl.byCrawl.get(from);
     if (!verdict) return { ...t, recheck: "unverifiable" as const };
     if (verdict.present.has(key)) return { ...t, ...failed }; // still there

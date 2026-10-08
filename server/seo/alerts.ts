@@ -198,11 +198,11 @@ export function strongLosses(lost: unknown): LostRow[] {
  * link from a strong site lost? A month can gain sites overall and still lose one that mattered — then both are said.
  * Returns the kind of the first alert raised, or null.
  */
-export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
+export async function raiseLinkAlerts(siteId: number, /** The snapshot to judge (its date); the newest when left out. It is compared with the snapshot before it. */ takenOn?: string): Promise<string | null> {
   const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled FROM seo_sites WHERE id=$1", [siteId]);
   if (!site || site.alerts_enabled === false) return null;
-  const { rows } = await pool.query("SELECT taken_on::text AS taken_on, summary, changes FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [siteId]);
-  if (rows.length < 2) return null;
+  const { rows } = await pool.query("SELECT taken_on::text AS taken_on, summary, changes FROM seo_backlink_snapshots WHERE site_id=$1 AND ($2::date IS NULL OR taken_on <= $2::date) ORDER BY taken_on DESC LIMIT 2", [siteId, takenOn ?? null]);
+  if (rows.length < 2 || (takenOn && rows[0].taken_on !== takenOn)) return null;
   const [latest, previous] = rows;
   const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
   // Named losses belong to this comparison only when they were collected since the snapshot it is compared with.

@@ -124,6 +124,11 @@ async function main() {
   const junkTen = Array.from({ length: 10 }, (_, i) => ({ domain: `noise${i}.example`, authority: 90 - i, spam: 95, follow: true }));
   await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
     ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 11))`, [buried.id, JSON.stringify([...junkTen, { domain: "chamber.example", authority: 46, spam: 3, follow: true }])]);
+  // each unsettled snapshot is judged against the one before it, not just the newest pair
+  const { rows: [three] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'three.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary) VALUES ($1,1,current_date-60,'{"referringDomains":100}'),($1,1,current_date-30,'{"referringDomains":80}'),($1,1,current_date,'{"referringDomains":81}')`, [three.id]);
+  eq("7l an older snapshot's own comparison can be judged: 100 -> 80 a month ago is a loss; the newest pair (80 -> 81) is nothing",
+    [await raiseLinkAlerts(three.id, (await pool.query("SELECT (current_date-30)::text d")).rows[0].d), await raiseLinkAlerts(three.id), (await listAlerts(1, three.id)).map((a: any) => a.kind)], ["links_lost", null, ["links_lost"]]);
   eq("7k a real loss behind ten stronger junk ones is still found and named", [await raiseLinkAlerts(buried.id), ((await listAlerts(1, buried.id))[0] as any)?.items[0].lost.map((l: any) => l.domain)], ["links_lost", ["chamber.example"]]);
 
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");

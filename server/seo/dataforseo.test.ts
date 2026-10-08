@@ -103,7 +103,7 @@ describe("rank checks (standard queue)", () => {
   it("buildRankResult: the first organic result on the domain or a subdomain, by rank_group; features are the element types", () => {
     const items = fixture("task_get").tasks[0].result[0].items;
     const r = buildRankResult({ keywordId: 11, keyword: "roofing contractor tampa", targetDomain: "constructhub.us" }, items);
-    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic"],
+    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic", "own:checked"],
       localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }],
       serpTop: [{ position: 1, domain: "bigroofer.example", url: "https://bigroofer.example/tampa", title: "Big Roofer" }, { position: 2, domain: "constructhub.us", url: "https://www.constructhub.us/roofing/tampa", title: "Tampa roofing contractors" }, { position: 3, domain: "blog.constructhub.us", url: "https://blog.constructhub.us/roofing", title: "Blog" }],
       rivals: {} });
@@ -178,7 +178,7 @@ describe("rank checks (standard queue)", () => {
     expect(calls[0]).toMatchObject({ method: "GET", path: "/serp/google/organic/task_get/advanced/10061512-1535-0066-0000-aaaaaaaaaaaa" });
     expect(done).toMatchObject({ status: "completed", result: { position: 2 } });
     expect(parseTaskGet(fixture("task_get_pending"), input)).toEqual({ status: "pending" });
-    expect(parseTaskGet(fixture("task_get_no_results"), input)).toMatchObject({ status: "completed", result: { position: null, url: null, serpFeatures: [] } });
+    expect(parseTaskGet(fixture("task_get_no_results"), input)).toMatchObject({ status: "completed", result: { position: null, url: null, serpFeatures: ["own:checked"] } });
     expect(parseTaskGet({ status_code: 20000, tasks: [{ status_code: 40101, status_message: "Internal SE Server Error." }] }, input)).toEqual({ status: "failed", message: "Internal SE Server Error." });
     expect(() => parseTaskGet({ status_code: 40400, status_message: "Not Found." }, input)).toThrow(DataForSeoError);
   });

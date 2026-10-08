@@ -361,6 +361,20 @@ Verdict: "Audit #16 is partly resolved: six fixes hold, four remain partial"; co
 11 MED  bulk action cleared cells that were not sent     FIXED: every selected finding is sent, fifty at a time.
 12 LOW  remembered inputs / comma in a town              FIXED: remembered on every deliberate look; a loading failure is said; "Bellingham, WA" is one town.
 
+## Codex audit #18 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-18.md)
+Verdict: "Audit #17 is partly resolved"; coverage about 60% (52-67). No cross-account disclosure. What was done:
+ 1 HIGH optional checks could look resolved             FIXED (audit page and action plan alike): a PageSpeed issue counts as re-checked only when that page was measured again for the same device; issues from checks that only sample links or images are never called fixed. Unit tests for each way a speed test can fail to run.
+ 2 MED  a "recheck" could predate the task              FIXED: the crawl must have finished after the task was added.
+ 3 LOW  misleading fallback states                      FIXED: up to 60 origin crawls per look; beyond that a task says "not checked this time"; "still there" is by the issue's name; a failed crawl counts as newer only by the clock; a failure to read the crawls is said on every open audit task.
+ 4 MED  snapshot could be bought again                  FIXED: the snapshot and the schedule are one transaction.
+ 5 MED  backlink alert debt                             FIXED: each unsettled snapshot is judged against the snapshot before it and marked on its own; nothing expires; the longest-waiting site goes first. NOT DONE: snapshots from before today are assumed settled.
+ 6 MED  planner could spend without a quote on screen   FIXED: no price, no purchase; loading and failure are shown with a retry.
+ 7 MED  a half-sent batch looked like total failure     FIXED: what was added before it stopped is said and the lists are refreshed.
+ 8 MED  old checks turned unknown ownership into zero   FIXED: new checks carry a marker; "it cites you" is counted only over checks that looked, older ones are "not known".
+ 9 LOW  compare-months footnote / default               FIXED: the same calendar month a year earlier; the footnote says what a dash can mean.
+10 LOW  cached planner selections not remembered        FIXED: pressing "Build" remembers the inputs even when the table is already saved.
+ Also: the rank tracker's summary names the device; a table made for another country has a rebuild button.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -409,3 +423,4 @@ Verdict: "Audit #16 is partly resolved: six fixes hold, four remain partial"; co
 - 10/8 slice 27 (three parity items): 273 unit tests incl. the white-label rule (one new route). Browser: the rank tracker's "On the page" chips and summary; a site starred and moved to the top, order by name with the starred site still first; two months compared for jameshardie.com (Sep 2025 against Sep 2026, then from Oct 2024).
 - 10/8 audit #17 fixes: 273 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks passing (incl. two reopenings at once for one place). Browser: planner quote "Up to $0.14" (the reservation), an over-long pairing named and blocked; an audit task added today says "Not rechecked since it was added", one added before crawls were recorded says it can't be checked automatically.
 - 10/8 slice 29 (directories + page numbers): 279 unit tests incl. the white-label route rule (two new routes). Browser, live: directories for three sites (201; meta "linked from 0 of these 26 - 4 where a competitor is and you are not"), gaps to the plan (4 added); Content explorer numbers for 25 pages (201, charged 16c against a stated 17c) and both orderings.
+- 10/8 audit #18 fixes: 280 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 29/29 (an older snapshot judged against its own predecessor), AI + lists 15/15, grid + scheduler passing, tasks passing. Browser: planner quote required before buying and inputs remembered after a reload; a live backlink refresh through the single transaction (snapshot saved, alerts settled, next snapshot a month on).

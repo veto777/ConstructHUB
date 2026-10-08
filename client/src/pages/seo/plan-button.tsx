@@ -36,8 +36,13 @@ export function AddToPlan({ siteId, tasks, label = "Add to plan", onDone, testId
     mutationFn: async (v: { siteId: number; tasks: PlanTask[] }) => {
       let added = 0, already = 0;
       for (let i = 0; i < v.tasks.length; i += 50) {
-        const r: { added: number; already: number } = await api("POST", `/api/seo/sites/${v.siteId}/tasks`, { tasks: v.tasks.slice(i, i + 50).map(fitTask) });
-        added += r.added; already += r.already;
+        try {
+          const r: { added: number; already: number } = await api("POST", `/api/seo/sites/${v.siteId}/tasks`, { tasks: v.tasks.slice(i, i + 50).map(fitTask) });
+          added += r.added; already += r.already;
+        } catch (e) {
+          // What went in before this batch stays in: say so, rather than "couldn't add".
+          throw Object.assign(e instanceof Error ? e : new Error(String(e)), { addedBefore: added, sent: i, of: v.tasks.length });
+        }
       }
       return { added, already };
     },
@@ -49,7 +54,13 @@ export function AddToPlan({ siteId, tasks, label = "Add to plan", onDone, testId
       });
       onDone?.();
     },
-    onError: (e) => toast({ title: "Couldn't add to the plan", description: apiErrorMessage(e), variant: "destructive" }),
+    onError: (e, v) => {
+      const partial = e as { addedBefore?: number; sent?: number; of?: number };
+      if (partial.sent) {
+        void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/tasks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] });
+        toast({ title: `Only the first ${partial.sent} of ${partial.of} were sent`, description: `${partial.addedBefore} were added to the plan before it stopped (${apiErrorMessage(e)}). Press the button again for the rest — ones already there are not added twice.`, variant: "destructive" });
+      } else toast({ title: "Couldn't add to the plan", description: apiErrorMessage(e), variant: "destructive" });
+    },
   });
   return (
     <button type="button" className="g-pill g-pill--sm" disabled={!tasks.length || m.isPending} onClick={() => m.mutate({ siteId, tasks })} data-testid={testId}

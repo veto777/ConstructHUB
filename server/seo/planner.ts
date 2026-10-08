@@ -27,6 +27,8 @@ export const plannerInput = z.object({
   towns: z.array(word).min(1).max(PLANNER_MAX_TOWNS),
   peek: z.boolean().default(false),
   refresh: z.boolean().default(false),
+  /** With `peek`: the customer pressed "Build the table" for these inputs, so they are the ones to remember. */
+  remember: z.boolean().default(false),
 }).strict();
 
 /** Lower case, single spaces, no duplicates. A comma is a space ("Bellingham, WA" is one town). */

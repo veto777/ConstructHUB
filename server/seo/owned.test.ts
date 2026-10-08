@@ -10,17 +10,17 @@ describe("results-page features the site itself is in", () => {
     { type: "organic", domain: "alpine.example", url: "https://alpine.example/", rank_group: 3 },
   ];
   it("marks the AI overview that cites it, the featured snippet that is its page and a question answered from it", () => {
-    expect(ownedFeatures(items, "alpine.example").sort()).toEqual(["own:ai_overview", "own:featured_snippet", "own:people_also_ask"]);
+    expect(ownedFeatures(items, "alpine.example").sort()).toEqual(["own:ai_overview", "own:checked", "own:featured_snippet", "own:people_also_ask"]);
   });
   it("another site's features are not ours, and a look-alike domain is not the site", () => {
-    expect(ownedFeatures(items, "pine.example")).toEqual([]);
-    expect(ownedFeatures([{ type: "featured_snippet", domain: "notalpine.example" }, { type: "ai_overview", references: [{ domain: "alpine.example.evil.test" }] }], "alpine.example")).toEqual([]);
-    expect(ownedFeatures([null, { type: 5 }, { type: "ai_overview" }, { type: "people_also_ask", items: "x" }], "alpine.example")).toEqual([]);
+    // "own:checked" alone = looked, and the site is in none of them (which is different from never having looked).
+    expect(ownedFeatures(items, "pine.example")).toEqual(["own:checked"]);
+    expect(ownedFeatures([{ type: "featured_snippet", domain: "notalpine.example" }, { type: "ai_overview", references: [{ domain: "alpine.example.evil.test" }] }], "alpine.example")).toEqual(["own:checked"]);
+    expect(ownedFeatures([null, { type: 5 }, { type: "ai_overview" }, { type: "people_also_ask", items: "x" }], "alpine.example")).toEqual(["own:checked"]);
   });
   it("travels with the check: what is on the page, then what is ours", () => {
     const r = buildRankResult({ keywordId: 1, keyword: "roof repair", targetDomain: "alpine.example" }, items);
-    expect(r.serpFeatures).toEqual(["ai_overview", "featured_snippet", "people_also_ask", "local_pack", "organic", "own:featured_snippet", "own:ai_overview", "own:people_also_ask"].sort((a, b) => r.serpFeatures.indexOf(a) - r.serpFeatures.indexOf(b)));
-    expect(r.serpFeatures.filter((f) => f.startsWith("own:")).sort()).toEqual(["own:ai_overview", "own:featured_snippet", "own:people_also_ask"]);
+    expect(r.serpFeatures.filter((f) => f.startsWith("own:")).sort()).toEqual(["own:ai_overview", "own:checked", "own:featured_snippet", "own:people_also_ask"]);
     expect(r.serpFeatures.slice(0, 5)).toEqual(["ai_overview", "featured_snippet", "people_also_ask", "local_pack", "organic"]);
   });
 });

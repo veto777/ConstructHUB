@@ -101,6 +101,7 @@ export const SEO_SCHEMA_DDL = [
   // false until the link alerts this snapshot calls for have been raised (existing snapshots are long dealt with).
   `ALTER TABLE seo_backlink_snapshots ADD COLUMN IF NOT EXISTS alerts_done boolean NOT NULL DEFAULT true`,
   `ALTER TABLE seo_backlink_snapshots ALTER COLUMN alerts_done SET DEFAULT false`,
+  `ALTER TABLE seo_backlink_snapshots ADD COLUMN IF NOT EXISTS alerts_tried_at timestamptz`,
   // DataForSEO spend, per paying account per calendar month (UTC). The cap in
   // server/seo/budget.ts reads the platform-wide sum of a month.
   `CREATE TABLE IF NOT EXISTS seo_api_usage (
