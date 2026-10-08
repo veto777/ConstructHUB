@@ -749,6 +749,13 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
       }
     }
 
+    {
+      // Which settings changed, by label — never the values (footers and terms are long, tokens never appear).
+      const keys = Object.keys(parsed.data);
+      const labels: Record<string, string> = {};
+      for (const k of keys) if (FIELD_LABELS[k]) labels[k] = FIELD_LABELS[k].toLowerCase();
+      if (keys.length) logActivity(ctx, "settings.updated", { entityType: "org", entityId: ctx.org.id, meta: { fields: keys, labels } });
+    }
     res.json(presentOrg(row));
   });
 
@@ -936,6 +943,10 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         ),
       );
 
+    logActivity(ctx, "member.removed", {
+      entityType: "member", entityId: target.id,
+      meta: { name: target.displayName || target.email },
+    });
     res.json(presentMember(row, ctx.permissions.seeCosts));
   });
 

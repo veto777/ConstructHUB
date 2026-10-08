@@ -169,6 +169,10 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     return ctx;
   }
 
+  /** One audit row per price-book edit: who changed which material / labor rate / package. Names only, no amounts. */
+  const logPb = (ctx: OrgContext, change: string, what: string, row: { id: string; name?: string | null }, entityType: string) =>
+    logActivity(ctx, "pricebook.updated", { entityType, entityId: row.id, meta: { change, what, name: row.name ?? "" } });
+
   // ── Price-floor lock (org setting, owner only) ────────────────────────────
   // Lives in custom_fields->'priceFloorLock' — merged, never a wholesale
   // replace, like notificationPrefs on PATCH /api/crm/org (routes.ts, which
@@ -193,6 +197,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       .set({ customFields: base, updatedAt: new Date() })
       .where(eq(crmOrgs.id, ctx.org.id))
       .returning();
+    logActivity(ctx, "pricebook.floor_lock", { entityType: "org", entityId: ctx.org.id, meta: { enabled: p.data.enabled } });
     res.json({ ...row, priceFloorLock: priceFloorLockOf(row?.customFields) });
   });
 
@@ -262,6 +267,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       await db.update(crmPbLaborRates).set({ isDefault: false }).where(eq(crmPbLaborRates.orgId, ctx.org.id));
     }
     const [row] = await db.insert(crmPbLaborRates).values({ ...p.data, orgId: ctx.org.id } as any).returning();
+    logPb(ctx, "created", "labor rate", row, "pricebook_labor");
     res.status(201).json(presentLabor(row, ctx));
   });
 
@@ -280,6 +286,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     }
     const [row] = await db.update(crmPbLaborRates).set(p.data as any)
       .where(eq(crmPbLaborRates.id, cur.id)).returning();
+    logPb(ctx, "updated", "labor rate", row, "pricebook_labor");
     res.json(presentLabor(row, ctx));
   });
 
@@ -292,8 +299,9 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const [row] = await db.update(crmPbLaborRates).set({ active: false, isDefault: false })
       .where(and(eq(crmPbLaborRates.orgId, ctx.org.id), eq(crmPbLaborRates.id, req.params.id),
-        eq(crmPbLaborRates.active, true))).returning({ id: crmPbLaborRates.id });
+        eq(crmPbLaborRates.active, true))).returning({ id: crmPbLaborRates.id, name: crmPbLaborRates.name });
     if (!row) return res.status(404).json({ message: "Labor rate not found" });
+    logPb(ctx, "deleted", "labor rate", row, "pricebook_labor");
     res.json({ ok: true });
   });
 
@@ -335,6 +343,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!p.success) return res.status(400).json({ message: "Invalid material", issues: p.error.issues });
     const [row] = await db.insert(crmPbMaterials)
       .values({ ...p.data, orgId: ctx.org.id, costUpdatedAt: new Date() } as any).returning();
+    logPb(ctx, "created", "material", row, "pricebook_material");
     res.status(201).json(presentMaterial(row, ctx));
   });
 
@@ -348,6 +357,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     const [row] = await db.update(crmPbMaterials).set(patch)
       .where(and(eq(crmPbMaterials.orgId, ctx.org.id), eq(crmPbMaterials.id, req.params.id))).returning();
     if (!row) return res.status(404).json({ message: "Material not found" });
+    logPb(ctx, "updated", "material", row, "pricebook_material");
     res.json(presentMaterial(row, ctx));
   });
 
@@ -357,8 +367,9 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
     if (!ctx) return;
     const [row] = await db.update(crmPbMaterials).set({ active: false, updatedAt: new Date() })
       .where(and(eq(crmPbMaterials.orgId, ctx.org.id), eq(crmPbMaterials.id, req.params.id),
-        eq(crmPbMaterials.active, true))).returning({ id: crmPbMaterials.id });
+        eq(crmPbMaterials.active, true))).returning({ id: crmPbMaterials.id, name: crmPbMaterials.name });
     if (!row) return res.status(404).json({ message: "Material not found" });
+    logPb(ctx, "deleted", "material", row, "pricebook_material");
     res.json({ ok: true });
   });
 
@@ -388,6 +399,13 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
       .set(p.data.field === "price" ? { priceCents: expr as any, updatedAt: new Date() }
                                     : { costCents: expr as any, updatedAt: new Date() })
       .where(and(...where)).returning({ id: crmPbMaterials.id });
+    logActivity(ctx, "pricebook.adjusted", {
+      entityType: "pricebook_material",
+      meta: {
+        field: p.data.field, count: rows.length,
+        percent: (p.data.direction === "increase" ? 1 : -1) * p.data.percentBps / 100,
+      },
+    });
     res.json({ ok: true, updated: rows.length });
   });
 
@@ -781,6 +799,7 @@ export function registerCrmPriceBookRoutes(app: Express, getDevUser: GetUser): v
         ...x, orgId: ctx.org.id, packageId: row.id, sortOrder: i,
       })) as any);
     }
+    logPb(ctx, "created", "package", row, "pricebook_package");
     res.status(201).json(row);
   });
 

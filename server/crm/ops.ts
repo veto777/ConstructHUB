@@ -508,9 +508,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       body: `A ${usd(pay.amountCents)} payment (${via}, recorded ${when})` +
         `${invoice?.number ? ` on invoice ${invoice.number}` : ""} was reversed by the account owner. Reason: ${reason}`,
     }).catch(() => {});
-    logActivity(ctx, "invoice.updated", {
+    logActivity(ctx, "payment.reversed", {
       entityType: "payment", entityId: pay.id, customerId: pay.customerId,
-      meta: { number: invoice?.number ?? null, change: `payment of ${usd(pay.amountCents)} reversed`, invoiceId: pay.invoiceId },
+      meta: { number: invoice?.number ?? null, amountCents: pay.amountCents, method: pay.method, reason, invoiceId: pay.invoiceId },
     });
     // Subscribers that were told payment.succeeded (and maybe invoice.paid)
     // hear about the reversal too, with the invoice balance it left behind.

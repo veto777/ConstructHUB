@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { logActivity } from "./activity";
 import { companyBranding, resolveInvoiceDivision, type CompanyBranding } from "./divisions";
 import { sendWithFallback } from "../email";
 
@@ -283,6 +284,10 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
     }
 
     await noteReceiptEmail(inv, to, emailed).catch(() => {});
+    logActivity(ctx, "receipt.sent", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, to, emailed },
+    });
     res.json({ receipt, to, emailed, emailError });
   });
 }
