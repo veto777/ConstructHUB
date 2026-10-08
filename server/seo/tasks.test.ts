@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markResolved, taskInput, taskPatch, tasksInput, toTask, type Task } from "./tasks";
+import { markResolved, markUnavailable, taskInput, taskPatch, tasksInput, toTask, type Task } from "./tasks";
 
 const row = (extra: Record<string, unknown> = {}) => ({ id: 1, kind: "keyword", title: "Move \"roof repair\" up from position 7", target: "https://alpine.example/roofing", detail: { position: 7, volume: 880 }, source: "kw:roof repair", status: "todo", note: null, created_at: "2026-10-08T09:00:00Z", done_at: null, ...extra });
 
@@ -33,7 +33,7 @@ describe("action plan", () => {
     expect(toTask(row({ kind: "weird", status: "weird", detail: [1, 2] }))).toMatchObject({ kind: "other", status: "todo", facts: {} });
   });
   it("claims an audit issue is no longer found only on positive evidence from the crawl the task came from", () => {
-    const task = (id: number, key: string, extra: Record<string, unknown> = {}) => toTask(row({ id, kind: "audit", source: `audit:${key}`, status: "todo", detail: { crawlId: "crawl-a" }, ...extra }));
+    const task = (id: number, key: string, extra: Record<string, unknown> = {}) => toTask(row({ id, kind: "audit", source: `audit:${key}`, status: "todo", created_at: "2026-10-08T09:00:00Z", detail: { crawlId: "crawl-a" }, ...extra }));
     const tasks: Task[] = [task(1, "missing-title"), task(2, "broken-links", { status: "doing" }), task(3, "slow-page", { status: "done" }), toTask(row({ id: 4, kind: "keyword", source: "kw:roof repair" })), task(5, "thin-content"), task(6, "renamed-check"), task(7, "old-task", { detail: {} }), task(8, "from-b", { detail: { crawlId: "crawl-b" } })];
     const verdict = { present: new Set(["broken-links"]), fixed: new Set(["missing-title"]), notRechecked: new Set(["thin-content"]) };
     const ev = (o: Partial<{ latestId: string | null; newerFailed: boolean; crawls: [string, typeof verdict][] }> = {}) => ({ latestId: o.latestId === undefined ? "crawl-c" : o.latestId, scannedAt: "2026-10-09T09:00:00Z", newerFailed: o.newerFailed ?? false, byCrawl: new Map(o.crawls ?? [["crawl-a", verdict]]) });
@@ -54,6 +54,12 @@ describe("action plan", () => {
     expect(say(markResolved(tasks, ev({ latestId: "crawl-a", crawls: [], newerFailed: true })))[0]).toEqual([1, null, "failed"]);
     expect(say(markResolved(tasks, ev({ newerFailed: true })))[0]).toEqual([1, "2026-10-09T09:00:00Z", "failed"]);
     expect(say(markResolved(tasks, null))[0]).toEqual([1, null, "none"]);
+    // A crawl that finished BEFORE the task was added is not a recheck of it, whatever it shows.
+    expect(say(markResolved([task(1, "missing-title", { created_at: "2026-10-10T00:00:00Z" })], ev()))).toEqual([[1, null, "none"]]);
+    // Too many different crawls asked about at once: that task is looked at another time, and says so.
+    expect(say(markResolved([task(8, "from-b", { detail: { crawlId: "crawl-b" } })], { ...ev(), skipped: new Set(["crawl-b"]) }))).toEqual([[8, null, "later"]]);
+    // The crawls could not be read at all: every open audit task says so (and only those).
+    expect(say(markUnavailable(tasks)).map(([, , r]) => r)).toEqual(["unavailable", "unavailable", null, null, "unavailable", "unavailable", "unavailable", "unavailable"]);
     // Nothing is ever marked done here.
     expect(markResolved(tasks, ev()).map((t) => t.status)).toEqual(tasks.map((t) => t.status));
   });

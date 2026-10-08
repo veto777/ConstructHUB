@@ -122,7 +122,12 @@ function CompareMonths({ report }: { report: Report }) {
   const [open, setOpen] = useState(false);
   const [a, setA] = useState<string | null>(null), [b, setB] = useState<string | null>(null);
   // A different report: the choice starts again (the newest month against the same month a year earlier, or the oldest there is).
-  useEffect(() => { const last = months[months.length - 1] ?? null; setB(last); setA(months[Math.max(0, months.length - 13)] ?? null); }, [months]);
+  useEffect(() => {
+    const last = months[months.length - 1] ?? null; setB(last);
+    // The same calendar month a year earlier when the history has it; otherwise the oldest month there is.
+    const yearAgo = last ? `${Number(last.slice(0, 4)) - 1}${last.slice(4)}` : null;
+    setA(yearAgo && months.includes(yearAgo) ? yearAgo : months[0] ?? null);
+  }, [months]);
   if (months.length < 2) return null;
   const h = (m: string | null) => (report.history ?? []).find((x) => x.month === m) ?? null, l = (m: string | null) => (report.linkHistory ?? []).find((x) => x.month === m) ?? null;
   const rows: [string, number | null | undefined, number | null | undefined, boolean][] = [
@@ -152,7 +157,7 @@ function CompareMonths({ report }: { report: Report }) {
               );
             })}</tbody>
           </table>
-          <p className="g-text-2 mt-2 text-[12px]">Search figures are monthly estimates going back two years; link figures go back one year, so a dash means that month is outside what is kept. The newest month can still be filling in. Nothing is bought to compare.</p>
+          <p className="g-text-2 mt-2 text-[12px]">Search figures are monthly estimates going back two years; link figures go back one year. A dash means there is no figure for that month — it is outside what is kept, that part of the report did not load, or the source has none. The newest month can still be filling in. Nothing is bought to compare.</p>
         </div>
       )}
     </section>

@@ -270,8 +270,11 @@ export function ownedFeatures(items: any[], target: string): string[] {
     }
     if (i.type === "people_also_ask" && Array.isArray(i.items) && i.items.some((q: any) => Array.isArray(q?.expanded_element) && q.expanded_element.some((e: any) => ours(e?.domain)))) out.add("own:people_also_ask");
   }
-  return [...out];
+  // Always present on checks made since ownership is looked at: without it, "not ours" cannot be told from "never looked".
+  return [OWNERSHIP_CHECKED, ...out];
 }
+/** Marks a check whose results-page features were examined for the site's own presence. */
+export const OWNERSHIP_CHECKED = "own:checked";
 
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
 export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }, items: any[]): RankCheckResult {

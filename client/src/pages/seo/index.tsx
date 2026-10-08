@@ -118,14 +118,17 @@ export default function SeoOverviewPage() {
               if (!firsts.length) return null;
               // A map pack is known three ways (the feature list, the saved pack, our own place in it): any of them counts.
               const maps = firsts.filter((p) => hasFeature(p.features, "local_pack") || (p.pack?.length ?? 0) > 0 || p.local != null);
-              const count = (t: string) => firsts.filter((p) => hasFeature(p.features, t)).length, own = (t: string) => firsts.filter((p) => ownsFeature(p.features, t)).length;
+              const count = (t: string) => firsts.filter((p) => hasFeature(p.features, t)).length;
+              // "You are in it" is known only for checks made since it is looked at; older checks are counted apart, not as "no".
+              const looked = (t: string) => firsts.filter((p) => hasFeature(p.features, t) && hasFeature(p.features, "own:checked"));
+              const own = (t: string) => { const l = looked(t), older = count(t) - l.length; return `${l.filter((p) => ownsFeature(p.features, t)).length}${l.length < count(t) ? ` of the ${l.length} checked for it; ${older} older check${older === 1 ? "" : "s"} not known` : ""}`; };
               const parts = [
                 maps.length ? `a map pack on ${maps.length} (you are in ${maps.filter((p) => p.local != null).length})` : null,
                 count("ai_overview") ? `an AI overview on ${count("ai_overview")} (it cites you on ${own("ai_overview")})` : null,
                 count("featured_snippet") ? `a featured snippet on ${count("featured_snippet")} (yours on ${own("featured_snippet")})` : null,
                 count("people_also_ask") ? `"people also ask" on ${count("people_also_ask")}` : null,
               ].filter(Boolean);
-              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">Of your {firsts.length} checked keyword{firsts.length === 1 ? "" : "s"}, Google shows {parts.join(", ")}.</p> : null;
+              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">Of your {firsts.length} keyword{firsts.length === 1 ? "" : "s"} checked on {o.devices[0]}, Google shows {parts.join(", ")}.</p> : null;
             })()}
             <table className="g-table" data-testid="table-positions">
               <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th title="What else Google shows for this search; a green chip means you are in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>

@@ -75,7 +75,9 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   const askedCells = asked ? asked.services.length * asked.towns.length : cells;
   const askedQuote = useQuery<{ quoteCents: number | null }>({ queryKey: [base, "quote", askedCells], queryFn: () => api("GET", `${base}?cells=${askedCells}`), enabled: !!site && askedCells > 0, staleTime: 60 * 60_000 });
   const price = askedQuote.data?.quoteCents ?? null;
-  const canPay = price == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= price;
+  // No price on screen, no purchase: the buttons wait for the quote, and say so when it cannot be had.
+  const priced = price != null;
+  const canPay = priced && (!status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= price);
   const d = saved.data?.page ?? null;
   useEffect(() => { setPicked(new Set()); }, [d?.fetchedAt]);
   const rankingsKnown = !d?.missing.includes("rankings"), volumesKnown = !d?.missing.includes("volumes");
@@ -95,7 +97,11 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   if (!site) return <Empty testId="planner-no-site"><h3>Add your site first</h3><p>The table shows where <i>your</i> site ranks for each service in each town, so it needs a site — add one above.</p></Empty>;
   return (
     <div data-testid="service-planner">
-      <form className="mb-3 grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); if (draftS.length && draftT.length && !tooMany && !tooLong) { setAsked({ services: draftS, towns: draftT }); setPicked(new Set()); } }} data-testid="form-planner">
+      <form className="mb-3 grid gap-3 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); if (draftS.length && draftT.length && !tooMany && !tooLong) {
+          setAsked({ services: draftS, towns: draftT }); setPicked(new Set());
+          // Pressing "Build" is what makes these the inputs to remember — also when the table itself is already saved.
+          void api("POST", base, { services: draftS, towns: draftT, peek: true, remember: true }).catch(() => {}).then(() => void qc.invalidateQueries({ queryKey: [base], exact: true }));
+        } }} data-testid="form-planner">
         <label className="block text-[13px]"><span className="g-text-2">Your services — one per line, as a customer would search (up to {MAX_SERVICES})</span>
           <textarea className="g-input mt-1 min-h-[120px] w-full py-2" value={services} onChange={(e) => setServices(e.target.value)} placeholder={"siding contractor\nroof repair\nwindow replacement\ngutters"} data-testid="textarea-planner-services" />
         </label>
@@ -119,13 +125,13 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {asked && saved.isSuccess && !d && (
         <Empty testId="planner-not-run">
           <h3>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h3>
-          <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
+          <p>{askedQuote.isLoading ? "Getting the price…" : !priced ? <>Couldn't get the price for this table, so it can't be bought yet. <button type="button" className="g-link" onClick={() => void askedQuote.refetch()}>Try again</button></> : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
           <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: false })} data-testid="button-planner-run">
             {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Get the numbers{price != null ? ` — up to ${money(price)}` : ""}</>}
           </Button>
         </Empty>
       )}
-      {d && stale && <Empty testId="planner-stale"><h3>This table was made for another country</h3><p>{site.domain} is now set to {market.label}; the saved table is not shown as its numbers. Build it again for {market.label}.</p></Empty>}
+      {d && stale && <Empty testId="planner-stale"><h3>This table was made for another country</h3><p>{site.domain} is now set to {market.label}; the saved table is not shown as its numbers.</p><Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-rebuild">{run.isPending ? "Checking…" : `Build it for ${market.label}${price != null ? ` — up to ${money(price)}` : ""}`}</Button></Empty>}
       {d && !stale && (
         <>
           <div className="g-tiles mb-3">

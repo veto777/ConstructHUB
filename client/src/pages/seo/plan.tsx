@@ -15,12 +15,14 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, Tile, useSelectedSite, useSeoSit
 type Kind = "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other";
 type Status = "todo" | "doing" | "done" | "dropped";
 type Counts = { todo: number; doing: number; done: number; dropped: number; doneRecently: number };
-type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
+type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed" | "later" | "unavailable"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
 type Data = { tasks: Task[]; counts: Counts; closedShown: number; closedMax?: number; max: number };
 const RECHECK: Record<NonNullable<Task["recheck"]>, string> = {
   none: "Not rechecked since it was added — run a new crawl in Site audit to see whether it is fixed.",
-  unverifiable: "This can't be checked automatically (the crawl it came from is not on record). Look in Site audit to see whether it is still listed.",
-  not_rechecked: "The newest crawl did not re-visit every page this was found on (or had no Google profile attached), so it cannot say whether it is fixed.",
+  unverifiable: "This can't be checked automatically. Look in Site audit to see whether it is still listed.",
+  not_rechecked: "The newest crawl did not run this check again on everything it was found on (a page not re-visited, a speed test that did not run, a check that only samples, or no Google profile attached), so it cannot say whether it is fixed.",
+  later: "Not checked this time (there are many audit tasks); it will be when some are finished.",
+  unavailable: "Couldn't read the crawls just now, so nothing can be said about this yet. Reload to try again.",
   failed: "The newest crawl failed, so this has not been rechecked.",
 };
 
@@ -131,7 +133,7 @@ export default function SeoPlanPage() {
                         {(t.url || t.target) && facts(t) ? " · " : ""}{facts(t)}{(t.url || t.target || facts(t)) ? " · " : ""}added {fmtDate(t.createdAt)}
                       </p>
                       {t.recheck && !t.resolved && <p className="g-text-2 mt-1 text-[12px]" data-testid={`task-recheck-${t.id}`}>{RECHECK[t.recheck]}</p>}
-                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A newer crawl{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} went back to every page this was found on and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
+                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A crawl made after you added this{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} ran this check again on everything it was found on and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
                       {noteFor === t.id ? (
                         <form className="mt-2 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); change.mutate({ siteId: site.id, id: t.id, patch: { note: note.trim() || null } }); }}>
                           <label className="min-w-0 flex-1"><span className="sr-only">Note for {t.title}</span><textarea className="g-input min-h-[64px] w-full py-2" value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} autoFocus data-testid={`input-task-note-${t.id}`} /></label>

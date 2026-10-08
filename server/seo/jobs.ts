@@ -309,29 +309,39 @@ export async function snapshotBacklinks(site: SiteRow, automatic = false): Promi
     const costUsd = summary.costUsd + (list?.costUsd ?? 0) + lostCost;
     // Saved BEFORE it is charged: if the snapshot cannot be written this throws, the lookup counts as failed and the
     // customer pays nothing — so a snapshot is never paid for and then missing (and bought again on the next try).
+    // The snapshot and the schedule move together, in one transaction: a snapshot that is saved has always closed its
+    // period, so a later pass cannot find the site still "due" and buy the same month again.
     let row: any;
+    const client = await pool.connect();
     try {
-      ({ rows: [row] } = await pool.query(
+      await client.query("BEGIN");
+      ({ rows: [row] } = await client.query(
         `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd,changes) VALUES($1,$2,current_date,$3,$4,$5,$6)
          ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd,
-           changes=EXCLUDED.changes, alerts_done=false
+           changes=EXCLUDED.changes, alerts_done=false, alerts_tried_at=NULL
          RETURNING id, taken_on::text AS taken_on`,
         [site.id, site.user_id, JSON.stringify({ ...summary.data, totalCount: list?.data.totalCount ?? null, listFailed: !list }), JSON.stringify(list?.data.items ?? []), costUsd, changes ? JSON.stringify(changes) : null]));
-    } catch (e: any) { throw Object.assign(new Error(`backlink snapshot for ${site.domain} could not be saved: ${e?.message ?? e}`), { costUsd, costUnknown: listUnknown, notSaved: true }); }
+      await client.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
+      await client.query("COMMIT");
+    } catch (e: any) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw Object.assign(new Error(`backlink snapshot for ${site.domain} could not be saved: ${e?.message ?? e}`), { costUsd, costUnknown: listUnknown, notSaved: true });
+    } finally { client.release(); }
     return { data: { id: row.id as number, takenOn: String(row.taken_on).slice(0, 10), changes }, costUsd, customerUsd: delivered, costUnknown: listUnknown };
   }, { allowanceOnly: automatic, label: `Backlink snapshot — ${site.domain} (${automatic ? "monthly" : "refresh"})` });
-  await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
   await settleLinkAlerts(site.id);
   return { id: out.data.id, takenOn: out.data.takenOn, costUsd: out.costUsd, lostFailed: out.data.changes?.failed === true };
 }
 
 async function runDueBacklinkSnapshots(): Promise<void> {
-  // Alerts still owed for snapshots already taken (the alert step failed, or the process stopped before it): saved rows only.
-  const { rows: owed } = await pool.query("SELECT DISTINCT site_id FROM seo_backlink_snapshots WHERE alerts_done = false AND taken_on >= current_date - 3 LIMIT 10").catch(() => ({ rows: [] as any[] }));
+  // Alerts still owed for snapshots already taken (the alert step failed, or the process stopped before it): saved rows
+  // only. The ones tried longest ago come first, so a site that keeps failing cannot crowd out the others; nothing expires.
+  const { rows: owed } = await pool.query(
+    "SELECT site_id FROM seo_backlink_snapshots WHERE alerts_done = false GROUP BY site_id ORDER BY min(alerts_tried_at) NULLS FIRST, site_id LIMIT 10").catch(() => ({ rows: [] as any[] }));
   for (const o of owed) await settleLinkAlerts(o.site_id);
   if (!isConfigured()) return;
   // Leased for six hours, not moved on a month: if the snapshot cannot be bought or saved, it is tried again later
-  // today. The month moves on inside snapshotBacklinks, only after the snapshot is saved.
+  // today. The month moves on in the same transaction that saves the snapshot (snapshotBacklinks).
   const { rows: due } = await pool.query(
     `UPDATE seo_sites SET next_backlinks_at=now()+interval '6 hours' WHERE next_backlinks_at<=now() AND last_backlinks_at IS NOT NULL RETURNING *`);
   for (const site of due) {
@@ -350,12 +360,18 @@ async function runDueBacklinkSnapshots(): Promise<void> {
   }
 }
 
-/** Raise the link alerts a site's newest snapshot calls for, and only then mark that snapshot as dealt with. */
+/**
+ * Raise the link alerts each of a site's unsettled snapshots calls for — each compared with the snapshot before IT,
+ * oldest first — and mark exactly that snapshot as dealt with. A snapshot saved meanwhile is not touched.
+ */
 async function settleLinkAlerts(siteId: number): Promise<void> {
-  try {
-    await raiseLinkAlerts(siteId);
-    await pool.query("UPDATE seo_backlink_snapshots SET alerts_done = true WHERE site_id=$1 AND alerts_done = false", [siteId]);
-  } catch (e: any) { console.error(`[seo] link alerts for site ${siteId} failed (they will be tried again): ${e?.message ?? e}`); }
+  const { rows } = await pool.query("UPDATE seo_backlink_snapshots SET alerts_tried_at = now() WHERE site_id=$1 AND alerts_done = false RETURNING id, taken_on::text AS taken_on", [siteId]).catch(() => ({ rows: [] as any[] }));
+  for (const snap of rows.sort((a: any, b: any) => String(a.taken_on).localeCompare(String(b.taken_on)))) {
+    try {
+      await raiseLinkAlerts(siteId, snap.taken_on);
+      await pool.query("UPDATE seo_backlink_snapshots SET alerts_done = true WHERE id=$1", [snap.id]);
+    } catch (e: any) { console.error(`[seo] link alerts for site ${siteId} (snapshot of ${snap.taken_on}) failed (they will be tried again): ${e?.message ?? e}`); }
+  }
 }
 
 /** One scheduler pass; only one instance at a time across processes. */

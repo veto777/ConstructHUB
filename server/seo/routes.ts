@@ -18,7 +18,7 @@
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, pageMetricsEstimateUsd, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, directoriesEstimateUsd, type DirectoriesPage } from "./directories";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
-import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
+import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
@@ -746,7 +746,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const remember = () => pool.query("UPDATE seo_sites SET planner=$3 WHERE id=$1 AND user_id=$2", [site.id, user, JSON.stringify({ services, towns })]).catch(() => {});
     const key = cacheKey("planner", [site.domain, site.location_code, site.language_code, services, towns]);
     const saved = input.refresh ? null : await cached<Planner>(user, key, CACHE_HOURS);
-    if (saved) { if (!input.peek) await remember(); return res.json({ page: saved, reused: true }); }
+    if (!input.peek || input.remember) await remember();
+    if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<Planner>(user, key, "planner", CACHE_HOURS, plannerEstimateUsd(services.length * towns.length),
@@ -762,8 +763,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const plan = await listTasks(user, site.id, Number.isFinite(closed) && closed > 0 ? closed : 100);
     // Audit tasks: what the newest finished crawl says about the issues of the crawl EACH task came from.
     const open = plan.tasks.filter((t) => t.kind === "audit" && (t.status === "todo" || t.status === "doing"));
-    const crawl = open.length ? await auditEvidence(user, site.domain, open.map((t) => t.facts.crawlId).filter((x): x is string => typeof x === "string")).catch(() => null) : null;
-    res.json({ tasks: crawl ? markResolved(plan.tasks, crawl) : plan.tasks, counts: plan.counts, closedShown: plan.closedShown, closedMax: MAX_CLOSED_SHOWN, max: MAX_OPEN_TASKS });
+    let evidenceFailed = false;
+    const crawl = open.length ? await auditEvidence(user, site.domain, open.map((t) => t.facts.crawlId).filter((x): x is string => typeof x === "string")).catch((e) => { evidenceFailed = true; console.warn(`[seo] crawl evidence for the action plan could not be read: ${e?.message ?? e}`); return null; }) : null;
+    res.json({ tasks: evidenceFailed ? markUnavailable(plan.tasks) : crawl ? markResolved(plan.tasks, crawl) : plan.tasks, counts: plan.counts, closedShown: plan.closedShown, closedMax: MAX_CLOSED_SHOWN, max: MAX_OPEN_TASKS });
   });
   route("post", "/api/seo/sites/:id/tasks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
