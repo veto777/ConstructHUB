@@ -2,5 +2,6 @@
 // One line per recorded walkthrough (its manifest file).
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
+export { default as v_crm_payments } from "./crm-payments.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_database_directory } from "./database-directory.json";
