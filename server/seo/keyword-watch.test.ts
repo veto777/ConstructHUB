@@ -86,6 +86,9 @@ describe("keyword watch", () => {
     expect(p1[0].url).toMatch(/^https:\/\/(www\.)?alpine\.example\/roofing$/);
     const ports = pagesChanged([kw("p", { path: "/a", url: "http://alpine.example:8080/a" }), kw("q", { path: "/a", url: "https://alpine.example/a" })], [], "alpine.example");
     expect(ports.map((x) => x.url).sort()).toEqual(["http://alpine.example:8080/a", "https://alpine.example/a"]);
+    // A page that moved from http to https is shown and planned with today's address; the older one is kept beside it.
+    const moved = pagesChanged([kw("m", { path: "/s", url: "https://alpine.example/s" })], [kw("m", { path: "/s", url: "http://alpine.example/s" })], "alpine.example");
+    expect([moved.length, moved[0].url, moved[0].urlBefore]).toEqual([1, "https://alpine.example/s", "http://alpine.example/s"]);
     // A page on another host is shown and planned with its own host, never glued onto the site's.
     const p2 = pagesChanged([kw("b", { path: "/shop", url: "https://store.alpine.example/shop" })], [], "alpine.example");
     expect([p2[0].path, p2[0].url]).toEqual(["store.alpine.example/shop", "https://store.alpine.example/shop"]);

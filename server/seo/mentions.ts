@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain, type DfsTask } from "./dataforseo";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
+import { sameUrlKey } from "./audit-pages";
 
 /** Websites listed in one lookup (one page per website). */
 export const MENTIONS_ROWS = 50;
@@ -46,9 +47,12 @@ export const placesInput = z.array(z.string().trim().min(2).max(40)).max(MAX_PLA
 
 /** How a name is compared for the customer's marks: case and spacing do not matter. */
 export const nameKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+/** A page as compared for the customer's verdicts: http/https, "www", a last slash and the fragment do not matter. */
+export const pageKeyOf = (url: string) => sameUrlKey(url);
 export const markInput = z.object({
   name: z.string().trim().min(3).max(80),
-  domain: z.string().trim().min(3).max(253).transform((d) => d.toLowerCase().replace(/^www\./, "")).refine((d) => /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(d), "Not a website"),
+  /** The page the verdict is about (a verdict is about one page: a directory can list several businesses). */
+  url: z.string().trim().max(2048).refine((u) => { try { return /^https?:$/.test(new URL(u).protocol); } catch { return false; } }, "Not a web address"),
   /** null = take the mark back. */
   verdict: z.enum(["mine", "not_mine"]).nullable(),
 }).strict();
@@ -83,16 +87,13 @@ export function mentionLinksRequest(domain: string, websites: string[]): Record<
 }
 
 /**
- * Whether a host is the site's own: the tracked host or a sub-domain of it — or, for a tracked sub-domain
- * ("branch.example.com"), the domain above it ("example.com") and its other sub-domains, taken as the same business.
+ * Whether a host is the site's own: the tracked host or a sub-domain of it. Nothing above the tracked host is assumed
+ * to be the same business (alice.github.io is not bob.github.io, and which part of a name is the registrable domain
+ * is not guessed); such a page shows as a mention the customer can mark "Not us".
  */
 export function ownHost(host: string, domain: string): boolean {
   const h = host.toLowerCase().replace(/^www\./, ""), d = domain.toLowerCase().replace(/^www\./, "");
-  if (h === d || h.endsWith(`.${d}`)) return true;
-  const parent = d.split(".").slice(1).join(".");
-  // Not when the "domain above" is a country's own suffix (example.co.uk is not a sub-domain of co.uk).
-  if (d.split(".").length <= 2 || !parent.includes(".") || /^(co|com|org|net|gov|edu|ac|ltd|plc|nom|or|ne|go)\.[a-z]{2}$/.test(parent)) return false;
-  return h === parent || h.endsWith(`.${parent}`);
+  return h === d || h.endsWith(`.${d}`);
 }
 /** One result as a row; null without a usable address, or when it is the business's own site (see ownHost). */
 export function parseMention(item: any, domain: string): Omit<MentionRow, "linksToYou"> | null {

@@ -19,7 +19,7 @@ import { saveAlert, deliverAlert } from "./alerts";
 import { getEntitlements } from "../entitlements";
 import { seoIncluded } from "./plan";
 import { recordFailure } from "../ops/issues";
-import { checkLinks, parseMention, placeIn, defaultPlaces, nameKey, MENTIONS_ROWS, MENTIONS_ESTIMATE_USD, type MentionRow, type MentionsPage } from "./mentions";
+import { checkLinks, parseMention, placeIn, defaultPlaces, nameKey, pageKeyOf, MENTIONS_ROWS, MENTIONS_ESTIMATE_USD, type MentionRow, type MentionsPage } from "./mentions";
 
 export const mentionWatchDeps = { request, entitled: async (userId: number) => seoIncluded(await getEntitlements(userId)) };
 /** The first watched check looks back this far (later ones: since the one before). */
@@ -122,10 +122,10 @@ export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; p
   return out.data;
 }
 
-/** Pure: the new pages worth an alert — likely the business, not marked otherwise, on a website not known to link. */
+/** Pure: the new pages worth an alert — likely the business, not marked otherwise (verdicts by page), on a website not known to link. */
 export function alertPages(rows: readonly MentionRow[], places: readonly string[], marks: ReadonlyMap<string, "mine" | "not_mine">): (MentionRow & { place: string | null; confirmed: boolean })[] {
-  return rows.map((r) => ({ ...r, place: placeIn(r, places), confirmed: marks.get(r.domain) === "mine" }))
-    .filter((r) => marks.get(r.domain) !== "not_mine" && (r.confirmed || !!r.place) && r.linksToYou !== true);
+  return rows.map((r) => ({ ...r, place: placeIn(r, places), confirmed: marks.get(pageKeyOf(r.url)) === "mine" }))
+    .filter((r) => marks.get(pageKeyOf(r.url)) !== "not_mine" && (r.confirmed || !!r.place) && r.linksToYou !== true);
 }
 
 /** Raise the alert each unsettled watched check calls for, once; then mark it dealt with. Alerts off = none (still settled). */
@@ -138,8 +138,8 @@ export async function settleMentionAlerts(siteId: number): Promise<number> {
     try {
       if (c.alerts_enabled !== false) {
         const page = c.page as MentionsPage;
-        const { rows: marks } = await pool.query("SELECT domain, verdict FROM seo_mention_marks WHERE site_id=$1 AND name_key=$2", [siteId, c.name_key]);
-        const pages = alertPages(Array.isArray(page?.rows) ? page.rows : [], await sitePlaces({ id: siteId, mention_places: c.mention_places }), new Map(marks.map((m: any) => [m.domain, m.verdict])));
+        const { rows: marks } = await pool.query("SELECT page_key, verdict FROM seo_mention_verdicts WHERE site_id=$1 AND name_key=$2", [siteId, c.name_key]);
+        const pages = alertPages(Array.isArray(page?.rows) ? page.rows : [], await sitePlaces({ id: siteId, mention_places: c.mention_places }), new Map(marks.map((m: any) => [m.page_key, m.verdict])));
         if (pages.length) {
           const item = { checkId: c.id, name: c.name, since: new Date(c.since).toISOString().slice(0, 10), takenOn: new Date(c.created_at).toISOString().slice(0, 10), linksChecked: page.linksChecked,
             pages: pages.slice(0, 50).map((p) => ({ domain: p.domain, url: p.url, title: p.title, place: p.place, confirmed: p.confirmed, linksToYou: p.linksToYou })), more: Math.max(0, pages.length - 50) };

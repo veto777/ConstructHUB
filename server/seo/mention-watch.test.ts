@@ -11,7 +11,8 @@ describe("mentions watch", () => {
   });
   it("alerts only on pages likely to be the business, not marked otherwise, on websites not known to link", () => {
     const rows = [row("a.com", "Alpine Exteriors in Bellingham"), row("b.com", "Alpine Exteriors Tampa"), row("c.com", "Alpine Exteriors Bellingham", true), row("d.com", "Alpine Exteriors in Bellingham"), row("e.com", "Alpine Exteriors news")];
-    const marks = new Map<string, "mine" | "not_mine">([["d.com", "not_mine"], ["e.com", "mine"]]);
+    // Verdicts are by page (d.com/p rejected, e.com/p confirmed); another page of d.com would be judged on its own.
+    const marks = new Map<string, "mine" | "not_mine">([["d.com/p", "not_mine"], ["e.com/p", "mine"]]);
     expect(alertPages(rows, ["Bellingham"], marks).map((r) => [r.domain, r.place, r.confirmed])).toEqual([["a.com", "Bellingham", false], ["e.com", null, true]]);
     // A link check that did not load is "not known": still a prospect worth a look, never counted as linking.
     expect(alertPages([row("f.com", "Alpine Exteriors Bellingham", null)], ["Bellingham"], new Map()).length).toBe(1);

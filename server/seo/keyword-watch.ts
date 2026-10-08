@@ -106,7 +106,8 @@ export type PageSide = { keywords: number; visits: number; /** Keywords with no 
 export type PageChange = {
   /** Stable identity (a hash of host and path): the same page in any snapshot. */ id: string;
   /** What to show: the path on the site's own host, the full address on another host; null = the source gave no page. */ path: string | null;
-  /** The page's full address when it is known (from the source, or the site's own host and the path); null when not. */ url: string | null;
+  /** The page's full address when it is known (from the source, or the site's own host and the path); null when not. The newer snapshot's spelling. */ url: string | null;
+  /** The older snapshot's spelling of the same page's address, when it differed (http then, https now). */ urlBefore?: string;
   /** The path was kept only to its first 300 characters (older snapshots): two long addresses could be one row here. */ cut: boolean;
   before: PageSide; after: PageSide;
   /** Keywords on this page in only one of the two snapshots (what that means depends on the comparison's basis). */ added: number; gone: number;
@@ -145,7 +146,8 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
   const host = bareHost(siteHost);
   const pages = new Map<string, PageChange>();
   const side = (): PageSide => ({ keywords: 0, visits: 0, unknown: 0 });
-  const at = (pg: ReturnType<typeof pageOf>) => {
+  /** `current`: the newer snapshot's view of the page — its address spelling (scheme, host) is the one shown and planned. */
+  const at = (pg: ReturnType<typeof pageOf>, current = false) => {
     const k = pg?.key ?? "\u0000";
     let row = pages.get(k);
     if (!row) {
@@ -155,6 +157,7 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
       pages.set(k, row);
     }
     if (pg?.cut) row.cut = true;
+    if (current && pg?.origin && row.url !== `${pg.origin}${pg.path}`) { if (row.url) row.urlBefore = row.url; row.url = `${pg.origin}${pg.path}`; }
     return row;
   };
   const add = (x: PageSide, k: SnapshotKeyword) => { x.keywords++; if (k.traffic === null) x.unknown++; else x.visits += k.traffic; };
@@ -169,7 +172,7 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
     else if (!pg && npg) row.movedOut++;   // the "page not given" row: it now has one
   }
   for (const k of now) {
-    const pg = pageOf(k, host), row = at(pg); add(row.after, k);
+    const pg = pageOf(k, host), row = at(pg, true); add(row.after, k);
     const b = was.get(k.keyword);
     if (!b) { row.added++; continue; }
     const bpg = pageOf(b, host);

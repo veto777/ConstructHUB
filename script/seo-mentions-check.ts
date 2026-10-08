@@ -45,12 +45,12 @@ const charged = async (user = 1) => Number((await pool.query("SELECT coalesce(su
   // Another account does not see this account's saved check.
   ok((await cached<MentionsPage>(2, key, 168)) === null, "another account does not see the saved check");
   // The customer's verdicts: one per site, name and website (a second one replaces it); only the two words; gone with the site.
-  const mark = (v: string) => pool.query(`INSERT INTO seo_mention_marks(site_id, user_id, name_key, domain, verdict) VALUES($1,1,'alpine exteriors','a.com',$2)
-    ON CONFLICT (site_id, name_key, domain) DO UPDATE SET verdict=excluded.verdict`, [site.id, v]);
-  await mark("mine"); await mark("not_mine");
-  ok((await pool.query("SELECT verdict FROM seo_mention_marks WHERE site_id=$1", [site.id])).rows.map((r) => r.verdict).join() === "not_mine", "a second verdict replaces the first");
+  const mark = (v: string, page = "a.com/p") => pool.query(`INSERT INTO seo_mention_verdicts(site_id, user_id, name_key, page_key, page_url, verdict) VALUES($1,1,'alpine exteriors',$3,'https://'||$3,$2)
+    ON CONFLICT (site_id, name_key, page_key) DO UPDATE SET verdict=excluded.verdict`, [site.id, v, page]);
+  await mark("mine"); await mark("not_mine"); await mark("mine", "a.com/other");
+  ok((await pool.query("SELECT page_key, verdict FROM seo_mention_verdicts WHERE site_id=$1 ORDER BY page_key", [site.id])).rows.map((r) => `${r.page_key}=${r.verdict}`).join() === "a.com/other=mine,a.com/p=not_mine", "a verdict is per page; a second one on a page replaces the first");
   ok(await mark("maybe").then(() => false, () => true), "only 'mine' or 'not_mine' can be stored");
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
-  ok((await pool.query("SELECT 1 FROM seo_mention_marks WHERE site_id=$1", [site.id])).rowCount === 0, "verdicts go with the site");
+  ok((await pool.query("SELECT 1 FROM seo_mention_verdicts WHERE site_id=$1", [site.id])).rowCount === 0, "verdicts go with the site");
   console.log(`mentions checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

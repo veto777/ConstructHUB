@@ -170,6 +170,28 @@ export const SEO_SCHEMA_DDL = [
      marked_at timestamptz NOT NULL DEFAULT now(),
      PRIMARY KEY (site_id, name_key, domain)
    )`,
+  // Verdicts are about a PAGE (one directory page can list several businesses; another page of the same website is
+  // another question). The website-level table above is no longer read: its rows were never page-specific.
+  `CREATE TABLE IF NOT EXISTS seo_mention_verdicts (
+     site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
+     user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     name_key text NOT NULL,
+     page_key text NOT NULL,
+     page_url text NOT NULL,
+     verdict text NOT NULL CHECK (verdict IN ('mine','not_mine')),
+     marked_at timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (site_id, name_key, page_key)
+   )`,
+  // "Check again" that was bought: its answer, kept by the answer it replaced, so a repeat of the same request returns
+  // it instead of buying again — even when the answer could not be saved as the report.
+  `CREATE TABLE IF NOT EXISTS seo_refresh_receipts (
+     user_id integer NOT NULL,
+     key text NOT NULL,
+     replaces text NOT NULL,
+     answer jsonb NOT NULL,
+     created_at timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (user_id, key, replaces)
+   )`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alert_drop integer NOT NULL DEFAULT 3`,
   // What changed between checks (server/seo/alerts.ts). `source` is what raised it (a rank run id, a snapshot date).
   `CREATE TABLE IF NOT EXISTS seo_alerts (

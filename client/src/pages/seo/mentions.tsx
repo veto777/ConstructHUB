@@ -12,7 +12,7 @@ import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoStatus } from 
 import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
-type Page = { name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
+type Page = { marksUnavailable?: boolean; name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
 type Watch = { watch: boolean; nextAt: string | null; latest: { id: number; since: string; takenAt: string; page: Page } | null };
 type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
@@ -34,14 +34,25 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   // Every answer seen on this screen, by name — a purchase stays on screen even when it could not be saved, and going
   // back to an earlier name shows its answer again. Never replaced by "nothing saved".
   const [kept, setKept] = useState<Record<string, Page>>({});
-  const keep = (p: Page) => setKept((m) => ({ ...m, [norm(p.name)]: p }));
+  // Kept by freshness: an older answer (an earlier search, or the same search before its link check came back) never
+  // replaces a newer one; the newest response's verdicts are taken either way.
+  const keep = (p: Page) => setKept((m) => {
+    const k = norm(p.name), had = m[k];
+    const t = (x: Page) => [x.fetchedAt, x.linksChecked ? (x.linksCheckedAt ?? x.fetchedAt) : ""].join("|");
+    if (!had || t(p) >= t(had)) return { ...m, [k]: p };
+    const marks = new Map(p.rows.map((r) => [r.url, r.mark]));
+    return { ...m, [k]: { ...had, rows: had.rows.map((r) => (marks.has(r.url) ? { ...r, mark: marks.get(r.url) } : r)) } };
+  });
   const [filter, setFilter] = useState<"prospects" | "yours" | "unsure" | "linked" | "notMine" | "all">("prospects");
-  // Verdicts just given on this screen (shown at once; the server keeps them per site, name and website).
-  const [marking, setMarking] = useState<Record<string, "mine" | "not_mine" | null>>({});
+  // Verdicts given on this screen, per name and PAGE: shown at once as pending, one request at a time per page (its
+  // buttons wait), confirmed when the server answers, and put back to what they were if it refuses.
+  type Verdict = "mine" | "not_mine" | null;
+  const [marking, setMarking] = useState<Record<string, { verdict: Verdict; pending: boolean }>>({});
   const mark = useMutation({
-    mutationFn: (v: { siteId: number; name: string; domain: string; verdict: "mine" | "not_mine" | null }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, domain: v.domain, verdict: v.verdict }),
-    onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.domain}`]: v.verdict })),
-    onError: (e, v) => { setMarking((m) => { const { [`${norm(v.name)}|${v.domain}`]: _x, ...rest } = m; return rest; }); toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }); },
+    mutationFn: (v: { siteId: number; name: string; url: string; verdict: Verdict; was: Verdict }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, url: v.url, verdict: v.verdict }),
+    onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.verdict, pending: true } })),
+    onSuccess: (_d, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.verdict, pending: false } })); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); },
+    onError: (e, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.was, pending: false } })); toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }); },
   });
   // The saved name and places of this site, whenever another site is opened or they load.
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
@@ -79,19 +90,23 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
     queryFn: async () => { try { return (await api("POST", key, { name: name.trim(), peek: true })).page as Page; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   useEffect(() => { if (peek.data) keep(peek.data); }, [peek.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
   const page = kept[norm(name)] ?? null;
   // Rows are read for the places on the server when the check is loaded; edited places are read here the same way
   // (whole words in the title and the excerpt) until they are saved.
+  // Always read for the places in the field now (whole words in the title and the excerpt, as the server does), so an
+  // answer kept from earlier can never show a match for places that have since changed.
   const placeOf = (r: Row) => {
-    if (!placesChanged) return r.place;
     const hay = ` ${`${r.title} ${r.snippet ?? ""}`.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ")} `;
     return places.find((p) => { const w = p.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim(); return w.length >= 2 && hay.includes(` ${w} `); }) ?? null;
   };
   const rows = (page?.rows ?? []).map((r) => ({ ...r, place: placeOf(r) }));
   // The customer's verdict decides when there is one; otherwise the place match is a pointer to check, nothing more.
-  const markOf = (r: Row) => { const k = `${norm(page?.name ?? "")}|${r.domain}`; return marking[k] !== undefined ? marking[k] : r.mark ?? null; };
+  const markKey = (r: Row) => `${norm(page?.name ?? "")}|${r.url}`;
+  const markOf = (r: Row): Verdict => marking[markKey(r)]?.verdict !== undefined ? marking[markKey(r)].verdict : r.mark ?? null;
+  const markPending = (r: Row) => !!marking[markKey(r)]?.pending;
   const likely = (r: Row & { place: string | null }) => markOf(r) === "mine" || (markOf(r) === null && !!r.place);
   const groups = {
     prospects: rows.filter((r) => likely(r) && r.linksToYou === false), yours: rows.filter(likely), unsure: rows.filter((r) => markOf(r) === null && !r.place),
@@ -110,8 +125,11 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
     source: `mention:${fingerprint(`${norm(page!.name)}\u0000${r.url}`)}`,
   });
   const exportCsv = () => {
-    const lines: (string | number | null)[][] = [["Searched name", "Website", "Page", "Title", "Excerpt", "Published", "Authority", "Name and place match (to verify)", "Link to your site (from any page of that website)", "Searched on", "Links checked on"],
-      ...rows.map((r) => [page!.name, r.domain, r.url, r.title, r.snippet, r.published, r.authority, r.place ? `name and ${r.place}` : "name only", linkWord(r.linksToYou), page!.fetchedAt.slice(0, 10), page!.linksCheckedAt?.slice(0, 10) ?? null])];
+    // Every row of the check (whatever tab is open), with the customer's own verdict and what the screen makes of it.
+    const lines: (string | number | null)[][] = [["Searched name", "Website", "Page", "Title", "Excerpt", "Published", "Authority", "Name and place match (to verify)", "Your verdict on this page", "Shown as", "Link to your site (from any page of that website)", "Searched on", "Links checked on"],
+      ...rows.map((r) => [page!.name, r.domain, r.url, r.title, r.snippet, r.published, r.authority, r.place ? `name and ${r.place}` : "name only",
+        markOf(r) === "mine" ? "this is us" : markOf(r) === "not_mine" ? "not us" : "", markOf(r) === "not_mine" ? "not you" : likely(r) ? "likely you" : "name only - check it is you",
+        linkWord(r.linksToYou), page!.fetchedAt.slice(0, 10), page!.linksCheckedAt?.slice(0, 10) ?? null])];
     const blob = new Blob([lines.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${domain}-mentions.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
@@ -127,7 +145,7 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
         <label className="flex min-w-0 flex-col text-[13px]"><span className="g-text-2 mb-1">Your places (towns, county), separated by commas</span>
           <input className="g-input w-80 max-w-full" value={placesText} onChange={(e) => setPlacesText(e.target.value)} placeholder="e.g. Bellingham, Whatcom, Lynden" data-testid="input-mentions-places" /></label>
         {placesChanged && <button type="button" className="g-pill g-pill--sm" disabled={savePlaces.isPending} onClick={() => savePlaces.mutate({ siteId, places })} data-testid="button-mentions-places">Save places (free)</button>}
-        <button type="button" className="g-pill" disabled={!nameOk || run.isPending || peek.isFetching || !status?.configured || !canPay(price)} onClick={() => run.mutate({ siteId, name: name.trim(), replaces: page?.fetchedAt })} data-testid="button-mentions-run">
+        <button type="button" className="g-pill" disabled={!nameOk || run.isPending || peek.isFetching || peekFailed || !status?.configured || !canPay(price)} onClick={() => run.mutate({ siteId, name: name.trim(), replaces: page?.fetchedAt })} data-testid="button-mentions-run">
           {run.isPending ? <Loader2 className="animate-spin" /> : <Play />} {run.isPending ? "Looking…" : `${page ? "Check again" : "Look for mentions"}${price != null ? ` — up to ${money(price)}` : ""}`}
         </button>
       </div>
@@ -135,7 +153,7 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
       {price == null && status && <p className="g-text-2 mb-2 text-[12px]">The price couldn't be loaded, so nothing can be bought yet — reload the page.</p>}
       {price != null && !canPay(price) && <p className="mb-2 text-[12px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit on the SEO dashboard.</p>}
       {!page ? (
-        <Empty testId="mentions-none"><h3>{peek.isFetching ? "Looking for a saved check of this name…" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h3><p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
+        <Empty testId="mentions-none"><h3>{peek.isFetching ? "Looking for a saved check of this name…" : peekFailed ? "Couldn't look for a saved check of this name" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h3>{peekFailed && <p role="alert">{apiErrorMessage(peek.error)} <button type="button" className="g-link" onClick={() => void peek.refetch()} data-testid="button-mentions-peek-retry">Look again (free)</button></p>}<p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
@@ -146,6 +164,7 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
             <div className="g-callout mb-2" role="status" data-testid="mentions-links-missing"><p>The check of which websites link to you did not load, so that column is not known (it was not charged).</p>
               <button type="button" className="g-pill g-pill--sm mt-1" disabled={run.isPending || !canPay(retryPrice)} onClick={() => run.mutate({ siteId, name: page.name, retryMissing: true })} data-testid="button-mentions-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></div>
           )}
+          {page.marksUnavailable && <p className="mb-2 text-[12px]" role="status" style={{ color: "#b06000" }}>Your "This is us / Not us" answers couldn't be loaded just now, so they aren't shown — they are still saved. Reload to see them.</p>}
           {page.linksPartial && <p className="g-text-2 mb-2 text-[12px]">More of these websites link to you than one check returns; for the rest it is "not known", never "no link".</p>}
           <nav className="g-tabs" aria-label="Which mentions">
             {tabs.map(([k, label, n]) => <a key={k} href={`#${k}`} aria-current={filter === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setFilter(k); }} data-testid={`tab-mentions-${k}`}>{label} ({fmtNum(n)})</a>)}
@@ -156,17 +175,17 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
                 <thead><tr><th>Website and page</th><th>What it says</th><th className="num">Authority</th><th>Published</th><th>Link to you</th><th><span className="sr-only">Action plan</span></th></tr></thead>
                 <tbody>
                   {list.map((r) => (
-                    <tr key={r.domain}>
+                    <tr key={r.url}>
                       <td className="max-w-[16rem]" data-label="Website"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.domain}</a><span className="g-text-2 block truncate text-[12px]" title={r.title}>{r.title}</span></td>
-                      <td className="max-w-[26rem] !whitespace-normal text-[12px]" data-label="What it says">{r.snippet ?? "—"}<span className="g-text-2 block">{markOf(r) === "mine" ? "You confirmed this website writes about you" : markOf(r) === "not_mine" ? "You marked this as another business" : r.place ? `Names ${r.place} too — check it is about you` : "Names none of your places — check it is you"}{!flatHas(`${r.title} ${r.snippet ?? ""}`, page.name) ? " · the name is elsewhere on the page, not in this excerpt" : ""}</span></td>
+                      <td className="max-w-[26rem] !whitespace-normal text-[12px]" data-label="What it says">{r.snippet ?? "—"}<span className="g-text-2 block">{markOf(r) === "mine" ? "You confirmed this page is about you" : markOf(r) === "not_mine" ? "You marked this page as another business" : r.place ? `Names ${r.place} too — check it is about you` : "Names none of your places — check it is you"}{!flatHas(`${r.title} ${r.snippet ?? ""}`, page.name) ? " · the name is elsewhere on the page, not in this excerpt" : ""}</span></td>
                       <td className="num" data-label="Authority">{r.authority ?? "—"}</td>
                       <td data-label="Published">{r.published ? fmtDate(r.published) : "—"}</td>
                       <td data-label="Link to you">{linkWord(r.linksToYou)}</td>
                       <td className="whitespace-nowrap text-right">
-                        <span className="inline-flex flex-wrap justify-end gap-1" role="group" aria-label={`Is ${r.domain} writing about you?`}>
-                          <button type="button" className="g-pill g-pill--sm" aria-pressed={markOf(r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, domain: r.domain, verdict: markOf(r) === "mine" ? null : "mine" })} data-testid={`button-mention-mine-${r.domain}`}>{markOf(r) === "mine" ? "✓ This is us" : "This is us"}</button>
-                          <button type="button" className="g-pill g-pill--sm" aria-pressed={markOf(r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, domain: r.domain, verdict: markOf(r) === "not_mine" ? null : "not_mine" })} data-testid={`button-mention-notmine-${r.domain}`}>{markOf(r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
-                          {r.linksToYou !== true && markOf(r) !== "not_mine" && <AddToPlan siteId={siteId} label="Plan" testId={`button-plan-mention-${r.domain}`} tasks={[task(r)]} />}
+                        <span className="inline-flex flex-wrap justify-end gap-1" role="group" aria-label={`Is this page on ${r.domain} about you?`} aria-busy={markPending(r)}>
+                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={markOf(r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "mine" ? null : "mine", was: markOf(r) })} data-testid={`button-mention-mine-${r.domain}`}>{markOf(r) === "mine" ? "✓ This is us" : "This is us"}</button>
+                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={markOf(r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "not_mine" ? null : "not_mine", was: markOf(r) })} data-testid={`button-mention-notmine-${r.domain}`}>{markOf(r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
+                          {r.linksToYou !== true && markOf(r) !== "not_mine" && !markPending(r) && <AddToPlan siteId={siteId} label="Plan" testId={`button-plan-mention-${r.domain}`} tasks={[task(r)]} />}
                         </span>
                       </td>
                     </tr>

@@ -59,11 +59,10 @@ describe("unlinked mentions", () => {
     const out = await fetchMentions("Nobody Named This", "x.com");
     expect([calls.length, out.data.rows, out.data.linksChecked]).toEqual([1, [], true]);
   });
-  it("the business's own site: its host and sub-domains, and for a tracked sub-domain the domain above it — never a country suffix", () => {
-    expect([ownHost("blog.alpine.example", "alpine.example"), ownHost("alpine.example", "branch.alpine.example"), ownHost("shop.alpine.example", "branch.alpine.example")]).toEqual([true, true, true]);
-    expect([ownHost("other.co.uk", "example.co.uk"), ownHost("notalpine.example", "alpine.example"), ownHost("example.com", "a.b")]).toEqual([false, false, false]);
-    // A result filed under another website but served from the site's own host is still the site's own.
-    expect(parseMention({ url: "https://branch.alpine.example/news", main_domain: "alpine.example", content_info: {} }, "branch.alpine.example")).toBeNull();
+  it("the business's own site is its host and its sub-domains — nothing above it is guessed to be the same business", () => {
+    expect([ownHost("blog.alpine.example", "alpine.example"), ownHost("www.alpine.example", "alpine.example")]).toEqual([true, true]);
+    expect([ownHost("alpine.example", "branch.alpine.example"), ownHost("bob.github.io", "alice.github.io"), ownHost("notalpine.example", "alpine.example")]).toEqual([false, false, false]);
+    // Judged on the page's own host as well as the website it is filed under.
     expect(parseMention({ url: "https://www.alpine.example/x", main_domain: "feed.example", content_info: {} }, "alpine.example")).toBeNull();
   });
 });

@@ -18,7 +18,7 @@
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { setMentionWatch, mentionWatchView } from "./mention-watch";
-import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
+import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -805,12 +805,18 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     return defaultPlaces(rows.map((r: any) => r.location_name));
   };
   /** A saved check as shown: each row read for the places (free to change, so worked out on every read) and with the
-   *  customer's own verdict on that website for this name, if they gave one. */
+   *  customer's own verdict on that PAGE for this name, if they gave one. Never fails: if the verdicts cannot be read,
+   *  the answer still goes out (it may just have been paid for) and says the verdicts are not shown. */
   const mentionsView = async (siteId: number, user: number, page: MentionsPage, places: string[]) => {
-    const { rows: marks } = await pool.query("SELECT domain, verdict FROM seo_mention_marks WHERE site_id=$1 AND user_id=$2 AND name_key=$3", [siteId, user, mentionNameKey(page.name)]);
-    const mark = new Map(marks.map((m: any) => [m.domain, m.verdict as "mine" | "not_mine"]));
-    return { ...page, rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places), mark: mark.get(r.domain) ?? null })) };
+    let mark = new Map<string, "mine" | "not_mine">(), marksUnavailable = false;
+    try {
+      const { rows: marks } = await pool.query("SELECT page_key, verdict FROM seo_mention_verdicts WHERE site_id=$1 AND user_id=$2 AND name_key=$3", [siteId, user, mentionNameKey(page.name)]);
+      mark = new Map(marks.map((m: any) => [m.page_key, m.verdict]));
+    } catch (e: any) { marksUnavailable = true; console.error(`[seo] mention verdicts for site ${siteId} could not be read: ${e?.message ?? e}`); }
+    return { ...page, ...(marksUnavailable ? { marksUnavailable } : {}), rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places), mark: mark.get(pageKeyOf(r.url)) ?? null })) };
   };
+  /** Bought "Check again" answers by the answer they replaced (see seo_refresh_receipts); in memory as well, for when the database write fails. */
+  const receiptsInMemory = new Map<string, MentionsPage>();
   route("get", "/api/seo/sites/:id/mentions", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
@@ -838,15 +844,16 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     await setMentionWatch(user, site.id, watch);
     res.json({ watch });
   });
-  // The customer's verdict on one website for one name: "mine", "not_mine", or null to take it back. Spends nothing.
+  // The customer's verdict on one page for one name: "mine", "not_mine", or null to take it back. Spends nothing.
   route("post", "/api/seo/sites/:id/mentions/marks", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const m = markInput.parse(req.body);
+    const pk = pageKeyOf(m.url);
     if (m.verdict) await pool.query(
-      `INSERT INTO seo_mention_marks(site_id, user_id, name_key, domain, verdict) VALUES($1,$2,$3,$4,$5)
-       ON CONFLICT (site_id, name_key, domain) DO UPDATE SET verdict=excluded.verdict, marked_at=now()`, [site.id, user, mentionNameKey(m.name), m.domain, m.verdict]);
-    else await pool.query("DELETE FROM seo_mention_marks WHERE site_id=$1 AND user_id=$2 AND name_key=$3 AND domain=$4", [site.id, user, mentionNameKey(m.name), m.domain]);
-    res.json({ domain: m.domain, verdict: m.verdict });
+      `INSERT INTO seo_mention_verdicts(site_id, user_id, name_key, page_key, page_url, verdict) VALUES($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (site_id, name_key, page_key) DO UPDATE SET verdict=excluded.verdict, page_url=excluded.page_url, marked_at=now()`, [site.id, user, mentionNameKey(m.name), pk, m.url, m.verdict]);
+    else await pool.query("DELETE FROM seo_mention_verdicts WHERE site_id=$1 AND user_id=$2 AND name_key=$3 AND page_key=$4", [site.id, user, mentionNameKey(m.name), pk]);
+    res.json({ url: m.url, verdict: m.verdict });
   });
   // Check for mentions of the name — or reopen the saved check (free for a week). The price on the button is the very
   // figure set aside. A second try buys only the link check that did not load. One at a time per saved answer.
@@ -872,13 +879,28 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
           async () => { const o = await checkLinks(now); if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown }); return o; }, true, `Mentions — ${site.domain} (link check, second try)`);
         return res.status(201).json({ page: await view(out.data), reused: false, saved: out.saved });
       }
-      // "Check again" says which answer it is replacing: if a newer one was saved meanwhile (a second click, another tab),
-      // that one is the answer — read now, inside the queue, so overlapping refreshes buy once.
+      // "Check again" must say which answer it replaces. The same replacement asked again (a second click, another tab,
+      // a retry after a lost response) gets the answer the first one bought — from its receipt, which is kept even when
+      // the answer could not be saved as the report — or a newer saved answer. Read inside the queue: one purchase.
+      if (input.refresh && !input.replaces) return res.status(400).json({ message: "Reload the page and press Check again." });
+      const receiptKey = `${user}|${key}|${input.replaces ?? ""}`;
+      if (input.refresh) {
+        const { rows: [rc] } = await pool.query("SELECT answer FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND created_at > now() - interval '7 days'", [user, key, input.replaces]).catch(() => ({ rows: [] as any[] }));
+        const earlier = (rc?.answer as MentionsPage | undefined) ?? receiptsInMemory.get(receiptKey);
+        if (earlier) return res.json({ page: await view(earlier), reused: true });
+      }
       const current = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
-      const stale = !input.refresh ? false : !current || !input.replaces || !(new Date(current.fetchedAt) > new Date(input.replaces));
+      const stale = !input.refresh ? false : !current || !(new Date(current.fetchedAt) > new Date(input.replaces!));
       if (current && !stale) return res.json({ page: await view(current), reused: true });
       if (!isConfigured()) return notReady(res);
       const out = await buyOnce<MentionsPage>(user, key, "mentions", MENTIONS_CACHE_HOURS, MENTIONS_ESTIMATE_USD, () => fetchMentions(input.name, site.domain), input.refresh, `Mentions — "${input.name}"`);
+      if (input.refresh && !out.reused) {
+        receiptsInMemory.set(receiptKey, out.data);
+        if (receiptsInMemory.size > 200) receiptsInMemory.delete(receiptsInMemory.keys().next().value as string);
+        await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING", [user, key, input.replaces, JSON.stringify(out.data)])
+          .then(() => pool.query("DELETE FROM seo_refresh_receipts WHERE created_at < now() - interval '7 days'"))
+          .catch((e) => console.error(`[seo] refresh receipt not kept (kept in memory): ${e?.message ?? e}`));
+      }
       return res.status(out.reused ? 200 : 201).json({ page: await view(out.data), reused: out.reused, saved: out.saved });
     });
   });

@@ -21,7 +21,7 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   mentionWatchDeps.request = (async () => { calls++; return ok20(found, 0.025); }) as any;
   mentionsDeps.request = (async () => { calls++; return ok20([], 0.025); }) as any;   // the link check: nobody links
   const { rows: [s] } = await pool.query("INSERT INTO seo_sites(user_id, domain, business_name, mention_places) VALUES(1,'mwatch.example','Alpine Exteriors',ARRAY['Bellingham']) RETURNING *");
-  await pool.query("INSERT INTO seo_mention_marks(site_id, user_id, name_key, domain, verdict) VALUES($1,1,'alpine exteriors','d.com','not_mine')", [s.id]);
+  await pool.query("INSERT INTO seo_mention_verdicts(site_id, user_id, name_key, page_key, page_url, verdict) VALUES($1,1,'alpine exteriors','d.com/p','https://d.com/p','not_mine')", [s.id]);
   const site = () => pool.query("SELECT * FROM seo_sites WHERE id=$1", [s.id]).then((r) => r.rows[0]);
   const alerts = () => pool.query("SELECT kind, title, items FROM seo_alerts WHERE site_id=$1", [s.id]).then((r) => r.rows);
   // 1. Off: nothing is bought.
