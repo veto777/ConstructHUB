@@ -62,6 +62,20 @@ export const AI_SCHEMA_DDL = [
      next_at timestamptz NOT NULL DEFAULT now(),
      created_at timestamptz NOT NULL DEFAULT now()
    )`,
+  // 'asking' = the run was opened and the ask may or may not have been paid for (written BEFORE buying);
+  // 'paid' = the answers are here and waiting to be filed.
+  `ALTER TABLE seo_ai_unsaved ALTER COLUMN answers DROP NOT NULL`,
+  `ALTER TABLE seo_ai_unsaved ADD COLUMN IF NOT EXISTS state text NOT NULL DEFAULT 'paid'`,
+  `ALTER TABLE seo_ai_unsaved ADD COLUMN IF NOT EXISTS tracked_id integer`,
+  // One answer per assistant per run, enforced by the database: filing a run twice cannot double it. Rows that would
+  // break the rule (the same run filed twice before the rule existed — identical copies) are reduced to the first
+  // one, and only while the rule is not there yet, so creating it can never fail on existing data.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_ai_checks_run_engine') THEN
+       DELETE FROM seo_ai_checks a USING seo_ai_checks b WHERE a.run_id IS NOT NULL AND a.run_id = b.run_id AND a.engine = b.engine AND a.id > b.id;
+     END IF;
+   END $$`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_checks_run_engine ON seo_ai_checks(run_id, engine) WHERE run_id IS NOT NULL`,
 ];
 
 /** One spelling of a question everywhere it is stored or compared: single spaces, trimmed. */
@@ -217,7 +231,7 @@ export async function askAi(prompt: string, engines: AiEngine[], site: { domain:
 export const askEstimateUsd = (engines: AiEngine[]) => Math.round(engines.reduce((a, e) => a + AI_ENGINES[e].estimateUsd, 0) * 1e6) / 1e6;
 
 /** Save the answers of one ask together (all or none), under one run id. */
-export async function saveAiAnswers(userId: number, siteId: number, prompt: string, answers: AiAnswer[], costUsd: number, runId: string): Promise<void> {
+export async function saveAiAnswers(userId: number, siteId: number, prompt: string, answers: AiAnswer[], costUsd: number, runId: string, opts: { /** A monthly question: its month moves on in the same step. */ advanceTrackedId?: number } = {}): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -225,9 +239,11 @@ export async function saveAiAnswers(userId: number, siteId: number, prompt: stri
     const { rows: [filed] } = await client.query("SELECT 1 FROM seo_ai_checks WHERE run_id=$1 AND user_id=$2 LIMIT 1", [runId, userId]);
     if (!filed) for (const a of answers)
       await client.query(
-        `INSERT INTO seo_ai_checks(user_id, site_id, prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, cost_usd, run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        `INSERT INTO seo_ai_checks(user_id, site_id, prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, cost_usd, run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         ON CONFLICT (run_id, engine) WHERE run_id IS NOT NULL DO NOTHING`,
         [userId, siteId, onePrompt(prompt), a.engine, a.model, a.mentioned, a.cited, a.listedAt, JSON.stringify(a.businesses), JSON.stringify(a.sources), JSON.stringify(a.searches), a.answer, costUsd / Math.max(1, answers.length), runId]);
     await client.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1", [runId]);
+    if (opts.advanceTrackedId !== undefined) await client.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [opts.advanceTrackedId]);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});

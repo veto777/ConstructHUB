@@ -48,12 +48,16 @@ function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCoun
   }
   // Grid scans: the same — failed in the background, read back by the page.
   if (/seo_grid_scans/.test(sql)) {
-    if (/^INSERT INTO seo_grid_scans/.test(sql)) { const id = db.scans.length + 1; db.scans.push({ id, status: "running", scan: null, error: null, stale: false }); return many([{ id }]); }
-    if (/SET status='failed', error=\$2/.test(sql)) { const s = db.scans.find((x) => x.id === params[0]); if (s) { s.status = "failed"; s.error = params[1]; } return many([]); }
-    if (/SET status='done', scan=\$2/.test(sql)) { const s = db.scans.find((x) => x.id === params[0]); if (s) { s.status = "done"; s.scan = JSON.parse(params[1]); } return many([]); }
+    if (/^INSERT INTO seo_grid_scans/.test(sql)) { const id = db.scans.length + 1; db.scans.push({ id, keyword: params[2], size: params[3], spacing: params[4], status: "running", scan: null, error: null }); return many([{ id }]); }
+    // closeStale (WHERE site_id=$1) closes nothing here: no scan in this suite is old.
+    if (/SET status='failed', error=\$2 WHERE id=\$1/.test(sql)) { const s = db.scans.find((x) => x.id === params[0] && x.status === "running"); if (s) { s.status = "failed"; s.error = params[1]; } return many([]); }
+    if (/SET status='done', scan=\$2/.test(sql)) { const s = db.scans.find((x) => x.id === params[0] && x.status === "running"); if (s) { s.status = "done"; s.scan = JSON.parse(params[1]); } return { rows: [], rowCount: s ? 1 : 0 }; }
     if (/^SELECT id, scan, status, error/.test(sql)) return many(db.scans.filter((x) => x.id === params[0]));
+    // The history lists failed scans with their note.
+    if (/status IN \('done','failed'\)/.test(sql)) return many(db.scans.filter((x) => x.status !== "running").map((x) => ({ id: x.id, keyword: x.keyword ?? "roofer", size: 3, spacing: 2, status: x.status, error: x.error, center: null, avgRank: null, points: 9, checked: 0, found: 0, top3: 0, at: "2026-10-01T00:00:00Z" })));
     return many([]);
   }
+  if (/FROM seo_grid_watches/.test(sql) && /^SELECT count/.test(sql)) return many([{ n: 0 }]);
   if (/FROM seo_sites WHERE id=\$1/.test(sql) || /FROM seo_sites s WHERE s\.user_id/.test(sql) || /^UPDATE seo_sites SET business_name/.test(sql) || /^INSERT INTO seo_sites/.test(sql)) return many([{ ...SITE }]);
   if (/^SELECT 1 FROM seo_sites/.test(sql)) return many([{ "?column?": 1 }]);
   if (/count\(\*\)::int (n|total)\b/.test(sql)) return many([{ n: 1, total: 1, has: false }]);
@@ -207,7 +211,10 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "POST /api/seo/sites/:id/grid/locate": [{ url: "/api/seo/sites/1/grid/locate", body: { query: "Acme Roofing Tampa" } }],
   "POST /api/seo/sites/:id/grid/pin": [{ url: "/api/seo/sites/1/grid/pin", body: { name: "Acme Roofing", lat: 27.95, lng: -82.46 } }],
   "POST /api/seo/sites/:id/grid/scan": [{ url: "/api/seo/sites/1/grid/scan", body: { keyword: "roofer near me", size: 3 } }],
+  "POST /api/seo/sites/:id/grid/watch": [{ url: "/api/seo/sites/1/grid/watch", body: { keyword: "roofer near me", size: 3, spacing: 2, every: "weekly" } }],
+  "DELETE /api/seo/sites/:id/grid/watch/:watchId": [{ url: "/api/seo/sites/1/grid/watch/1" }],
   "GET /api/seo/sites/:id/grid/:scanId": [{ url: "/api/seo/sites/1/grid/1" }],
+  "POST /api/seo/opportunities": [{ url: "/api/seo/opportunities", body: { domain: "example.com", refresh: true } }],
   "POST /api/seo/keyword": [{ url: "/api/seo/keyword", body: { keyword: "roof repair", refresh: true } }],
   "POST /api/seo/gap": [
     { url: "/api/seo/gap", body: { kind: "content", domain: "example.com", competitors: ["rival.com"], refresh: true } },
@@ -251,7 +258,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
 /** Routes that ask the provider while the request waits: with the provider down they must answer with the neutral error. */
 const ASKS_PROVIDER = new Set([
   "POST /api/seo/sites/:id/keywords/volumes", "POST /api/seo/keywords/research", "POST /api/seo/sites/:id/backlinks/refresh", "POST /api/seo/explorer", "POST /api/seo/report",
-  "POST /api/seo/sites/:id/grid/locate", "POST /api/seo/keyword", "POST /api/seo/gap", "POST /api/seo/keywords/bulk", "POST /api/seo/content", "POST /api/seo/batch",
+  "POST /api/seo/sites/:id/grid/locate", "POST /api/seo/opportunities", "POST /api/seo/keyword", "POST /api/seo/gap", "POST /api/seo/keywords/bulk", "POST /api/seo/content", "POST /api/seo/batch",
   "POST /api/seo/sites/:id/ai/ask", "POST /api/seo/ai/mentions", "GET /api/seo/locations", "POST /api/seo/sites/:id/competitors",
 ]);
 
@@ -281,7 +288,7 @@ beforeEach(() => { provider = "success"; ledger.refuse = null; db.runs.length = 
 describe("every SEO route, as a customer", () => {
   it("has a request in this suite", () => {
     const routes = [...new Set(registered())];
-    expect(routes.length).toBeGreaterThan(50);
+    expect(routes.length).toBe(62);
     expect(routes.filter((r) => !SPECS[r])).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r))).toEqual([]);
   });
@@ -303,7 +310,7 @@ describe("every SEO route, as a customer", () => {
       // Background work started by those requests (a rank run posting, a grid scan) saves a note; read it back.
       await settle(() => db.runs.every((r) => r.status !== "queued") && db.scans.every((s) => s.status !== "running"));
       if (mode === "success") { provider = "taskFailed"; await collectRunningRuns(); }
-      for (const url of ["/api/seo/sites/1/runs", "/api/seo/sites/1/overview", ...db.scans.map((s) => `/api/seo/sites/1/grid/${s.id}`)]) {
+      for (const url of ["/api/seo/sites/1/runs", "/api/seo/sites/1/overview", "/api/seo/sites/1/grid", ...db.scans.map((s) => `/api/seo/sites/1/grid/${s.id}`)]) {
         const r = await hit("GET", url);
         for (const l of r.leaks) problems.push(`stored then returned by ${url}: ${l}`);
       }
@@ -335,7 +342,7 @@ describe("every SEO route, as a customer", () => {
         }
       }
       await settle(() => db.runs.every((r) => r.status !== "queued") && db.scans.every((s) => s.status !== "running"));
-      for (const url of ["/api/seo/sites/1/runs", ...db.scans.map((s) => `/api/seo/sites/1/grid/${s.id}`)]) for (const l of (await hit("GET", url)).leaks) problems.push(`stored then returned by ${url}: ${l}`);
+      for (const url of ["/api/seo/sites/1/runs", "/api/seo/sites/1/grid", ...db.scans.map((s) => `/api/seo/sites/1/grid/${s.id}`)]) for (const l of (await hit("GET", url)).leaks) problems.push(`stored then returned by ${url}: ${l}`);
       expect(problems).toEqual([]);
       expect(refused).toBeGreaterThan(10);
     });
@@ -383,11 +390,15 @@ describe("notes saved by earlier versions are made safe when read", () => {
     expect(r.body.map((x: any) => x.error)).toEqual(legacy);
   });
   it("a grid scan saved with an error's own text", async () => {
-    db.scans.push({ id: 1, status: "failed", scan: null, error: "DataForSEO HTTP 500 on /serp/google/maps/live/advanced", stale: false }, { id: 2, status: "failed", scan: null, error: "The scan ran but its results could not be saved.", stale: false });
-    const a = await hit("GET", "/api/seo/sites/1/grid/1"), b = await hit("GET", "/api/seo/sites/1/grid/2");
-    expect(a.body.error).toBe("The scan could not be completed.");
-    expect(b.body.error).toBe("The scan ran but its results could not be saved.");
-    expect([...a.leaks, ...b.leaks]).toEqual([]);
+    const notes = ["DataForSEO HTTP 500 on /serp/google/maps/live/advanced", "The scan ran but its results could not be saved. You were not charged.", "This month's included SEO data had run out, so the repeating scan was skipped.", "The repeating scan could not be completed; it will be tried again."];
+    db.scans.push(...notes.map((error, i) => ({ id: i + 1, status: "failed", scan: null, error })));
+    const shown = ["The scan could not be completed.", ...notes.slice(1)];
+    for (let i = 0; i < notes.length; i++) { const r = await hit("GET", `/api/seo/sites/1/grid/${i + 1}`); expect(r.body.error).toBe(shown[i]); expect(r.leaks).toEqual([]); }
+    // ...and in the history, which lists failed scans with their note.
+    const list = await hit("GET", "/api/seo/sites/1/grid");
+    expect(list.leaks).toEqual([]);
+    expect(list.body.scans.map((x: any) => x.error)).toEqual(shown);
+    expect(db.scans.map((x) => x.error)).toEqual(notes);
   });
   it("publicNote keeps what this code writes and nothing else", () => {
     expect(publicNote(null)).toBeNull();
@@ -467,6 +478,13 @@ describe("the boundary itself", () => {
     const out = seoErrorResponse(new TypeError("Cannot read properties of undefined (reading 'dataforseo_labs')"));
     expect(out).toMatchObject({ status: 500, unexpected: true, body: { code: "seo_error", message: SEO_UNEXPECTED_MESSAGE } });
     expect(publicFailure(new Error("DataForSEO unreachable"), "The scan could not be completed.")).toBe("The scan could not be completed.");
+  });
+  it("an error written for the customer (a list or a repeating-scan limit) is answered as written; a plain Error never is", async () => {
+    const { ListError } = await import("./lists"); const { WatchError } = await import("./grid-monitor");
+    expect(seoErrorResponse(new ListError("List not found", 404))).toMatchObject({ status: 404, unexpected: false, body: { message: "List not found" } });
+    expect(seoErrorResponse(new WatchError("Up to 5 scans can repeat for one site.", 403))).toMatchObject({ status: 403, body: { message: "Up to 5 scans can repeat for one site." } });
+    expect(new WatchError("x").name).toBe("WatchError");
+    expect(seoErrorResponse(Object.assign(new Error("DataForSEO said no"), { status: 403 })).status).toBe(500);
   });
 });
 

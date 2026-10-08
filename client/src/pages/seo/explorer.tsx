@@ -16,11 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
+import { OpportunitiesView } from "./opportunities";
 import { MarketPicker, useMarket } from "./market";
 import { findMarket, marketKey, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
 
-type GapKey = "contentGap" | "linkIntersect";
+type GapKey = "contentGap" | "linkIntersect" | "opportunities";
 type ViewKey = ReportKey | GapKey | "overview";
 
 type Footprint = {
@@ -100,7 +101,7 @@ function AuthorityRing({ value }: { value: number | null }) {
 
 /** The left menu, grouped the way Site Explorer groups its reports. */
 const MENU: { group: string; items: [ViewKey, string][] }[] = [
-  { group: "", items: [["overview", "Overview"]] },
+  { group: "", items: [["overview", "Overview"], ["opportunities", "Opportunities"]] },
   { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["referringIps", "Referring IPs"], ["linkCompetitors", "Sites with similar links"], ["linkIntersect", "Link intersect"], ["bestByLinks", "Best pages by links"]] },
   { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["subdomains", "Subdomains"], ["contentGap", "Content gap"]] },
   { group: "Paid search", items: [["paidKeywords", "Paid keywords"], ["ads", "Ads"]] },
@@ -146,10 +147,12 @@ export default function SeoExplorerPage() {
     },
     onError: (e) => toast({ title: "Couldn't analyse that domain", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const tracksHere = (siteId: number) => { const s = (sites.data ?? []).find((x) => x.id === siteId); return !!s && s.locationCode === market.locationCode && s.languageCode === market.languageCode; };
   const trackKeywords = useMutation({
     mutationFn: (v: { siteId: number; rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[] }) =>
-      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
-    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
+      // Numbers from another country are not the tracked site's numbers: the keywords go in without them.
+      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), ...(tracksHere(v.siteId) ? { volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
+    onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker`, description: tracksHere(v.siteId) ? undefined : `These numbers are for ${market.label}, not the country that site is tracked in, so they were not copied.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
@@ -254,12 +257,14 @@ export default function SeoExplorerPage() {
           {view !== "overview" ? (
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
-              {view === "contentGap" || view === "linkIntersect" ? (
+              {view === "opportunities" ? (
+                <OpportunitiesView key={`${report.domain}:${marketKey(market)}`} domain={report.domain} status={status.data} market={market} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
+              ) : view === "contentGap" || view === "linkIntersect" ? (
                 <GapView market={market} kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : (<>
                 {REPORT_NOTE[view] && <p className="g-text-2 mb-3 text-[13px]" data-testid="text-report-note">{REPORT_NOTE[view]}</p>}
-                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
+                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               </>)}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}

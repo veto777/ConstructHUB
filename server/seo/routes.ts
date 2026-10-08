@@ -15,6 +15,8 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
+import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
 import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
@@ -28,7 +30,7 @@ import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthl
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
-import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd } from "./pricing";
+import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier } from "./pricing";
 import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
@@ -96,6 +98,9 @@ export const SEO_PRICES = {
   bulkPer100: retailCents(100 * LABS_ITEM_USD),
   /** One page of Link intersect (the most it costs, for up to three competitors). Content gap is competitorGap per competitor. */
   linkIntersect: retailCents(gapEstimateUsd("links", GAP_MAX_COMPETITORS, 50)),
+  /** Opportunities: the most it can cost (500 keywords), and about what a site with 100 keywords costs. */
+  opportunitiesMax: retailCents(OPP_ESTIMATE_USD),
+  opportunitiesSmall: retailCents(estimateLabsUsd(100)),
   /** Local grid: finding the business on Google Maps, and so much per 100 points scanned. */
   gridLocate: retailCents(GRID_POINT_USD),
   gridPer100: retailCents(100 * GRID_POINT_USD),
@@ -183,6 +188,9 @@ const settingsInput = z.object({
 const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
+/** A search with an operator costs several times more at the source than the price we show, so it is refused where the price is fixed. */
+const hasOperator = (k: string) => serpKeywordMultiplier(k) > 1;
+const NO_OPERATORS = "Search operators such as site: or intitle: aren't supported here — enter the search the way a customer would type it.";
 
 export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => any) {
   const route = (method: "get" | "post" | "delete", path: string, fn: (req: any, res: any, user: number, ent: Entitlements) => Promise<any>) =>
@@ -306,6 +314,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   route("post", "/api/seo/sites", async (req, res, user) => {
     const input = siteInput.parse(req.body);
+    // A site's own country and language are used by paid lookups later, so only a pair on the list is stored.
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_sites WHERE user_id=$1", [user]);
@@ -475,6 +485,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Keyword research: seed → suggestions with volume / CPC / difficulty (up to 50 rows). One keyword search of the plan.
   route("post", "/api/seo/keywords/research", async (req, res, user, ent) => {
     const input = researchInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     if (!isConfigured()) return notReady(res);
     const out = await once(`research:${user}:${cleanKeyword(input.seed)}:${input.locationCode}:${input.languageCode}`, () =>
       withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }), { label: `Keyword ideas — ${cleanKeyword(input.seed)}` }));
@@ -580,7 +591,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // The saved pin and the scans so far. Spends nothing.
   route("get", "/api/seo/sites/:id/grid", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
+    res.json({ pin: readPin((site as { grid_pin?: unknown }).grid_pin), scans: await listScans(user, site.id), running: await runningScan(user, site.id), watches: await listWatches(user, site.id), maxWatches: MAX_WATCHES, sizes: GRID_SIZES, spacings: GRID_SPACINGS, depth: GRID_DEPTH, suggestion: site.business_name ?? "" });
   });
   // Search Google Maps for the business, to choose the listing the grid is centred on. One small lookup.
   route("post", "/api/seo/sites/:id/grid/locate", async (req, res, user) => {
@@ -604,28 +615,36 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = scanInput.parse(req.body);
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a search to check." });
+    if (hasOperator(keyword)) return res.status(400).json({ message: NO_OPERATORS });
     const pin = readPin((site as { grid_pin?: unknown }).grid_pin);
     if (!pin) return res.status(400).json({ message: "Choose your business on Google Maps first." });
     if (!isConfigured()) return notReady(res);
-    const already = await runningScan(user, site.id);
-    if (already) return res.status(200).json({ id: already.id, running: true, reused: true });
-    const points = input.size * input.size;
-    const id = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
-    void (async () => {
-      try {
-        const o = await withBudget(user, gridEstimateUsd(points), () => fetchGrid({ keyword, size: input.size, spacing: input.spacing, pin, domain: site.domain }),
-          { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` });
-        for (let attempt = 1; ; attempt++) {
-          try { await finishScan(id, o.data as GridScan, o.costUsd); break; }
-          catch (e: any) { if (attempt >= 3) { console.error(`[seo] local grid scan ${id} was paid for but could not be saved: ${e?.message ?? e}`); await failScan(id, "The scan ran but its results could not be saved.").catch(() => {}); break; } await new Promise((r) => setTimeout(r, 500 * attempt)); }
-        }
-      } catch (e: any) {
-        if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${id} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
-        await failScan(id, publicFailure(e, "The scan could not be completed. Try again in a few minutes.")).catch(() => {});
-      }
-    })();
-    res.status(202).json({ id, running: true });
+    // One at a time per site — the database's rule, so a second server process cannot start another.
+    const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
+    if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
+    const scanId = started.id;
+    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` })
+      .catch(async (e: any) => {
+        if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
+        // The note is the customer's (server/seo/public-errors.ts): never the error's own text.
+        const message = e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : publicFailure(e, "The scan could not be completed. Try again in a few minutes.");
+        await failScan(scanId, message).catch(() => {});
+      });
+    res.status(202).json({ id: scanId, running: true });
   }));
+  // Repeat a scan every week or month (run by the scheduler from the month's included data only).
+  route("post", "/api/seo/sites/:id/grid/watch", (req, res, user) => serial(`gridwatch:${user}`, async () => {
+    const site = await ownedSite(user, req.params.id);
+    const input = watchInput.parse(req.body);
+    if (hasOperator(input.keyword)) return res.status(400).json({ message: NO_OPERATORS });
+    if (!readPin((site as { grid_pin?: unknown }).grid_pin)) return res.status(400).json({ message: "Choose your business on Google Maps first." });
+    res.status(201).json({ watch: await saveWatch(user, site.id, input) });
+  }));
+  route("delete", "/api/seo/sites/:id/grid/watch/:watchId", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    await deleteWatch(user, site.id, id.parse(req.params.watchId));
+    res.json({ ok: true });
+  });
   route("get", "/api/seo/sites/:id/grid/:scanId", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const state = await getScan(user, site.id, id.parse(req.params.scanId));
@@ -639,6 +658,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a keyword." });
+    if (hasOperator(keyword)) return res.status(400).json({ message: NO_OPERATORS });
     const key = cacheKey("keyword-overview", [keyword, input.locationCode, input.languageCode]);
     if (!input.refresh) {
       const saved = await cached<KeywordOverview>(user, key, KEYWORD_OVERVIEW_TTL_DAYS * 24);
@@ -649,6 +669,22 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Opportunities (Site Explorer): what to work on next, from one lookup ────
+  route("post", "/api/seo/opportunities", async (req, res, user) => {
+    const input = oppInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
+    const domain = normalizeDomain(input.domain);
+    if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
+    const key = cacheKey("opportunities", [domain, input.locationCode, input.languageCode]);
+    const saved = input.refresh ? null : await cached<Opportunities>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<Opportunities>(user, key, "opportunities", CACHE_HOURS, OPP_ESTIMATE_USD,
+      () => fetchOpportunities({ domain, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Opportunities — ${domain}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Content gap / Link intersect (Site Explorer) ────────────────────────────
@@ -662,7 +698,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!competitors.length) return res.status(400).json({ message: "Enter at least one competitor's domain, different from the site itself." });
     const content = input.kind === "content";
     const limit = content ? CONTENT_GAP_ROWS : input.limit, offset = content ? 0 : input.offset;
-    const key = cacheKey(`gap:${input.kind}`, [target, competitors, limit, offset, input.locationCode, input.languageCode]);
+    // Links are the same in every country: one saved page, whatever country was sent.
+    const key = cacheKey(`gap:${input.kind}`, [target, competitors, limit, offset, content ? input.locationCode : 2840, content ? input.languageCode : "en"]);
     const saved = input.refresh ? null : await cached<GapPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
@@ -726,7 +763,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
   route("get", "/api/seo/lists", async (_req, res, user) => { res.json({ lists: await listsOf(user) }); });
   // One at a time per account, so two requests cannot both pass the list limits.
-  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); }));
+  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { const input = listItemsInput.parse(req.body); if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." }); res.status(201).json(await addToList(user, input)); }));
   // "Refresh numbers": today's volume, difficulty, CPC and intent for every keyword in the list, written back to it.
   // One lookup per 200 keywords; always bought fresh (that is the point), and each batch is on the usage page.
   route("post", "/api/seo/lists/:id/refresh", (req, res, user) => serial(`lists:${user}`, async () => {
@@ -738,7 +775,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     for (let i = 0; i < keywords.length; i += BULK_MAX) {
       const chunk = keywords.slice(i, i + BULK_MAX);
       try {
-        const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
+        const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: list.locationCode, languageCode: list.languageCode }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
         updated += await refreshListMetrics(list.id, out.data.rows, out.data.notFound);
         attempted += chunk.length;
       } catch (e: any) {
@@ -1037,17 +1074,23 @@ export async function searchConsoleSummary(user: number, domain: string) {
     [user, `sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`, `http://${domain}/`, `http://www.${domain}/`, `sc-domain:www.${domain}`]);
   const asset = assets[0];
   if (!asset) return null;
+  // Two equal 28-day windows counted back from the newest day that has been synced (Google runs two or three days
+  // behind), so the newer window is not short just because today's numbers do not exist yet.
   const { rows } = await pool.query(
-    `SELECT (date>=current_date-28) AS recent, sum(clicks)::float8 clicks, sum(impressions)::float8 impressions, count(DISTINCT date)::int AS days,
-            CASE WHEN sum(impressions)>0 THEN sum(position*impressions)/sum(impressions) END::float8 AS position
-       FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date>=current_date-56 GROUP BY 1`, [asset.id]);
+    `WITH last AS (SELECT max(date) AS d FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date >= current_date - 70)
+     SELECT (g.date > last.d - 28) AS recent, sum(g.clicks)::float8 clicks, sum(g.impressions)::float8 impressions, count(DISTINCT g.date)::int AS days, max(last.d)::text AS through,
+            CASE WHEN sum(g.impressions)>0 THEN sum(g.position*g.impressions)/sum(g.impressions) END::float8 AS position
+       FROM gsc_analytics g, last WHERE g.asset_id=$1 AND g.dimension='date' AND g.date > last.d - 56 GROUP BY 1`, [asset.id]);
   const pick = (recent: boolean) => rows.find((r) => r.recent === recent);
   const cur = pick(true), prev = pick(false);
+  const days = cur?.days ?? 0, previousDays = prev?.days ?? 0;
   return {
     property: asset.external_id, syncedAt: asset.synced_at,
-    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each period is there.
+    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each 28 is there.
     clicks: cur ? cur.clicks ?? 0 : null, impressions: cur ? cur.impressions ?? 0 : null, position: cur?.position != null ? Math.round(cur.position * 10) / 10 : null,
     previousClicks: prev ? prev.clicks ?? 0 : null, previousImpressions: prev ? prev.impressions ?? 0 : null,
-    days: cur?.days ?? 0, previousDays: prev?.days ?? 0,
+    days, previousDays, through: (cur?.through ?? prev?.through ?? null) as string | null,
+    /** Both windows are complete, so the difference between them is a real change and not missing days. */
+    comparable: days === 28 && previousDays === 28,
   };
 }

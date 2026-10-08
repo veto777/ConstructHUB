@@ -4,7 +4,7 @@
  * and "Refresh numbers" buy data, and both show the price first.
  */
 import { MarketPicker } from "./market";
-import type { SeoMarket } from "@shared/seo-markets";
+import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, type SeoSite, type SeoStatus } from "./shell";
 
 export type KwRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null };
-type List = { id: number; name: string; createdAt: string; keywords: number; volume: number };
+type List = { id: number; name: string; locationCode?: number; languageCode?: string; createdAt: string; keywords: number; volume: number };
+const sameMarket = (l: { locationCode?: number; languageCode?: string }, m: { locationCode: number; languageCode: string }) => (l.locationCode ?? 2840) === m.locationCode && (l.languageCode ?? "en") === m.languageCode;
 const MAX_BULK = 200;
 
 const csvCell = (v: string | number | null | undefined) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
@@ -30,7 +31,7 @@ export const bulkPrice = (status: SeoStatus | undefined, n: number) => status?.p
 const affordable = (status: SeoStatus | undefined, cents: number | null) => cents == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= cents;
 
 /** "Add to list": pick one of the account's lists or name a new one. */
-export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwRow[]; onDone?: () => void; label?: string }) {
+export function AddToList({ rows, onDone, label = "Add to a list", market = DEFAULT_MARKET }: { rows: KwRow[]; onDone?: () => void; label?: string; /** The country these numbers are for; a list holds one country's keywords. */ market?: SeoMarket }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -38,7 +39,7 @@ export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwR
   const [name, setName] = useState("");
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"], enabled: open });
   const m = useMutation({
-    mutationFn: () => api("POST", "/api/seo/lists/items", { ...(listId === "new" ? { name: name.trim() } : { listId }), items: rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent ?? null })) }),
+    mutationFn: () => api("POST", "/api/seo/lists/items", { ...(listId === "new" ? { name: name.trim() } : { listId }), locationCode: market.locationCode, languageCode: market.languageCode, items: rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent ?? null })) }),
     onSuccess: (r: { list: { name: string }; added: number }) => {
       void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/seo/lists") });
       toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to "${r.list.name}"`, description: r.added < rows.length ? "The rest were already in it." : undefined });
@@ -52,7 +53,7 @@ export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwR
       <label className="flex items-center gap-2"><span className="g-text-2">List</span>
         <select className="g-select" value={listId} onChange={(e) => setListId(e.target.value === "new" ? "new" : Number(e.target.value))} data-testid="select-list">
           <option value="new">New list…</option>
-          {(lists.data?.lists ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} ({l.keywords})</option>)}
+          {(lists.data?.lists ?? []).map((l) => <option key={l.id} value={l.id} disabled={!sameMarket(l, market)}>{l.name} ({l.keywords}){sameMarket(l, market) ? "" : ` — ${marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")} list`}</option>)}
         </select>
       </label>
       {lists.isLoading && <span className="g-text-2 flex items-center gap-1" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" /> loading your lists…</span>}
@@ -110,7 +111,10 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
   });
   const run = useMutation({
     mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/keywords/bulk", v.body),
-    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onSuccess: (data: { saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this analysis again will not be free. Export it now if you need it.", variant: "destructive" });
+    },
     onError: (e) => toast({ title: "Couldn't analyse those keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
@@ -144,7 +148,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
               <span className="g-text-2" data-testid="text-bulk-meta">{fmtNum(page.rows.length)} of {fmtNum(asked.length)} keywords have numbers · as of {fmtDate(page.fetchedAt)}</span>
               <button type="button" className="g-pill g-pill--sm" onClick={() => set(new Set(picked.size === page.rows.length ? [] : page.rows.map((r) => r.keyword)))} disabled={!page.rows.length}>{picked.size === page.rows.length && page.rows.length ? "Select none" : "Select all"}</button>
               <span className="ml-auto flex flex-wrap items-center gap-2">
-                <AddToList rows={chosen} onDone={clear} />
+                <AddToList market={market} rows={chosen} onDone={clear} />
                 {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                 <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
@@ -159,7 +163,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
 }
 
 /** The account's keyword lists: open one, tidy it, track it, export it, or get fresh numbers for it. */
-export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void }) {
+export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; /** `from` is the list's own country: its numbers belong to it. */ onTrack?: (rows: KwRow[], from: SeoMarket) => void; onOpen?: (keyword: string, from: SeoMarket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [openId, setOpenId] = useState<number | null>(null);
@@ -167,7 +171,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   const { picked, toggle, clear } = usePicked();
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"] });
   const current = openId ?? lists.data?.lists[0]?.id ?? null;
-  const items = useQuery<{ list: { id: number; name: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
+  const items = useQuery<{ list: { id: number; name: string; locationCode?: number; languageCode?: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/seo/lists") });
   const create = useMutation({
     mutationFn: () => api("POST", "/api/seo/lists/items", { name: name.trim(), items: [] }),
@@ -185,6 +189,8 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
     onError: (e) => toast({ title: "Couldn't delete the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const all = lists.data?.lists ?? [], rows = items.data?.items ?? [];
+  /** The country the open list's numbers are for. */
+  const listMarket: SeoMarket = findMarket(items.data?.list.locationCode ?? 2840, items.data?.list.languageCode ?? "en") ?? DEFAULT_MARKET;
   const chosen = rows.filter((r) => picked.has(r.keyword));
   // One lookup per 200 keywords.
   const batches = Array.from({ length: Math.ceil(rows.length / MAX_BULK) }, (_, i) => Math.min(MAX_BULK, rows.length - i * MAX_BULK));
@@ -211,7 +217,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
               <ul className="space-y-0.5" aria-label="Your keyword lists">
                 {all.map((l) => (
                   <li key={l.id}><button type="button" onClick={() => { setOpenId(l.id); clear(); }} aria-current={current === l.id ? "true" : undefined} className={`flex w-full items-baseline gap-2 rounded px-2 py-1.5 text-left text-[13px] ${current === l.id ? "g-text font-medium" : "g-text-2"}`} style={current === l.id ? { background: "var(--g-hover)" } : undefined} data-testid={`list-${l.id}`}>
-                    <span className="min-w-0 flex-1 truncate">{l.name}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
+                    <span className="min-w-0 flex-1 truncate">{l.name}{sameMarket(l, DEFAULT_MARKET) ? "" : <span className="g-text-2 font-normal"> · {marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")}</span>}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
                   </button></li>
                 ))}
               </ul>
@@ -227,7 +233,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
                   <h3 className="g-text text-[17px] font-medium">{items.data.list.name}</h3>
                   <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {fmtNum(rows.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month in total</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen, listMarket); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
@@ -235,7 +241,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
                   </span>
                 </div>
                 {rows.length === 0 ? <Empty testId="list-empty"><h3>This list is empty</h3><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
-                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} onOpen={onOpen} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
+                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} onOpen={onOpen ? (k) => onOpen(k, listMarket) : undefined} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
               </>
             )}
           </div>

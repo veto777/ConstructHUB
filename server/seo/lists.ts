@@ -8,7 +8,9 @@
  *                  later, with the numbers each keyword had when it was added.
  *                  Free — nothing in a list calls the data source.
  */
+import { marketLabel } from "@shared/seo-markets";
 import { z } from "zod";
+import { SeoCustomerError } from "./public-errors";
 import { pool } from "../db";
 import { request, assertOk, taskItems } from "./dataforseo";
 import { estimateLabsUsd } from "./pricing";
@@ -75,6 +77,9 @@ export const LIST_SCHEMA_DDL = [
     added_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (list_id, keyword)
   )`,
+  // A list holds one country's numbers (United States for lists made before countries existed).
+  `ALTER TABLE seo_keyword_lists ADD COLUMN IF NOT EXISTS location_code integer NOT NULL DEFAULT 2840`,
+  `ALTER TABLE seo_keyword_lists ADD COLUMN IF NOT EXISTS language_code text NOT NULL DEFAULT 'en'`,
 ];
 
 const metric = z.number().min(0).max(2_000_000_000).transform(Math.round).nullable().optional();
@@ -83,6 +88,9 @@ export const listItemsInput = z.object({
   listId: z.number().int().positive().optional(),
   /** ...or to a new one with this name. */
   name: z.string().trim().min(1).max(80).optional(),
+  /** The country the numbers are for. A new list takes it; an existing list must already be that country's. */
+  locationCode: z.number().int().positive().default(2840),
+  languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
   items: z.array(z.object({
     keyword: z.string().trim().min(1).max(200),
     volume: metric, difficulty: z.number().min(0).max(100).transform(Math.round).nullable().optional(),
@@ -90,20 +98,21 @@ export const listItemsInput = z.object({
   }).strict()).max(1000).default([]),
 }).strict().refine((v) => v.listId !== undefined || v.name !== undefined, { message: "Choose a list or name a new one." });
 
-export class ListError extends Error { constructor(message: string, readonly status = 400) { super(message); this.name = "ListError"; } }
+export type ListRef = { id: number; name: string; locationCode: number; languageCode: string };
+export class ListError extends SeoCustomerError {}
 
 export async function listsOf(userId: number) {
   const { rows } = await pool.query(
-    `SELECT l.id, l.name, l.created_at AS "createdAt", count(i.keyword)::int AS keywords, coalesce(sum(i.volume),0)::bigint AS volume
+    `SELECT l.id, l.name, l.location_code AS "locationCode", l.language_code AS "languageCode", l.created_at AS "createdAt", count(i.keyword)::int AS keywords, coalesce(sum(i.volume),0)::bigint AS volume
        FROM seo_keyword_lists l LEFT JOIN seo_keyword_list_items i ON i.list_id=l.id
       WHERE l.user_id=$1 GROUP BY l.id ORDER BY l.name`, [userId]);
   return rows.map((r: any) => ({ ...r, volume: Number(r.volume) }));
 }
 
 async function ownedList(userId: number, listId: number) {
-  const { rows: [l] } = await pool.query("SELECT id, name FROM seo_keyword_lists WHERE id=$1 AND user_id=$2", [listId, userId]);
+  const { rows: [l] } = await pool.query(`SELECT id, name, location_code AS "locationCode", language_code AS "languageCode" FROM seo_keyword_lists WHERE id=$1 AND user_id=$2`, [listId, userId]);
   if (!l) throw new ListError("List not found", 404);
-  return l as { id: number; name: string };
+  return l as ListRef;
 }
 
 export async function listItems(userId: number, listId: number) {
@@ -115,19 +124,24 @@ export async function listItems(userId: number, listId: number) {
 
 /** Add keywords to a list (creating it by name when asked). Keywords already there get their numbers refreshed. */
 /** `replace`: a refresh — the numbers handed in are today's and overwrite what is stored, even with "none". */
-export async function addToList(userId: number, input: z.infer<typeof listItemsInput>, replace = false): Promise<{ list: { id: number; name: string }; added: number; total: number }> {
-  let list: { id: number; name: string };
+export async function addToList(userId: number, input: z.infer<typeof listItemsInput>, replace = false): Promise<{ list: ListRef; added: number; total: number }> {
+  let list: ListRef;
   if (input.listId !== undefined) list = await ownedList(userId, input.listId);
   else {
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_keyword_lists WHERE user_id=$1", [userId]);
-    const { rows: [existing] } = await pool.query("SELECT id, name FROM seo_keyword_lists WHERE user_id=$1 AND lower(name)=lower($2)", [userId, input.name]);
+    const { rows: [existing] } = await pool.query(`SELECT id, name, location_code AS "locationCode", language_code AS "languageCode" FROM seo_keyword_lists WHERE user_id=$1 AND lower(name)=lower($2)`, [userId, input.name]);
     if (existing) list = existing;
     else {
       if (n >= MAX_LISTS) throw new ListError(`You can keep up to ${MAX_LISTS} lists. Delete one you no longer need.`, 403);
-      const { rows: [created] } = await pool.query("INSERT INTO seo_keyword_lists(user_id, name) VALUES($1,$2) ON CONFLICT (user_id, name) DO UPDATE SET name=EXCLUDED.name RETURNING id, name", [userId, input.name]);
+      const { rows: [created] } = await pool.query(
+        `INSERT INTO seo_keyword_lists(user_id, name, location_code, language_code) VALUES($1,$2,$3,$4) ON CONFLICT (user_id, name) DO UPDATE SET name=EXCLUDED.name
+         RETURNING id, name, location_code AS "locationCode", language_code AS "languageCode"`, [userId, input.name, input.locationCode, input.languageCode]);
       list = created;
     }
   }
+  // One country's numbers per list: mixing them would put two different search volumes under one keyword.
+  if (input.items.length && (list.locationCode !== input.locationCode || list.languageCode !== input.languageCode))
+    throw new ListError(`"${list.name}" holds ${marketLabel(list.locationCode, list.languageCode)} keywords. Start a new list for ${marketLabel(input.locationCode, input.languageCode)}.`, 409);
   const byKeyword = new Map(input.items.map((i) => [cleanKeywords([i.keyword], 1)[0], i] as const).filter(([k]) => !!k));
   const keywords = [...byKeyword.keys()];
   const { rows: [{ have }] } = await pool.query("SELECT count(*)::int have FROM seo_keyword_list_items WHERE list_id=$1", [list.id]);

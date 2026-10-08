@@ -5,6 +5,7 @@
  * the newest Site Explorer report, the newest crawl, backlink snapshots and
  * alerts. Making or sending a report never spends SEO data.
  */
+import { gridReportLines, type GridReportLine } from "./grid-monitor";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
 import { pool } from "../db";
@@ -47,8 +48,10 @@ export type SiteReport = {
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
-  searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; syncedAt?: string | null } | null;
+  searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; /** The newest day synced; the 28 days end here. */ through?: string | null; syncedAt?: string | null } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
+  /** Repeating local grids: the newest scan of each with the comparable one before it. */
+  grids?: GridReportLine[];
 };
 
 type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean };
@@ -107,6 +110,7 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     reportDeps.searchConsole(userId, site.domain).catch(() => null),
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
+  const grids = await gridReportLines(userId, site.id).catch(() => []);
   const ranks = rankingsSection(checks, primary);
   const { rows: [count] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
   if (ranks) ranks.section.tracked = Math.max(ranks.section.checked, Number(count?.n ?? 0));
@@ -128,8 +132,9 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
       topIssues: a.issues.slice(0, 6).map((i) => ({ title: i.title, severity: i.severity, count: i.count })),
     } : null,
     // Nothing synced for the last 28 days is no section at all, rather than a row of zeros.
-    searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
+    searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
     alerts,
+    grids,
   };
 }
 
@@ -137,11 +142,14 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
 
 const n = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString("en-US"));
 const rnd = (v: number | null | undefined) => (v == null ? null : Math.round(v));
-/** Enough of both 28-day periods is synced for the change between them to mean something. */
+/** Both 28-day periods are complete; only then is the difference a change and not missing days. (One rule for the PDF, the email and the rank tracker tile.) */
 export const gscComparable = (g: NonNullable<SiteReport["searchConsole"]>) => g.previousClicks !== null && (g.days ?? 28) >= GSC_MIN_DAYS && (g.previousDays ?? 28) >= GSC_MIN_DAYS;
-export const GSC_MIN_DAYS = 21;
+export const GSC_MIN_DAYS = 28;
 const gscChange = (g: NonNullable<SiteReport["searchConsole"]>, now: number | null, before: number | null) => (gscComparable(g) && now !== null && before !== null ? signed(now - before) : "");
-const gscPartial = (g: NonNullable<SiteReport["searchConsole"]>) => ((g.days ?? 28) < GSC_MIN_DAYS ? `Only ${g.days} of the last 28 days have been synced from Search Console, so these counts are incomplete.` : null);
+/** The period in words, with its end date and anything missing from either window — the same text wherever these numbers are shown. */
+export const gscPeriod = (g: NonNullable<SiteReport["searchConsole"]>) =>
+  `${g.through ? `28 days to ${g.through}` : "last 28 days"}${(g.days ?? 28) < GSC_MIN_DAYS ? ` (${g.days} of 28 days synced)` : g.previousClicks !== null && (g.previousDays ?? 28) < GSC_MIN_DAYS ? ` (not compared: only ${g.previousDays} of the 28 days before are synced)` : ""}`;
+const gscPartial = (g: NonNullable<SiteReport["searchConsole"]>) => ((g.days ?? 28) < GSC_MIN_DAYS ? `Only ${g.days} of these 28 days have been synced from Search Console, so the counts are incomplete and are not compared with the period before.` : null);
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—");
 const signed = (v: number | null | undefined) => (v == null || v === 0 ? "" : ` (${v > 0 ? "+" : "−"}${n(Math.abs(v))})`);
 const where = (m: { location: string | null }) => (m.location ? ` in ${m.location}` : "");
@@ -161,9 +169,9 @@ export function reportHighlights(r: SiteReport): [string, string][] {
   }
   if (r.searchConsole) {
     const g = r.searchConsole;
-    const part = (g.days ?? 28) < GSC_MIN_DAYS ? ` (${g.days} of 28 days synced)` : "";
-    rows.push([`Clicks from Google, last 28 days${part}`, `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`]);
-    rows.push([`Times shown in Google, last 28 days${part}`, `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`]);
+    const period = gscPeriod(g);
+    rows.push([`Clicks from Google, ${period}`, `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`]);
+    rows.push([`Times shown in Google, ${period}`, `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`]);
   }
   if (r.search) {
     rows.push(["Estimated visits from Google / month", `${n(r.search.organicTraffic)}${signed(r.search.trafficChange)}`]);
@@ -171,11 +179,15 @@ export function reportHighlights(r: SiteReport): [string, string][] {
     rows.push(["Websites linking to it", `${n(r.search.referringDomains)}${signed(r.search.referringDomainsChange)}`]);
     if (r.search.authority !== null) rows.push(["Authority (0–100)", String(r.search.authority)]);
   }
+  for (const g of r.grids ?? []) rows.push([`Local grid — "${g.keyword}"`, gridLine(g)]);
   if (r.audit && r.audit.health !== null) rows.push(["Site health (0–100)", `${r.audit.health}${signed(r.audit.healthChange)} · ${n(r.audit.errors)} errors, ${n(r.audit.warnings)} warnings`]);
   return rows;
 }
 
-export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole;
+/** One repeating grid in words: where it stands and, when there is a comparable scan before it, where it stood. */
+export const gridLine = (g: GridReportLine) =>
+  `in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
+export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length;
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
@@ -218,12 +230,12 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
     }
     if (r.searchConsole) {
       const g = r.searchConsole;
-      heading("Clicks from Google — Search Console, last 28 days");
+      heading(`Clicks from Google — Search Console, ${gscPeriod(g)}`);
       pair("Clicks", `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`);
       pair("Times shown in results", `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`);
       if (g.position !== null) pair("Average position", String(g.position));
       const partial = gscPartial(g);
-      line(partial ?? (gscComparable(g) ? "These are Google's own counts for the site. Changes in brackets compare with the 28 days before." : "These are Google's own counts for the site. There is not enough earlier data yet to compare with the 28 days before."), soft);
+      line(partial ?? (gscComparable(g) ? "These are Google's own counts for the site. Changes in brackets compare with the 28 days before." : "These are Google's own counts for the site. The 28 days before are not fully synced, so no comparison is shown."), soft);
     }
     if (r.search) {
       heading(`Search presence — analysed ${day(r.search.fetchedAt)}`);
@@ -240,6 +252,11 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Pages crawled", n(r.audit.crawled));
       pair("Errors / warnings / notices", `${n(r.audit.errors)} / ${n(r.audit.warnings)} / ${n(r.audit.notices)}`);
       if (r.audit.topIssues.length) { doc.moveDown(0.3); line("What to fix first", soft); for (const i of r.audit.topIssues) line(`  • ${i.title} — ${n(i.count)} affected (${i.severity})`); }
+    }
+    if ((r.grids ?? []).length) {
+      heading("Local grid — Google's local results across your area");
+      for (const g of r.grids!) pair(`"${g.keyword}" · ${g.size} × ${g.size} points, ${g.spacing} mi apart · ${day(g.at)}`, gridLine(g));
+      line("Each point is a Google search made from that spot. The position score counts a point where the business is not in the first 20 as 21; lower is better.", soft);
     }
     if (r.alerts.length) { heading("Alerts in the last month"); for (const a of r.alerts) line(`${day(a.createdAt)} — ${a.title}`); }
     doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });

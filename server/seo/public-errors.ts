@@ -19,7 +19,6 @@ import { z } from "zod";
 import { SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import { DataForSeoError, SEO_SOURCE_PUBLIC_MESSAGES } from "./dataforseo";
 import { SeoBudgetError, BUDGET_PAUSED_MESSAGE } from "./budget";
-import { ListError } from "./lists";
 import { SEO_NOT_READY_MESSAGE } from "./plan";
 
 /** The vendor by any spelling, its hosts and its env names. Nothing matching this may reach a customer. */
@@ -31,6 +30,15 @@ export const SEO_VENDOR_NAME = "DataForSEO";
 export const SEO_UNEXPECTED_MESSAGE = "Something went wrong on our side — try again in a few minutes. Your SEO usage page shows whether anything was charged.";
 /** A saved note that cannot be shown as written. */
 export const SEO_NOTE_FALLBACK = "The check could not be completed.";
+
+/**
+ * An error whose `message` was WRITTEN FOR THE CUSTOMER by the code that throws it (a limit reached, a thing not
+ * found). Extend this — never plain Error — for anything a route should answer with as it is; a plain Error's
+ * text is never shown.
+ */
+export class SeoCustomerError extends Error {
+  constructor(message: string, readonly status = 400) { super(message); this.name = new.target.name; }
+}
 
 export type SeoErrorResponse = { status: number; body: Record<string, unknown>; /** Something the server did not expect: worth a line in the log and the issue desk. */ unexpected: boolean };
 
@@ -46,8 +54,8 @@ const SOURCE_STATUS: Record<DataForSeoError["code"], number> = {
 export function seoErrorResponse(e: unknown, opts: { admin?: boolean } = {}): SeoErrorResponse {
   const admin = opts.admin === true;
   if (e instanceof z.ZodError) return { status: 400, unexpected: false, body: { message: "Invalid input", issues: e.issues.slice(0, 3) } };
-  // Its messages are written for the customer (server/seo/lists.ts).
-  if (e instanceof ListError) return { status: e.status, unexpected: false, body: { message: e.message } };
+  // Written for the customer by the feature that throws it (ListError, WatchError).
+  if (e instanceof SeoCustomerError) return { status: e.status, unexpected: false, body: { message: e.message } };
   if (e instanceof SeoBudgetError) {
     // `message` is the customer's: SEO credit, or the neutral "paused". The wholesale dollars and the cap are in `detail`.
     return { status: 402, unexpected: false, body: {
@@ -101,6 +109,9 @@ const KNOWN_NOTES: (string | RegExp)[] = [
   // server/seo/grid.ts and the grid routes
   "The scan ran but its results could not be saved.", "The scan could not be completed. Try again in a few minutes.", "The scan could not be completed.",
   "The scan was interrupted before it finished. Lookups it had not made were not charged.",
+  "The scan ran but its results could not be saved. You were not charged.",
+  // server/seo/grid-monitor.ts (repeating scans)
+  "This month's included SEO data had run out, so the repeating scan was skipped.", "The repeating scan could not be completed; it will be tried again.",
   // What vendor errors read as before the wording above.
   "The search data service is busy — try again in a minute.", "That request couldn't be run — check the keyword or domain and try again.",
   "That check didn't complete — try again in a few minutes.", "The search data service didn't answer — try again in a few minutes.",
