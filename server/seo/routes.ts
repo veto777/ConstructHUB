@@ -1229,12 +1229,16 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/voice", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
-    const device = (devices.includes(String(req.query.device)) ? String(req.query.device) : devices[0]) as "desktop" | "mobile";
-    // ?tag=: the same, on the keywords carrying that tag only (one of the site's own tags; anything else is refused).
+    // A choice that is given must be one this site has: anything else is refused, never quietly read as "all" / the default.
+    const qd = req.query.device, qt = req.query.tag;
+    if (qd !== undefined && qd !== "" && (typeof qd !== "string" || !devices.includes(qd))) return void res.status(400).json({ message: "This site does not track that device." });
+    const device = (typeof qd === "string" && qd ? qd : devices[0]) as "desktop" | "mobile";
+    // ?tag=: the same, on the keywords carrying that tag only (one of the site's own tags).
     const { rows: tagRows } = await pool.query("SELECT DISTINCT unnest(tags) AS tag FROM seo_keywords WHERE site_id=$1 ORDER BY 1", [site.id]);
     const tags = tagRows.map((t: any) => String(t.tag));
-    const tag = typeof req.query.tag === "string" && req.query.tag !== "" ? req.query.tag : null;
-    if (tag !== null && !tags.includes(tag)) return void res.status(400).json({ message: "This site has no keywords with that tag." });
+    if (qt !== undefined && typeof qt !== "string") return void res.status(400).json({ code: "bad_tag", message: "Choose one tag." });
+    const tag = typeof qt === "string" && qt !== "" ? qt : null;
+    if (tag !== null && !tags.includes(tag)) return void res.status(400).json({ code: "bad_tag", message: "This site has no keywords with that tag." });
     const [competitors, { checks, checkedOn, tracked }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device, tag)]);
     const voice = shareOfVoice(checks, site.domain, competitors, (e) => listingNamed(e, site.business_name));
     res.json({ device, devices, tag, tags, checkedOn, tracked, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });

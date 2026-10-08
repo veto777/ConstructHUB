@@ -26,10 +26,12 @@ export type LinkedDomain = {
  * address the check does not follow), "no_answer" (timed out or failed). null = an ordinary 2xx answer. Only "gone"
  * and "error" are called broken.
  */
-export type Answer = "gone" | "error" | "refused" | "inconclusive" | "no_content" | "redirect_unfollowed" | "no_answer" | "no_status";
+export type Answer = "gone" | "error" | "refused" | "inconclusive" | "no_content" | "redirect_unfollowed" | "no_answer" | "no_status" | "unusual";
 /** `no_status`: no status, and a crawl from before the reason was recorded — why is not known. */
 export const answerOf = (s: number | null, reason?: string): Answer | null =>
   s === null ? (reason === "redirect_not_followed" ? "redirect_unfollowed" : reason ? "no_answer" : "no_status")
+  // Outside the usual classes (1xx, above 599): not known what it means — never "fine", never "broken".
+  : s < 200 || s > 599 ? "unusual"
   : s === 404 || s === 410 ? "gone" : s >= 500 ? "error" : s === 401 || s === 403 || s === 429 ? "refused" : s >= 400 ? "inconclusive"
   : s >= 300 ? "redirect_unfollowed" : s === 204 ? "no_content" : null;
 export type BrokenOutgoing = { to: string; status: number | null; answer: Answer; /** Pages that link to it (up to 5) and how many in all. */ from: string[]; fromCount: number };

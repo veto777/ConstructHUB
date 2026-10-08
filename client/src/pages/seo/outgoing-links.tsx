@@ -10,7 +10,7 @@ import { Empty, fmtDate, fmtNum, isNotRunYet, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Domain = { domain: string; pages: number; links: number; examples: { from: string; to: string; anchor: string | null }[]; checked: number; broken: number };
-type Answer = "gone" | "error" | "refused" | "inconclusive" | "no_content" | "redirect_unfollowed" | "no_answer" | "no_status";
+type Answer = "gone" | "error" | "refused" | "inconclusive" | "no_content" | "redirect_unfollowed" | "no_answer" | "no_status" | "unusual";
 type Broken = { to: string; status: number | null; answer: Answer; from: string[]; fromCount: number };
 /** The status in words — what the check saw, not what the page holds (it does not read the page). */
 const ANSWER: Record<Answer, string> = {
@@ -18,6 +18,7 @@ const ANSWER: Record<Answer, string> = {
   inconclusive: "answered with an error our check cannot judge; open it yourself", no_content: "answered with nothing to show",
   redirect_unfollowed: "sent the check on to an address it does not follow; open it yourself", no_answer: "no answer — it may have been slow or down at the time",
   no_status: "the check got no status, and this crawl did not record why (a newer crawl will); open it yourself",
+  unusual: "answered with a status outside the usual ones; open it yourself",
 };
 const broken = (a: Answer) => a === "gone" || a === "error";
 /** A short, stable fingerprint of a whole address, for a task identity that must fit 200 characters. */

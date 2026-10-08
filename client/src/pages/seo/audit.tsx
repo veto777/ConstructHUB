@@ -40,6 +40,8 @@ const SEVERITY: Record<Severity, { label: string; plural: string; color: string 
   notice: { label: "Notice", plural: "Notices", color: "var(--g-blue)" },
 };
 const CATEGORY: Record<string, string> = { technical: "Technical", performance: "Performance", local: "Local", content: "Content", "ai-readiness": "AI readiness" };
+/** An area's name: only from the known list (an area name from the crawl is never looked up as anything else). */
+const catName = (k: unknown) => (typeof k === "string" ? (Object.prototype.hasOwnProperty.call(CATEGORY, k) ? CATEGORY[k] : k) : "Other");
 const STATUS = [
   { key: "ok", label: "Working (2xx)", color: "var(--g-green)" },
   { key: "redirected", label: "Redirected (3xx)", color: "var(--g-blue)" },
@@ -99,7 +101,9 @@ export default function SeoAuditPage() {
   const choose = (c: { at: string | null; vs: string | null }) => site && setPick((m) => ({ ...m, [site.id]: c }));
   const q = useQuery<AuditData>({
     queryKey: [key, at, vs], enabled: !!site,
-    queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+    queryFn: async ({ signal }) => { const qs = new URLSearchParams({ ...(at ? { at } : {}), ...(vs ? { vs } : {}) }).toString(); const r = await fetch(`${key}${qs ? `?${qs}` : ""}`, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); }, refetchOnMount: "always", refetchOnWindowFocus: true,
+    // While a crawl runs, every 6 seconds; otherwise every 5 minutes, so a crawl finished (or changed) elsewhere shows up.
+    refetchInterval: (query) => (query.state.data?.running ? 6000 : 5 * 60_000) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -130,7 +134,7 @@ export default function SeoAuditPage() {
   const shownAt = crawls.findIndex((c) => a && c.jobId === a.jobId);
   const earlier = shownAt >= 0 ? crawls.slice(shownAt + 1) : [];
   const crawlWord = (c: { at: string | null; pageCap: number | null }, i: number) => `${fmtDate(c.at)}${crawls.filter((x) => fmtDate(x.at) === fmtDate(c.at)).length > 1 ? ` (#${crawls.length - i})` : ""}${c.pageCap ? ` · up to ${fmtNum(c.pageCap)} pages` : ""}`;
-  const exportAll = () => a && downloadCsv(`site-audit-${site?.domain}.csv`, [["Severity", "Issue", "Category", "Affected", "Page or entry"], ...a.issues.flatMap((i) => i.items.map((u) => [SEVERITY[i.severity].label, i.title, CATEGORY[i.category] ?? i.category, String(i.count), u]))]);
+  const exportAll = () => a && downloadCsv(`site-audit-${site?.domain}.csv`, [["Severity", "Issue", "Category", "Affected", "Page or entry"], ...a.issues.flatMap((i) => i.items.map((u) => [SEVERITY[i.severity].label, i.title, catName(i.category), String(i.count), u]))]);
 
   return (
     <SeoShell
@@ -179,7 +183,7 @@ export default function SeoAuditPage() {
       {site && d?.vsMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-vs-missing">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown){a?.comparedWith ? ", so the crawl before it is used" : a ? ", and there is no earlier crawl to compare with" : ""}.</p>}
       {/* Every finished crawl as a dated list — whatever is shown above, and however many have a score. */}
       {site && d && trend.length > 0 && (
-        <details className="mb-3 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">Every crawl ({trend.length}), as a list</summary>
+        <details className="mb-3 text-[12px]" data-testid="audit-trend-list"><summary className="g-link cursor-pointer">{(d.crawls?.length ?? 0) > trend.length ? `The latest ${trend.length} crawls (of ${d.crawls!.length}${d.crawls!.length >= 100 ? "+" : ""}), as a list` : `Every crawl (${trend.length}), as a list`}</summary>
           <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((h, i, all) => <li key={h.jobId}>{fmtDate(h.at)}{all.filter((x) => fmtDate(x.at) === fmtDate(h.at)).length > 1 ? ` ${new Date(h.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}` : ""}: {h.unreadable ? "could not be read" : h.health === null ? "no page could be scored" : `health ${h.health}, ${fmtNum(h.crawled)} pages`}</li>)}</ul>
         </details>
       )}
@@ -247,7 +251,7 @@ export default function SeoAuditPage() {
                   <ul className="space-y-2 text-[13px]">
                     {Object.entries(a.scores.categories).map(([k, v]) => (
                       <li key={k}>
-                        <div className="flex"><span className="g-text">{CATEGORY[k] ?? k}</span><span className="g-text ml-auto tabular-nums">{v == null ? "not measured" : v}</span></div>
+                        <div className="flex"><span className="g-text">{catName(k)}</span><span className="g-text ml-auto tabular-nums">{v == null ? "not measured" : v}</span></div>
                         <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>{v != null && <div className="h-full" style={{ width: `${v}%`, background: healthColor(v) }} />}</div>
                       </li>
                     ))}
@@ -321,7 +325,7 @@ export default function SeoAuditPage() {
             <label className="ml-auto flex items-center gap-2 text-[13px]"><span className="g-text-2">Area</span>
               <select className="g-select" value={category} onChange={(e) => setCategory(e.target.value)} data-testid="select-audit-category">
                 <option value="all">All areas</option>
-                {categories.map((c) => <option key={c} value={c}>{CATEGORY[c] ?? c}</option>)}
+                {categories.map((c) => <option key={c} value={c}>{catName(c)}</option>)}
               </select>
             </label>
             <button type="button" className="g-pill g-pill--sm" onClick={exportAll} data-testid="button-audit-export"><Download /> Export</button>
@@ -341,7 +345,7 @@ export default function SeoAuditPage() {
                       <tr data-testid={`row-issue-${i.key}`}>
                         <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${i.title}`} onClick={() => { setOpen(isOpen ? null : i.key); setShowAll(false); }} data-testid={`button-issue-${i.key}`}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
                         <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
-                        <td data-label="Area" className="g-text-2">{CATEGORY[i.category] ?? i.category}</td>
+                        <td data-label="Area" className="g-text-2">{catName(i.category)}</td>
                         <td className="num" data-label="Affected">{fmtNum(i.count)}</td>
                         <td className="num pr-2" data-label={`Change since ${before}`}><Change issue={i} before={before} /></td>
                       </tr>

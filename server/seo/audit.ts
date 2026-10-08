@@ -48,13 +48,13 @@ const ROLLUPS: { test: RegExp; key: (m: RegExpMatchArray) => string; title: (m: 
     test: /^gap-([a-z_]+)-/,
     key: (m) => `gap-${m[1]}`,
     title: (m) => `Google Business Profile ${m[1].replace(/_/g, " ")} with no matching page`,
-    item: (f) => String(f.title ?? f.id).replace(/^No matching [^:]+: /, ""),
+    item: (f) => (typeof f.title === "string" ? f.title : String(f.id)).replace(/^No matching [^:]+: /, ""),
   },
   {
     test: /^psi-(mobile|desktop)-/,
     key: (m) => `psi-${m[1]}`,
     title: (m) => `${m[1] === "mobile" ? "Mobile" : "Desktop"} PageSpeed score below 90`,
-    item: (f) => `${(Array.isArray(f.urls) && f.urls[0]) || ""} — score ${String(f.title ?? "").split(": ").pop()}`,
+    item: (f) => `${(Array.isArray(f.urls) && typeof f.urls[0] === "string" && f.urls[0]) || ""} — score ${(typeof f.title === "string" ? f.title : "").split(": ").pop()}`,
   },
 ];
 
@@ -107,8 +107,10 @@ const safeScores = (s: unknown): AuditSummary["scores"] => {
   if (!s || typeof s !== "object" || Array.isArray(s)) return null;
   const o = s as { overall?: unknown; categories?: unknown };
   if (!o.categories || typeof o.categories !== "object" || Array.isArray(o.categories)) return null;
-  const cats = Object.entries(o.categories as Record<string, unknown>).filter(([, v]) => v === null || typeof v === "number") as [string, number | null][];
-  return { overall: typeof o.overall === "number" ? o.overall : null, categories: Object.fromEntries(cats) };
+  // A rating is a finite 0-100 number; anything else is "not measured" (null), never shown as a rating.
+  const rating = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 100 ? v : null);
+  const cats = Object.entries(o.categories as Record<string, unknown>).map(([k, v]) => [k, rating(v)] as [string, number | null]);
+  return { overall: rating(o.overall), categories: Object.fromEntries(cats) };
 };
 export function healthScore(report: AuditReport, pages: AuditPage[]): number | null {
   const c = healthCounts(report, pages);

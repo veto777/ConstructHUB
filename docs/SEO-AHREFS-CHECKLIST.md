@@ -931,6 +931,21 @@ Verdict: five new defects, none HIGH. Kimi (second reviewer, from 3:58 PM ET) fo
  Kimi: Competitors kept the previous site's answer while loading .. FIXED (only the same site's earlier answer may stand in; the panel is reset per site)
  NOT DONE: as audit #43; a PDF font for every script.
 
+## Codex audit #50 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-50.md) - Kimi reviewed the fixes before deploy
+
+Verdict: eight new defects, none HIGH. Kimi (pre-deploy review): no serious defects; one low fixed (a tag removed elsewhere now goes back to all keywords).
+
+ 1 bad device / tag values silently changed the question ....... FIXED (a value given must be one the site has, else refused)
+ 2 a failed tag choice removed the controls .................... FIXED (heading and choices stay with the earlier answer, marked; "All keywords" offered; a removed tag goes back to all)
+ 3 an idle Site audit never saw a crawl finished elsewhere ...... FIXED (read again every 5 minutes and when the window regains focus)
+ 4 odd titles / area names could still crash Site audit ......... FIXED (titles only when text; area names never looked up beyond the known list)
+ 5 an empty tag showed measured-looking zeros ................... FIXED ("not measured", no bars)
+ 6 outgoing checks mislabelled statuses outside 200-599 ......... FIXED ("answered with a status outside the usual ones" - never fine, never broken)
+ 7 "every crawl" meant twelve .................................. FIXED ("the latest 12 crawls (of N)")
+ 8 area scores outside 0-100 shown as ratings ................... FIXED (not measured)
+ Kimi's earlier lows (audit #49 round): the Pages tab's 1xx rule, the empty-tag wording and the permanent "unusual: 0" row - FIXED; a read that keeps colliding with crawl updates after three tries is still a plain error (rare).
+ NOT DONE: as audit #43; a PDF font for every script.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -1013,3 +1028,4 @@ Verdict: five new defects, none HIGH. Kimi (second reviewer, from 3:58 PM ET) fo
 - 10/8 audit #47 fixes: 405 tests; nineteen real-Postgres scripts passing (audit compare 19/19 with a broken crawl in between; link-opportunity and outgoing fixtures now save a report as the crawler does). Live database checked read-only: 1 of 1 finished crawls reads. Browser (vb11, commit checked): Site audit pickers and comparisons, groups, report by tag and PDF, health tile; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #48 fixes: 405 tests; nineteen real-Postgres scripts passing (outgoing 5/5 with a broken newest crawl). Browser (vb11, commit checked): Site audit, health tile, outgoing links on both real crawls; 1440 and 390 px, no overflow, no page errors.
 - 10/8 slice 62 (competitors by tag) + audit #49 fixes: 406 tests; nineteen real-Postgres scripts passing (rank tags 9/9 with share of voice by tag). Browser (vb11, commit checked): the tag choice keeps focus, an unknown tag refused; Site audit, health tile, groups; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #50 fixes: 406 tests; nineteen real-Postgres scripts passing. Kimi reviewed the diff before deploy. Browser (vb11, commit checked): competitors by tag, Site audit pickers, outgoing links on both real crawls; 1440 and 390 px, no overflow, no page errors.

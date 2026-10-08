@@ -43,10 +43,25 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
     onSuccess: done,
     onError: (e) => toast({ title: "Couldn't remove that competitor", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const v = q.data;
-  if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading competitors…</p>;
-  if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load competitors: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
-  if (!v) return null;
+  // The last answer keeps the heading and choices on screen when a choice fails, so another can be picked (focus kept).
+  const [last, setLast] = useState<(Voice & { tag?: string | null; tags?: string[] }) | null>(null);
+  useEffect(() => { if (q.data && !q.isPlaceholderData) setLast(q.data); }, [q.data, q.isPlaceholderData]);
+  // A tag that no longer exists (removed elsewhere) goes back to all keywords.
+  // (Learned either from a newer answer's tag list or from the server refusing the tag.)
+  useEffect(() => {
+    if (!tag || q.isFetching) return;
+    if ((last?.tags && !last.tags.includes(tag)) || (q.isError && /no keywords with that tag/i.test(apiErrorMessage(q.error)))) setTag("");
+  }, [last, tag, q.isFetching, q.isError, q.error]);
+  const v = q.data ?? last;
+  if (!v) {
+    if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading competitors…</p>;
+    if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load competitors: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
+    return null;
+  }
+  // Shown figures belong to the choice made only when they were read for it.
+  const stale = !q.data || q.isError;
+  // None of the chosen keywords was in the newest check: nothing measured (never "0%").
+  const unmeasured = v.keywords === 0;
   const full = v.competitors.length >= v.max;
   const top = Math.max(1, ...v.domains.map((d) => d.visibility));
   return (
@@ -60,6 +75,7 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
               {v.tags!.map((t) => <option key={t} value={t}>Tagged {t}</option>)}
             </select></label>
         )}
+        {q.isError && <span className="text-[12px]" role="alert" data-testid="text-voice-error">Couldn't load {tag ? `"${tag}"` : "these keywords"}: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button>{tag && <> · <button type="button" className="g-link" onClick={() => setTag("")}>All keywords</button></>}{stale ? " — what is shown below is the earlier answer." : ""}</span>}
         {q.isPlaceholderData && <span id={`voice-loading-${site.id}`} className="g-text-2 text-[12px]" role="status"><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Loading {tag ? `"${tag}"` : "all keywords"}…</span>}
         {v.keywords > 0 && <span className="g-text-2 text-[12px]" data-testid="text-voice-coverage">{fmtNum(v.keywords)}{v.tracked != null && v.tracked > v.keywords ? ` of your ${fmtNum(v.tracked)}` : ""} tracked keyword{v.keywords === 1 ? "" : "s"}, checked {fmtDate(v.checkedOn)}</span>}
         {(v.devices?.length ?? 0) > 1 && <span className="flex gap-1" role="group" aria-label="Device">{v.devices!.map((d) => <button key={d} type="button" className="g-pill g-pill--sm" aria-pressed={v.device === d} style={v.device === d ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => setDevice(d)}>{d === "desktop" ? "Desktop" : "Mobile"}</button>)}</span>}
@@ -73,11 +89,12 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
               <li key={d.domain} data-testid={`voice-${d.domain}`}>
                 <div className="flex items-center gap-2 text-[13px]">
                   <span className={`min-w-0 flex-1 truncate ${d.isSite ? "g-text font-medium" : "g-text"}`}>{d.domain}{d.isSite && <span className="g-text-2 font-normal"> · you</span>}</span>
+                  {unmeasured ? <span className="g-text-2 text-[12px]">not measured</span> : <>
                   <span className="g-text-2 text-[12px] tabular-nums">{d.top10} in top 10{d.averagePosition != null ? ` · avg ${d.averagePosition}` : ""}</span>
-                  <span className="g-text w-12 text-right tabular-nums">{d.visibility}%</span>
+                  <span className="g-text w-12 text-right tabular-nums">{d.visibility}%</span></>}
                   {!d.isSite && <button type="button" className="g-text-2" aria-label={`Stop following ${d.domain}`} disabled={remove.isPending} onClick={() => remove.mutate(d.domain)}><X className="h-3.5 w-3.5" /></button>}
                 </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? "var(--g-blue)" : "#9aa0a6" }} /></div>
+                {!unmeasured && <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? "var(--g-blue)" : "#9aa0a6" }} /></div>}
               </li>
             ))}
           </ul>
@@ -85,7 +102,7 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
             <label className="min-w-0 flex-1"><span className="sr-only">Competitor's website</span><input className="g-input w-full" value={input} onChange={(e) => setInput(e.target.value)} placeholder={full ? `You follow ${v.max} — remove one to add another` : "competitor.com"} disabled={full} data-testid="input-follow-competitor" /></label>
             <button type="submit" className="g-pill" disabled={full || !input.trim() || add.isPending}>{add.isPending ? <Loader2 className="animate-spin" /> : <Plus />} Follow</button>
           </form>
-          {!v.hasPages && <p className="g-text-2 mt-2 text-[12px]">Competitor positions fill in at the next check — checks made before today did not save the result page.</p>}
+          {!v.hasPages && !unmeasured && <p className="g-text-2 mt-2 text-[12px]">Competitor positions fill in at the next check — the checks shown did not save the result page.</p>}
           {v.hasPages && v.competitors.length > 0 && <p className="g-text-2 mt-2 text-[12px]">A competitor you just followed is measured in the top ten right away, and further down from the next check. A check reads Google's results only as far as the page your own site is on, so a competitor ranking below you may show as not found.</p>}
         </div>
         <div className="space-y-4">
