@@ -136,7 +136,9 @@ function csvOf(cols: Col[], rows: any[]): string {
   return [used.map((c) => esc(c.label)).join(","), ...rows.map((r) => used.map((c) => esc(c.csv(r))).join(","))].join("\n");
 }
 
-export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel }: {
+export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction }: {
+  /** Keyword tables: something else to do with the ticked rows (e.g. add them to a list). */
+  extraAction?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null }[], clear: () => void) => ReactNode;
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
   onExplore?: (domain: string) => void;
   /** Keyword tables: track the ticked keywords (the page supplies the site). */
@@ -186,7 +188,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     a.click(); URL.revokeObjectURL(a.href);
   };
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
-  const trackable = !!onTrack && isKeywordRows(table);
+  const trackable = (!!onTrack || !!extraAction) && isKeywordRows(table);
   const from = offset + 1, to = offset + (page?.rows.length ?? 0);
 
   return (
@@ -250,7 +252,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
               {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""} · as of {fmtDate(page.fetchedAt)}
             </span>
             <span className="flex flex-wrap items-center gap-2">
-              {trackable && picked.size > 0 && <Button size="sm" onClick={() => { onTrack!(page.rows.filter((r) => picked.has(r.keyword))); setPicked(new Set()); }} data-testid="button-track-picked">{trackLabel ?? "Track"} ({picked.size})</Button>}
+              {trackable && extraAction && picked.size > 0 && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
+              {trackable && onTrack && picked.size > 0 && <Button size="sm" onClick={() => { onTrack(page.rows.filter((r) => picked.has(r.keyword))); setPicked(new Set()); }} data-testid="button-track-picked">{trackLabel ?? "Track"} ({picked.size})</Button>}
               <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={download} data-testid="button-export-csv"><Download /> Export CSV</button>
             </span>
           </div>

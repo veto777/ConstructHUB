@@ -20,13 +20,13 @@ import {
   crmCommitments, crmCostEntries, crmChangeOrders,
   crmPunchItems, crmDailyLogs, crmSelections, crmEstimateOptions,
   crmApiKeys, crmWebhooks, crmProjects, crmCustomers, crmOrgs, crmEstimates,
-  crmEstimateItems, crmPayments, crmMembers, permitDatabases, propertyAppraisers, counties,
+  crmEstimateItems, crmPayments, crmMembers,
   crmNotificationChannel, crmNotificationEnabled, crmEngagementSessions, crmCustomerNotes,
   CRM_WEBHOOK_EVENTS, CRM_CHANGE_ORDER_STATUSES,
   CRM_PUNCH_STATUSES, CRM_SELECTION_STATUSES, CRM_COMMITMENT_TYPES,
   CRM_LINE_ITEM_KINDS,
 } from "@shared/schema";
-import { and, eq, desc, asc, sql, ilike, isNull } from "drizzle-orm";
+import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
@@ -40,6 +40,7 @@ import { computeApprovalTotals } from "./discounts";
 import { progressInvoiceItems } from "./invoice-math";
 import { lockDocNumbers, nextDocNumber } from "./doc-number";
 import { objectPolicy } from "./object-access";
+import { suggestPermitOffices } from "./permit-suggest";
 
 type GetUser = (req: any, res: any) => any;
 const tok = () => randomBytes(24).toString("hex");
@@ -1147,46 +1148,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     if (!ctx) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
-    const city = (proj.city || "").trim();
-    const state = (proj.state || "").trim();
-    if (!state) {
-      return res.json({ portals: [], appraisers: [], message: "Add a state to the project first so offices can be matched safely." });
-    }
-    // A portal's state is the ", ST" on its own jurisdiction ("Bentonville, AR").
-    // Its county_id cannot be trusted for this: the city seed copied ids from
-    // another database, so hundreds of city rows point at a county in a
-    // different state (Bentonville AR → Denver CO) and matched the wrong state.
-    let stateCode = /^[A-Za-z]{2}$/.test(state) ? state.toUpperCase() : null;
-    if (!stateCode) {
-      const [byName] = await db.select({ code: counties.stateCode }).from(counties)
-        .where(sql`lower(${counties.state}) = lower(${state})`).limit(1);
-      stateCode = byName?.code ? byName.code.toUpperCase() : null;
-    }
-    // HARD RULE: only real, verified, liveness-checked rows. Never synthesise.
-    const portals = !stateCode ? [] : await db.select({
-      id: permitDatabases.id, name: permitDatabases.name,
-      jurisdiction: permitDatabases.jurisdiction, portalUrl: permitDatabases.portalUrl,
-      searchUrl: permitDatabases.searchUrl, phone: sql<string | null>`null`, // legacy contacts have no current source evidence
-      linkStatus: permitDatabases.linkStatus,
-      lastVerifiedAt: permitDatabases.lastVerifiedAt,
-    }).from(permitDatabases)
-      .where(and(
-        sql`upper(right(trim(${permitDatabases.jurisdiction}), 4)) = ${`, ${stateCode}`}`,
-        eq(permitDatabases.isActive, true),
-        sql`${permitDatabases.linkStatus} in ('live', 'verified', 'unconfirmed')`,
-        city ? ilike(permitDatabases.jurisdiction, `%${city}%`) : sql`true`,
-      )).limit(15);
-    const appraisers = await db.select({
-      id: propertyAppraisers.id, name: propertyAppraisers.name,
-      portalUrl: propertyAppraisers.portalUrl, searchUrl: propertyAppraisers.searchUrl,
-      linkStatus: propertyAppraisers.linkStatus, lastVerifiedAt: propertyAppraisers.lastVerifiedAt,
-    }).from(propertyAppraisers)
-      .innerJoin(counties, eq(propertyAppraisers.countyId, counties.id))
-      .where(and(eq(propertyAppraisers.isActive, true),
-        sql`${propertyAppraisers.linkStatus} in ('live', 'verified', 'unconfirmed')`,
-        sql`(lower(${counties.stateCode}) = lower(${state}) or lower(${counties.state}) = lower(${state}))`,
-        city ? ilike(propertyAppraisers.name, `%${city}%`) : sql`true`)).limit(10);
-    res.json({ portals, appraisers, jurisdiction: [city, state].filter(Boolean).join(", ") });
+    res.json(await suggestPermitOffices(proj.city || "", proj.state || ""));
   });
 
   app.patch("/api/crm/projects/:id/permit", async (req: any, res) => {

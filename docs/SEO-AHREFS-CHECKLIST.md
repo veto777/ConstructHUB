@@ -39,7 +39,7 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  C3  Who ranks: top organic results with each site's authority, dated, with a Refresh button (was labelled "today" while up to a week old - Codex FAIL, fixed 10-08).
 - [x] DONE  C4  What else is on the results page (map pack, people also ask, AI overview …).
 - [x] DONE  C5  Matching terms, related terms and questions: filters, sort, paging, CSV, and "track on my site".
-- [ ] TODO  C6  Bulk input (paste many keywords); saved keyword lists.
+- [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. NOT seen in a browser.
 - [ ] TODO  C7  Other countries and languages (US English only today).
 - [ ] TODO  C8  Clicks, traffic potential, parent topic.
 
@@ -47,17 +47,17 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
 - [x] DONE  D2  History: project chart (visibility %, average position) and positions-by-band chart per check date; click a keyword for its own history chart and table. Built from saved checks, free. NOT yet seen with real check data (no tracked sites exist on production yet).
 - [x] PART  D3  Tags: set a tag when adding keywords, filter the history by tag. TODO: edit tags in the table (API exists), competitors on the same keywords, share of voice vs competitors.
-- [ ] TODO  D4  Local / map-pack positions by city.
-- [ ] TODO  D5  SERP features won per keyword; scheduled email report.
+- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. NOT seen in a browser. US only.
+- [ ] TODO  D5  SERP features won per keyword (only the map pack is tracked so far); scheduled email report.
 
 ## E. Billing of SEO data (shared/seo-credits.ts, server/seo/credits.ts, budget.ts)
 - [x] DONE  E1  Every lookup charged at 4x wholesale, reserved then settled to the real cost. Codex FAIL (double refund possible; cost of parallel calls lost on failure) -> fixed 10-08: a reservation settles exactly once; failed reports carry the full cost; a failed lookup costs the customer nothing.
 - [x] DONE  E2  Plan allowance per month (Starter $10, Pro $20, Growth $40, Agency $40) then prepaid packs ($25 / $50 / $100).
 - [x] DONE  E3  Price shown before every lookup incl. "Run check now"; two identical requests at once buy once; a saved page is never charged twice; out-of-credit refuses without running. (Codex FAIL fixed 10-08.)
 - [x] DONE  E4  Nothing sold inside the iPhone apps.
-- [ ] TODO  E5  A usage history screen (what each lookup cost and when).
+- [x] DONE  E5  Usage page (`/seo/usage`): every lookup with what it was, when, what it cost and whether it came from included data or purchased credit; month totals; credit purchases; export.
 - [x] DONE  E6  Automatic jobs (weekly rank check, monthly backlink snapshot) spend the month's included data only - never credit the customer bought. (Codex finding 6.)
-- [x] PART  E7  Rank runs: task ids are saved after every batch (a crash no longer loses paid ids); a removed keyword or a run stuck for hours can no longer jam a site. STILL OPEN: checks that never come back from the queue are noted on the run but not refunded.
+- [x] DONE  E7  Rank runs: task ids saved after every batch and kept through errors; a removed keyword or a stuck run cannot jam a site; checks that never come back are refunded once (real-database check 11a-11e).
 - [x] DONE  E8  Durable reservations (table seo_reservations): the reservation row, the customer's credit and our ledger settle in one transaction; a reservation the process never settled is finished by a reconciler after 30 minutes (customer charged nothing). Verified on a real Postgres with script/seo-ledger-check.ts: 24/24.
 
 ## F. Site Audit
@@ -65,7 +65,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] PART  F2  HTTP status distribution (2xx / 3xx / 4xx / 5xx / failed) and per-area scores. TODO: crawl depth, indexability report, internal-link report, per-page explorer, pause/resume, custom page limit (fixed at 150).
 
 ## G. Other Ahrefs tools
-- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.  G4  Alerts (new/lost links, new keywords).
+- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.
+- [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
 - [ ] TODO  G5  Client-ready PDF reports and scheduled reports.  G6  Batch analysis of many domains.
 
 ## Codex audit #2 (2026-10-08, read-only, in a container; report: tower1 ~/codex-audits/out/seo-audit-2.md)
@@ -112,6 +113,27 @@ STILL OPEN: 7 (no refund for checks that never return), 11 (a partial explorer r
 15 (agency delegation), 17 (ledger checks are a manual script, not in CI), B5 filters on competitors / best-by-links.
 Health score: non-page files and off-site redirects no longer count as failures (Codex, section 4).
 
+## Codex audit #4 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-4.md)
+Verdict: "Substantial progress, but the billing and correctness claims still overstate the implementation." Coverage: about 40% (35-45%).
+Re-check of the earlier items: FIXED N3 N9 N10 N11, older 9 14 16 - the rest PARTLY. 15 new defects; done the same day:
+ 1 reconciler could refund a call that was only slow . FIXED (a late result is settled for real; credit cannot attach to a closed reservation)
+ 2 outcome write could fail, wrong amount settled .... FIXED (the outcome is handed into the settling transaction; a lost acknowledgement is detected from the row)
+ 3 unknown spend still understated ................... FIXED (gap, backlink list, rank chunks priced from their own keywords; reported cost never trimmed)
+ 4 paid task ids wiped on a late error ............... FIXED (kept and collected; unreturned checks refunded)
+ 5 another business taken for the customer's ......... FIXED (website decides; name only for entries with no website, whole name only)
+ 6 same-day re-run repeats the alert and email ....... FIXED (one alert of a kind per site per day)
+ 7 alert could be saved and never sent ............... FIXED (claimed, sent, retried for a day)
+ 8 index swap had a gap .............................. FIXED (new rule first, then the old one goes)
+ 9 a keyword's place could change under its history .. FIXED (every keyword stores its place; old rows back-filled)
+10 gap price shown for a different request ........... FIXED; a competitor that did not load can be retried
+11 "links to every competitor" not enforced .......... FIXED in the parser (the source has no mode switch on this endpoint: tested live, it rejects one)
+12 "fixed" when only some pages were re-checked ...... FIXED (every page must have been crawled again)
+13 buy-once and import locks are per process ......... OPEN by design: production runs one process; explorer re-checks its saved copy now
+14 new data could stay invisible ..................... FIXED (worker-fed pages refetch when opened; alerts poll; imports refresh tracker views)
+15 place picker had no keyboard support .............. FIXED (arrows, Enter, Escape; Enter never submits unresolved text)
+STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / backlink saves), 11 (partial explorer report needs a full refresh),
+15 (agency delegation), 17 (database checks are manual scripts, not CI); B5 filters on competitors / best-by-links.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -121,3 +143,7 @@ Health score: non-page files and off-site redirects no longer count as failures 
   against the real stored crawl. Still NOT seen in a browser by the builder; the rank-history charts have never had real data.
 - 2026-10-08 (slice 3): Content gap + Link intersect, durable ledger, Codex audit #3 fixes. 100 SEO unit tests pass;
   script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still NOT seen in a browser.
+- 2026-10-08 (slice 4): place-level tracking, map pack, alerts. 113 SEO unit tests pass; script/seo-local-check.ts 17/17 on a
+  throwaway Postgres that still had the old schema and rows (the upgrade runs in place); map pack found on live results.
+- 2026-10-08 (slice 5): keyword lists, bulk analysis, usage page, Codex audit #4 fixes. 130 SEO unit tests pass;
+  script/seo-ledger-check.ts 38/38 and script/seo-local-check.ts 20/20 on a fresh throwaway Postgres. NOT seen in a browser.

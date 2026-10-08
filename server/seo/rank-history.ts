@@ -5,11 +5,13 @@
  */
 import { pool } from "../db";
 
-export type CheckRow = { keywordId: number; checkedOn: string; position: number | null; volume: number | null };
+export type CheckRow = { keywordId: number; checkedOn: string; position: number | null; volume: number | null; local?: number | null };
 export type RankDay = {
   date: string; checked: number; ranked: number;
   top3: number; top10: number; top20: number; top100: number; notRanked: number;
   averagePosition: number | null;
+  /** Keywords where the business was in the Google map pack. */
+  mapPack: number;
   /** Estimated share of the clicks available on the tracked keywords, 0-100. */
   visibility: number;
 };
@@ -35,6 +37,7 @@ export function summarizeChecks(rows: CheckRow[]): RankDay[] {
     return {
       date, checked: day.length, ranked: ranked.length,
       top3: count(1, 3), top10: count(4, 10), top20: count(11, 20), top100: ranked.filter((r) => r.position > 20).length, notRanked: day.length - ranked.length,
+      mapPack: day.filter((r) => r.local != null).length,
       averagePosition: ranked.length ? Math.round((ranked.reduce((a, r) => a + r.position, 0) / ranked.length) * 10) / 10 : null,
       visibility: total ? Math.round((won / total / CLICK_SHARE[0]) * 1000) / 10 : 0,
     };
@@ -45,7 +48,7 @@ export const HISTORY_DAYS = 365;
 
 export async function rankHistory(siteId: number, device: "desktop" | "mobile", tag: string | null): Promise<RankDay[]> {
   const { rows } = await pool.query(
-    `SELECT c.keyword_id AS "keywordId", c.checked_on::text AS "checkedOn", c.position, k.search_volume AS volume
+    `SELECT c.keyword_id AS "keywordId", c.checked_on::text AS "checkedOn", c.position, c.local_position AS local, k.search_volume AS volume
        FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id
       WHERE c.site_id=$1 AND c.device=$2 AND c.checked_on >= current_date - $3::int AND ($4::text IS NULL OR $4 = ANY(k.tags))
       ORDER BY c.checked_on`, [siteId, device, HISTORY_DAYS, tag]);

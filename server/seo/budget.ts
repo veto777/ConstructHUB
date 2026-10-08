@@ -78,7 +78,7 @@ export class SeoBudgetError extends Error {
 
 export type BudgetReservation = { /** seo_reservations row: what makes the settlement survive a crash. */ id?: string; userId: number; month: string; estimateUsd: number; credit: CreditReservation | null; /** Set by settleBudget: a reservation settles once. */ settled?: boolean };
 /** `allowanceOnly`: spend the month's included SEO data only, never credit the customer bought (automatic jobs). */
-export type BudgetOptions = { allowanceOnly?: boolean };
+export type BudgetOptions = { allowanceOnly?: boolean; /** What this lookup is, in the customer's words — shown in their usage history. */ label?: string };
 
 /** Reserve `estimateUsd` for this account, or throw SeoBudgetError. */
 export async function reserveBudget(userId: number, estimateUsd: number, opts: BudgetOptions = {}): Promise<BudgetReservation> {
@@ -102,7 +102,7 @@ export async function reserveBudget(userId: number, estimateUsd: number, opts: B
        ON CONFLICT(user_id,month) DO UPDATE SET cost_usd=seo_api_usage.cost_usd+EXCLUDED.cost_usd, requests=seo_api_usage.requests+1, updated_at=now()`,
       [userId, month, estimateUsd]);
     // Recorded with the reservation itself: if this process never settles it, reconcileReservations will.
-    await client.query("INSERT INTO seo_reservations(id,user_id,month,estimate_usd) VALUES($1,$2,$3,$4)", [id, userId, month, estimateUsd]);
+    await client.query("INSERT INTO seo_reservations(id,user_id,month,estimate_usd,label) VALUES($1,$2,$3,$4,$5)", [id, userId, month, estimateUsd, opts.label ? opts.label.slice(0, 200) : null]);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
@@ -114,8 +114,16 @@ export async function reserveBudget(userId: number, estimateUsd: number, opts: B
   // from this month's allowance and then purchased credit (server/seo/credits.ts).
   const reservation: BudgetReservation = { id, userId, month, estimateUsd, credit: null };
   try {
-    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), { ...opts, reservationId: id });
+    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), { allowanceOnly: opts.allowanceOnly, reservationId: id });
   } catch (e) {
+    if (!(e instanceof SeoCreditShort)) {
+      // The error may have arrived after the credit was in fact taken (a lost acknowledgement). The reservation row is
+      // written in that same transaction, so it says which: credit on the row = taken, proceed as reserved.
+      const held = await pool.query("SELECT credit FROM seo_reservations WHERE id=$1 AND settled_at IS NULL", [id]).then((r) => r.rows[0]?.credit ?? null, () => undefined);
+      if (held) { reservation.credit = held; return reservation; }
+      // Cannot tell: leave the row open for the reconciler instead of guessing.
+      if (held === undefined) throw e;
+    }
     // Nothing will run: close the reservation and give the wholesale estimate back, together.
     await pool.query(
       `WITH closed AS (UPDATE seo_reservations SET settled_at=now(), actual_usd=0, customer_usd=0 WHERE id=$4 AND settled_at IS NULL RETURNING 1)
@@ -135,11 +143,10 @@ export async function reserveBudget(userId: number, estimateUsd: number, opts: B
  * own (wholesale) cost; the customer is charged `customerUsd` at their price —
  * the same amount unless the call failed, when they are charged nothing.
  *
- * Settles once. The numbers are written to the reservation row first, then the
- * row, the customer's credit and our ledger change in ONE transaction; if that
- * fails or the process dies, the row stays open and reconcileReservations
- * finishes it with the recorded numbers. A second call for the same
- * reservation finds nothing open and does nothing.
+ * Settles once. The reservation row, the customer's credit and our ledger
+ * change in ONE transaction, with the outcome handed in — never read back from
+ * a separate write. If that transaction fails the outcome is left on the row,
+ * so reconcileReservations finishes it with the real numbers. Never throws.
  */
 export async function settleBudget(r: BudgetReservation, actualUsd: number, customerUsd = actualUsd): Promise<void> {
   if (r.settled) return;
@@ -149,35 +156,96 @@ export async function settleBudget(r: BudgetReservation, actualUsd: number, cust
     // No reservation row (built by hand, as the unit tests do): settle the two ledgers directly.
     await budgetDeps.settleCredits(r.credit, retailCents(customerUsd)).catch((e: any) => console.error(`[seo] credit settle failed user=${r.userId}: ${e?.message ?? e}`));
     const delta = round6(actualUsd - r.estimateUsd);
-    if (delta !== 0) await pool.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd+$3), updated_at=now() WHERE user_id=$1 AND month=$2", [r.userId, r.month, delta]);
+    if (delta !== 0) await pool.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd+$3), updated_at=now() WHERE user_id=$1 AND month=$2", [r.userId, r.month, delta]).catch((e: any) => console.error(`[seo] ledger settle failed user=${r.userId}: ${e?.message ?? e}`));
     return;
   }
-  await pool.query("UPDATE seo_reservations SET actual_usd=$2, customer_usd=$3 WHERE id=$1 AND settled_at IS NULL", [r.id, actualUsd, customerUsd])
-    .catch((e: any) => console.error(`[seo] could not record the settlement of ${r.id}: ${e?.message ?? e}`));
-  await applySettlement(r.id).catch((e: any) => console.error(`[seo] settlement of ${r.id} did not complete (it will be retried): ${e?.message ?? e}`));
+  try {
+    await applySettlement(r.id, { actualUsd, customerUsd });
+  } catch (e: any) {
+    console.error(`[seo] settlement of ${r.id} did not complete (it will be retried): ${e?.message ?? e}`);
+    await pool.query("UPDATE seo_reservations SET actual_usd=$2, customer_usd=$3 WHERE id=$1 AND settled_at IS NULL", [r.id, actualUsd, customerUsd])
+      .catch((w: any) => console.error(`[seo] could not record the outcome of ${r.id} either — the reconciler will close it at no charge to the customer: ${w?.message ?? w}`));
+  }
 }
 
 /**
- * Close one open reservation: the customer's credit, our ledger and the row
- * itself in one transaction. A reservation whose outcome was never recorded
- * (the process died mid-call) costs the customer nothing and keeps our own
- * estimate — the call may have been charged to us. False when already closed.
+ * Close one reservation: the customer's credit, our ledger and the row itself
+ * in one transaction, under a lock on the row.
+ *
+ *   open, outcome known (handed in, or left on the row by a failed settle)  -> settle to it.
+ *   open, outcome unknown (the process died mid-call)  -> the customer is charged nothing, our ledger keeps
+ *     the estimate, and the row is marked `reconciled`.
+ *   closed as `reconciled`, and the real outcome now arrives (the call was only slow)  -> settle the
+ *     difference, so a late result is paid for like any other.
+ *   closed otherwise  -> nothing to do.
+ * Returns whether anything changed.
  */
-export async function applySettlement(id: string): Promise<boolean> {
+/** The credit record after a settlement: what was held, plus or minus what the settlement moved. */
+function finalCredit(held: CreditReservation | null, moved: { dIncluded: number; dWallet: number } | void): string | null {
+  if (!held) return null;
+  return JSON.stringify({ ...held, fromIncluded: Math.max(0, held.fromIncluded + (moved?.dIncluded ?? 0)), fromWallet: Math.max(0, held.fromWallet + (moved?.dWallet ?? 0)) });
+}
+
+export async function applySettlement(id: string, outcome?: { actualUsd: number; customerUsd: number }): Promise<boolean> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows: [row] } = await client.query("SELECT * FROM seo_reservations WHERE id=$1 AND settled_at IS NULL FOR UPDATE", [id]);
+    const { rows: [row] } = await client.query("SELECT * FROM seo_reservations WHERE id=$1 FOR UPDATE", [id]);
     if (!row) { await client.query("ROLLBACK"); return false; }
     const estimate = Number(row.estimate_usd);
-    const actual = row.actual_usd === null ? estimate : Number(row.actual_usd);
-    const customer = row.customer_usd === null ? 0 : Number(row.customer_usd);
-    await budgetDeps.settleCredits(row.credit ?? null, retailCents(customer), client);
-    const delta = round6(actual - estimate);
-    if (delta !== 0) await client.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd+$3), updated_at=now() WHERE user_id=$1 AND month=$2", [row.user_id, row.month, delta]);
-    await client.query("UPDATE seo_reservations SET settled_at=now(), actual_usd=$2, customer_usd=$3 WHERE id=$1", [id, actual, customer]);
+    const ledger = async (delta: number) => {
+      if (round6(delta) !== 0) await client.query("UPDATE seo_api_usage SET cost_usd=greatest(0,cost_usd+$3), updated_at=now() WHERE user_id=$1 AND month=$2", [row.user_id, row.month, round6(delta)]);
+    };
+    if (row.settled_at) {
+      if (!row.reconciled || !outcome) { await client.query("ROLLBACK"); return false; }
+      // Nothing is held any more (the reconciler gave it all back): charge what the lookup really cost.
+      const held = row.credit ? { ...row.credit, fromIncluded: 0, fromWallet: 0 } : null;
+      const moved = await budgetDeps.settleCredits(held, retailCents(outcome.customerUsd), client);
+      await ledger(outcome.actualUsd - Number(row.actual_usd ?? estimate));
+      await client.query("UPDATE seo_reservations SET reconciled=false, actual_usd=$2, customer_usd=$3, credit=$4 WHERE id=$1", [id, outcome.actualUsd, outcome.customerUsd, finalCredit(held, moved)]);
+      await client.query("COMMIT");
+      console.warn(`[seo] reservation ${id} finished after it had been closed as abandoned; settled late`);
+      return true;
+    }
+    const known = outcome ?? (row.actual_usd !== null ? { actualUsd: Number(row.actual_usd), customerUsd: Number(row.customer_usd ?? 0) } : null);
+    const actual = known ? known.actualUsd : estimate, customer = known ? known.customerUsd : 0;
+    const moved = await budgetDeps.settleCredits(row.credit ?? null, retailCents(customer), client);
+    await ledger(actual - estimate);
+    // From here on the row's credit is what the lookup finally took, not what was set aside for it.
+    await client.query("UPDATE seo_reservations SET settled_at=now(), actual_usd=$2, customer_usd=$3, reconciled=$4, credit=$5 WHERE id=$1", [id, actual, customer, !known, finalCredit(row.credit ?? null, moved)]);
     await client.query("COMMIT");
     return true;
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Give back part of what a settled lookup cost the customer: paid work that was
+ * never delivered (rank checks that never came back). Purchased credit first.
+ * `key` makes it happen once. Returns the cents refunded.
+ */
+export async function refundReservation(id: string, cents: number, key: string): Promise<number> {
+  if (!(cents >= 1)) return 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: [row] } = await client.query("SELECT * FROM seo_reservations WHERE id=$1 FOR UPDATE", [id]);
+    if (!row || !row.settled_at || !row.credit || row.refund_key === key) { await client.query("ROLLBACK"); return 0; }
+    // The row's credit is what the lookup took (and has not yet been refunded), split by where it came from.
+    const fromIncluded = Number(row.credit.fromIncluded ?? 0), fromWallet = Number(row.credit.fromWallet ?? 0);
+    const give = Math.min(Math.floor(cents), fromIncluded + fromWallet);
+    if (give <= 0) { await client.query("ROLLBACK"); return 0; }
+    const dWallet = Math.min(give, fromWallet), dIncluded = give - dWallet;
+    await client.query("UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents-$3), wallet_cents=greatest(0,wallet_cents-$4), updated_at=now() WHERE user_id=$1 AND month=$2", [row.user_id, row.month, dIncluded, dWallet]);
+    if (dWallet) await client.query("UPDATE seo_credit_wallets SET balance_cents=balance_cents+$2, updated_at=now() WHERE user_id=$1", [row.user_id, dWallet]);
+    await client.query("UPDATE seo_reservations SET refunded_cents=refunded_cents+$2, refund_key=$3, credit=$4 WHERE id=$1", [id, give, key, JSON.stringify({ ...row.credit, fromIncluded: fromIncluded - dIncluded, fromWallet: fromWallet - dWallet })]);
+    await client.query("COMMIT");
+    console.info(`[seo] refunded ${give}c of reservation ${id} (${key})`);
+    return give;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
@@ -221,6 +289,7 @@ export async function withBudget<T>(userId: number, estimateUsd: number, call: (
     // Part of the cost is unknown (a call timed out or the source never answered): our ledger keeps the whole estimate.
     const unknown = e?.costUnknown === true || e?.code === "timeout" || (e?.code === "upstream" && reported === 0);
     await settleBudget(r, unknown ? Math.max(reported, estimateUsd) : reported, 0);
+    // The reservation id travels with the error so nothing downstream has to guess what was (not) charged.
     throw e;
   }
   // The data is in hand: settleBudget never throws, so a ledger error cannot lose a result that was paid for.

@@ -85,7 +85,7 @@ export default function SeoAuditPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site?.id}/audit`;
-  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
@@ -229,8 +229,9 @@ export default function SeoAuditPage() {
           {issues.length === 0 ? (
             <Empty testId="audit-no-issues"><h3>{a.issues.length ? "No issues match these filters" : "No issues found"}</h3><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
           ) : (
-            <table className="g-table" data-testid="table-audit-issues">
-              <thead><tr><th aria-label="Show details" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num">Since last crawl</th></tr></thead>
+            <div className="overflow-x-auto">
+            <table className="g-table w-full" data-testid="table-audit-issues">
+              <thead><tr><th aria-label="Show details" className="w-12" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num whitespace-nowrap pr-2" title="Change in affected pages since the crawl before">Change</th></tr></thead>
               <tbody>
                 {issues.map((i) => {
                   const isOpen = open === i.key, shown = isOpen && !showAll ? i.items.slice(0, 25) : i.items;
@@ -241,7 +242,7 @@ export default function SeoAuditPage() {
                         <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
                         <td data-label="Area" className="g-text-2">{CATEGORY[i.category] ?? i.category}</td>
                         <td className="num" data-label="Affected">{fmtNum(i.count)}</td>
-                        <td className="num" data-label="Since last crawl"><Change issue={i} /></td>
+                        <td className="num pr-2" data-label="Change since last crawl"><Change issue={i} /></td>
                       </tr>
                       {isOpen && (
                         <tr data-testid={`detail-issue-${i.key}`}>
@@ -265,6 +266,7 @@ export default function SeoAuditPage() {
                 })}
               </tbody>
             </table>
+            </div>
           )}
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">

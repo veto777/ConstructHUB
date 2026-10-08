@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   dataforseoDeps, isConfigured, assertOk, isTaskInProgress, isNoResultsTask, buildRankResult, parseTaskPost, parseTaskGet,
   parseKeywordItem, parseIntersectionItem, parseBacklinkSummary, parseBacklinkRow, parseAdsVolumeItem, normalizeDomain,
-  serpTaskPost, serpTaskGet, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
+  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
   DataForSeoError, API_BASE,
 } from "./dataforseo";
 
@@ -103,11 +103,57 @@ describe("rank checks (standard queue)", () => {
   it("buildRankResult: the first organic result on the domain or a subdomain, by rank_group; features are the element types", () => {
     const items = fixture("task_get").tasks[0].result[0].items;
     const r = buildRankResult({ keywordId: 11, keyword: "roofing contractor tampa", targetDomain: "constructhub.us" }, items);
-    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic"] });
+    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic"],
+      localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }] });
     // a local-pack hit on another domain is not an organic ranking
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "tamparoofpros.example" }, items).position).toBeNull();
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "bigroofer.example" }, items)).toMatchObject({ position: 1, url: "https://bigroofer.example/tampa" });
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "hub.us" }, items).position).toBeNull(); // not a suffix match
+  });
+  it("map pack: the business is found by its website, or by its name when the entry has no website", () => {
+    const items = fixture("task_get").tasks[0].result[0].items;
+    // by website: in the pack at 1, though it has no organic ranking
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "tamparoofpros.example" }, items)).toMatchObject({ position: null, localPosition: 1 });
+    const pack = [
+      { type: "local_pack", rank_group: 1, title: "Big Roofer Inc." },
+      { type: "local_pack", rank_group: 2, title: "Alpine Exteriors, LLC", domain: null },
+      { type: "local_pack", rank_group: 3, title: "Alpine Roofing & Gutters", domain: "alpineroofing.example" },
+    ];
+    const byName = buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "alpineexteriorswa.com", businessName: "Alpine Exteriors" }, pack);
+    expect(byName.localPosition).toBe(2);
+    expect(byName.localPack.map((p) => p.title)).toEqual(["Big Roofer Inc.", "Alpine Exteriors, LLC", "Alpine Roofing & Gutters"]);
+    // no name given and no website on the entries: not found, never guessed
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "alpineexteriorswa.com" }, pack).localPosition).toBeNull();
+    // a different business that merely shares a word is not a match
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Alpine" }, pack).localPosition).toBeNull();
+    // no map on the page
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Alpine Exteriors" }, [])).toMatchObject({ localPosition: null, localPack: [] });
+  });
+  it("map pack: another business is never taken for the customer's", () => {
+    // a longer name that merely starts with ours is a different business
+    expect(isOurListing({ title: "Precision Roofing Supply" }, "x.com", "Precision Roofing")).toBe(false);
+    // the same name on a different website is a different business
+    expect(isOurListing({ title: "Precision Roofing", domain: "precisionroofing-ohio.example" }, "x.com", "Precision Roofing")).toBe(false);
+    // the website wins wherever it is in the pack, even after an entry whose name matches
+    const pack = [
+      { type: "local_pack", rank_group: 1, title: "Precision Roofing" },
+      { type: "local_pack", rank_group: 2, title: "Precision Roofing of Tampa", domain: "www.x.com" },
+    ];
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Precision Roofing" }, pack).localPosition).toBe(2);
+    // a tagline after a separator is not part of the name
+    expect(isOurListing({ title: "Alpine Exteriors | Siding, Roofing & Windows" }, "x.com", "Alpine Exteriors")).toBe(true);
+  });
+  it("business names compare without punctuation or company suffixes", () => {
+    expect(normalizeBusinessName("Alpine Exteriors, LLC")).toBe("alpine exteriors");
+    expect(normalizeBusinessName("The A&B Roofing Co.")).toBe("a and b roofing");
+    expect(isOurListing({ title: "Alpine Exteriors - Siding Contractor" }, "x.com", "Alpine Exteriors")).toBe(true);
+    expect(isOurListing({ title: "Alp" }, "x.com", "Alp")).toBe(false);
+    expect(isOurListing({ title: "Someone Else", domain: "www.x.com" }, "x.com", null)).toBe(true);
+  });
+  it("task_post sends a keyword's own place when it has one", async () => {
+    const calls = mockFetch(() => fixture("task_post"));
+    await serpTaskPost({ tasks: [{ keyword: "roof repair", keywordId: 1, device: "desktop", locationCode: 1015214 }, { keyword: "siding", keywordId: 2, device: "desktop" }], locationCode: 2840, languageCode: "en", depth: 10, targetDomain: "x.com" }).catch(() => {});
+    expect(calls[0].body.map((t: any) => t.location_code)).toEqual([1015214, 2840]);
   });
   it("task_get: completed, pending, no-results and failed outcomes", async () => {
     const input = { taskId: "10061512-1535-0066-0000-aaaaaaaaaaaa", keywordId: 11, keyword: "roofing contractor tampa", targetDomain: "constructhub.us" };

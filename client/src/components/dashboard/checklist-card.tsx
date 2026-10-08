@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { DashLink, FOCUS_RING } from "./dash-link";
+import { SocialLinks } from "@/components/social-links";
 
 const COLLAPSED_KEY = "constructhub:dashboard:checklist-collapsed";
 const readCollapsed = () => { try { return window.localStorage.getItem(COLLAPSED_KEY) === "1"; } catch { return false; } };
@@ -79,6 +80,8 @@ export function ChecklistCard({ items }: { items: DashboardChecklistItem[] }) {
           })}
         </GoogleList>
       )}
+      {/* New accounts land here: where the tips and walkthrough videos are posted. */}
+      {!collapsed && <SocialLinks tone="app" label="Follow us for tips" className="mt-3 border-t border-border/40 pt-3 sm:justify-start" testId="social-checklist" />}
     </Card>
   );
 }

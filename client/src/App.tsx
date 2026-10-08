@@ -1,4 +1,5 @@
 import AgencyPage from "@/pages/agency";
+import { SocialLinks } from "@/components/social-links";
 import GoogleProfilePage from "@/pages/google-profile";
 import InvitePage from "@/pages/invite";
 import { PaymentNeededBanner } from "@/components/payment-needed-banner";
@@ -94,6 +95,8 @@ const SeoDashboardPage = lazyPage(() => import("@/pages/seo/dashboard"));
 const SeoKeywordsPage = lazyPage(() => import("@/pages/seo/keywords"));
 const SeoExplorerPage = lazyPage(() => import("@/pages/seo/explorer"));
 const SeoAuditPage = lazyPage(() => import("@/pages/seo/audit"));
+const SeoAlertsPage = lazyPage(() => import("@/pages/seo/alerts"));
+const SeoUsagePage = lazyPage(() => import("@/pages/seo/usage"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
@@ -219,6 +222,8 @@ function DashboardRouter() {
       <Route path="/seo/rank-tracker" component={SeoOverviewPage} />
       <Route path="/seo/explorer" component={SeoExplorerPage} />
       <Route path="/seo/audit" component={SeoAuditPage} />
+      <Route path="/seo/alerts" component={SeoAlertsPage} />
+      <Route path="/seo/usage" component={SeoUsagePage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
@@ -418,7 +423,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/audit": "Site audit", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/usage": "SEO data usage", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
@@ -742,6 +747,7 @@ function AppContent() {
               <CrmPlanGate><PortalRouter /></CrmPlanGate>
               {/* Help and "Report an issue" under every CRM page (they sell nothing, so the iPhone app keeps them too). */}
               <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
+                <SocialLinks tone="app" className="basis-full" testId="social-crm-footer" />
                 <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
                 <span className="mx-2 text-border">&middot;</span>
                 <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
@@ -809,6 +815,7 @@ function AppContent() {
             </div>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
             <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 md:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
+              <SocialLinks tone="app" className="basis-full" testId="social-dashboard-footer" />
               <Link href="/tutorials" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-help">Help</Link>
               <span className="mx-2 text-border">&middot;</span>
               <Link href={reportIssueHref()} className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-report-issue">Report an issue</Link>

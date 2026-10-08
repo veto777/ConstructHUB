@@ -110,6 +110,17 @@ describe("what counts as broken, and what counts as fixed", () => {
     expect(s.fixed.map((f) => f.key)).toEqual(["alt"]);
     expect(s.notRechecked.map((f) => f.key)).toEqual(["thin"]);
   });
+  it("an issue is fixed only when every page it was on was crawled again", () => {
+    const before = { report: { findings: [finding("thin", "warning", ["https://x/a", "https://x/b"], "Thin content")] }, pages: [page("https://x/a"), page("https://x/b")] };
+    expect(auditSummary({ findings: [] }, [page("https://x/a")], before).notRechecked.map((f) => f.key)).toEqual(["thin"]);
+    expect(auditSummary({ findings: [] }, [page("https://x/a"), page("https://x/b")], before).fixed.map((f) => f.key)).toEqual(["thin"]);
+  });
+  it("a PageSpeed entry is re-checked when its page was crawled again", () => {
+    const psi = { id: "psi-mobile-https://x/a", category: "performance", severity: "warning", title: "mobile PageSpeed performance: 41", urls: ["https://x/a"], why: "", fix: "" };
+    const before = { report: { findings: [psi] }, pages: [page("https://x/a")] };
+    expect(auditSummary({ findings: [] }, [page("https://x/a")], before).fixed.map((f) => f.key)).toEqual(["psi-mobile"]);
+    expect(auditSummary({ findings: [] }, [page("https://x/other")], before).notRechecked.map((f) => f.key)).toEqual(["psi-mobile"]);
+  });
   it("Google-profile checks are 'not re-checked' when this crawl had no profile", () => {
     const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };
     const before = { report: { profile: { id: 7 }, findings: [local] }, pages: [page("https://x/")] };

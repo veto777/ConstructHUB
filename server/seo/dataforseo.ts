@@ -179,22 +179,61 @@ export interface RankCheckResult {
   url: string | null;
   /** Distinct SERP element types on the page (organic, local_pack, people_also_ask, ai_overview, …). */
   serpFeatures: string[];
+  /** This business's place in the Google map pack (1-3); null when it is not in it or Google showed none. */
+  localPosition: number | null;
+  /** Who Google showed in the map pack, in order. Empty when there was none. */
+  localPack: { position: number; title: string; domain: string | null }[];
+}
+
+/** A business name reduced to what identifies it: lower case, no punctuation, no "LLC"/"Inc". */
+export function normalizeBusinessName(name: string | null | undefined): string {
+  return String(name ?? "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\b(llc|inc|incorporated|co|corp|corporation|company|ltd|the)\b/g, " ").replace(/\s+/g, " ").trim();
+}
+const sameSite = (domain: unknown, target: string) => {
+  if (typeof domain !== "string" || !domain) return false;
+  const d = domain.toLowerCase().replace(/^www\./, "");
+  return d === target || d.endsWith(`.${target}`);
+};
+/** A map-pack entry on the tracked website. */
+export const listingOnDomain = (item: { domain?: unknown }, targetDomain: string) => sameSite(item.domain, targetDomain.toLowerCase().replace(/^www\./, ""));
+/**
+ * A map-pack entry with the tracked business's name. Only for an entry that shows NO website (one that shows
+ * a different website is a different business), and only on the whole name: "Precision Roofing" is not
+ * "Precision Roofing Supply". A tagline after a separator ("Alpine Exteriors | Siding & Windows") is ignored.
+ */
+export function listingNamed(item: { domain?: unknown; title?: unknown }, businessName?: string | null): boolean {
+  if (typeof item.domain === "string" && item.domain) return false;
+  const ours = normalizeBusinessName(businessName);
+  if (ours.length < 4 || typeof item.title !== "string") return false;
+  return normalizeBusinessName(item.title) === ours || normalizeBusinessName(item.title.split(/\s+[|–—:·-]\s+/)[0]) === ours;
+}
+/** Is this map-pack entry the tracked business? By website, or by name when the entry shows no website. */
+export function isOurListing(item: { domain?: unknown; title?: unknown }, targetDomain: string, businessName?: string | null): boolean {
+  return listingOnDomain(item, targetDomain) || listingNamed(item, businessName);
 }
 
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
-export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string }, items: any[]): RankCheckResult {
+export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }, items: any[]): RankCheckResult {
   const target = input.targetDomain.toLowerCase().replace(/^www\./, "");
   const match = items.find((item) => {
     if (!item || item.type !== "organic" || typeof item.domain !== "string") return false;
     const d = item.domain.toLowerCase().replace(/^www\./, "");
     return d === target || d.endsWith(`.${target}`);
   });
+  const packItems = items.filter((i) => i && i.type === "local_pack");
+  const pack = packItems.map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: str(i.title) ?? "", domain: str(i.domain) }));
+  // The website decides wherever it appears in the pack; the name is only a fallback for entries that show none.
+  const onDomain = packItems.findIndex((i) => listingOnDomain(i, input.targetDomain));
+  const ours = onDomain >= 0 ? onDomain : packItems.findIndex((i) => listingNamed(i, input.businessName));
   return {
     keywordId: input.keywordId,
     keyword: input.keyword,
     position: match ? num(match.rank_group) ?? num(match.rank_absolute) : null,
     url: match ? str(match.url) : null,
     serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean))],
+    localPosition: ours >= 0 ? pack[ours].position : null,
+    localPack: pack,
   };
 }
 
@@ -208,7 +247,7 @@ const stopOnTarget = (domain: string) => ({
   find_targets_in: ["organic"],
 });
 
-export interface RankTaskInput { keyword: string; keywordId: number; device: Device }
+export interface RankTaskInput { keyword: string; keywordId: number; device: Device; /** Where to check from, when not the site's own place. */ locationCode?: number }
 export interface PostedRankTask extends RankTaskInput { taskId: string }
 
 /** Standard-queue task_post (charged now; results collected free by serpTaskGet). */
@@ -218,7 +257,7 @@ export async function serpTaskPost(input: { tasks: RankTaskInput[]; locationCode
   const depth = clampSerpDepth(input.depth);
   const response = await request("POST", "/serp/google/organic/task_post", input.tasks.map((t) => ({
     keyword: t.keyword,
-    location_code: input.locationCode,
+    location_code: t.locationCode ?? input.locationCode,
     language_code: input.languageCode,
     device: t.device,
     os: t.device === "desktop" ? "windows" : "android",
@@ -253,12 +292,12 @@ export type RankTaskOutcome =
   | { status: "completed"; result: RankCheckResult };
 
 /** Collect one queued task (free). */
-export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string }): Promise<RankTaskOutcome> {
+export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): Promise<RankTaskOutcome> {
   const response = await request("GET", `/serp/google/organic/task_get/advanced/${encodeURIComponent(input.taskId)}`);
   return parseTaskGet(response, input);
 }
 
-export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string }): RankTaskOutcome {
+export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): RankTaskOutcome {
   const task = response?.tasks?.[0];
   if (!response || response.status_code !== 20000 || !task)
     throw new DataForSeoError("upstream", response?.status_message || "DataForSEO task_get failed", 0, response?.status_code);

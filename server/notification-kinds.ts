@@ -21,6 +21,9 @@ export const NOTIFICATION_KINDS = {
   "social.post_failed": { label: "A social media post failed", inApp: true, email: true },
   "gbp.post_failed": { label: "A Google post or photo failed", inApp: true, email: false },
   "sitescan.completed": { label: "Site Scan completed", inApp: true, email: false },
+  "seo.rank_drop": { label: "Rankings fell, or you left the Google map pack", inApp: true, email: true },
+  "seo.rank_gain": { label: "Rankings improved, or you entered the Google map pack", inApp: true, email: false },
+  "seo.links_change": { label: "Sites linking to you were lost or gained", inApp: true, email: true },
   "sitescan.regressed": { label: "Site Scan score dropped or new critical issue", inApp: true, email: false },
   // Platform admins only (server/ops/app-review-watch.ts): bell + iPhone push; email stays off unless switched on.
   "ops.app_review": { label: "iPhone app review status changed (admins)", inApp: true, email: false },

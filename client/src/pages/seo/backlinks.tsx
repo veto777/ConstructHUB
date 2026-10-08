@@ -16,7 +16,7 @@ export default function SeoBacklinksPage() {
   const [site, onSite] = useSelectedSite(sites.data);
   const qc = useQueryClient();
   const { toast } = useToast();
-  const data = useQuery<Data>({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`], enabled: !!site });
+  const data = useQuery<Data>({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`], enabled: !!site, refetchOnMount: "always", });
   const refresh = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/backlinks/refresh`),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: "Backlinks updated" }); },

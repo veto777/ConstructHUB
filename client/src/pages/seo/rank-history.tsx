@@ -11,7 +11,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, type SeoSite } from "./shell";
 
 type Device = "desktop" | "mobile";
-type Day = { date: string; checked: number; ranked: number; top3: number; top10: number; top20: number; top100: number; notRanked: number; averagePosition: number | null; visibility: number };
+type Day = { date: string; checked: number; ranked: number; top3: number; top10: number; top20: number; top100: number; notRanked: number; averagePosition: number | null; visibility: number; mapPack?: number };
 type History = { device: Device; devices: Device[]; tag: string | null; tags: string[]; days: Day[] };
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
@@ -34,7 +34,7 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
   if (device) params.set("device", device);
   if (tag) params.set("tag", tag);
   const qs = params.toString();
-  const q = useQuery<History>({ queryKey: [`/api/seo/sites/${site.id}/rank-history${qs ? `?${qs}` : ""}`] });
+  const q = useQuery<History>({ queryKey: [`/api/seo/sites/${site.id}/rank-history${qs ? `?${qs}` : ""}`], refetchOnMount: "always", });
   const h = q.data;
   if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading history…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load the history: {apiErrorMessage(q.error)}</p>;
@@ -107,8 +107,8 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
         <details className="mt-2 text-[13px]" data-testid="rank-history-table">
           <summary className="g-link cursor-pointer">Show these numbers as a table</summary>
           <table className="g-table mt-2">
-            <thead><tr><th>Checked</th><th className="num">Visibility</th><th className="num">Average position</th>{BUCKETS.map((b) => <th key={b.key} className="num">{b.label}</th>)}</tr></thead>
-            <tbody>{[...h.days].reverse().map((d) => <tr key={d.date}><td>{fmtDate(d.date)}</td><td className="num">{d.visibility}%</td><td className="num">{d.averagePosition ?? "—"}</td>{BUCKETS.map((b) => <td key={b.key} className="num">{d[b.key]}</td>)}</tr>)}</tbody>
+            <thead><tr><th>Checked</th><th className="num">Visibility</th><th className="num">Average position</th><th className="num">In map pack</th>{BUCKETS.map((b) => <th key={b.key} className="num">{b.label}</th>)}</tr></thead>
+            <tbody>{[...h.days].reverse().map((d) => <tr key={d.date}><td>{fmtDate(d.date)}</td><td className="num">{d.visibility}%</td><td className="num">{d.averagePosition ?? "—"}</td><td className="num">{d.mapPack ?? 0}</td>{BUCKETS.map((b) => <td key={b.key} className="num">{d[b.key]}</td>)}</tr>)}</tbody>
           </table>
         </details>
       )}
@@ -120,7 +120,7 @@ type Point = { date: string; desktop: number | null; mobile: number | null; url:
 
 /** One keyword's position at every saved check. Lower on the chart is worse: position 1 is at the top. */
 export function KeywordHistory({ id, devices }: { id: number; devices: Device[] }) {
-  const q = useQuery<{ keyword: string; points: Point[] }>({ queryKey: [`/api/seo/keywords/${id}/history`] });
+  const q = useQuery<{ keyword: string; points: Point[] }>({ queryKey: [`/api/seo/keywords/${id}/history`], refetchOnMount: "always", });
   if (q.isLoading) return <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <p className="g-text-2 text-[13px]" role="alert">Couldn't load this keyword's history: {apiErrorMessage(q.error)}</p>;
   const points = q.data?.points ?? [];
