@@ -5,7 +5,7 @@
  * (the server keeps it), so the screen first asks for the saved page ("peek")
  * and only spends when the person presses Run.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRef, useEffect, useMemo, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
@@ -197,13 +197,13 @@ export function scopePathOf(raw: string, domain: string): { path: string } | { e
     v = v.split("#")[0];
     if (!v.startsWith("/")) v = `/${v}`;
   }
-  // A "?" with nothing after it is no query (the server reads it the same way).
-  v = v.replace(/\?$/, "");
+  // A "?" with nothing after it is no query (the server reads it the same way) — only when it is the first "?".
+  if (v.indexOf("?") === v.length - 1) v = v.slice(0, -1);
   return /^\/(?!\/)[^\s\\#]*$/.test(v) && v.length <= 300 ? { path: v } : bad;
 }
 /** The one spelling of a scope (the server's rule, server/seo/reports.ts canonicalScope): no last slash unless there is a query; the section "/" is the whole site. */
 export function canonicalScope(path: string, exact: boolean): { path: string; exact: boolean } | null {
-  const q = path.replace(/\?$/, "");
+  const q = path.indexOf("?") === path.length - 1 ? path.slice(0, -1) : path;
   const p = q.includes("?") ? q : q.replace(/\/+$/, "") || "/";
   return p === "/" && !exact ? null : { path: p, exact };
 }
@@ -228,7 +228,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
   onExplore?: (domain: string) => void;
   /** Keyword tables: track the ticked keywords (the page supplies the site). */
-  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => void | Promise<unknown>;
+  /** Resolves when the keywords are tracked, rejects when they are not: the button waits for it, and only then are the ticks of the rows that were sent removed. */
+  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => Promise<unknown>;
   trackLabel?: string;
 }) {
   const qc = useQueryClient();
@@ -259,6 +260,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const rowsOf = saved.data?.page?.fetchedAt ?? null;
+  const rowsRef = useRef(rowsOf);
+  rowsRef.current = rowsOf;
   // The ticks belong to the rows on screen: another page of rows starts with none, so the number on the button is what is sent.
   // ("rowsOf" changes when the rows themselves are replaced under the same page — a fresh purchase, a refresh.)
   useEffect(() => { setPicked(new Set()); }, [offset, limit, sortKeyOf(table, sort), rowsOf]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -400,9 +403,11 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
               {trackable && extraAction && page.rows.some((r) => picked.has(r.keyword)) && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
               {trackable && onTrack && page.rows.some((r) => picked.has(r.keyword)) && (
                 <Button size="sm" disabled={tracking} aria-busy={tracking} data-testid="button-track-picked" onClick={() => {
-                  const out = onTrack(page.rows.filter((r) => picked.has(r.keyword)));
-                  // The page says when tracking has finished (it returns a promise): the ticks go only on success; on failure they stay for another try.
-                  if (out && typeof (out as Promise<unknown>).then === "function") { setTracking(true); (out as Promise<unknown>).then(() => setPicked(new Set()), () => {}).finally(() => setTracking(false)); }
+                  const sent = page.rows.filter((r) => picked.has(r.keyword)), sentKeys = new Set(sent.map((r) => r.keyword)), rowsThen = rowsOf;
+                  setTracking(true);
+                  // On success only the ticks that were SENT go — one ticked while it was on its way stays — and only if the
+                  // rows on screen are still the ones they were sent from. On failure every tick stays for another try.
+                  onTrack(sent).then(() => { if (rowsThen === rowsRef.current) setPicked((now) => new Set([...now].filter((k) => !sentKeys.has(k)))); }, () => {}).finally(() => setTracking(false));
                 }}>{tracking ? "Tracking…" : `${trackLabel ?? "Track"} (${page.rows.filter((r) => picked.has(r.keyword)).length})`}</Button>
               )}
               <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={download} data-testid="button-export-csv"><Download /> Export CSV</button>

@@ -14,6 +14,7 @@
  * One snapshot a day at most, and it is never rewritten: asking again the same day returns the one there is, so an
  * alert already sent for that day always matches the snapshot it was raised from.
  */
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
@@ -120,6 +121,8 @@ export const KEYWORD_WATCH_DDL = [
   `ALTER TABLE seo_keyword_snapshots ADD COLUMN IF NOT EXISTS alerts_tried_at timestamptz`,
   // One snapshot being taken per site, whoever asked (the customer or the schedule, on any server process).
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS kw_snapshot_claim timestamptz`,
+  // Whose claim it is: only its owner may save under it or give it back.
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS kw_snapshot_claim_token text`,
 ];
 /**
  * Alerts gain two kinds. Run AFTER seo_alerts and the grid's own change to the same rule exist (last in
@@ -145,41 +148,61 @@ export async function latestSnapshots(userId: number, siteId: number, upTo?: str
 }
 
 type WatchSite = { id: number; user_id: number; domain: string; location_code: number; language_code: string };
+/** Longer than a snapshot can take (one request to the source, a minute at most, plus saving), so a live owner is not displaced. */
 const CLAIM_MINUTES = 10;
 /**
- * Take today's snapshot — or return it, if there already is one (`reused`, nothing bought: one snapshot a day, never
- * rewritten). One at a time per site, by a claim in the DATABASE that the customer's request and the schedule share,
- * so the two cannot both buy. Saved inside the charged call (SAVED FIRST, CHARGED SECOND): if it cannot be written
- * the customer pays nothing. The monthly one (`automatic`) spends only the month's included data, is taken only if
- * the watch is still on and still due when its turn comes, and moves the site's next date in the same transaction.
+ * Take the day's snapshot — or return it, if there already is one (`reused`, nothing bought: one snapshot a day, never
+ * rewritten). Days are the database's, which runs in UTC; the day is read ONCE and used for the look-up and the save
+ * alike, so an operation that crosses midnight cannot look at one day and save into another.
+ *
+ * One at a time per site, by a claim in the DATABASE that the customer's request and the schedule share. The claim
+ * carries its owner's token: it is checked again just before the source is asked and again in the transaction that
+ * saves, and only its owner can give it back — an owner whose claim ran out and was taken over buys nothing, saves
+ * nothing and cannot release the new owner's claim.
+ *
+ * Saved inside the charged call (SAVED FIRST, CHARGED SECOND). The monthly one (`lease` given) spends only the
+ * month's included data and is taken only if, when its turn comes, the watch is still on AND the site's next date is
+ * still the one the scheduler leased — a snapshot taken by hand meanwhile moves that date, and the monthly one stands down.
  */
-export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean): Promise<{ id: number; takenOn: string; keywords: number; reused: boolean }> {
-  const { rowCount } = await pool.query(`UPDATE seo_sites SET kw_snapshot_claim = now() WHERE id=$1 AND user_id=$2 AND (kw_snapshot_claim IS NULL OR kw_snapshot_claim < now() - interval '${CLAIM_MINUTES} minutes')`, [site.id, site.user_id]);
-  if (!rowCount) throw new KeywordWatchBusy();
+export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, lease?: string): Promise<{ id: number; takenOn: string; keywords: number; reused: boolean }> {
+  const token = randomUUID();
+  const { rows: [claim] } = await pool.query(
+    `UPDATE seo_sites SET kw_snapshot_claim = now(), kw_snapshot_claim_token = $3 WHERE id=$1 AND user_id=$2 AND (kw_snapshot_claim IS NULL OR kw_snapshot_claim < now() - interval '${CLAIM_MINUTES} minutes')
+     RETURNING current_date::text AS today`, [site.id, site.user_id, token]);
+  if (!claim) throw new KeywordWatchBusy();
+  const day = String(claim.today).slice(0, 10);
+  const mine = async (db: { query: typeof pool.query } = pool) => ((await db.query("SELECT 1 FROM seo_sites WHERE id=$1 AND kw_snapshot_claim_token=$2", [site.id, token])).rowCount ?? 0) > 0;
+  const standDown = { id: 0, takenOn: "", keywords: 0, reused: true };
   try {
-    const { rows: [today] } = await pool.query("SELECT id, taken_on::text AS taken_on, jsonb_array_length(keywords) AS n FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 AND taken_on = current_date", [site.id, site.user_id]);
+    const { rows: [today] } = await pool.query("SELECT id, taken_on::text AS taken_on, jsonb_array_length(keywords) AS n FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 AND taken_on = $3::date", [site.id, site.user_id, day]);
     if (today) {
-      // Already taken today: the watch's month runs from it, and nothing is bought.
-      await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = current_date + interval '1 month' WHERE id=$1 AND kw_watch AND (next_kw_snapshot_at IS NULL OR next_kw_snapshot_at < current_date + interval '1 month')", [site.id]);
+      // Already taken this day: the watch's month runs from it, and nothing is bought.
+      await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = $2::date + interval '1 month' WHERE id=$1 AND kw_watch AND (next_kw_snapshot_at IS NULL OR next_kw_snapshot_at < $2::date + interval '1 month')", [site.id, day]);
       return { id: today.id, takenOn: String(today.taken_on).slice(0, 10), keywords: today.n, reused: true };
     }
     if (automatic) {
-      // Looked at again now that it is this site's turn: switched off meanwhile, or no longer due, means nothing is bought.
-      const { rows: [s] } = await pool.query("SELECT kw_watch, location_code, language_code FROM seo_sites WHERE id=$1", [site.id]);
-      if (!s?.kw_watch) return { id: 0, takenOn: "", keywords: 0, reused: true };
+      // Looked at again now that it is this site's turn: switched off meanwhile, or its date moved (someone took a
+      // snapshot by hand, or another pass leased it again), means this occurrence is no longer the one to run.
+      const { rows: [s] } = await pool.query("SELECT kw_watch, next_kw_snapshot_at::text AS next, location_code, language_code FROM seo_sites WHERE id=$1", [site.id]);
+      if (!s?.kw_watch || (lease !== undefined && s.next !== lease)) return standDown;
       site = { ...site, location_code: s.location_code, language_code: s.language_code };
     }
     const out = await withBudget(site.user_id, KW_SNAPSHOT_ESTIMATE_USD, async () => {
+      // Still the owner? (Reserving the budget can wait on the database.) If not, nothing is asked of the source.
+      if (!(await mine())) throw Object.assign(new KeywordWatchBusy(), { costUsd: 0, costUnknown: false });
       const o = await fetchKeywordSnapshot({ domain: site.domain, locationCode: site.location_code ?? 2840, languageCode: site.language_code ?? "en" });
       const fail = (why: string) => Object.assign(new Error(`keyword snapshot for ${site.domain} could not be saved: ${why}`), { costUsd: o.costUsd, costUnknown: false, notSaved: true });
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
+        // The site's row is locked for the save: either this is still the owner, or nothing is written.
+        const { rowCount: owner } = await client.query("SELECT 1 FROM seo_sites WHERE id=$1 AND kw_snapshot_claim_token=$2 FOR UPDATE", [site.id, token]);
+        if (!owner) { await client.query("ROLLBACK"); throw fail("the claim on the site was taken over while the source answered"); }
         const { rows: [row] } = await client.query(
-          `INSERT INTO seo_keyword_snapshots(site_id, user_id, location_code, language_code, keywords, total, fetched, cost_usd) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+          `INSERT INTO seo_keyword_snapshots(site_id, user_id, taken_on, location_code, language_code, keywords, total, fetched, cost_usd) VALUES($1,$2,$3::date,$4,$5,$6,$7,$8,$9)
            ON CONFLICT (site_id, taken_on) DO NOTHING RETURNING id, taken_on::text AS taken_on`,
-          [site.id, site.user_id, site.location_code ?? 2840, site.language_code ?? "en", JSON.stringify(o.data.keywords), o.data.total, o.data.fetched, o.costUsd]);
-        if (!row) { await client.query("ROLLBACK"); throw fail("today's snapshot already exists"); }
+          [site.id, site.user_id, day, site.location_code ?? 2840, site.language_code ?? "en", JSON.stringify(o.data.keywords), o.data.total, o.data.fetched, o.costUsd]);
+        if (!row) { await client.query("ROLLBACK"); throw fail("the day's snapshot already exists"); }
         // Whoever took it, the watch's month starts again from this snapshot.
         await client.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 month' WHERE id=$1 AND kw_watch", [site.id]);
         await client.query("COMMIT");
@@ -192,7 +215,8 @@ export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean): 
     await settleKeywordAlerts(site.id).catch((e) => console.error(`[seo] keyword alerts for site ${site.id} failed (they will be tried again): ${e?.message ?? e}`));
     return out.data;
   } finally {
-    await pool.query("UPDATE seo_sites SET kw_snapshot_claim = NULL WHERE id=$1", [site.id]).catch(() => {});
+    // Only the owner gives the claim back: a claim that ran out and was taken over belongs to someone else now.
+    await pool.query("UPDATE seo_sites SET kw_snapshot_claim = NULL, kw_snapshot_claim_token = NULL WHERE id=$1 AND kw_snapshot_claim_token=$2", [site.id, token]).catch(() => {});
   }
 }
 
@@ -214,7 +238,9 @@ export async function settleKeywordAlerts(siteId: number): Promise<number> {
       const [now, before] = await latestSnapshots(snap.user_id, siteId, snap.taken_on);
       if (snap.alerts_enabled !== false && now && before && now.id === snap.id) {
         const c = compareKeywordSnapshots(now, before), a = keywordAlerts(c);
-        const item = (list: KeywordChange[]) => [{ since: c.since, keywords: list.slice(0, 50), more: Math.max(0, list.length - 50) }];
+        // What the alert keeps: the first fifty, how many more there were, and exactly which two snapshots and which
+        // country it compared — so an old alert still says what it was about after newer snapshots or a change of country.
+        const item = (list: KeywordChange[]) => [{ since: c.since, takenOn: c.takenOn, snapshotId: now.id, beforeId: before.id, locationCode: c.locationCode, languageCode: c.languageCode, keywords: list.slice(0, 50), more: Math.max(0, list.length - 50) }];
         if (a.added.length) { const id = await saveAlert(snap.user_id, siteId, "kw_new", now.takenOn, `${searches(a.added.length)} newly seen in the top ${KW_ALERT_NEW_WITHIN} for ${snap.domain}`, item(a.added)); if (id) { await deliverAlert(id); raised++; } }
         if (a.gone.length) { const id = await saveAlert(snap.user_id, siteId, "kw_lost", now.takenOn, `${searches(a.gone.length)} no longer seen for ${snap.domain} (it was in the top ${KW_ALERT_LOST_WITHIN})`, item(a.gone)); if (id) { await deliverAlert(id); raised++; } }
       }
@@ -240,12 +266,12 @@ export async function runDueKeywordSnapshots(): Promise<number> {
     "SELECT site_id FROM seo_keyword_snapshots WHERE alerts_done = false GROUP BY site_id ORDER BY min(alerts_tried_at) NULLS FIRST, site_id LIMIT 20").catch(() => ({ rows: [] as any[] }));
   for (const o of owed) await settleKeywordAlerts(o.site_id).catch((e) => console.error(`[seo] keyword alerts for site ${o.site_id} failed: ${e?.message ?? e}`));
   const { rows: due } = await pool.query(
-    `UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '6 hours' WHERE kw_watch AND next_kw_snapshot_at <= now() RETURNING id, user_id, domain, location_code, language_code`);
+    `UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '6 hours' WHERE kw_watch AND next_kw_snapshot_at <= now() RETURNING id, user_id, domain, location_code, language_code, next_kw_snapshot_at::text AS lease`);
   let done = 0;
   for (const site of due) {
     try {
       if (!(await keywordWatchDeps.entitled(site.user_id))) { await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch", [site.id]); continue; }
-      const out = await takeKeywordSnapshot(site, true);
+      const out = await takeKeywordSnapshot(site, true, site.lease);
       if (!out.reused) done++;
     } catch (e: any) {
       if (e instanceof KeywordWatchBusy) continue;   // the customer is taking one right now; the lease brings this site back later
@@ -262,16 +288,19 @@ export async function runDueKeywordSnapshots(): Promise<number> {
 export type KeywordWatchView = {
   watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean;
   latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null;
+  /** When the day changes for snapshots (the next midnight UTC): after it a new one can be taken. */
+  nextDayAt: string;
   /** false = the newest snapshot was taken for another country or language than the site is tracked in now. */
   sameMarket: boolean;
   comparison: KeywordComparison | null;
 };
 export async function keywordWatchView(userId: number, site: { id: number; kw_watch?: boolean; next_kw_snapshot_at?: unknown; location_code?: number; language_code?: string; alerts_enabled?: boolean }): Promise<KeywordWatchView> {
   const [now, before] = await latestSnapshots(userId, site.id);
-  const { rows: [d] } = await pool.query("SELECT current_date::text AS today");
+  const { rows: [d] } = await pool.query("SELECT current_date::text AS today, ((current_date + 1)::timestamp AT TIME ZONE current_setting('TimeZone'))::timestamptz AS next");
   return {
     watch: !!site.kw_watch, nextAt: site.kw_watch && site.next_kw_snapshot_at ? new Date(site.next_kw_snapshot_at as string).toISOString() : null, rows: KW_SNAPSHOT_ROWS, alertsOn: site.alerts_enabled !== false,
     latest: now ? { takenOn: now.takenOn, keywords: now.keywords.length, total: now.total, whole: coverage(now), locationCode: now.locationCode, languageCode: now.languageCode, today: now.takenOn === String(d.today).slice(0, 10) } : null,
+    nextDayAt: new Date(d.next).toISOString(),
     sameMarket: !now || (now.locationCode === (site.location_code ?? 2840) && now.languageCode === (site.language_code ?? "en")),
     comparison: now && before ? compareKeywordSnapshots(now, before) : null,
   };

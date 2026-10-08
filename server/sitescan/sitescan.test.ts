@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterAll, beforeAll } from "vitest";
 import { makeSafeFetch, publicIP, siteUrl, type PageResponse } from "./http";
 import { robotsRules } from "./robots";
-import { crawl, emptyState, parsePage, findingsFor, scoresFor } from "./audit";
+import { enrichFindings, fixesFor } from "./guidance";
+import { crawl, emptyState, parsePage, findingsFor, scoresFor, MISSING_PAGE_PROBE } from "./audit";
 import {
   pageSpeed,
   businessSchema,
@@ -297,6 +298,49 @@ it("blocks encoded loopback, IPv6 transition forms, and private redirect targets
     await expect(makeSafeFetch(async () => [{ address: "8.8.8.8", family: 4 }], send)("https://public.test/")).rejects.toThrow();
     expect(send).toHaveBeenCalledTimes(1);
   }
+});
+it("asks once for a page that cannot exist, and reports a site that answers it with OK", async () => {
+  const html = "<html><head><title>Fixture</title></head><body><h1>Fixture</h1></body></html>";
+  const site = (missing: (url: string) => PageResponse | Promise<PageResponse>, robots = "") => {
+    const asked: string[] = [];
+    const http = async (url: string) => {
+      asked.push(url);
+      if (url.endsWith("robots.txt")) return response(url, robots);
+      if (url.endsWith("sitemap.xml") || url.endsWith("llms.txt")) return response(url, "", 404);
+      if (url.endsWith(MISSING_PAGE_PROBE)) return missing(url);
+      return response(url, html);
+    };
+    return { asked, run: () => crawl("https://fixture.test/", 2, undefined, undefined, http, async () => {}) };
+  };
+  const probe = "https://fixture.test/" + MISSING_PAGE_PROBE;
+  // The honest answer: not found. Nothing is reported, and the address is asked for exactly once.
+  const good = site((url) => response(url, "Not found", 404));
+  const ok = await good.run();
+  expect(ok.missingPage).toEqual({ url: probe, status: 404, finalUrl: probe });
+  expect(good.asked.filter((u) => u === probe)).toHaveLength(1);
+  expect(findingsFor(ok).map((f) => f.id)).not.toContain("soft-404");
+  expect(ok.pages.map((p) => p.url)).not.toContain(probe);   // the made-up address is never treated as a page of the site
+  // "200 OK" for a page that does not exist: reported once, with the address that was asked for.
+  const soft = findingsFor(await site((url) => response(url, html)).run()).find((f) => f.id === "soft-404");
+  expect(soft).toMatchObject({ category: "technical", severity: "warning", urls: [probe] });
+  expect(soft!.why).toContain("answered 200 OK.");
+  // The finding goes through the rest of the report like any other: it has its guide and its evidence.
+  const softState = await site((url) => response(url, html)).run();
+  const enriched = enrichFindings(findingsFor(softState), softState, null).find((f) => f.id === "soft-404");
+  expect(enriched!.guidance.steps.length).toBeGreaterThan(1);
+  expect(fixesFor(findingsFor(softState), softState, null).find((f) => f.findingId === "soft-404" || (f as any).id === "soft-404" || JSON.stringify(f).includes(MISSING_PAGE_PROBE))).toBeTruthy();
+  // Sent on to the home page, which answers OK: the same thing, and the report says where it was sent.
+  const moved = findingsFor(await site(() => response("https://fixture.test/", html)).run()).find((f) => f.id === "soft-404");
+  expect(moved!.why).toContain("after sending the request on to https://fixture.test/");
+  // A server error, no answer at all, or robots.txt forbidding the address: nothing is claimed.
+  expect(findingsFor(await site((url) => response(url, "", 500)).run()).map((f) => f.id)).not.toContain("soft-404");
+  const dead = await site(() => { throw new Error("connection reset"); }).run();
+  expect([dead.missingPage, findingsFor(dead).map((f) => f.id).includes("soft-404")]).toEqual([null, false]);
+  const barred = site((url) => response(url, html), "User-agent: *\nDisallow: /page-that");
+  const b = await barred.run();
+  expect([b.missingPage, barred.asked.includes(probe), findingsFor(b).map((f) => f.id).includes("soft-404")]).toEqual([null, false, false]);
+  // A crawl saved before this check existed says nothing either.
+  expect(findingsFor({ ...ok, missingPage: undefined }).map((f) => f.id)).not.toContain("soft-404");
 });
 it("discovers nested sitemaps, applies bot exclusions and reports each audit category", async () => {
   const state = await crawl("https://fixture.test/", 3, undefined, undefined, async url => response(url,

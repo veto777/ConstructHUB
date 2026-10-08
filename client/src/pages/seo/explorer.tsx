@@ -326,7 +326,7 @@ export default function SeoExplorerPage() {
               ) : (<>
                 {REPORT_NOTE[view] && <p className="g-text-2 mb-3 text-[13px]" data-testid="text-report-note">{REPORT_NOTE[view]}</p>}
                 <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />}
-                  onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
+                  onTrack={trackedSite ? (rows) => trackKeywords.mutateAsync({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               </>)}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}
             </>

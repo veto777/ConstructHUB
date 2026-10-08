@@ -61,7 +61,7 @@ function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCoun
     return many([]);
   }
   // Keyword watch: the claim on the site is free, so a snapshot goes on to ask the provider.
-  if (/^UPDATE seo_sites SET kw_snapshot_claim = now\(\)/.test(sql)) return { rows: [], rowCount: 1 };
+  if (/^UPDATE seo_sites SET kw_snapshot_claim = now\(\)/.test(sql)) return many([{ today: "2026-10-08" }]);
   // Rendering checks: started, failed in the background with the error's own text, read back by the page.
   if (/seo_render_runs/.test(sql)) {
     if (/^INSERT INTO seo_render_runs/.test(sql)) { const id = db.renders.length + 1; db.renders.push({ id, status: "running", urls: JSON.parse(params[2]), result: null, error: null, created_at: "2026-10-01T00:00:00Z" }); return many([{ id }]); }

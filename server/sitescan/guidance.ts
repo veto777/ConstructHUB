@@ -132,6 +132,14 @@ export const guides: Record<string, Guide> = {
     "Use browser DevTools Console to locate blocked resources.",
     "Replace HTTP resource references with working HTTPS URLs and reload.",
   ),
+  "soft-404": guide(
+    "Medium",
+    "A missing address that answers 200 leaves search engines to guess which pages are real; Google reports such pages as soft 404s.",
+    "crawling-indexing/http-network-errors",
+    "Open an address on the site that has no page and look at the status it returns (browser DevTools, Network tab).",
+    "Set the server or host to answer 404 or 410 for addresses that have no page, while still showing visitors a helpful not-found page.",
+    "Do not redirect missing addresses to the home page; redirect only when a page has moved to a real replacement.",
+  ),
   canonical: guide(
     "Low",
     "A different canonical may be intentional; Google can select one without this tag.",
@@ -393,6 +401,7 @@ export function platformSteps(platform: Platform, id: string) {
               "nofollow",
               "sitemap",
               "robots",
+              "soft-404",
             ].includes(key) || key.startsWith("bot-")
           ? 3
           : 1
@@ -585,6 +594,12 @@ export function fixesFor(
               .filter((i) => i.alt === undefined)
               .map((i) => i.url),
           };
+        if (f.id === "soft-404")
+          evidence = {
+            asked: state.missingPage?.url,
+            answered: state.missingPage?.status,
+            endedAt: state.missingPage?.finalUrl,
+          };
         if (f.id === "redirects")
           evidence = { chain: p?.redirects, final: url };
         if (f.id === "mixed")
@@ -655,6 +670,10 @@ export function reconcileFixes(
       let checked = !!page;
       if (f.findingId === "fetch" || f.findingId === "status")
         checked = state.pages.some((p) => p.url === f.page && p.status === 200);
+      // Fixed only when the address that has no page was asked for again and answered "not found" (404) or "gone" (410).
+      if (f.findingId === "soft-404")
+        checked =
+          !!state.missingPage && [404, 410].includes(state.missingPage.status);
       if (f.findingId === "broken-links")
         checked =
           !!page &&

@@ -134,6 +134,20 @@ describe("what counts as broken, and what counts as fixed", () => {
     const s = auditSummary({ findings: [] }, [page("https://x/a"), page("https://x/gone")], before);
     expect([s.fixed.map((f) => f.key), s.notRechecked.map((f) => f.key).sort()]).toEqual([[], ["broken-links", "oversized-images"]]);
   });
+  it("'missing pages answer OK' is fixed only when this crawl asked for the missing page again and was answered", () => {
+    const soft = { id: "soft-404", category: "technical", severity: "warning", title: 'Missing pages answer "OK" instead of "not found"', urls: ["https://x/page-that-should-not-exist-constructhub-site-scan"], why: "", fix: "" };
+    const before = { report: { findings: [soft] }, pages: [page("https://x/")] };
+    const now = (coverage?: unknown) => auditSummary({ findings: [], ...(coverage === undefined ? {} : { coverage }) } as any, [page("https://x/")], before);
+    // Asked again and answered "not found": fixed.
+    expect(now({ missingPageProbe: { status: 404, redirected: false } }).fixed.map((f) => f.key)).toEqual(["soft-404"]);
+    // Not asked this time (robots.txt), no answer, a server error, or a crawl that says nothing about it: not re-checked — never "fixed".
+    expect(now({ missingPageProbe: { status: 410, redirected: false } }).fixed.map((f) => f.key)).toEqual(["soft-404"]);
+    for (const c of [{ missingPageProbe: null }, { missingPageProbe: { status: 503, redirected: false } }, {}, undefined])
+      expect([now(c).fixed.map((f) => f.key), now(c).notRechecked.map((f) => f.key)], JSON.stringify(c)).toEqual([[], ["soft-404"]]);
+    // Still there: listed as an issue with the one address that was asked for.
+    const still = auditSummary({ findings: [soft], coverage: { missingPageProbe: { status: 200, redirected: false } } } as any, [page("https://x/")], before);
+    expect(still.issues.find((i) => i.key === "soft-404")).toMatchObject({ count: 1, previous: 1, change: 0, severity: "warning" });
+  });
   it("Google-profile checks are 'not re-checked' when this crawl had no profile", () => {
     const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };
     const before = { report: { profile: { id: 7 }, findings: [local] }, pages: [page("https://x/")] };

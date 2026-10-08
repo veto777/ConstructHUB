@@ -47,8 +47,15 @@ export type Page = {
   };
   redirects: string[];
 };
+/**
+ * An address no site has a page at. Asked for once per crawl: a site that answers it with "200 OK" (or sends it to
+ * another page that does) is not telling crawlers which of its addresses are missing — see the "soft-404" finding.
+ */
+export const MISSING_PAGE_PROBE = "page-that-should-not-exist-constructhub-site-scan";
 export type CrawlState = {
   origin?: string;
+  /** What the site answered for MISSING_PAGE_PROBE: undefined on crawls from before the check; null when it was not asked (robots.txt) or did not answer. */
+  missingPage?: { url: string; status: number; finalUrl: string } | null;
   queue: string[];
   pages: Page[];
   errors: { url: string; message: string }[];
@@ -246,6 +253,22 @@ export async function crawl(
         !/<html/i.test(llms.body) &&
         llms.body.trim().length > 0;
     }
+    // One request for a page that cannot exist (robots.txt permitting): how does the site answer for a missing page?
+    state.missingPage = null;
+    const probe = origin + "/" + MISSING_PAGE_PROBE;
+    if (robots.allowed(probe)) {
+      await wait(Math.max(300, robots.delay * 1000));
+      const missing = await http(
+        probe,
+        (u) => new URL(u).origin === origin && robots.allowed(u),
+      ).catch(() => null);
+      if (missing)
+        state.missingPage = {
+          url: probe,
+          status: missing.status,
+          finalUrl: missing.url,
+        };
+    }
     state.queue = [...new Set([...state.queue, ...state.sitemap])].slice(
       0,
       cap * 5,
@@ -344,6 +367,11 @@ const businessTypes = new Set([
   "Plumber",
   "RoofingContractor",
 ]);
+/** The same address, give or take a last slash. */
+function samePage(a: string, b: string): boolean {
+  const norm = (u: string) => u.replace(/\/+$/, "");
+  return norm(a) === norm(b);
+}
 function isBusinessSchema(value: any): boolean {
   const types = Array.isArray(value?.["@type"])
     ? value["@type"]
@@ -387,6 +415,23 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "Search engines and visitors cannot use these pages.",
     "Restore the page or redirect to a relevant replacement.",
   );
+  // A page that cannot exist was answered as if it did. Said only on a 2xx answer to the probe (after any redirect);
+  // a 404/410, an error, or a probe that was not made says nothing.
+  const missing = state.missingPage;
+  if (missing && missing.status >= 200 && missing.status < 300) {
+    const moved = samePage(missing.finalUrl, missing.url)
+      ? ""
+      : ` after sending the request on to ${missing.finalUrl}`;
+    add(
+      "soft-404",
+      "technical",
+      "warning",
+      'Missing pages answer "OK" instead of "not found"',
+      [missing.url],
+      `We asked for an address that has no page (${missing.url}) and the site answered ${missing.status} OK${moved}. A site that does this gives search engines no way to tell a removed or mistyped address from a real page: they have to guess (Google calls these soft 404s), they keep crawling addresses that lead nowhere, and broken links on the site cannot be found by this scan or by any other crawler — so the broken-link check in this report cannot be relied on for links within the site.`,
+      "Make the server answer 404 (or 410) for addresses that have no page, and keep showing visitors a helpful not-found page with that status. On a site built as a single-page app this is a hosting or server setting, not something the page's own code can do: the server must know which addresses exist. Do not redirect missing addresses to the home page.",
+    );
+  }
   add(
     "fetch",
     "technical",

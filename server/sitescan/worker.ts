@@ -232,10 +232,20 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       coverage: {
         pageCap: job.page_cap,
         checkedLinks: state.linkChecks.length,
+        // Whether the site was asked for a page that cannot exist, and what it answered (see the "soft-404" finding).
+        missingPageProbe: state.missingPage
+          ? {
+              status: state.missingPage.status,
+              redirected:
+                state.missingPage.finalUrl.replace(/\/+$/, "") !==
+                state.missingPage.url.replace(/\/+$/, ""),
+            }
+          : null,
         checkedImages: state.imageChecks.length,
         notes: [
           "Scores are heuristic audit indicators, not search rankings.",
           "HTML-only crawl; JavaScript is not executed.",
+          "One request is made for an address that has no page, to see whether the site answers \"not found\".",
           "Links (40) and images (30, 2 MB maximum) are sampled; full page weight comes from PageSpeed. Unknown CDN image sizes are not measured.",
           "NAP and service gaps compare scanned text/headings with the last synced GBP snapshot.",
           "AI drafts must be reviewed before use.",

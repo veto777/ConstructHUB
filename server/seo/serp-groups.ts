@@ -1,28 +1,36 @@
 /**
- * Rank tracker → searches Google answers with the same pages. Two tracked keywords whose first-page results are
- * largely the same addresses are, to Google, the same question — one page can usually serve both, and two pages
- * aimed at them are aiming at one thing. Worked out from the result pages the last rank check already saved
- * (seo_rank_checks.serp_top, the first page of ordinary results — up to ten, in practice seven to nine) — free.
+ * Rank tracker → searches with largely the same results. Tracked keywords whose first-page results overlap heavily
+ * with one another's are candidates for being one topic — worth a look at whether one page, or two, should serve
+ * them. Worked out from the result pages the rank checks already saved (seo_rank_checks.serp_top, the first page of
+ * ordinary results — up to ten, in practice seven to nine) — free.
  *
- * What it rests on is said with every group: one check, on one date, on one device, in one place; "the same" means
- * at least SERP_SHARED of those addresses in common with the group's first keyword. Keywords tracked in different
- * places are never compared (their results differ because the place does). It is a snapshot, not a rule.
+ * It is an overlap count, not Google's own grouping, and the page says so: "the same" means at least SERP_SHARED
+ * addresses in common with the group's FIRST keyword (the others are not compared with each other); each keyword
+ * brings its own newest check, so the results compared can be from different days — every member carries its date;
+ * keywords tracked in different places are never compared (their results differ because the place does).
  */
 import { pool } from "../db";
-import { strictPageKey } from "./competing-pages";
+import { aliasKey, strictPageKey } from "./competing-pages";
 
-/** Addresses two first pages must share for the searches to count as one. Four is the usual line in keyword grouping; on real pages (7–9 results) it is about half. */
+/** Addresses two first pages must share for the searches to be put together. Four is the usual line in keyword grouping; on real pages (7–9 results) it is about half. */
 export const SERP_SHARED = 4;
 /** A result page with fewer addresses than this is too thin to compare. */
 export const SERP_MIN_RESULTS = 6;
-export type SerpCheck = { keywordId: number; keyword: string; volume: number | null; locationCode: number | null; location: string | null; position: number | null; /** The site's own page in these results. */ url: string | null; serpTop: unknown };
-export type SerpGroupMember = { keywordId: number; keyword: string; volume: number | null; position: number | null; /** The site's own ranking page (exact address), or null. */ page: string | null; /** Addresses shared with the group's first keyword; the first keyword itself has all of its own. */ shared: number; of: number };
+export type SerpCheck = { keywordId: number; keyword: string; volume: number | null; locationCode: number | null; location: string | null; position: number | null; /** The site's own page in these results. */ url: string | null; serpTop: unknown; checkedOn?: string | null };
+export type SerpGroupMember = {
+  keywordId: number; keyword: string; volume: number | null; position: number | null;
+  /** The site's own ranking address (exact), or null — which, when `position` is a number, means "ranks, but the page was not recorded". */ page: string | null;
+  /** Addresses shared with the group's first keyword; the first keyword itself has all of its own. */ shared: number; of: number;
+  /** The day this keyword's results were saved. */ checkedOn: string | null;
+};
 export type SerpGroup = {
   location: string | null; locationCode: number | null;
-  /** The first keyword (highest volume) and the others whose results match it, most shared first. */ members: SerpGroupMember[];
+  /** The first keyword (highest volume) and the others whose results overlap with it, most shared first. */ members: SerpGroupMember[];
   /** Searches a month across the members that have a figure, and how many have one. */ volume: number | null; measured: number;
-  /** The site's own pages that rank within the group (exact addresses). More than one = different pages of the site answer what Google treats as one question. */ ownPages: string[];
-  /** Members the site does not rank for at all. */ unranked: number;
+  /** The site's own recorded addresses that rank within the group (exact). */ ownPages: string[];
+  /** How many clearly different pages those addresses are (addresses differing only by http/https, "www" or a last slash count once — they MAY be one page; that is not checked). */ ownDistinct: number;
+  /** Members the site is not found for at all, and members it ranks for without the page having been recorded. */ unranked: number; rankedNoPage: number;
+  /** The earliest and latest day among the members' checks. */ from: string | null; to: string | null;
 };
 export type SerpGroups = { groups: SerpGroup[]; /** Keywords with a usable saved result page. */ compared: number; /** Keywords checked but without one (too few results saved, or none). */ skipped: number; shared: number };
 
@@ -37,7 +45,7 @@ const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
  * Pure and deterministic. Within one place: keywords are taken highest volume first (then by name); each joins the
  * first existing group whose FIRST keyword it shares at least SERP_SHARED addresses with, or starts a group. Being
  * compared with the first keyword only means a group cannot drift from one topic to another through a chain of
- * near-matches. Groups of one are not returned.
+ * near-matches — and also that two members need not overlap with each other. Groups of one are not returned.
  */
 export function groupBySerp(checks: readonly SerpCheck[], shared = SERP_SHARED): SerpGroups {
   const usable = checks.map((c) => ({ c, urls: top(c.serpTop) })).filter((x) => x.urls.length >= SERP_MIN_RESULTS);
@@ -48,7 +56,7 @@ export function groupBySerp(checks: readonly SerpCheck[], shared = SERP_SHARED):
     list.sort((a, b) => (b.c.volume ?? -1) - (a.c.volume ?? -1) || cmp(a.c.keyword, b.c.keyword) || a.c.keywordId - b.c.keywordId);
     const open: { head: (typeof list)[number]; set: Set<string>; members: SerpGroupMember[] }[] = [];
     for (const x of list) {
-      const member = (n: number): SerpGroupMember => ({ keywordId: x.c.keywordId, keyword: x.c.keyword, volume: x.c.volume, position: x.c.position, page: x.c.position !== null && x.c.url ? strictPageKey(x.c.url) : null, shared: n, of: x.urls.length });
+      const member = (n: number): SerpGroupMember => ({ keywordId: x.c.keywordId, keyword: x.c.keyword, volume: x.c.volume, position: x.c.position, page: x.c.position !== null && x.c.url ? strictPageKey(x.c.url) : null, shared: n, of: x.urls.length, checkedOn: x.c.checkedOn ? String(x.c.checkedOn).slice(0, 10) : null });
       let placed = false;
       for (const g of open) {
         const n = x.urls.filter((u) => g.set.has(u)).length;
@@ -61,15 +69,19 @@ export function groupBySerp(checks: readonly SerpCheck[], shared = SERP_SHARED):
       const [head, ...rest] = g.members;
       rest.sort((a, b) => b.shared - a.shared || (b.volume ?? -1) - (a.volume ?? -1) || cmp(a.keyword, b.keyword));
       const members = [head, ...rest], vols = members.map((m) => m.volume).filter((v): v is number => typeof v === "number");
+      const ownPages = [...new Set(members.map((m) => m.page).filter((p): p is string => !!p))].sort(cmp);
+      const days = members.map((m) => m.checkedOn).filter((d): d is string => !!d).sort();
       groups.push({
         location: g.head.c.location, locationCode: g.head.c.locationCode, members,
         volume: vols.length ? vols.reduce((a, b) => a + b, 0) : null, measured: vols.length,
-        ownPages: [...new Set(members.map((m) => m.page).filter((p): p is string => !!p))].sort(cmp), unranked: members.filter((m) => m.position === null).length,
+        ownPages, ownDistinct: new Set(ownPages.map((p) => aliasKey(p) ?? p)).size,
+        unranked: members.filter((m) => m.position === null).length, rankedNoPage: members.filter((m) => m.position !== null && !m.page).length,
+        from: days[0] ?? null, to: days[days.length - 1] ?? null,
       });
     }
   }
-  // Groups where the site answers one question with several pages first, then the largest.
-  groups.sort((a, b) => Number(b.ownPages.length > 1) - Number(a.ownPages.length > 1) || (b.volume ?? -1) - (a.volume ?? -1) || b.members.length - a.members.length || cmp(a.members[0].keyword, b.members[0].keyword));
+  // Groups in which clearly different pages of the site rank first, then the largest.
+  groups.sort((a, b) => Number(b.ownDistinct > 1) - Number(a.ownDistinct > 1) || (b.volume ?? -1) - (a.volume ?? -1) || b.members.length - a.members.length || cmp(a.members[0].keyword, b.members[0].keyword));
   return { groups, compared: usable.length, skipped: checks.length - usable.length, shared };
 }
 
