@@ -10,9 +10,9 @@ import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
 
-type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean; whyNot: string | null; depth: number | null; inlinks: number; outlinks: number;
+type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean; whyNot: string | null; depth: number | null; inlinks: number | null; outlinks: number;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
-type Summary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; orphans: number; deep: number; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
+type Summary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; linksMeasured?: boolean; orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
 type Data = { jobId: string; scannedAt: string | null; summary: Summary; pages: Row[] };
 
 const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolean; count: (s: Summary) => number; hint: string }[] = [
@@ -20,8 +20,8 @@ const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolea
   { key: "notIndexable", label: "Can't be indexed", test: (r) => !r.indexable, count: (s) => s.notIndexable, hint: "Google will not show these pages in results. Fine for a thank-you page; a problem for a service page." },
   { key: "errors", label: "Errors", test: (r) => r.status >= 400, count: (s) => s.errors, hint: "These addresses return an error. Restore the page or redirect it to the closest one that works." },
   { key: "redirected", label: "Redirected", test: (r) => r.redirected, count: (s) => s.redirected, hint: "Links on your site point to an address that forwards somewhere else. Link straight to the final address." },
-  { key: "orphans", label: "No links to it", test: (r, i) => i > 0 && r.inlinks === 0, count: (s) => s.orphans, hint: "No crawled page of your site links to these. Visitors and Google can only find them from a sitemap or another site — add a link from a related page." },
-  { key: "deep", label: "4+ clicks deep", test: (r) => (r.depth ?? 0) >= 4, count: (s) => s.deep, hint: "Pages far from the home page are crawled less often and rank worse. Link to the important ones from the menu or a service page." },
+  { key: "orphans", label: "No links to it", test: (r, i) => i > 0 && r.inlinks === 0, count: (s) => s.orphans ?? 0, hint: "No crawled page of your site links to these. Visitors and Google can only find them from a sitemap or another site — add a link from a related page." },
+  { key: "deep", label: "4+ clicks deep", test: (r) => (r.depth ?? 0) >= 4, count: (s) => s.deep ?? 0, hint: "Pages far from the home page are crawled less often and rank worse. Link to the important ones from the menu or a service page." },
   { key: "thin", label: "Little text", test: (r) => r.status < 400 && r.words < 200, count: (s) => s.thin, hint: "Under 200 words. A page that should rank for a service needs enough to answer what the customer is asking." },
   { key: "noTitle", label: "No title", test: (r) => r.status < 400 && r.titleLength === 0, count: (s) => s.noTitle, hint: "The title is the blue line in Google's results. Every page needs its own." },
   { key: "noDescription", label: "No description", test: (r) => r.status < 400 && r.descriptionLength === 0, count: (s) => s.noDescription, hint: "The description is the text under the title in Google's results. Without one Google picks a sentence itself." },
@@ -39,7 +39,7 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
   const q = useQuery<Data>({ queryKey: [`/api/seo/sites/${site.id}/audit/pages`], refetchOnMount: "always" });
   const [filter, setFilter] = useState("all");
   const [text, setText] = useState("");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "depth", dir: 1 });
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "path", dir: 1 });
   const [open, setOpen] = useState<string | null>(null);
   const [shown, setShown] = useState(100);
   const d = q.data;
@@ -61,17 +61,25 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
   if (q.isLoading) return <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the crawled pages…</p>;
   if (q.isError) return <div className="g-callout" role="alert" data-testid="audit-pages-error"><h3>Couldn't load the pages</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
   if (!d || d.pages.length === 0) return <Empty testId="audit-pages-empty"><h3>No pages to show</h3><p>The crawl did not save any pages for {site.domain}. Run a new crawl.</p></Empty>;
-  const s = d.summary;
+  const s = d.summary, measured = s.linksMeasured !== false;
   return (
     <div data-testid="audit-pages">
       <div className="g-tiles mb-4">
         <Tile label="Can be indexed" value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} hint={s.notIndexable ? `${fmtNum(s.notIndexable)} can't — check they are meant not to` : "Every crawled page can appear in Google"} testId="tile-pages-indexable" />
-        <Tile label="Average clicks from home" value={s.averageDepth ?? "—"} hint={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
-        <Tile label="Pages nothing links to" value={fmtNum(s.orphans)} hint="Among the pages crawled" testId="tile-pages-orphans" />
+        {measured ? <>
+          <Tile label="Average clicks from home" value={s.averageDepth ?? "—"} hint={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
+          <Tile label="Pages nothing links to" value={fmtNum(s.orphans)} hint="Among the pages crawled" testId="tile-pages-orphans" />
+        </> : <Tile label="Links between pages" value="Not measurable" hint="This site's links are added by JavaScript" testId="tile-pages-links-unmeasured" />}
         <Tile label="Pages with little text" value={fmtNum(s.thin)} hint="Under 200 words" testId="tile-pages-thin" />
       </div>
+      {!measured && (
+        <div className="g-callout mb-3" role="status" data-testid="pages-links-unmeasured">
+          <h3>Links between your pages could not be measured</h3>
+          <p>Most pages of {site.domain} have no links in their page source — the menus and links are added by JavaScript after the page loads. This crawl reads the source without running scripts, so it cannot say which pages link to which, or how many clicks deep a page is. Google does run scripts, but more slowly and less reliably than it reads plain links; putting your main menu and in-page links in the page's HTML is the safer choice.</p>
+        </div>
+      )}
       <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Show pages">
-        {FILTERS.map((f) => { const n = f.count(s); return (
+        {FILTERS.filter((f) => measured || (f.key !== "orphans" && f.key !== "deep")).map((f) => { const n = f.count(s); return (
           <button key={f.key} type="button" className="g-pill g-pill--sm" aria-pressed={filter === f.key} disabled={n === 0 && f.key !== "all"} style={filter === f.key ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined}
             onClick={() => { setFilter(f.key); setShown(100); setOpen(null); }} data-testid={`filter-pages-${f.key}`}>{f.label} <span className="tabular-nums">({fmtNum(n)})</span></button>
         ); })}
@@ -98,7 +106,7 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
                     <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{!r.indexable && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Can't be indexed: {r.whyNot}</span>}</td>
                     <td className="num" data-label="Status" style={r.status >= 400 ? { color: "var(--g-red)" } : undefined}>{r.status || "—"}{r.redirected ? " ↪" : ""}</td>
                     <td className="num" data-label="Clicks deep">{r.depth ?? <span className="g-text-2" title="No crawled page links to it">—</span>}</td>
-                    <td className="num" data-label="Links to it">{fmtNum(r.inlinks)}</td>
+                    <td className="num" data-label="Links to it">{r.inlinks == null ? <span className="g-text-2" title="Not measurable on this site">—</span> : fmtNum(r.inlinks)}</td>
                     <td className="num" data-label="Words">{fmtNum(r.words)}</td>
                     <td className="num" data-label="Title">{r.titleLength}{tl && <span className="g-text-2 text-[12px]"> {tl}</span>}</td>
                     <td className="num" data-label="Description">{r.descriptionLength}{dl && <span className="g-text-2 text-[12px]"> {dl}</span>}</td>

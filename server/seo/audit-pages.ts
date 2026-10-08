@@ -16,20 +16,29 @@ export type PageRow = {
   url: string; path: string; status: number; redirected: boolean;
   /** Can Google put this page in its index? And if not, the plain reason. */
   indexable: boolean; whyNot: string | null;
-  /** Clicks from the first page crawled (0 = that page); null = no link to it was found on the crawled pages. */
+  /** Clicks from the first page crawled (0 = that page); null = no link to it was found, or links could not be measured. */
   depth: number | null;
-  /** Other crawled pages of the site that link to it / pages of the site it links to. */
-  inlinks: number; outlinks: number;
+  /** Other crawled pages of the site that link to it (null when links could not be measured) / pages of the site it links to. */
+  inlinks: number | null; outlinks: number;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number;
   images: number; imagesNoAlt: number; kb: number | null;
   /** Issue keys (as on the Issues tab) this page is listed under. */
   issues: string[];
 };
-export type PagesSummary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; orphans: number; deep: number; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
+export type PagesSummary = {
+  pages: number; indexable: number; notIndexable: number; errors: number; redirected: number;
+  /**
+   * False when most pages carry no links in their HTML — a site that builds its menus with JavaScript. The crawl reads
+   * the page source without running scripts, so for such a site nothing can honestly be said about which pages link
+   * to which: orphans, deep and averageDepth are then null rather than wrong.
+   */
+  linksMeasured: boolean;
+  orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number;
+};
 
 /** Addresses compared the way a crawler treats them: no fragment, no trailing slash, lower-case host. */
 export function sameUrlKey(u: string): string {
-  try { const x = new URL(u); return `${x.protocol}//${x.host.toLowerCase()}${x.pathname.replace(/\/+$/, "") || ""}${x.search}`; }
+  try { const x = new URL(u); return `${x.host.toLowerCase().replace(/^www\./, "")}${x.pathname.replace(/\/+$/, "") || ""}${x.search}`; }
   catch { return String(u).replace(/#.*$/, "").replace(/\/+$/, ""); }
 }
 const pathOf = (u: string) => { try { const x = new URL(u); return (x.pathname || "/") + x.search; } catch { return u; } };
@@ -37,9 +46,12 @@ const pathOf = (u: string) => { try { const x = new URL(u); return (x.pathname |
 export const THIN_WORDS = 200, DEEP_CLICKS = 4;
 
 /** One row per crawled page, with link counts and click depth worked out across the crawl. Pure, for tests. */
-export function pageRows(pages: RawPage[], findings: unknown[] | undefined): PageRow[] {
+export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageRow[] {
+  // The same address saved twice (http and https, with and without a slash) is one page.
+  const seenKeys = new Set<string>();
+  const pages = all.filter((p) => { const k = sameUrlKey(p.url); if (seenKeys.has(k)) return false; seenKeys.add(k); return true; });
   const byKey = new Map<string, number>();
-  pages.forEach((p, i) => { if (!byKey.has(sameUrlKey(p.url))) byKey.set(sameUrlKey(p.url), i); });
+  pages.forEach((p, i) => byKey.set(sameUrlKey(p.url), i));
   // Internal links between crawled pages (a page's link to itself does not count).
   const out: Set<number>[] = pages.map(() => new Set<number>()), into: number[] = pages.map(() => 0);
   pages.forEach((p, i) => {
@@ -58,6 +70,7 @@ export function pageRows(pages: RawPage[], findings: unknown[] | undefined): Pag
       queue = next;
     }
   }
+  const measured = linksMeasurable(pages, out);
   const issuesOf = new Map<string, string[]>();
   for (const g of groupFindings(findings as any).values())
     for (const item of g.items) { const u = item.match(/^https?:\/\/\S+/)?.[0]; if (u) { const k = sameUrlKey(u); issuesOf.set(k, [...(issuesOf.get(k) ?? []), g.key]); } }
@@ -68,7 +81,7 @@ export function pageRows(pages: RawPage[], findings: unknown[] | undefined): Pag
     const whyNot = p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : canonicalElsewhere ? "its canonical tag points to another page" : null;
     return {
       url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: whyNot === null, whyNot,
-      depth: depth[i], inlinks: into[i], outlinks: out[i].size,
+      depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: out[i].size,
       title: p.title || null, titleLength: (p.title ?? "").trim().length, descriptionLength: (p.description ?? "").trim().length, h1: Array.isArray(p.h1) ? p.h1.length : 0,
       words: p.words, images: p.images, imagesNoAlt: p.imagesNoAlt, kb: typeof p.bytes === "number" ? Math.round(p.bytes / 1024) : null,
       issues: [...new Set(issuesOf.get(key) ?? [])],
@@ -76,14 +89,23 @@ export function pageRows(pages: RawPage[], findings: unknown[] | undefined): Pag
   });
 }
 
+/** Links are measurable when at least half of the pages that loaded link to another crawled page. */
+export function linksMeasurable(pages: RawPage[], out: Set<number>[]): boolean {
+  const loaded = pages.map((p, i) => (p.status < 400 ? i : -1)).filter((i) => i >= 0);
+  if (loaded.length < 3) return loaded.length > 0;
+  return loaded.filter((i) => out[i].size > 0).length * 2 >= loaded.length;
+}
+
 export function pagesSummary(rows: PageRow[]): PagesSummary {
   const ok = rows.filter((r) => r.status < 400);
   const depths = rows.map((r) => r.depth).filter((d): d is number => d !== null);
+  const measured = rows.length === 0 || rows.some((r) => r.inlinks !== null);
   return {
     pages: rows.length, indexable: rows.filter((r) => r.indexable).length, notIndexable: rows.filter((r) => !r.indexable).length,
     errors: rows.filter((r) => r.status >= 400).length, redirected: rows.filter((r) => r.redirected).length,
-    orphans: rows.filter((r, i) => i > 0 && r.inlinks === 0).length, deep: rows.filter((r) => (r.depth ?? 0) >= DEEP_CLICKS).length,
-    averageDepth: depths.length ? Math.round((depths.reduce((a, b) => a + b, 0) / depths.length) * 10) / 10 : null,
+    linksMeasured: measured,
+    orphans: measured ? rows.filter((r, i) => i > 0 && r.inlinks === 0).length : null, deep: measured ? rows.filter((r) => (r.depth ?? 0) >= DEEP_CLICKS).length : null,
+    averageDepth: measured && depths.length ? Math.round((depths.reduce((a, b) => a + b, 0) / depths.length) * 10) / 10 : null,
     thin: ok.filter((r) => r.words < THIN_WORDS).length, noTitle: ok.filter((r) => r.titleLength === 0).length, noDescription: ok.filter((r) => r.descriptionLength === 0).length,
   };
 }

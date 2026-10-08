@@ -11,6 +11,7 @@ describe("sameUrlKey", () => {
     expect(sameUrlKey("https://x.com/")).toBe(sameUrlKey("https://x.com"));
     expect(sameUrlKey("https://x.com/a?b=1")).not.toBe(sameUrlKey("https://x.com/a"));
     expect(sameUrlKey("not a url/")).toBe("not a url");
+    expect(sameUrlKey("http://www.x.com/a")).toBe(sameUrlKey("https://x.com/a"));
   });
 });
 
@@ -51,7 +52,16 @@ describe("pageRows", () => {
     expect(row("/").issues).toEqual(["psi-mobile"]);
   });
   it("summarises the crawl", () => {
-    expect(pagesSummary(rows)).toEqual({ pages: 11, indexable: 8, notIndexable: 3, errors: 1, redirected: 1, orphans: 5, deep: 1, averageDepth: 1.8, thin: 1, noTitle: 1, noDescription: 1 });
+    expect(pagesSummary(rows)).toEqual({ pages: 11, indexable: 8, notIndexable: 3, errors: 1, redirected: 1, linksMeasured: true, orphans: 5, deep: 1, averageDepth: 1.8, thin: 1, noTitle: 1, noDescription: 1 });
+  });
+  it("says nothing about links on a site whose pages carry none in their source (menus built by JavaScript)", () => {
+    const spa = [page(`${H}/`, [`${H}/a`, `${H}/b`]), ...["a", "b", "c", "d", "e"].map((x) => page(`${H}/${x}`))];
+    const r = pageRows(spa, []);
+    expect(r.every((x) => x.inlinks === null && x.depth === null)).toBe(true);
+    expect(pagesSummary(r)).toMatchObject({ pages: 6, linksMeasured: false, orphans: null, deep: null, averageDepth: null, indexable: 6 });
+  });
+  it("counts an address saved twice once", () => {
+    expect(pageRows([page("http://x.com/"), page("https://x.com"), page(`${H}/a`)], [])).toHaveLength(2);
   });
   it("copes with nothing and with malformed pages", () => {
     expect(pageRows([], undefined)).toEqual([]);
