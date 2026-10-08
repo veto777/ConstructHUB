@@ -1,0 +1,105 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-notifications",
+  "title": "Notifications",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings#:~:text=Emails%20the%20system%20sends%20to%20you",
+      "caption": "Notifications",
+      "chapter": "The Notifications card",
+      "narration": "Notifications decide which alerts the CRM sends you, and how they reach you."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"notif-channel-header\"]",
+      "caption": "Three channels",
+      "narration": "Each alert has three switches: In-app, Email and Text."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=A client opened an estimate for the first time.",
+      "caption": "One row, one event",
+      "narration": "Each row is one event, like a client opening an estimate for the first time."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-notif-estimateViewed\"]",
+      "caption": "Switch one off",
+      "chapter": "Switch an alert on or off",
+      "narration": "Switch off what you don't need. Let's stop the email for Estimate viewed."
+    },
+    {
+      "action": "wait",
+      "caption": "Saved right away",
+      "narration": "It's saved right away. The CRM says Notification preferences saved.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "text=A lead came in through your website lead form.",
+      "caption": "More events",
+      "narration": "Further down are alerts for payments, your team and website leads."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Text alerts also need a text sender",
+      "caption": "Text alerts",
+      "narration": "Text alerts also need a text sender, set up in the SMS card below."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-notifications-bell\"]",
+      "caption": "The bell",
+      "chapter": "The bell",
+      "narration": "In-app alerts land under the bell, at the top of every page."
+    },
+    {
+      "action": "wait",
+      "caption": "Bell list",
+      "narration": "Estimate opens, payments and team activity are listed here as they happen.",
+      "holdMs": 300
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "These switches are only about alerts to you. Emails to your clients always send."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Menu: Settings",
+      "narration": "You'll find Notifications under Settings in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to choose your notifications | ConstructHUB CRM",
+    "description": "A short walkthrough of Notifications in the ConstructHUB CRM settings. You will see the In-app, Email and Text switches for each alert, switch one off, and find the bell where in-app alerts land.",
+    "tags": [
+      "notification settings",
+      "email alerts",
+      "text alerts",
+      "estimate viewed alert",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Pick your alerts",
+    "accent": "alerts",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

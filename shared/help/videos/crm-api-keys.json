@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-api-keys",
+  "durationSec": 54,
+  "video": {
+    "key": "tutorials/crm-api-keys.99cadb3a.mp4",
+    "bytes": 4790305,
+    "sha256": "99cadb3a5ede294efe401d5d2a8e7d5e0d397a863e9236fadfb03b41f5fc4ac6"
+  },
+  "captions": {
+    "key": "tutorials/crm-api-keys.a375a956.vtt",
+    "bytes": 1287,
+    "sha256": "a375a956940640ddf11dabfb19eafa9b56bf5dc079e7aa1b00e75399c1bd5f4f"
+  },
+  "poster": {
+    "key": "tutorials/crm-api-keys.a237f2f0.jpg",
+    "bytes": 80941,
+    "sha256": "a237f2f0e8dc83d6360ae6d7e1b69a38a08d9f646be9801c47993d8b8dc5343b"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:28:59.307Z",
+    "video": "3dfc35a83453cc1884eceadb623de800",
+    "captions": "b52fc6305d28d5606a4cd4cf70ad773e",
+    "poster": "a7bf2f292ed515a2a43ff48c2513023b"
+  }
+}

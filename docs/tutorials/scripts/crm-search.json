@@ -1,0 +1,105 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-search",
+  "title": "Getting around the CRM",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "chapter": "The menu",
+      "narration": "Here is how to get around the CRM: the menu, the page helpers, and dark mode."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "The menu",
+      "narration": "The menu on the left has every part of the CRM, from Home down to Settings."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-sidebar-toggle\"]",
+      "caption": "Fold the menu",
+      "narration": "This button folds the menu down to icons, to give the page more room."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-sidebar-toggle\"]",
+      "caption": "Open it again",
+      "narration": "Click it again to bring the names back."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"info-tip-dashboard\"]",
+      "caption": "The i",
+      "chapter": "The i and Watch buttons",
+      "narration": "Next to a page's title, the i explains what the page is for."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "Press Escape, or the X, to close it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Clients",
+      "narration": "Some pages also have a video. Let's open Clients."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"help-play-crm-clients\"]",
+      "caption": "Watch",
+      "narration": "Watch plays a short walkthrough of the page, right here."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-theme-toggle\"]",
+      "caption": "Dark mode",
+      "chapter": "Dark mode and more help",
+      "narration": "The moon at the bottom of the menu switches to dark mode."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-theme-toggle\"]",
+      "caption": "Light mode",
+      "narration": "Click it again to go back to light."
+    },
+    {
+      "action": "scroll",
+      "selector": "[data-testid=\"link-portal-nav-tutorials\"]",
+      "caption": "Tutorials",
+      "narration": "Tutorials, near the bottom of the menu, lists every walkthrough."
+    }
+  ],
+  "youtube": {
+    "title": "How to get around the CRM | ConstructHUB CRM",
+    "description": "A short tour of getting around the ConstructHUB CRM. You will fold and open the menu, open a page's i to read what it is for, find the Watch button that plays a walkthrough, and switch dark mode on and off.",
+    "tags": [
+      "CRM navigation",
+      "dark mode",
+      "getting started",
+      "CRM menu",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Find your way around",
+    "accent": "way",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
