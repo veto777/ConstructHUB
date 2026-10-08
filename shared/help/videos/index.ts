@@ -3,6 +3,7 @@
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_estimate_tracking } from "./crm-estimate-tracking.json";
+export { default as v_crm_google_calendar } from "./crm-google-calendar.json";
 export { default as v_crm_project_edit } from "./crm-project-edit.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_database_directory } from "./database-directory.json";
