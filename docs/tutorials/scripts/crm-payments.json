@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-payments",
+  "title": "Read the Payments page",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/payments",
+      "caption": "The Payments page",
+      "narration": "Every payment from your clients lands on the Payments page. Here is how to read it.",
+      "chapter": "Your payment account"
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Your payment account\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "The connected account",
+      "narration": "At the top is your payment account. This one is connected, with bank and card on."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Recent payments\"]",
+      "caption": "Recent payments",
+      "narration": "Scroll down to Recent payments. Online payments and the ones you record share one list."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-card-paid\"]",
+      "caption": "One payment",
+      "narration": "Each row starts with the amount, how it was paid, and what it was for.",
+      "chapter": "Read a payment"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-who-tutfx-pay-card-paid\"] a",
+      "caption": "The client",
+      "narration": "Under that is the client. Click the name to open their page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-card-paid\"] >> text=succeeded",
+      "caption": "The state",
+      "narration": "On the right is the state. Succeeded means the money came through."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-demo-pay-02\"]",
+      "caption": "Pending",
+      "narration": "Pending means a payment link was made and has not been paid yet.",
+      "chapter": "Pending, failed and refunded"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-ach-failed\"]",
+      "caption": "Failed",
+      "narration": "Failed means the payment did not go through, so that client still owes you."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-card-refunded\"]",
+      "caption": "Refunded",
+      "narration": "A refunded payment stays in the list, and shows how much went back."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-demo-pay-05\"]",
+      "caption": "Recorded by hand",
+      "narration": "A check or cash you recorded yourself is here too, with your note."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-reverse-payment-demo-pay-05\"]",
+      "caption": "Reverse",
+      "narration": "Those have a Reverse button, in case you typed one in wrong."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-ach-processing\"]",
+      "caption": "Processing",
+      "narration": "A bank payment says processing while the bank moves the money.",
+      "chapter": "When a bank payment clears"
+    },
+    {
+      "action": "fixture",
+      "caption": "The bank payment clears",
+      "narration": "You do not have to do anything. When it clears, the state changes by itself.",
+      "fixture": "stripe.settle"
+    },
+    {
+      "action": "goto",
+      "url": "/crm/payments",
+      "caption": "Open Payments again",
+      "narration": "Open the Payments page again later,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"payment-tutfx-pay-ach-processing\"]",
+      "caption": "Now succeeded",
+      "narration": "and the same payment now says succeeded."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-payments\"]",
+      "caption": "Where to find it",
+      "narration": "You will find Payments in the left menu of your CRM."
+    }
+  ],
+  "youtube": {
+    "title": "How to read your Payments page | ConstructHUB CRM",
+    "description": "See every client payment in one list in ConstructHUB CRM: the amount, how it was paid, who paid, and whether it succeeded, is pending, processing, failed or was refunded. The walkthrough uses a demo company with demonstration payments.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "payments",
+      "payment status",
+      "ACH payments",
+      "card payments",
+      "check payments",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Read every payment",
+    "accent": "payment",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

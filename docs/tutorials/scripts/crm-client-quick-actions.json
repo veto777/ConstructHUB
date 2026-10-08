@@ -18,9 +18,9 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid^=\"client-\"] a:has-text(\"Tunde Oyelaran\")",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Rafael Quintanilla\")",
       "caption": "Open the client",
-      "narration": "Open a client. We'll use Tunde Oyelaran.",
+      "narration": "Open a client. We'll use Rafael Quintanilla.",
       "holdMs": 700
     },
     {
@@ -118,11 +118,36 @@
       "narration": "The project is on this page, and in the Lead column of your pipeline."
     },
     {
-      "action": "highlight",
+      "action": "click",
       "selector": "[data-testid=\"button-take-payment\"]",
       "caption": "Take a payment",
-      "narration": "And Take a payment is where you record money this client has paid.",
-      "chapter": "Take a payment"
+      "narration": "And Take a payment opens the payment form for this client.",
+      "chapter": "Take a payment",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-take-invoice\"]",
+      "caption": "The invoice",
+      "narration": "Their open invoice is already picked."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-create-checkout-link\"]",
+      "caption": "Create payment link",
+      "narration": "Create payment link makes a secure link they can pay online."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-record-manual-payment\"]",
+      "caption": "Record a payment",
+      "narration": "Or record a check or cash they already gave you."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close",
+      "narration": "We'll close this one too."
     },
     {
       "action": "highlight",
@@ -133,7 +158,7 @@
   ],
   "youtube": {
     "title": "How to use quick actions on a client | ConstructHUB CRM",
-    "description": "A short walkthrough of Quick actions on a client's page in the ConstructHUB CRM. You will book a visit, start an estimate, and add a project to your pipeline without leaving the client.",
+    "description": "A short walkthrough of Quick actions on a client's page in the ConstructHUB CRM. You will book a visit, start an estimate, add a project to your pipeline and open the payment form without leaving the client. The walkthrough uses a demo company and demo clients.",
     "tags": [
       "contractor CRM",
       "construction CRM",

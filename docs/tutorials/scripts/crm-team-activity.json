@@ -1,0 +1,133 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-team-activity",
+  "title": "See what a team member has been doing",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team?tab=team",
+      "caption": "Team",
+      "narration": "Want to know what someone on your team did today? Every member has an activity log.",
+      "chapter": "Your team's activity"
+    },
+    {
+      "action": "session",
+      "session": "member:Priya Shah",
+      "url": "/crm/clients",
+      "caption": "Signed in as Priya",
+      "narration": "First, some work to log. This is Priya, in sales, signed in as herself."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Hannah Lindqvist\")",
+      "caption": "Open a client",
+      "narration": "She opens a client,",
+      "chapter": "A team member records a payment",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-take-payment\"]",
+      "caption": "Take a payment",
+      "narration": "chooses Take a payment,",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-take-amount\"]",
+      "value": "500",
+      "caption": "The amount",
+      "narration": "types the amount of a check,"
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-take-note\"]",
+      "value": "Check #3381",
+      "caption": "The check number",
+      "narration": "adds the check number,"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-record-manual-payment\"]",
+      "caption": "Record",
+      "narration": "and records it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/team?tab=team",
+      "holdMs": 1200,
+      "caption": "Back as the owner",
+      "chapter": "Open the activity log",
+      "narration": "Now back to you, on the Team tab."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"button-activity-\"]",
+      "caption": "Activity",
+      "narration": "Find Priya, and choose Activity under her name.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"row-activity-\"] >> nth=0",
+      "caption": "The line",
+      "narration": "There it is: who, what, the amount, the invoice, and the time."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"row-activity-\"] >> nth=0",
+      "caption": "What is logged",
+      "narration": "The log keeps estimates, invoices, client changes and payments, newest first."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"button-activity-\"]",
+      "caption": "Hide activity",
+      "narration": "Choose Hide activity to close it.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Dee Okafor\") [data-testid^=\"button-activity-\"]",
+      "caption": "Nothing yet",
+      "narration": "Someone with nothing logged yet says so.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Where to find it",
+      "narration": "Only the owner can open these logs. They are under Team and Company."
+    }
+  ],
+  "youtube": {
+    "title": "How to see what a team member did | ConstructHUB CRM",
+    "description": "Open a team member's activity log in ConstructHUB CRM. A team member records a check payment, then the owner opens Team, chooses Activity under her name and reads the line: who, what, the amount, the invoice and the time. The walkthrough uses a demo company and demo team.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "team activity",
+      "activity log",
+      "audit log",
+      "team management",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Who did what",
+    "accent": "what",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}

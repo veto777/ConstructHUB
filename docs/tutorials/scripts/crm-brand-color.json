@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-brand-color",
+  "title": "Pick your brand colour",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "narration": "Make your estimates and invoices match your brand. Pick your colour in Settings.",
+      "chapter": "Find Company theme"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-company-theme\"]",
+      "caption": "Company theme",
+      "narration": "Scroll to Company theme, under the company profile."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"theme-swatch-grid\"]",
+      "caption": "Twenty colours",
+      "narration": "There are twenty colours to choose from.",
+      "chapter": "Pick a colour"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"theme-swatch-teal\"]",
+      "caption": "Click a swatch",
+      "narration": "Click one. It saves straight away.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"theme-preview-strip\"]",
+      "caption": "The preview",
+      "narration": "The preview shows your company name and the approve button in that colour."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"theme-base-white\"]",
+      "caption": "Main color",
+      "narration": "Main color sets the band behind your name. Choose white,",
+      "chapter": "Black or white",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"theme-preview-strip\"]",
+      "caption": "On white",
+      "narration": "and the same colour sits on a white band."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"theme-base-black\"]",
+      "caption": "Back to black",
+      "narration": "We'll go back to black.",
+      "holdMs": 900
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "narration": "Now look at a real document. Open Estimates,",
+      "chapter": "On your documents"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"doc-link-demo-estimate-e-2000\"]",
+      "caption": "Open an estimate",
+      "narration": "open an estimate,",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview-estimate\"]",
+      "caption": "Preview",
+      "narration": "and choose Preview.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"doc-wordmark\"]",
+      "caption": "Your colour",
+      "narration": "This is the client's view. The heading and the accents are in your colour."
+    },
+    {
+      "action": "back",
+      "caption": "Back",
+      "narration": "Go back to the CRM."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "You will find Company theme under Settings, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "Set your brand colour on estimates and invoices | ConstructHUB CRM",
+    "description": "Choose the accent colour for your estimates, invoices, contracts and client portal in ConstructHUB CRM, pick a black or white base, and check the result on a real estimate. The walkthrough uses a demo company and demo clients.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "brand colour",
+      "company branding",
+      "estimate design",
+      "invoice branding",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your brand colour",
+    "accent": "colour",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

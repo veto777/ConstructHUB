@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-team-crew-view",
+  "title": "What your crew sees",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team?tab=team",
+      "caption": "Team",
+      "narration": "Everyone on your team signs in with their own role. Here is what a field login sees.",
+      "chapter": "A field member"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") [data-testid^=\"select-role-\"]",
+      "caption": "The field role",
+      "narration": "Marco Delgado is on the team with the field role."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") .grid",
+      "caption": "His permissions",
+      "narration": "For him, See all jobs and See prices are both switched off."
+    },
+    {
+      "action": "session",
+      "session": "member:Marco Delgado",
+      "url": "/crm",
+      "caption": "Signed in as Marco",
+      "chapter": "What he sees",
+      "narration": "Now this is Marco's screen, signed in as himself."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-sidebar=\"content\"]",
+      "caption": "A shorter menu",
+      "narration": "His menu is shorter. There is no Messages, Invoices, Integrations or Settings."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"in your book\")]/ancestor::*[contains(@class,\"rounded\")][1]",
+      "caption": "Three clients",
+      "narration": "Home counts three clients for him. Those are the clients on his own jobs."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Clients",
+      "narration": "The Clients list shows only those three.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Pipeline",
+      "narration": "And the pipeline shows only his projects.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Estimates",
+      "narration": "Estimates lists only his job.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Price book",
+      "narration": "The price book lists the work for him,",
+      "chapter": "No prices",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has([data-testid^=\"input-qty-\"]) >> nth=0",
+      "caption": "No prices",
+      "narration": "but not what each item costs. Prices are hidden from him."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "caption": "Schedule and JobCam",
+      "narration": "He still has Schedule and JobCam, for his visits and job photos."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/team?tab=team",
+      "holdMs": 1200,
+      "caption": "Back as the owner",
+      "chapter": "Change what someone sees",
+      "narration": "Back on your own Team page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") .grid",
+      "caption": "The switches",
+      "narration": "These switches decide what each person can see and do."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Where to find it",
+      "narration": "You will find them under Team and Company, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "What your crew sees when they sign in | ConstructHUB CRM",
+    "description": "See ConstructHUB CRM through a field member's login: a shorter menu, only the clients and projects on their own jobs, and totals hidden when See prices is off. Then find the switches that control it on your Team page. The walkthrough uses a demo company and demo team.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "crew access",
+      "team permissions",
+      "field crew",
+      "roles",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "What crews see",
+    "accent": "crews",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

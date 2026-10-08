@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-client-photos",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/crm-client-photos.bba21be1.mp4",
+    "bytes": 5984810,
+    "sha256": "bba21be1024c47164c25c1d0a627a89e72810975c822cf483bc2dcfe1c8fb03f"
+  },
+  "captions": {
+    "key": "tutorials/crm-client-photos.7bfc9989.vtt",
+    "bytes": 1612,
+    "sha256": "7bfc998916d13049a5bb3e0fdda628a6a83750f10638074d2c41f510abdbe8c9"
+  },
+  "poster": {
+    "key": "tutorials/crm-client-photos.1ca8b141.jpg",
+    "bytes": 83241,
+    "sha256": "1ca8b1414a7cdb8b26349d273c4500952e14fe67d942c4748f14096965e2c83d"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:13:34.872Z",
+    "video": "079091cb81c764963f71f7d7ebf83b74",
+    "captions": "f7b4ebd60f86f717e51ceaa2391f328a",
+    "poster": "00528fd67e99cbdfaed55e39487b6e88"
+  }
+}

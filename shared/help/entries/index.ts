@@ -2,12 +2,15 @@
 // One line per help entry file.
 export { default as e_crm_api_keys } from "./crm/crm-api-keys";
 export { default as e_crm_billing } from "./crm/crm-billing";
+export { default as e_crm_brand_color } from "./crm/crm-brand-color";
 export { default as e_crm_change_orders } from "./crm/crm-change-orders";
 export { default as e_crm_client_bid_status } from "./crm/crm-client-bid-status";
+export { default as e_crm_client_contact_shortcuts } from "./crm/crm-client-contact-shortcuts";
 export { default as e_crm_client_edit } from "./crm/crm-client-edit";
 export { default as e_crm_client_export } from "./crm/crm-client-export";
 export { default as e_crm_client_new } from "./crm/crm-client-new";
 export { default as e_crm_client_notes } from "./crm/crm-client-notes";
+export { default as e_crm_client_photos } from "./crm/crm-client-photos";
 export { default as e_crm_client_portal_message } from "./crm/crm-client-portal-message";
 export { default as e_crm_client_portal_preview } from "./crm/crm-client-portal-preview";
 export { default as e_crm_client_portal } from "./crm/crm-client-portal";
@@ -20,6 +23,7 @@ export { default as e_crm_discount_defaults } from "./crm/crm-discount-defaults"
 export { default as e_crm_document_defaults } from "./crm/crm-document-defaults";
 export { default as e_crm_estimate_approved } from "./crm/crm-estimate-approved";
 export { default as e_crm_estimate_client_options } from "./crm/crm-estimate-client-options";
+export { default as e_crm_estimate_client_view } from "./crm/crm-estimate-client-view";
 export { default as e_crm_estimate_discounts } from "./crm/crm-estimate-discounts";
 export { default as e_crm_estimate_edit } from "./crm/crm-estimate-edit";
 export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
@@ -67,6 +71,8 @@ export { default as e_crm_schedule_views } from "./crm/crm-schedule-views";
 export { default as e_crm_scheduled_exports } from "./crm/crm-scheduled-exports";
 export { default as e_crm_search } from "./crm/crm-search";
 export { default as e_crm_sms_setup } from "./crm/crm-sms-setup";
+export { default as e_crm_team_activity } from "./crm/crm-team-activity";
+export { default as e_crm_team_crew_view } from "./crm/crm-team-crew-view";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
 export { default as e_brand_tour_crm } from "./start-here/brand-tour-crm";
