@@ -32,17 +32,18 @@ import fs from "fs";
 import path from "path";
 import { HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { ROOT, parseArgs, readEnvFile, sha256, sleep } from "../tutorials/lib";
-import { DENYLIST, buildPost, checkAccounts, emptyLedger, followYouTube, listAccounts, parseAllowlist, reconcilePosts, redact, sendPosts, type Io, type PlannedPost, type SocialLedger, type Target } from "../tutorials/social-post-lib";
-import type { SocialPlatform } from "../tutorials/social-text";
+import { DENYLIST, buildPost, checkAccounts, emptyLedger, listAccounts, parseAllowlist, reconcilePosts, redact, sendPosts, type Io, type PlannedPost, type SocialLedger, type Target } from "../tutorials/social-post-lib";
 import { uploadSessionRequest } from "../../server/youtube/client";
 import { easternLabel } from "../../server/youtube/schedule";
 import { OUT } from "./make";
-import { accountTimes, nextAllowed, rateRefusal } from "../tutorials/social-rate";
+import { accountTimes, addBackoff, backoffFor, nextAllowed, rateRefusal, slotClock, type Backoff } from "../tutorials/social-rate";
+import { captionFor, readQueue, type PostPlatform } from "./queue";
 import { emptyViralLedger, planViral, type ViralClip, type ViralLedger, type ViralPlanned, type ViralPlatform, type ViralTarget } from "./stream";
 
 export const VIRAL_LEDGER = path.join(ROOT, "docs", "gator", "viral-schedule.json");
 const TUTORIAL_LEDGER = path.join(ROOT, "docs", "tutorials", "social-schedule.json");
-const YT_LEDGER = path.join(ROOT, "docs", "tutorials", "youtube-schedule.json");
+/** Shared with the tutorial stream: when a platform told an account to slow down (social-rate.ts). */
+export const BACKOFF_FILE = path.join(ROOT, "docs", "tutorials", "social-backoff.json");
 /** Where a clip's file will be served from once it is uploaded (the tutorials' media route). Not uploaded by this tool. */
 export const plannedMediaUrl = (conceptId: string, sha: string, what: "clip" | "cover") => `https://constructhub.us/api/tutorials/media/gator-${conceptId}.social-${what === "clip" ? "vertical" : "cover-vertical"}.${sha.slice(0, 8)}.${what === "clip" ? "mp4" : "jpg"}`;
 const readJson = <T>(file: string, fallback: T): T => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) as T : fallback);
@@ -54,6 +55,8 @@ export type YoutubeShort = { conceptId: string; title: string; sha256: string; s
 export const SHORTS_PLAYLIST = "ConstructHUB Gator Shorts";
 /** The three pilots were posted before styles had numbers: they are style 6 (cartoon with a meme caption). */
 const PILOT_STYLE: Record<string, number> = { "while-youre-here": 6, "two-day-job": 6, "shingle-rhythm": 6 };
+/** The owner's cadence began here; the refusals of the night before (five posts in two hours) are what it was written for, not a reason to back off again. */
+const CADENCE_SINCE = Date.parse("2026-10-08T12:00:00Z");
 export const ledgerKey = (conceptId: string) => `gator:${conceptId}`;
 /** Every entry of this ledger is a gator clip: marked so, whatever wrote it. */
 export const saveViralLedger = (file: string) => (l: SocialLedger) => {
@@ -77,8 +80,8 @@ export function planAsap(clips: readonly ViralClip[], targets: readonly ViralTar
       if (before) { skipped.push({ conceptId: c.conceptId, accountId: t.id, reason: `already ${before.status}` }); continue; }
       const at = new Date(now.getTime() + (ti + n * gapMin) * 60000);
       // The platform's allowance (both streams). "As soon as possible" does not mean "more than the account can take".
-      const refusal = o.overrideRate ? null : rateRefusal(t.platform, at, times);
-      if (refusal) { const free = nextAllowed(t.platform, at, times); skipped.push({ conceptId: c.conceptId, accountId: t.id, reason: `${refusal}${free ? ` — free again ${easternLabel(free)} (--at ${free.toISOString()})` : ""}` }); continue; }
+      const refusal = o.overrideRate ? null : rateRefusal(t.platform, at, times, undefined, { accountId: t.id, noGap: true });
+      if (refusal) { const free = nextAllowed(t.platform, at, times, undefined, { accountId: t.id, noGap: true }); skipped.push({ conceptId: c.conceptId, accountId: t.id, reason: `${refusal}${free ? ` — free again ${easternLabel(free)} (--at ${free.toISOString()})` : ""}` }); continue; }
       n++; times.push(at.getTime());
       planned.push({ conceptId: c.conceptId, target: t, at, eastern: easternLabel(at), slot: "asap", text: mine.text, ...(mine.title ? { title: mine.title } : {}) });
     }
@@ -88,18 +91,18 @@ export function planAsap(clips: readonly ViralClip[], targets: readonly ViralTar
 }
 
 /** Put a clip and its cover in R2 (create-only) and ask each public address for its first bytes. */
-async function host(conceptId: string, s: any, say: (l: string) => void): Promise<{ clip: string; cover: string }> {
+async function host(conceptId: string, clipFile: string, clipSha: string, s: any, say: (l: string) => void): Promise<{ clip: string; cover: string }> {
   const keys = ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"], envFile = process.env.TUTORIAL_R2_ENV || "/home/voiceban/ConstructHUB-live/.env";
   const env: Record<string, string | undefined> = { ...(fs.existsSync(envFile) ? readEnvFile(envFile, keys) : {}), ...Object.fromEntries(keys.flatMap((k) => (process.env[k] ? [[k, process.env[k]]] : []))) };
   if (keys.slice(0, 3).some((k) => !env[k])) throw new Error("R2_ENDPOINT, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are not set");
   const Bucket = env.R2_BUCKET_NAME || "constructhub";
   const s3 = new S3Client({ region: "auto", endpoint: env.R2_ENDPOINT, credentials: { accessKeyId: env.R2_ACCESS_KEY_ID!, secretAccessKey: env.R2_SECRET_ACCESS_KEY! } });
   const out: Record<string, string> = {};
-  for (const [what, file, type] of [["clip", s.clip.file, "video/mp4"], ["cover", s.clip.cover, "image/jpeg"]] as const) {
+  for (const [what, file, type] of [["clip", clipFile, "video/mp4"], ["cover", s.clip.cover, "image/jpeg"]] as const) {
     const data = fs.readFileSync(path.join(OUT, conceptId, file));
-    if (what === "clip" && sha256(data) !== s.clip.sha256) throw new Error(`${conceptId}: ${file} is not the file social.json describes — assemble it again`);
+    if (what === "clip" && sha256(data) !== clipSha) throw new Error(`${conceptId}: ${file} changed since the plan was made — run it again`);
     // Named by the CLIP's hash, cover included: the pair belongs together.
-    const Key = mediaKey(conceptId, s.clip.sha256, what), url = plannedMediaUrl(conceptId, s.clip.sha256, what);
+    const Key = mediaKey(conceptId, clipSha, what), url = plannedMediaUrl(conceptId, clipSha, what);
     const head = async () => { try { const r = await s3.send(new HeadObjectCommand({ Bucket, Key })); return Number(r.ContentLength); } catch (e: any) { if (e?.$metadata?.httpStatusCode === 404 || e?.name === "NotFound") return null; throw e; } };
     const there = await head();
     if (there !== null && there !== data.length) throw new Error(`${Key} exists in R2 with ${there} bytes, expected ${data.length} — refusing to touch it`);
@@ -111,7 +114,7 @@ async function host(conceptId: string, s: any, say: (l: string) => void): Promis
     say(`  ${there === null ? "+" : "="} ${url}  206, ${data.length} bytes`);
     out[what] = url;
   }
-  fs.writeFileSync(path.join(OUT, conceptId, "hosted.json"), JSON.stringify({ conceptId, sha256: s.clip.sha256, ...out, verifiedAt: new Date().toISOString() }, null, 2) + "\n");
+  fs.writeFileSync(path.join(OUT, conceptId, `hosted-${clipSha.slice(0, 8)}.json`), JSON.stringify({ conceptId, file: clipFile, sha256: clipSha, ...out, verifiedAt: new Date().toISOString() }, null, 2) + "\n");
   return out as { clip: string; cover: string };
 }
 
@@ -172,8 +175,19 @@ async function sendShorts(ids: string[], viral: ViralLedger, save: (l: SocialLed
   return failed ? 2 : 0;
 }
 
+/** The calendar from `now` on, as text: day, Eastern time, account, clip — with the tutorial slot of each day shown as kept free. */
+export function scheduleTable(viral: ViralLedger, now: Date): string {
+  const rows = viral.posts.filter((p) => p.status !== "failed" && new Date(p.scheduledTime ?? p.createdAt).getTime() >= now.getTime() - 12 * 3600000).map((p) => ({ at: new Date(p.scheduledTime ?? p.createdAt), account: `${p.platform} ${p.accountId}`, platform: p.platform as string, id: p.accountId, what: `${p.conceptId} (${p.cut})`, status: p.status as string, url: p.publicUrl ?? "" }));
+  const days = [...new Set(rows.map((r) => easternLabel(r.at).slice(0, 10)))].sort(), accounts = [...new Map(rows.map((r) => [r.id, r.platform])).entries()];
+  for (const d of days) for (const [id, platform] of accounts) { const c = slotClock(d, "tutorial", platform, id); if (c) rows.push({ at: new Date(NaN), account: `${platform} ${id}`, platform, id, what: "tutorial (integrator)", status: "kept free", url: `${d} ${c}` }); }
+  const line = (r: (typeof rows)[number]) => { const when = Number.isFinite(r.at.getTime()) ? easternLabel(r.at).slice(0, 16) : r.url; return `${when}  ${r.account.padEnd(16)} ${r.status.padEnd(10)} ${r.what}${Number.isFinite(r.at.getTime()) && r.url ? `  ${r.url}` : ""}`; };
+  const out = rows.map(line).sort();
+  const per = new Map<string, number>(); for (const r of rows) if (Number.isFinite(r.at.getTime())) { const k = `${easternLabel(r.at).slice(0, 10)} ${r.account}`; per.set(k, (per.get(k) ?? 0) + 1); }
+  return [`GATOR SCHEDULE — written ${easternLabel(now)} (all times Eastern). One tutorial cut a day per account is left to the tutorial stream.`, "", ...out, "", "Gator clips per day and account:", ...[...per.entries()].sort().map(([k, n]) => `  ${k}: ${n}`), ""].join("\n");
+}
+
 export async function viralMain(argv: string[]): Promise<number> {
-  const args = parseArgs(argv, ["go", "brief", "asap", "reconcile", "youtube", "override-rate"]);
+  const args = parseArgs(argv, ["go", "brief", "asap", "reconcile", "youtube", "override-rate", "enable-shorts"]);
   const key = process.env.TUTORIAL_BLOTATO_KEY ?? "";
   const say = (s: string) => console.log(redact(s, key));
   const io: Io = { fetch: async (url, init) => { const r = await fetch(url, { ...init, signal: AbortSignal.timeout(60_000) }); return { status: r.status, text: () => r.text() }; }, sleep, now: () => new Date(), log: say };
@@ -182,18 +196,23 @@ export async function viralMain(argv: string[]): Promise<number> {
   const tutorial = readJson<SocialLedger>(TUTORIAL_LEDGER, emptyLedger());
   const viral = readJson<ViralLedger>(ledgerFile, emptyViralLedger());
   const save = saveViralLedger(ledgerFile);
+  const backoffs = readJson<Backoff[]>(BACKOFF_FILE, []);
+  const queue = readQueue();
   try {
   if (args.flags.reconcile) {
     if (!key) throw new Error("TUTORIAL_BLOTATO_KEY is not set (run with --env-file=/home/voiceban/ConstructHUB-live/.env)");
     const r = await reconcilePosts({ ledger: viral as unknown as SocialLedger, save, key, io });
     say(`${r.checked} asked, ${r.changed} changed`);
     for (const a of r.attention) say(`!!!! ${a}`);
+    // A platform that said "slow down": that account drops to two posts a day for 48 hours (social-rate.ts).
+    for (const p of viral.posts) if (p.status === "failed" && new Date(p.createdAt).getTime() >= CADENCE_SINCE) { const b = backoffFor(p, new Date(p.checkedAt ?? p.createdAt)); if (b && addBackoff(backoffs, b)) { fs.writeFileSync(BACKOFF_FILE, JSON.stringify(backoffs, null, 2) + "\n"); say(`!!!! BACK-OFF: ${b.platform} ${b.accountId} — ${b.perDay} posts a day until ${easternLabel(b.until)} (${b.why}). Run daily.ts --schedule --go to carry the refused clips to the next free slots.`); } }
     for (const p of viral.posts) say(`  ${p.status.padEnd(11)} ${p.conceptId ?? p.helpKey} → ${p.platform} ${p.account}  ${p.scheduledEastern}${p.publicUrl ? `  ${p.publicUrl}` : ""}`);
     return r.attention.length ? 2 : 0;
   }
+  // YouTube is for the walkthroughs (the owner, 2026-10-08): gator Shorts are switched off unless asked for by name.
+  if (args.flags.youtube && !args.flags["enable-shorts"]) throw new Error("gator clips do not go to YouTube (the owner, 2026-10-08: YouTube is for the walkthroughs). The Shorts code is kept: add --enable-shorts to use it.");
   if (args.flags.youtube) return await sendShorts(args._, viral, save, !!args.flags.go, typeof args.flags.gap === "string" ? Number(args.flags.gap) : 3, say);
   if (args.flags.go && !args._.length) throw new Error("--go needs the clips named: posting is never “everything that happens to be in the folder”");
-  const yt = readJson<{ videos: { helpKey: string; status: string; publishAt: string }[] }>(YT_LEDGER, { videos: [] }).videos.filter((v) => v.status === "published" || v.status === "scheduled");
 
   // The accounts. With --go: the allowlist, checked against Blotato's own list (as the tutorial poster does).
   // Dry: the ones the tutorial ledger already posts to — no network.
@@ -205,7 +224,7 @@ export async function viralMain(argv: string[]): Promise<number> {
     for (const t of seen.values()) say(`  ${t.id.padEnd(7)} ${t.platform.padEnd(10)} ${t.name}`);
   } else for (const p of tutorial.posts) if (!DENYLIST[p.accountId] && (p.platform === "instagram" || p.platform === "tiktok" || p.platform === "linkedin")) seen.set(p.accountId, { id: p.accountId, platform: p.platform, name: p.account });
   const only = typeof args.flags.platform === "string" ? args.flags.platform.split(",") : null;
-  const targets = [...seen.values(), { id: "youtube", platform: "youtube" as ViralPlatform, name: "our YouTube channel (YouTube's own API, never Blotato)" }].filter((t) => !only || only.includes(t.platform));
+  const targets = [...seen.values()].filter((t) => !only || only.includes(t.platform));
   const ids = args._.length ? args._ : (fs.existsSync(OUT) ? fs.readdirSync(OUT).filter((d) => fs.existsSync(path.join(OUT, d, "social.json"))).sort() : []);
   const socials = new Map<string, any>(), clips: ViralClip[] = [];
   for (const id of ids) {
@@ -214,40 +233,40 @@ export async function viralMain(argv: string[]): Promise<number> {
     const s = JSON.parse(fs.readFileSync(f, "utf8"));
     if (s.aiGenerated !== true) { say(`  – ${id}: its social.json does not carry the AI-generated flag — refused`); continue; }
     socials.set(id, s);
-    clips.push({ conceptId: id, platforms: Object.fromEntries((["instagram", "tiktok", "linkedin", "youtube"] as const).flatMap((p) => (s.platforms?.[p] ? [[p, { text: s.platforms[p].text, title: s.platforms[p].title }]] : []))) });
+    // The review queue decides: only an approved clip is posted, and it says which file and text each platform gets.
+    const st = queue.state[id];
+    if (st && st.status !== "approved" && !args.flags.asap) { say(`  – ${id}: ${st.status}${st.why ? ` (${st.why})` : ""} — not posted`); continue; }
+    if (st?.post && st.caption) clips.push({ conceptId: id, platforms: Object.fromEntries((Object.keys(st.post) as PostPlatform[]).map((p) => [p, { text: captionFor(p, st.caption!), file: st.post![p] }])) });
+    else clips.push({ conceptId: id, platforms: Object.fromEntries((["instagram", "tiktok", "linkedin"] as const).flatMap((p) => (s.platforms?.[p] ? [[p, { text: s.platforms[p].text, title: s.platforms[p].title }]] : []))) });
   }
-  // Tutorial cuts that will exist by then: every scheduled video's post on each account, at the time the tutorial poster gives it.
-  const alsoTutorial = yt.flatMap((v) => [...seen.values()].filter((t) => !tutorial.posts.some((p) => p.helpKey === v.helpKey && p.accountId === t.id)).map((t) => ({ accountId: t.id, at: followYouTube(v.publishAt, t.platform as SocialPlatform, v.helpKey, t.id) })));
   const at = (v: string) => { const d = new Date(v); if (!Number.isFinite(d.getTime()) || d.getTime() < now.getTime() - 60_000) throw new Error("--at is an ISO time that has not passed (2026-10-08T14:15:00Z)"); return d; };
   const gap = typeof args.flags.gap === "string" ? Number(args.flags.gap) : 4;
   if (!(gap >= 1 && gap <= 120)) throw new Error("--gap is 1–120 minutes");
   // --asap keeps the order the clips were named in.
   const ordered = args._.length ? args._.map((id) => clips.find((c) => c.conceptId === id)).filter((c): c is ViralClip => !!c) : clips;
   const { planned, skipped } = args.flags.asap
-    ? planAsap(ordered, targets.filter((t) => t.platform !== "youtube"), viral, typeof args.flags.at === "string" ? at(args.flags.at) : now, gap, { tutorial, overrideRate: !!args.flags["override-rate"] })
-    : planViral(ordered, targets, { now, viral, tutorial, youtubeTimes: yt.map((v) => v.publishAt), alsoTutorial });
+    ? planAsap(ordered, targets, viral, typeof args.flags.at === "string" ? at(args.flags.at) : now, gap, { tutorial, overrideRate: !!args.flags["override-rate"] })
+    : planViral(ordered, targets, { now, viral, tutorial, backoffs });
 
   say(`${args.flags.go ? "POSTING" : "DRY RUN — nothing is uploaded, sent or written"}: the viral stream (gator shorts)${args.flags.asap ? ", as soon as possible" : ""}.   (now ${easternLabel(now)})`);
   say(`${planned.length} post(s): ${clips.length} clip(s) × ${targets.length} account(s)`);
   for (const s of skipped) say(`  – ${s.conceptId} → ${s.accountId}: ${s.reason}`);
   const toSend: PlannedPost[] = [];
+  const shaOf = new Map<string, string>(), fileSha = (id: string, file: string) => { const k = `${id}/${file}`; if (!shaOf.has(k)) shaOf.set(k, sha256(fs.readFileSync(path.join(OUT, id, file)))); return shaOf.get(k)!; };
+  const hostList = new Map<string, { id: string; file: string; sha: string }>();
   for (const p of planned) {
-    const s = socials.get(p.conceptId), media = plannedMediaUrl(p.conceptId, s.clip.sha256, "clip");
+    const s = socials.get(p.conceptId), file = p.file ?? (s.clip.file as string), sha = fileSha(p.conceptId, file), media = plannedMediaUrl(p.conceptId, sha, "clip");
+    hostList.set(`${p.conceptId}/${file}`, { id: p.conceptId, file, sha });
     say(`\n── ${p.conceptId} → ${p.target.platform} ${p.target.name} (${p.target.id}) ──────────────`);
-    say(`  when:   ${p.eastern}  [the ${p.slot} Eastern slot]`);
-    say(`  file:   ${path.join(OUT, p.conceptId, s.clip.file)}  (${s.clip.durationSec} s; would be served as ${media})`);
-    if (p.target.platform === "youtube") {
-      const req = uploadSessionRequest({ title: p.title!, description: p.text, tags: s.platforms.youtube.hashtags, categoryId: "24", publishAt: p.at.toISOString(), containsSyntheticMedia: true }, s.clip.bytes, now.getTime());
-      say(`  videos.insert: ${JSON.stringify(req.body)}`);
-    } else {
-      const immediate = p.at.getTime() - now.getTime() < 90_000;
-      const m = { url: media, sha256: s.clip.sha256 as string, coverUrl: p.target.platform === "instagram" ? plannedMediaUrl(p.conceptId, s.clip.sha256, "cover") : null, coverMs: p.target.platform === "tiktok" ? s.clip.coverMs : null };
-      const body = buildPost(p.target as Target, p.text, m, immediate ? null : new Date(Math.round(p.at.getTime() / 1000) * 1000).toISOString());
-      toSend.push({ helpKey: ledgerKey(p.conceptId), target: p.target as Target, text: p.text, cut: s.clip.file, media: m, at: p.at, immediate, eastern: p.eastern, body });
-      if (p.target.platform === "tiktok" && (body.post.target as any).isAiGenerated !== true) throw new Error("the TikTok post would not carry isAiGenerated");
-      say(`  target: ${JSON.stringify(body.post.target)}`);
-      say(`  AI label: ${p.target.platform === "tiktok" ? "isAiGenerated: true (TikTok's own label)" : s.disclosure[p.target.platform]}`);
-    }
+    say(`  when:   ${p.eastern}  [${p.slot}]`);
+    say(`  file:   ${path.join(OUT, p.conceptId, file)}  (${s.clip.durationSec} s; served as ${media})`);
+    const immediate = p.at.getTime() - now.getTime() < 90_000;
+    const m = { url: media, sha256: sha, coverUrl: p.target.platform === "instagram" ? plannedMediaUrl(p.conceptId, sha, "cover") : null, coverMs: p.target.platform === "tiktok" ? s.clip.coverMs : null };
+    const body = buildPost(p.target as Target, p.text, m, immediate ? null : new Date(Math.round(p.at.getTime() / 1000) * 1000).toISOString());
+    toSend.push({ helpKey: ledgerKey(p.conceptId), target: p.target as Target, text: p.text, cut: file, media: m, at: p.at, immediate, eastern: p.eastern, body });
+    if (p.target.platform === "tiktok" && (body.post.target as any).isAiGenerated !== true) throw new Error("the TikTok post would not carry isAiGenerated");
+    if (!/#AIContent|#aicontent|AI-generated/.test(p.text)) throw new Error(`${p.conceptId}: the ${p.target.platform} text does not say it is AI-generated`);
+    say(`  AI label: ${p.target.platform === "tiktok" ? "isAiGenerated: true (TikTok's own label) + #AIContent" : "#AIContent in the text"}`);
     say(`  ledger: stream “viral”, ${path.relative(ROOT, ledgerFile)}${args.flags.go ? "" : " (not written in a dry run)"}`);
     say(`  text (${p.text.length}):`);
     say(args.flags.brief ? `    | ${p.text.split("\n")[0]} …` : p.text.split("\n").map((l) => `    | ${l}`).join("\n"));
@@ -256,11 +275,11 @@ export async function viralMain(argv: string[]): Promise<number> {
   if (!toSend.length) { say("\nnothing to post"); return 0; }
   // Media first: every clip and cover in R2, each public address answering with its first bytes.
   say("\nMedia:");
-  for (const id of [...new Set(toSend.map((p) => p.helpKey.replace(/^gator:/, "")))]) await host(id, socials.get(id), say);
+  for (const h of hostList.values()) await host(h.id, h.file, h.sha, socials.get(h.id), say);
   const allow = parseAllowlist(process.env.TUTORIAL_BLOTATO_ACCOUNT_IDS);
   const r = await sendPosts({ planned: toSend, ledger: viral as unknown as SocialLedger, save, key, io, allow });
   say(`\n${r.sent} created, ${r.failed} failed → ${path.relative(ROOT, ledgerFile)} (commit it). Run --reconcile in a few minutes.`);
-  say("YouTube Shorts are a separate step: --youtube <conceptId…> --go");
+  if (typeof args.flags.table === "string") { fs.writeFileSync(args.flags.table, scheduleTable(viral, now)); say(`→ ${args.flags.table}`); }
   return r.failed ? 2 : 0;
   } catch (e) { console.error(redact(`\n✗ ${e instanceof Error ? e.message : String(e)}`, key)); return 1; }
 }

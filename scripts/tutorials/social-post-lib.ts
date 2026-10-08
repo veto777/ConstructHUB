@@ -26,7 +26,7 @@
 import { createHash } from "node:crypto";
 import { SCHEDULE_TZ, addDays, easternLabel, zoneTime, zonedToUtc } from "../../server/youtube/schedule";
 import { PLATFORM_RULES, SOCIAL_PLATFORMS, type SocialPlatform } from "./social-text";
-import { rateRefusal } from "./social-rate";
+import { TUTORIALS_PER_DAY, rateRefusal, slotAt, tutorialSlotFor, tutorialsOfTheDay, type Backoff } from "./social-rate";
 
 export const BLOTATO_BASE = "https://backend.blotato.com/v2";
 
@@ -204,8 +204,16 @@ export type PlanOptions = {
    * shared rate rule (social-rate.ts) — LinkedIn 3 and a young Instagram account 4 in any 24 hours.
    */
   otherPosts?: readonly { accountId: string; at: Date | string }[];
+  /**
+   * By default only THE TUTORIAL OF THE DAY gets a social cut: the first video YouTube publishes each Eastern
+   * day (`prefer`: another one for a date). `everyVideo` plans them all, a day at a time (the old behaviour).
+   */
+  everyVideo?: boolean; prefer?: Readonly<Record<string, string>>;
+  /** Accounts a platform told to slow down (docs/tutorials/social-backoff.json; social-rate.ts). */
+  backoffs?: readonly Backoff[];
 };
-export const WARMUP_DAYS = 14, WARMUP_PER_DAY = 1, CADENCE_PER_DAY = 3;
+/** One tutorial cut per account per Eastern day (the owner, 2026-10-08) — during the warm-up and after it. YouTube gets every walkthrough. */
+export const WARMUP_DAYS = 14, WARMUP_PER_DAY = TUTORIALS_PER_DAY, CADENCE_PER_DAY = TUTORIALS_PER_DAY;
 /** A time closer than this is sent without `scheduledTime` (Blotato wants a future time; "now" is simply now). */
 export const IMMEDIATE_WITHIN_MS = 90_000;
 
@@ -225,6 +233,7 @@ export function planPosts(videos: readonly VideoForPost[], targets: readonly Tar
     const dayN = Math.round((new Date(`${date}T00:00:00Z`).getTime() - new Date(`${warmStart}T00:00:00Z`).getTime()) / DAY_MS);
     return dayN < (o.warmupDays ?? WARMUP_DAYS) ? (o.warmupPerDay ?? WARMUP_PER_DAY) : CADENCE_PER_DAY;
   };
+  const ofTheDay = o.everyVideo || o.spreadMin != null ? null : new Set(tutorialsOfTheDay(videos, { tz, prefer: o.prefer }).map((v) => v.helpKey));
   const order = [...videos].sort((a, b) => a.publishAt.localeCompare(b.publishAt) || a.helpKey.localeCompare(b.helpKey));
   targets.forEach((t, ti) => {
     const used = new Map<string, number>();
@@ -244,23 +253,21 @@ export function planPosts(videos: readonly VideoForPost[], targets: readonly Tar
       if (live) { skipped.push({ helpKey: v.helpKey, accountId: t.id, reason: live.status === "sending" ? "a post was sent and its outcome was never recorded — check Blotato by hand (never sent twice)" : `already ${live.status}${live.postSubmissionId ? ` (${live.postSubmissionId})` : ""}` }); continue; }
       if (before.length && !o.retryFailed) { skipped.push({ helpKey: v.helpKey, accountId: t.id, reason: `failed before (${before[before.length - 1].errorMessage ?? "no message"}) — pass --retry-failed to try again` }); continue; }
 
+      if (ofTheDay && !ofTheDay.has(v.helpKey)) { skipped.push({ helpKey: v.helpKey, accountId: t.id, reason: "not the tutorial of the day — one tutorial cut a day per account; YouTube has the walkthrough" }); continue; }
       let at: Date;
       if (o.spreadMin != null) { at = new Date(cursor); }
       else {
-        at = followYouTube(v.publishAt, t.platform, v.helpKey, t.id, tz);
-        // A video that is already public: its post goes out in the next window instead of in the past.
-        if (at.getTime() < o.now.getTime()) {
-          at = new Date(o.now.getTime() + (10 + stable(50, "late", v.helpKey, t.id)) * MIN);
-          if (t.platform === "linkedin") at = followYouTube(o.now, "linkedin", v.helpKey, t.id, tz);
-        }
+        // The day's tutorial slot (10:15–11:00 Eastern; social-rate.ts) — never before YouTube has the video, never in the past.
+        at = tutorialSlotFor(v.publishAt, t.platform, t.id, tz);
+        if (at.getTime() < o.now.getTime() + 10 * MIN) at = tutorialSlotFor(new Date(o.now.getTime() + 10 * MIN), t.platform, t.id, tz);
       }
       // The day's share for this account: move on, a day at a time, until one has room — and until the
       // platform's own rate allows it (both streams counted).
       for (let guard = 0; guard < 400; guard++) {
         const d = zoneTime(at, tz).date;
-        if ((used.get(d) ?? 0) < capOn(d) && !(t.platform === "linkedin" && o.spreadMin == null && isWeekend(d)) && !rateRefusal(t.platform, at, times)) break;
-        const next = addDays(d, 1), clock = zoneTime(at, tz).time;
-        at = zonedToUtc(next, o.spreadMin != null || t.platform !== "linkedin" ? clock : hhmm(9 * 60 + stable(120, "morning", v.helpKey, t.id)), tz);
+        if ((used.get(d) ?? 0) < capOn(d) && !rateRefusal(t.platform, at, times, undefined, { accountId: t.id, backoffs: o.backoffs, tz, noGap: o.spreadMin != null })) break;
+        const next = addDays(d, 1);
+        at = o.spreadMin != null ? zonedToUtc(next, zoneTime(at, tz).time, tz) : slotAt(next, "tutorial", t.platform, t.id, tz)!;
       }
       const d = zoneTime(at, tz).date;
       used.set(d, (used.get(d) ?? 0) + 1);

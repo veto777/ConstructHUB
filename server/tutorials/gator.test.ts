@@ -11,15 +11,16 @@ import { STYLES } from "../../scripts/gator/styles";
 import { schedule, stylesMd, DOC as STYLES_DOC } from "../../scripts/gator/styles-doc";
 import { BAND, REFERENCE, analyse, compare, pitchCorrection } from "../../scripts/gator/voiceprint";
 import { END_TAG_SEC, H, LOGO_RECT, MAX_SEC, MIN_PX, W, ZONES, assFile, layoutBeat, wrapCaption, type Beat } from "../../scripts/gator/layout";
-import { automaticChecks, mayPost, nextInQueue, type Queue } from "../../scripts/gator/daily";
+import { automaticChecks, defaultPost, mayApprove, mayPost, nextInQueue, type Queue } from "../../scripts/gator/daily";
+import { captionFor, readQueue } from "../../scripts/gator/queue";
 import { VOICE, voiceFilter, voiceKey } from "../../scripts/gator/voice";
-import { accountTimes, nextAllowed, rateRefusal } from "../../scripts/tutorials/social-rate";
+import { SLOT_ORDER, accountTimes, addBackoff, backoffFor, mayRetry, nextAllowed, rateRefusal, slotAt, slotClock, tutorialRefusal, tutorialSlotFor, tutorialsOfTheDay, type Backoff } from "../../scripts/tutorials/social-rate";
 import { bandFault, clipSpent, hatRow, lineBeats, peaksOf, plainWords, saysTheLine, subtitleBeats, timeline } from "../../scripts/gator/make";
 import fs from "fs";
 import { DOC, conceptsMd } from "../../scripts/gator/concepts-doc";
 import { mediaKey, planAsap, plannedMediaUrl, viralMain } from "../../scripts/gator/post";
 import { RATE, synth, toPcm } from "../../scripts/gator/sound";
-import { VIRAL_RULES, emptyViralLedger, planViral, slotFor, weekOf, type ViralClip, type ViralLedgerPost, type ViralTarget } from "../../scripts/gator/stream";
+import { VIRAL_RULES, emptyViralLedger, planViral, weekOf, type ViralClip, type ViralLedgerPost, type ViralTarget } from "../../scripts/gator/stream";
 import { buildPost, emptyLedger as emptySocialLedger, planPosts, type LedgerPost, type SocialLedger, type VideoForPost } from "../../scripts/tutorials/social-post-lib";
 import { SAFE_AREA, inside, overlaps, safeRect } from "../../scripts/tutorials/social-lib";
 import { uploadSessionRequest } from "../youtube/client";
@@ -371,86 +372,103 @@ describe("gator shorts — the viral stream in the calendar", () => {
   const tutorials = (ids: [string, "instagram" | "tiktok" | "linkedin"][], days: number): SocialLedger => ({ ...emptySocialLedger(), posts: ids.flatMap(([id, p]) => Array.from({ length: days }, (_x, d) => tutorialPost(id, p, new Date(Date.parse("2026-10-12T13:30:00Z") + d * 86400000).toISOString()))) });
   const day = (d: Date) => zoneTime(d).date, clock = (d: Date) => zoneTime(d).time.slice(0, 5);
 
-  it("one gator clip per account per day, at 12:00 or 19:00 Eastern, a few minutes past the hour", () => {
-    const { planned, skipped } = planViral(CLIPS, [IG, TT], { now, viral: emptyViralLedger(), tutorial: tutorials([["76607", "instagram"], ["63054", "tiktok"]], 20) });
+  const minutes = (d: Date) => { const c = clock(d); return +c.slice(0, 2) * 60 + +c.slice(3, 5); };
+  it("three gator clips per account per day — morning, midday, evening — with the tutorial slot kept free", () => {
+    const { planned, skipped } = planViral(CLIPS, [IG, TT], { now: new Date("2026-10-12T10:00:00Z"), viral: emptyViralLedger(), tutorial: emptySocialLedger() });
     expect(skipped).toEqual([]);
-    expect(planned).toHaveLength(16);
     for (const t of [IG, TT]) {
       const mine = planned.filter((p) => p.target.id === t.id);
-      expect(new Set(mine.map((p) => day(p.at))).size).toBe(8);               // never two on a day
-      expect(mine.map((p) => p.conceptId)).toEqual(CLIPS.map((c) => c.conceptId));
+      expect(mine.map((p) => p.conceptId)).toEqual(CLIPS.map((c) => c.conceptId));                  // the order given
+      expect(mine.map((p) => day(p.at))).toEqual(["2026-10-12", "2026-10-12", "2026-10-12", "2026-10-13", "2026-10-13", "2026-10-13", "2026-10-14", "2026-10-14"]);
+      expect(mine.slice(0, 3).map((p) => p.slot)).toEqual(["gator-morning", "gator-midday", "gator-evening"]);
       for (const p of mine) {
-        expect(["12:00", "19:00"]).toContain(p.slot);
-        const [h, m] = clock(p.at).split(":").map(Number);
-        expect(`${String(h).padStart(2, "0")}:00`).toBe(p.slot);
-        expect(m).toBeGreaterThanOrEqual(VIRAL_RULES.jitter.from);
-        expect(m).toBeLessThan(VIRAL_RULES.jitter.from + VIRAL_RULES.jitter.span);
+        const m = minutes(p.at), [from, to] = p.slot === "gator-morning" ? [450, 495] : p.slot === "gator-midday" ? [780, 810] : [1110, 1230];
+        expect(m, `${p.slot} ${clock(p.at)}`).toBeGreaterThanOrEqual(from); expect(m).toBeLessThanOrEqual(to);
+        // Two hours from every other gator clip AND from the tutorial slot of its day.
+        const tut = slotAt(day(p.at), "tutorial", t.platform, t.id)!;
+        expect(Math.abs(p.at.getTime() - tut.getTime())).toBeGreaterThanOrEqual(120 * 60000);
+      }
+      for (let i = 1; i < mine.length; i++) expect(mine[i].at.getTime() - mine[i - 1].at.getTime()).toBeGreaterThanOrEqual(120 * 60000);
+    }
+    expect(VIRAL_RULES.perDay).toBe(3);
+  });
+  it("the minute moves every day: no two consecutive days have the same time, and the same question has the same answer", () => {
+    for (const t of [IG, TT, LI]) for (const name of SLOT_ORDER) {
+      let last: string | null = "";
+      for (let d = 0; d < 60; d++) {
+        const date = zoneTime(new Date(Date.parse("2026-10-12T16:00:00Z") + d * 86400000)).date, c = slotClock(date, name, t.platform, t.id);
+        expect(slotClock(date, name, t.platform, t.id)).toBe(c);
+        if (c !== null) expect(c, `${t.platform} ${name} ${date}`).not.toBe(last);
+        last = c;
       }
     }
-    // The slot varies: over a fortnight an account sees both.
-    const slots = new Set(Array.from({ length: 14 }, (_x, d) => slotFor(`2026-10-${String(12 + d).padStart(2, "0")}`, IG).slot));
-    expect(slots.size).toBe(2);
-    expect(slotFor("2026-10-14", IG)).toEqual(slotFor("2026-10-14", IG));     // the same every time it is asked
-  });
-  it("never back-to-back: no gator clip without a tutorial cut between it and the last one", () => {
-    // Tutorial cuts only on the first three days: the fourth clip has nothing to stand behind.
-    const { planned, skipped } = planViral(CLIPS, [IG], { now, viral: emptyViralLedger(), tutorial: tutorials([["76607", "instagram"]], 3) });
-    expect(planned).toHaveLength(3);
-    expect(skipped).toHaveLength(5);
-    expect(skipped[0].reason).toMatch(/next to another gator clip.*tutorial cuts between/);
-    // With no tutorial cut at all, exactly one gator clip goes out — and then the stream waits.
-    expect(planViral(CLIPS, [IG], { now, viral: emptyViralLedger(), tutorial: emptySocialLedger() }).planned).toHaveLength(1);
-    // On any planned timeline, the neighbours of a gator clip are tutorial cuts.
-    const tut = tutorials([["76607", "instagram"]], 20), all = planViral(CLIPS, [IG], { now, viral: emptyViralLedger(), tutorial: tut }).planned;
-    const line = [...tut.posts.map((p) => ({ at: Date.parse(p.scheduledTime!), viral: false })), ...all.map((p) => ({ at: p.at.getTime(), viral: true }))].sort((a, b) => a.at - b.at);
-    for (let i = 1; i < line.length; i++) expect(line[i].viral && line[i - 1].viral).toBe(false);
-    // Tutorial cuts planned in the same run count too.
-    const joint = planViral(CLIPS, [IG], { now, viral: emptyViralLedger(), tutorial: emptySocialLedger(), alsoTutorial: Array.from({ length: 6 }, (_x, d) => ({ accountId: "76607", at: new Date(Date.parse("2026-10-12T13:30:00Z") + d * 86400000) })) });
-    expect(joint.planned).toHaveLength(6);
-  });
-  it("keeps 45 minutes from any other post on the account", () => {
-    const d = "2026-10-13", s = slotFor(d, IG), tut = tutorials([["76607", "instagram"]], 20);
-    tut.posts.push(tutorialPost("76607", "instagram", new Date(s.at.getTime() + 20 * 60000).toISOString(), "clash"));
-    const { planned } = planViral(CLIPS.slice(0, 3), [IG], { now, viral: emptyViralLedger(), tutorial: tut });
-    expect(planned.map((p) => day(p.at))).not.toContain(d);
-    for (const p of planned) for (const t of tut.posts) expect(Math.abs(Date.parse(t.scheduledTime!) - p.at.getTime())).toBeGreaterThanOrEqual(45 * 60000);
-  });
-  it("LinkedIn: two a week at most, weekdays at lunch, and only the clips written for it", () => {
-    const clips = [...CLIPS.slice(0, 5), clip("no-linkedin", false)];
-    const { planned, skipped } = planViral(clips, [LI], { now, viral: emptyViralLedger(), tutorial: tutorials([["38445", "linkedin"]], 30) });
-    expect(skipped).toEqual([{ conceptId: "no-linkedin", accountId: "38445", reason: "no LinkedIn version — the joke does not belong there" }]);
-    expect(planned).toHaveLength(5);
-    const perWeek = new Map<string, number>();
-    for (const p of planned) {
-      const d = day(p.at), wd = new Date(`${d}T12:00:00Z`).getUTCDay();
-      expect(wd).toBeGreaterThanOrEqual(1); expect(wd).toBeLessThanOrEqual(5);
-      expect(clock(p.at).startsWith("12:")).toBe(true);
-      perWeek.set(weekOf(d), (perWeek.get(weekOf(d)) ?? 0) + 1);
+    // A day's four slots are at least two hours apart on every account, for a year.
+    for (const t of [IG, LI]) for (let d = 0; d < 365; d++) {
+      const date = zoneTime(new Date(Date.parse("2026-10-12T16:00:00Z") + d * 86400000)).date, at = SLOT_ORDER.map((n) => slotAt(date, n, t.platform, t.id)).filter((x): x is Date => !!x);
+      for (let i = 1; i < at.length; i++) expect(at[i].getTime() - at[i - 1].getTime(), `${t.platform} ${date}`).toBeGreaterThanOrEqual(120 * 60000);
     }
-    expect(Math.max(...perWeek.values())).toBe(2);
-    expect(perWeek.size).toBe(3);                                             // five clips need three weeks
-    expect(weekOf("2026-10-18")).toBe("2026-10-12");                          // Sunday belongs to the week that began on Monday
   });
-  it("a clip goes to an account once; the viral ledger is the record", () => {
+  it("LinkedIn: weekdays inside business hours, weekends one gator clip, and only the clips given a LinkedIn version", () => {
+    const clips = [clip("li-1"), clip("no-li", false), ...["li-2", "li-3", "li-4", "li-5", "li-6", "li-7", "li-8", "li-9", "li-10", "li-11", "li-12", "li-13", "li-14", "li-15", "li-16", "li-17"].map((x) => clip(x))];
+    const { planned, skipped } = planViral(clips, [LI], { now: new Date("2026-10-12T10:00:00Z"), viral: emptyViralLedger(), tutorial: emptySocialLedger() });
+    expect(skipped).toEqual([{ conceptId: "no-li", accountId: "38445", reason: "no LinkedIn version — the clip does not belong there" }]);
+    const per = new Map<string, number>();
+    for (const p of planned) {
+      const z = zoneTime(p.at), weekend = ["Saturday", "Sunday"].includes(z.weekday);
+      per.set(z.date, (per.get(z.date) ?? 0) + 1);
+      if (weekend) expect(p.slot).toBe("gator-midday");
+      else { expect(minutes(p.at)).toBeGreaterThanOrEqual(8 * 60); expect(minutes(p.at)).toBeLessThanOrEqual(18 * 60); }
+    }
+    expect([...per.entries()].sort().map(([, n]) => n)).toEqual([3, 3, 3, 3, 3, 1, 1]);                // Monday…Friday, Saturday, Sunday
+  });
+  it("a clip goes to an account once; a refused one is carried to the next free slot, never within 12 hours", () => {
     const viral = emptyViralLedger();
     const post = (conceptId: string, status: ViralLedgerPost["status"], iso: string): ViralLedgerPost => ({ ...tutorialPost("76607", "instagram", iso, `gator:${conceptId}`), status, stream: "viral", conceptId, aiGenerated: true });
-    viral.posts.push(post("clip-a", "published", "2026-10-11T16:05:00Z"), post("clip-b", "sending", "2026-10-11T23:05:00Z"), post("clip-c", "failed", "2026-10-10T16:05:00Z"));
-    const { planned, skipped } = planViral(CLIPS.slice(0, 4), [IG], { now, viral, tutorial: tutorials([["76607", "instagram"]], 20) });
-    expect(planned.map((p) => p.conceptId)).toEqual(["clip-d"]);
-    expect(skipped.map((s) => s.reason)).toEqual(["already published (p)", "already sending (p)", "failed before — it is not retried by itself"]);
+    // Monday 09:00 Eastern: a is out, b's outcome is unknown, c was refused at 06:00 this morning.
+    viral.posts.push(post("clip-a", "published", "2026-10-11T16:05:00Z"), post("clip-b", "sending", "2026-10-11T23:05:00Z"), post("clip-c", "failed", "2026-10-12T10:00:00Z"));
+    const { planned, skipped } = planViral(CLIPS.slice(0, 5), [IG], { now, viral, tutorial: emptySocialLedger() });
+    expect(skipped.map((s) => s.reason)).toEqual(["already published (p)", "already sending (p)"]);
+    const at = Object.fromEntries(planned.map((p) => [p.conceptId, p]));
+    // c waits for the evening slot (12 hours after its refusal); d and e do not wait behind it.
+    expect(at["clip-c"].slot).toBe("gator-evening"); expect(day(at["clip-c"].at)).toBe("2026-10-12");
+    expect(at["clip-c"].at.getTime() - Date.parse("2026-10-12T10:00:00Z")).toBeGreaterThanOrEqual(12 * 3600000);
+    expect(at["clip-d"].slot).toBe("gator-midday"); expect(day(at["clip-d"].at)).toBe("2026-10-12");
+    expect(at["clip-e"].slot).toBe("gator-morning"); expect(day(at["clip-e"].at)).toBe("2026-10-13");
   });
-  it("YouTube Shorts: one a day, clear of the tutorials' publish times, labelled synthetic", () => {
-    const s = slotFor("2026-10-12", YT);
-    const { planned } = planViral(CLIPS.slice(0, 4), [YT], { now, viral: emptyViralLedger(), tutorial: emptySocialLedger(),
-      youtubeTimes: [new Date(s.at.getTime() - 10 * 60000), ...Array.from({ length: 30 }, (_x, d) => new Date(Date.parse("2026-10-12T13:00:00Z") + d * 86400000))] });
-    expect(planned).toHaveLength(4);
-    expect(planned.map((p) => day(p.at))).not.toContain("2026-10-12");         // ten minutes after a tutorial: moved on
-    expect(new Set(planned.map((p) => day(p.at))).size).toBe(4);
-    expect(planned[0].title).toBe("clip-a #Shorts");
-    const req = uploadSessionRequest({ title: planned[0].title!, description: planned[0].text, publishAt: planned[0].at.toISOString(), containsSyntheticMedia: true }, 1000, now.getTime());
-    expect(req.body.status).toMatchObject({ privacyStatus: "private", containsSyntheticMedia: true, selfDeclaredMadeForKids: false });
-    // The tutorials' own uploads are unchanged: the field is absent unless asked for.
-    expect("containsSyntheticMedia" in uploadSessionRequest({ title: "A tutorial" }, 1000).body.status).toBe(false);
+  it("counts what the account already has that day — both streams — and never plans more than four posts a day", () => {
+    // The tutorial stream already posted twice today on Instagram (the night of 2026-10-08): room for two gator clips, not three.
+    const tutorial: SocialLedger = { ...emptySocialLedger(), posts: [tutorialPost("76607", "instagram", "2026-10-12T04:10:00Z"), tutorialPost("76607", "instagram", "2026-10-12T04:40:00Z")] };
+    const { planned } = planViral(CLIPS, [IG], { now: new Date("2026-10-12T10:00:00Z"), viral: emptyViralLedger(), tutorial });
+    expect(planned.filter((p) => day(p.at) === "2026-10-12")).toHaveLength(2);
+    expect(planned.filter((p) => day(p.at) === "2026-10-13")).toHaveLength(3);
+  });
+  it("a platform that said “slow down” gets two posts a day for 48 hours, and the clips move on", () => {
+    const refused = { platform: "linkedin", accountId: "38445", errorMessage: "LinkedIn: a share limit has been reached for unverified members" };
+    const b = backoffFor(refused, new Date("2026-10-12T12:30:00Z"))!;
+    expect(b).toMatchObject({ platform: "linkedin", accountId: "38445", perDay: 2, until: "2026-10-14T12:30:00.000Z" });
+    expect(backoffFor({ platform: "instagram", accountId: "76607", errorMessage: "The Instagram account is restricted" }, new Date())).not.toBeNull();
+    expect(backoffFor({ platform: "tiktok", accountId: "63054", errorMessage: "video too short" }, new Date())).toBeNull();
+    expect(backoffFor({ platform: "linkedin", accountId: "38445", errorMessage: "media could not be fetched" }, new Date())).toBeNull();
+    const list: Backoff[] = [];
+    expect(addBackoff(list, b)).toBe(true);
+    expect(addBackoff(list, backoffFor(refused, new Date("2026-10-13T12:30:00Z"))!)).toBe(false);        // one is already running
+    expect(mayRetry("2026-10-12T12:30:00Z", new Date("2026-10-12T23:00:00Z"))).toBe(false);
+    expect(mayRetry("2026-10-12T12:30:00Z", new Date("2026-10-13T00:30:00Z"))).toBe(true);
+    const clips = Array.from({ length: 9 }, (_x, i) => clip(`li-${i}`));
+    const { planned } = planViral(clips, [LI], { now: new Date("2026-10-12T12:31:00Z"), viral: emptyViralLedger(), tutorial: emptySocialLedger(), backoffs: list });
+    const per = new Map<string, number>(); for (const p of planned) per.set(day(p.at), (per.get(day(p.at)) ?? 0) + 1);
+    // Monday and Tuesday: the tutorial + ONE gator clip (two posts a day); Wednesday: the back-off ends at 08:30, the morning slot is still inside it.
+    expect(per.get("2026-10-12")).toBe(1); expect(per.get("2026-10-13")).toBe(1); expect(per.get("2026-10-15")).toBe(3);
+    expect(planned).toHaveLength(9);
+  });
+  it("YouTube is for the walkthroughs: no gator clip is planned there, and the Shorts tool is switched off", async () => {
+    const { planned, skipped } = planViral(CLIPS.slice(0, 2), [YT], { now, viral: emptyViralLedger(), tutorial: emptySocialLedger() });
+    expect(planned).toEqual([]);
+    expect(skipped[0].reason).toMatch(/YouTube is for the walkthroughs/);
+    const err = console.error; let said = "";
+    console.error = (s: string) => { said += s; };
+    try { expect(await viralMain(["--youtube", "while-youre-here", "--go"])).toBe(1); } finally { console.error = err; }
+    expect(said).toMatch(/gator clips do not go to YouTube/);
   });
   it("TikTok carries its AI-generated label; the tutorial stream's plan is untouched by the viral one", () => {
     const body = buildPost({ id: "63054", platform: "tiktok", name: "construct.hub" }, "caption", { url: "https://constructhub.us/api/tutorials/media/gator-x.social-vertical.12345678.mp4", coverMs: 600 }, "2026-10-13T16:05:00.000Z");
@@ -492,58 +510,85 @@ describe("gator shorts — the viral stream in the calendar", () => {
 
 describe("the platforms' rate rule — one allowance for both streams", () => {
   const T0 = Date.parse("2026-10-08T04:00:00Z"), h = (n: number) => T0 + n * 3600000;
-  it("LinkedIn: three posts in any rolling 24 hours, then a refusal", () => {
-    expect(rateRefusal("linkedin", h(3), [h(0), h(1)])).toBeNull();
-    expect(rateRefusal("linkedin", h(3), [h(0), h(1), h(2)])).toMatch(/4 posts in 24 hours — 3 at most/);
-    expect(rateRefusal("linkedin", h(24.1), [h(0), h(1), h(2)])).toBeNull();               // the first has left the window
-    expect(rateRefusal("linkedin", h(23.9), [h(0), h(1), h(2)])).not.toBeNull();
-    // A post is also refused when it would overfill the window of one already scheduled AFTER it.
-    expect(rateRefusal("linkedin", h(0), [h(1), h(2), h(3)])).not.toBeNull();
-    expect(rateRefusal("tiktok", h(0), Array.from({ length: 30 }, (_x, i) => h(i / 10)))).toBeNull();
+  it("four posts per account per Eastern day, on Instagram, TikTok and LinkedIn alike", () => {
+    for (const p of ["instagram", "tiktok", "linkedin"]) {
+      expect(rateRefusal(p, h(12), [h(4), h(6), h(8)])).toBeNull();
+      expect(rateRefusal(p, h(12), [h(4), h(6), h(8), h(10)]), p).toMatch(/5 posts on 2026-10-08 — 4 a day at most/);
+      expect(rateRefusal(p, h(28), [h(4), h(6), h(8), h(10)])).toBeNull();                // the next Eastern day
+    }
+    expect(rateRefusal("twitter", h(0), Array.from({ length: 30 }, (_x, i) => h(i / 10)))).toBeNull();
   });
-  it("Instagram: four in 24 hours for the account's first two weeks, then the rule lapses", () => {
-    const four = [h(0), h(1), h(2), h(3)];
-    expect(rateRefusal("instagram", h(4), four)).toMatch(/5 posts in 24 hours — 4 at most/);
-    expect(rateRefusal("instagram", h(4), four.slice(1))).toBeNull();
-    const later = [h(0), ...[0, 1, 2, 3].map((i) => h(15 * 24 + i))];
-    expect(rateRefusal("instagram", h(15 * 24 + 4), later)).toBeNull();
-    expect(rateRefusal("instagram", h(13 * 24 + 4), [h(0), ...[0, 1, 2, 3].map((i) => h(13 * 24 + i))])).not.toBeNull();
+  it("never more than five in any rolling 24 hours, and two hours between posts on an account", () => {
+    // Four late on one Eastern day, then the next day's: the calendar rule alone would allow eight around midnight.
+    const lateDay = [h(10), h(13), h(16), h(19)];                                          // 06:00–15:00 Eastern on the 8th… all one day
+    expect(rateRefusal("instagram", h(25), lateDay)).toBeNull();                           // the fifth in 24 hours
+    expect(rateRefusal("instagram", h(27.5), [...lateDay, h(25)])).toMatch(/6 posts in 24 hours — 5 at most/);
+    // Also the window of a post already scheduled AFTER the new one.
+    expect(rateRefusal("instagram", h(22), [...lateDay, h(25), h(28)])).not.toBeNull();
+    expect(rateRefusal("linkedin", h(5.5), [h(4)])).toMatch(/within 120 minutes/);
+    expect(rateRefusal("linkedin", h(6), [h(4)])).toBeNull();
+    expect(rateRefusal("linkedin", h(5.5), [h(4)], undefined, { noGap: true })).toBeNull();   // an explicit "minutes apart" order
+  });
+  it("a back-off lowers the day's cap for that account only, while it runs", () => {
+    const b: Backoff = { platform: "linkedin", accountId: "38445", from: new Date(h(0)).toISOString(), until: new Date(h(48)).toISOString(), perDay: 2, why: "share limit" };
+    expect(rateRefusal("linkedin", h(12), [h(6), h(9)], undefined, { accountId: "38445", backoffs: [b] })).toMatch(/2 a day at most \(backing off until/);
+    expect(rateRefusal("linkedin", h(12), [h(6)], undefined, { accountId: "38445", backoffs: [b] })).toBeNull();
+    expect(rateRefusal("linkedin", h(12), [h(6), h(9)], undefined, { accountId: "other", backoffs: [b] })).toBeNull();
+    expect(rateRefusal("linkedin", h(60), [h(54), h(57)], undefined, { accountId: "38445", backoffs: [b] })).toBeNull();   // it is over
   });
   it("says when the account is free again, and failed posts do not count", () => {
-    const free = nextAllowed("linkedin", new Date(h(3)), [h(0), h(1), h(2)])!;
-    expect(free.getTime()).toBeGreaterThanOrEqual(h(24));
-    expect(free.getTime()).toBeLessThan(h(24.5));
+    const free = nextAllowed("linkedin", new Date(h(11)), [h(4), h(6), h(8), h(10)])!;
+    expect(zoneTime(free).date).toBe("2026-10-09");
     const post = (status: string, at: number) => ({ accountId: "38445", status, scheduledTime: new Date(at).toISOString(), createdAt: new Date(at).toISOString() });
     const tutorial = { posts: [post("published", h(0)), post("failed", h(0.5)), { ...post("scheduled", h(1)), accountId: "other" }] }, viral = { posts: [post("scheduled", h(2))] };
     expect(accountTimes("38445", tutorial, viral)).toEqual([h(0), h(2)]);
+  });
+  it("one tutorial cut a day per account: the first that YouTube publishes that day, in the tutorial slot", () => {
+    const v = (helpKey: string, publishAt: string) => ({ helpKey, publishAt });
+    const vids = [v("b-noon", "2026-10-12T16:00:00Z"), v("a-morning", "2026-10-12T13:00:00Z"), v("c-evening", "2026-10-12T21:00:00Z"), v("d-next", "2026-10-13T13:00:00Z"), v("e-next", "2026-10-13T16:00:00Z")];
+    expect(tutorialsOfTheDay(vids).map((x) => x.helpKey)).toEqual(["a-morning", "d-next"]);
+    expect(tutorialsOfTheDay(vids, { prefer: { "2026-10-12": "c-evening" } }).map((x) => x.helpKey)).toEqual(["c-evening", "d-next"]);
+    // 09:00 Eastern publish → that day's slot; 17:00 Eastern publish → the cut never precedes its video: the next day's.
+    const morning = tutorialSlotFor("2026-10-12T13:00:00Z", "instagram", "76607"), late = tutorialSlotFor("2026-10-12T21:00:00Z", "instagram", "76607");
+    expect(zoneTime(morning).date).toBe("2026-10-12"); expect(zoneTime(late).date).toBe("2026-10-13");
+    for (const at of [morning, late]) { const z = zoneTime(at).time; expect(z >= "10:15" && z <= "11:00", z).toBe(true); }
+    expect(tutorialRefusal(late, [morning.getTime()])).toBeNull();
+    expect(tutorialRefusal(new Date(morning.getTime() + 3 * 3600000), [morning.getTime()])).toMatch(/already has its tutorial cut on 2026-10-12/);
+    // The tutorial poster obeys it wherever it runs: three videos a day on YouTube → one cut a day per account.
+    const video = (k: string, at: string): VideoForPost => ({ helpKey: k, publishAt: at, posts: { instagram: { text: "t", cut: "vertical.mp4", media: { url: "https://constructhub.us/api/tutorials/media/x.mp4", sha256: "s" } }, linkedin: { text: "t", cut: "feed.mp4", media: { url: "https://constructhub.us/api/tutorials/media/x.mp4", sha256: "s" } } } });
+    const targets = [{ id: "76607", platform: "instagram" as const, name: "constructhubapp" }, { id: "38445", platform: "linkedin" as const, name: "Construct HUB" }];
+    const r = planPosts(vids.map((x) => video(x.helpKey, x.publishAt)), targets, emptySocialLedger(), { now: new Date("2026-10-12T10:00:00Z") });
+    expect(r.planned.map((p) => `${p.helpKey}@${p.target.platform}@${zoneTime(p.at).date}`).sort()).toEqual(["a-morning@instagram@2026-10-12", "a-morning@linkedin@2026-10-12", "d-next@instagram@2026-10-13", "d-next@linkedin@2026-10-13"]);
+    expect(r.skipped.filter((x) => /not the tutorial of the day/.test(x.reason))).toHaveLength(6);
+    for (const p of r.planned) expect(p.at.getTime()).toBe(slotAt(zoneTime(p.at).date, "tutorial", p.target.platform, p.target.id)!.getTime());
   });
   it("the gator poster counts the tutorial cuts — and “now” does not mean “more than the account can take”", () => {
     const now = new Date("2026-10-08T04:30:00Z");
     const LI: ViralTarget = { id: "38445", platform: "linkedin", name: "Construct HUB" };
     const clip = (id: string): ViralClip => ({ conceptId: id, platforms: { linkedin: { text: id } } });
     const tut = (iso: string): LedgerPost => ({ helpKey: iso, accountId: "38445", platform: "linkedin", account: "x", cut: "feed.mp4", mediaUrl: "", mediaSha256: "", textSha256: "", textLength: 1, scheduledTime: iso, scheduledEastern: "", status: "published", postSubmissionId: "p", createdAt: iso });
-    // The night of 2026-10-08: three tutorial cuts on LinkedIn since 22:31 Eastern, then gator clips "now".
-    const tutorial: SocialLedger = { ...emptySocialLedger(), posts: [tut("2026-10-08T02:31:56Z"), tut("2026-10-08T03:14:56Z"), tut("2026-10-08T03:58:56Z")] };
+    // 00:30 Eastern on the 8th with four posts already since midnight: "now" is refused, and it says when it is free.
+    const tutorial: SocialLedger = { ...emptySocialLedger(), posts: [tut("2026-10-08T04:01:00Z"), tut("2026-10-08T04:08:00Z"), tut("2026-10-08T04:15:00Z"), tut("2026-10-08T04:22:00Z")] };
     const r = planAsap([clip("a"), clip("b")], [LI], emptyViralLedger(), now, 4, { tutorial });
     expect(r.planned).toEqual([]);
     expect(r.skipped).toHaveLength(2);
-    expect(r.skipped[0].reason).toMatch(/3 at most.*free again 2026-10-08 22:45 EDT/);
+    expect(r.skipped[0].reason).toMatch(/4 a day at most.*free again 2026-10-09/);
     // The owner can still say "send it": the override is a flag, not the default.
     expect(planAsap([clip("a")], [LI], emptyViralLedger(), now, 4, { tutorial, overrideRate: true }).planned).toHaveLength(1);
     // The cadence planner keeps the rule too.
     const planned = planViral([clip("a")], [LI], { now, viral: emptyViralLedger(), tutorial }).planned;
     expect(planned).toHaveLength(1);
-    expect(planned[0].at.getTime()).toBeGreaterThan(Date.parse("2026-10-09T02:31:56Z"));
+    expect(zoneTime(planned[0].at).date).toBe("2026-10-09");
   });
   it("the tutorial poster counts the gator clips", () => {
-    const now = new Date("2026-10-12T13:00:00Z");
+    const now = new Date("2026-10-12T10:00:00Z");
     const video = (k: string, at: string): VideoForPost => ({ helpKey: k, publishAt: at, posts: { linkedin: { text: "t", cut: "feed.mp4", media: { url: "https://constructhub.us/api/tutorials/media/x.mp4", sha256: "s" } } } });
     const target = { id: "38445", platform: "linkedin" as const, name: "Construct HUB" };
-    const base = planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5 }).planned[0].at;
-    const three = [-3, -2, -1].map((n) => ({ accountId: "38445", at: new Date(base.getTime() + n * 3600000) }));
-    const pushed = planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5, otherPosts: three }).planned[0].at;
-    expect(pushed.getTime()).toBeGreaterThan(base.getTime() + 12 * 3600000);
-    expect(planPosts([video("v1", "2026-10-12T14:00:00Z")], [target], emptySocialLedger(), { now, perDay: 5, otherPosts: three.slice(1) }).planned[0].at.getTime()).toBe(base.getTime());
+    const base = planPosts([video("v1", "2026-10-12T13:00:00Z")], [target], emptySocialLedger(), { now }).planned[0].at;
+    const four = [-6, -3, 3, 6].map((n) => ({ accountId: "38445", at: new Date(base.getTime() + n * 3600000) }));
+    const pushed = planPosts([video("v1", "2026-10-12T13:00:00Z")], [target], emptySocialLedger(), { now, otherPosts: four }).planned[0].at;
+    expect(zoneTime(pushed).date).toBe("2026-10-13");
+    expect(planPosts([video("v1", "2026-10-12T13:00:00Z")], [target], emptySocialLedger(), { now, otherPosts: four.slice(1) }).planned[0].at.getTime()).toBe(base.getTime());
   });
 });
 
@@ -662,14 +707,40 @@ describe("gator shorts — what the machine checks by itself", () => {
     expect(clipSpent(ledger, "a")).toBe(4.96);
     expect(clipSpent(ledger, "ab")).toBe(1.6);
   });
-  it("the daily command: the next approved concept, and nothing posted without a reviewer", () => {
-    const q: Queue = { version: 1, order: ["x-gone", "a", "b", "c"], state: { a: { status: "approved", at: "t" } } };
+  it("the daily command: nothing is made twice, nothing is posted without a reviewer", () => {
+    const q: Queue = { version: 1, order: ["x-gone", "a", "b", "c"], state: { a: { status: "approved", at: "t", caption: ["Hook."], post: { tiktok: "captioned.mp4" } } } };
     expect(nextInQueue(q, ["a", "b", "c"])).toBe("b");
+    // A clip that is already on disk is never generated — and paid for — again.
+    expect(nextInQueue(q, ["a", "b", "c"], ["b"])).toBe("c");
+    expect(nextInQueue(q, ["a", "b", "c"], ["b", "c"])).toBeNull();
     expect(nextInQueue({ ...q, state: { ...q.state, b: { status: "rejected", at: "t" }, c: { status: "ready-for-review", at: "t" } } }, ["a", "b", "c"])).toBeNull();
     expect(mayPost(q, "b")).toMatch(/has not been made/);
-    expect(mayPost(q, "a")).toMatch(/already approved/);
+    expect(mayPost(q, "a")).toBeNull();
+    expect(mayPost({ ...q, state: { a: { status: "approved", at: "t" } } }, "a")).toMatch(/no caption or no file/);
     expect(mayPost({ ...q, state: { b: { status: "rejected", at: "t", why: "two tails" } } }, "b")).toMatch(/rejected: two tails/);
-    expect(mayPost({ ...q, state: { b: { status: "ready-for-review", at: "t" } } }, "b")).toBeNull();
+    expect(mayPost({ ...q, state: { b: { status: "ready-for-review", at: "t" } } }, "b")).toMatch(/ready-for-review — not posted/);
+    expect(mayPost({ ...q, state: { b: { status: "held", at: "t", why: "the owner: it does not look like an accident" } } }, "b")).toMatch(/held: the owner/);
+    expect(mayApprove(q, "a")).toMatch(/already approved/);
+    expect(mayApprove({ ...q, state: { b: { status: "ready-for-review", at: "t" } } }, "b")).toBeNull();
+    expect(mayApprove({ ...q, state: { b: { status: "held", at: "t" } } }, "b")).toBeNull();
+    expect(mayApprove({ ...q, state: { b: { status: "ready-for-review", at: "t", checks: ["-19 LUFS"] } } }, "b")).toMatch(/failed its automatic checks/);
+    // Which file each platform gets: subtitles where he talks, the music cut of a replay edit, LinkedIn only when it is tame.
+    const files = ["clip.mp4", "pure.mp4", "captioned.mp4", "replay-music.mp4", "replay-nomusic.mp4"];
+    expect(defaultPost(files, { talks: true })).toEqual({ tiktok: "captioned.mp4", instagram: "captioned.mp4" });
+    expect(defaultPost(files, { talks: false, replay: true })).toEqual({ tiktok: "replay-music.mp4", instagram: "replay-music.mp4" });
+    expect(defaultPost(["clip.mp4", "pure.mp4", "captioned.mp4"], { talks: false, linkedin: true })).toEqual({ tiktok: "pure.mp4", instagram: "pure.mp4", linkedin: "pure.mp4" });
+    expect(defaultPost(["clip.mp4"], { talks: true, linkedin: true })).toEqual({ tiktok: "clip.mp4", instagram: "clip.mp4", linkedin: "clip.mp4" });
+    // Every caption: the hook, one line, "#AIContent" — and no claim beyond the name and the address.
+    for (const pf of ["tiktok", "instagram", "linkedin"] as const) {
+      const text = captionFor(pf, ["He's been doing this twenty years.", "Never said good years."]);
+      expect(text.startsWith("He's been doing this twenty years.\nNever said good years.")).toBe(true);
+      expect(text).toContain("#AIContent");
+      expect(text).not.toMatch(/\b(best|guarantee|free|#1|save)\b/i);
+    }
+    expect(captionFor("tiktok", ["Hook."])).toBe("Hook.\n#AIContent #contractorlife #construction #jobsite #bluecollar");
+    // The committed queue: every approved clip can be posted, and its files exist as named.
+    const real = readQueue();
+    for (const [id, st] of Object.entries(real.state)) { if (st.status === "approved") expect(mayPost(real, id), id).toBeNull(); else expect(st.why, id).toBeTruthy(); }
     const c = conceptById("permit-office-359");
     const good = { clip: { width: 1080, height: 1920, fps: 30, durationSec: 9.5, lufs: -14.2, truePeakDb: -3 }, aiGenerated: true, disclosure: { tiktok: { isAiGenerated: true }, youtube: { containsSyntheticMedia: true } }, speech: { lineOverBedDb: 14 } };
     expect(automaticChecks(c, good, 14, 24).failed).toEqual([]);

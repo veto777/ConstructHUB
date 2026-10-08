@@ -119,20 +119,17 @@ Three clips, 7.9 s each, in `analysis/gator-shorts/` (git-ignored): `two-day-job
 
 ## Mixing into the calendar
 
-Proposed default — implemented as a plan only (`scripts/gator/stream.ts`, tested; nothing is posted):
+The owner's cadence (2026-10-08), in code in `scripts/tutorials/social-rate.ts` (shared by both streams) and
+`scripts/gator/stream.ts`, tested:
 
-- **Tutorials stay exactly as they are**: three a day on YouTube, their cuts following on the other
-  platforms, their own ledger (`docs/tutorials/social-schedule.json`).
-- **TikTok and Instagram: tutorial cuts + one gator clip a day** per account, at a peak slot —
-  12:00 or 19:00 Eastern, which of the two varies by day and account, 3–22 minutes
-  past the hour, never within 45 minutes of another post on that account.
-- **Never back-to-back**: on an account's timeline a gator clip always has a tutorial cut between it and the
-  last gator clip. No tutorial cut that day → no gator clip that day (the stream waits; it never fills a gap).
-- **LinkedIn: two gator clips a week at most** (Monday–Sunday), weekdays at 12:00 Eastern, and only the
-  15 concepts written a LinkedIn version; the other 15 are skipped there.
-- **YouTube Shorts: one a day** through our own YouTube client (never Blotato), `#Shorts` in the title,
-  `status.containsSyntheticMedia: true` (verified in YouTube's videos resource: settable in videos.insert),
-  category 24, never within 45 minutes of a tutorial's publish time.
+- **YouTube gets every walkthrough and no gator clips.** (The Shorts code is kept, switched off.)
+- **TikTok, Instagram and LinkedIn: one tutorial cut and 3 gator clips a day per account**, at least two
+  hours apart: gator 07:30–08:15, the tutorial 10:15–11:00, gator 13:00–13:30, gator 18:30–20:30 Eastern; the
+  minute moves every day. LinkedIn on weekdays keeps to business hours (08:00–08:15, 13:00–13:30,
+  15:30–17:30) and at the weekend gets the tutorial and one gator clip; it only gets the tame clips.
+- **Four posts a day per account**; if LinkedIn ("share limit") or Instagram ("account is restricted") refuses
+  a post, that account drops to two a day for 48 hours and the refused clip moves to the next free slot,
+  never sooner than 12 hours later.
 - **Its own ledger**: `docs/gator/viral-schedule.json`, entries marked `stream: "viral"`; a clip goes to an
   account once.
 - **Order**: evergreen concepts in the order below, a satisfying-work clip after every two jokes; the

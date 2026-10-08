@@ -145,20 +145,22 @@ describe("when", () => {
     // After the clocks go back (1 November 2026) nine o'clock is still nine o'clock Eastern.
     expect(eastern(followYouTube("2026-10-31T15:00:00.000Z", "linkedin", "crm-home", "38445"))).toMatchObject({ date: "2026-11-02", abbr: "EST" });
   });
-  it("starts new accounts gently: one post per account per day for 14 days, then three", () => {
-    const now = new Date("2026-10-08T14:00:00.000Z"), { planned } = planPosts(FOUR, targets(), emptyLedger(), { now });
+  it("one tutorial cut per account per day — the tutorial of the day, in the tutorial slot (10:15–11:00 Eastern)", () => {
+    // Four videos YouTube published on one day: by default only the first gets a cut.
+    const now = new Date("2026-10-08T10:00:00.000Z"), one = planPosts(FOUR, targets(), emptyLedger(), { now });
+    expect(one.planned.map((p) => p.helpKey)).toEqual(Array(targets().length).fill([...FOUR].sort((a, b) => a.publishAt.localeCompare(b.publishAt))[0].helpKey));
+    // `everyVideo`: all of them, one a day per account — also after the warm-up.
+    const { planned } = planPosts(FOUR, targets(), emptyLedger(), { now, everyVideo: true });
     expect(planned.length).toBe(12);
     for (const t of targets()) {
-      const days = planned.filter((p) => p.target.id === t.id).map((p) => eastern(p.at).date);
-      expect(new Set(days).size, t.platform).toBe(4);
-      if (t.platform === "linkedin") for (const p of planned.filter((x) => x.target.id === t.id)) expect(["Saturday", "Sunday"]).not.toContain(eastern(p.at).weekday);
+      const mine = planned.filter((p) => p.target.id === t.id);
+      expect(new Set(mine.map((p) => eastern(p.at).date)).size, t.platform).toBe(4);
+      for (const p of mine) { const z = eastern(p.at).time; expect(z >= "10:15" && z <= "11:00", `${t.platform} ${z}`).toBe(true); }
     }
-    // Twenty videos scheduled over the coming weeks: at most one a day inside the warm-up, up to three after it.
     const many = Array.from({ length: 20 }, (_x, i) => video(`crm-v${i}`, new Date(Date.parse("2026-10-20T13:00:00Z") + Math.floor(i / 4) * 86400000 + i * 600000).toISOString()));
     const per = new Map<string, number>();
-    for (const p of planPosts(many, [targets()[0]], emptyLedger(), { now, warmupStart: "2026-10-08" }).planned) per.set(eastern(p.at).date, (per.get(eastern(p.at).date) ?? 0) + 1);
-    for (const [date, n] of per) expect(n, date).toBeLessThanOrEqual(date < "2026-10-22" ? 1 : 3);
-    expect(Math.max(...per.values())).toBe(3);
+    for (const p of planPosts(many, [targets()[0]], emptyLedger(), { now, warmupStart: "2026-10-08", everyVideo: true }).planned) per.set(eastern(p.at).date, (per.get(eastern(p.at).date) ?? 0) + 1);
+    expect(Math.max(...per.values())).toBe(1);
   });
   it("--spread: the first post now, the next ones 30–45 minutes apart per account, accounts a few minutes apart", () => {
     const now = new Date("2026-10-08T14:00:00.000Z"), { planned } = planPosts(FOUR, targets(), emptyLedger(), { now, spreadMin: 30, perDay: 4 });
@@ -174,9 +176,6 @@ describe("when", () => {
       starts.push(mine[0].at.getTime());
       for (let i = 1; i < mine.length; i++) {
         const gap = (mine[i].at.getTime() - mine[i - 1].at.getTime()) / 60000;
-        // LinkedIn takes three posts in 24 hours from an unverified profile (social-rate.ts, learned 2026-10-08):
-        // its fourth waits until the first is a day old.
-        if (t.platform === "linkedin" && i === 3) { expect(mine[3].at.getTime() - mine[0].at.getTime()).toBeGreaterThanOrEqual(24 * 3600000); continue; }
         expect(gap).toBeGreaterThanOrEqual(30); expect(gap).toBeLessThanOrEqual(45);
         expect(mine[i].body.scheduledTime).toBe(mine[i].at.toISOString());
         expect(mine[i].immediate).toBe(false);
@@ -185,7 +184,7 @@ describe("when", () => {
     expect((starts[1] - starts[0]) / 60000).toBeGreaterThanOrEqual(3);
     expect((starts[2] - starts[1]) / 60000).toBeGreaterThanOrEqual(3);
     expect((starts[2] - starts[0]) / 60000).toBeLessThanOrEqual(12);
-    // Without --per-day the warm-up cap still holds: one today, the rest on the following days.
+    // Without --per-day the one-a-day rule still holds: one today, the rest on the following days.
     const capped = planPosts(FOUR, [targets()[0]], emptyLedger(), { now, spreadMin: 30 }).planned;
     expect(new Set(capped.map((p) => eastern(p.at).date)).size).toBe(4);
   });

@@ -1,11 +1,359 @@
 {
   "version": 1,
   "order": [
-    "selfie-roof", "fall-bucket", "selfie-deck", "moment-ladders", "slap-jobsite", "goat-cousin",
-    "cctv-ladder", "fail-dominoes", "cctv-shingles", "cast-stretcher", "selfie-leak", "fail-wheelbarrow",
-    "fall-wetfloor", "cast-inspector", "pov-nailgun", "pov-one-trip", "skill-blower", "skill-tail",
-    "goat-inch-short", "mascot-shed", "take-measure", "take-caulk", "satis-chalk", "satis-caulk",
-    "moment-video", "slap-arena", "measure-twice", "zero-percent-rain"
+    "selfie-roof",
+    "goat-cousin",
+    "cast-stretcher",
+    "slap-jobsite",
+    "take-measure",
+    "moment-ladders",
+    "selfie-deck",
+    "pov-nailgun",
+    "goat-inch-short",
+    "skill-tail",
+    "cast-inspector",
+    "slap-arena",
+    "take-caulk",
+    "pov-one-trip",
+    "measure-twice",
+    "skill-blower",
+    "zero-percent-rain",
+    "fall-bucket",
+    "fall-wetfloor",
+    "fail-dominoes",
+    "fail-wheelbarrow",
+    "cctv-ladder",
+    "cctv-shingles",
+    "satis-chalk",
+    "satis-caulk",
+    "mascot-shed",
+    "moment-video",
+    "selfie-leak",
+    "talking-sample-1",
+    "talking-sample-2",
+    "talking-sample-3",
+    "talking-sample-4",
+    "talking-final-1",
+    "our-goat"
   ],
-  "state": {}
+  "state": {
+    "selfie-roof": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "He's been doing this twenty years.",
+        "He never said good years."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4"
+      }
+    },
+    "goat-cousin": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "“That's your price? My cousin can do it cheaper.”",
+        "Every estimator's whole week, in one goat."
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4",
+        "linkedin": "clip.mp4"
+      }
+    },
+    "cast-stretcher": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "He sent the new guy for a board stretcher.",
+        "The new guy came back with one."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "slap-jobsite": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Lunch break. The big guy said go ahead.",
+        "He's fine. He landed in the insulation."
+      ],
+      "post": {
+        "tiktok": "replay-music.mp4",
+        "instagram": "replay-music.mp4"
+      }
+    },
+    "take-measure": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Measure once. Cut twice.",
+        "That's the trade."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "moment-ladders": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "He had one more thing to say about ladders.",
+        "The crew had heard enough. (Tie off.)"
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4"
+      }
+    },
+    "selfie-deck": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Day one on the new deck. He said it was solid.",
+        "Day two starts now."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4"
+      }
+    },
+    "pov-nailgun": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "New guy's first day.",
+        "Nobody has said a word to him since."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "goat-inch-short": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "“Cut it exactly where you said, boss.”",
+        "Measure twice. Then check who measured."
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4",
+        "linkedin": "clip.mp4"
+      }
+    },
+    "skill-tail": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "No trowel. He says he doesn't need one.",
+        "Honestly, nice finish."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "cast-inspector": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "The inspector looked in the panel.",
+        "He does that. Means we passed."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "slap-arena": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "They let the little guy have a turn.",
+        "Never bet against the hard hat."
+      ],
+      "post": {
+        "tiktok": "replay-music.mp4",
+        "instagram": "replay-music.mp4"
+      }
+    },
+    "take-caulk": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Do your best.",
+        "Caulk the rest."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "pov-one-trip": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "He said he'd get it all in one trip.",
+        "He did."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "measure-twice": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Measure twice. Cut once.",
+        "Still short."
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4",
+        "linkedin": "clip.mp4"
+      }
+    },
+    "skill-blower": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "He found a new setting on the leaf blower.",
+        "Do not ask him how."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      }
+    },
+    "zero-percent-rain": {
+      "status": "approved",
+      "at": "2026-10-08T12:33:18Z",
+      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "caption": [
+        "Forecast: 0% chance of rain.",
+        "The 0%:"
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4",
+        "linkedin": "clip.mp4"
+      }
+    },
+    "fall-bucket": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "fall-wetfloor": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "fail-dominoes": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "fail-wheelbarrow": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "cctv-ladder": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "cctv-shingles": {
+      "status": "held",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
+    },
+    "satis-chalk": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the chalk lines come out as scribbles, not three straight lines"
+    },
+    "satis-caulk": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the camera dives into his arm after the bead"
+    },
+    "mascot-shed": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "off-model: the talking model gave the cartoon mascot see-through glasses and eyes; a white band in the still"
+    },
+    "moment-video": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the possum vanishes under the wall and is never shown fine — a viewer could think he is under it"
+    },
+    "selfie-leak": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the weakest selfie: the burst is small and the last line is cut short"
+    },
+    "talking-sample-1": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "voice test, not a clip for posting"
+    },
+    "talking-sample-2": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "voice test, not a clip for posting (the mascot gets eyes when he talks)"
+    },
+    "talking-sample-3": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "voice test, not a clip for posting"
+    },
+    "talking-sample-4": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "voice test, not a clip for posting"
+    },
+    "talking-final-1": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "off-model: the cartoon mascot gets eyes when he talks"
+    },
+    "our-goat": {
+      "status": "rejected",
+      "at": "2026-10-08T12:33:18Z",
+      "why": "the goat alone is an ingredient of the goat cuts, not a post"
+    }
+  }
 }

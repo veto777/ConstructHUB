@@ -26,27 +26,40 @@ import { CONCEPTS, conceptById, lintConcept, type Concept } from "./concepts";
 import { spent } from "./higgsfield";
 import { OUT, clipSpent, produce, readLedger } from "./make";
 import { viralMain } from "./post";
+import { readQueue, saveQueue, type PostPlatform, type Queue } from "./queue";
 
-export const QUEUE = path.join(ROOT, "docs", "gator", "queue.json");
+export { QUEUE, readQueue, type Queue, type QueueState } from "./queue";
 export const REVIEW_DIR = path.join(OUT, "_review");
 export const DEFAULT_CLIP_BUDGET = 24;
-export type QueueState = { status: "ready-for-review" | "approved" | "rejected"; at: string; credits?: number; checks?: string[]; why?: string };
-export type Queue = { version: 1; order: string[]; state: Record<string, QueueState> };
-export const readQueue = (file = QUEUE): Queue => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { version: 1, order: [], state: {} });
-const saveQueue = (q: Queue) => { fs.mkdirSync(path.dirname(QUEUE), { recursive: true }); fs.writeFileSync(QUEUE, JSON.stringify(q, null, 2) + "\n"); };
 
-/** The next concept to make: the first in `order` that has no state yet. Pure (tested). */
-export function nextInQueue(q: Queue, known: readonly string[]): string | null {
-  for (const id of q.order) if (!q.state[id] && known.includes(id)) return id;
+/**
+ * The next concept to MAKE: the first in `order` that has no state and no finished clip. A clip that is
+ * already on disk (`made`) is never made — and paid for — again: it is registered instead. Pure (tested).
+ */
+export function nextInQueue(q: Queue, known: readonly string[], made: readonly string[] = []): string | null {
+  for (const id of q.order) if (!q.state[id] && known.includes(id) && !made.includes(id)) return id;
   return null;
+}
+/** May this clip be approved? Only one that was made and is waiting (or held). Pure (tested). */
+export function mayApprove(q: Queue, id: string): string | null {
+  const s = q.state[id];
+  if (!s) return `${id} has not been made by the daily command`;
+  if (s.status === "rejected") return `${id} was rejected${s.why ? `: ${s.why}` : ""}`;
+  if (s.status === "ready-for-review" || s.status === "held") return s.checks?.length ? `${id} failed its automatic checks (${s.checks.join("; ")})` : null;
+  return `${id} is already ${s.status}`;
 }
 /** May this clip be posted? Only after a reviewer said so. Pure (tested). */
 export function mayPost(q: Queue, id: string): string | null {
   const s = q.state[id];
   if (!s) return `${id} has not been made by the daily command`;
-  if (s.status === "rejected") return `${id} was rejected${s.why ? `: ${s.why}` : ""}`;
-  if (s.status === "ready-for-review") return null;
-  return `${id} is already ${s.status}`;
+  if (s.status === "approved") return s.post && s.caption ? null : `${id} is approved but has no caption or no file per platform`;
+  return `${id} is ${s.status}${s.why ? `: ${s.why}` : ""} — not posted`;
+}
+/** Which file each platform gets by default: subtitles where he talks (muted feeds), the music cut of a replay edit; LinkedIn only when asked. Pure (tested). */
+export function defaultPost(files: readonly string[], o: { talks: boolean; replay?: boolean; linkedin?: boolean }): Partial<Record<PostPlatform, string>> {
+  const has = (f: string) => files.includes(f);
+  const feed = o.replay && has("replay-music.mp4") ? "replay-music.mp4" : o.talks && has("captioned.mp4") ? "captioned.mp4" : has("pure.mp4") ? "pure.mp4" : "clip.mp4";
+  return { tiktok: feed, instagram: feed, ...(o.linkedin ? { linkedin: has("pure.mp4") ? "pure.mp4" : "clip.mp4" } : {}) };
 }
 
 /** What a machine can check of a finished clip. An empty list = nothing wrong that can be measured. */
@@ -94,13 +107,13 @@ export function toReview(c: Concept, budget: number): { passed: string[]; failed
   const social = JSON.parse(fs.readFileSync(path.join(src, "social.json"), "utf8")), credits = clipSpent(readLedger(), c.id);
   const checks = automaticChecks(c, social, credits, budget);
   fs.mkdirSync(dst, { recursive: true });
-  for (const f of ["clip.mp4", "cover.jpg", "review.jpg", "social.json"]) fs.copyFileSync(path.join(src, f), path.join(dst, f));
+  for (const f of ["clip.mp4", "cover.jpg", "review.jpg", "social.json"]) if (fs.existsSync(path.join(src, f))) fs.copyFileSync(path.join(src, f), path.join(dst, f));
   fs.writeFileSync(path.join(dst, "REVIEW.md"), reviewMd(c, social, checks, credits));
   return { ...checks, credits };
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["status"]);
+  const args = parseArgs(process.argv.slice(2), ["status", "schedule", "go", "linkedin"]);
   const q = readQueue(), known = CONCEPTS.map((c) => c.id);
   const budget = typeof args.flags.budget === "string" ? Number(args.flags.budget) : DEFAULT_CLIP_BUDGET;
   if (!(budget > 0 && budget <= 100)) throw new Error("--budget is 1–100 credits");
@@ -108,7 +121,7 @@ async function main() {
     const s = spent(readLedger());
     console.log(`budget: ${s.credits} of ${readLedger().cap.credits} credits spent`);
     for (const id of q.order) console.log(`  ${(q.state[id]?.status ?? "to make").padEnd(17)} ${id}${q.state[id]?.why ? `  (${q.state[id].why})` : ""}`);
-    console.log(`next: ${nextInQueue(q, known) ?? "— the queue is empty: add concept ids to `order` in docs/gator/queue.json"}`);
+    console.log(`next: ${nextInQueue(q, known, known.filter((k) => fs.existsSync(path.join(OUT, k, "social.json")))) ?? "— the queue is empty: add concept ids to `order` in docs/gator/queue.json"}`);
     return;
   }
   if (typeof args.flags.reject === "string") {
@@ -118,21 +131,38 @@ async function main() {
     saveQueue(q); console.log(`${id}: rejected — it will not be posted`);
     return;
   }
-  if (typeof args.flags.approve === "string") {
-    const id = args.flags.approve, no = mayPost(q, id);
-    if (no) throw new Error(no);
-    if (!fs.existsSync(path.join(REVIEW_DIR, id, "REVIEW.md"))) throw new Error(`${id} has no review sheet (${path.join(REVIEW_DIR, id)})`);
-    if (q.state[id].checks?.length) throw new Error(`${id} failed its automatic checks (${q.state[id].checks!.join("; ")}) — fix and assemble it again before approving`);
-    // The cadence (one a day at a peak slot, never back-to-back, the platforms' rate rule) picks the time.
-    const code = await viralMain([id, "--go", "--brief"]);
-    if (code !== 0) throw new Error(`${id}: the poster stopped (exit ${code}) — it stays ready for review`);
-    q.state[id] = { ...q.state[id], status: "approved", at: new Date().toISOString() };
-    saveQueue(q); console.log(`${id}: approved and queued — commit docs/gator/queue.json and docs/gator/viral-schedule.json`);
+  if (typeof args.flags.hold === "string") {
+    const id = args.flags.hold;
+    if (!q.state[id]) throw new Error(`${id} is not in the review queue`);
+    q.state[id] = { ...q.state[id], status: "held", at: new Date().toISOString(), why: typeof args.flags.why === "string" ? args.flags.why : "waiting for the owner" };
+    saveQueue(q); console.log(`${id}: held — it will not be posted until someone approves it`);
     return;
   }
-  const id = typeof args.flags.concept === "string" ? args.flags.concept : nextInQueue(q, known);
+  if (typeof args.flags.approve === "string") {
+    // "I looked at its frames (and listened): it may be posted." Approving does not post: --schedule does.
+    const id = args.flags.approve, no = mayApprove(q, id);
+    if (no) throw new Error(no);
+    const dir = path.join(OUT, id), c = conceptById(id);
+    const caption: [string, string?] = typeof args.flags.caption === "string" ? (args.flags.caption.split("|").map((x) => x.trim()) as [string, string?]) : q.state[id].caption ?? [c.caption];
+    const post = q.state[id].post ?? defaultPost(fs.readdirSync(dir), { talks: c.shots.some((x) => x.say), replay: fs.existsSync(path.join(dir, "replay-music.mp4")) && !c.shots.some((x) => x.say), linkedin: !!args.flags.linkedin });
+    q.state[id] = { ...q.state[id], status: "approved", at: new Date().toISOString(), by: typeof args.flags.by === "string" ? args.flags.by : "a reviewer", caption, post };
+    delete q.state[id].why;
+    saveQueue(q); console.log(`${id}: approved — ${Object.entries(post).map(([p, f]) => `${p}: ${f}`).join(", ")}. It goes out with the next --schedule --go.`);
+    return;
+  }
+  if (args.flags.schedule) {
+    // Every approved clip that an account does not have yet, in the queue's order, into the next free gator slots.
+    const ids = q.order.filter((id) => !mayPost(q, id));
+    if (!ids.length) { console.log("Nothing approved is waiting."); return; }
+    const code = await viralMain([...ids, "--brief", ...(args.flags.go ? ["--go"] : []), ...(typeof args.flags.table === "string" ? ["--table", args.flags.table] : []), ...(typeof args.flags.platform === "string" ? ["--platform", args.flags.platform] : [])]);
+    if (code !== 0) throw new Error(`the poster stopped (exit ${code})`);
+    return;
+  }
+  const made = known.filter((k) => fs.existsSync(path.join(OUT, k, "social.json")));
+  const id = typeof args.flags.concept === "string" ? args.flags.concept : nextInQueue(q, known, made);
   if (!id) { console.log("Nothing to make: every concept in docs/gator/queue.json `order` has been made. Add ids to approve more concepts."); return; }
   if (q.state[id]) throw new Error(`${id} is already ${q.state[id].status}`);
+  if (made.includes(id)) throw new Error(`${id} has already been made (${path.join(OUT, id)}) — it is not generated and paid for twice. Register it for review instead of making it again.`);
   if (!q.order.includes(id)) throw new Error(`${id} is not approved for making — add it to \`order\` in docs/gator/queue.json`);
   const c = conceptById(id);
   console.log(`${id} — “${c.title}”  (budget ${budget} credits)`);
