@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-payment-record",
+  "title": "Record a check or cash payment",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Find the invoice",
+      "narration": "A client handed you a check. Here's how to record it against their invoice."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Quintanilla",
+      "caption": "Search for the client",
+      "narration": "On Clients, search for the client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Rafael Quintanilla\")",
+      "caption": "Open the client",
+      "narration": "Click the name to open their page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"invoice-demo-invoice-inv-2000\"]",
+      "caption": "The invoice: paid and due",
+      "narration": "Under Invoices, this one is part paid. The line shows what's paid and what's still due."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-record-payment-demo-invoice-inv-2000\"]",
+      "caption": "Record payment",
+      "chapter": "Record the payment",
+      "narration": "Choose Record payment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-payment-amount\"]",
+      "caption": "Amount received",
+      "narration": "The amount is filled in with what's still due. Change it if the client paid less."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-payment-method\"]",
+      "value": "Check",
+      "caption": "Method",
+      "narration": "Pick how they paid: check, cash, wire, or a card you took another way."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder^=\"Check #\"]",
+      "value": "Check #318",
+      "caption": "Note",
+      "narration": "Add a note, like the check number."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-payment\"]",
+      "caption": "Record",
+      "narration": "Then choose Record."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"invoice-demo-invoice-inv-2000\"]",
+      "caption": "Paid, nothing due",
+      "chapter": "The balance updates",
+      "narration": "The invoice is now marked paid, and the client gets an emailed receipt."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-outstanding-balance\"]",
+      "caption": "Outstanding balance",
+      "narration": "Higher up, the outstanding balance and the amount collected have changed too."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"client-payment-\"] >> nth=0",
+      "caption": "Listed under Payments",
+      "narration": "The payment is listed under Payments, with a Reverse button in case it was entered by mistake."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find your clients, and their invoices, under Clients in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to record a check or cash payment | ConstructHUB CRM",
+    "description": "A short walkthrough of recording a payment by hand in the ConstructHUB CRM. You will open a client, choose Record payment on their invoice, set the amount, the method and a note, and see the invoice and the client's balance update.",
+    "tags": [
+      "record a payment",
+      "check payment",
+      "cash payment",
+      "contractor invoice",
+      "invoicing software",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Got a check?",
+    "accent": "check?",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}
