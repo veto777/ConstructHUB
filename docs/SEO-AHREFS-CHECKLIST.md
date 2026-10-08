@@ -63,7 +63,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  F2  Site audit -> Pages: every crawled page with status, whether it can be indexed and why not, clicks from the home page, links to it, words, title and description length, size, the issues it is listed under; quick filters, search, sort, export. When a site's links only exist after JavaScript runs (true of alpineexteriorswa.com), link counts and depth are shown as not measurable instead of wrong. TODO: pause/resume, custom page limit (fixed at 150), JavaScript rendering.
 
 ## G. Other Ahrefs tools
-- [ ] TODO  G1  Content Explorer.  G3  Web Analytics.
+- [x] PART  G1  Content explorer (`/seo/content`): search the web for pages about a topic; title, site, authority, date, author, excerpt; sort by relevance / strongest sites / newest; filters for date, authority, kind of site, leaving out your own; paging, export, open a site in Site explorer. Run live and seen in a browser 10-08. Not Ahrefs' depth: no traffic or linking-site numbers per page.
+- [ ] TODO  G3  Web Analytics.
 - [x] DONE  G2  Brand Radar / AI visibility: see B13. A question can be asked again every month (up to 5 per site), from the included data only. Not yet: competitor share across many questions.
 - [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
 - [x] DONE  G5  Reports (`/seo/reports`): the site's report on screen, as a PDF (the account's own name and logo when set), and emailed weekly or monthly to up to 5 addresses, or sent now. Built from saved numbers - free. Seen in a browser; the PDF was rendered and read (and two faults found that way were fixed).
@@ -192,6 +193,19 @@ Coverage: about 50% (45-55%). 13 new defects, on AI visibility and the audit pag
 OPEN: 12 (back-fill is not a versioned migration), the shared email / notification helpers, cost of posting tasks the source rejects,
 per-process locks, usage paging, agency delegation, no way to delete a saved AI question.
 
+## Codex audit #8 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-8.md)
+Verdict: "Substantial SEO functionality, but billing recovery, automatic AI tracking, and customer-facing conclusions still need fixes. This is not
+yet an Ahrefs equivalent." Coverage: 50-60%, midpoint 55%, with Content Explorer still counted as 0-5% (built the same day). 12 new defects:
+ 1 a tracked AI question could drop out of view ..... FIXED (every tracked question is listed with its own Stop; one spelling of a question everywhere)
+ 5 answers of different asks counted together ....... FIXED (run id; saved all-or-none; the server says whether they were saved)
+ 6 a failed monthly ask was lost for 30 days ........ FIXED (leased for an hour; the month moves on only after the answers are saved)
+ 7 an answer could land under another site ......... FIXED (bound to the site it was asked for)
+ 8 batch analysis invented zeros / no retry ........ FIXED (unknown is shown as unknown; a column that did not load can be retried)
+10 canonical tag called a block .................... FIXED (its own filter, described as a request Google usually follows); links are judged on any same-site link
+11 crawl limits applied after reading everything ... FIXED (1,000 pages and 500 links a page inside the query)
+OPEN: 2 (refund intent not written atomically with the run closing), 3 (cost of rank tasks the source rejects), 4 (the shared notifier),
+9 (unknown cost as an amount, outside rank posting), 12 (the back-fill is not a versioned migration).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -218,3 +232,5 @@ per-process locks, usage paging, agency delegation, no way to delete a saved AI 
   in a browser; looking at the page explorer on the real crawl is what showed that link counts cannot be trusted on a JavaScript-built site.
 - 2026-10-08 (slice 10): batch analysis, positions over time, monthly AI questions, Codex audit #7 fixes. 181 SEO unit tests.
   Batch analysis and the monthly AI question were run for real; every SEO tab was opened in the browser with no page errors.
+- 2026-10-08 (slice 11): Content explorer, Codex audit #8 fixes, section tabs wrap to two lines on a wide screen. 188 SEO unit tests.
+  Content explorer run live; the AI page re-run in the browser after the run-id change.
