@@ -91,9 +91,14 @@ describe("rendering check", () => {
       // A run closed meanwhile: nothing more is fetched for it.
       let fetched = 0;
       renderDeps.request = (async () => { fetched++; return ok(item(400, 30), 0.001); }) as any;
-      const cut = await fetchRender(["https://alpine.example/a", "https://alpine.example/b", "https://alpine.example/c", "https://alpine.example/d", "https://alpine.example/e"], undefined, async () => true);
-      expect(fetched).toBeLessThanOrEqual(6);   // at most the three pages already under way
-      expect(cut.data.rows.filter((r) => r.verdict === "unknown").length).toBeGreaterThanOrEqual(2);
+      const cut: any = await fetchRender(["https://alpine.example/a", "https://alpine.example/b", "https://alpine.example/c", "https://alpine.example/d", "https://alpine.example/e"], undefined, async () => true).catch((e) => e);
+      expect(fetched).toBe(0);   // closed before it began: not even the first page is asked for
+      expect(cut).toBeInstanceOf(Error);
+      // Closed part-way: what is under way finishes, nothing new is asked for — and when the run's state cannot be read, the same.
+      let asked = 0; fetched = 0;
+      const part = await fetchRender(["https://alpine.example/a", "https://alpine.example/b", "https://alpine.example/c", "https://alpine.example/d", "https://alpine.example/e"], undefined, async () => { if (++asked > 4) throw new Error("database down"); return false; });
+      expect(fetched).toBe(4);
+      expect(part.data.rows.filter((r) => r.verdict === "unknown").length).toBeGreaterThanOrEqual(3);
       renderDeps.request = (async () => { throw new DataForSeoError("timeout", "timed out"); }) as any;
       const failed: any = await fetchRender(["https://alpine.example/a"]).catch((e) => e);
       expect(failed).toBeInstanceOf(Error);

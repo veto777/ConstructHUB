@@ -15,6 +15,7 @@ type Summary = {
   byEngine: (Count & { engine: string })[]; byMonth: (Count & { month: string; questions: number })[];
   businesses: { name: string; answers: number; questions: number }[];
   sources: { domain: string; answers: number; questions: number; ours: boolean; rival: boolean; directory?: string }[];
+  truncated?: boolean;
 };
 const ENGINE: Record<string, string> = { chatgpt: "ChatGPT", gemini: "Google Gemini", perplexity: "Perplexity" };
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
@@ -32,19 +33,41 @@ function Bar({ n, total, label }: { n: number; total: number; label: string }) {
 }
 
 export function AiSummaryPanel({ site }: { site: SeoSite }) {
-  const q = useQuery<Summary>({ queryKey: [`/api/seo/sites/${site.id}/ai/summary`], refetchOnMount: "always" });
-  if (q.isLoading) return null;
+  // Asked again when the window is looked at and every few minutes: the monthly questions, or another tab, may have added answers.
+  const q = useQuery<Summary>({ queryKey: [`/api/seo/sites/${site.id}/ai/summary`], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 60_000, refetchInterval: 5 * 60_000 });
+  if (q.isLoading) return <p className="g-text-2 mb-4 text-[13px]" role="status" data-testid="ai-summary-loading">Adding up your saved answers…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't add up your saved answers: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
   const s = q.data;
-  // Nothing asked yet (or not lately): the page's own introduction says what to do; no empty panel.
-  if (!s || s.now.answers === 0) return null;
+  // Nothing saved at all: the page's own introduction says what to do; no empty panel.
+  if (!s || (s.now.answers === 0 && s.byMonth.length === 0)) return null;
+  const months = (
+    <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-months">
+      <h3 className="g-text mb-2 text-[14px] font-medium">Month by month</h3>
+      {s.byMonth.length < 2 && s.now.answers > 0 ? <p className="g-text-2 text-[13px]">One month of answers so far. Ask the same questions again next month — or tick "ask every month" — to see whether this moves.</p> : (
+        <table className="g-table w-full">
+          <thead><tr><th>Month</th><th className="num">Questions</th><th className="num">Named you</th><th className="num">Used your site</th></tr></thead>
+          <tbody>{s.byMonth.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td className="num">{fmtNum(m.questions)}</td><td className="num">{of(m.mentioned, m.answers)}</td><td className="num">{of(m.cited, m.answers)}</td></tr>)}</tbody>
+        </table>
+      )}
+      {s.byMonth.length >= 2 && <p className="g-text-2 mt-2 text-[12px]">Each month counts the newest answer to each question from each assistant. Months can hold different questions and different assistants, so they are not like for like — the Questions column says how many each rests on.</p>}
+      {s.truncated && <p className="g-text-2 mt-2 text-[12px]" role="status">There are more saved answers than are read at once; the oldest months may be incomplete.</p>}
+    </div>
+  );
+  // Answers on record, but none recent: the history is still shown, and "now" is not claimed.
+  if (s.now.answers === 0) return (
+    <section className="mb-6" data-testid="ai-summary">
+      <h2 className="g-text text-[16px] font-medium">The picture so far</h2>
+      <p className="g-text-2 mb-3 max-w-3xl text-[13px]" data-testid="text-ai-summary">No answers from the last {s.nowDays} days, so there is nothing to say about now. Ask your questions again to bring this up to date; the earlier months are below.</p>
+      <div className="grid gap-4 lg:grid-cols-2">{months}</div>
+    </section>
+  );
   const others = s.sources.filter((x) => !x.ours);
-  const task = (x: Summary["sources"][number]): PlanTask => ({ kind: "link_prospect", title: `Check your ${x.directory ?? x.domain} profile — AI assistants read ${x.domain} for ${x.questions} of your questions`, target: x.domain, facts: { answers: x.answers, questions: x.questions }, source: `ai-source:${x.domain}` });
+  const task = (x: Summary["sources"][number]): PlanTask => ({ kind: "link_prospect", title: `Check that your ${x.directory ?? x.domain} profile is accurate — ${x.domain} was among the sources of answers to ${x.questions} of your questions`, target: x.domain, facts: { answers: x.answers, questions: x.questions }, source: `ai-source:${x.domain}` });
   return (
     <section className="mb-6" data-testid="ai-summary">
       <h2 className="g-text text-[16px] font-medium">The picture so far</h2>
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]" data-testid="text-ai-summary">
-        Across your {fmtNum(s.now.questions)} question{s.now.questions === 1 ? "" : "s"}, counting the newest answer from each assistant ({fmtNum(s.now.answers)} answer{s.now.answers === 1 ? "" : "s"} from the last {s.nowDays} days): you were named in <b className="g-text font-medium">{of(s.now.mentioned, s.now.answers)}</b> and your website was used as a source in <b className="g-text font-medium">{of(s.now.cited, s.now.answers)}</b>{s.now.first > 0 ? `; you were the first business named in ${fmtNum(s.now.first)}` : ""}. These are your own questions — a sample, not every question people ask.
+        Across your {fmtNum(s.now.questions)} question{s.now.questions === 1 ? "" : "s"}, counting for each question the newest answer from each assistant ({fmtNum(s.now.answers)} answer{s.now.answers === 1 ? "" : "s"} from the last {s.nowDays} days): you were named in <b className="g-text font-medium">{of(s.now.mentioned, s.now.answers)}</b> and your website was used as a source in <b className="g-text font-medium">{of(s.now.cited, s.now.answers)}</b>{s.now.first > 0 ? `; you were the first business named in ${fmtNum(s.now.first)}` : ""}. These are your own questions — a sample, not every question people ask.
       </p>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-engines">
@@ -53,29 +76,20 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
             {s.byEngine.map((e) => <li key={e.engine}><div className="g-text mb-0.5">{ENGINE[e.engine] ?? e.engine}</div><Bar n={e.mentioned} total={e.answers} label={`${ENGINE[e.engine] ?? e.engine} named you in`} /></li>)}
           </ul>
         </div>
-        <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-months">
-          <h3 className="g-text mb-2 text-[14px] font-medium">Month by month</h3>
-          {s.byMonth.length < 2 ? <p className="g-text-2 text-[13px]">One month of answers so far. Ask the same questions again next month — or tick "ask every month" — to see whether this moves.</p> : (
-            <table className="g-table w-full">
-              <thead><tr><th>Month</th><th className="num">Questions</th><th className="num">Named you</th><th className="num">Used your site</th></tr></thead>
-              <tbody>{s.byMonth.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td className="num">{fmtNum(m.questions)}</td><td className="num">{of(m.mentioned, m.answers)}</td><td className="num">{of(m.cited, m.answers)}</td></tr>)}</tbody>
-            </table>
-          )}
-          {s.byMonth.length >= 2 && <p className="g-text-2 mt-2 text-[12px]">Each month counts the newest answer to each question from each assistant. Months with different questions are not like for like — the Questions column says how many each rests on.</p>}
-        </div>
+        {months}
         <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-businesses">
-          <h3 className="g-text mb-1 text-[14px] font-medium">Other businesses the assistants named</h3>
-          {s.businesses.length === 0 ? <p className="g-text-2 text-[13px]">No other business was named in these answers.</p> : (
+          <h3 className="g-text mb-1 text-[14px] font-medium">Other names in the answers</h3>
+          {s.businesses.length === 0 ? <p className="g-text-2 text-[13px]">No other name was picked out in these answers — which is not the same as no other business being mentioned.</p> : (
             <>
               <ul className="space-y-1.5 text-[13px]">
                 {s.businesses.slice(0, 10).map((b) => <li key={b.name}><div className="g-text mb-0.5 truncate" title={b.name}>{b.name}</div><Bar n={b.answers} total={s.now.answers} label={`${b.name} was named in`} /></li>)}
               </ul>
-              <p className="g-text-2 mt-2 text-[12px]">Read from the names the answers set in bold, so a name written two ways can appear twice and a heading can slip in. Answers out of your {fmtNum(s.now.answers)}.</p>
+              <p className="g-text-2 mt-2 text-[12px]">Mostly other businesses — but read from what the answers set in bold, so a heading can slip in, one business written two ways can appear twice, and yours could appear under a spelling we did not recognise. Answers out of your {fmtNum(s.now.answers)}.</p>
             </>
           )}
         </div>
         <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-sources">
-          <h3 className="g-text mb-1 text-[14px] font-medium">Websites the assistants drew on</h3>
+          <h3 className="g-text mb-1 text-[14px] font-medium">Websites among the answers' sources</h3>
           {others.length === 0 ? <p className="g-text-2 text-[13px]">{s.sources.length ? "Only your own website was used as a source." : "These answers listed no sources."}</p> : (
             <>
               <table className="g-table w-full" data-testid="table-ai-sources">
@@ -90,7 +104,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
                   ))}
                 </tbody>
               </table>
-              <p className="g-text-2 mt-2 text-[12px]">The pages an assistant read while answering. Many are other businesses' own websites. Where one is a directory or review site, having a complete profile there puts your business in front of the assistant — it is no promise of being named.{s.sources.some((x) => x.ours) ? ` Your own website was used in ${fmtNum(s.sources.find((x) => x.ours)!.answers)} of these answers.` : ""}</p>
+              <p className="g-text-2 mt-2 text-[12px]">The websites the saved answers listed as their sources. Many are other businesses' own sites. Where one is a directory or review site, it is worth checking that your profile there is accurate — which page of it an assistant read, and whether that changes a future answer, is not known.{s.now.cited > 0 ? ` Your own website was among the sources of ${of(s.now.cited, s.now.answers)} answers.` : ""}</p>
             </>
           )}
         </div>

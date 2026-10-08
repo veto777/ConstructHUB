@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import {
+import { scopeClauses, effectiveReport, TooManyFilters, SCOPED_TABLES,
   reportInput, reportRequest, andClauses, SORTS, defaultSort, DOMAIN_TABLES, KEYWORD_TABLES, isKeywordTable, reportCacheKey,
   parseBacklink, parseLinkedPage, parseKeywordIdea, parseKeywordOverview, parseReportRows,
 } from "./reports";
@@ -24,6 +24,40 @@ describe("report requests", () => {
     expect(isKeywordTable("keywords")).toBe(false);
   });
 
+  it("a site report narrowed to a section or to one page", () => {
+    const kw = (o: Record<string, unknown>) => reportRequest(effectiveReport(base(o))).body.filters;
+    // Keywords: the ranking page's path. A section is everything that goes on from the path; a page is the path as
+    // written, with or without its last slash.
+    expect(kw({ path: "/blog/" })).toEqual(["ranked_serp_element.serp_item.relative_url", "like", "/blog/%"]);
+    expect(kw({ path: "/services/roofing", exactPage: true })).toEqual([["ranked_serp_element.serp_item.relative_url", "=", "/services/roofing"], "or", ["ranked_serp_element.serp_item.relative_url", "=", "/services/roofing/"]]);
+    expect(kw({ path: "/p?id=7", exactPage: true })).toEqual(["ranked_serp_element.serp_item.relative_url", "=", "/p?id=7"]);
+    expect(kw({ path: "/blog/", filters: { positionMax: 10 } })).toEqual([["ranked_serp_element.serp_item.relative_url", "like", "/blog/%"], "and", ["ranked_serp_element.serp_item.rank_group", "<=", 10]]);
+    // Link and page reports: a whole address, so the site comes before the path.
+    expect(reportRequest(effectiveReport(base({ table: "backlinks", path: "/blog/" }))).body.filters).toEqual(["url_to", "like", "%example.com/blog/%"]);
+    expect(reportRequest(effectiveReport(base({ table: "lostBacklinks", path: "/blog", exactPage: true, filters: { follow: "followed" } }))).body.filters)
+      .toEqual([[["url_to", "like", "%example.com/blog"], "or", ["url_to", "like", "%example.com/blog/"]], "and", ["dofollow", "=", true]]);
+    expect(reportRequest(effectiveReport(base({ table: "pages", path: "/blog/" }))).body.filters).toEqual(["page_address", "like", "%example.com/blog/%"]);
+    expect(reportRequest(effectiveReport(base({ table: "bestByLinks", path: "/blog/" }))).body.filters).toEqual(["url", "like", "%example.com/blog/%"]);
+    // A report counted for the whole site is never narrowed, keyed or bought per section; "/" alone is the whole site.
+    for (const t of DOMAIN_TABLES) if (!SCOPED_TABLES.has(t)) expect(effectiveReport(base({ table: t, path: "/blog/", exactPage: true })), t).toMatchObject({ path: undefined, exactPage: false });
+    expect(effectiveReport(base({ path: "/" })).path).toBeUndefined();
+    expect(effectiveReport(base({ path: "/", exactPage: true })).path).toBe("/");
+    expect(scopeClauses({ table: "anchors", target: "example.com", path: "/blog/" })).toEqual([]);
+    // Saved pages: a section is its own page; an unscoped report keeps the key it always had.
+    const key = (o: Record<string, unknown>) => reportCacheKey(base(o));
+    expect(key({ path: "/blog/" })).not.toBe(key({}));
+    expect(key({ path: "/blog/" })).not.toBe(key({ path: "/blog/", exactPage: true }));
+    expect(key({ path: "/" })).toBe(key({}));
+    expect(key({ table: "anchors", path: "/blog/" })).toBe(key({ table: "anchors" }));
+    // The path: starts with /, and nothing the source's pattern matching would read as "anything".
+    for (const bad of ["blog/", "/a b", "/100%", "/a\\b", ""]) expect(reportInput.safeParse({ domain: "example.com", table: "keywords", path: bad }).success, bad).toBe(false);
+    expect(reportInput.safeParse({ domain: "example.com", table: "keywords", path: "/my_page-1/" }).success).toBe(true);
+    // More conditions than the source takes is refused out loud — never a filter dropped silently.
+    expect(() => reportRequest(effectiveReport(base({ path: "/blog/", filters: { positionMin: 1, positionMax: 10, volumeMin: 1, volumeMax: 9, difficultyMin: 1, difficultyMax: 9, intent: "commercial", contains: "roof" } })))).toThrow(TooManyFilters);
+    expect(() => reportRequest(effectiveReport(base({ path: "/blog", exactPage: true, filters: { positionMin: 1, positionMax: 10, volumeMin: 1, volumeMax: 9, difficultyMin: 1, difficultyMax: 9, intent: "commercial" } })))).toThrow(TooManyFilters);
+    expect(() => reportRequest(effectiveReport(base({ filters: { positionMin: 1, positionMax: 10, volumeMin: 1, volumeMax: 9, difficultyMin: 1, difficultyMax: 9, intent: "commercial", contains: "roof" } })))).not.toThrow();
+  });
+
   it("organic keywords: filters become the source's and-joined clauses", () => {
     const req = reportRequest(base({ sort: "volume", limit: 100, offset: 100, filters: { positionMax: 10, volumeMin: 100, difficultyMax: 30, intent: "commercial", contains: "roof" } }));
     expect(req.path).toBe("/dataforseo_labs/google/ranked_keywords/live");
@@ -43,7 +77,9 @@ describe("report requests", () => {
     expect(andClauses([["a", "=", 1]])).toEqual(["a", "=", 1]);
     expect(andClauses([])).toBeUndefined();
     const many = Array.from({ length: 12 }, (_, i) => [`f${i}`, "=", i] as [string, string, unknown]);
-    expect((andClauses(many) as unknown[]).filter((x) => Array.isArray(x))).toHaveLength(8);
+    // More than the source takes is refused, not cut down to eight behind the customer's back.
+    expect(() => andClauses(many)).toThrow(TooManyFilters);
+    expect((andClauses(many.slice(0, 8)) as unknown[]).filter((x) => Array.isArray(x))).toHaveLength(8);
   });
 
   it("backlink reports differ only by status and filter", () => {

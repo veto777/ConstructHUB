@@ -57,8 +57,20 @@ export const reportFilters = z.object({
 }).strict();
 export type ReportFilters = z.infer<typeof reportFilters>;
 
+/**
+ * Reports that can be narrowed to one section of a site ("/blog/") or one page of it: the ones whose rows are, or
+ * point at, pages. The others (linking sites, anchors, competitors…) are counted for the whole site by the source.
+ */
+export const SCOPED_TABLES: ReadonlySet<ReportTable> = new Set<ReportTable>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
+/** A path on the site: starts with "/", no spaces, and none of the characters the source's pattern matching treats as "anything" (% and \). */
+export const scopePath = z.string().trim().min(1).max(300).regex(/^\/[^\s%\\]*$/, "Start the path with / and leave out spaces, % and \\");
+export class TooManyFilters extends Error { constructor() { super("Too many filters at once — remove one and try again."); } }
+
 export const reportInput = z.object({
   domain: z.string().min(3).max(253).optional(),
+  /** Narrow a site report to the pages whose path starts with this ("/blog/"), or — with exactPage — to this one page. */
+  path: scopePath.optional(),
+  exactPage: z.boolean().default(false),
   keyword: z.string().trim().min(1).max(200).optional(),
   table: z.enum([...DOMAIN_TABLES, ...KEYWORD_TABLES]),
   limit: z.union([z.literal(25), z.literal(50), z.literal(100)]).default(50),
@@ -73,9 +85,15 @@ export const reportInput = z.object({
 export type ReportInput = z.infer<typeof reportInput>;
 
 type Clause = [string, string, unknown];
-/** Clauses joined with "and" the way the source wants them: [c1, "and", c2, ...]. At most 8 conditions. */
-export function andClauses(clauses: Clause[]): unknown[] | undefined {
-  const kept = clauses.slice(0, 8);
+/**
+ * Clauses joined with "and" the way the source wants them: [c1, "and", c2, ...]. The source takes at most 8
+ * conditions; more than that is refused out loud (TooManyFilters) — a filter is never dropped silently.
+ */
+export function andClauses(clauses: (Clause | unknown[])[]): unknown[] | undefined {
+  // A clause that is itself "this or that" counts as its two conditions.
+  const conditions = clauses.reduce((n: number, c) => n + (Array.isArray(c[0]) ? c.filter((x) => Array.isArray(x)).length : 1), 0);
+  if (conditions > 8) throw new TooManyFilters();
+  const kept = clauses;
   if (!kept.length) return undefined;
   if (kept.length === 1) return kept[0];
   return kept.flatMap((c, i) => (i ? ["and", c] : [c]));
@@ -128,7 +146,26 @@ export const FILTERS_FOR: Record<ReportTable, readonly (keyof ReportFilters)[]> 
 export function effectiveReport<T extends ReportInput>(input: T): T {
   const allowed = FILTERS_FOR[input.table] as readonly string[];
   const filters = Object.fromEntries(Object.entries(input.filters).filter(([k, v]) => allowed.includes(k) && v !== undefined && v !== false)) as ReportFilters;
-  return { ...input, filters, sort: input.sort !== undefined && hasSort(input.table, input.sort) ? input.sort : defaultSort(input.table) };
+  // "/" alone is the whole site; a report that cannot be narrowed is never keyed (or bought) per section.
+  const path = SCOPED_TABLES.has(input.table) && input.path && !(input.path === "/" && !input.exactPage) ? input.path : undefined;
+  return { ...input, filters, path, exactPage: !!path && !!input.exactPage, sort: input.sort !== undefined && hasSort(input.table, input.sort) ? input.sort : defaultSort(input.table) };
+}
+/**
+ * The condition that narrows a report to a section or a page. Keyword reports compare the ranking page's path;
+ * the others compare a whole address, so the pattern starts with "anything" (the scheme, "www", a sub-domain) and
+ * then the site and the path. A section matches every address that goes on from there; one page matches the path
+ * as written and the same with or without its last slash. Checked against the source 2026-10-08.
+ */
+export function scopeClauses(input: { table: ReportTable; target: string; path?: string; exactPage?: boolean }): (Clause | unknown[])[] {
+  if (!input.path || !SCOPED_TABLES.has(input.table)) return [];
+  const p = input.path, other = p.endsWith("/") ? p.slice(0, -1) : `${p}/`;
+  const both = (field: string, op: string, a: string, b: string): unknown[] => (b === a || b === "" ? [field, op, a] : [[field, op, a], "or", [field, op, b]]);
+  if (input.table === "keywords" || input.table === "paidKeywords") {
+    const field = "ranked_serp_element.serp_item.relative_url";
+    return [input.exactPage ? both(field, "=", p, p.includes("?") ? p : other) : [field, "like", `${p}%`]];
+  }
+  const field = input.table === "pages" ? "page_address" : input.table === "bestByLinks" ? "url" : "url_to";
+  return [input.exactPage ? both(field, "like", `%${input.target}${p}`, p.includes("?") ? `%${input.target}${p}` : `%${input.target}${other}`) : [field, "like", `%${input.target}${p}%`]];
 }
 
 /** How a question starts, by language (the Questions report keeps only searches that start this way). */
@@ -150,12 +187,14 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
   ];
   const like = (field: string): Clause[] => (f.contains ? [[field, "like", `%${f.contains}%`]] : []);
   const follow: Clause[] = f.follow ? [["dofollow", "=", f.follow === "followed"]] : [];
+  const scope = scopeClauses(input);
 
   switch (t) {
     case "keywords":
     case "paidKeywords": {
       const kd = "keyword_data";
       const clauses = [
+        ...scope,
         ...range("ranked_serp_element.serp_item.rank_group", f.positionMin, f.positionMax),
         ...range(`${kd}.keyword_info.search_volume`, f.volumeMin, f.volumeMax),
         ...range(`${kd}.keyword_properties.keyword_difficulty`, f.difficultyMin, f.difficultyMax),
@@ -165,17 +204,17 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
       return { path: "/dataforseo_labs/google/ranked_keywords/live", body: { ...labs, target: input.target, item_types: [t === "keywords" ? "organic" : "paid"], filters: andClauses(clauses), order_by: [sort] } };
     }
     case "pages":
-      return { path: "/dataforseo_labs/google/relevant_pages/live", body: { ...labs, target: input.target, filters: andClauses(f.contains ? [["page_address", "like", `%${f.contains}%`]] : []), order_by: [sort] } };
+      return { path: "/dataforseo_labs/google/relevant_pages/live", body: { ...labs, target: input.target, filters: andClauses([...scope, ...(f.contains ? [["page_address", "like", `%${f.contains}%`] as Clause] : [])]), order_by: [sort] } };
     case "competitors":
       return { path: "/dataforseo_labs/google/competitors_domain/live", body: { ...labs, target: input.target, exclude_top_domains: true, filters: andClauses(like("domain")), order_by: [sort] } };
     case "backlinks":
-      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([...follow, ...like("anchor")]), order_by: [sort] } };
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([...scope, ...follow, ...like("anchor")]), order_by: [sort] } };
     case "newBacklinks":
-      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([["is_new", "=", true], ...follow, ...like("anchor")]), order_by: [sort] } };
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([...scope, ["is_new", "=", true], ...follow, ...like("anchor")]), order_by: [sort] } };
     case "lostBacklinks":
-      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "lost", filters: andClauses([...follow, ...like("anchor")]), order_by: [sort] } };
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "lost", filters: andClauses([...scope, ...follow, ...like("anchor")]), order_by: [sort] } };
     case "brokenBacklinks":
-      return { path: "/backlinks/backlinks/live", body: { ...links, mode: "as_is", backlinks_status_type: "live", filters: andClauses([["is_broken", "=", true], ...follow]), order_by: [sort] } };
+      return { path: "/backlinks/backlinks/live", body: { ...links, mode: "as_is", backlinks_status_type: "live", filters: andClauses([...scope, ["is_broken", "=", true], ...follow]), order_by: [sort] } };
     case "referringDomains":
       return { path: "/backlinks/referring_domains/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("domain")), order_by: [sort] } };
     case "anchors":
@@ -190,7 +229,7 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
       // The ad library has no paging of its own: everything it will give is asked for once (fetchAdsSnapshot) and paged here.
       return { path: "/serp/google/ads_search/live/advanced", body: { target: input.target, location_code: input.locationCode, depth: ADS_MAX } };
     case "bestByLinks":
-      return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("url")), order_by: [sort] } };
+      return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", filters: andClauses([...scope, ...like("url")]), order_by: [sort] } };
     case "matchingTerms":
     case "questions": {
       const clauses = [
@@ -302,7 +341,7 @@ export function parseReportRows(table: ReportTable, items: any[], target: string
   }
 }
 
-export type ReportPage = { table: ReportTable; target: string; /** Ads: the library gave as many as can be asked for, so there may be more than `total`. */ capped?: boolean; rows: unknown[]; /** Rows the source returned before our own filtering — what paging goes by. */ sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+export type ReportPage = { table: ReportTable; target: string; /** The section or page the report was narrowed to, when it was. */ path?: string; exactPage?: boolean; /** Ads: the library gave as many as can be asked for, so there may be more than `total`. */ capped?: boolean; rows: unknown[]; /** Rows the source returned before our own filtering — what paging goes by. */ sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 /** Run one page at the source. */
 export async function fetchReportPage(input: ReportInput & { target: string }): Promise<{ data: ReportPage; costUsd: number }> {
@@ -311,7 +350,7 @@ export async function fetchReportPage(input: ReportInput & { target: string }): 
   const rows = parseReportRows(input.table, taskItems(task), input.target);
   return {
     data: {
-      table: input.table, target: input.target, rows,
+      table: input.table, target: input.target, ...(input.path ? { path: input.path, exactPage: !!input.exactPage } : {}), rows,
       sourceRows: taskItems(task).length, total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
       sort: input.sort && SORTS[input.table][input.sort] ? input.sort : defaultSort(input.table), fetchedAt: new Date().toISOString(),
     },
@@ -477,7 +516,9 @@ export function cacheKey(kind: string, parts: unknown): string {
 }
 export const reportCacheKey = (i: ReportInput & { target: string }) =>
   // A report that does not depend on the country is keyed as the United States whatever was sent, so it is one saved page, not one per country.
-  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, COUNTRY_TABLES.has(i.table) ? i.locationCode : 2840, COUNTRY_TABLES.has(i.table) ? i.languageCode : "en", Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b))]);
+  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, COUNTRY_TABLES.has(i.table) ? i.locationCode : 2840, COUNTRY_TABLES.has(i.table) ? i.languageCode : "en", Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b)),
+    // Only when narrowed, so pages saved before sections existed are still found.
+    ...(effectiveReport(i).path ? [effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
 
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(

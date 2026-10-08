@@ -2,7 +2,7 @@
  * Rank tracker → the page Google shows for a search: tracked keywords for which Google has shown DIFFERENT pages of
  * the site from one check to the next. Going back and forth between two pages is a reason to look at whether the two
  * are competing for the search; a single change is more often a page that was moved or replaced, and is listed
- * apart. A third kind is one page seen under two addresses (http and https, with and without "www" or a last slash).
+ * apart. A third kind is addresses that differ only by http/https, "www" or a last slash — possibly one page.
  * These are observations from saved checks — one page per check per device — not a diagnosis. Free.
  */
 import { pool } from "../db";
@@ -10,18 +10,21 @@ import { pageKey } from "@shared/seo-page-key";
 
 export const COMPETING_DAYS = 120;
 export type CompetingCheck = { keywordId: number; keyword: string; volume: number | null; location?: string | null; device: string; checkedOn: string; position: number | null; url: string | null };
-export type CompetingPage = { /** The address as Google showed it most recently. */ url: string; /** Checks in which this page was the one shown. */ times: number; best: number; lastSeen: string; lastPosition: number; /** Other ways the same page's address was written in these checks. */ alsoAs?: string[] };
+export type CompetingPage = { /** The address, exactly as Google showed it (less its fragment and click-tracking). */ url: string; /** Checks in which this address was the one shown. */ times: number; best: number; lastSeen: string; lastPosition: number };
 export type CompetingKeyword = {
   keywordId: number; keyword: string; volume: number | null; /** The place the keyword is tracked in, when it has one. */ location: string | null; device: string;
   /**
-   * "alternating": Google went from one page to another and back at least once. "changed": the page changed without
-   * going back. "aliases": always the same page, but its address was written in more than one way.
+   * "alternating": Google left one page for a clearly different one and came back at least once. "changed": it moved
+   * to a clearly different page without coming back. "variants": every address shown differs from the others only by
+   * http/https, "www" or a last slash — possibly one page, possibly not; that has not been checked.
    */
-  kind: "alternating" | "changed" | "aliases";
-  /** Checks in which the site ranked, in the period, and the dates of the first and last of them. */ checks: number; firstRanked: string; lastRanked: string;
-  /** The newest check of this keyword on this device, ranked or not. Later than lastRanked = it has not ranked since. */ lastCheck: string;
-  /** Times the page shown differed from the ranked check before. */ switches: number;
-  /** The pages shown, the one shown most recently first. */ pages: CompetingPage[];
+  kind: "alternating" | "changed" | "variants";
+  /** Checks in which the site ranked AND the page was recorded, with the dates of the first and last of them. */ checks: number; firstRanked: string; lastRanked: string;
+  /** The newest check in which the site ranked at all — later than lastRanked when the page of that check was not recorded. */ lastRankedAny: string;
+  /** The newest check of this keyword on this device, ranked or not. Later than lastRankedAny = not found since. */ lastCheck: string;
+  /** Times the exact address shown differed from the one in the ranked check before. */ switches: number;
+  /** The addresses shown, the one shown most recently first. Nothing is merged. */ pages: CompetingPage[];
+  /** Groups of the addresses above that differ only by http/https, "www" or a last slash. Left out when there are none. */ variants?: string[][];
 };
 
 const TRACKING = /^(utm_[a-z]+|gclid|fbclid|msclkid|srsltid|gad_source|gbraid|wbraid|mc_cid|mc_eid)$/i;
@@ -34,8 +37,9 @@ export function strictPageKey(url: string): string | null {
   return u.toString();
 }
 /**
- * Addresses that are ALMOST certainly one page: the same but for http/https, "www" and a last slash. Used only to
- * tell "one page under two addresses" apart from "two pages" — the two are reported differently, neither is hidden.
+ * Addresses that MAY be one page: the same but for http/https, "www" and a last slash. Whether they are is not
+ * checked here (it takes a redirect or a canonical tag to know). Used only to keep the stronger claims — "went back
+ * and forth", "changed page" — for addresses that are clearly different; nothing is merged or hidden because of it.
  */
 export function aliasKey(url: string): string | null {
   const k = strictPageKey(url);
@@ -45,8 +49,13 @@ export function aliasKey(url: string): string | null {
   return `${u.host.toLowerCase().replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "") || "/"}${u.search}`;
 }
 
-/** Pure. Only checks where the site ranked with a known page count; a check where it did not rank says nothing about which page. */
-export function findCompeting(rows: readonly CompetingCheck[]): { items: CompetingKeyword[]; /** Keywords with at least two ranked checks on one device: the only ones a change could have been seen in. */ comparable: number } {
+/**
+ * Pure. Only checks where the site ranked with a known page count; a check where it did not rank says nothing about
+ * which page. Every exact address is kept and counted on its own. Whether Google "went back and forth" or "changed
+ * page" is judged between addresses that are clearly different pages — two spellings of what may be one address
+ * (see aliasKey) never make that claim, and are reported as possible variants instead.
+ */
+export function findCompeting(rows: readonly CompetingCheck[]): { items: CompetingKeyword[]; /** Keywords with at least two ranked checks (page recorded) on one device: the only ones a change could have been seen in. */ comparable: number } {
   const groups = new Map<string, { all: CompetingCheck[]; ranked: CompetingCheck[] }>();
   for (const r of rows) {
     const k = `${r.keywordId}:${r.device}`;
@@ -56,31 +65,35 @@ export function findCompeting(rows: readonly CompetingCheck[]): { items: Competi
   }
   const perKeyword = new Map<number, CompetingKeyword>();
   const comparable = new Set<number>();
-  const rank = { alternating: 0, changed: 1, aliases: 2 } as const;
+  const rank = { alternating: 0, changed: 1, variants: 2 } as const;
+  const latest = (list: CompetingCheck[], from: string) => list.reduce((m, c) => (c.checkedOn > m ? c.checkedOn : m), from);
   for (const { all, ranked } of groups.values()) {
     if (ranked.length < 2) continue;
     comparable.add(ranked[0].keywordId);
     ranked.sort((a, b) => a.checkedOn.localeCompare(b.checkedOn));
-    const pages = new Map<string, CompetingPage & { written: Set<string> }>();
-    let switches = 0, returned = false, before: string | null = null;
-    const seen = new Set<string>();
+    const pages = new Map<string, CompetingPage>();
+    const families = new Map<string, Set<string>>();   // probably-one-page → the exact addresses seen for it
+    let switches = 0, returned = false, beforeExact: string | null = null, beforeFamily: string | null = null;
+    const seenFamilies = new Set<string>();
     for (const c of ranked) {
-      const key = aliasKey(c.url!)!, exact = strictPageKey(c.url!)!;
-      if (before !== null && key !== before) { switches++; if (seen.has(key)) returned = true; }
-      seen.add(key); before = key;
-      const p = pages.get(key);
-      if (!p) pages.set(key, { url: exact, times: 1, best: c.position!, lastSeen: c.checkedOn, lastPosition: c.position!, written: new Set([exact]) });
-      else { p.times++; p.best = Math.min(p.best, c.position!); p.lastSeen = c.checkedOn; p.lastPosition = c.position!; p.url = exact; p.written.add(exact); }
+      const family = aliasKey(c.url!)!, exact = strictPageKey(c.url!)!;
+      if (beforeExact !== null && exact !== beforeExact) switches++;
+      if (beforeFamily !== null && family !== beforeFamily && seenFamilies.has(family)) returned = true;
+      seenFamilies.add(family); beforeExact = exact; beforeFamily = family;
+      (families.get(family) ?? families.set(family, new Set()).get(family)!).add(exact);
+      const p = pages.get(exact);
+      if (!p) pages.set(exact, { url: exact, times: 1, best: c.position!, lastSeen: c.checkedOn, lastPosition: c.position! });
+      else { p.times++; p.best = Math.min(p.best, c.position!); p.lastSeen = c.checkedOn; p.lastPosition = c.position!; }
     }
-    const aliased = [...pages.values()].some((p) => p.written.size > 1);
-    if (pages.size < 2 && !aliased) continue;
-    const first = ranked[0];
+    if (pages.size < 2) continue;
+    const variants = [...families.values()].filter((f) => f.size > 1).map((f) => [...f].sort());
+    const first = ranked[0], lastRanked = ranked[ranked.length - 1].checkedOn;
     const found: CompetingKeyword = {
       keywordId: first.keywordId, keyword: first.keyword, volume: first.volume, location: first.location ?? null, device: first.device,
-      kind: pages.size < 2 ? "aliases" : returned ? "alternating" : "changed", checks: ranked.length, firstRanked: first.checkedOn, lastRanked: ranked[ranked.length - 1].checkedOn,
-      lastCheck: all.reduce((m, c) => (c.checkedOn > m ? c.checkedOn : m), first.checkedOn), switches,
-      pages: [...pages.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen) || b.times - a.times || a.url.localeCompare(b.url))
-        .map(({ written, ...p }) => ({ ...p, ...(written.size > 1 ? { alsoAs: [...written].filter((w) => w !== p.url).sort() } : {}) })),
+      kind: families.size < 2 ? "variants" : returned ? "alternating" : "changed", checks: ranked.length, firstRanked: first.checkedOn, lastRanked,
+      lastRankedAny: latest(all.filter((c) => c.position !== null), lastRanked), lastCheck: latest(all, lastRanked), switches,
+      pages: [...pages.values()].sort((a, b) => b.lastSeen.localeCompare(a.lastSeen) || b.times - a.times || (a.url < b.url ? -1 : 1)),
+      ...(variants.length ? { variants } : {}),
     };
     // One line per keyword. When both devices were checked: the stronger kind, then the more changes, then desktop —
     // a fixed order, so the same checks always give the same line. The line says which device it is.

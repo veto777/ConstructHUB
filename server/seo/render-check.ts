@@ -163,6 +163,9 @@ export async function fetchRender(urls: string[], domain?: string, /** Asked bef
   const one = async (url: string, js: boolean): Promise<any> => {
     const allow = () => { unknownUsd += js ? RENDER_BROWSER_USD : RENDER_PLAIN_USD; };
     for (let attempt = 1; ; attempt++) {
+      // Asked before EVERY request, the first page and second tries included: a run that was closed — or whose state
+      // cannot be read — buys nothing more.
+      if (halted || (stopped && await stopped().catch(() => true))) { halted = true; return null; }
       let resp: any;
       try { resp = await renderDeps.request("POST", "/on_page/instant_pages", [{ url, enable_javascript: js, enable_browser_rendering: js }]); }
       catch (e: any) {
@@ -190,7 +193,7 @@ export async function fetchRender(urls: string[], domain?: string, /** Asked bef
       const i = next++;
       if (i >= urls.length) return;
       // A run closed as interrupted cannot be saved or charged any more: stop buying fetches for it.
-      if (halted || (stopped && i > 0 && await stopped().catch(() => false))) { halted = true; rows[i] = buildRenderRow(urls[i], null, null, domain); continue; }
+      if (halted) { rows[i] = buildRenderRow(urls[i], null, null, domain); continue; }
       const [plain, rendered] = await Promise.all([one(urls[i], false), one(urls[i], true)]);
       rows[i] = buildRenderRow(urls[i], plain, rendered, domain);
     }

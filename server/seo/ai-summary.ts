@@ -10,6 +10,7 @@
  */
 import { pool } from "../db";
 import { DIRECTORIES } from "./directories";
+import { normalizeBusinessName } from "./dataforseo";
 
 export const AI_SUMMARY_MONTHS = 12;
 /** "Now" looks no further back than this: an answer older than that says little about today. */
@@ -23,8 +24,13 @@ export type AiSummary = {
   byEngine: (AiCount & { engine: string })[];
   /** Oldest first; only months that have answers. */
   byMonth: (AiCount & { month: string; questions: number })[];
-  /** Other businesses named in the "now" answers, most-named first. Read from the names the answers set in bold. */
+  /**
+   * Other names the "now" answers set in bold, most-named first. Mostly businesses — but read from formatting, so a
+   * heading can be among them, and the customer's own business under a spelling we could not match. Never "competitors".
+   */
   businesses: { name: string; answers: number; questions: number }[];
+  /** true = there were more saved answers than are read at once, so older months may be incomplete (see aiSummary). */
+  truncated?: boolean;
   /** Websites the "now" answers drew on, most-used first. */
   sources: { domain: string; answers: number; questions: number; ours: boolean; /** A competitor this site follows. */ rival: boolean; /** The name of the review site or directory this is (server/seo/directories.ts), when it is one — a place a business can have a profile. */ directory?: string }[];
 };
@@ -41,7 +47,11 @@ function newestEach(rows: AiCheckLite[]): AiCheckLite[] {
 }
 
 /** Pure. `now` is passed in for tests. */
-export function summariseAi(rows: readonly AiCheckLite[], opts: { rivals?: readonly string[]; now?: Date } = {}): AiSummary {
+export function summariseAi(rows: readonly AiCheckLite[], opts: { rivals?: readonly string[]; now?: Date; /** The customer's own business, so it is not listed among the others. */ businessName?: string | null; domain?: string | null } = {}): AiSummary {
+  // The customer's own business, however the answer wrote it: its name as whole words inside the bold text
+  // ("Alpine Exteriors (Bellingham)", "Alpine Exteriors — siding"), or its web address.
+  const own = normalizeBusinessName(opts.businessName), ownDomain = opts.domain ? bare(opts.domain) : "";
+  const isOwn = (name: string) => { const n = ` ${normalizeBusinessName(name)} `; return (own.length >= 4 && n.includes(` ${own} `)) || (!!ownDomain && name.toLowerCase().includes(ownDomain)); };
   const nowAt = opts.now ?? new Date();
   const since = new Date(nowAt.getTime() - AI_SUMMARY_NOW_DAYS * 86400_000).toISOString();
   const current = newestEach(rows.filter((r) => r.at >= since));
@@ -58,7 +68,7 @@ export function summariseAi(rows: readonly AiCheckLite[], opts: { rivals?: reado
     const names = Array.isArray(r.businesses) ? r.businesses.filter((b): b is string => typeof b === "string" && !!b.trim()) : [];
     const seen = new Set<string>();
     names.forEach((n, i) => {
-      if (r.listedAt === i + 1) return;
+      if (r.listedAt === i + 1 || isOwn(n)) return;
       const k = nameKey(n);
       if (!k || seen.has(k)) return;
       seen.add(k);
@@ -89,11 +99,22 @@ export function summariseAi(rows: readonly AiCheckLite[], opts: { rivals?: reado
   };
 }
 
-/** A site's saved answers of the last AI_SUMMARY_MONTHS months, added up. Saved rows only. */
-export async function aiSummary(userId: number, siteId: number, rivals: readonly string[]): Promise<AiSummary> {
+export const AI_SUMMARY_MAX_ROWS = 20000;
+/**
+ * A site's saved answers of the last AI_SUMMARY_MONTHS months, added up. Saved rows only. The database hands over
+ * only what the summary counts — the newest answer to each question from each assistant in each month — so asking
+ * one question many times cannot push other questions or older months out. If even that is more than
+ * AI_SUMMARY_MAX_ROWS (the newest are kept), the result says so (`truncated`).
+ */
+export async function aiSummary(userId: number, siteId: number, opts: { rivals: readonly string[]; businessName?: string | null; domain?: string | null }): Promise<AiSummary> {
   const { rows } = await pool.query(
-    `SELECT prompt, engine, mentioned, cited, listed_at AS "listedAt", businesses, sources, created_at
-       FROM seo_ai_checks WHERE site_id=$1 AND user_id=$2 AND created_at >= now() - interval '${AI_SUMMARY_MONTHS} months'
-      ORDER BY created_at DESC, id DESC LIMIT 5000`, [siteId, userId]);
-  return summariseAi(rows.map((r: any) => ({ ...r, at: new Date(r.created_at).toISOString() })), { rivals });
+    `SELECT * FROM (
+       SELECT DISTINCT ON (lower(btrim(regexp_replace(prompt, '\\s+', ' ', 'g'))), engine, date_trunc('month', created_at AT TIME ZONE 'UTC'))
+              prompt, engine, mentioned, cited, listed_at AS "listedAt", businesses, sources, created_at, id
+         FROM seo_ai_checks WHERE site_id=$1 AND user_id=$2 AND created_at >= now() - interval '${AI_SUMMARY_MONTHS + 1} months'
+        ORDER BY lower(btrim(regexp_replace(prompt, '\\s+', ' ', 'g'))), engine, date_trunc('month', created_at AT TIME ZONE 'UTC'), created_at DESC, id DESC
+     ) newest ORDER BY created_at DESC, id DESC LIMIT ${AI_SUMMARY_MAX_ROWS + 1}`, [siteId, userId]);
+  const truncated = rows.length > AI_SUMMARY_MAX_ROWS;
+  const out = summariseAi(rows.slice(0, AI_SUMMARY_MAX_ROWS).map((r: any) => ({ ...r, at: new Date(r.created_at).toISOString() })), opts);
+  return truncated ? { ...out, truncated } : out;
 }

@@ -170,7 +170,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
               <button type="button" className="g-pill g-pill--sm" onClick={() => set(new Set(picked.size === page.rows.length ? [] : page.rows.map((r) => r.keyword)))} disabled={!page.rows.length}>{picked.size === page.rows.length && page.rows.length ? "Select none" : "Select all"}</button>
               <span className="ml-auto flex flex-wrap items-center gap-2">
                 <AddToList market={market} rows={chosen} onDone={clear} />
-                {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => onTrack(chosen)} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                 <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
             </div>

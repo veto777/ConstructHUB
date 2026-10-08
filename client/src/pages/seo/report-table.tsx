@@ -171,6 +171,17 @@ const HAS: Record<string, TableKey[]> = {
   follow: ["backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks"],
   everyLink: ["backlinks", "newBacklinks", "lostBacklinks"],
 };
+/** Reports that can be narrowed to one section or one page of the site (server/seo/reports.ts SCOPED_TABLES). */
+const SCOPED: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
+/** What was typed, as a path on the site: a pasted address is cut down to its path; "blog" becomes "/blog". null = not usable. */
+export function scopePathOf(raw: string, domain: string): string | null {
+  let v = raw.trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) { try { const u = new URL(v); v = u.pathname + u.search; } catch { return null; } }
+  else { const bare = domain.replace(/^www\./, ""); const m = v.replace(/^www\./, ""); if (m.toLowerCase().startsWith(`${bare.toLowerCase()}/`)) v = m.slice(bare.length); }
+  if (!v.startsWith("/")) v = `/${v}`;
+  return /^\/[^\s%\\]*$/.test(v) && v.length <= 300 ? v : null;
+}
 const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains", competitors: "Domain contains", bestByLinks: "URL contains" };
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
 
@@ -200,16 +211,21 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const [sort, setSort] = useState(SORT_LABELS[table][0][0]);
   const [draft, setDraft] = useState<Filters>({});
   const [filters, setFilters] = useState<Filters>({});
+  /** The section or page the report is narrowed to: what is typed, and what was applied. */
+  const [scopeDraft, setScopeDraft] = useState<{ text: string; exact: boolean }>({ text: "", exact: false });
+  const [scope, setScope] = useState<{ path: string; exact: boolean } | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState<25 | 50 | 100>(50);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // A different report or target starts clean.
-  useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); }, [table, target]);
+  useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); setScopeDraft({ text: "", exact: false }); setScope(null); setScopeError(null); }, [table, target]);
+  const scoped = !!domain && SCOPED.has(table);
 
   // Belt and braces with the remount: a sort the report does not have is never sent.
   const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
   const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
-  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang]);
+  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}), ...(scoped && scope ? { path: scope.path, exactPage: scope.exact } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang, scoped, scope]);
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
@@ -238,7 +254,18 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
         onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setDraft((d) => ({ ...d, [key]: v === "" ? undefined : Number(v) })); }} />
     </label>
   );
-  const apply = () => { setFilters(Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters); setOffset(0); setPicked(new Set()); };
+  const apply = () => {
+    // The section first: a path that cannot be used is said, and nothing else changes until it is put right.
+    if (scoped) {
+      const typed = scopeDraft.text.trim();
+      const path = typed ? scopePathOf(typed, domain!) : null;
+      if (typed && !path) { setScopeError("Enter a path on this site, such as /blog/ — no spaces or % signs."); return; }
+      if (scopeDraft.exact && !path) { setScopeError("Say which page: a path such as /services/roofing."); return; }
+      setScopeError(null);
+      setScope(path && !(path === "/" && !scopeDraft.exact) ? { path, exact: scopeDraft.exact } : null);
+    }
+    setFilters(Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters); setOffset(0); setPicked(new Set());
+  };
   const download = () => {
     if (!page) return;
     const blob = new Blob([csvOf(cols, page.rows)], { type: "text/csv;charset=utf-8" });
@@ -253,6 +280,15 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   return (
     <div data-testid={`report-${table}`}>
       <form className="mb-3 flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={(e) => { e.preventDefault(); apply(); }} data-testid="report-filters">
+        {scoped && (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <label className="g-text-2 flex items-center gap-1 text-[12px]">Only pages under
+              <input className="g-input w-[170px] !py-1" value={scopeDraft.text} maxLength={300} placeholder="/blog/" autoComplete="off" spellCheck={false} aria-invalid={!!scopeError} aria-describedby={scopeError ? `scope-error-${table}` : undefined}
+                onChange={(e) => { setScopeDraft((d) => ({ ...d, text: e.target.value })); setScopeError(null); }} data-testid="filter-scope" />
+            </label>
+            <label className="g-text flex items-center gap-1.5 text-[12px]"><input type="checkbox" checked={scopeDraft.exact} onChange={(e) => { setScopeDraft((d) => ({ ...d, exact: e.target.checked })); setScopeError(null); }} data-testid="filter-scope-exact" /> this page only</label>
+          </span>
+        )}
         {has("position") && <>{numField("positionMin", "Position from", "w-[60px]")}{numField("positionMax", "to", "w-[60px]")}</>}
         {has("volume") && numField("volumeMin", "Volume ≥")}
         {has("difficulty") && numField("difficultyMax", "Difficulty ≤", "w-[60px]")}
@@ -286,8 +322,15 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
             <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
           </select>
         </label>
-        {Object.keys(HAS).some((f) => has(f)) && <button type="submit" className="g-pill g-pill--sm" data-testid="button-apply-filters">Apply filters</button>}
+        {(scoped || Object.keys(HAS).some((f) => has(f))) && <button type="submit" className="g-pill g-pill--sm" data-testid="button-apply-filters">Apply filters</button>}
       </form>
+      {scopeError && <p id={`scope-error-${table}`} className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="scope-error">{scopeError}</p>}
+      {scoped && scope && (
+        <p className="g-text mb-2 text-[13px]" role="status" data-testid="text-scope">
+          Narrowed to {scope.exact ? "the page" : "pages under"} <b className="font-medium">{domain}{scope.path}</b>{scope.exact ? " (with or without its last slash)" : ""}{domain && !scope.exact ? " — including the same path on any sub-domain" : ""}. A narrowed report is saved, and paid for, separately from the whole site's.{" "}
+          <button type="button" className="g-link" onClick={() => { setScope(null); setScopeDraft({ text: "", exact: false }); setOffset(0); setPicked(new Set()); }} data-testid="button-scope-clear">Show the whole site</button>
+        </p>
+      )}
 
       {saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
       {saved.isError && !page && (

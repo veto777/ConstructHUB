@@ -39,7 +39,7 @@ import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBa
 import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
-  reportInput, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
+  reportInput, reportRequest, TooManyFilters, SCOPED_TABLES, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
   effectiveReport, fetchAdsSnapshot, adsPage, ADS_MAX, ADS_ESTIMATE_USD, ADS_TYPICAL_USD, type AdsSnapshot,
   CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
   type ReportPage, type KeywordOverview,
@@ -595,8 +595,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const forKeyword = isKeywordTable(input.table);
     const target = forKeyword ? cleanKeyword(input.keyword ?? "") : normalizeDomain(input.domain ?? "");
     if (!target) return res.status(400).json({ message: forKeyword ? "Enter a keyword." : "Enter a domain like example.com" });
+    if (forKeyword && input.path) return res.status(400).json({ message: "A section only applies to a site's reports." });
+    if (input.exactPage && !input.path) return res.status(400).json({ message: "Say which page: a path such as /services/roofing." });
+    if (input.path && !SCOPED_TABLES.has(input.table)) return res.status(400).json({ message: "This report is counted for the whole site and can't be narrowed to a section." });
     // Sorts and filters this report does not have are dropped before anything is looked up or keyed.
     const full = effectiveReport({ ...input, target });
+    // More conditions than the source takes: refused before anything is looked up, never dropped silently.
+    try { reportRequest(full); } catch (e) { if (e instanceof TooManyFilters) return res.status(400).json({ message: e.message }); throw e; }
     if (input.table === "ads") {
       // One lookup brings every ad the library will give; each page is cut from that saved copy.
       if (input.offset >= ADS_MAX) return res.status(400).json({ message: `Google's ad library gives the ${ADS_MAX} most recent ads.` });
@@ -764,12 +769,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       });
       return;
     }
-    const saved = input.refresh ? null : await cached<DirectoriesPage>(user, key, CACHE_HOURS);
-    if (saved) return res.json({ page: saved, reused: true });
-    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
-    if (!isConfigured()) return notReady(res);
-    const out = await buyOnce<DirectoriesPage>(user, key, "directories", CACHE_HOURS, directoriesEstimateUsd(sites.length), () => fetchDirectories(sites), input.refresh, `Directories — ${sites.join(", ")}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+    if (input.peek) {
+      const kept = await cached<DirectoriesPage>(user, key, CACHE_HOURS);
+      return kept ? res.json({ page: kept, reused: true }) : res.status(404).json({ code: "no_report", message: "Not run yet." });
+    }
+    // The same queue as the second try above: a first purchase, a full "check again" and a second try for the missing
+    // sites never run side by side for one saved answer, so none can save over what another just brought.
+    await serial(`directories:${user}:${key}`, async () => {
+      const saved = input.refresh ? null : await cached<DirectoriesPage>(user, key, CACHE_HOURS);
+      if (saved) return res.json({ page: saved, reused: true });
+      if (!isConfigured()) return notReady(res);
+      const out = await buyOnce<DirectoriesPage>(user, key, "directories", CACHE_HOURS, directoriesEstimateUsd(sites.length), () => fetchDirectories(sites), input.refresh, `Directories — ${sites.join(", ")}`);
+      return res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+    });
   });
 
   // ── Service-area planner (Keywords explorer): services x towns for one site ──
@@ -992,7 +1004,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // The saved answers added up: named / used as a source now and month by month, other businesses named, websites drawn on. Saved rows only.
   route("get", "/api/seo/sites/:id/ai/summary", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json(await aiSummary(user, site.id, await trackedCompetitors(site.id)));
+    res.json(await aiSummary(user, site.id, { rivals: await trackedCompetitors(site.id), businessName: site.business_name ?? null, domain: site.domain }));
   });
   // Ask the chosen assistants one question. One purchase per identical question in flight; an assistant that
   // fails is not charged; the answers are saved so the history builds up.

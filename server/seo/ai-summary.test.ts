@@ -11,9 +11,11 @@ describe("AI visibility added up", () => {
       a("Best roofer in  Bellingham", "gemini", "2026-10-01", { mentioned: false, businesses: ["Topside Roofing", "Skyline", "Topside Roofing, LLC"], sources: [{ domain: "yelp.com", ours: false }, { domain: "blog.topside.example", ours: false }] }),
       a("siding contractor near me", "chatgpt", "2026-10-02", { mentioned: true, listedAt: 2, businesses: ["Skyline", "Alpine Exteriors"], sources: [{ domain: "yelp.com", ours: false }] }),
       a("old question", "chatgpt", "2026-03-01", { mentioned: true }),   // too old to say anything about now
-    ], { rivals: ["topside.example"], now });
-    expect(s.now).toEqual({ answers: 3, mentioned: 2, cited: 1, questions: 2, first: 1 });
-    expect(s.byEngine).toEqual([{ engine: "chatgpt", answers: 2, mentioned: 2, cited: 1 }, { engine: "gemini", answers: 1, mentioned: 0, cited: 0 }]);
+      // The customer's own business under a spelling the answer's list reading did not match: still not an "other business".
+      a("siding contractor near me", "gemini", "2026-10-02", { mentioned: true, listedAt: null, businesses: ["Alpine Exteriors (Bellingham)", "alpine.example — siding"] }),
+    ], { rivals: ["topside.example"], now, businessName: "Alpine Exteriors", domain: "www.alpine.example" });
+    expect(s.now).toEqual({ answers: 4, mentioned: 3, cited: 1, questions: 2, first: 1 });
+    expect(s.byEngine).toEqual([{ engine: "chatgpt", answers: 2, mentioned: 2, cited: 1 }, { engine: "gemini", answers: 2, mentioned: 1, cited: 0 }]);
     // Other businesses: this business itself is left out; one name written three ways is one business, counted once per answer.
     expect(s.businesses).toEqual([{ name: "Skyline", answers: 3, questions: 2 }, { name: "Topside Roofing", answers: 2, questions: 1 }]);
     expect(s.sources).toEqual([
