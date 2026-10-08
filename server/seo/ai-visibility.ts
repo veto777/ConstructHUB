@@ -35,7 +35,25 @@ export const AI_SCHEMA_DDL = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS seo_ai_checks_site ON seo_ai_checks(site_id, created_at DESC)`,
+  // Questions asked again every month (from the month's included data only).
+  `CREATE TABLE IF NOT EXISTS seo_ai_tracked (
+    id serial PRIMARY KEY,
+    site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    prompt text NOT NULL,
+    engines text[] NOT NULL,
+    next_at timestamptz NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_tracked_prompt ON seo_ai_tracked(site_id, lower(prompt))`,
 ];
+
+export const MAX_TRACKED_PROMPTS = 5;
+export const trackInput = z.object({
+  prompt: z.string().trim().min(8).max(300),
+  engines: z.array(z.enum(["chatgpt", "gemini", "perplexity"])).min(1).max(3).default(["chatgpt", "gemini", "perplexity"]),
+  on: z.boolean(),
+}).strict();
 
 /**
  * The assistants we ask, and the model each is asked through. `estimateUsd` is
@@ -249,4 +267,21 @@ export async function fetchAiMentions(input: { domain: string; platform: "google
     data: { domain: input.domain, platform: input.platform, total: typeof r.total_count === "number" ? r.total_count : null, rows: (Array.isArray(r.items) ? r.items : []).map((i: any) => parseMention(i, input.domain)).filter((x: AiMention | null): x is AiMention => !!x), fetchedAt: new Date().toISOString() },
     costUsd: typeof task.cost === "number" ? task.cost : 0,
   };
+}
+
+// ── Asked again every month ────────────────────────────────────────────────
+
+export async function trackedPrompts(siteId: number): Promise<{ prompt: string; engines: AiEngine[]; nextAt: string }[]> {
+  const { rows } = await pool.query(`SELECT prompt, engines, next_at AS "nextAt" FROM seo_ai_tracked WHERE site_id=$1 ORDER BY created_at`, [siteId]);
+  return rows;
+}
+/** Turn monthly re-asking on or off for a question. Returns null when the site already tracks the most allowed. */
+export async function setTracked(userId: number, siteId: number, input: z.infer<typeof trackInput>): Promise<boolean> {
+  if (!input.on) { await pool.query("DELETE FROM seo_ai_tracked WHERE site_id=$1 AND user_id=$2 AND lower(prompt)=lower($3)", [siteId, userId, input.prompt]); return true; }
+  const { rows: [{ n, has }] } = await pool.query("SELECT count(*)::int n, bool_or(lower(prompt)=lower($2)) AS has FROM seo_ai_tracked WHERE site_id=$1", [siteId, input.prompt]);
+  if (!has && n >= MAX_TRACKED_PROMPTS) return false;
+  await pool.query(
+    `INSERT INTO seo_ai_tracked(site_id, user_id, prompt, engines, next_at) VALUES($1,$2,$3,$4, now() + interval '30 days')
+     ON CONFLICT (site_id, lower(prompt)) DO UPDATE SET engines=EXCLUDED.engines`, [siteId, userId, input.prompt, [...new Set(input.engines)]]);
+  return true;
 }

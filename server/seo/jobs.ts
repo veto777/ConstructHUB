@@ -22,6 +22,7 @@ import { retailCents } from "@shared/seo-credits";
 import { deliverPendingAlerts } from "./alerts";
 import { sendDueReports } from "./site-report-send";
 import { trackedCompetitors } from "./voice";
+import { runDueAiChecks } from "./ai-monthly";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -323,6 +324,7 @@ export async function seoTick(): Promise<void> {
       await collectRunningRuns();
       await retryOwedRefunds().catch((e) => console.error("[seo] owed refunds failed", e?.message ?? e));
       await deliverPendingAlerts().catch((e) => console.error("[seo] alert delivery failed", e?.message ?? e));
+      await runDueAiChecks().catch((e) => console.error("[seo] monthly AI questions failed", e?.message ?? e));
       await sendDueReports().catch((e) => console.error("[seo] scheduled reports failed", e?.message ?? e));
       await runDueBacklinkSnapshots();
     } finally {

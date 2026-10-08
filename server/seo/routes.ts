@@ -51,7 +51,7 @@ import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as foll
 import { listingNamed } from "./dataforseo";
 import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage } from "./batch";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
-import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
+import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -690,7 +690,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       aiHistory(user, site.id),
       pool.query("SELECT keyword, location_name AS location FROM seo_keywords WHERE site_id=$1 ORDER BY (location_name IS NOT NULL AND location_name <> 'United States') DESC, search_volume DESC NULLS LAST, id LIMIT 40", [site.id]),
     ]);
-    res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords) });
+    res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords), tracked: await trackedPrompts(site.id), maxTracked: MAX_TRACKED_PROMPTS });
   });
   // Ask the chosen assistants one question. One purchase per identical question in flight; an assistant that
   // fails is not charged; the answers are saved so the history builds up.
@@ -706,6 +706,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     });
     res.status(201).json({ prompt: input.prompt, answers: out.data.answers, failed: out.data.failed });
   });
+  // Ask a question again every month, or stop. One at a time per account, so the limit cannot be raced.
+  route("post", "/api/seo/sites/:id/ai/track", (req, res, user) => serial(`aitrack:${user}`, async () => {
+    const site = await ownedSite(user, req.params.id);
+    const input = trackInput.parse(req.body);
+    if (!(await setTracked(user, site.id, input))) return res.status(403).json({ message: `You can have up to ${MAX_TRACKED_PROMPTS} questions asked every month per site. Stop one first.` });
+    res.json({ tracked: await trackedPrompts(site.id) });
+  }));
+
   // The questions for which an AI answer already uses a site as a source. Saved for a week; `peek` never buys.
   route("post", "/api/seo/ai/mentions", async (req, res, user) => {
     const input = mentionsInput.parse(req.body);

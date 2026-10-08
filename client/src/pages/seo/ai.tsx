@@ -18,7 +18,7 @@ type Engine = "chatgpt" | "gemini" | "perplexity";
 type Source = { domain: string; title: string | null; url: string | null; ours: boolean };
 type Answer = { engine: Engine; model: string; mentioned: boolean; cited: boolean; listedAt: number | null; businesses: string[]; sources: Source[]; searches: string[]; answer: string; at?: string };
 type PromptHistory = { prompt: string; lastAt: string; latest: (Answer & { at: string })[]; history: { at: string; engine: Engine; mentioned: boolean; cited: boolean; listedAt: number | null }[] };
-type Data = { businessName: string | null; domain: string; prompts: PromptHistory[]; suggestions: string[] };
+type Data = { businessName: string | null; domain: string; prompts: PromptHistory[]; suggestions: string[]; tracked?: { prompt: string; engines: Engine[]; nextAt: string }[]; maxTracked?: number };
 type Mention = { question: string; searches: number | null; answer: string; sources: { domain: string; title: string | null; ours: boolean }[]; seenAt: string | null };
 type MentionsPage = { domain: string; platform: "google" | "chat_gpt"; total: number | null; rows: Mention[]; fetchedAt: string };
 
@@ -146,6 +146,11 @@ export default function SeoAiPage() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); toast({ title: "Business name saved" }); },
     onError: (e) => toast({ title: "Couldn't save the name", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const track = useMutation({
+    mutationFn: (v: { prompt: string; on: boolean; engines: Engine[] }) => api("POST", `${key}/track`, v),
+    onSuccess: (_r, v) => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: v.on ? "This question will be asked again every month" : "Monthly asking stopped" }); },
+    onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const shown = d?.prompts.find((p) => p.prompt === openPrompt) ?? d?.prompts[0] ?? null;
   const toggle = (e: Engine) => setEngines((x) => (x.includes(e) ? x.filter((y) => y !== e) : [...x, e]));
   const ready = prompt.trim().length >= 8 && engines.length > 0;
@@ -187,6 +192,13 @@ export default function SeoAiPage() {
             <section className="mt-5" data-testid="ai-result">
               <h2 className="g-text mb-1 text-[16px] font-medium">"{shown.prompt}"</h2>
               <p className="g-text-2 mb-3 text-[13px]">Named by {shown.latest.filter((a) => a.mentioned).length} of {shown.latest.length} assistant{shown.latest.length === 1 ? "" : "s"} · last asked {fmtDate(shown.lastAt)} <button type="button" className="g-link ml-2" disabled={ask.isPending} onClick={() => ask.mutate(shown.prompt)} data-testid="button-ai-again">Ask again{price != null ? ` — about ${money(price)}` : ""}</button></p>
+              {(() => { const t = d.tracked?.find((x) => x.prompt.toLowerCase() === shown.prompt.toLowerCase()); const asked = shown.latest.map((a) => a.engine); const monthly = status.data?.prices ? asked.reduce((a, e) => a + (status.data!.prices[ENGINES.find((x) => x.key === e)!.price] ?? 0), 0) : null; return (
+                <label className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="ai-track">
+                  <input type="checkbox" checked={!!t} disabled={track.isPending} onChange={(e) => track.mutate({ prompt: shown.prompt, on: e.target.checked, engines: asked })} data-testid="checkbox-ai-track" />
+                  <span className="g-text">Ask this again every month</span>
+                  <span className="g-text-2 text-[12px]">{t ? `next on ${fmtDate(t.nextAt)} · ` : ""}{monthly != null ? `about ${money(monthly)} a month, taken from your included SEO data only — it is skipped when that has run out` : ""}</span>
+                </label>
+              ); })()}
               <div className="grid gap-4 lg:grid-cols-3">{ENGINES.map((e) => shown.latest.find((a) => a.engine === e.key)).filter((a): a is Answer & { at: string } => !!a).map((a) => <AnswerCard key={a.engine} a={a} name={d.businessName} />)}</div>
               {shown.history.length > 0 && (
                 <details className="mt-3 text-[13px]" data-testid="ai-history"><summary className="g-link cursor-pointer">Earlier answers to this question ({shown.history.length})</summary>
