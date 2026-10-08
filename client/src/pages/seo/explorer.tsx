@@ -6,7 +6,7 @@
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { holdNote, isNotRunYet } from "./shell";
+import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ExternalLink, Loader2, Plus, RefreshCw, Search } from "lucide-react";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
+import { AddToList } from "./keyword-lists";
 
 type GapKey = "contentGap" | "linkIntersect";
 type ViewKey = ReportKey | GapKey | "overview";
@@ -141,7 +142,7 @@ export default function SeoExplorerPage() {
   const trackKeywords = useMutation({
     mutationFn: (v: { siteId: number; rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[] }) =>
       api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
-    onSuccess: (r: { added: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
+    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
@@ -249,7 +250,7 @@ export default function SeoExplorerPage() {
                 <GapView kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : (
-                <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }}
+                <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               )}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}

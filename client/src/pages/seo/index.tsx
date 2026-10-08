@@ -31,7 +31,7 @@ export default function SeoOverviewPage() {
   const { toast } = useToast();
   const [openKw, setOpenKw] = useState<number | null>(null);
   const overview = useQuery<Overview>({
-    queryKey: [`/api/seo/sites/${site?.id}/overview`], enabled: !!site,
+    queryKey: [`/api/seo/sites/${site?.id}/overview`], enabled: !!site, refetchOnMount: "always", 
     refetchInterval: (q) => q.state.data?.runs.some((r) => r.status === "queued" || r.status === "running") ? 20_000 : false,
   });
   // The history charts (their keys carry the device/tag) and the dashboard change with every check and keyword edit.
@@ -99,7 +99,7 @@ export default function SeoOverviewPage() {
                   return (
                     <Fragment key={r.id}>
                     <tr data-testid={`row-keyword-${r.id}`}>
-                      <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
+                      <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== "United States" && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
                       {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`In the map pack: ${first.pack!.map((p) => p.title).join(", ")}`}>not in it{first.previousLocal != null && <> <span className="g-move g-move--down">lost</span></>}</span> : <span className="g-text-2" title="Google showed no map for this search">no map</span>}</td>
                       <td className="num" data-label="Volume">{fmtNum(r.searchVolume)}</td>

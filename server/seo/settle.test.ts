@@ -13,7 +13,7 @@ const reservation = (): BudgetReservation => ({
 describe("settleBudget", () => {
   it("settles a reservation exactly once — a second settlement cannot refund it again", async () => {
     const charged: number[] = [];
-    budgetDeps.settleCredits = async (_r, cents) => { charged.push(cents); };
+    budgetDeps.settleCredits = async (_r, cents) => { charged.push(cents); return { dIncluded: 0, dWallet: 0 }; };
     const r = reservation();
     await settleBudget(r, 0.05);
     await settleBudget(r, 0.05, 0);
@@ -23,7 +23,7 @@ describe("settleBudget", () => {
   });
   it("charges the customer nothing for a failed call while keeping our own cost", async () => {
     const charged: number[] = [];
-    budgetDeps.settleCredits = async (_r, cents) => { charged.push(cents); };
+    budgetDeps.settleCredits = async (_r, cents) => { charged.push(cents); return { dIncluded: 0, dWallet: 0 }; };
     await settleBudget(reservation(), 0.05, 0);
     expect(charged).toEqual([0]);
   });

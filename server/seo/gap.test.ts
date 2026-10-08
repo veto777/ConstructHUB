@@ -61,6 +61,11 @@ describe("parseLinkIntersect", () => {
       links: [{ competitor: "b.com", backlinks: 73, firstSeen: "2026-02-08" }, { competitor: "c.com", backlinks: 7, firstSeen: null }],
     });
   });
+  it("a site that does not link to every competitor is not an intersection", () => {
+    expect(parseLinkIntersect({ domain_intersection: { "1": { target: "x.com", rank: 100, backlinks: 5 } } }, ["b.com", "c.com"])).toBeNull();
+    expect(parseLinkIntersect({ domain_intersection: { "1": { target: "x.com", rank: 100, backlinks: 5 }, "2": { target: "x.com", rank: 100, backlinks: 0 } } }, ["b.com", "c.com"])).toBeNull();
+    expect(parseLinkIntersect({ domain_intersection: { "1": { target: "x.com", rank: 100, backlinks: 5 } } }, ["b.com"])).not.toBeNull();
+  });
   it("skips an item with no intersection", () => {
     expect(parseLinkIntersect({}, ["b.com"])).toBeNull();
     expect(parseLinkIntersect({ domain_intersection: {} }, ["b.com"])).toBeNull();
@@ -76,8 +81,16 @@ describe("fetchGap", () => {
     }) as typeof gapDeps.labsDomainIntersection;
     const out = await fetchGap({ ...input, kind: "content", competitors: ["b.com", "c.com"] });
     expect(out.data.missing).toEqual(["c.com"]);
+    expect(out.costUnknown).toBe(false);
     expect(out.data.rows).toHaveLength(1);
     expect(out.costUsd).toBeCloseTo(0.021, 6);
+  });
+  it("content gap: a competitor that timed out makes the cost unknown", async () => {
+    gapDeps.labsDomainIntersection = (async (i: any) => {
+      if (i.competitor === "c.com") throw Object.assign(new Error("timed out"), { code: "timeout", costUsd: 0 });
+      return { data: { items: [kw("roof repair", 4, 1000)], totalCount: 1 }, costUsd: 0.02 };
+    }) as typeof gapDeps.labsDomainIntersection;
+    expect((await fetchGap({ ...input, kind: "content", competitors: ["b.com", "c.com"] })).costUnknown).toBe(true);
   });
   it("content gap: every competitor failing throws with what it cost", async () => {
     gapDeps.labsDomainIntersection = (async () => { throw Object.assign(new Error("boom"), { costUsd: 0.001 }); }) as typeof gapDeps.labsDomainIntersection;

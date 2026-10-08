@@ -1,4 +1,5 @@
 import { LOCATION_SCHEMA_DDL } from "./locations";
+import { LIST_SCHEMA_DDL } from "./lists";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -105,13 +106,22 @@ export const SEO_SCHEMA_DDL = [
   ...CREDIT_SCHEMA_DDL,
   // Saved pages of Site Explorer reports and keyword overviews (server/seo/reports.ts).
   ...REPORT_SCHEMA_DDL,
+  // Keyword lists (server/seo/lists.ts).
+  ...LIST_SCHEMA_DDL,
+  // What each lookup was, for the customer's usage history (server/seo/usage.ts).
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS label text`,
+  `CREATE INDEX IF NOT EXISTS seo_reservations_user ON seo_reservations(user_id, created_at DESC)`,
   // Places a rank check can be run from (server/seo/locations.ts).
   ...LOCATION_SCHEMA_DDL,
   // A keyword can be tracked in several places: the same keyword in Tampa and in Clearwater is two rows.
   `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_code integer`,
   `ALTER TABLE seo_keywords ADD COLUMN IF NOT EXISTS location_name text`,
-  `ALTER TABLE seo_keywords DROP CONSTRAINT IF EXISTS seo_keywords_site_id_keyword_key`,
+  // The new rule is in place before the old one goes, so there is never a moment with neither.
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_keywords_site_keyword_place ON seo_keywords(site_id, keyword, coalesce(location_code, 0))`,
+  `ALTER TABLE seo_keywords DROP CONSTRAINT IF EXISTS seo_keywords_site_id_keyword_key`,
+  // Every keyword carries the place it is checked from, so changing a site's default never moves a keyword's history.
+  `UPDATE seo_keywords k SET location_code=s.location_code, location_name=CASE WHEN s.location_code=2840 THEN 'United States' ELSE k.location_name END
+     FROM seo_sites s WHERE s.id=k.site_id AND k.location_code IS NULL`,
   // The Google map pack: this business's place in it (1-3, null = not in it) and who was in it.
   `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_position integer`,
   `ALTER TABLE seo_rank_checks ADD COLUMN IF NOT EXISTS local_pack jsonb`,
@@ -133,6 +143,15 @@ export const SEO_SCHEMA_DDL = [
     UNIQUE (site_id, kind, source)
   )`,
   `CREATE INDEX IF NOT EXISTS seo_alerts_user ON seo_alerts(user_id, created_at DESC)`,
+  // Set once the bell / email went out; a row without it is retried (server/seo/alerts.ts deliverPendingAlerts).
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS notified_at timestamptz`,
+  // Ledger: a reservation closed as abandoned can still be settled for real if its call finishes late; refunds are recorded once.
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS reconciled boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS refunded_cents integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_reservations ADD COLUMN IF NOT EXISTS refund_key text`,
+  // A rank run remembers what paid for it and how many checks were accepted, to refund the ones that never come back.
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,
 ];
 
 export async function ensureSeoSchema() {

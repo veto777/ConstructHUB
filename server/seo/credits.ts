@@ -109,7 +109,11 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
       [userId, month, split.fromIncluded, split.fromWallet]);
     if (split.fromWallet) await client.query(`UPDATE seo_credit_wallets SET balance_cents=balance_cents-$2, updated_at=now() WHERE user_id=$1`, [userId, split.fromWallet]);
     const reservation: CreditReservation = { userId, month, fromIncluded: split.fromIncluded, fromWallet: split.fromWallet, allowanceCents, allowanceOnly: !!opts.allowanceOnly };
-    if (opts.reservationId) await client.query(`UPDATE seo_reservations SET credit=$2 WHERE id=$1`, [opts.reservationId, JSON.stringify(reservation)]);
+    if (opts.reservationId) {
+      // Only onto a reservation that is still open: one that was closed meanwhile must not end up holding credit.
+      const { rowCount } = await client.query(`UPDATE seo_reservations SET credit=$2 WHERE id=$1 AND settled_at IS NULL`, [opts.reservationId, JSON.stringify(reservation)]);
+      if (!rowCount) throw new Error(`reservation ${opts.reservationId} is no longer open`);
+    }
     await client.query("COMMIT");
     return reservation;
   } catch (e) {
@@ -126,11 +130,14 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
  * More than reserved: the extra comes from the allowance, then purchased credit,
  * and never drives a balance below zero.
  */
-export async function settleCredits(r: CreditReservation | null, actualCents: number, tx?: PoolClient): Promise<void> {
-  if (!r) return;
+/** What a settlement moved: added to (or, negative, given back from) the allowance used and the purchased credit. */
+export type CreditDelta = { dIncluded: number; dWallet: number };
+export async function settleCredits(r: CreditReservation | null, actualCents: number, tx?: PoolClient): Promise<CreditDelta> {
+  const none: CreditDelta = { dIncluded: 0, dWallet: 0 };
+  if (!r) return none;
   const reserved = r.fromIncluded + r.fromWallet;
   const delta = actualCents - reserved;
-  if (delta === 0) return;
+  if (delta === 0) return none;
   const apply = async (client: PoolClient) => {
     const { rows: [u] } = await client.query(`SELECT included_cents FROM seo_credit_usage WHERE user_id=$1 AND month=$2 FOR UPDATE`, [r.userId, r.month]);
     const { rows: [w] } = await client.query(`SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [r.userId]);
@@ -149,6 +156,7 @@ export async function settleCredits(r: CreditReservation | null, actualCents: nu
       `UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents+$3), wallet_cents=greatest(0,wallet_cents+$4), updated_at=now() WHERE user_id=$1 AND month=$2`,
       [r.userId, r.month, dIncluded, dWallet]);
     if (dWallet) await client.query(`UPDATE seo_credit_wallets SET balance_cents=greatest(0,balance_cents-$2), updated_at=now() WHERE user_id=$1`, [r.userId, dWallet]);
+    return { dIncluded, dWallet };
   };
   // Inside the caller's transaction (budget.ts settles the reservation row and both ledgers together)...
   if (tx) return apply(tx);
@@ -156,8 +164,9 @@ export async function settleCredits(r: CreditReservation | null, actualCents: nu
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    await apply(client);
+    const moved = await apply(client);
     await client.query("COMMIT");
+    return moved;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;

@@ -39,7 +39,7 @@ export default function SeoAlertsPage() {
   const [scope, setScope] = useState<"site" | "all">("all");
   const [kind, setKind] = useState<Kind | "all">("all");
   const url = `/api/seo/alerts${scope === "site" && site ? `?siteId=${site.id}` : ""}`;
-  const q = useQuery<{ alerts: Alert[]; unread: number }>({ queryKey: [url] });
+  const q = useQuery<{ alerts: Alert[]; unread: number }>({ queryKey: [url], refetchOnMount: "always", refetchInterval: 60_000 });
   const read = useMutation({
     mutationFn: (ids: number[] | null) => api("POST", "/api/seo/alerts/read", ids ? { ids } : {}),
     onSuccess: () => { void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },

@@ -28,7 +28,7 @@ export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
 export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
-export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number };
+export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;
@@ -66,6 +66,13 @@ export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => 
 export const canAfford = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
   !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices[key] ?? 0);
 
+/**
+ * After something changed what the worker-fed pages show (keywords tracked, a site added): every tracked-site view,
+ * the dashboard, alerts and the balance are fetched again, wherever they are next opened.
+ */
+export const refreshSeoData = (qc: { invalidateQueries: (f: { predicate: (q: { queryKey: readonly unknown[] }) => boolean }) => unknown }) =>
+  void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && /^\/api\/seo\/(sites|dashboard|status|alerts|keywords\/\d+\/history)/.test(q.queryKey[0]) });
+
 /** Says so when more than the typical price is set aside while a lookup runs. */
 export const holdNote = (status: SeoStatus | undefined, key: keyof SeoPrices) => {
   const hold = status?.holds?.[key], price = status?.prices?.[key];
@@ -96,6 +103,7 @@ const TABS = [
   { href: "/seo/alerts", label: "Alerts" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
+  { href: "/seo/usage", label: "Usage" },
 ];
 
 export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
@@ -123,7 +131,8 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
             <nav className="g-tabs" aria-label="SEO sections">
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
             </nav>
-            {picker && <SitePicker site={site} onSite={onSite} sites={sites} />}
+            {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
+            {picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}
             <UsageLine status={status} />
             {status.data && !status.data.configured && <NotReadyNotice />}
             {children}

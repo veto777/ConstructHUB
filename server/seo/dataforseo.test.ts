@@ -129,6 +129,20 @@ describe("rank checks (standard queue)", () => {
     // no map on the page
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Alpine Exteriors" }, [])).toMatchObject({ localPosition: null, localPack: [] });
   });
+  it("map pack: another business is never taken for the customer's", () => {
+    // a longer name that merely starts with ours is a different business
+    expect(isOurListing({ title: "Precision Roofing Supply" }, "x.com", "Precision Roofing")).toBe(false);
+    // the same name on a different website is a different business
+    expect(isOurListing({ title: "Precision Roofing", domain: "precisionroofing-ohio.example" }, "x.com", "Precision Roofing")).toBe(false);
+    // the website wins wherever it is in the pack, even after an entry whose name matches
+    const pack = [
+      { type: "local_pack", rank_group: 1, title: "Precision Roofing" },
+      { type: "local_pack", rank_group: 2, title: "Precision Roofing of Tampa", domain: "www.x.com" },
+    ];
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Precision Roofing" }, pack).localPosition).toBe(2);
+    // a tagline after a separator is not part of the name
+    expect(isOurListing({ title: "Alpine Exteriors | Siding, Roofing & Windows" }, "x.com", "Alpine Exteriors")).toBe(true);
+  });
   it("business names compare without punctuation or company suffixes", () => {
     expect(normalizeBusinessName("Alpine Exteriors, LLC")).toBe("alpine exteriors");
     expect(normalizeBusinessName("The A&B Roofing Co.")).toBe("a and b roofing");

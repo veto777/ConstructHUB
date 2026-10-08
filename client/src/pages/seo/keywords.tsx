@@ -8,7 +8,7 @@
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
 import { useEffect, useState } from "react";
-import { holdNote, isNotRunYet } from "./shell";
+import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Loader2, Plus, Search } from "lucide-react";
@@ -17,6 +17,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey } from "./report-table";
+import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
 
 type Overview = {
   missing?: string[];
@@ -52,6 +53,9 @@ export default function SeoKeywordsPage() {
   const [keyword, setKeyword] = useState<string | null>(initial || null);
   const [ideas, setIdeas] = useState<TableKey>("matchingTerms");
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [mode, setMode] = useState<"one" | "bulk" | "lists">(() => { const v = new URLSearchParams(window.location.search).get("view"); return v === "bulk" || v === "lists" ? v : "one"; });
+  /** Keywords handed to the bulk analysis from a list. */
+  const [bulkSeed, setBulkSeed] = useState("");
 
   // A keyword looked up in the last week opens without spending.
   const saved = useQuery<{ overview: Overview } | null>({
@@ -77,11 +81,13 @@ export default function SeoKeywordsPage() {
   const track = useMutation({
     mutationFn: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) =>
       api("POST", `/api/seo/sites/${site!.id}/keywords`, { keywords: rows.map((r) => r.keyword), volumes: rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
-    onSuccess: (r: { added: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}` }); },
+    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} now tracked on ${site?.domain}` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
   const submit = () => { const k = input.trim(); if (!k) return; setOverview(null); setKeyword(k.toLowerCase()); lookup.mutate(k); };
+  /** From a list or a bulk analysis: open one keyword's overview (the saved copy if there is one; nothing is bought). */
+  const openKeyword = (k: string) => { setMode("one"); setInput(k); setOverview(null); setKeyword(k.toLowerCase()); };
   const configured = !!status.data?.configured;
   const affordable = canAfford(status.data, "keywordOverview");
   const price = status.data?.prices ? money(status.data.prices.keywordOverview) : "";
@@ -91,6 +97,12 @@ export default function SeoKeywordsPage() {
 
   return (
     <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranks today, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
+      <nav className="g-tabs" aria-label="Keywords explorer views">
+        {([["one", "One keyword"], ["bulk", "Many keywords"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
+      </nav>
+      {mode === "bulk" && <BulkKeywords key={bulkSeed} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
+      {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} onAnalyse={(kws) => { setBulkSeed(kws.join("\n")); setMode("bulk"); }} />}
+      {mode === "one" && (<>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">
           <span className="sr-only">Keyword</span>
@@ -115,7 +127,8 @@ export default function SeoKeywordsPage() {
             <h2 className="g-text text-[20px] font-medium">"{o.keyword}"</h2>
             <span className="g-text-2 text-[12px]">as of {fmtDate(o.fetchedAt)}</span>
             <button type="button" className="g-pill g-pill--sm" disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate()} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>
-            {site && <button type="button" className="g-pill g-pill--sm ml-auto" disabled={track.isPending} onClick={() => track.mutate([{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }])} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
+            <span className="ml-auto"><AddToList rows={[{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty, intent: o.intent }]} label="Save to a list" /></span>
+            {site && <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate([{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }])} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
           </div>
           <div className="g-tiles mb-4">
             <Stat label="Search volume" value={fmtNum(o.volume)} hint={peak ? `Peak ${fmtNum(peak.volume)} in ${monthLabel(peak.month)}` : "per month"} />
@@ -168,10 +181,11 @@ export default function SeoKeywordsPage() {
           <nav className="g-tabs" aria-label="Keyword ideas">
             {IDEAS.map(([k, label]) => <a key={k} href={`#${k}`} aria-current={ideas === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setIdeas(k); }} data-testid={`tab-ideas-${k}`}>{label}</a>)}
           </nav>
-          <ReportView table={ideas} keyword={o.keyword} status={status.data} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
+          <ReportView table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
           {!site && <p className="g-text-2 mt-2 text-[13px]">Add a site above to track keywords from these lists.</p>}
         </div>
       )}
+      </>)}
     </SeoShell>
   );
 }

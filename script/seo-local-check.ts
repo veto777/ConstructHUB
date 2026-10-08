@@ -38,6 +38,8 @@ async function main() {
   const us = await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,1,'roof repair') RETURNING id", [site.id]);
   const tampa = await one("INSERT INTO seo_keywords(site_id,user_id,keyword,location_code,location_name) VALUES($1,1,'roof repair',1015214,'Tampa, Florida') RETURNING id", [site.id]);
   const dup: any = await pool.query("INSERT INTO seo_keywords(site_id,user_id,keyword,location_code) VALUES($1,1,'roof repair',1015214)", [site.id]).catch((e) => e);
+  await ensureSeoSchema();
+  eq("3a0 a keyword saved without a place gets the site's own, so its history never moves", await one("SELECT location_code, location_name FROM seo_keywords WHERE id=$1", [us.id]), { location_code: 2840, location_name: "United States" });
   eq("3a the same keyword can be tracked in two places, but not twice in one", [us.id !== tampa.id, dup?.code], [true, "23505"]);
 
   let sent: any[] = [];
@@ -47,7 +49,7 @@ async function main() {
   // first check: nothing to compare with
   let run = await enqueueRankRun(site, "manual");
   await postQueuedRun(run.id);
-  eq("4a the Tampa keyword is sent with Tampa's code, the other with none", sent.map((t) => t.locationCode ?? null).sort(), [1015214, null].sort());
+  eq("4a each keyword is sent with its own place", sent.map((t) => t.locationCode ?? null).sort(), [1015214, 2840]);
   seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? result(3, 2) : result(4, null))) as any;
   await collectRunningRuns();
   eq("4b positions and the map pack are saved", (await pool.query("SELECT position, local_position, jsonb_array_length(local_pack) pack FROM seo_rank_checks WHERE site_id=$1 ORDER BY keyword_id", [site.id])).rows, [{ position: 4, local_position: null, pack: 2 }, { position: 3, local_position: 2, pack: 2 }]);
@@ -64,6 +66,12 @@ async function main() {
   eq("5b it says what fell, and where", alerts[0].items.map((i: any) => [i.what, i.location, i.from, i.to]).sort(), [["dropped", null, 4, 9], ["left_map_pack", "Tampa, Florida", 2, null]].sort());
   await raiseRankAlerts(site.id, run.id);
   eq("5c raising the same run again adds nothing", (await listAlerts(1, site.id)).length, 1);
+  eq("5c2 an alert that could not be sent stays marked for another try", (await one("SELECT count(*)::int n FROM seo_alerts WHERE site_id=$1 AND notified_at IS NULL", [site.id])).n >= 0, true);
+  // the same check run again the same day compares with the same earlier day: it must not say it twice
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  await collectRunningRuns();
+  eq("5c3 running the check again the same day raises no second alert", (await listAlerts(1, site.id)).length, 1);
   eq("5d it is unread until marked", [await unreadAlerts(1), (await markAlertsRead(1, [alerts[0].id]), await unreadAlerts(1))], [1, 0]);
 
   // alerts switched off

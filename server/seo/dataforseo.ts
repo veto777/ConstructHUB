@@ -190,16 +190,27 @@ export function normalizeBusinessName(name: string | null | undefined): string {
   return String(name ?? "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ")
     .replace(/\b(llc|inc|incorporated|co|corp|corporation|company|ltd|the)\b/g, " ").replace(/\s+/g, " ").trim();
 }
-/** Is this map-pack entry the tracked business? By website when the entry has one, else by name. */
+const sameSite = (domain: unknown, target: string) => {
+  if (typeof domain !== "string" || !domain) return false;
+  const d = domain.toLowerCase().replace(/^www\./, "");
+  return d === target || d.endsWith(`.${target}`);
+};
+/** A map-pack entry on the tracked website. */
+export const listingOnDomain = (item: { domain?: unknown }, targetDomain: string) => sameSite(item.domain, targetDomain.toLowerCase().replace(/^www\./, ""));
+/**
+ * A map-pack entry with the tracked business's name. Only for an entry that shows NO website (one that shows
+ * a different website is a different business), and only on the whole name: "Precision Roofing" is not
+ * "Precision Roofing Supply". A tagline after a separator ("Alpine Exteriors | Siding & Windows") is ignored.
+ */
+export function listingNamed(item: { domain?: unknown; title?: unknown }, businessName?: string | null): boolean {
+  if (typeof item.domain === "string" && item.domain) return false;
+  const ours = normalizeBusinessName(businessName);
+  if (ours.length < 4 || typeof item.title !== "string") return false;
+  return normalizeBusinessName(item.title) === ours || normalizeBusinessName(item.title.split(/\s+[|–—:·-]\s+/)[0]) === ours;
+}
+/** Is this map-pack entry the tracked business? By website, or by name when the entry shows no website. */
 export function isOurListing(item: { domain?: unknown; title?: unknown }, targetDomain: string, businessName?: string | null): boolean {
-  const target = targetDomain.toLowerCase().replace(/^www\./, "");
-  if (typeof item.domain === "string" && item.domain) {
-    const d = item.domain.toLowerCase().replace(/^www\./, "");
-    if (d === target || d.endsWith(`.${target}`)) return true;
-  }
-  const ours = normalizeBusinessName(businessName), theirs = normalizeBusinessName(typeof item.title === "string" ? item.title : "");
-  if (ours.length < 4 || theirs.length < 4) return false;
-  return ours === theirs || (ours.length >= 8 && theirs.startsWith(ours)) || (theirs.length >= 8 && ours.startsWith(theirs));
+  return listingOnDomain(item, targetDomain) || listingNamed(item, businessName);
 }
 
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
@@ -212,7 +223,9 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
   });
   const packItems = items.filter((i) => i && i.type === "local_pack");
   const pack = packItems.map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: str(i.title) ?? "", domain: str(i.domain) }));
-  const ours = packItems.findIndex((i) => isOurListing(i, input.targetDomain, input.businessName));
+  // The website decides wherever it appears in the pack; the name is only a fallback for entries that show none.
+  const onDomain = packItems.findIndex((i) => listingOnDomain(i, input.targetDomain));
+  const ours = onDomain >= 0 ? onDomain : packItems.findIndex((i) => listingNamed(i, input.businessName));
   return {
     keywordId: input.keywordId,
     keyword: input.keyword,

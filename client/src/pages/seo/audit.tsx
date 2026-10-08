@@ -85,7 +85,7 @@ export default function SeoAuditPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site?.id}/audit`;
-  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
+  const q = useQuery<AuditData>({ queryKey: [key], enabled: !!site, refetchOnMount: "always", refetchInterval: (query) => (query.state.data?.running ? 6000 : false) });
   const [severity, setSeverity] = useState<Severity | "all">("all");
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);

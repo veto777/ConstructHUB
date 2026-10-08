@@ -116,8 +116,9 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
-    const urls = g.items.filter((i) => /^https?:\/\//.test(i));
-    return urls.length === 0 || urls.some((u) => crawledNow.has(u));
+    // Every page it was on must have been looked at again (an entry such as "URL — score 41" starts with its page).
+    const urls = g.items.map((i) => i.match(/^https?:\/\/\S+/)?.[0]).filter((u): u is string => !!u);
+    return urls.length === 0 || urls.every((u) => crawledNow.has(u));
   };
   const brief = (g: Group) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length });
   const fixed = gone.filter(recheckable).map(brief), notRechecked = gone.filter((g) => !recheckable(g)).map(brief);
@@ -145,7 +146,7 @@ const bare = (domain: string) => domain.toLowerCase().replace(/^www\./, "");
 // Tolerant of a malformed stored crawl: anything that is not the expected JSON type reads as empty, never as an error.
 const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
                                 'url', p->>'url',
-                                'status', CASE WHEN jsonb_typeof(p->'status')='number' THEN (p->>'status')::numeric::int ELSE 0 END,
+                                'status', CASE WHEN jsonb_typeof(p->'status')='number' AND (p->>'status')::numeric BETWEEN 0 AND 999 THEN (p->>'status')::numeric::int ELSE 0 END,
                                 'redirects', CASE WHEN jsonb_typeof(p->'redirects')='array' THEN jsonb_array_length(p->'redirects') ELSE 0 END))
                               FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) p
                              WHERE jsonb_typeof(p)='object'), '[]'::jsonb)`;

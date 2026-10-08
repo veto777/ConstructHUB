@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeChange, linkChange, rankChanges, type CheckPair } from "./alerts";
+import { alertMessage, describeChange, linkChange, rankChanges, type CheckPair } from "./alerts";
 import { locationLabel, locationTypeLabel, usableLocations } from "./locations";
 
 const pair = (keyword: string, previous: number | null, position: number | null, extra: Partial<CheckPair> = {}): CheckPair =>
@@ -72,5 +72,23 @@ describe("locations", () => {
       null,
     ])).toEqual([{ code: 1015214, name: "Tampa,Florida,United States", type: "City" }]);
     expect(usableLocations(undefined as any)).toEqual([]);
+  });
+});
+
+describe("alertMessage", () => {
+  it("a ranking alert lists the first five changes and counts the rest", () => {
+    const items = Array.from({ length: 7 }, (_, i) => ({ keyword: `k${i}`, device: "desktop", location: null, what: "dropped", from: 3, to: 9 }));
+    const m = alertMessage({ kind: "rank_drop", title: "7 rankings fell for x.com", domain: "x.com", items });
+    expect(m.kind).toBe("seo.rank_drop");
+    expect(m.severity).toBe("warning");
+    expect(m.body.split("\n")).toHaveLength(6);
+    expect(m.body).toContain("…and 2 more.");
+    expect(alertMessage({ kind: "rank_gain", title: "t", domain: "x.com", items: items.slice(0, 1) })).toMatchObject({ kind: "seo.rank_gain", severity: "info" });
+  });
+  it("a links alert says how many sites there were and are", () => {
+    const m = alertMessage({ kind: "links_lost", title: "x.com lost 10 linking sites", domain: "x.com", items: [{ from: 100, to: 90, since: "2026-09-08" }] });
+    expect(m).toMatchObject({ kind: "seo.links_change", severity: "warning", actionUrl: "/seo/backlinks" });
+    expect(m.body).toBe("Sites linking to x.com: 100 on 2026-09-08, 90 now.");
+    expect(alertMessage({ kind: "links_gained", title: "t", domain: "x.com", items: [] }).body).toContain("x.com");
   });
 });

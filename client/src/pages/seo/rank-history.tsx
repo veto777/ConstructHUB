@@ -34,7 +34,7 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
   if (device) params.set("device", device);
   if (tag) params.set("tag", tag);
   const qs = params.toString();
-  const q = useQuery<History>({ queryKey: [`/api/seo/sites/${site.id}/rank-history${qs ? `?${qs}` : ""}`] });
+  const q = useQuery<History>({ queryKey: [`/api/seo/sites/${site.id}/rank-history${qs ? `?${qs}` : ""}`], refetchOnMount: "always", });
   const h = q.data;
   if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading history…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load the history: {apiErrorMessage(q.error)}</p>;
@@ -120,7 +120,7 @@ type Point = { date: string; desktop: number | null; mobile: number | null; url:
 
 /** One keyword's position at every saved check. Lower on the chart is worse: position 1 is at the top. */
 export function KeywordHistory({ id, devices }: { id: number; devices: Device[] }) {
-  const q = useQuery<{ keyword: string; points: Point[] }>({ queryKey: [`/api/seo/keywords/${id}/history`] });
+  const q = useQuery<{ keyword: string; points: Point[] }>({ queryKey: [`/api/seo/keywords/${id}/history`], refetchOnMount: "always", });
   if (q.isLoading) return <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <p className="g-text-2 text-[13px]" role="alert">Couldn't load this keyword's history: {apiErrorMessage(q.error)}</p>;
   const points = q.data?.points ?? [];

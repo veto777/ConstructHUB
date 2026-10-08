@@ -65,20 +65,73 @@ export function describeChange(c: RankChange): string {
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 export const ITEM_CAP = 200;
 
-/** Insert the alert once (per site, kind and source); true when it is new. */
-async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<boolean> {
-  const { rowCount } = await pool.query(
-    `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING`,
+/** Insert the alert once (per site, kind and source); its id when it is new, null when it already exists. */
+async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
+  const { rows: [row] } = await pool.query(
+    `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING RETURNING id`,
     [userId, siteId, kind, source, title, JSON.stringify(items.slice(0, ITEM_CAP))]);
-  return (rowCount ?? 0) > 0;
+  return row ? Number(row.id) : null;
 }
 
-/** After a rank run: compare each keyword's newest check with the one before it and raise what moved. */
+/** The bell / email text for a saved alert. Pure, for tests. */
+export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
+  if (a.kind === "rank_drop" || a.kind === "rank_gain") {
+    const items = (Array.isArray(a.items) ? a.items : []) as RankChange[];
+    return {
+      kind: a.kind === "rank_drop" ? "seo.rank_drop" : "seo.rank_gain", title: a.title, severity: a.kind === "rank_drop" ? "warning" : "info",
+      body: items.slice(0, 5).map(describeChange).join("\n") + (items.length > 5 ? `\n…and ${items.length - 5} more.` : ""),
+      actionLabel: "See what changed", actionUrl: "/seo/alerts",
+    };
+  }
+  const i = (Array.isArray(a.items) ? a.items[0] : null) ?? {};
+  return {
+    kind: "seo.links_change", title: a.title, severity: a.kind === "links_lost" ? "warning" : "info",
+    body: `Sites linking to ${a.domain}: ${i.from ?? "?"} on ${i.since ?? "the last snapshot"}, ${i.to ?? "?"} now.`,
+    actionLabel: "See the links", actionUrl: "/seo/backlinks",
+  };
+}
+
+/**
+ * Send one alert to the bell (and email when that is on). The row is claimed
+ * first, so it goes out once; if sending fails the claim is released and
+ * deliverPendingAlerts tries again.
+ */
+export async function deliverAlert(alertId: number): Promise<boolean> {
+  const { rows: [a] } = await pool.query(
+    `UPDATE seo_alerts x SET notified_at=now() FROM seo_sites s WHERE x.id=$1 AND x.notified_at IS NULL AND s.id=x.site_id
+     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId]);
+  if (!a) return false;
+  try {
+    const m = alertMessage(a);
+    await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
+    return true;
+  } catch (e: any) {
+    await pool.query("UPDATE seo_alerts SET notified_at=NULL WHERE id=$1", [alertId]).catch(() => {});
+    console.error(`[seo] alert ${alertId} was not delivered (it will be retried): ${e?.message ?? e}`);
+    return false;
+  }
+}
+
+/** Alerts saved but never sent (a crash between the two, or a failed send): try again for a day. */
+export async function deliverPendingAlerts(): Promise<number> {
+  const { rows } = await pool.query(
+    "SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '24 hours' ORDER BY id LIMIT 20");
+  let sent = 0;
+  for (const r of rows) if (await deliverAlert(Number(r.id))) sent++;
+  return sent;
+}
+
+/**
+ * After a rank run: compare each keyword's newest check with the check of the
+ * day before it and raise what moved. One alert of each kind per site per day:
+ * running the check again the same day compares with the same earlier day, so
+ * it must not tell the owner the same thing twice.
+ */
 export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ drops: number; gains: number }> {
-  const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled, alert_drop FROM seo_sites WHERE id=$1", [siteId]);
+  const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled, alert_drop, current_date::text AS today FROM seo_sites WHERE id=$1", [siteId]);
   if (!site || site.alerts_enabled === false) return { drops: 0, gains: 0 };
   const { rows } = await pool.query(
-    `SELECT k.id AS "keywordId", k.keyword, k.location_name AS location, x.device,
+    `SELECT k.id AS "keywordId", k.keyword, NULLIF(k.location_name, 'United States') AS location, x.device,
             max(x.position) FILTER (WHERE rn=1) AS position, max(x.position) FILTER (WHERE rn=2) AS previous,
             max(x.local_position) FILTER (WHERE rn=1) AS local, max(x.local_position) FILTER (WHERE rn=2) AS "previousLocal",
             bool_or(rn=1 AND x.run_id=$2) AS in_run
@@ -87,20 +140,10 @@ export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ 
       WHERE rn<=2 GROUP BY k.id, k.keyword, k.location_name, x.device HAVING count(*)=2`, [siteId, runId]);
   // Only keywords this run actually checked, and only those that had a check before it.
   const { drops, gains } = rankChanges(rows.filter((r: any) => r.in_run), site.alert_drop ?? DEFAULT_DROP);
-  const link = "/seo/alerts";
-  if (drops.length && await saveAlert(site.user_id, siteId, "rank_drop", runId, `${plural(drops.length, "ranking")} fell for ${site.domain}`, drops)) {
-    await notifyUser(site.user_id, "seo.rank_drop", {
-      title: `${plural(drops.length, "ranking")} fell for ${site.domain}`,
-      body: drops.slice(0, 5).map(describeChange).join("\n") + (drops.length > 5 ? `\n…and ${drops.length - 5} more.` : ""),
-      link, severity: "warning", actionLabel: "See what changed", actionUrl: link,
-    }).catch((e: any) => console.error(`[seo] rank-drop notification failed: ${e?.message ?? e}`));
-  }
-  if (gains.length && await saveAlert(site.user_id, siteId, "rank_gain", runId, `${plural(gains.length, "ranking")} improved for ${site.domain}`, gains)) {
-    await notifyUser(site.user_id, "seo.rank_gain", {
-      title: `${plural(gains.length, "ranking")} improved for ${site.domain}`,
-      body: gains.slice(0, 5).map(describeChange).join("\n") + (gains.length > 5 ? `\n…and ${gains.length - 5} more.` : ""),
-      link, severity: "info", actionLabel: "See what changed", actionUrl: link,
-    }).catch((e: any) => console.error(`[seo] rank-gain notification failed: ${e?.message ?? e}`));
+  for (const [kind, items, verb] of [["rank_drop", drops, "fell"], ["rank_gain", gains, "improved"]] as const) {
+    if (!items.length) continue;
+    const id = await saveAlert(site.user_id, siteId, kind, site.today, `${plural(items.length, "ranking")} ${verb} for ${site.domain}`, items);
+    if (id) await deliverAlert(id);
   }
   return { drops: drops.length, gains: gains.length };
 }
@@ -122,14 +165,11 @@ export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
   const [latest, previous] = rows;
   const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
   if (!change) return null;
-  const lost = change.kind === "links_lost";
-  const title = `${site.domain} ${lost ? "lost" : "gained"} ${plural(change.by, "linking site")}`;
+  const title = `${site.domain} ${change.kind === "links_lost" ? "lost" : "gained"} ${plural(change.by, "linking site")}`;
   const items = [{ from: previous.summary.referringDomains, to: latest.summary.referringDomains, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null }];
-  if (!(await saveAlert(site.user_id, siteId, change.kind, latest.taken_on, title, items))) return null;
-  await notifyUser(site.user_id, "seo.links_change", {
-    title, body: `Sites linking to ${site.domain}: ${previous.summary.referringDomains} on ${previous.taken_on}, ${latest.summary.referringDomains} now.`,
-    link: "/seo/alerts", severity: lost ? "warning" : "info", actionLabel: "See the links", actionUrl: "/seo/backlinks",
-  }).catch((e: any) => console.error(`[seo] link notification failed: ${e?.message ?? e}`));
+  const id = await saveAlert(site.user_id, siteId, change.kind, latest.taken_on, title, items);
+  if (!id) return null;
+  await deliverAlert(id);
   return change.kind;
 }
 

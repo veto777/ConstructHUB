@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, type SeoStatus } from "./shell";
+import { AddToList } from "./keyword-lists";
 
 export type GapKind = "content" | "links";
 type ContentRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competitors: { domain: string; position: number | null; url: string | null }[]; traffic: number };
@@ -55,7 +56,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
     queryFn: async () => { try { return await api("POST", "/api/seo/gap", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/gap", body),
+    mutationFn: (again: boolean) => api("POST", "/api/seo/gap", again ? { ...body, refresh: true } : body),
     onSuccess: (data: { page: Page }) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't run the comparison", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -70,7 +71,9 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
     setDraft([...draft, d]); setInput("");
   };
   const offers = suggestions.map(clean).filter((s) => s && s !== clean(domain) && !draft.includes(s)).slice(0, 6);
-  const priceCents = status?.prices ? (kind === "content" ? status.prices.competitorGap * Math.max(1, draft.length) : status.prices.linkIntersect ?? null) : null;
+  const priceFor = (n: number) => status?.prices ? (kind === "content" ? status.prices.competitorGap * Math.max(1, n) : status.prices.linkIntersect ?? null) : null;
+  // Two different things: what the list being edited would cost, and what the comparison on screen costs to run.
+  const draftPrice = priceFor(draft.length), priceCents = priceFor(applied.length);
   const available = status?.credits?.availableCents;
   const affordable = priceCents == null || available == null || available === -1 || available >= priceCents;
   const page = saved.data?.page ?? null;
@@ -108,7 +111,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
       )}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button type="button" disabled={!draft.length || (!dirty && applied.length > 0)} onClick={compare} data-testid="button-gap-compare">Compare{draft.length ? ` with ${draft.length} competitor${draft.length === 1 ? "" : "s"}` : ""}</Button>
-        <span className="g-text-2 text-[13px]">{priceCents != null ? `A new comparison costs about ${money(priceCents)} of your SEO data${kind === "content" ? " (one per competitor)" : ""}; reopening it within a day is free.` : ""}</span>
+        <span className="g-text-2 text-[13px]">{draftPrice != null ? `A new comparison costs about ${money(draftPrice)} of your SEO data${kind === "content" ? " (one per competitor)" : ""}; reopening it within a day is free.` : ""}</span>
       </div>
 
       {applied.length === 0 && <Empty testId="gap-intro"><h3>Add up to {MAX} competitors</h3><p>Type a competitor's website{offers.length ? " or pick one above" : ""}, then press <b>Compare</b>.</p></Empty>}
@@ -117,8 +120,8 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
       {applied.length > 0 && saved.isSuccess && !page && (
         <Empty testId="gap-not-run">
           <h3>Compare {domain} with {applied.join(", ")}</h3>
-          <p>This {offset > 0 ? "page" : "comparison"} hasn't been run yet.{!affordable && " You don't have enough SEO data left — add credit above."}</p>
-          <Button className="mt-2" disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate()} data-testid="button-gap-run">
+          <p>This {offset > 0 ? "page" : "comparison"} hasn't been run yet.{!affordable && " You don't have enough SEO data left — add credit above."}{dirty && " You changed the competitors above — press Compare to use the new list."}</p>
+          <Button className="mt-2" disabled={run.isPending || !status?.configured || !affordable || dirty} onClick={() => run.mutate(false)} data-testid="button-gap-run">
             {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Comparing…</> : `Run comparison${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}
           </Button>
         </Empty>
@@ -131,20 +134,21 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
               {kind === "content" ? `${fmtNum(page.rows.length)} keywords` : `${fmtNum(page.offset + 1)}–${fmtNum(page.offset + page.rows.length)}${page.total != null ? ` of ${fmtNum(page.total)}` : ""} sites`} · as of {fmtDate(page.fetchedAt)}
             </span>
             <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportRows} disabled={!page.rows.length} data-testid="button-gap-export"><Download /> Export</button>
+            {kind === "content" && <AddToList rows={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent }))} onDone={() => setPicked(new Set())} />}
             {kind === "content" && onTrack && <button type="button" className="g-pill g-pill--sm" disabled={!picked.size} onClick={() => { onTrack((page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))); setPicked(new Set()); }} data-testid="button-gap-track"><Plus /> Add {picked.size || ""} to rank tracker</button>}
           </div>
-          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison.</p>}
+          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate(true)} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}
           {kind === "content" && <p className="g-text-2 mb-2 text-[12px]">Built from each competitor's 100 highest-traffic keywords that {domain} doesn't rank for. Keywords more than one competitor ranks for come first.</p>}
           {page.rows.length === 0 ? (
             <Empty testId="gap-empty"><h3>Nothing found</h3><p>{kind === "content" ? `No keyword these competitors rank for that ${domain} doesn't.` : `No site links to ${page.competitors.length > 1 ? "all of these competitors" : "this competitor"} without also linking to ${domain}. Try fewer competitors.`}</p></Empty>
           ) : kind === "content" ? (
             <div className="overflow-x-auto">
               <table className="g-table" data-testid="table-gap-content">
-                <thead><tr>{onTrack && <th aria-label="Select" />}<th>Keyword</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th>{page.competitors.map((c) => <th key={c} className="num">{c}</th>)}<th className="num">Their traffic</th></tr></thead>
+                <thead><tr><th aria-label="Select" /><th>Keyword</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th>{page.competitors.map((c) => <th key={c} className="num">{c}</th>)}<th className="num">Their traffic</th></tr></thead>
                 <tbody>
                   {(page.rows as ContentRow[]).map((r) => (
                     <tr key={r.keyword}>
-                      {onTrack && <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>}
+                      <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>
                       <td>{r.keyword}{r.intent && <span className="g-text-2 text-[12px] capitalize"> · {r.intent}</span>}</td>
                       <td className="num" data-label="Volume / mo">{fmtNum(r.volume)}</td>
                       <td className="num" data-label="Difficulty">{kd(r.difficulty)}</td>

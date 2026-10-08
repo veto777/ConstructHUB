@@ -6,7 +6,8 @@
  */
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
-import { budgetDeps, reserveBudget, settleBudget, applySettlement, reconcileReservations, withBudget, SeoBudgetError } from "../server/seo/budget";
+import { budgetDeps, reserveBudget, settleBudget, applySettlement, reconcileReservations, refundReservation, withBudget, SeoBudgetError } from "../server/seo/budget";
+import { reserveCredits } from "../server/seo/credits";
 import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps } from "../server/seo/jobs";
 import { dataforseoDeps } from "../server/seo/dataforseo";
 
@@ -99,6 +100,54 @@ async function main() {
   await pool.query("UPDATE seo_rank_runs SET status='running', started_at=now()-interval '4 hours' WHERE site_id=$1 AND status='queued'", [site.id]);
   await collectRunningRuns();
   eq("7f a run stuck for hours is closed, not left blocking the site", (await one("SELECT count(*)::int n FROM seo_rank_runs WHERE site_id=$1 AND status IN ('queued','running')", [site.id])).n, 0);
+
+
+  // 8. a call that was only slow: closed as abandoned, then finishes after all
+  allowance = 100000;
+  let base = await state(2);
+  const moved = async () => { const n = await state(2); return { included: n.included - base.included, wallet: n.wallet - base.wallet, cost: Math.round((n.cost - base.cost) * 1e4) / 1e4, open: n.open }; };
+  r = await reserveBudget(2, 0.05, { label: "slow lookup" });
+  await pool.query("UPDATE seo_reservations SET created_at=now()-interval '31 minutes' WHERE id=$1", [r.id]);
+  await reconcileReservations();
+  eq("8a closed as abandoned: the customer holds nothing, our ledger keeps the estimate", await moved(), { included: 0, wallet: 0, cost: 0.05, open: 0 });
+  await settleBudget(r, 0.03);
+  eq("8b the call finishes late and is settled for real: 12c charged, our ledger at $0.03", await moved(), { included: 12, wallet: 0, cost: 0.03, open: 0 });
+  await settleBudget({ ...r, settled: false }, 0.03);
+  eq("8c ...once", await moved(), { included: 12, wallet: 0, cost: 0.03, open: 0 });
+  eq("8d the usage label was saved", (await one("SELECT label FROM seo_reservations WHERE id=$1", [r.id])).label, "slow lookup");
+
+  // 9. refunds for paid work that was never delivered
+  base = await state(2);
+  r = await reserveBudget(2, 0.05);
+  await settleBudget(r, 0.05);
+  eq("9a refund half of a 20c lookup", [await refundReservation(r.id!, 10, "k1"), await moved()], [10, { included: 10, wallet: 0, cost: 0.05, open: 0 }]);
+  eq("9b the same refund again does nothing", [await refundReservation(r.id!, 10, "k1"), await moved()], [0, { included: 10, wallet: 0, cost: 0.05, open: 0 }]);
+  eq("9b2 the usage history shows what is left of the charge", (await one("SELECT (credit->>'fromIncluded')::int inc, refunded_cents FROM seo_reservations WHERE id=$1", [r.id])), { inc: 10, refunded_cents: 10 });
+  eq("9c a refund can never exceed what was charged", [await refundReservation(r.id!, 500, "k2"), await moved()], [10, { included: 0, wallet: 0, cost: 0.05, open: 0 }]);
+
+  // 10. credit cannot be attached to a reservation that is already closed
+  const late: any = await reserveCredits(2, 100000, 20, { reservationId: r.id }).catch((e) => e);
+  eq("10 reserving credit onto a closed reservation is refused and takes nothing", [late instanceof Error, (await moved()).included], [true, 0]);
+
+  // 11. rank checks that never come back are refunded
+  base = await state(2);
+  const site3 = await one("INSERT INTO seo_sites(user_id,domain,devices) VALUES(2,'late.example','desktop') RETURNING *");
+  const k1 = await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,2,'a') RETURNING id", [site3.id]);
+  await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,2,'b') RETURNING id", [site3.id]);
+  seoJobDeps.serpTaskPost = (async (i: any) => ({ data: i.tasks.map((t: any, n: number) => ({ ...t, taskId: `late-${n}` })), costUsd: 0.05 })) as any;
+  const lateRun = await enqueueRankRun(site3, "manual");
+  await postQueuedRun(lateRun.id);
+  eq("11a the run remembers what paid for it", (await one("SELECT posted, reservation_id IS NOT NULL AS has FROM seo_rank_runs WHERE id=$1", [lateRun.id])), { posted: 2, has: true });
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === k1.id ? { status: "completed", result: { position: 3, url: "u", serpFeatures: [], localPosition: null, localPack: [] } } : { status: "pending" })) as any;
+  await collectRunningRuns();
+  eq("11b one back, one still waiting", await one("SELECT status, checked, jsonb_array_length(tasks) waiting FROM seo_rank_runs WHERE id=$1", [lateRun.id]), { status: "running", checked: 1, waiting: 1 });
+  await pool.query("UPDATE seo_rank_runs SET started_at=now()-interval '91 minutes' WHERE id=$1", [lateRun.id]);
+  await collectRunningRuns();
+  const closed = await one("SELECT status, error FROM seo_rank_runs WHERE id=$1", [lateRun.id]);
+  eq("11c the run closes and says the missing check was refunded", [closed.status, /refunded/.test(closed.error ?? "")], ["done", true]);
+  eq("11d half of the 20c came back, to where it was taken from", [(await moved()).included, (await moved()).wallet], [10, 0]);
+  await collectRunningRuns();
+  eq("11e and only once", (await moved()).included, 10);
 
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   await pool.end();
