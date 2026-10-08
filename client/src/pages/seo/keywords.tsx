@@ -7,7 +7,7 @@
  * The overview is one lookup (free to reopen for a week); each page of an idea
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey } from "./report-table";
 import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
+import { MarketPicker, useMarket } from "./market";
+import { marketKey, type SeoMarket } from "@shared/seo-markets";
 
 type Overview = {
   missing?: string[];
@@ -28,6 +30,7 @@ type Overview = {
   features: string[];
   topAvg: { authority: number | null; backlinks: number | null; referringDomains: number | null };
   serp: { position: number; domain: string; url: string; title: string | null; authority: number | null }[];
+  potential?: { url: string; traffic: number; keywords: number; parentTopic: string | null; parentVolume: number | null } | null;
 };
 
 const IDEAS: [TableKey, string][] = [["matchingTerms", "Matching terms"], ["relatedTerms", "Related terms"], ["questions", "Questions"]];
@@ -38,7 +41,7 @@ const FEATURE: Record<string, string> = {
   related_searches: "Related searches", people_also_search: "People also search", knowledge_graph: "Knowledge panel", shopping: "Shopping", top_stories: "Top stories", ai_overview: "AI overview",
 };
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return <div className="g-tile"><div className="g-tile__label">{label}</div><div className="g-tile__value">{value}</div>{hint && <div className="g-tile__hint">{hint}</div>}</div>;
 }
 
@@ -56,16 +59,20 @@ export default function SeoKeywordsPage() {
   const [mode, setMode] = useState<"one" | "bulk" | "lists">(() => { const v = new URLSearchParams(window.location.search).get("view"); return v === "bulk" || v === "lists" ? v : "one"; });
   /** Keywords handed to the bulk analysis from a list. */
   const [bulkSeed, setBulkSeed] = useState("");
+  const [market, setMarket] = useMarket();
+  const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
+  /** Another country is another lookup: what is on screen is put away first. */
+  const changeMarket = (m: SeoMarket) => { if (marketKey(m) === marketKey(market)) return; setOverview(null); setMarket(m); };
 
   // A keyword looked up in the last week opens without spending.
   const saved = useQuery<{ overview: Overview } | null>({
-    queryKey: ["/api/seo/keyword", keyword], enabled: !!keyword && !overview, retry: false,
-    queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryKey: ["/api/seo/keyword", keyword, marketKey(market)], enabled: !!keyword && !overview, retry: false,
+    queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true, ...mk }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   useEffect(() => { if (saved.data?.overview && !overview) setOverview(saved.data.overview); }, [saved.data, overview]);
 
   const lookup = useMutation({
-    mutationFn: (k: string) => api("POST", "/api/seo/keyword", { keyword: k }),
+    mutationFn: (k: string) => api("POST", "/api/seo/keyword", { keyword: k, ...mk }),
     onSuccess: (data: { overview: Overview }) => {
       setOverview(data.overview); setKeyword(data.overview.keyword); setInput(data.overview.keyword);
       window.history.replaceState({}, "", `/seo/keywords?keyword=${encodeURIComponent(data.overview.keyword)}`);
@@ -74,8 +81,9 @@ export default function SeoKeywordsPage() {
     onError: (e) => toast({ title: "Couldn't look that keyword up", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const refresh = useMutation({
-    mutationFn: () => api("POST", "/api/seo/keyword", { keyword: overview?.keyword, refresh: true }),
-    onSuccess: (data: { overview: Overview }) => { setOverview(data.overview); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: () => api("POST", "/api/seo/keyword", { keyword: overview?.keyword, refresh: true, ...mk }),
+    // Only if that keyword is still the one on screen: a refresh that lands after another was opened is not shown over it.
+    onSuccess: (data: { overview: Overview }) => { setOverview((cur) => (cur && cur.keyword === data.overview.keyword ? data.overview : cur)); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
@@ -100,7 +108,7 @@ export default function SeoKeywordsPage() {
       <nav className="g-tabs" aria-label="Keywords explorer views">
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["lists", "My lists"]] as const).map(([m, label]) => <a key={m} href={`#${m}`} aria-current={mode === m ? "page" : undefined} onClick={(e) => { e.preventDefault(); setMode(m); }} data-testid={`tab-keywords-${m}`}>{label}</a>)}
       </nav>
-      {mode === "bulk" && <BulkKeywords key={bulkSeed} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
+      {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={changeMarket} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
       {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows) => track.mutate(rows) : undefined} onOpen={openKeyword} />}
       {mode === "one" && (<>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-keyword">
@@ -109,12 +117,13 @@ export default function SeoKeywordsPage() {
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           <input className="g-input w-full pl-9" placeholder="e.g. siding contractor" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-keyword" autoComplete="off" />
         </label>
+        <MarketPicker value={market} onChange={changeMarket} disabled={lookup.isPending} />
         <Button type="submit" disabled={busy || !input.trim() || !configured || !affordable} data-testid="button-keyword-lookup">
           {lookup.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking up…</> : "Look up"}
         </Button>
       </form>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
-        A keyword's overview costs about {price} of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} United States, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
+        A keyword's overview costs about {price} of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} {market.label}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
       </p>
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and today's results…" : "Opening the saved overview…"}</p>}
       {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who holds the top ten today — and hundreds of related searches you can track.</p></Empty>}
@@ -135,7 +144,12 @@ export default function SeoKeywordsPage() {
             <Stat label="Difficulty" value={kd(o.difficulty)} hint={o.topAvg.referringDomains != null ? `Top pages average ${fmtNum(o.topAvg.referringDomains)} referring domains` : "0–100"} />
             <Stat label="Cost per click" value={o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`} hint={o.bidLow != null && o.bidHigh != null ? `Top-of-page bids $${o.bidLow.toFixed(2)}–$${o.bidHigh.toFixed(2)}` : o.competition ? `${cap(o.competition.toLowerCase())} ad competition` : undefined} />
             <Stat label="Intent" value={o.intent ? cap(o.intent) : "—"} hint={o.results != null ? `${fmtNum(o.results)} results` : undefined} />
+            {o.potential !== undefined && <>
+              <Stat label="Traffic potential" value={o.potential ? fmtNum(o.potential.traffic) : "—"} hint={o.potential ? (o.potential.keywords === 1 ? "Visits a month the #1 page gets from search — it ranks for one keyword" : `Visits a month the #1 page gets from all ${fmtNum(o.potential.keywords)} keywords it ranks for`) : "Not available for this keyword"} />
+              <Stat label="Parent topic" value={o.potential?.parentTopic ? (o.potential.parentTopic === o.keyword ? <span data-testid="text-parent-topic">This keyword</span> : <button type="button" className="g-link block text-left text-[17px] leading-snug" onClick={() => { const k = o.potential!.parentTopic!; setInput(k); setOverview(null); setKeyword(k); }} data-testid="button-parent-topic">{o.potential.parentTopic}</button>) : "—"} hint={o.potential?.parentTopic ? `The search that sends the #1 page the most visits${o.potential.parentVolume != null ? ` — ${fmtNum(o.potential.parentVolume)} searches a month` : ""}` : undefined} />
+            </>}
           </div>
+          {o.potential === undefined && <p className="g-text-2 -mt-2 mb-4 text-[13px]" data-testid="text-potential-older">Traffic potential and parent topic were added after this overview was saved — Refresh to see them.</p>}
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <section className="rounded-lg border p-4 lg:col-span-2" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-trend">
               <h3 className="g-text mb-2 text-[15px] font-medium">Search volume by month</h3>
@@ -181,7 +195,7 @@ export default function SeoKeywordsPage() {
           <nav className="g-tabs" aria-label="Keyword ideas">
             {IDEAS.map(([k, label]) => <a key={k} href={`#${k}`} aria-current={ideas === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setIdeas(k); }} data-testid={`tab-ideas-${k}`}>{label}</a>)}
           </nav>
-          <ReportView key={`${ideas}:${o.keyword}`} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
+          <ReportView key={`${ideas}:${o.keyword}:${marketKey(market)}`} market={market} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutate(rows) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
           {!site && <p className="g-text-2 mt-2 text-[13px]">Add a site above to track keywords from these lists.</p>}
         </div>
       )}

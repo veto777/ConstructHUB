@@ -16,6 +16,8 @@ import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
+import { MarketPicker, useMarket } from "./market";
+import { findMarket, marketKey, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
 
 type GapKey = "contentGap" | "linkIntersect";
@@ -27,7 +29,7 @@ type Footprint = {
   isNew: number; isUp: number; isDown: number; isLost: number;
 };
 type Report = {
-  domain: string; fetchedAt: string;
+  domain: string; locationCode?: number; languageCode?: string; fetchedAt: string;
   organic: Footprint; paid: Footprint;
   links: {
     authority: number | null; backlinks: number | null; referringDomains: number | null; followedDomains: number | null; nofollowDomains: number | null;
@@ -45,7 +47,7 @@ type Report = {
   anchors: { anchor: string; backlinks: number | null; referringDomains: number | null; firstSeen: string | null }[] | null;
   missing: string[];
 };
-type Recent = { items: { domain: string; fetchedAt: string; authority: number | null; referringDomains: number | null; keywords: number | null; traffic: number | null }[]; freeForDays: number };
+type Recent = { items: { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; authority: number | null; referringDomains: number | null; keywords: number | null; traffic: number | null }[]; freeForDays: number };
 
 const BLUE = "#1a73e8", ORANGE = "#e8710a", GREEN = "#188038", GREY = "#9aa0a6";
 const usd = (n: number | null | undefined) => n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`;
@@ -121,17 +123,22 @@ export default function SeoExplorerPage() {
   const [table, setTable] = useState<TableKey>("keywords");
   const [view, setView] = useState<ViewKey>("overview");
   const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
+  const [market, setMarket] = useMarket();
+  const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
+  /** Another country is another report: what is on screen is put away first. */
+  const changeMarket = (m: SeoMarket) => { if (marketKey(m) === marketKey(market)) return; setReport(null); setView("overview"); setMarket(m); };
 
   const recent = useQuery<Recent>({ queryKey: ["/api/seo/explorer/recent"] });
   // A saved report opens without spending anything; 404 just means "not looked up yet".
   const saved = useQuery<{ report: Report; fresh: boolean }>({
-    queryKey: [`/api/seo/explorer?domain=${encodeURIComponent(domain ?? "")}`], enabled: !!domain && !report, retry: false,
+    queryKey: [`/api/seo/explorer?domain=${encodeURIComponent(domain ?? "")}&locationCode=${market.locationCode}&languageCode=${market.languageCode}`], enabled: !!domain && !report, retry: false,
   });
   useEffect(() => { if (saved.data?.report && !report) setReport(saved.data.report); }, [saved.data, report]);
 
   const analyse = useMutation({
-    mutationFn: (v: { domain: string; refresh: boolean }) => api("POST", "/api/seo/explorer", v),
-    onSuccess: (data: { report: Report; reused: boolean }) => {
+    mutationFn: (v: { domain: string; refresh: boolean }) => api("POST", "/api/seo/explorer", { ...v, ...mk }),
+    onSuccess: (data: { report: Report; reused: boolean; saved?: boolean }) => {
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this report again will not be free.", variant: "destructive" });
       setReport(data.report); setDomain(data.report.domain); setInput(data.report.domain);
       window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(data.report.domain)}`);
       void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] });
@@ -181,6 +188,7 @@ export default function SeoExplorerPage() {
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           <input className="g-input w-full pl-9" placeholder="example.com" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-explorer-domain" autoComplete="off" spellCheck={false} />
         </label>
+        <MarketPicker value={market} onChange={changeMarket} disabled={analyse.isPending} />
         <Button type="submit" disabled={busy || !input.trim() || !configured} data-testid="button-explorer-analyse" title={!configured ? "Being switched on for your account" : undefined}>
           {analyse.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : "Analyse"}
         </Button>
@@ -196,8 +204,8 @@ export default function SeoExplorerPage() {
             <thead><tr><th>Domain</th><th className="num">Authority</th><th className="num">Referring domains</th><th className="num">Organic keywords</th><th className="num">Organic traffic</th><th className="num">Analysed</th></tr></thead>
             <tbody>
               {recent.data!.items.map((r) => (
-                <tr key={r.domain}>
-                  <td><button type="button" className="g-link" onClick={() => open(r.domain)} data-testid={`button-open-${r.domain}`}>{r.domain}</button></td>
+                <tr key={`${r.domain}:${r.locationCode}:${r.languageCode}`}>
+                  <td><button type="button" className="g-link" onClick={() => { const m = findMarket(r.locationCode ?? 2840, r.languageCode ?? "en"); if (m) setMarket(m); open(r.domain); }} data-testid={`button-open-${r.domain}`}>{r.domain}</button>{(r.locationCode ?? 2840) !== 2840 || (r.languageCode ?? "en") !== "en" ? <span className="g-text-2 ml-2 text-[12px]">{marketLabel(r.locationCode, r.languageCode)}</span> : null}</td>
                   <td className="num" data-label="Authority">{r.authority ?? "—"}</td>
                   <td className="num" data-label="Referring domains">{fmtNum(r.referringDomains)}</td>
                   <td className="num" data-label="Organic keywords">{fmtNum(r.keywords)}</td>
@@ -220,7 +228,7 @@ export default function SeoExplorerPage() {
         <div data-testid="explorer-report">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="g-text text-[20px] font-medium">Overview: <a href={`https://${report.domain}`} target="_blank" rel="noreferrer" className="g-link">{report.domain} <ExternalLink className="inline h-3.5 w-3.5" aria-hidden /></a></h2>
-            <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">United States · as of {fmtDate(report.fetchedAt)}</span>
+            <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">{marketLabel(report.locationCode ?? 2840, report.languageCode ?? "en")} · as of {fmtDate(report.fetchedAt)}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               {!tracked && <button type="button" className="g-pill" disabled={track.isPending} onClick={() => track.mutate(report.domain)} data-testid="button-explorer-track"><Plus /> Track rankings</button>}
               <button type="button" className="g-pill" disabled={analyse.isPending || !configured} onClick={() => { setInput(report.domain); analyse.mutate({ domain: report.domain, refresh: true }); }} data-testid="button-explorer-refresh"><RefreshCw className={analyse.isPending ? "animate-spin" : ""} /> Refresh</button>
@@ -247,11 +255,11 @@ export default function SeoExplorerPage() {
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
               {view === "contentGap" || view === "linkIntersect" ? (
-                <GapView kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
+                <GapView market={market} kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : (<>
                 {REPORT_NOTE[view] && <p className="g-text-2 mb-3 text-[13px]" data-testid="text-report-note">{REPORT_NOTE[view]}</p>}
-                <ReportView key={`${view}:${report.domain}`} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
+                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               </>)}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}

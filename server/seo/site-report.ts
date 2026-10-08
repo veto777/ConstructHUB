@@ -46,7 +46,8 @@ export type SiteReport = {
     trafficChange: number | null; keywordsChange: number | null; referringDomainsChange: number | null } | null;
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
-  searchConsole: { clicks: number; impressions: number; position: number | null; previousClicks: number; previousImpressions: number } | null;
+  /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
+  searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; syncedAt?: string | null } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
 };
 
@@ -126,7 +127,8 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
       errors: a.totals.error.affected, warnings: a.totals.warning.affected, notices: a.totals.notice.affected,
       topIssues: a.issues.slice(0, 6).map((i) => ({ title: i.title, severity: i.severity, count: i.count })),
     } : null,
-    searchConsole: gsc ? { clicks: Math.round(gsc.clicks), impressions: Math.round(gsc.impressions), position: gsc.position, previousClicks: Math.round(gsc.previousClicks), previousImpressions: Math.round(gsc.previousImpressions) } : null,
+    // Nothing synced for the last 28 days is no section at all, rather than a row of zeros.
+    searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
     alerts,
   };
 }
@@ -134,6 +136,12 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
 // ── Words ──────────────────────────────────────────────────────────────────
 
 const n = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString("en-US"));
+const rnd = (v: number | null | undefined) => (v == null ? null : Math.round(v));
+/** Enough of both 28-day periods is synced for the change between them to mean something. */
+export const gscComparable = (g: NonNullable<SiteReport["searchConsole"]>) => g.previousClicks !== null && (g.days ?? 28) >= GSC_MIN_DAYS && (g.previousDays ?? 28) >= GSC_MIN_DAYS;
+export const GSC_MIN_DAYS = 21;
+const gscChange = (g: NonNullable<SiteReport["searchConsole"]>, now: number | null, before: number | null) => (gscComparable(g) && now !== null && before !== null ? signed(now - before) : "");
+const gscPartial = (g: NonNullable<SiteReport["searchConsole"]>) => ((g.days ?? 28) < GSC_MIN_DAYS ? `Only ${g.days} of the last 28 days have been synced from Search Console, so these counts are incomplete.` : null);
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—");
 const signed = (v: number | null | undefined) => (v == null || v === 0 ? "" : ` (${v > 0 ? "+" : "−"}${n(Math.abs(v))})`);
 const where = (m: { location: string | null }) => (m.location ? ` in ${m.location}` : "");
@@ -153,8 +161,9 @@ export function reportHighlights(r: SiteReport): [string, string][] {
   }
   if (r.searchConsole) {
     const g = r.searchConsole;
-    rows.push(["Clicks from Google, last 28 days", `${n(g.clicks)}${signed(g.clicks - g.previousClicks)}`]);
-    rows.push(["Times shown in Google, last 28 days", `${n(g.impressions)}${signed(g.impressions - g.previousImpressions)}`]);
+    const part = (g.days ?? 28) < GSC_MIN_DAYS ? ` (${g.days} of 28 days synced)` : "";
+    rows.push([`Clicks from Google, last 28 days${part}`, `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`]);
+    rows.push([`Times shown in Google, last 28 days${part}`, `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`]);
   }
   if (r.search) {
     rows.push(["Estimated visits from Google / month", `${n(r.search.organicTraffic)}${signed(r.search.trafficChange)}`]);
@@ -210,10 +219,11 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
     if (r.searchConsole) {
       const g = r.searchConsole;
       heading("Clicks from Google — Search Console, last 28 days");
-      pair("Clicks", `${n(g.clicks)}${signed(g.clicks - g.previousClicks)}`);
-      pair("Times shown in results", `${n(g.impressions)}${signed(g.impressions - g.previousImpressions)}`);
+      pair("Clicks", `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`);
+      pair("Times shown in results", `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`);
       if (g.position !== null) pair("Average position", String(g.position));
-      line("These are Google's own counts for the site. Changes in brackets compare with the 28 days before.", soft);
+      const partial = gscPartial(g);
+      line(partial ?? (gscComparable(g) ? "These are Google's own counts for the site. Changes in brackets compare with the 28 days before." : "These are Google's own counts for the site. There is not enough earlier data yet to compare with the 28 days before."), soft);
     }
     if (r.search) {
       heading(`Search presence — analysed ${day(r.search.fetchedAt)}`);

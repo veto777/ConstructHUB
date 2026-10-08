@@ -3,6 +3,8 @@
  * keep keywords in named lists. A list is free to open and edit; only "Analyse"
  * and "Refresh numbers" buy data, and both show the price first.
  */
+import { MarketPicker } from "./market";
+import type { SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -92,14 +94,15 @@ function usePicked() {
 }
 
 /** Paste up to 200 keywords and get the numbers for all of them in one go. */
-export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void; initial?: string }) {
+export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", market, onMarket }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void; initial?: string; market?: SeoMarket; onMarket?: (m: SeoMarket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [text, setText] = useState(initial);
   const [asked, setAsked] = useState<string[]>([]);
   const { picked, toggle, clear, set } = usePicked();
   const draft = useMemo(() => parseKeywords(text), [text]);
-  const body = useMemo(() => ({ keywords: asked }), [asked]);
+  const loc = market?.locationCode, lang = market?.languageCode;
+  const body = useMemo(() => ({ keywords: asked, ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [asked, loc, lang]);
   const queryKey = ["/api/seo/keywords/bulk", body];
   const saved = useQuery<{ page: { rows: KwRow[]; notFound: string[]; fetchedAt: string } } | null>({
     queryKey, enabled: asked.length > 0, retry: false, staleTime: 5 * 60_000,
@@ -120,8 +123,9 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
           <textarea className="g-input mt-1 min-h-[140px] w-full py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"roof repair tampa\nsiding contractor tampa\ngutter installation tampa"} data-testid="textarea-bulk" />
         </label>
         <div className="mt-2 flex flex-wrap items-center gap-2">
+          {market && onMarket && <MarketPicker value={market} onChange={(m) => { setAsked([]); clear(); onMarket(m); }} />}
           <Button type="submit" disabled={!draft.length} data-testid="button-bulk-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX_BULK)} keyword${draft.length === 1 ? "" : "s"}` : "keywords"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? `About ${money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))} of your SEO data; reopening the same set within a day is free. United States, Google.` : "Volume, difficulty, cost per click and intent for each. United States, Google."}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? `About ${money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))} of your SEO data; reopening the same set within a day is free. ${market?.label ?? "United States"}, Google.` : "Volume, difficulty, cost per click and intent for each. United States, Google."}</span>
         </div>
       </form>
       <div className="mt-4">

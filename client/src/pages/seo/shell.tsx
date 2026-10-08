@@ -28,7 +28,7 @@ export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
 export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
-export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number };
+export type SeoPrices = { explorerReport: number; reportPage: number; adsReport?: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;

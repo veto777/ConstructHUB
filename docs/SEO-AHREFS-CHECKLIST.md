@@ -38,8 +38,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  C4  What else is on the results page (map pack, people also ask, AI overview …).
 - [x] DONE  C5  Matching terms, related terms and questions: filters, sort, paging, CSV, and "track on my site".
 - [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. Seen in a browser 10-08.
-- [ ] TODO  C7  Other countries and languages (US English only today).
-- [ ] TODO  C8  Clicks, traffic potential, parent topic.
+- [x] PART  C7  Country selector on Site Explorer, Keywords Explorer (overview, ideas, many keywords) and Content gap: United States (English / Spanish), Canada (English / French), United Kingdom, Ireland, Australia, New Zealand, South Africa, Mexico - one choice remembered on the device; the server refuses any pair not on the list (shared/seo-markets.ts). Link reports are the same in every country and are not bought twice. Not covered: the other ~85 countries the source has, keyword lists (refresh is US), batch analysis, the dashboard cards (the site's own country).
+- [x] PART  C8  Traffic potential (what the page ranking first earns from search across all its keywords) and parent topic (the keyword that sends that page the most visits; click to open it) on the keyword overview - one more lookup, so the overview is now about $0.20 (was $0.16). Overviews saved earlier say so and offer Refresh. Clicks per search: not available from the source - TODO.
 
 ## D. Rank tracker (`/seo/rank-tracker`, index.tsx)
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
@@ -221,6 +221,19 @@ Coverage: 55% (50-60%); Content Explorer now counted at 20-35%. 10 new defects; 
 10 an invalid site to leave out was ignored .............. FIXED (refused)
 Also: the report now carries real clicks and impressions from Google Search Console when the site's property is connected.
 
+## Codex audit #10 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-10.md)
+Verdict: "The audit #9 fixes are incomplete"; coverage about 58% (52-64). No cross-account defect found. What was done:
+ 1 HIGH monthly AI could lose paid answers / re-buy   FIXED: after a paid ask one transaction moves the month on AND parks the answers (seo_ai_unsaved); filing them removes the parked row in the same transaction and is idempotent per run; a background pass keeps retrying (10 min steps, at most 6 h apart) without buying anything. Real-Postgres check script/seo-ai-waiting-check.ts (7 checks). Still possible: the database refusing every write right after the ask.
+ 2 MED  ads re-bought earlier pages, wrong quote        FIXED: one lookup for all 120, saved, paged free; own price ($0.03, hold $0.04) from the measured $0.006.
+ 3 MED  ads cap shown as a total; offsets past the cap  FIXED: total is what was returned with "most recent ... may have run others" when capped; offset >= 120 refused; a malformed row no longer shifts pages.
+ 4 MED  unused filters/sorts made second billable copies FIXED: effectiveReport drops filters a report does not use and replaces an unknown sort; the cache key is built from that.
+ 5 MED  referring-IP note accused sites of one owner    FIXED: wording now says concentration, not ownership.
+ 6 MED  subdomain www stripped; missing numbers as zero FIXED: host kept as is; missing numbers are null.
+ 7 MED  Search Console zeros when nothing was synced    FIXED: null when a period has no rows; change shown only when both periods have 21+ days; the report says when the period is partly synced.
+ 8 LOW  report states / accessible names                FIXED: separate "couldn't check" state (with Back), report-specific empty text, row-specific names on Explore / See the ad.
+ Re-check items: keyword Refresh no longer replaces another keyword's overview; Content explorer's failed check keeps Back; batch "can afford" uses the server's hold; report tables and Site Explorer say when a result could not be kept.
+ NOT DONE: legacy AI answers without a run id still grouped by time (old rows only); persisting report purchases that fail to save (they are shown and flagged, not recoverable).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -252,3 +265,5 @@ Also: the report now carries real clicks and impressions from Google Search Cons
 - 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
   a report page) were run in the browser.
 - 10/8 slice 13: referring IPs, similar-link sites, subdomains and ads run in the browser against live data for jameshardie.com (50/50/7/50 rows, 0 page errors). Found by looking: the "Authority" number on two of them was not the site's own - column removed.
+- 10/8 slice 14: keyword overview refreshed live in the browser ("siding contractor": traffic potential and parent topic shown; price line $0.20, hold $0.26); switched to Canada - screen cleared, nothing bought until Look up, then Canadian numbers and results (1,300 searches, klzroofing.com first); Site Explorer followed the same choice and showed no report for Canada until asked. 0 page errors.
+- 10/8 audit #10 fixes: ads report run in the browser - one purchase, pages 2 and 3 opened without another (purchases counted: 1), "Rows 101-120 of 120 most recent", Next disabled; referring-IP note and subdomain rows read back. Real Postgres: ledger 44/44, places+alerts 20/20, waiting AI answers 7/7.

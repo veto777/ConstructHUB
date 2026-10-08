@@ -336,13 +336,13 @@ export async function saveReport(userId: number, report: DomainReport, costUsd: 
 /** Domains this account looked up, newest first, with the headline numbers for the list. */
 export async function recentReports(userId: number, limit = 12) {
   const { rows } = await pool.query(
-    `SELECT DISTINCT ON (domain) domain, created_at,
+    `SELECT DISTINCT ON (domain, location_code, language_code) domain, location_code, language_code, created_at,
             (report->'links'->>'authority')::float8 AS authority,
             (report->'links'->>'referringDomains')::float8 AS referring_domains,
             (report->'organic'->>'keywords')::float8 AS keywords,
             (report->'organic'->>'traffic')::float8 AS traffic
-       FROM seo_domain_reports WHERE user_id=$1 ORDER BY domain, created_at DESC`, [userId]);
+       FROM seo_domain_reports WHERE user_id=$1 ORDER BY domain, location_code, language_code, created_at DESC`, [userId]);
   return rows
     .sort((a: any, b: any) => +new Date(b.created_at) - +new Date(a.created_at)).slice(0, limit)
-    .map((r: any) => ({ domain: r.domain, fetchedAt: r.created_at, authority: r.authority, referringDomains: r.referring_domains, keywords: r.keywords, traffic: r.traffic }));
+    .map((r: any) => ({ domain: r.domain, locationCode: r.location_code, languageCode: r.language_code, fetchedAt: r.created_at, authority: r.authority, referringDomains: r.referring_domains, keywords: r.keywords, traffic: r.traffic }));
 }
