@@ -1,0 +1,131 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-punch-list",
+  "title": "Punch list",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the punch list",
+      "narration": "A punch list is what is left to finish on a job. Here is how to keep one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Nguyen\") a",
+      "caption": "Open the project",
+      "narration": "Open the job from the Pipeline. We'll use the Nguyen job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Punch list\"]",
+      "caption": "Punch list tab",
+      "narration": "Choose the Punch list tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-punch-title\"]",
+      "value": "Transition strip at the bath door",
+      "caption": "Item",
+      "chapter": "Add items",
+      "narration": "Type the item.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Location\")) > input",
+      "value": "Hall bath",
+      "caption": "Location",
+      "narration": "Add where it is. The location is optional.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-punch\"]",
+      "caption": "Add",
+      "narration": "Click the plus button.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-punch-title\"]",
+      "value": "Reattach the closet door guide",
+      "caption": "Second item",
+      "narration": "Add the next one the same way.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Location\")) > input",
+      "value": "Bedroom 2",
+      "caption": "Location",
+      "narration": "This one is in the second bedroom.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-punch\"]",
+      "caption": "Add",
+      "narration": "And add it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"punch-row-\"]:has-text(\"Transition strip\")",
+      "caption": "Open item",
+      "chapter": "Tick them off",
+      "narration": "Each item starts as open."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"punch-row-\"]:has-text(\"Transition strip\") [data-testid^=\"button-toggle-punch-\"]",
+      "caption": "Done",
+      "narration": "When one is finished, choose Done.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"punch-row-\"]:has-text(\"Transition strip\")",
+      "caption": "Done item",
+      "narration": "It is crossed out and marked done. Reopen brings it back."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to keep a punch list on a job | ConstructHUB CRM",
+    "description": "A short walkthrough of the Punch list tab in the ConstructHUB CRM. You will open a project, add punch items with a location, mark one done, and see how to reopen it.",
+    "tags": [
+      "punch list",
+      "construction punch list",
+      "job closeout",
+      "project management",
+      "contractor checklist",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Close out every job",
+    "accent": "job",
+    "kicker": "CRM Tutorial",
+    "step": 11
+  }
+}

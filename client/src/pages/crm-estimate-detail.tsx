@@ -513,7 +513,7 @@ export default function CrmEstimateDetailPage() {
                       <Input value={l.name} maxLength={300} onChange={(ev) => setLine(idx, { name: ev.target.value })}
                         aria-invalid={unnamedLines.includes(idx)}
                         className={unnamedLines.includes(idx) ? "border-destructive" : undefined}
-                        placeholder="Hardie siding — front elevation" data-testid={`edit-line-name-${idx}`} />
+                        placeholder="Fiber-cement siding — front elevation" data-testid={`edit-line-name-${idx}`} />
                     </div>
                     <div className="sm:col-span-2">
                       <Label className="text-xs">Kind</Label>

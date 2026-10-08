@@ -1,0 +1,126 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-api-keys",
+  "title": "API keys and webhooks",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "redactSelectors": [
+    "[data-testid=\"text-new-api-key\"] code",
+    "[data-testid=\"text-new-webhook-secret\"] code"
+  ],
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/integrations",
+      "caption": "API keys",
+      "chapter": "Create an API key",
+      "narration": "API keys and webhooks connect your own tools to the CRM."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "text=Read-only access to your data",
+      "offset": 150,
+      "caption": "Down to API keys",
+      "narration": "Both are on Integrations, under the connected accounts."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Read-only access to your data",
+      "caption": "Read-only",
+      "narration": "An API key gives a tool read-only access to your data."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder*=\"reporting script\"]",
+      "value": "Reporting script",
+      "caption": "Key name",
+      "narration": "Give the key a name that says what will use it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create-api-key\"]",
+      "caption": "Create key",
+      "chapter": "Copy the key",
+      "narration": "Choose Create key."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-new-api-key\"] code",
+      "caption": "Copy it now",
+      "narration": "Copy the key now and keep it private. It is never shown again.",
+      "redact": true
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"row-api-key-\"]",
+      "caption": "Your keys",
+      "narration": "The list keeps the name and the first few characters. The trash can revokes the key."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-webhook-url\"]",
+      "value": "https://example.com/hooks/crm",
+      "caption": "Endpoint URL",
+      "chapter": "Add a webhook",
+      "narration": "A webhook tells your own system when something happens. Type its address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkbox-webhook-event-estimate.approved\"]",
+      "caption": "Events",
+      "narration": "Tick the events you want to hear about. We'll pick estimate approved."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create-webhook\"]",
+      "caption": "Add webhook",
+      "narration": "Choose Add webhook."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-new-webhook-secret\"] code",
+      "caption": "Signing secret",
+      "narration": "Copy the signing secret now. It is never shown again either.",
+      "redact": true
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"row-webhook-\"]",
+      "caption": "Active webhook",
+      "narration": "The webhook is listed as active, with its events."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "caption": "Menu: Integrations",
+      "narration": "You'll find both under Integrations in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to create an API key and a webhook | ConstructHUB CRM",
+    "description": "A short walkthrough of API keys and webhooks in the ConstructHUB CRM. You will create a read-only API key, then add a webhook that tells your own system when an estimate is approved. The key and the signing secret are each shown once.",
+    "tags": [
+      "API key",
+      "webhooks",
+      "CRM integrations",
+      "CRM API",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Connect your own tools",
+    "accent": "tools",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

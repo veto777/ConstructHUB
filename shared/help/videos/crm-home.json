@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-home",
+  "durationSec": 72,
+  "video": {
+    "key": "tutorials/crm-home.d312ab65.mp4",
+    "bytes": 6551056,
+    "sha256": "d312ab659d74ebcf00ac4c0e0f04e15cb8803b52cb28c86b31aa8fc169f86d00"
+  },
+  "captions": {
+    "key": "tutorials/crm-home.30501374.vtt",
+    "bytes": 1705,
+    "sha256": "30501374fd5cb98988854ca6d83f06e62a7914581b6bcab4d17f9d0e59cd1ecb"
+  },
+  "poster": {
+    "key": "tutorials/crm-home.7a3ef412.jpg",
+    "bytes": 93885,
+    "sha256": "7a3ef41293fabe933df840682881fa3748034fd140068868fc7f11eed8c7853a"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:06:39.208Z",
+    "video": "71259076bcc005a76b604d36e1b938d7",
+    "captions": "ced947957b55f46f07b99db8adbb5749",
+    "poster": "08edab09a98346ec5f62c46296d878f4"
+  }
+}

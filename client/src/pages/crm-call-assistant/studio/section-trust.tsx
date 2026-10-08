@@ -28,7 +28,7 @@ export function CredibilitySection({ value, onChange, disabled }: SectionProps<C
       <div className="grid gap-4 sm:grid-cols-2">
         <StringListEditor id="licenses" label="Licenses" values={value.licenses} onChange={(v) => set("licenses", v)} disabled={disabled} testid="list-licenses" placeholder="State license number" max={20} />
         <StringListEditor id="warranties" label="Warranties" values={value.warranties} onChange={(v) => set("warranties", v)} disabled={disabled} testid="list-warranties" placeholder="Lifetime workmanship warranty" max={20} />
-        <StringListEditor id="certifications" label="Certifications" values={value.certifications} onChange={(v) => set("certifications", v)} disabled={disabled} testid="list-certifications" placeholder="James Hardie Elite Preferred" max={20} />
+        <StringListEditor id="certifications" label="Certifications" values={value.certifications} onChange={(v) => set("certifications", v)} disabled={disabled} testid="list-certifications" placeholder="e.g. Manufacturer-certified installer" max={20} />
         <StringListEditor id="awards" label="Awards" values={value.awards} onChange={(v) => set("awards", v)} disabled={disabled} testid="list-awards" placeholder="Best of Bellingham 2025" max={20} />
         <StringListEditor id="memberships" label="Memberships" values={value.memberships} onChange={(v) => set("memberships", v)} disabled={disabled} testid="list-memberships" placeholder="BBB A+, NAHB" max={20} />
         <TextField id="reviews" label="Reviews and ratings" value={value.reviews} onChange={(v) => set("reviews", v)} disabled={disabled} testid="input-reviews"

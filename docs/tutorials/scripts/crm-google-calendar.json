@@ -1,0 +1,106 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-google-calendar",
+  "title": "Sync with Google Calendar",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "The Calendar card",
+      "narration": "Put every appointment from the CRM on your Google Calendar."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-calendar-feed-url\"]",
+      "redact": true,
+      "caption": "The feed link",
+      "narration": "In Settings, scroll to Calendar. The first part is a private feed link, for any calendar app."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"Company Google Calendar\")]/ancestor::div[contains(@class,\"border-t\")][1]",
+      "caption": "Company Google Calendar",
+      "narration": "The second part is the company Google Calendar."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"Company Google Calendar\")]/following-sibling::p[1]",
+      "caption": "Every appointment",
+      "narration": "Every appointment is written into a calendar named ConstructHub CRM, in the Google account you connect."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"pill-google-calendar-status\"]",
+      "caption": "Connected",
+      "chapter": "Connected",
+      "narration": "You connect once, by signing in on Google's own screen. Here it is already connected."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/last synced/",
+      "caption": "Last synced",
+      "narration": "Under that: when it was connected, and when it last synced."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-sync-google-calendar\"]",
+      "caption": "Sync now",
+      "chapter": "Sync now",
+      "narration": "Choose Sync now to push your schedule straight away.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/last synced/",
+      "caption": "Synced",
+      "narration": "The last synced time changes to now."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/team",
+      "caption": "Team & Company",
+      "chapter": "Your own calendar",
+      "narration": "One more place: Team and Company, on the My profile tab."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-my-google-calendar\"]",
+      "caption": "My Google Calendar",
+      "narration": "Each team member can connect their own Google Calendar here, for their own appointments only."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "The company calendar is in Settings, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to sync your schedule with Google Calendar | ConstructHUB CRM",
+    "description": "See where ConstructHUB CRM connects to Google Calendar: the company calendar that carries every appointment, Sync now, and the personal calendar each team member can connect. Recorded in a demo workspace with a stand-in calendar already connected; connecting itself happens on Google's sign-in screen.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "Google Calendar sync",
+      "contractor scheduling",
+      "crew calendar",
+      "appointments",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Sync Google Calendar",
+    "accent": "Calendar",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

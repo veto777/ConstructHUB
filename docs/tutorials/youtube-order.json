@@ -1,0 +1,128 @@
+{
+  "_about": "The order in which walkthrough videos go out on YouTube (scripts/tutorials/youtube-schedule.ts). Each track is one area of the product, in the order a new user should meet its videos. The scheduler takes one video from each track in turn (top to bottom, then round again), so the three videos of a day come from three different areas and each area still plays in its learning order. A key that is not produced yet keeps its place in its track; a produced key that is in no track goes in a last track, 'other', alphabetically. Slots already scheduled are never reshuffled. Keys are the rows of CRM-VIDEO-PLAN.md.",
+  "tracks": [
+    {
+      "name": "getting-started",
+      "keys": [
+        "database-directory",
+        "crm-home",
+        "crm-create-menu",
+        "crm-search"
+      ]
+    },
+    {
+      "name": "clients-and-leads",
+      "keys": [
+        "crm-clients",
+        "crm-client-new",
+        "crm-client-edit",
+        "crm-client-import",
+        "crm-client-bid-status",
+        "crm-client-notes",
+        "crm-client-quick-actions",
+        "crm-lead-new",
+        "crm-pipeline",
+        "crm-pipeline-move",
+        "crm-follow-ups"
+      ]
+    },
+    {
+      "name": "estimates",
+      "keys": [
+        "crm-pricebook",
+        "crm-pricebook-add",
+        "crm-pricebook-template",
+        "crm-create-estimate",
+        "crm-estimates",
+        "crm-estimate-edit",
+        "crm-estimate-discounts",
+        "crm-estimate-options",
+        "crm-quick-bid",
+        "crm-estimate-client-view",
+        "crm-estimate-approved"
+      ]
+    },
+    {
+      "name": "schedule",
+      "keys": [
+        "crm-schedule",
+        "crm-schedule-views",
+        "crm-schedule-from-client",
+        "crm-schedule-calendar-feed"
+      ]
+    },
+    {
+      "name": "invoices-and-payments",
+      "keys": [
+        "crm-invoices",
+        "crm-invoice-create",
+        "crm-payment-record",
+        "crm-payments",
+        "crm-payment-link",
+        "crm-payment-reverse"
+      ]
+    },
+    {
+      "name": "projects",
+      "keys": [
+        "crm-project-new",
+        "crm-project",
+        "crm-project-costing",
+        "crm-change-orders",
+        "crm-project-punch-list",
+        "crm-project-daily-log",
+        "crm-project-selections",
+        "crm-project-permits"
+      ]
+    },
+    {
+      "name": "jobcam",
+      "keys": [
+        "jobcam",
+        "crm-jobcam-timeline",
+        "crm-jobcam-share",
+        "crm-jobcam-project"
+      ]
+    },
+    {
+      "name": "messages",
+      "keys": [
+        "crm-messages",
+        "crm-message-send"
+      ]
+    },
+    {
+      "name": "team-and-settings",
+      "keys": [
+        "crm-team-profile",
+        "crm-team-invite",
+        "crm-team-roles",
+        "crm-team-divisions",
+        "crm-company-settings",
+        "crm-document-defaults",
+        "crm-notifications",
+        "crm-billing"
+      ]
+    },
+    {
+      "name": "integrations",
+      "keys": [
+        "crm-integrations",
+        "crm-lead-capture",
+        "crm-reports",
+        "crm-hover",
+        "crm-api-keys",
+        "crm-migrate",
+        "crm-report-issue"
+      ]
+    },
+    {
+      "name": "client-portal",
+      "keys": [
+        "crm-client-portal-preview",
+        "crm-client-portal",
+        "crm-client-portal-message"
+      ]
+    }
+  ]
+}

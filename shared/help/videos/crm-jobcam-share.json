@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-jobcam-share",
+  "durationSec": 51,
+  "video": {
+    "key": "tutorials/crm-jobcam-share.f4968ae8.mp4",
+    "bytes": 4612734,
+    "sha256": "f4968ae854c9f13b5aac74fcf65628e9dd05aaa0e82e2d4ed90546352442e2e7"
+  },
+  "captions": {
+    "key": "tutorials/crm-jobcam-share.20f1adb0.vtt",
+    "bytes": 1071,
+    "sha256": "20f1adb0297b1bcb8c10e32736601efd19640d9c9490a1d1bdf3abfc742e4c09"
+  },
+  "poster": {
+    "key": "tutorials/crm-jobcam-share.7457b396.jpg",
+    "bytes": 91105,
+    "sha256": "7457b3963c5104e71e0bafafacab16e6d30931adf3823109f071c749d911c9ea"
+  },
+  "uploaded": {
+    "at": "2026-10-08T02:42:37.904Z",
+    "video": "9bab14dc2167562da147d6d3065ef0cd",
+    "captions": "c86fe2541a175e40a80c4bd7efddb0dd",
+    "poster": "07c6710617f3a603b767657e07f47dd9"
+  }
+}

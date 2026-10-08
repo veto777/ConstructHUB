@@ -15,7 +15,8 @@
  * ADDITIVE ONLY — step scripts find rows by name: never rename, reorder or delete a demo row.
  *
  * HARD RULES: everything here is fictional. Emails end in example.com, phones are 555-01xx, the
- * photos are flat colour cards made by ffmpeg and labelled as demo photos. Never copy a real
+ * photos are the drawn job-site scenes of scripts/tutorials/assets/photos (gen-assets.ts: flat
+ * illustration, nobody's house). Never copy a real
  * customer, address or job into this file — and it refuses any database that is not a recording
  * database on 127.0.0.1:5432.
  */
@@ -23,7 +24,7 @@ import { spawnSync } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
-import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
+import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuid, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
 
 const raw = process.env.DATABASE_URL;
 if (!raw) throw new Error("DATABASE_URL is not set");
@@ -116,6 +117,26 @@ async function main() {
   await q(`update crm_orgs set timezone = 'America/New_York', email = 'office@aspireinteriors.example.com', license_number = 'DEMO-FL-1001' where id = $1`, [orgId]);
   for (const table of ["crm_members", "crm_divisions"])
     await q(`update ${table} set email = replace(email, '@aspireinteriors.co', '@aspireinteriors.example.com') where org_id = $1 and email like '%@aspireinteriors.co'`, [orgId]);
+  // ── Divisions: one per demo state, every address invented (batch D, 2026-10-08) ─────────────────
+  // The base seed's two divisions read like a real business ("2211 Meridian St, Bellingham, WA" as
+  // headquarters, "1847 Main Street, Sarasota"). The demo company works in Florida, New York and
+  // Texas, so: Florida — Sarasota is the headquarters; the Washington row BECOMES New York — Albany
+  // (same row, same id: nothing points at a division that is gone); Texas — Austin is added. Street
+  // lines are made up ("Demo …", with a suite) and were not checked against real ones; only the
+  // city / state / ZIP are real places. Licence numbers are DEMO-<state>-1001.
+  // NO SALES-TAX RATE is set on any division or on the company: the app's own starting state
+  // (PRODUCER-GUIDE.md "Sales tax"), and where crm-sales-tax begins.
+  const txDivision = demoUuid("demo-division-tx");
+  await q(`update crm_divisions set code = 'NY', name = 'Aspire Interiors — New York', email = 'ny@aspireinteriors.example.com', phone = '(518) 555-0142',
+             address_line1 = '77 Demo Larkspur St', address_line2 = 'Suite 5', city = 'Albany', state = 'NY', postal_code = '12210', license_state = 'NY', is_headquarters = false, updated_at = now()
+           where org_id = $1 and code = 'WA' and not exists (select 1 from crm_divisions where org_id = $1 and code = 'NY')`, [orgId]);
+  await q(`update crm_divisions set address_line1 = '410 Demo Harbor Way', address_line2 = 'Suite 2', is_headquarters = true, updated_at = now()
+           where org_id = $1 and code = 'FL' and (address_line1 = '1847 Main Street' or address_line2 is null)`, [orgId]);
+  await q(`insert into crm_divisions (id, org_id, name, code, email, phone, address_line1, address_line2, city, state, postal_code, license_number, license_state, is_headquarters)
+           values ($1, $2, 'Aspire Interiors — Texas', 'TX', 'tx@aspireinteriors.example.com', '(512) 555-0131', '1200 Demo Cedar Elm Blvd', 'Suite 140', 'Austin', 'TX', '78704', 'DEMO-TX-1001', 'TX', false)
+           on conflict (id) do nothing`, [txDivision, orgId]);
+  // The company's own address was the same street line: the same invented one as its Florida division.
+  await q(`update crm_orgs set address_line1 = '410 Demo Harbor Way', address_line2 = 'Suite 2' where id = $1 and address_line1 = '1847 Main Street'`, [orgId]);
   await q(`update crm_divisions set license_number = 'DEMO-' || code || '-1001' where org_id = $1`, [orgId]);
   await q(`update crm_members set title = 'Owner' where org_id = $1 and role = 'owner' and title is null`, [orgId]);
 
@@ -273,6 +294,7 @@ async function main() {
   ];
   const projectsOldest = await oldest("crm_projects");
   for (const [i, p] of newProjects.entries()) {
+    if (projects.some((have) => have.number === p.number)) continue; // already there, under the id its template gave it
     const at = before(projectsOldest, newProjects.length - i);
     await q(`insert into crm_projects (id, org_id, customer_id, number, name, status, city, state, trades, contract_value_cents, project_manager_member_id, sales_member_id, stage_changed_at, completed_at, created_at, updated_at)
              values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) on conflict (id) do nothing`,
@@ -280,6 +302,10 @@ async function main() {
         p.pm ? member(p.pm) : null, p.sales ? member(p.sales) : null, ago(p.stageDays * 24 * 60), p.status === "complete" ? ago(p.stageDays * 24 * 60) : null, at]);
   }
   projects = await q(`select id, number from crm_projects where org_id = $1`, [orgId]);
+  // Each New York and Texas job runs under its state's division (the Florida jobs fall to the headquarters,
+  // which is the Florida division — one of them names it outright, as the base seed left it).
+  await q(`update crm_projects p set division_id = d.id from crm_divisions d
+            where p.org_id = $1 and d.org_id = $1 and d.code = p.state and p.state in ('NY', 'TX') and p.division_id is null and p.number = any($2::text[])`, [orgId, [...DEMO_PROJECT_NUMBERS]]);
   const projectOf = (doc: string, key: "estimate" | "invoice"): string | null => { const p = newProjects.find((x) => x[key] === doc); return p ? project(p.number) : null; };
   const emailOf = (name: string): string => newClients.find((c) => c.name === name)!.email;
 
@@ -340,51 +366,127 @@ async function main() {
     { n: 11, client: "Halvorsen-Quist Properties", from: "client", body: "Both units will be empty at the same time, so the floors can be done in one visit.", at: local(-5, 16, 30), read: true },
   ] as Msg[]) await addMsg(m);
 
-  // ── JobCam: six photos on the Kane job. Flat colour cards — obviously not anybody's house. ─────
+  // ── A follow-up that is due today, on a lead (producers, 2026-10-08: "Due for follow-up" was always empty) ──
+  // Rosa & Stefan Ferrante (Brooklyn NY, P-1993 Lead): a weekly cadence whose last follow-up was a week
+  // ago this morning — so it is due, zero days overdue, on any day the workspace is copied (the date
+  // shift above moves it along). Set once: a cadence that is already there is left alone.
+  await q(`update crm_customers set follow_up_cadence_days = 7, last_follow_up_at = $3 where org_id = $1 and id = $2 and follow_up_cadence_days is null`,
+    [orgId, customer("Rosa & Stefan Ferrante"), local(-7, 0, 5)]);
+
+  // ── A declined estimate (the Declined tab of Clients was empty) ────────────────────────────────
+  // Dana Whitfield (Osprey FL, P-2002 Lead) had no estimate: E-1996 is her only one, sent, opened and
+  // declined two days ago — so she is the one client under "Declined". Numbered and filed below every
+  // other estimate; 7% typed on it like the other Florida documents.
+  {
+    const id = "demo-estimate-e-1996", who = customer("Dana Whitfield");
+    const lines = [mat("TL-SUB312", 60), mat("TL-SET40", 2), labour("Install crew", 18, "tile install")], t = totals(lines, 700);
+    const [dana] = await q(`select email from crm_customers where id = $1`, [who]);
+    const made = await q(`insert into crm_estimates (id, org_id, customer_id, project_id, number, title, status, intro_text, subtotal_cents, discount_cents, tax_rate_bps, tax_cents, total_cents, public_token,
+               sent_at, sent_to_email, first_viewed_at, last_viewed_at, view_count, declined_at, decline_reason, expires_at, created_by_member_id, created_at, updated_at)
+             values ($1,$2,$3,$4,'E-1996','Kitchen floor — tile option','declined',$5,$6,0,700,$7,$8,$9,$10,$11,$12,$13,2,$13,$14,$15,$16,$17,$17) on conflict (id) do nothing returning id`,
+      [id, orgId, who, project("P-2002"), "Thanks for having us out — here's the tile option we talked about.", t.subtotal, t.tax, t.total, randomBytes(24).toString("hex"),
+        ago(6 * 24 * 60), dana?.email ?? null, ago(5 * 24 * 60), ago(2 * 24 * 60), "Going with a lower-cost option for now.", new Date(Date.now() + 24 * DAY), member("Priya Shah"), before(estimatesOldest, 12)]);
+    if (made.length) for (const [n, l] of lines.entries())
+      await q(`insert into crm_estimate_items (id, org_id, estimate_id, sort_order, kind, name, quantity_milli, unit, unit_price_cents, taxable) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true) on conflict (id) do nothing`,
+        [`${id}-line-${n + 1}`, orgId, id, n, l.kind, l.name, Math.round(l.qty * 1000), l.unit, l.cents]);
+  }
+
+  // ── JobCam: six photos on the Kane job and three on the Hadley job ─────────────────────────────
+  // The pictures are the drawn job-site scenes of scripts/tutorials/assets/photos (gen-assets.ts) —
+  // flat illustration, obviously not anybody's house — one per caption. (Until 2026-10-08 they were
+  // flat brown cards reading "Demo photo N"; a folder that still holds one is re-made, see `source`.)
   for (const [i, t] of [["Before", "#64748b"], ["Progress", "#2563eb"], ["After", "#16a34a"], ["Issue", "#dc2626"]].entries())
     await q(`insert into jobcam_tags (id, org_id, name, color, created_by_member_id) values ($1,$2,$3,$4,$5) on conflict (id) do nothing`, [`demo-tag-${i + 1}`, orgId, t[0], t[1], owner]);
-  type Photo = { n: number; caption: string; colour: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean };
+  const CLIP = "clip-floor-walkthrough.mp4";
+  type Photo = { n: number; caption: string; asset: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean; job?: [project: string, client: string] };
   const photos: Photo[] = [
-    { n: 1, caption: "Living room before — old carpet", colour: "0x8d99ae", tags: ["Before"], by: "Marco Delgado", minutesAgo: 3 * 24 * 60 + 300 },
-    { n: 2, caption: "Subfloor checked and levelled", colour: "0xb08968", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 2 * 24 * 60 + 200 },
-    { n: 3, caption: "First rows of hardwood down", colour: "0x9c6644", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 2 * 24 * 60 + 30, client: true },
-    { n: 4, caption: "Scratch on board by the hallway — replacing it", colour: "0x7f5539", tags: ["Issue"], by: "Dee Okafor", minutesAgo: 24 * 60 + 240 },
-    { n: 5, caption: "Hallway finished", colour: "0xa47148", tags: ["After"], by: "Marco Delgado", minutesAgo: 24 * 60 + 60, starred: true, client: true },
-    { n: 6, caption: "Stair treads dry-fitted", colour: "0x6f4e37", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 90 },
+    { n: 1, caption: "Living room before — old carpet", asset: "site-09.jpg", tags: ["Before"], by: "Marco Delgado", minutesAgo: 3 * 24 * 60 + 300 },
+    { n: 2, caption: "Subfloor checked and levelled", asset: "site-01.jpg", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 2 * 24 * 60 + 200 },
+    { n: 3, caption: "First rows of hardwood down", asset: "site-02.jpg", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 2 * 24 * 60 + 30, client: true },
+    { n: 4, caption: "Scratch on board by the hallway — replacing it", asset: "site-07.jpg", tags: ["Issue"], by: "Dee Okafor", minutesAgo: 24 * 60 + 240 },
+    { n: 5, caption: "Hallway finished", asset: "site-03.jpg", tags: ["After"], by: "Marco Delgado", minutesAgo: 24 * 60 + 60, starred: true, client: true },
+    { n: 6, caption: "Stair treads dry-fitted", asset: "site-05.jpg", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 90 },
+    // Three on the Hadley job in Austin (the CRM tour follows that job end to end). Older than every Kane
+    // shot and untagged, so the Recent feed still opens on the same six tiles and no tag count moves.
+    { n: 7, caption: "Front room before — old laminate", asset: "site-06.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 200, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 8, caption: "Hallway measured for planks", asset: "site-10.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 185, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 9, caption: "Sample planks against the baseboard", asset: "site-11.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 170, client: true, job: ["P-1997", "Caleb & Nora Hadley"] },
+    // More on the Hadley job, a short clip among them (the feed shows a video tile with its length)…
+    { n: 10, caption: "Bedroom before — carpet to come up", asset: "site-09.jpg", tags: ["Before"], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 160, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 11, caption: "Walk-through of the front room", asset: CLIP, tags: ["Before"], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 150, job: ["P-1997", "Caleb & Nora Hadley"] },
+    // …and four on a New York job: Hannah Lindqvist's baseboards and stair trim in Buffalo (P-1995, invoiced).
+    // (Producers, 2026-10-08: every JobCam video was Florida because only the Kane job had photos.) All older
+    // than the Kane shots, so the Recent feed still opens on the same six tiles.
+    { n: 12, caption: "Hallway measured for baseboard", asset: "site-10.jpg", tags: ["Before"], by: "Owen Brooks", minutesAgo: 4 * 24 * 60 + 300, job: ["P-1995", "Hannah Lindqvist"] },
+    { n: 13, caption: "Baseboards on, doorway cased", asset: "site-07.jpg", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 4 * 24 * 60 + 120, job: ["P-1995", "Hannah Lindqvist"] },
+    { n: 14, caption: "Stair trim finished", asset: "site-05.jpg", tags: ["After"], by: "Marco Delgado", minutesAgo: 4 * 24 * 60 + 60, starred: true, client: true, job: ["P-1995", "Hannah Lindqvist"] },
+    { n: 15, caption: "Front room done", asset: "site-03.jpg", tags: ["After"], by: "Owen Brooks", minutesAgo: 4 * 24 * 60 + 30, client: true, job: ["P-1995", "Hannah Lindqvist"] },
   ];
-  const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
+  // The first three Hadley shots were seeded without tags; a tag each, set once (a tag someone put on in a slot is left alone).
+  for (const [n, tag] of [[7, "Before"], [8, "Progress"], [9, "Progress"]] as const)
+    await q(`update jobcam_media set tags = $3 where org_id = $1 and id = $2 and coalesce(array_length(tags, 1), 0) = 0`, [orgId, `demo-photo-0${n}`, [tag]]);
   const kane = project("P-2001");
   for (const p of photos) {
     const id = `demo-photo-${String(p.n).padStart(2, "0")}`;
     const dir = path.join(process.cwd(), "tmp", "jobcam", "jobcam", orgId, id);
-    const files = { original: "original.jpg", display: "display.jpg", thumb: "thumb.jpg" };
-    if (!fs.existsSync(path.join(dir, files.thumb))) {
+    const video = p.asset === CLIP;
+    const files = video ? { original: "original.mp4", display: "poster.jpg", thumb: "thumb.jpg" } : { original: "original.jpg", display: "display.jpg", thumb: "thumb.jpg" };
+    // The files live in this working copy (tmp/jobcam is the slot app's local object store), so every
+    // checkout makes its own. `source` says which drawing a folder was made from: a folder without it
+    // holds an old colour card and is made again.
+    const from = path.join(import.meta.dirname, "assets", video ? "" : "photos", p.asset), source = path.join(dir, "source");
+    if (!fs.existsSync(from)) throw new Error(`${p.asset} is not in scripts/tutorials/assets — run gen-assets.ts`);
+    if (!fs.existsSync(path.join(dir, files.thumb)) || !fs.existsSync(source) || fs.readFileSync(source, "utf8").trim() !== p.asset) {
       fs.mkdirSync(dir, { recursive: true });
-      const label = path.join(dir, "label.txt");
-      fs.writeFileSync(label, `Demo photo ${p.n}`);
-      const sub = path.join(dir, "sub.txt");
-      fs.writeFileSync(sub, p.caption);
-      const esc = (f: string) => f.replace(/:/g, "\\:");
-      const made = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-f", "lavfi",
-        "-i", `color=c=${p.colour}:s=1600x1200:d=1,noise=alls=12:allf=t,vignette=PI/5`,
-        "-vf", `drawtext=fontfile=${font}:textfile='${esc(label)}':fontsize=110:fontcolor=white@0.92:x=(w-text_w)/2:y=h/2-130,`
-          + `drawtext=fontfile=${font}:textfile='${esc(sub)}':fontsize=46:fontcolor=white@0.85:x=(w-text_w)/2:y=h/2+40`,
-        "-frames:v", "1", "-q:v", "4", "-update", "1", path.join(dir, files.original)], { encoding: "utf8" });
-      if (made.status !== 0) throw new Error(`ffmpeg could not make ${id}: ${made.stderr}`);
+      fs.copyFileSync(from, path.join(dir, `${files.original}.tmp`));
+      fs.renameSync(path.join(dir, `${files.original}.tmp`), path.join(dir, files.original));
       for (const [name, width] of [[files.display, 1280], [files.thumb, 480]] as const) {
-        const r = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-i", path.join(dir, files.original), "-vf", `scale=${width}:-2`, "-q:v", "5", "-update", "1", path.join(dir, name)], { encoding: "utf8" });
+        // Written beside and renamed: an app serving this folder never reads half a file.
+        const r = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", ...(video ? ["-ss", "1"] : []), "-i", path.join(dir, files.original), "-frames:v", "1", "-vf", `scale=${width}:-2`, "-q:v", "4", "-update", "1", "-f", "image2", path.join(dir, `${name}.tmp`)], { encoding: "utf8" });
         if (r.status !== 0) throw new Error(`ffmpeg could not scale ${id}: ${r.stderr}`);
+        fs.renameSync(path.join(dir, `${name}.tmp`), path.join(dir, name));
       }
-      fs.rmSync(label); fs.rmSync(sub);
+      fs.writeFileSync(source, `${p.asset}\n`);
     }
     const key = (name: string) => `jobcam/${orgId}/${id}/${name}`;
     const at = ago(p.minutesAgo), bytes = fs.statSync(path.join(dir, files.original)).size;
+    // A clip is its own file (H.264 MP4: the browser plays the original, so there is no transcode), a poster and a thumbnail.
     await q(`insert into jobcam_media (id, org_id, project_id, customer_id, uploader_member_id, kind, status, file_name, mime, bytes, rendition_bytes,
-               r2_key_original, r2_key_display, r2_key_thumb, width, height, captured_at, uploaded_at, caption, caption_source, tags, starred, client_visible, created_at, updated_at)
-             values ($1,$2,$3,$4,$5,'photo','ready',$6,'image/jpeg',$7,$8,$9,$10,$11,1600,1200,$12,$12,$13,'user',$14,$15,$16,$12,$12) on conflict (id) do nothing`,
-      [id, orgId, kane, customer("Joe & Mary Kane"), member(p.by), `demo-photo-${p.n}.jpg`, bytes,
+               r2_key_original, r2_key_display, r2_key_poster, r2_key_thumb, width, height, duration_s, captured_at, uploaded_at, caption, caption_source, tags, starred, client_visible, created_at, updated_at)
+             values ($1,$2,$3,$4,$5,$17,'ready',$6,$18,$7,$8,$9,$10,$19,$11,$20,$21,$22,$12,$12,$13,'user',$14,$15,$16,$12,$12)
+             -- a row that is already there keeps everything a script may have been written against; only the sizes follow the picture
+             on conflict (id) do update set bytes = excluded.bytes, rendition_bytes = excluded.rendition_bytes`,
+      [id, orgId, p.job ? project(p.job[0]) : kane, customer(p.job ? p.job[1] : "Joe & Mary Kane"), member(p.by), `demo-photo-${p.n}.${video ? "mp4" : "jpg"}`, bytes,
         fs.statSync(path.join(dir, files.display)).size + fs.statSync(path.join(dir, files.thumb)).size,
-        key(files.original), key(files.display), key(files.thumb), at, p.caption, p.tags, !!p.starred, !!p.client]);
+        key(files.original), video ? null : key(files.display), key(files.thumb), at, p.caption, p.tags, !!p.starred, !!p.client,
+        video ? "video" : "photo", video ? "video/mp4" : "image/jpeg", video ? key(files.display) : null, video ? 1280 : 1600, video ? 720 : 1200, video ? 4 : null]);
+  }
+
+  // ── Quick Bid: two price-book items priced per square foot ─────────────────────────────────────
+  // Quick Bid prices a per-sq-ft item against the wall (or roof) area of the client's latest ready
+  // measurement report. The price book had no such item, so the button was disabled on every client
+  // (batch B). The reports themselves are the HOVER fixture's three jobs (Ellison FL, Oyelaran NY,
+  // Hadley TX — seed-fixtures / FIXTURES.md): with fixtures off there is still no report, and Quick
+  // Bid says so. Invented prices, like the rest of the price book.
+  const [painting] = await q(`select id from crm_pb_categories where org_id = $1 and name = 'Painting' limit 1`, [orgId]);
+  for (const it of [
+    { key: "demo-pb-ext-repaint", code: "PT-EXT-SF", name: "Exterior repaint, per sq ft of wall", rate: 285, text: "Two coats on siding and trim, priced by the wall area on the measurement report." },
+    { key: "demo-pb-ext-wash", code: "PT-WASH-SF", name: "Exterior wash and prep, per sq ft of wall", rate: 45, text: "Soft wash, scrape and spot-prime before paint, priced by wall area." },
+  ]) await q(`insert into crm_pb_items (id, org_id, category_id, code, name, description, unit, pricing_mode, rate_cents_per_sqft, sqft_metric) values ($1,$2,$3,$4,$5,$6,'sf','per_sqft',$7,'siding') on conflict (id) do nothing`,
+    [demoUuid(it.key), orgId, painting?.id ?? null, it.code, it.name, it.text, it.rate]);
+
+  // ── Good / better / best: three options on one open estimate ───────────────────────────────────
+  // E-2002 (Luis Orozco, FL — sent and viewed, not decided): three display options with their totals,
+  // the middle one recommended and equal to the estimate's own total. E-2000, which the options
+  // walkthrough builds on camera from nothing, is left without any.
+  {
+    const [e] = await q(`select id, subtotal_cents, total_cents from crm_estimates where org_id = $1 and number = 'E-2002' limit 1`, [orgId]);
+    if (e) for (const o of [
+      { tier: 1, name: "Good", share: 0.88, text: "12 mil plank, standard underlayment, existing baseboards put back." },
+      { tier: 2, name: "Better", share: 1, text: "20 mil plank, acoustic underlayment, existing baseboards put back.", recommended: true },
+      { tier: 3, name: "Best", share: 1.17, text: "20 mil plank, acoustic underlayment, new 5 1/4 inch baseboards throughout." },
+    ]) await q(`insert into crm_estimate_options (id, org_id, estimate_id, name, tier, description, recommended, show_total, subtotal_cents, total_cents) values ($1,$2,$3,$4,$5,$6,$7,true,$8,$9) on conflict (id) do nothing`,
+      [demoUuid(`demo-option-e-2002-${o.tier}`), orgId, e.id, o.name, o.tier, o.text, !!o.recommended, o.share === 1 ? e.subtotal_cents : Math.round((e.subtotal_cents * o.share) / 100) * 100, o.share === 1 ? e.total_cents : Math.round((e.total_cents * o.share) / 100) * 100]);
   }
 
   const count = async (t: string) => Number((await q(`select count(*)::int as n from ${t} where org_id = $1`, [orgId]))[0].n);

@@ -7,7 +7,8 @@
  *
  * Plays the step script in headless Chromium, films it from Chromium's own screencast, and writes
  *   raw.mkv       the screen capture at device pixels (with a pre-roll that mux.ts cuts off)
- *   timings.json  where every step starts and ends in it
+ *   timings.json  where every step starts and ends in it — and what it pointed at (the target's box,
+ *                 when its ring left, the pointer's path), which social.ts uses to frame the phone cuts
  *
  * Run narrate.ts FIRST: each step is held for its measured narration clip plus a short pad, so the
  * picture and the voice line up without editing. (--no-narration estimates the lengths from the
@@ -43,6 +44,8 @@ import { ROOT, flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type Narr
 
 /** The only place an `upload` step may take files from: generated demo files (gen-assets.ts). */
 export const ASSETS_DIR = path.join(ROOT, "scripts", "tutorials", "assets");
+import { isCrmRoute } from "../../shared/help/registry";
+import { CARD_SAFE, cardHtml } from "./card";
 
 /** Injected into every document of the recording context. Plain JS: it runs in the page. */
 function overlay() {
@@ -68,6 +71,9 @@ function overlay() {
     #__tut .sync{position:absolute;inset:0;background:#000;display:none}
     #__tut .sync.on{display:block}
     .__tut-blur{filter:blur(7px)!important}
+    #__tut .card{position:absolute;inset:0;display:none}
+    #__tut.carding .card{display:block}
+    #__tut.carding .cur,#__tut.carding .ring,#__tut.carding .url{display:none}
     /* The assistant launcher and its welcome bubble are not part of any feature being taught. */
     [data-testid="hub-launcher"],[data-testid="hub-welcome-bubble"],[data-testid="hub-panel"]{display:none!important}
     /* …nor is the unread count on the CRM's bell. */
@@ -80,7 +86,7 @@ function overlay() {
   root.id = "__tut";
   root.setAttribute("aria-hidden", "true");
   root.innerHTML = `<style>${css}</style><div class="veil"></div><div class="ring"></div><div class="url"></div>
-    <svg class="cur" viewBox="0 0 26 26"><path d="M5 3v18.2l4.7-4.4 3 7 3.1-1.3-3-6.9H19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="sync"></div>`;
+    <div class="card"></div><svg class="cur" viewBox="0 0 26 26"><path d="M5 3v18.2l4.7-4.4 3 7 3.1-1.3-3-6.9H19z" fill="#111" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="sync"></div>`;
   const ring = root.querySelector(".ring") as HTMLElement, cur = root.querySelector(".cur") as HTMLElement;
   const url = root.querySelector(".url") as HTMLElement;
   let pos = { x: Math.round(innerWidth * 0.93), y: Math.round(innerHeight * 0.55) }; // the page's empty right margin
@@ -161,6 +167,37 @@ function overlay() {
     /** Make the compositor produce a frame (the screencast only sends one when something changed). */
     nudge() { mount(); cur.style.opacity = cur.style.opacity === "0.999" ? "1" : "0.999"; },
     blur(el: Element) { el.classList.add("__tut-blur"); },
+    /** A full-screen card over the page (markup from scripts/tutorials/card.ts), or null to take it away. Whole figures count up. */
+    card(html: string | null) {
+      mount();
+      const box = root.querySelector(".card") as HTMLElement;
+      root.classList.toggle("carding", !!html);
+      box.innerHTML = html ?? "";
+      for (const el of Array.from(box.querySelectorAll("[data-count]")) as HTMLElement[]) {
+        const full = el.getAttribute("data-count")!, pre = full.startsWith("$") ? "$" : "", end = Number(full.replace("$", "")), t0 = performance.now(), wait = 260, dur = 620;
+        if (!Number.isFinite(end)) continue;
+        el.textContent = `${pre}0`;
+        const tick = (t: number) => {
+          const u = Math.min(1, Math.max(0, (t - t0 - wait) / dur)), e = 1 - Math.pow(1 - u, 3);
+          el.textContent = `${pre}${Math.round(end * e)}`;
+          if (u < 1 && el.isConnected) requestAnimationFrame(tick); else if (el.isConnected) el.textContent = full;
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+    /**
+     * Push in on an element (the page is scaled about its centre), or null to come back out. The
+     * overlay is not inside <body>, so the ring and the cursor keep their size and follow the element.
+     */
+    punch(el: Element | null, scale = 1.35) {
+      const b = document.body;
+      if (!b) return;
+      b.style.transition = "transform .5s cubic-bezier(.2,.8,.2,1)";
+      if (!el) { b.style.transform = ""; setTimeout(() => { if (!b.style.transform) { b.style.transformOrigin = ""; b.style.transition = ""; } }, 560); return; }
+      const r = el.getBoundingClientRect(), o = b.getBoundingClientRect();
+      b.style.transformOrigin = `${r.left + r.width / 2 - o.left}px ${r.top + r.height / 2 - o.top}px`;
+      b.style.transform = `scale(${scale})`;
+    },
     /** A full black frame: the mark mux.ts looks for to line the video's clock up with the recorder's. */
     sync(on: boolean) { mount(); (root.querySelector(".sync") as HTMLElement).classList.toggle("on", on); },
     /** For the thumbnail's screenshot: the cursor off, and where the ring is (CSS px), or null. */
@@ -171,6 +208,22 @@ function overlay() {
       return { x: r.left, y: r.top, width: r.width, height: r.height };
     },
   };
+}
+
+/** The stylesheet behind a script's `redactSelectors`: unreadable from the first paint, on every page of the recording. */
+export const redactCss = (selectors: readonly string[]): string => `${selectors.join(",")}{filter:blur(9px)!important;user-select:none!important}`;
+/** Runs in every document before any of its own scripts: the rule is in place before the app can draw the element. */
+function redactFromLoad(css: string) {
+  const add = () => { if (document.getElementById("__tut-redact") || !document.documentElement) return !!document.getElementById("__tut-redact"); const s = document.createElement("style"); s.id = "__tut-redact"; s.textContent = css; document.documentElement.appendChild(s); return true; };
+  if (!add()) { new MutationObserver((_m, o) => { if (add()) o.disconnect(); }).observe(document, { childList: true }); document.addEventListener("DOMContentLoaded", add); }
+}
+
+/** On a busy box Chromium now and then answers "Unable to capture screenshot": the page is fine — ask again. */
+export async function screenshot(page: Pick<Page, "screenshot" | "waitForTimeout">, file: string, attempts = 5): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try { await page.screenshot({ path: file }); return; }
+    catch (e) { if (attempt >= attempts) throw e; await page.waitForTimeout(400 * attempt); }
+  }
 }
 
 /** Width and height of a JPEG, from its SOF marker. */
@@ -211,10 +264,38 @@ export const CAPTION_SAFE = (height: number) => Math.round(height * 0.17);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-class Player {
+type TargetBox = { x: number; y: number; width: number; height: number };
+
+/** A click's ring is taken away this long after the click (it would otherwise sit on whatever the click opened). */
+export const RING_OFF_AFTER_CLICK_MS = 450;
+/**
+ * A page that a step OPENED WHOLE (a click on a link out of the app, a Preview, a checkout) stays on
+ * screen at least this long after it has drawn, before anything leaves it again — a `back` right
+ * after such a click used to show the page for under half a second.
+ */
+export const MIN_PAGE_DWELL_MS = 1600;
+/** How much longer the page on camera must stay: `shownAtMs` is when it finished drawing (null: it was there all along). */
+export const dwellLeft = (shownAtMs: number | null, nowMs: number, min: number = MIN_PAGE_DWELL_MS): number => (shownAtMs == null ? 0 : Math.max(0, shownAtMs + min - nowMs));
+
+export class Player {
   pos: { x: number; y: number };
-  constructor(private page: Page, private viewport: { width: number; height: number }) {
+  /** `now` is the recording's clock (ms since the capture started): every session's player shares it. */
+  constructor(private page: Page, private viewport: { width: number; height: number }, private now: () => number = () => Date.now()) {
     this.pos = { x: Math.round(viewport.width * 0.93), y: Math.round(viewport.height * 0.55) };
+  }
+
+  // What a step pointed at, for the social cuts (social.ts crops the recording around it): the target's
+  // box where it came to rest, when its ring was taken away, and the pointer's path. Reset per step.
+  private aimed: TargetBox | null = null;
+  private ringOffAt: number | null = null;
+  private path: [number, number, number][] = [];
+  beginStep() { this.aimed = null; this.ringOffAt = null; this.path = []; }
+  /** The step's record. The box is read again at the end when the ring is still on its element (it may have moved). */
+  async endStep(): Promise<{ target: TargetBox | null; ringOffMs: number | null; cursor: [number, number, number][] }> {
+    const round = (b: TargetBox): TargetBox => ({ x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10, width: Math.round(b.width * 10) / 10, height: Math.round(b.height * 10) / 10 });
+    const still = this.ringed ? await this.ringed.boundingBox({ timeout: 300 }).catch(() => null) : null;
+    const box = still ?? this.aimed;
+    return { target: box ? round(box) : null, ringOffMs: this.ringOffAt, cursor: this.path };
   }
 
   /** Move the pointer along a slightly bowed path, slow–fast–slow, so it glides instead of jumping. */
@@ -228,14 +309,55 @@ class Player {
     for (let i = 1; i <= n; i++) {
       const t = ease(i / n), arc = Math.sin(Math.PI * t) * bow;
       await this.page.mouse.move(from.x + dx * t + nx * arc, from.y + dy * t + ny * arc);
+      if (i % 6 === 0 || i === n) this.path.push([this.now(), Math.round(from.x + dx * t + nx * arc), Math.round(from.y + dy * t + ny * arc)]);
       const due = started + (duration * i) / n;
       if (due > Date.now()) await sleep(due - Date.now());
     }
     this.pos = to;
   }
 
+  /**
+   * Requests the page has in flight (not the long-lived ones: an event stream or a socket never ends).
+   * `quiet()` waits for what a click or a choice set off to come back — on a loaded box that takes
+   * anything from 50 ms to 2 s, and a fixed pause was either too short (the next step pointed at a
+   * page that was not there yet; producers padded every step with holdMs 1200) or wasted time.
+   */
+  private inflight = new Set<unknown>();
+  private lastNet = 0;
+  watchNetwork() {
+    const done = (r: unknown) => { if (this.inflight.delete(r)) this.lastNet = Date.now(); };
+    this.page.on("request", (r) => { if (["xhr", "fetch", "document", "script"].includes(r.resourceType())) { this.inflight.add(r); this.lastNet = Date.now(); } });
+    this.page.on("requestfinished", done); this.page.on("requestfailed", done);
+    this.page.on("framenavigated", (f) => { if (f === this.page.mainFrame()) this.inflight.clear(); });
+    return this;
+  }
+  /** Until nothing has been in flight for `calmMs` (at most `maxMs`; a request older than that is a stream, not an answer). */
+  async quiet(calmMs = 350, maxMs = 3500) {
+    const from = Date.now();
+    await sleep(60); // let the click's own request start
+    while (Date.now() - from < maxMs) {
+      if (!this.inflight.size && Date.now() - Math.max(this.lastNet, from) >= calmMs) return;
+      if (!this.inflight.size && this.lastNet < from && Date.now() - from >= calmMs) return;
+      await sleep(50);
+    }
+  }
+  /** A card is up / the page is pushed in: both are undone before the next step does anything. */
+  punched = false;
+  async clearStage() {
+    await this.page.evaluate(() => { const t = (window as any).__tut; if (!t) return false; const had = !!document.querySelector("#__tut.carding"); t.card(null); return had; }).catch(() => false);
+    if (this.punched) { this.punched = false; await this.page.evaluate(() => (window as any).__tut?.punch(null)).catch(() => {}); await sleep(520); }
+  }
   private ringed: Locator | null = null;
+  private ringOffTimer: ReturnType<typeof setTimeout> | null = null;
+  /** After a click: the ring goes a moment later. Cancelled by the next `ring()` — it must never wipe the NEXT step's ring. */
+  ringOffSoon(ms: number = RING_OFF_AFTER_CLICK_MS) {
+    if (this.ringOffTimer) clearTimeout(this.ringOffTimer);
+    this.ringOffTimer = setTimeout(() => { this.ringOffTimer = null; void this.ring(null).catch(() => {}); }, ms);
+  }
   async ring(target: Locator | null) {
+    // Whoever rings (or clears) now decides: a pending "take the click's ring away" is void.
+    if (this.ringOffTimer) { clearTimeout(this.ringOffTimer); this.ringOffTimer = null; }
+    if (!target && this.ringed) this.ringOffAt = this.now();
     this.ringed = target;
     if (target) await target.evaluate((el) => (window as any).__tut?.ring(el));
     else await this.page.evaluate(() => (window as any).__tut?.ring(null)).catch(() => {});
@@ -295,6 +417,8 @@ class Player {
       }, safe);
       if (lifted) { await sleep(380); last = (await target.boundingBox()) ?? last; }
     }
+    // Where the target came to rest (after any scroll or lift): what social.ts frames the phone cuts around.
+    this.aimed = last;
     const wide = last.width > 320;
     const point = {
       x: Math.round(last.x + (wide ? Math.min(last.width * 0.3, 220) : last.width / 2)),
@@ -310,13 +434,36 @@ class Player {
     const page = this.page;
     if (step.action === "goto") {
       await this.ring(null);
-      await page.goto(new URL(step.url!, base).toString(), { waitUntil: "domcontentloaded" });
+      await page.goto(hostFor(step.url!, base), { waitUntil: "domcontentloaded" });
       await settle(page);
       return;
     }
     if (step.action === "wait") return;
     if (step.action === "back") { await this.ring(null); await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page); return; }
     if (step.action === "press") { await page.keyboard.press(step.value!); return; }
+    if (step.action === "card") {
+      await this.ring(null);
+      await page.evaluate((html) => (window as any).__tut.card(html), cardHtml(step.card!));
+      // What the phone cuts frame: the card's middle column, where everything that matters is.
+      this.aimed = { ...CARD_SAFE };
+      return;
+    }
+    if (step.action === "scroll-to") {
+      // Open a long page AT something (a settings card), without a text-fragment address and its purple highlight.
+      await this.ring(null);
+      const to = page.locator(fill(step.selector!)).first();
+      await to.waitFor({ state: "attached", timeout: 20_000 });
+      await to.evaluate((el, offset) => {
+        // The nearest thing that scrolls: the page itself, or a panel inside it.
+        let host: Element | null = el.parentElement;
+        while (host && !(/(auto|scroll)/.test(getComputedStyle(host).overflowY) && host.scrollHeight > host.clientHeight + 4)) host = host.parentElement;
+        const top = el.getBoundingClientRect().top - (host ? host.getBoundingClientRect().top : 0) - offset;
+        (host ?? document.scrollingElement ?? document.documentElement).scrollBy({ top, behavior: "smooth" });
+      }, step.offset ?? 84);
+      let last = await to.boundingBox();
+      for (let i = 0, still = 0; i < 30 && still < 2; i++) { await sleep(120); const box = await to.boundingBox(); still = box && last && Math.abs(box.y - last.y) < 0.5 ? still + 1 : 0; last = box; }
+      return;
+    }
 
     const target = page.locator(fill(step.selector!)).first();
     if (step.action === "upload") {
@@ -334,7 +481,7 @@ class Player {
       const opened = await chooser.catch(() => null);
       if (!opened) throw new Error(`upload: clicking ${step.selector} opened no file chooser — point the step at the input[type=file] itself (the dry run lists them)`);
       await opened.setFiles(files);
-      setTimeout(() => { void this.ring(null); }, 450);
+      this.ringOffSoon();
       return;
     }
     if (step.action === "drag") {
@@ -373,6 +520,7 @@ class Player {
       point = now;
       await this.glide(point);
     }
+    if (step.punch && (step.action === "highlight" || step.action === "hover")) { await sleep(250); await target.evaluate((el, z) => (window as any).__tut?.punch(el, z), step.punch); this.punched = true; }
     switch (step.action) {
       case "highlight": break;
       case "hover": await page.mouse.move(point.x, point.y); break;
@@ -380,7 +528,9 @@ class Player {
         await sleep(350);
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         // The click has done its job; a ring left behind would sit on whatever the click put there (a dialog, a new page).
-        setTimeout(() => { void this.ring(null); }, 450);
+        this.ringOffSoon();
+        // …and what it asked the server for is back before the step is counted as done.
+        await this.quiet();
         break;
       case "type":
         await sleep(250);
@@ -440,10 +590,26 @@ class Player {
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         await sleep(250);
         await this.ring(target);
+        await this.quiet();
         break;
       }
     }
   }
+}
+
+/**
+ * A tour may cross the two apps (the overview films do): a /crm path is opened on the CRM's host name,
+ * any other path on the main host — same machine, same port. For a script that stays in one app this
+ * is the base it was given.
+ */
+const CRM_HOST = "portal.constructhub.us", CLIENT_HOST = "client.constructhub.us";
+export function hostFor(pathname: string, base: string): string {
+  const u = new URL(base);
+  // The homeowner's browser stays on the client host: its pages are not the contractor's CRM or the platform.
+  if (u.hostname === CLIENT_HOST) return new URL(pathname, u).toString();
+  const crm = isCrmRoute(pathname.split(/[?#]/)[0]);
+  if (crm) u.hostname = CRM_HOST; else if (u.hostname === CRM_HOST) u.hostname = "127.0.0.1";
+  return new URL(pathname, u).toString();
 }
 
 /** The page has stopped loading: network quiet, fonts in, one more beat for the first paint. */
@@ -454,7 +620,11 @@ async function settle(page: Page) {
 }
 
 /** One person's browser: its own cookies, its own cursor. Only the session on camera is filmed. */
-type Session = { name: string; base: string; context: BrowserContext; page: Page; player: Player; cdp: CDPSession | null };
+type Session = {
+  name: string; base: string; context: BrowserContext; page: Page; player: Player; cdp: CDPSession | null;
+  /** When the page on camera finished drawing after its last whole-page load (recording clock, ms) — see MIN_PAGE_DWELL_MS. */
+  shownAtMs: number | null;
+};
 
 async function main() {
   const args = parseArgs(process.argv.slice(2), ["shots", "no-narration", "dry"]);
@@ -535,10 +705,13 @@ async function main() {
     const origin = new URL(sessionBase(name));
     const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
     // No cookie banner, on any of the app's hosts this person may land on (a checkout returns to the CRM host).
-    await context.addCookies([...new Set([origin.hostname, "portal.constructhub.us", "client.constructhub.us"])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
+    // …and on the main host by address: a tour that crosses from one app to the other (hostFor) must not meet it on the way.
+    await context.addCookies([...new Set([origin.hostname, "127.0.0.1", CRM_HOST, CLIENT_HOST])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
     // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
     await context.addInitScript(overlay);
+    // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
+    if (script.redactSelectors?.length) await context.addInitScript(redactFromLoad, redactCss(script.redactSelectors));
     await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
     // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
     // sees") opens it in this one instead; the script comes back with a `back` step.
@@ -570,14 +743,14 @@ async function main() {
     if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
       throw new Error(`the browser window of "${name}" is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
     page.on("pageerror", (e) => console.warn(`  page error (${name}): ${e.message}`));
-    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport), cdp: null };
+    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport, now).watchNetwork(), cdp: null, shownAtMs: null };
     // A page that loads whole is blank, then plain text, then the app: none of that is filmed. The
     // moment the main frame asks for a new document, the capture holds what is on screen until the
     // new page has drawn.
     page.on("request", (request) => {
       if (current !== session || !request.isNavigationRequest() || request.frame() !== page.mainFrame()) return;
       // …that is: until the new document has replaced this one (a redirect asks again and holds again), and then drawn.
-      void hold(async () => { await page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 8000 }).catch(() => {}); await drawn(page); });
+      void hold(async () => { await page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 8000 }).catch(() => {}); await drawn(page); session.shownAtMs = now(); });
     });
     if (writer) {
       const cdp = await context.newCDPSession(page);
@@ -639,6 +812,10 @@ async function main() {
   };
   async function play(step: TutorialStep): Promise<void> {
     const session = current!;
+    // A card or a push-in belongs to the step that asked for it.
+    if (step.action !== "card" || session.player.punched) await session.player.clearStage();
+    // The page's own "are you sure?" (window.confirm): a headless browser shows no box and answers Cancel unless told otherwise.
+    if (step.action === "click" && step.dialog) session.page.once("dialog", (d) => { void (step.dialog === "accept" ? d.accept() : d.dismiss()).catch(() => {}); });
     if (step.action === "session") {
       // …opened at an address a fixture helper hands over (the link in an email, a checkout link), or at `url`.
       if (!step.fixture) return switchTo(step.session!, step.url);
@@ -661,6 +838,8 @@ async function main() {
       if (step.text) await session.page.getByText(fill(step.text)).first().waitFor({ state, timeout });
       return;
     }
+    // Leaving a page that has only just appeared (Back straight after the click that opened it): let it be seen first.
+    if ((step.action === "back" || step.action === "goto") && !dry) await sleep(dwellLeft(session.shownAtMs, now()));
     return session.player.play(step, session.base);
   }
 
@@ -699,22 +878,30 @@ async function main() {
     if (i === 0 && step.action === "goto") { await play(step); await drawn(current!.page); trimStartMs = now(); }
     else if (i === 0) trimStartMs = now();
     const startMs = now();
-    if (!(i === 0 && step.action === "goto")) await play(step);
+    if (!(i === 0 && step.action === "goto")) {
+      // Each session has its own player; a `session` step changes which one is on camera.
+      const before: Session = current!;
+      before.player.beginStep();
+      await play(step);
+      if (current !== before) current!.player.beginStep();
+    }
     const page = current!.page, player = current!.player;
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
-    // Never shorter than the line — and never so short after a slow action that its result is not seen.
-    const until = dry ? now() + 350 : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
+    // Never shorter than the line — and never so short after a slow action that its result is not seen:
+    // a page this step opened whole (its load is not filmed) gets its minimum time on screen from when it drew.
+    const opened = current!.shownAtMs != null && current!.shownAtMs >= startMs ? current!.shownAtMs : null;
+    const until = dry ? now() + (step.action === "card" ? 1400 : 350) : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad, opened == null ? 0 : opened + MIN_PAGE_DWELL_MS) + (step.holdMs ?? 0);
     while (until - now() > 300) { await sleep(250); await player.keepRing(); }
     await sleep(Math.max(0, until - now()));
     if (script.thumbnail?.step === i) {
       // The thumbnail's screenshot: this frame, full resolution, the cursor off, and where its ring is.
       const ring = await page.evaluate(() => (window as any).__tut.shot(true));
-      await page.screenshot({ path: path.join(dir, "thumb-shot.png") });
+      await screenshot(page, path.join(dir, "thumb-shot.png"));
       await page.evaluate(() => (window as any).__tut.shot(false));
       fs.writeFileSync(path.join(dir, "thumb-shot.json"), JSON.stringify({ step: i, zoom, viewport: script.viewport, ring }, null, 2) + "\n");
     }
-    if (args.flags.shots) await page.screenshot({ path: path.join(shotsDir, `${String(i).padStart(2, "0")}.png`) });
+    if (args.flags.shots) await screenshot(page, path.join(shotsDir, `${String(i).padStart(2, "0")}.png`));
     // A dry run also lists what can be pointed at on this screen: every visible data-testid, with its tag and
     // text; what can be dragged (⇄); and every file input, hidden ones too (⬆) — an `upload` step's target.
     if (dry) fs.writeFileSync(path.join(shotsDir, `${String(i).padStart(2, "0")}.txt`), `[${current!.name}] ` + await page.evaluate(() => {
@@ -733,8 +920,10 @@ async function main() {
       }
       return `${location.host}${location.pathname}${location.search}\n${rows.join("\n")}\n`;
     }));
+    // Where the step pointed (social.ts frames the phone cuts around it). Never worth failing a recording for.
+    const pointed = i === 0 && step.action === "goto" ? { target: null, ringOffMs: null, cursor: [] } : await player.endStep().catch(() => ({ target: null, ringOffMs: null, cursor: [] as [number, number, number][] }));
     const endMs = now();
-    steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs });
+    steps.push({ index: i, action: step.action, caption: step.caption, startMs, narrationStartMs, narrationMs: clipMs[i], endMs, target: pointed.target, ringOffMs: pointed.ringOffMs, cursor: pointed.cursor });
     console.log(`  step ${String(i).padStart(2)} ${step.action.padEnd(9)} ${(startMs / 1000).toFixed(2)}s → ${(endMs / 1000).toFixed(2)}s  ${step.caption}`);
   }
   await sleep(700);

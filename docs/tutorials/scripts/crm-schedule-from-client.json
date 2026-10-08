@@ -1,0 +1,138 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-schedule-from-client",
+  "title": "Book a visit from a client's page",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open the client",
+      "narration": "You can book a visit straight from a client's page. Here is how."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Hadley",
+      "caption": "Search",
+      "narration": "Find the client. We'll search for Hadley.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Caleb & Nora Hadley\") a",
+      "caption": "Open the client",
+      "narration": "Open Caleb and Nora Hadley.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-quick-actions\"]",
+      "caption": "Quick actions",
+      "narration": "Quick actions sit near the top of the client's page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-schedule-appointment\"]",
+      "caption": "Schedule appointment",
+      "chapter": "Book the visit",
+      "narration": "Choose Schedule appointment.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-title\"]",
+      "value": "Final walkthrough",
+      "caption": "Title",
+      "narration": "Give the visit a title.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-start\"]",
+      "value": "{{DATE+4}}T09:00",
+      "caption": "Starts",
+      "narration": "The form opens on tomorrow at nine. Set the start you want.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-end\"]",
+      "value": "{{DATE+4}}T10:00",
+      "caption": "Ends",
+      "narration": "Then set when it ends.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-appointment-notes\"]",
+      "value": "Bring the care guide",
+      "caption": "Notes",
+      "narration": "Notes are optional. Use them for things like a gate code.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-appointment\"]",
+      "caption": "Schedule",
+      "narration": "Choose Schedule.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"appointment-\"]:has-text(\"Final walkthrough\")",
+      "caption": "On the client's page",
+      "chapter": "Where it lands",
+      "narration": "The visit is now in the Schedule section of the client's page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-schedule\"]",
+      "caption": "Open Schedule",
+      "narration": "It is on the calendar too. Open Schedule in the menu.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"event-\"]:has-text(\"Final walkthrough\")",
+      "caption": "On the calendar",
+      "narration": "Here it is, on its day."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find your clients under Clients, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to book a visit from a client's page | ConstructHUB CRM",
+    "description": "A short walkthrough of scheduling from a client's page in the ConstructHUB CRM. You will open a client, choose Schedule appointment, set the title and time, and see the visit on the client's page and on the calendar.",
+    "tags": [
+      "contractor scheduling",
+      "book a site visit",
+      "job scheduling software",
+      "appointment calendar",
+      "client management",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Book visits fast",
+    "accent": "fast",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-billing",
+  "title": "Seats on your CRM plan",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team?tab=team",
+      "caption": "Team tab",
+      "chapter": "The Seats card",
+      "narration": "Each person on your team uses a seat on your CRM plan. Here is where to check your seats."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Deactivated members don't use a seat",
+      "caption": "Seats",
+      "narration": "The Team tab opens with Seats. It names your plan and the seats it includes."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"badge-seats\"]",
+      "caption": "Used of total",
+      "narration": "The badge shows seats used, out of the total. It's green while a seat is free."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"badge-seats\"]",
+      "caption": "Red when full",
+      "narration": "A red badge means every seat is taken."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-invite-email\"]",
+      "caption": "Invite someone",
+      "chapter": "Who uses a seat",
+      "narration": "You need a free seat to invite someone new."
+    },
+    {
+      "action": "scroll",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Owen Brooks\")",
+      "caption": "Team members",
+      "narration": "Everyone listed under Team members uses a seat."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"The owner has every permission\")",
+      "caption": "The owner too",
+      "narration": "That includes you, the owner. Here six people are listed, and six seats are in use."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"button-remove-\"]",
+      "caption": "Remove from team",
+      "chapter": "Free up a seat",
+      "narration": "The trash can removes someone from the team. They lose access right away."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Deactivated members don't use a seat",
+      "caption": "Deactivated members",
+      "narration": "Deactivated members don't use a seat, so the seat is free again."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Menu: Team & Company",
+      "narration": "You'll find Seats under Team and Company in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to check the seats on your CRM plan | ConstructHUB CRM",
+    "description": "A short walkthrough of Seats in the ConstructHUB CRM. You will see how many seats your plan includes, how many are in use, who is using them, and how a seat becomes free again.",
+    "tags": [
+      "CRM seats",
+      "team seats",
+      "user licenses",
+      "CRM plan",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Count your seats",
+    "accent": "seats",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

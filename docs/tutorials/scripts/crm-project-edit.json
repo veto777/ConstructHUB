@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-edit",
+  "title": "Put a value and a manager on a job",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "The pipeline board",
+      "chapter": "Open the job",
+      "narration": "Put a contract value and a manager on a job, right from the pipeline board."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\")",
+      "caption": "The job's card",
+      "narration": "Find the job's card. This one is a tile backsplash in Estimating, with no value yet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\") [data-testid^=\"button-edit-project-\"]",
+      "caption": "The pencil",
+      "narration": "Click the pencil on the card.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-edit-name\"]",
+      "caption": "Name",
+      "chapter": "Value, stage and owner",
+      "narration": "Edit project opens. You can rename the job here."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-value\"]",
+      "value": "5400",
+      "caption": "Contract value",
+      "narration": "Type the contract value."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-edit-stage\"]",
+      "value": "Proposal Sent",
+      "caption": "Stage",
+      "narration": "If the job has moved on, change its stage. This one goes to Proposal Sent."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-edit-owner\"]",
+      "value": "Marco Delgado",
+      "caption": "Owner",
+      "narration": "Under Owner, choose the person on your team who manages this job."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-edit\"]",
+      "caption": "Save changes",
+      "narration": "Then choose Save changes.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\")",
+      "caption": "The card, updated",
+      "chapter": "See the result",
+      "narration": "The card has moved to Proposal Sent, and it now shows the value."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-1998\") [data-testid^=\"button-edit-project-\"]",
+      "caption": "Open it again",
+      "narration": "Open the pencil again any time.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-edit-owner\"]",
+      "caption": "The owner is saved",
+      "narration": "The owner you chose is saved with the job."
+    },
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Home",
+      "narration": "Now open Home."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Pipeline value\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Pipeline value",
+      "narration": "Pipeline value adds up your open jobs, so the new value is counted here too."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Where to find it",
+      "narration": "You will find the board under Pipeline, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set a job's contract value and manager | ConstructHUB CRM",
+    "description": "Use the pencil on a pipeline card in ConstructHUB CRM to set a job's contract value, change its stage and choose the team member who owns it. The pipeline value on Home counts the new number. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "pipeline board",
+      "contract value",
+      "project manager",
+      "job stages",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Price the job",
+    "accent": "job",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

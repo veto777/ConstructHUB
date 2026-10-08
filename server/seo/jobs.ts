@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { getEntitlements } from "../entitlements";
 import { recordFailure } from "../ops/issues";
-import { reserveBudget, settleBudget, withBudget, SeoBudgetError } from "./budget";
+import { reserveBudget, settleBudget, withBudget, reconcileReservations, SeoBudgetError } from "./budget";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -29,6 +29,7 @@ const RUN_WINDOW_MS = 90 * 60_000;
 const TASK_GETS_PER_TICK = 300;
 const TASK_GET_CONCURRENCY = 10;
 export const BACKLINK_ROWS = 100;
+export const WEEKLY_SKIPPED_MESSAGE = "This month's included SEO data is used up, so the automatic weekly check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.";
 
 export type SiteRow = { id: number; user_id: number; domain: string; location_code: number; language_code: string; devices: DeviceSet; serp_depth: number; next_rank_check_at?: Date; next_backlinks_at?: Date; last_rank_check_at?: Date | null; last_backlinks_at?: Date | null; created_at?: Date };
 
@@ -40,7 +41,15 @@ export async function enqueueRankRun(site: SiteRow, trigger: "weekly" | "manual"
     "SELECT id FROM seo_rank_runs WHERE site_id=$1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1", [site.id]);
   if (open) return { id: open.id, reused: true };
   const id = randomUUID();
-  await pool.query("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger) VALUES($1,$2,$3,$4)", [id, site.id, site.user_id, trigger]);
+  try {
+    await pool.query("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger) VALUES($1,$2,$3,$4)", [id, site.id, site.user_id, trigger]);
+  } catch (e: any) {
+    // seo_rank_runs_one_active: another request queued this site's run between the check and the insert.
+    if (e?.code !== "23505") throw e;
+    const { rows: [other] } = await pool.query("SELECT id FROM seo_rank_runs WHERE site_id=$1 AND status IN ('queued','running') ORDER BY created_at DESC LIMIT 1", [site.id]);
+    if (!other) throw e;
+    return { id: other.id, reused: true };
+  }
   return { id, reused: false };
 }
 
@@ -69,13 +78,16 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     let reservation;
     try {
-      reservation = await reserveBudget(run.user_id, estimate.usd);
+      // The automatic weekly check spends the month's included data only — never credit the customer bought.
+      reservation = await reserveBudget(run.user_id, estimate.usd, { allowanceOnly: run.trigger === "weekly" });
     } catch (e) {
-      if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", e.message); return true; }
+      if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", run.trigger === "weekly" && e.code === "seo_credits" ? WEEKLY_SKIPPED_MESSAGE : e.message); return true; }
       throw e;
     }
     const posted: PostedRankTask[] = [];
     let costUsd = 0;
+    // What a chunk that never answered may have cost us (the customer is not charged for it).
+    let unknownUsd = 0;
     let firstError: string | null = null;
     for (let i = 0; i < inputs.length; i += MAX_TASKS_PER_POST) {
       const chunk = inputs.slice(i, i + MAX_TASKS_PER_POST);
@@ -83,14 +95,17 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
         const out = await seoJobDeps.serpTaskPost({ tasks: chunk, locationCode: site.location_code, languageCode: site.language_code, depth: site.serp_depth, targetDomain: site.domain });
         posted.push(...out.data);
         costUsd += out.costUsd;
+        // Saved chunk by chunk: a crash mid-posting must not lose task ids that were already paid for.
+        await pool.query("UPDATE seo_rank_runs SET tasks=$2, lease_until=now()+interval '5 minutes' WHERE id=$1", [run.id, JSON.stringify(posted)]);
       } catch (e: any) {
         firstError ??= e?.message ?? String(e);
         costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+        if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) unknownUsd += estimate.usd * (chunk.length / inputs.length);
         console.warn(`[seo] run ${run.id} task_post chunk ${i / MAX_TASKS_PER_POST} failed: ${firstError}`);
         firstError = "Some checks were not accepted by the search data service.";
       }
     }
-    await settleBudget(reservation, costUsd);
+    await settleBudget(reservation, Math.min(estimate.usd, costUsd + unknownUsd), costUsd);
     if (!posted.length) {
       await finishRun(run.id, "failed", firstError ?? "DataForSEO accepted none of the tasks", costUsd);
       return true;
@@ -114,6 +129,11 @@ async function finishRun(id: string, status: "done" | "failed", error: string | 
 
 /** Poll the queue for running runs; write every finished check; close runs that are complete or past the window. */
 export async function collectRunningRuns(): Promise<void> {
+  // A run can never stay open for good (one open run per site: a stuck one would block every later check).
+  await pool.query(
+    `UPDATE seo_rank_runs SET status='failed', finished_at=now(), lease_until=NULL, tasks='[]'::jsonb,
+            error=concat_ws(' · ', error, 'The check stopped before it finished.')
+      WHERE (status='running' AND started_at < now() - interval '3 hours') OR (status='queued' AND created_at < now() - interval '24 hours')`).catch(() => {});
   const { rows: runs } = await pool.query(
     `UPDATE seo_rank_runs SET lease_until=now()+interval '5 minutes'
      WHERE id IN (SELECT id FROM seo_rank_runs WHERE status='running' AND (lease_until IS NULL OR lease_until<now()) ORDER BY started_at FOR UPDATE SKIP LOCKED LIMIT 20)
@@ -138,12 +158,17 @@ export async function collectRunningRuns(): Promise<void> {
           if (r.value.status === "pending") { pending.push(t); continue; }
           if (r.value.status === "failed") { console.warn(`[seo] run ${run.id} check failed ${t.keyword} (${t.device}): ${r.value.message}`); failures.push(`${t.keyword} (${t.device})`); continue; }
           const res = r.value.result;
+          try {
           await pool.query(
             `INSERT INTO seo_rank_checks(keyword_id,site_id,run_id,checked_on,device,position,url,serp_features)
              VALUES($1,$2,$3,current_date,$4,$5,$6,$7)
              ON CONFLICT(keyword_id,checked_on,device) DO UPDATE SET position=EXCLUDED.position,url=EXCLUDED.url,serp_features=EXCLUDED.serp_features,run_id=EXCLUDED.run_id`,
             [t.keywordId, run.site_id, run.id, t.device, res.position, res.url, JSON.stringify(res.serpFeatures)]);
           written++;
+          } catch (e: any) {
+            // 23503: the keyword was removed while its check was in the queue — drop the result, keep the run going.
+            if (e?.code !== "23503") throw e;
+          }
         }
       }
       const remaining = [...pending, ...rest];
@@ -182,20 +207,21 @@ export async function scheduleWeeklyRuns(): Promise<void> {
 }
 
 /** Buy the summary + top backlinks for a site and store today's snapshot. */
-export async function snapshotBacklinks(site: SiteRow): Promise<{ id: number; takenOn: string; costUsd: number }> {
+/** `automatic`: the monthly job — included data only, never purchased credit. */
+export async function snapshotBacklinks(site: SiteRow, automatic = false): Promise<{ id: number; takenOn: string; costUsd: number }> {
   const estimate = estimateBacklinkSnapshotUsd(BACKLINK_ROWS);
   const out = await withBudget(site.user_id, estimate, async () => {
     const summary = await seoJobDeps.backlinksSummary({ target: site.domain });
     let list: Awaited<ReturnType<typeof backlinksList>> | null = null;
     try { list = await seoJobDeps.backlinksList({ target: site.domain, limit: BACKLINK_ROWS }); }
     catch (e: any) { summary.costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0; console.warn(`[seo] backlinks list failed for ${site.domain}: ${e?.message}`); }
-    return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null }, costUsd: summary.costUsd + (list?.costUsd ?? 0) };
-  });
+    return { data: { summary: summary.data, backlinks: list?.data.items ?? [], totalCount: list?.data.totalCount ?? null, listFailed: !list }, costUsd: summary.costUsd + (list?.costUsd ?? 0) };
+  }, { allowanceOnly: automatic });
   const { rows: [row] } = await pool.query(
     `INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,backlinks,cost_usd) VALUES($1,$2,current_date,$3,$4,$5)
      ON CONFLICT(site_id,taken_on) DO UPDATE SET summary=EXCLUDED.summary,backlinks=EXCLUDED.backlinks,cost_usd=seo_backlink_snapshots.cost_usd+EXCLUDED.cost_usd
      RETURNING id, taken_on`,
-    [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount }), JSON.stringify(out.data.backlinks), out.costUsd]);
+    [site.id, site.user_id, JSON.stringify({ ...out.data.summary, totalCount: out.data.totalCount, listFailed: out.data.listFailed }), JSON.stringify(out.data.backlinks), out.costUsd]);
   await pool.query("UPDATE seo_sites SET last_backlinks_at=now(), next_backlinks_at=now()+interval '1 month' WHERE id=$1", [site.id]);
   return { id: row.id, takenOn: String(row.taken_on).slice(0, 10), costUsd: out.costUsd };
 }
@@ -208,7 +234,7 @@ async function runDueBacklinkSnapshots(): Promise<void> {
     try {
       const ent = await getEntitlements(site.user_id);
       if (!seoIncluded(ent)) continue;
-      await snapshotBacklinks(site);
+      await snapshotBacklinks(site, true);
     } catch (e) {
       if (!(e instanceof SeoBudgetError)) void recordFailure("job", "SEO backlink snapshot", e);
       else console.warn(`[seo] backlink snapshot for ${site.domain} skipped: ${e.message}`);
@@ -223,6 +249,7 @@ export async function seoTick(): Promise<void> {
     const { rows: [{ locked }] } = await client.query("SELECT pg_try_advisory_lock($1) AS locked", [LOCK_KEY]);
     if (!locked) return;
     try {
+      await reconcileReservations().catch((e) => console.error("[seo] reconcile failed", e?.message ?? e));
       await scheduleWeeklyRuns();
       for (let i = 0; i < 10 && (await postQueuedRun()); i++) { /* post up to 10 queued runs per tick */ }
       await collectRunningRuns();

@@ -1,0 +1,116 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-portal",
+  "title": "The client portal, from the client's side",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open the client's view",
+      "narration": "Every client gets their own portal. Here is what they find in it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Joe & Mary Kane\") a",
+      "caption": "Open a client",
+      "narration": "Open a client. We'll use Joe and Mary Kane."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "See what the client sees",
+      "narration": "Choose See what the client sees."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"banner-contractor-preview\"]",
+      "caption": "Contractor preview",
+      "narration": "This is their portal, as a preview. It's read-only, so nothing here reaches the client."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-needs-action\"]",
+      "caption": "Needs your action",
+      "chapter": "What the client finds",
+      "narration": "Home starts with what needs their action, like an invoice that's due."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-estimates\"]",
+      "caption": "Estimates",
+      "narration": "Estimates lists what you've sent them."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-invoices\"]",
+      "caption": "Invoices & receipts",
+      "narration": "Invoices and receipts shows what they owe, and what they've paid."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-contracts\"]",
+      "caption": "Signed contracts",
+      "narration": "Signed contracts keeps the documents they've signed."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-photos\"]",
+      "caption": "Photos",
+      "chapter": "Photos, messages and contact",
+      "narration": "Photos shows the job photos you've shared with them."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-messages\"]",
+      "caption": "Messages",
+      "narration": "Messages is where they write to you."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-contact\"]",
+      "caption": "Contact us",
+      "narration": "And Contact us has your phone and email."
+    },
+    {
+      "action": "back",
+      "caption": "Back to the CRM",
+      "narration": "Go back, and you're in the CRM again, on the client's page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-view-as-client\"]",
+      "caption": "On every client",
+      "narration": "You'll find See what the client sees on every client's page."
+    }
+  ],
+  "youtube": {
+    "title": "What your client sees in their portal | ConstructHUB CRM",
+    "description": "A short tour of the client portal in the ConstructHUB CRM, opened with See what the client sees. You will look at what a client finds: what needs their action, estimates, invoices and receipts, signed contracts, photos, messages and your contact details.",
+    "tags": [
+      "client portal",
+      "customer portal",
+      "homeowner portal",
+      "contractor client login",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See what clients see",
+    "accent": "clients",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

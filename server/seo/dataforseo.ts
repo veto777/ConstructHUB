@@ -105,7 +105,10 @@ export async function request(method: "GET" | "POST", path: string, body?: unkno
       throw new DataForSeoError("upstream", `DataForSEO unreachable on ${path}: ${e?.message ?? e}`);
     }
     if (res.ok) {
-      const text = await res.text();
+      let text: string;
+      // The body can still time out or break off after the headers arrived.
+      try { text = await res.text(); }
+      catch (e: any) { throw new DataForSeoError(e?.name === "TimeoutError" || e?.name === "AbortError" ? "timeout" : "upstream", `DataForSEO response was cut off on ${path}`); }
       if (!text) throw new DataForSeoError("upstream", "DataForSEO returned an empty response");
       try { return JSON.parse(text) as DfsResponse; } catch { throw new DataForSeoError("upstream", "DataForSEO returned a non-JSON response"); }
     }

@@ -658,7 +658,7 @@ export default function CrmProjectPage() {
                     {editing && (
                       <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                         <div className="flex-1 min-w-[180px]"><Label className="text-xs">Chosen option</Label>
-                          <Input value={editing.chosen} maxLength={200} placeholder="Therma-Tru fiberglass, black"
+                          <Input value={editing.chosen} maxLength={200} placeholder="Fiberglass entry door, black"
                             onChange={(e) => setSelEdit({ ...editing, chosen: e.target.value })} data-testid="input-sel-chosen" /></div>
                         <div><Label className="text-xs">Actual cost $</Label>
                           <Input type="number" min={0} step="0.01" value={editing.actual}

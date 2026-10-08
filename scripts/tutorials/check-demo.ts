@@ -11,7 +11,8 @@
  * thread of the demo workspace (Florida, New York and Texas — read from the slot's database, so a
  * row added tomorrow is walked too):
  *   · the client page — and on it the client's estimates, invoices, jobs, payments and visits;
- *   · the client-portal preview ("See what the client sees") — the grant must be accepted;
+ *   · the client-portal preview ("See what the client sees") — the grant must be accepted, the
+ *     portal must get the client's documents (200) and the page must not be blank;
  *   · the project page, the single-project route behind it, and the project's JobCam page;
  *   · the estimate page; the Estimates and Invoices lists (a row per document; invoices have no
  *     page of their own — they open on the client page, checked above);
@@ -115,6 +116,14 @@ async function main() {
       await tab.goto(redeem.toString(), { waitUntil: "domcontentloaded", timeout: 60_000 });
       const cookie = (await visitor.cookies()).find((k) => k.name === "crm_client");
       if (!cookie || !decodeURIComponent(cookie.value).startsWith("prev.")) flag("the portal refused the preview grant (no preview session was set) — is the client's id a uuid?");
+      // …and the portal must then DRAW for that session: the page asked for the client's documents and got them
+      // (a refused grant used to land on a blank page with a 401 here — batch A, 2026-10-08).
+      else {
+        const docs = await tab.evaluate(async () => { const r = await fetch("/api/client/documents"); return { status: r.status, preview: r.ok ? (await r.json()).contractorPreview === true : false }; }).catch(() => ({ status: 0, preview: false }));
+        if (docs.status !== 200 || !docs.preview) flag(`the portal preview opened but /api/client/documents answered ${docs.status} (preview session: ${docs.preview})`);
+        await tab.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {});
+        if (!(await tab.locator("body").innerText().catch(() => "")).trim()) flag("the portal preview page is blank");
+      }
     } finally { await visitor.close(); }
   }
 

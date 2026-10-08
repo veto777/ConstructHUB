@@ -17,7 +17,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { loadScript, outDir, parseArgs, run, type NarrationIndex, type Timings } from "./lib";
+import { lastFrameSeekSec, loadScript, outDir, parseArgs, run, type NarrationIndex, type Timings } from "./lib";
 import { LOUDNESS, measureLoudness } from "./mux";
 import { describeSpan, findFlashes } from "./flash";
 import { unlexiconedBrandTerms } from "./lexicon";
@@ -124,7 +124,10 @@ export async function checkVideo(dir: string, script: { helpKey: string; wantsYo
   fs.mkdirSync(frames);
   const shots: [string, number][] = [["intro-card", built.cardMs / 2], ["first-frame-after-card", built.cardMs + 400]];
   timings.steps.forEach((s) => shots.push([`step${String(s.index).padStart(2, "0")}-${s.action}`, out(s.endMs) - 450]));
-  shots.push(["end-card", seconds * 1000 - (built.endCardMs ?? 0) / 2], ["last-frame", seconds * 1000 - 60]);
+  // The last frame is found by counting frames (the sound is a few ms longer than the picture: a time taken from the file's length can fall after it).
+  const [rateN, rateD] = String(v?.r_frame_rate ?? "30/1").split("/").map(Number), nbFrames = Number(v?.nb_frames);
+  const lastMs = Number.isInteger(nbFrames) && nbFrames > 0 ? lastFrameSeekSec(nbFrames, rateN / (rateD || 1)) * 1000 : Number(v?.duration) * 1000 - 50;
+  shots.push(["end-card", Math.min(lastMs, seconds * 1000 - (built.endCardMs ?? 0) / 2)], ["last-frame", lastMs]);
   for (let i = 0; i < shots.length; i++) {
     const [name, t] = shots[i];
     await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4", "-ss", (t / 1000).toFixed(3), "-i", at("walkthrough.mp4"), "-frames:v", "1", "-vf", "scale=1280:-2", "-q:v", "3", "-update", "1",

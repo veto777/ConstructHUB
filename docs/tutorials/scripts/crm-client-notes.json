@@ -1,0 +1,114 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-notes",
+  "title": "Client notes and the activity timeline",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "caption": "Clients",
+      "narration": "Every client page in the ConstructHUB CRM keeps private notes and an activity timeline.",
+      "url": "/crm/clients",
+      "chapter": "Add a note"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Open the client",
+      "narration": "Open a client. We'll use Caleb and Nora Hadley.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-notes\"]",
+      "caption": "Notes",
+      "narration": "Scroll down to Notes. These are for your team. The client never sees them."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-note-body\"]",
+      "caption": "Type a note",
+      "narration": "Type anything the crew should remember.",
+      "value": "Park on the street. Small dog in the yard."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-note\"]",
+      "caption": "Add note",
+      "narration": "Then choose Add note.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"note-\"]:has-text(\"Small dog\")",
+      "caption": "Saved with name and time",
+      "narration": "The note is saved with your name and the time."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"note-\"]:has-text(\"Small dog\") [data-testid^=\"button-edit-note-\"]",
+      "caption": "Edit or Delete",
+      "narration": "Use Edit or Delete to change it later."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-timeline\"]",
+      "caption": "Activity",
+      "narration": "Just above Notes is Activity. You don't write this one. The CRM keeps it for you.",
+      "chapter": "The activity timeline"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"timeline-entry-\"]",
+      "caption": "Newest first",
+      "narration": "It lists what has happened with this client, newest first. Here, a payment by check."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"timeline-entry-\"]:has-text(\"from the portal\")",
+      "caption": "A message from the client",
+      "chapter": "What the timeline records",
+      "narration": "Here the client sent a message from their portal,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"timeline-entry-\"]:has-text(\"replied\")",
+      "caption": "A reply from the team",
+      "narration": "and here someone on your team replied."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find both on any client's page, under Clients in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to use client notes and the activity timeline | ConstructHUB CRM",
+    "description": "A short walkthrough of Notes and Activity on a client's page in the ConstructHUB CRM. You will add a private note for your team, and read the timeline the CRM keeps of what has happened with that client.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "client notes",
+      "activity timeline",
+      "client management"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Client notes",
+    "accent": "notes",
+    "step": 3,
+    "kicker": "CRM Tutorial"
+  }
+}

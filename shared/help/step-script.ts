@@ -25,8 +25,40 @@ export const STEP_ACTIONS = [
   "session",    // switch to another person's browser: `session` = "owner" | "client" | "member:<Name>"
   "fixture",    // call a tutorial fixture helper (recording slots only): `fixture` = "<provider>.<action>", `input`
   "wait-for",   // wait until `selector` or `text` is on screen (or gone: `state: "hidden"`), up to `timeoutMs`
+  "scroll-to",  // scroll the page so the target sits `offset` px under the top (no ring) — open a long page at a card
+  "card",       // a full-screen brand card (`card`): a stat, or a two-column comparison — overview films only
 ] as const;
 export type StepAction = (typeof STEP_ACTIONS)[number];
+
+/**
+ * A full-screen card (scripts/tutorials/card.ts draws it). A NUMBER ON A CARD IS A CLAIM: a card that
+ * shows a price ("$") must carry a footnote saying whose list price it is and as of when — and the
+ * film's entry in docs/brand/VIDEO-SCRIPTS.md lists where the number was read.
+ */
+export const tutorialCardSchema = z.object({
+  /** The small label above the headline ("As of October 2026"). */
+  kicker: z.string().min(2).max(56).optional(),
+  headline: z.string().min(2).max(64),
+  /** Word(s) of the headline to set on the orange pill. */
+  accent: z.string().min(1).max(28).optional(),
+  /** One big figure and what it counts. */
+  stat: z.object({ value: z.string().min(1).max(10), label: z.string().min(2).max(64) }).optional(),
+  /** Exactly two columns, side by side: them, then us (`us: true` draws the orange frame). */
+  columns: z.array(z.object({
+    title: z.string().min(2).max(34), value: z.string().min(1).max(10).optional(), unit: z.string().min(2).max(60).optional(),
+    lines: z.array(z.string().min(2).max(64)).max(4).optional(), us: z.boolean().optional(),
+  })).length(2).optional(),
+  /** The small print: whose price, which plan, as of when. */
+  footnote: z.string().min(4).max(200).optional(),
+  /** The gator, bottom right. */
+  mascot: z.boolean().optional(),
+}).superRefine((c, ctx) => {
+  if (c.stat && c.columns) ctx.addIssue({ code: "custom", message: "a card is a stat or two columns, not both", path: ["columns"] });
+  if (c.accent && !c.headline.toLowerCase().includes(c.accent.toLowerCase())) ctx.addIssue({ code: "custom", message: "accent must be part of the headline", path: ["accent"] });
+  const shown = [c.headline, c.stat?.value, c.stat?.label, ...(c.columns ?? []).flatMap((x) => [x.value, x.unit, ...(x.lines ?? [])])].filter(Boolean).join(" ");
+  if (/\$\s?\d/.test(shown) && !/\b(20\d\d)\b/.test(c.footnote ?? "")) ctx.addIssue({ code: "custom", message: "a card that shows a price needs a footnote that says whose list price it is and as of when (a year)", path: ["footnote"] });
+});
+export type TutorialCard = z.infer<typeof tutorialCardSchema>;
 
 export const tutorialStepSchema = z.object({
   /** CSS selector or a `data-testid=…` selector of the element to act on. Not needed for goto/wait. */
@@ -70,15 +102,33 @@ export const tutorialStepSchema = z.object({
   state: z.enum(["visible", "hidden"]).optional(),
   /** wait-for: how long to wait, in ms (default 15000). */
   timeoutMs: z.number().int().min(100).max(120_000).optional(),
+  /** scroll-to: how far under the top of the window the target comes to rest, in CSS px (default 84: clear of the app's header). */
+  offset: z.number().int().min(0).max(400).optional(),
+  /** card: what the card says. */
+  card: tutorialCardSchema.optional(),
+  /**
+   * click: the page will ask "are you sure?" with the browser's own confirm box (window.confirm) —
+   * "accept" answers OK. Without it the recorder answers Cancel, as it always has. The box itself is
+   * never on camera (a headless browser draws none): say what was asked in the narration.
+   */
+  dialog: z.enum(["accept", "dismiss"]).optional(),
+  /** highlight / hover: push in on the target (1.15–1.8 × the page) for this step — the money moment. Undone by the next step. */
+  punch: z.number().min(1.1).max(1.8).optional(),
 }).superRefine((s, ctx) => {
   if (s.action === "goto" && !s.url) ctx.addIssue({ code: "custom", message: "goto needs url", path: ["url"] });
-  if (!["goto", "wait", "press", "back", "session", "fixture", "wait-for"].includes(s.action) && !s.selector) ctx.addIssue({ code: "custom", message: `${s.action} needs selector`, path: ["selector"] });
+  if (!["goto", "wait", "press", "back", "session", "fixture", "wait-for", "card"].includes(s.action) && !s.selector) ctx.addIssue({ code: "custom", message: `${s.action} needs selector`, path: ["selector"] });
   if (["type", "select", "press"].includes(s.action) && s.value === undefined) ctx.addIssue({ code: "custom", message: `${s.action} needs value`, path: ["value"] });
   if (s.action === "upload" && !s.files) ctx.addIssue({ code: "custom", message: "upload needs files", path: ["files"] });
   if (s.action === "drag" && !s.to) ctx.addIssue({ code: "custom", message: "drag needs to", path: ["to"] });
   if (s.action === "session" && !s.session) ctx.addIssue({ code: "custom", message: "session needs session", path: ["session"] });
   if (s.action === "fixture" && !s.fixture) ctx.addIssue({ code: "custom", message: "fixture needs fixture", path: ["fixture"] });
   if (s.action === "wait-for" && !s.selector && !s.text) ctx.addIssue({ code: "custom", message: "wait-for needs selector or text", path: ["selector"] });
+  if (s.action === "card" && !s.card) ctx.addIssue({ code: "custom", message: "card needs card", path: ["card"] });
+  if (s.action === "card" && s.selector) ctx.addIssue({ code: "custom", message: "a card has no selector", path: ["selector"] });
+  if (s.card !== undefined && s.action !== "card") ctx.addIssue({ code: "custom", message: "card is only for card", path: ["card"] });
+  if (s.offset !== undefined && s.action !== "scroll-to") ctx.addIssue({ code: "custom", message: "offset is only for scroll-to", path: ["offset"] });
+  if (s.dialog !== undefined && s.action !== "click") ctx.addIssue({ code: "custom", message: "dialog is only for click", path: ["dialog"] });
+  if (s.punch !== undefined && !["highlight", "hover"].includes(s.action)) ctx.addIssue({ code: "custom", message: "punch is only for highlight / hover", path: ["punch"] });
   // A field that belongs to another action is a typo, not a hint: refuse it.
   const only = (field: "files" | "to" | "session" | "fixture" | "input" | "open" | "text" | "state" | "timeoutMs", actions: string[]) => {
     if (s[field] !== undefined && !actions.includes(s.action)) ctx.addIssue({ code: "custom", message: `${field} is only for ${actions.join(" / ")}`, path: [field] });
@@ -104,16 +154,32 @@ export const tutorialScriptSchema = z.object({
   /** The Call Assistant persona whose voice narrates (shared/voice-personas.ts). */
   narrator: z.enum(["janice", "gabe", "sofia", "maya", "marcus", "ethan"]).default("janice"),
   steps: z.array(tutorialStepSchema).min(1).max(80),
+  /**
+   * Blurred FROM PAGE LOAD, on every page of the recording, before the element first paints — for
+   * something secret that appears by itself (a key the page shows right after "Create", a join link,
+   * an embed code) and would be readable until a later step pointed at it. Plain CSS selectors only
+   * (`[data-testid="text-new-api-key"] code`): they go into a stylesheet, so no `text=` / `>>` / `:has-text()`.
+   * A step's own `redact: true` still blurs its target when the step reaches it.
+   */
+  redactSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
   /** What the YouTube upload says (youtube.json is generated from this and the measured timings). */
   youtube: z.object({
     /** Task first: "How to create and send an estimate | ConstructHUB CRM". */
     title: z.string().min(10).max(70),
-    /** Two or three true sentences; chapters and links are added by the tool. */
+    /** Two or three true sentences: the opening of the YouTube description. The rest (steps, chapters, links, search terms) is built at upload time by server/youtube/description.ts. */
     description: z.string().min(40).max(600),
     tags: z.array(z.string().min(2).max(40)).min(3).max(12),
     playlist: z.string().min(3).max(100).default("ConstructHUB CRM tutorials"),
     /** 28 Science & Technology, 27 Education. */
     category: z.union([z.literal(27), z.literal(28)]).default(28),
+    /**
+     * Overview films only. Where every number on screen about ANOTHER company was read, and when: the
+     * description prints them under SOURCES. A script whose cards or narration name a competitor's
+     * price must list its source here (server/help-registry.test.ts).
+     */
+    sources: z.array(z.object({ label: z.string().min(3).max(120), url: z.string().url().startsWith("https://").max(200), read: z.string().regex(/^20\d\d-\d\d-\d\d$/) })).max(6).optional(),
+    /** Companies the film names: the description says their names are their owners' trademarks and that ConstructHUB is not affiliated. */
+    names: z.array(z.string().min(2).max(40)).max(6).optional(),
   }).optional(),
   /** The designed 1280×720 thumbnail (scripts/tutorials/thumbnail.ts). */
   thumbnail: z.object({
@@ -129,8 +195,8 @@ export const tutorialScriptSchema = z.object({
   if (s.thumbnail && s.thumbnail.step >= s.steps.length) ctx.addIssue({ code: "custom", message: "thumbnail.step is not a step", path: ["thumbnail", "step"] });
   // The thumbnail's screenshot is taken at the END of that step, and wants the ring on the key element:
   // a click drops its ring (and usually changes the screen), a goto / back / wait / press has none.
-  else if (s.thumbnail && !["highlight", "hover", "type", "select", "scroll"].includes(s.steps[s.thumbnail.step].action))
-    ctx.addIssue({ code: "custom", message: "thumbnail.step must be a highlight, hover, type, select or scroll step (the ring stays on those)", path: ["thumbnail", "step"] });
+  else if (s.thumbnail && !["highlight", "hover", "type", "select", "scroll", "card"].includes(s.steps[s.thumbnail.step].action))
+    ctx.addIssue({ code: "custom", message: "thumbnail.step must be a highlight, hover, type, select or scroll step (the ring stays on those), or a card", path: ["thumbnail", "step"] });
   if (s.thumbnail?.accent && !s.thumbnail.headline.toLowerCase().split(/\s+/).includes(s.thumbnail.accent.toLowerCase())) ctx.addIssue({ code: "custom", message: "thumbnail.accent must be a word of the headline", path: ["thumbnail", "accent"] });
 });
 export type TutorialScript = z.infer<typeof tutorialScriptSchema>;

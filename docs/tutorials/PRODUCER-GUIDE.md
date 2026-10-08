@@ -305,10 +305,23 @@ new one. Merge `video-fixtures` into your branch when your current video is done
   and replace each with the uuid from "Demo data" (or a `:has-text` selector) before you re-record.
 - **After any change of yours to the seeds** — `check-demo.ts <slot>` ("Demo data").
 
+## Overview films ("Start here")
+
+The films that say what ConstructHUB is are not tutorials: their facts and scripts live in
+`docs/brand/FACT-BASE.md` and `docs/brand/VIDEO-SCRIPTS.md`, their help entries in
+`shared/help/entries/start-here/` (keys start `brand-`; the group leads `/tutorials`, in the order
+`START_HERE_ORDER` in `shared/help/registry.ts` gives). They are made on the same line. Two things
+differ: a tour may cross both apps — a `goto` opens a `/crm…` path on the CRM host and any other path
+on the main host, whatever the base. Their scripts find the demo clients and jobs by name, never by
+id. The Hadley job (Austin, TX) carries three demo photos for these
+films. Nothing in a brand film names a competitor or states a competitor's price without the owner's
+sign-off recorded in `VIDEO-SCRIPTS.md`.
+
 ## Publishing to YouTube
 
-Nothing is uploaded to YouTube by the line: there are no YouTube credentials. Each production leaves
-everything upload-ready in `analysis/video-out/<helpKey>/`:
+Producers do not upload anything: a production leaves everything upload-ready in
+`analysis/video-out/<helpKey>/`, and **one** person or agent — the coordinator, never a producer slot
+— runs the scheduler from an up-to-date checkout of `main` on vb11.
 
 | File | What it is |
 | --- | --- |
@@ -317,14 +330,99 @@ everything upload-ready in `analysis/video-out/<helpKey>/`:
 | `thumbnail.jpg` | 1280×720, under 2 MB (`thumbnail-320.png`: the same at list size) |
 | `youtube.json` | Channel (Construct HUB, `@ConstructHUB-t3v`, `UCRsxhhzhirrQCnqETChhyFw`), title, description with chapter timestamps from the step timings, "Try it" and in-app help links, tags, playlist, category, `madeForKids: false`, language `en`, `privacyStatus: "private"`, and the measured size / length / loudness of the file |
 
-By hand today: upload `walkthrough.mp4` in YouTube Studio, paste title / description / tags from
-`youtube.json`, add `captions.srt` ("with timing"), set `thumbnail.jpg`, file it in the playlist.
+### The scheduler — `scripts/tutorials/youtube-schedule.ts`
 
-`scripts/tutorials/youtube-upload.ts <helpKey>` is the next piece: a dry run by default (it prints
-what it would send), `--upload` refuses without `YT_CLIENT_ID`, `YT_CLIENT_SECRET`, `YT_REFRESH_TOKEN`
-(OAuth, `youtube.upload` scope, granted by the channel's owner). It always uploads **private** — the
-owner publishes. It is written from the API reference and has **never been run against Google**; the
-first real upload is one video, by hand, with the owner watching.
+Three videos a day, published **by YouTube itself**: each video is uploaded now as *private* with a
+publish time (`status.publishAt`) and YouTube makes it public at that time. Nothing of ours has to be
+running when a video goes out, and there is no cron.
+
+```bash
+cd ~/ConstructHUB-<checkout of main>          # the manifests in shared/help/videos decide what is eligible
+S="npx tsx --env-file=/home/voiceban/ConstructHUB-live/.env scripts/tutorials/youtube-schedule.ts"
+
+npx tsx scripts/tutorials/youtube-schedule.ts   # DRY RUN (default): the table of what would go out and when
+$S --go                                         # upload them: private + publish time, captions, thumbnail, playlist
+$S --reconcile                                  # ask YouTube what really happened; update the ledger
+$S --retry-thumbnails --go                      # set thumbnails that are not "ok" yet
+npx tsx scripts/tutorials/youtube-schedule.ts --print-description crm-schedule     # the text one video gets
+npx tsx scripts/tutorials/youtube-schedule.ts --update-descriptions                 # DRY: new text for what is already up
+$S --update-descriptions --go                   # send it (title, description, tags only)
+npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutorials/youtube-calendar.md
+```
+
+- **Title, description and tags are built at upload time** by `server/youtube/description.ts` — a
+  producer changes nothing. YouTube allows 5,000 characters in a description (5,000 *bytes* through
+  the API, and no `<` or `>`), so every video gets 4,300–4,900 characters of readable text: the search
+  phrase and the benefit in the opening line ("How to … in ConstructHUB CRM - …", the part that shows
+  above "Show more"), the script's `youtube.description`, who it is for and the link; *In this video*;
+  the chapter list from `youtube.json` (only when it is one YouTube accepts — otherwise *Steps*,
+  without times); *Step by step* (the narration, numbered); *What you need*, *Good to know* and the
+  short version from the help entry; *Why contractors use this* and the *Search terms* line from the
+  hand-written bank for the video's area (`AREAS` in that file — every sentence restates a help
+  entry; add to it only what a help entry says); related tutorials (a link only once a video is
+  public); *About ConstructHUB*; three to five hashtags. Wording that is shared between videos is
+  picked by a hash of the help key, so descriptions are not copies of each other. Sentences in a
+  script or entry that say "best", "#1", "guarantee", "included with", a data vendor's name or the
+  CRM's host name are left out (and reported). A title is kept unless it is over 70 characters; tags
+  are the script's own, then the area's, up to 450 characters.
+  `--print-description <helpKey>` shows what a video would get. `--update-descriptions [helpKey…]`
+  rebuilds the text of videos that are **already** posted or scheduled — dry by default (length and
+  first 200 characters each; `--save DIR` writes them out to read), `--go` sends them
+  (`videos.update`, `part=snippet`: nothing about the video, its schedule or its status changes) and
+  records the text, its length and its sha256 in the ledger. The lint that every script in the repo
+  (and in the sibling worktrees) yields a valid description is `server/youtube/description.test.ts`.
+- **When.** After a batch of videos has been merged to `main` and deployed (so the in-app page the
+  description links to shows the video): dry run, read the table, `--go`, `--calendar`, commit the
+  ledger and the calendar. `--reconcile` once a day while videos are going out — it exits 2 and
+  prints `!!!!` lines when something needs a person.
+- **The ledger**, `docs/tutorials/youtube-schedule.json` (committed), is the source of truth for what
+  is posted: video id, link, status (`scheduled` / `published` / `failed`), the publish time in UTC
+  and Eastern, the sha256 of the mp4 that went up, and how captions / thumbnail / playlist went. It
+  is written after every video and every step, so an interrupted run loses nothing. **A key that is
+  in the ledger is never uploaded again**, and a slot that is taken is never moved.
+- **Eligible** = `walkthrough.mp4` + `captions.srt` + `youtube.json` in an out-dir, the mp4 is the
+  encode `youtube.json` describes, **and** `shared/help/videos/<helpKey>.json` exists in the checkout
+  the tool runs from (the video is merged). `--out-dir DIR` (repeatable) says where to look; by
+  default every `~/ConstructHUB*/analysis/video-out`. The dry run lists what it found but will not
+  post, and why; `--include-unmerged` (dry run only) previews those too.
+- **Slots.** Every day in America/New_York gets one morning, one midday and one late time, each from
+  its own pool (06:00 06:30 07:00 08:00 09:00 · 11:00 12:00 12:30 13:00 14:00 · 15:30 16:00 17:00
+  18:30 19:30), picked from the date itself: always at least three hours apart, never the same time
+  in the same slot two days running, the same answer every time it is asked, DST-correct. The host
+  clock (UTC on vb11) plays no part. `--per-day 2` is morning + late; `--per-day 1` is one time a day
+  from 06:00 09:00 12:00 14:00 16:00 18:30 08:00 11:00 15:00 19:30. New videos start tomorrow
+  (Eastern) or on the last day in the ledger that still has a free slot; `--start YYYY-MM-DD` moves that.
+- **Order**, `docs/tutorials/youtube-order.json`: tracks, one per area (getting started, clients and
+  leads, estimates, schedule, invoices and payments, projects, JobCam, messages, team and settings,
+  integrations, client portal), each in learning order. The scheduler takes one video from each track
+  in turn, so a day's three videos come from three areas. A key that is not produced yet keeps its
+  place and takes the next free slot when it arrives; a key in no track goes last, alphabetically.
+  Add a new feature's key to its track when you add its row to `CRM-VIDEO-PLAN.md`.
+- **Quota.** One run uploads at most `--max` videos (default 30; the project allows about 100
+  uploads a day and customers' own uploads share that). When YouTube says the day's limit is used up
+  the run stops cleanly; run it again after midnight Pacific.
+- **A new cut of a posted video** is reported ("the mp4 … is NOT the file that was uploaded") and not
+  re-uploaded. `--replace <helpKey>` uploads the new file into the same slot (or the next free one if
+  the old one is already public) and prints the old video id: **delete that one by hand in YouTube
+  Studio** — the tool never deletes a video, and an old scheduled video would otherwise go public too.
+- **Category** is `youtube.json`'s `categoryId` (the step script's `youtube.category`, 28 by default);
+  26 (Howto & Style) when it names none; `--category N` forces one for a run. Never made for kids.
+- **Thumbnails.** The channel is phone-verified (since 2026-10-08), so `thumbnail.jpg` is set with the
+  upload. A refusal is recorded as `failed: …` and shouted about; a video with no `thumbnail.jpg` yet
+  is `pending`. `--retry-thumbnails --go` tries every one that is not `ok` again.
+- **What it touches in production:** it reads the channel connection from the production database and
+  saves the refreshed access token there (the same thing the server does). Nothing else is written.
+  The plain dry run and `--calendar` use neither the database nor Google.
+- **What YouTube requires for a scheduled upload:** the video must be private and never published;
+  the time at least 15 minutes ahead (the tool keeps an hour). A Google Cloud project that has not
+  passed YouTube's API audit gets its uploads locked private — this project's uploads did go public
+  on 2026-10-07, so it is not locked today; if that ever changes, `--reconcile` reports the video as
+  `LOCKED PRIVATE` once its time has passed.
+
+The library is `server/youtube/schedule.ts` (tests: `server/youtube/schedule.test.ts`); the
+description builder is `server/youtube/description.ts` with its file reading in
+`description-sources.ts`; the YouTube calls are in `server/youtube/client.ts` (`uploadVideo` with
+`publishAt`, `updateVideoSchedule`, `updateVideoSnippet`, `getVideoStatus`).
 
 **The thumbnail template** (`scripts/tutorials/brand.ts`, rendered by `thumbnail.ts`): a saturated
 brand-blue field (#1a73e8, brighter and deeper at the edges) with faint rays, an orange shape
@@ -337,6 +435,144 @@ always gets the same one and a channel page gets all four. The bottom-right corn
 that matters (YouTube prints the length there). Anton is bundled (`scripts/tutorials/assets/`, SIL
 OFL); nothing is fetched at render time. To try another layout: `thumbnail.ts <script> --variant 0-3`.
 The in-app poster stays a plain frame of the video (`poster.jpg`) — the thumbnail is for YouTube.
+
+## Social cuts
+
+The 16:9 master is right for YouTube and wrong for a phone feed. `scripts/tutorials/social.ts` re-frames
+a **finished** master — nothing is re-recorded, the voice engine is never called — into:
+
+| File (in `analysis/video-out/<helpKey>/social/`) | What | For |
+| --- | --- | --- |
+| `vertical.mp4` | 1080×1920, 30 fps, H.264 High + AAC 48 kHz stereo, **59 s at most**, −14 LUFS (true peak ≤ −1 dBTP) | Instagram Reels, YouTube Shorts, Threads, X |
+| `vertical-tiktok.mp4` | the same cut with the designed cover as its first half second (TikTok takes a moment of the video as its cover, not an image) | TikTok |
+| `feed.mp4` | 1080×1350 (4:5), 89 s at most — normally the whole walkthrough | LinkedIn, Facebook, the Instagram feed |
+| `cover-vertical.jpg`, `cover-feed.jpg` | the thumbnail's design restacked for a tall frame; headline, screenshot and gator inside the centre 4:5 | Instagram's cover image; a feed post's first image |
+| `social.json` | what was measured of every file + the post text per platform | `social-upload.ts`, `social-post.ts` |
+| `focus.json` | where the camera looked at each step, and how that was found | reading, when a cut looks wrong |
+
+```bash
+npx tsx scripts/tutorials/social.ts <helpKey>                       # finds the master in the known out-dirs
+npx tsx scripts/tutorials/social.ts <helpKey> --out-dir DIR         # …or in DIR/<helpKey>/ (repeatable); --out FOLDER names it exactly
+npx tsx scripts/tutorials/social.ts <helpKey> --only vertical       # one cut; --text-only rebuilds social.json's posts without encoding
+npx tsx scripts/tutorials/social.ts --all [--out-dir DIR]… [--force]  # BACKFILL: every finished master that has no up-to-date cuts
+npx tsx scripts/tutorials/produce.ts <helpKey> --slot N --no-upload --social   # a new video gets its cuts with the master
+```
+
+About 2½ minutes a cut on this box (every ffmpeg under the encode lock, niced, 4 threads). Then **look at
+them** — a dozen frames of each (`ffmpeg -ss N -i vertical.mp4 -frames:v 1 f.jpg`): UI text readable at
+phone size, the control being talked about in frame, captions inside their strip, only demo names.
+
+**What a cut is.** A branded band with the kicker and the hook headline (the script's `thumbnail.headline`);
+the recording full width underneath — a crop of about 1,000 of the master's 1,920 pixels that **follows the
+highlighted control**, easing from step to step; large word-by-word captions (Anton capitals, white with a
+dark edge, the word being said in the brand orange, two lines at most) in their own strip *under* the
+recording, so they never cover a control; a thin orange progress bar; the gator and the address at the
+bottom; a 2 s end card. The first second and a half is the headline, large, over the recording while the
+camera pushes in — not a still title card. No music.
+
+**Safe areas** (`SAFE_AREA` in `social-lib.ts`, tested): on the vertical cut nothing that must be read is in
+the top 14% (the platform's tabs), the bottom 22% (account name, caption, audio) or the right 16% of the
+caption strip (the like / comment / share column). The 4:5 cut has no overlay, only a margin.
+
+**Fitting 59 s** (`planCut`, tested). The pause after every line is tightened from 450 ms + the step's
+`holdMs` to 220 ms — cuts are only ever made in the silence between two lines, never inside a sentence, and
+a step whose action ran longer than its line (typing, a page loading) keeps the action. If that is not
+enough, picture and speech are sped up together by **8% at most**. If it still does not fit, the cut keeps
+the steps from the start up to the last that fits — stopping at a chapter boundary when one is in the last
+30% — and its end card reads "Full walkthrough on YouTube / constructhub.us/tutorials" instead of "More
+tutorials at …". The feed cut has 89 s and nearly always holds the whole walkthrough.
+
+**How the camera knows where to look.** `record.ts` now saves, for every step, the target's box, the moment
+its ring was taken away and the pointer's path (`timings.json` → `steps[].target`, `ringOffMs`, `cursor`).
+Masters recorded before that have none: `social.ts` then looks at the master four times a second and
+**finds the recorder's ring** — a hollow rectangle of the brand orange (the app's solid orange buttons and
+the selected menu item are told apart by being solid; a rectangle that stays put across three steps, such
+as a focused field's outline, is not the ring). Where no ring is found: a field being typed in is located
+by its own blue focus outline; a `highlight` with no ring is taken to be the selected menu item and gets
+the whole menu; anything else (a page that has just opened, `back`, `wait`) gets a wide shot of the page.
+After a click has landed the camera moves on to where the next step will point, so what the click opened
+is in frame. The first video (Database Directory, 1280×720, blue ring) is handled the same way and
+upscaled more — its text is softer than the others'.
+
+**The post text** (`social-text.ts` → `social.json` → `platforms`). Built from the same true material as the
+YouTube description: the hook headline, the producer's title, the help entry (what it is, what it does, how
+to use it), the area's facts and search phrases, the area's hashtags. Instagram gets 1,200–1,800 characters
+(hook, what it is, the numbered short version, three or four "why" lines, a search-phrase line, "Full
+tutorial: link in bio / constructhub.us/tutorials"); TikTok two lines and five hashtags; LinkedIn 900–1,400
+characters in a plainer voice with `https://constructhub.us/tutorials`; Facebook, X (≤ 270) and Threads
+(≤ 480) shorter ones. Every post is linted before it is written (`lintPost`): the platform's length limit,
+its hashtag count, the description's banned words (vendor names, "best", "guarantee", "included with",
+the CRM's host name), no price the help entry does not state, no address but constructhub.us, nothing that
+reads as a claim about real results. CRM posts say the CRM is a separate product with its own plans and
+that the screen is a demo workspace; the permit-directory post does not call real directory data a demo.
+**Instagram hashtags are five, not 8–12**: Instagram has capped a post at five since December 2025, and
+more are blocked or stripped (`PLATFORM_RULES.instagram.hashtags` is the one place to change it).
+
+## Posting to social
+
+Through **Blotato** (`https://backend.blotato.com/v2`, header `blotato-api-key`). The workspace is
+**shared with the owner's other brands**, so the poster is built to be unable to post anywhere else.
+
+```bash
+cd ~/ConstructHUB-<checkout of main>
+npx tsx scripts/tutorials/social-upload.ts <helpKey>…          # 1. the cuts → R2 (create-only), each checked at its public address
+S="npx tsx --env-file=/home/voiceban/ConstructHUB-live/.env scripts/tutorials/social-post.ts"
+$S [helpKey…]                                                  # 2. DRY RUN (default): accounts, times, files, every caption in full
+$S [helpKey…] --go                                             # 3. create the posts
+$S --reconcile                                                 # 4. a few minutes later, and daily: what became of each post
+git add docs/tutorials/social-schedule.json && git commit      #    the ledger is the record — commit it
+```
+
+- **Media.** Blotato needs nothing uploaded to it — "pass any publicly accessible URL in `mediaUrls`". The
+  cuts go to our own R2 as `tutorials/<helpKey>.social-<vertical|tiktok|feed|cover-vertical|cover-feed>.<hash8>.<ext>`
+  and are served by the media route already in production (`https://constructhub.us/api/tutorials/media/…`,
+  public, immutable, byte ranges) — no deploy needed. `social-upload.ts` never overwrites or deletes, asks
+  every public address for its first bytes (206, right length, right type) and writes `social/hosted.json`;
+  the poster refuses a file that changed since.
+- **Who may be posted to.** `TUTORIAL_BLOTATO_ACCOUNT_IDS` in the production `.env`, comma-separated — the
+  only accounts the tool will touch. Empty → it refuses to run. On top of that, every run: (1) the ids of the
+  other brands' accounts (and of our own YouTube channel, which is posted through YouTube's API) are on a
+  **built-in denylist** (`DENYLIST` in `social-post-lib.ts`) that no flag lifts — a typo in the env cannot
+  reach another brand's audience; (2) Blotato's own account list must contain each id; (3) its username or
+  full name must look like ConstructHUB (contain "construct" or "chub") unless you pass `--i-checked <id>`;
+  (4) one bad id stops the whole run. The tool only **creates** posts and reads; it never edits, reschedules
+  or deletes anything in the workspace (tested).
+- **Adding an account** (after the owner connects it at my.blotato.com → Accounts): run the dry run — it
+  prints nothing about other accounts, so list them once with
+  `curl -s -H "blotato-api-key: $TUTORIAL_BLOTATO_KEY" https://backend.blotato.com/v2/users/me/accounts`
+  (never paste the key anywhere), take the new account's `id`, append it to `TUTORIAL_BLOTATO_ACCOUNT_IDS`
+  in `/home/voiceban/ConstructHUB-live/.env`, and run the dry run again: it must list the account by name.
+  A **Facebook** account also needs its Page: `TUTORIAL_BLOTATO_PAGE_IDS=<accountId>:<pageId>` (page ids:
+  `GET /v2/users/me/accounts/<accountId>/subaccounts`); a **LinkedIn** account posts to the personal
+  profile unless a company page is given the same way. Today: 76607 Instagram `constructhubapp`, 38445
+  LinkedIn "Construct HUB" (a profile — no company page is connected to it), 63054 TikTok `construct.hub`.
+- **When.** By default a post follows its video on YouTube (`youtube-schedule.json`): the same Eastern day,
+  30–90 minutes after YouTube publishes it; LinkedIn only on weekdays 08:30–17:00 Eastern, otherwise
+  09:00–10:59 the next weekday. The minute is a hash of the video and the account — the same every time.
+  Blotato does the timing (`scheduledTime`, an instant beside `post`); nothing of ours runs at post time.
+  `--spread M` ignores YouTube's times: per account the first post goes out now and each next one M minutes
+  (plus up to a third of M) later, accounts starting a few minutes apart.
+- **A gentle start.** New accounts are flagged easily: an account gets **one post a day for its first 14
+  days** (`--warmup-start YYYY-MM-DD` or `TUTORIAL_SOCIAL_START`; default: the day of the first post in the
+  ledger; `--warmup-days N`), then three a day like YouTube. What does not fit a day moves to the next.
+  `--per-day N` sets the share outright. `--platform instagram,tiktok` / `--account 76607` start one network
+  at a time.
+- **TikTok** is sent with every field it requires, set to what is true: public, comments / duets / stitches
+  on, not a paid partnership, `isYourBrand: true` (it promotes our own product) and `isAiGenerated: true`
+  (the narration is a synthetic voice). Its cover is the video's frame at 200 ms — the designed cover, which
+  is the first half second of `vertical-tiktok.mp4`. Instagram gets `cover-vertical.jpg` as `coverImageUrl`,
+  as a Reel shared to the feed. LinkedIn takes no cover: its first frame is the hook.
+- **Never twice.** The ledger, `docs/tutorials/social-schedule.json`, holds one entry per video and account.
+  It is written **before** each request (`sending`) and again after the answer, so an interrupted run cannot
+  repeat a post: an entry whose answer never came stays `sending`, is never sent again by the tool, and
+  `--reconcile` shouts about it — look in Blotato. Only a failure Blotato itself reported can be retried
+  (`--retry-failed`).
+- **Rate.** Blotato allows 30 post creations a minute; the tool makes one every six seconds, waits out a
+  429 for as long as it says, and reads statuses a second apart.
+- Blotato's limits and fields were read from its documentation on 2026-10-08 (`help.blotato.com/api/start`,
+  the API reference and "Media Requirements"); they are quoted in the headers of `social-post-lib.ts` and
+  `social-text.ts`. Not verified by a real post yet: that Instagram honours `coverImageUrl` and that LinkedIn
+  accepts a 4:5 video through Blotato (its page lists 16:9, 9:16 and 1:1; LinkedIn itself takes 4:5).
 
 ## Pitfalls already hit (and what the tools now do about them)
 

@@ -1,0 +1,128 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-edit",
+  "title": "Edit or delete a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Edit a client",
+      "narration": "Here's how to change a client's details in the ConstructHUB CRM, and what Delete does."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Imani Brewster\")",
+      "caption": "Open the client",
+      "narration": "Open the client. We'll use Imani Brewster."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-edit-client\"]",
+      "caption": "Edit",
+      "narration": "Choose Edit.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-phone\"]",
+      "value": "(214) 555-0173",
+      "caption": "Phone",
+      "narration": "Change what you need. Imani has a new phone number."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-notes\"]",
+      "value": "Prefers a call after 5 pm.",
+      "caption": "Intake notes",
+      "narration": "Intake notes are for your team only."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-client\"]",
+      "caption": "Save changes",
+      "narration": "Choose Save changes.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-phone\"]",
+      "caption": "Updated",
+      "narration": "Her page shows the new number and the note straight away."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-delete-client\"]",
+      "caption": "Delete",
+      "chapter": "Delete a client",
+      "narration": "Delete removes a client for good. Only the workspace owner sees this button."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-delete-client\"]",
+      "caption": "Delete asks first",
+      "narration": "Choose Delete, and the CRM asks you to confirm."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-confirm-delete-client\"]",
+      "caption": "Delete permanently",
+      "narration": "Imani has work on file. So when you choose Delete permanently, nothing is removed yet."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-delete-client-detail\"]",
+      "caption": "What would be removed",
+      "chapter": "What Delete checks first",
+      "narration": "The CRM counts her estimates, invoices, projects and calendar visits, and asks again."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-confirm-delete-client-force\"]",
+      "caption": "Delete everything",
+      "narration": "Delete everything removes all of it, and it cannot be undone."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-cancel-delete-client\"]",
+      "caption": "Cancel",
+      "narration": "We'll choose Cancel, and Imani stays.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find Clients in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to edit or delete a client | ConstructHUB CRM",
+    "description": "A short walkthrough of editing a client in the ConstructHUB CRM. You will change a phone number and the intake notes, then see what Delete checks and asks before it removes a client and their work.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "edit a client",
+      "delete a client",
+      "client management",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Fix client details",
+    "accent": "Fix",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

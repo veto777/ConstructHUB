@@ -1,0 +1,174 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-tour-crm",
+  "title": "ConstructHUB CRM: one job, lead to paid",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "card",
+      "card": {
+        "kicker": "ConstructHUB CRM",
+        "headline": "Lead to paid.",
+        "accent": "paid",
+        "mascot": true
+      },
+      "chapter": "A lead comes in",
+      "caption": "The hook",
+      "narration": "One job. Lead to paid. Watch."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "narration": "Every job starts as a lead."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "punch": 1.3,
+      "caption": "The Hadley job",
+      "narration": "This one: the Hadleys' new floor, in Austin, Texas."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates/demo-estimate-e-1998",
+      "chapter": "Estimate, signed",
+      "caption": "The estimate",
+      "narration": "The estimate comes straight out of your price book."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Approved by Nora Hadley/",
+      "caption": "Signed online",
+      "narration": "Nora approved it online. Typed her name. Signed."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "chapter": "Schedule and photos",
+      "caption": "Schedule",
+      "narration": "The visit goes on the schedule."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "narration": "Everything about the job"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
+      "caption": "Caleb & Nora Hadley",
+      "narration": "sits on the client's page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-customer-jobcam\"]",
+      "caption": "JobCam",
+      "narration": "Photos and video from the site, filed with JobCam."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-convert-demo-estimate-e-1998\"]",
+      "chapter": "Invoice and payment",
+      "caption": "Create invoice",
+      "narration": "Work done? One click turns the estimate into an invoice."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"invoice-\"]:has-text(\"INV-2003\") [data-testid^=\"button-send-invoice-\"]",
+      "caption": "Send",
+      "narration": "Send it."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "hadleys@example.com",
+        "invoice": "INV-2003"
+      },
+      "holdMs": 600,
+      "caption": "The client's side",
+      "narration": "Now your client's side. They open the invoice,"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-pay-invoice\"]",
+      "holdMs": 700,
+      "caption": "Pay",
+      "narration": "and pay online."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"checkout-summary\"]",
+      "caption": "Secure checkout",
+      "narration": "A secure checkout. In this demo it's a stand-in. No real payment."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkout-method-card\"]",
+      "caption": "Card",
+      "narration": "Card, or bank account."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-checkout-pay\"]",
+      "holdMs": 1800,
+      "caption": "Pay",
+      "narration": "Paid."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/invoices",
+      "holdMs": 600,
+      "caption": "Back in the CRM",
+      "narration": "Back in your CRM,"
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has-text(\"INV-2003\")",
+      "caption": "Marked paid",
+      "narration": "the invoice is marked paid. Nothing to chase."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "ConstructHUB CRM · its own product, its own plans",
+        "headline": "Run the whole job.",
+        "accent": "whole job",
+        "footnote": "constructhub.us/pricing — filmed in a demo workspace with sample data.",
+        "mascot": true
+      },
+      "caption": "Run the whole job",
+      "narration": "Lead. Estimate. Signature. Schedule. Photos. Invoice. Paid. ConstructHUB. Run the whole job."
+    }
+  ],
+  "youtube": {
+    "title": "ConstructHUB CRM in 90 seconds: one job from lead to paid",
+    "description": "One job in the ConstructHUB CRM, start to finish: a lead on the pipeline, an estimate the client signs online, the visit on the schedule, job-site photos with JobCam, the invoice, and the client paying it online. Filmed in a demo workspace; the checkout page is a stand-in.",
+    "tags": [
+      "contractor CRM",
+      "CRM for contractors",
+      "estimate to invoice",
+      "contractor invoicing",
+      "get paid online contractor",
+      "job site photos",
+      "ConstructHUB CRM"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Lead to paid",
+    "accent": "paid",
+    "kicker": "CRM in 90 seconds",
+    "step": 17
+  }
+}

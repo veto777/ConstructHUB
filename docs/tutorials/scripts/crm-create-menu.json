@@ -1,0 +1,129 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-create-menu",
+  "title": "The Create button",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm",
+      "caption": "Create, at the top of the menu",
+      "chapter": "What Create can start",
+      "narration": "In the ConstructHUB CRM, the Create button sits at the top of the menu on every page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create\"]",
+      "caption": "Open Create",
+      "narration": "Click it to start something new.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"create-item-estimate\"]",
+      "caption": "Estimate",
+      "narration": "Estimate opens the estimate builder."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"create-item-invoice\"]",
+      "caption": "Invoice",
+      "narration": "Invoice makes a quick draft invoice with one line."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"create-item-message\"]",
+      "caption": "Message",
+      "narration": "Message writes a client a short email."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"create-item-customer\"]",
+      "caption": "Customer",
+      "narration": "Customer adds a new client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"create-item-lead\"]",
+      "caption": "Lead",
+      "chapter": "Add a lead",
+      "narration": "And Lead puts a new job on your pipeline. Let's add one."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-name\"]",
+      "value": "Marco Reyes",
+      "caption": "Name",
+      "narration": "Type the person's name."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-phone\"]",
+      "value": "(512) 555-0127",
+      "caption": "Phone",
+      "narration": "Add a phone number or an email."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-addr\"]",
+      "value": "2210 Juniper Hollow Dr, Austin, TX",
+      "caption": "Address",
+      "narration": "Add the job address if you have it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-lead-note\"]",
+      "value": "Wants the hall bath retiled. Call after 4.",
+      "caption": "Note",
+      "narration": "In Note, write what they asked for."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-lead\"]",
+      "caption": "Add lead",
+      "narration": "Then choose Add lead.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Marco Reyes\")",
+      "caption": "On the pipeline, in the Lead column",
+      "chapter": "Create is on every page",
+      "narration": "The CRM takes you to the Pipeline, and the new lead is in the Lead column."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-create\"]",
+      "caption": "Create, still at the top",
+      "narration": "You're on a different page now, and Create is still here, at the top of the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to use the Create button | ConstructHUB CRM",
+    "description": "A short walkthrough of the Create button in the ConstructHUB CRM. You will see the five things it starts from any page: an estimate, an invoice, a lead, a message and a new client. Then you will add a lead and find it on the pipeline.",
+    "tags": [
+      "contractor CRM",
+      "construction CRM",
+      "add a lead",
+      "contractor software",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "sales pipeline",
+      "contractor leads"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Start anything fast",
+    "accent": "fast",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}

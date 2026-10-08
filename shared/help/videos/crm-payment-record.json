@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-payment-record",
+  "durationSec": 62,
+  "video": {
+    "key": "tutorials/crm-payment-record.326f5d42.mp4",
+    "bytes": 5209793,
+    "sha256": "326f5d4213e155401b222c599df7e27ccb1133b9c8c843201be957c404e425f2"
+  },
+  "captions": {
+    "key": "tutorials/crm-payment-record.cc99baf0.vtt",
+    "bytes": 1359,
+    "sha256": "cc99baf049d3f5e776f5a60e8292fd4fc3d1e715e696983202e2e49fe7b4b87d"
+  },
+  "poster": {
+    "key": "tutorials/crm-payment-record.379ed4eb.jpg",
+    "bytes": 100366,
+    "sha256": "379ed4ebf2c70bc64f866672f6a5d2bc94da3be8959195984bc1a7f5256a984f"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:28:49.007Z",
+    "video": "11aff42fde9808346e0dc7f01e4a0eb1",
+    "captions": "28dd6d011df0731be1cb516f07d5e8cd",
+    "poster": "605f7c1dcaefb3d18fa13435d00c3181"
+  }
+}

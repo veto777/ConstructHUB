@@ -83,7 +83,7 @@ export function ServicesSection({ value, onChange, disabled }: SectionProps<Comp
             <div className="space-y-1.5">
               <Label htmlFor={`service-details-${i}`}>Details the assistant may share (optional)</Label>
               <Textarea id={`service-details-${i}`} value={s.details} rows={2} disabled={disabled} data-testid={`textarea-service-details-${i}`}
-                placeholder="e.g. Full replacement only, James Hardie fiber cement. Minimum five windows per order."
+                placeholder="e.g. Full replacement only, fiber cement siding. Minimum five windows per order."
                 onChange={(e) => set("services", services.map((x, j) => (j === i ? { ...x, details: e.target.value } : x)))} />
             </div>
           </RowCard>
@@ -93,9 +93,9 @@ export function ServicesSection({ value, onChange, disabled }: SectionProps<Comp
 
       <div className="grid gap-4 sm:grid-cols-2">
         <StringListEditor id="company-materials" label="Materials" values={value.materials} onChange={(v) => set("materials", v)} disabled={disabled}
-          testid="list-materials" placeholder="e.g. James Hardie fiber cement" hint="What you install. The assistant recommends these and does not invent others." max={40} />
+          testid="list-materials" placeholder="e.g. fiber cement siding" hint="What you install. The assistant recommends these and does not invent others." max={40} />
         <StringListEditor id="company-brands" label="Brands" values={value.brands} onChange={(v) => set("brands", v)} disabled={disabled}
-          testid="list-brands" placeholder="e.g. GAF, Milgard" max={40} />
+          testid="list-brands" placeholder="e.g. the siding and window brands you install" max={40} />
       </div>
 
       <div className="space-y-3">

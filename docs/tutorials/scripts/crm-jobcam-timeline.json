@@ -1,0 +1,136 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-timeline",
+  "title": "JobCam timeline and a photo's details",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "chapter": "Timeline",
+      "narration": "The JobCam feed can also be read day by day. Here is the timeline, and what a photo keeps."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-view-toggle\"]",
+      "caption": "Timeline",
+      "narration": "Choose Timeline."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"jobcam-day-\"] >> nth=0",
+      "caption": "Grouped by day",
+      "narration": "Shots are grouped by day, newest first. The project is named beside each day."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "A shot",
+      "chapter": "A photo's details",
+      "narration": "Click a shot to open it full size."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Open a shot",
+      "narration": "It opens over the feed."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-project\"]",
+      "caption": "When, who, project",
+      "narration": "Under it you see when it was taken, who took it, and its project."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-details\"] >> text=no location",
+      "caption": "Location",
+      "narration": "A location shows here when one was saved with the shot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-tags\"]",
+      "caption": "Tag and caption",
+      "narration": "The tag and the caption are at the bottom."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-star\"]",
+      "caption": "Star",
+      "chapter": "Star and browse",
+      "narration": "Click the star to mark a favorite."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-next\"]",
+      "caption": "Next shot",
+      "narration": "The arrows move to the next shot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-download\"]",
+      "caption": "Download",
+      "narration": "Download saves a copy of the photo."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-info\"]",
+      "caption": "Hide details",
+      "narration": "The i button hides the details, so more of the photo shows."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-close\"]",
+      "caption": "Close",
+      "narration": "Close brings you back to the timeline."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Starred",
+      "narration": "The shot you starred now carries a star."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-view-toggle\"]",
+      "caption": "Grid",
+      "narration": "Choose Grid to go back to the tiles."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Menu: JobCam",
+      "narration": "You'll find JobCam in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to use the JobCam timeline and photo details | ConstructHUB CRM",
+    "description": "A short walkthrough of the JobCam timeline in the ConstructHUB CRM. You will see job-site shots grouped by day, open one to read when it was taken, who took it and its project, star it, and move between shots.",
+    "tags": [
+      "job site photos",
+      "construction photo app",
+      "jobsite photo documentation",
+      "photo timeline",
+      "JobCam",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Every photo by day",
+    "accent": "day",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

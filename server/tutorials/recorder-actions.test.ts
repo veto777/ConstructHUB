@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, assetFiles, fill } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, redactCss, screenshot } from "../../scripts/tutorials/record";
+import { CARD_SAFE, cardHtml } from "../../scripts/tutorials/card";
+import { lastFrameSeekSec } from "../../scripts/tutorials/lib";
+import { tutorialCardSchema } from "@shared/help/step-script";
 import { SLOT_MAX, SLOT_PORT, isSlot } from "../../scripts/tutorials/app";
 
 /**
@@ -74,7 +77,7 @@ describe("the demo files an upload may use", () => {
   it("are all there, small, and what they say they are", () => {
     const magic = (f: string, n: number) => fs.readFileSync(path.join(ASSETS_DIR, f)).subarray(0, n);
     const photos = fs.readdirSync(path.join(ASSETS_DIR, "photos")).filter((f) => f.endsWith(".jpg")).sort();
-    expect(photos).toEqual(["site-01.jpg", "site-02.jpg", "site-03.jpg", "site-04.jpg", "site-05.jpg", "site-06.jpg", "site-07.jpg", "site-08.jpg"]);
+    expect(photos).toEqual(Array.from({ length: 11 }, (_x, i) => `site-${String(i + 1).padStart(2, "0")}.jpg`));
     for (const p of photos) { expect([...magic(`photos/${p}`, 3)]).toEqual([0xff, 0xd8, 0xff]); expect(fs.statSync(path.join(ASSETS_DIR, "photos", p)).size).toBeLessThan(200_000); }
     expect(magic("logo-aspire-interiors.png", 4).toString("latin1")).toBe("\x89PNG");
     expect(magic("care-guide.pdf", 5).toString("latin1")).toBe("%PDF-");
@@ -136,6 +139,194 @@ describe("the recorder", () => {
   it("lists file inputs and draggable things in a dry run", () => {
     expect(src).toContain(`document.querySelectorAll('input[type="file"]')`);
     expect(src).toContain('el.getAttribute("draggable") === "true" ? "⇄" : " "');
+  });
+});
+
+describe("the recorder's ring, dwell and hosts", () => {
+  /** A page and an element that only record what the overlay is told: "on:<name>" / "off". */
+  const stage = () => {
+    const calls: string[] = [];
+    const page = { evaluate: async () => { calls.push("off"); } } as any;
+    const el = (name: string) => ({ evaluate: async () => { calls.push(`on:${name}`); }, boundingBox: async () => ({ x: 1, y: 2, width: 3, height: 4 }) }) as any;
+    return { calls, player: new Player(page, { width: 1024, height: 576 }, () => 0), el };
+  };
+
+  it("a click's delayed ring-off never wipes the next step's ring", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, player, el } = stage();
+      await player.ring(el("save"));
+      player.ringOffSoon();                    // the click on "save"
+      await vi.advanceTimersByTimeAsync(200);  // the next step starts 200 ms later…
+      await player.ring(el("next"));           // …and rings its own target
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS * 3);
+      expect(calls).toEqual(["on:save", "on:next"]); // no "off" after "on:next"
+      expect((await player.endStep()).target).toEqual({ x: 1, y: 2, width: 3, height: 4 });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("still takes the click's ring away when nothing else is ringed, once, and a second click restarts the wait", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, player, el } = stage();
+      await player.ring(el("open"));
+      player.ringOffSoon();
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS - 50);
+      player.ringOffSoon();
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS - 50);
+      expect(calls).toEqual(["on:open"]);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(calls).toEqual(["on:open", "off"]);
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS * 3);
+      expect(calls).toEqual(["on:open", "off"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("a page a step opened whole stays on screen a minimum time before a back or a goto leaves it", () => {
+    expect(MIN_PAGE_DWELL_MS).toBeGreaterThanOrEqual(1500);
+    expect(dwellLeft(null, 5000)).toBe(0);                       // the page was there all along
+    expect(dwellLeft(10_000, 10_300)).toBe(MIN_PAGE_DWELL_MS - 300); // drawn 0.3 s ago: wait the rest
+    expect(dwellLeft(10_000, 10_000 + MIN_PAGE_DWELL_MS + 1)).toBe(0);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/session\.shownAtMs = now\(\)/);                                   // stamped when the new page has drawn
+    expect(src).toMatch(/step\.action === "back" \|\| step\.action === "goto"\) && !dry\) await sleep\(dwellLeft\(/);
+    expect(src).toMatch(/opened \+ MIN_PAGE_DWELL_MS/);                                     // …and the step that opened it is held that long
+    expect(src).not.toMatch(/setTimeout\(\(\) => \{ void this\.ring\(null\); \}/);       // the uncancellable timer is gone
+  });
+
+  it("a goto crosses hosts: /crm… on the CRM host, anything else on the main host — and the homeowner's browser stays where it is", () => {
+    for (const base of ["http://portal.constructhub.us:8186", "http://127.0.0.1:8186"]) {
+      expect(hostFor("/crm/pipeline", base)).toBe("http://portal.constructhub.us:8186/crm/pipeline");
+      expect(hostFor("/crm", base)).toBe("http://portal.constructhub.us:8186/crm");
+      expect(hostFor("/databases?state=TX", base)).toBe("http://127.0.0.1:8186/databases?state=TX");
+      expect(hostFor("/", base)).toBe("http://127.0.0.1:8186/");
+    }
+    expect(hostFor("/crmish", "http://portal.constructhub.us:8186")).toBe("http://127.0.0.1:8186/crmish");
+    expect(hostFor("/invoices", "http://client.constructhub.us:8186")).toBe("http://client.constructhub.us:8186/invoices");
+    expect(hostFor("/crm", "http://client.constructhub.us:8186")).toBe("http://client.constructhub.us:8186/crm");
+  });
+
+  it("keeps every capability of the lines that were merged into it", () => {
+    const src = read("scripts/tutorials/record.ts");
+    for (const action of ["upload", "drag", "session", "fixture", "wait-for"]) expect(src, action).toContain(`step.action === "${action}"`);
+    expect(src).toMatch(/held\+\+/);                    // frame-hold on whole-page loads
+    expect(src).toMatch(/host\.style\.translate/);      // dialog lifting
+    expect(src).toMatch(/this\.aimed = last/);          // target box for the social cuts…
+    expect(src).toMatch(/target: pointed\.target, ringOffMs: pointed\.ringOffMs, cursor: pointed\.cursor/); // …saved with the cursor path
+    expect(src).toMatch(/page\.goto\(hostFor\(step\.url!, base\)/); // host-switching goto
+  });
+});
+
+describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
+  const them = { title: "Them", value: "$99", unit: "a month", lines: ["One line"] }, us = { title: "Us", value: "$49", us: true };
+
+  it("the schema knows the two new actions and their fields, and the JSON Schema twin agrees", () => {
+    for (const a of ["scroll-to", "card"]) expect(STEP_ACTIONS).toContain(a);
+    const twin = JSON.parse(read("shared/help/step-script.schema.json"));
+    for (const f of ["offset", "card", "dialog", "punch"]) expect(twin.properties.steps.items.properties[f], f).toBeTruthy();
+    expect(twin.properties.redactSelectors).toBeTruthy();
+    ok({ action: "scroll-to", selector: "[data-testid=card-defaults]" }); ok({ action: "scroll-to", selector: "x", offset: 120 });
+    bad({ action: "scroll-to" }); bad({ action: "highlight", selector: "x", offset: 10 });
+    ok({ action: "click", selector: "x", dialog: "accept" }); bad({ action: "highlight", selector: "x", dialog: "accept" });
+    ok({ action: "highlight", selector: "x", punch: 1.4 }); bad({ action: "click", selector: "x", punch: 1.4 }); bad({ action: "highlight", selector: "x", punch: 3 });
+    ok({ action: "card", card: { headline: "Five apps to run one job?" } });
+    bad({ action: "card" }); bad({ action: "card", selector: "x", card: { headline: "Hello there" } }); bad({ action: "highlight", selector: "x", card: { headline: "Hello there" } });
+  });
+
+  it("a card that shows a price must say whose price and as of when; a stat and columns do not mix", () => {
+    const card = (c: Record<string, unknown>) => tutorialCardSchema.safeParse(c).success;
+    expect(card({ headline: "Five seats", stat: { value: "5", label: "seats on Essentials" } })).toBe(true);
+    expect(card({ headline: "Them vs us", columns: [them, us] })).toBe(false);                                  // a price, no footnote
+    expect(card({ headline: "Them vs us", columns: [them, us], footnote: "List prices, month to month." })).toBe(false); // no date
+    expect(card({ headline: "Them vs us", columns: [them, us], footnote: "List prices, month to month, as of October 2026. Different features — check both." })).toBe(true);
+    expect(card({ headline: "$94 for five", footnote: "ConstructHUB CRM Essentials, list price, October 2026" })).toBe(true);
+    expect(card({ headline: "$94 for five" })).toBe(false);
+    expect(card({ headline: "Both", stat: { value: "5", label: "seats" }, columns: [them, us], footnote: "2026" })).toBe(false);
+    expect(card({ headline: "One", columns: [them] })).toBe(false);
+    expect(card({ headline: "Stop overpaying", accent: "cheaper" })).toBe(false);
+  });
+
+  it("draws a card from its spec alone: every word escaped, nothing fetched, the content inside the column every cut shows", () => {
+    const a = { font: "data:font/ttf;base64,AAAA", gator: "data:image/webp;base64,BBBB" };
+    const html = cardHtml({ kicker: "As of <October> 2026", headline: "Half the price?", accent: "half", columns: [{ ...them, title: "A & B <Co>" }, us], footnote: "List \"price\", 2026", mascot: true }, a);
+    expect(html).toContain("A &amp; B &lt;Co&gt;");
+    expect(html).toContain("As of &lt;October&gt; 2026");
+    expect(html).toContain("List &quot;price&quot;, 2026");
+    expect(html).toContain(`<span class="o">Half</span> the price?`);
+    expect(html).toContain(`<div class="col us">`);
+    expect(html).not.toContain("data-count"); // a column's price never counts up through other prices
+    expect(cardHtml({ headline: "Five seats", stat: { value: "5", label: "seats" } }, a)).toContain(`data-count="5"`);
+    expect(html).toContain(`src="${a.gator}"`);
+    expect(html.split(a.font).join("").split(a.gator).join("")).not.toMatch(/https?:\/\/|file:/); // nothing fetched: the font and the mascot are inlined
+    expect(html.match(/url\(/g)).toHaveLength(1);
+    expect(cardHtml({ headline: "No gator here" }, a)).not.toContain("<img");
+    // The middle column fits the widest shot a phone cut can take of a 1024×576 page (social-lib maxCropW: 1495 master px = 797 CSS px), clear of the caption strip.
+    expect(CARD_SAFE.width).toBeLessThanOrEqual(797);
+    expect(CARD_SAFE.x * 2 + CARD_SAFE.width).toBe(1024);
+    expect(CARD_SAFE.y + CARD_SAFE.height + 26).toBeLessThanOrEqual(576 - CAPTION_SAFE(576));
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/this\.aimed = \{ \.\.\.CARD_SAFE \}/); // …and that column is what the recorder reports as the step's target
+  });
+
+  it("blurs a script's redactSelectors from page load — a stylesheet, in place before the page draws", () => {
+    expect(redactCss(['[data-testid="text-new-api-key"] code', ".join-link"])).toBe('[data-testid="text-new-api-key"] code,.join-link{filter:blur(9px)!important;user-select:none!important}');
+    const script = (redactSelectors: string[]) => { try { parseTutorialScript({ helpKey: "x", title: "t", viewport: { width: 1024, height: 576 }, steps: [{ action: "goto", url: "/", caption: "c", narration: "n" }], redactSelectors }); return true; } catch { return false; } };
+    expect(script(['[data-testid="text-new-api-key"] code'])).toBe(true);
+    for (const sel of ["text=Secret", "div >> code", 'p:has-text("key")', "a{color:red}", "x</style>"]) expect(script([sel]), sel).toBe(false);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/addInitScript\(redactFromLoad, redactCss\(script\.redactSelectors\)\)/);
+    expect(src).toMatch(/step\.dialog === "accept" \? d\.accept\(\) : d\.dismiss\(\)/);
+  });
+
+  it("finds a video's last frame by counting frames, never from the file's length", () => {
+    expect(lastFrameSeekSec(1800, 30)).toBeCloseTo(59.95, 6);        // the last frame starts at 59.9667 s: the seek is before it and after frame 1798
+    expect(lastFrameSeekSec(1800, 30)).toBeGreaterThan(1798 / 30);
+    expect(lastFrameSeekSec(1800, 30)).toBeLessThan(1799 / 30);
+    expect(lastFrameSeekSec(1, 30)).toBe(0);
+    expect(() => lastFrameSeekSec(0, 30)).toThrow();
+    expect(read("scripts/tutorials/check.ts")).not.toMatch(/seconds \* 1000 - 60\]/);
+  });
+});
+
+describe("under load", () => {
+  it("a refused screenshot is asked for again, and only gives up after several tries", async () => {
+    let calls = 0;
+    const page = { screenshot: async () => { if (++calls < 3) throw new Error("Page.captureScreenshot: Unable to capture screenshot"); return Buffer.alloc(0); }, waitForTimeout: async () => {} } as any;
+    await screenshot(page, "/dev/null");
+    expect(calls).toBe(3);
+    const dead = { screenshot: async () => { calls++; throw new Error("Unable to capture screenshot"); }, waitForTimeout: async () => {} } as any;
+    calls = 0;
+    await expect(screenshot(dead, "/dev/null", 4)).rejects.toThrow(/Unable to capture/);
+    expect(calls).toBe(4);
+  });
+
+  it("a click waits for what it asked the server for, instead of a fixed pause", async () => {
+    const handlers: Record<string, ((x: any) => void)[]> = {};
+    const page = { on: (e: string, f: (x: any) => void) => { (handlers[e] ??= []).push(f); }, mainFrame: () => "main" } as any;
+    const player = new Player(page, { width: 1024, height: 576 }, () => 0).watchNetwork();
+    const emit = (e: string, x: any) => handlers[e].forEach((f) => f(x));
+    const req = { resourceType: () => "fetch" }, image = { resourceType: () => "image" };
+    // Nothing in flight: back after the calm time, long before the limit.
+    let t = Date.now(); await player.quiet(120, 2000); expect(Date.now() - t).toBeLessThan(700);
+    // An image does not count; a fetch does, until it finishes.
+    emit("request", image); emit("request", req);
+    setTimeout(() => emit("requestfinished", req), 400);
+    t = Date.now(); await player.quiet(120, 3000);
+    expect(Date.now() - t).toBeGreaterThanOrEqual(480); expect(Date.now() - t).toBeLessThan(1500);
+    // A request that never ends (an event stream) cannot hold a recording for ever.
+    emit("request", { resourceType: () => "fetch" });
+    t = Date.now(); await player.quiet(120, 600); expect(Date.now() - t).toBeLessThan(1200);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src.match(/await this\.quiet\(\)/g)!.length).toBeGreaterThanOrEqual(2); // after a click and after a choice
+  });
+
+  it("produce.ts keeps the capture until mux and check have passed, tries those again, and can finish a kept capture", () => {
+    const src = read("scripts/tutorials/produce.ts");
+    expect(src.indexOf('twice("check"')).toBeGreaterThan(src.indexOf('twice("mux"'));
+    expect(src.indexOf('fs.rmSync(path.join(out, f)')).toBeGreaterThan(src.indexOf('twice("check"')); // deleted only after the check
+    expect(src.match(/fs\.rmSync\(path\.join\(out, f\)/g)).toHaveLength(1);
+    expect(src).toMatch(/args\.flags\["from-raw"\]/);
+    expect(src).toMatch(/--from-raw: .* is not there/);
   });
 });
 

@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-change-orders",
+  "durationSec": 60,
+  "video": {
+    "key": "tutorials/crm-change-orders.7c188f7b.mp4",
+    "bytes": 4965820,
+    "sha256": "7c188f7b3048fc0e70befacdbcb78ecfacacdddf26ad17dbb6be0b62252f7606"
+  },
+  "captions": {
+    "key": "tutorials/crm-change-orders.f855108e.vtt",
+    "bytes": 1299,
+    "sha256": "f855108e04c892c985e100e528be74dac11a1aad7fa92fe352fc1019e6ab81e5"
+  },
+  "poster": {
+    "key": "tutorials/crm-change-orders.36b5e9c5.jpg",
+    "bytes": 86968,
+    "sha256": "36b5e9c5bd8beeb7daaf0d482c9035953f36247e5ab77ec237c1c74173349a97"
+  },
+  "uploaded": {
+    "at": "2026-10-08T03:19:00.890Z",
+    "video": "4867666f58482749aaf5b6909d7e487a",
+    "captions": "7fcba297bebc591fe8f86fa6d3bd3e55",
+    "poster": "cb46591646ec4edda55586badc657dae"
+  }
+}

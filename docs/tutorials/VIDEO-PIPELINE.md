@@ -45,7 +45,8 @@ orange with the mascot.
 | Tutorial fixtures: stand-ins for Stripe, HOVER, Google Calendar, texting and the recipient's inbox, in a recording slot only (gate, registry, providers); the fixture rows; the demo files an `upload` step may use | `server/tutorials/fixtures/`, `scripts/tutorials/seed-fixtures.ts`, `scripts/tutorials/assets/` + `gen-assets.ts` — **`docs/tutorials/FIXTURES.md`** |
 | Intro card, end card and the YouTube thumbnail (our artwork, bundled Anton font) | `scripts/tutorials/brand.ts`, `thumbnail.ts`, `assets/` |
 | One manifest file per video + one file per new help entry, collected through generated indexes (`merge=union`) | `shared/help/videos/`, `shared/help/entries/<group>/`, `scripts/tutorials/gen-index.ts` |
-| YouTube metadata per video, and a dry-run uploader that has never been run against Google | `youtube.json` from `mux.ts`; `scripts/tutorials/youtube-upload.ts` |
+| YouTube metadata per video; the scheduler that posts three a day through YouTube's own scheduled publishing, with its ledger, order and calendar | `youtube.json` from `mux.ts`; `scripts/tutorials/youtube-schedule.ts`, `server/youtube/schedule.ts`, `docs/tutorials/youtube-{schedule,order}.json`, `youtube-calendar.md` — see "Publishing to YouTube" in `PRODUCER-GUIDE.md` |
+| Phone cuts of a master (9:16 ≤ 59 s and 4:5, action-follow crop, burned-in word captions, covers, per-platform post text), their hosting in R2 and the Blotato cross-poster with its allowlist, denylist and ledger | `scripts/tutorials/social.ts`, `social-lib.ts`, `social-brand.ts`, `social-text.ts`, `social-upload.ts`, `social-post.ts`, `social-post-lib.ts`, `docs/tutorials/social-schedule.json` — see "Social cuts" and "Posting to social" in `PRODUCER-GUIDE.md` |
 
 **Recording databases are schemas today.** The intended design is `CREATE DATABASE <name> TEMPLATE
 constructhub_tut_template`. The dev role (`constructhub_dev`) has no CREATEDB on vb11 and
@@ -360,8 +361,8 @@ permissions line, the "Connections" list heading and `tab-connection-work-queue`
 1. Produce the CRM plan (`CRM-VIDEO-PLAN.md`): four batches, one producer per slot.
 2. Grant the dev role CREATEDB (or pre-create the databases) so recording databases are real
    databases, as designed; then test `db.ts` in database mode.
-3. Owner inputs: YouTube OAuth credentials (the uploader is untested) and (only if wanted) Higgsfield.
-   No provider account is needed any more: the CRM's are fixtured (`FIXTURES.md`).
+3. Owner inputs: only (if wanted) Higgsfield. No provider account is needed any more: the CRM's are
+   fixtured (`FIXTURES.md`); YouTube is connected and the scheduler posts (see `PRODUCER-GUIDE.md`).
 4. Platform fixtures, one provider at a time from the Search Console skeleton: Search Console, Google
    Business Profile, Google Ads, Cloudflare, SEO data, Site Scan. And a signed-out second session, for
    the invited team member's side.

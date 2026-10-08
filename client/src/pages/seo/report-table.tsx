@@ -6,6 +6,7 @@
  * and only spends when the person presses Run.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { holdNote, isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ type Filters = {
   positionMin?: number; positionMax?: number; volumeMin?: number; volumeMax?: number; difficultyMin?: number; difficultyMax?: number;
   intent?: string; contains?: string; follow?: "followed" | "nofollow"; everyLink?: boolean;
 };
-type Page = { table: TableKey; target: string; rows: any[]; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+type Page = { table: TableKey; target: string; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const strip = (u: string | null | undefined) => (u ?? "").replace(/^https?:\/\/(www\.)?/, "");
@@ -130,7 +131,7 @@ const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
 
 function csvOf(cols: Col[], rows: any[]): string {
-  const esc = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const esc = (v: unknown) => { const raw = v == null ? "" : String(v); /* A cell from the open web must not run as a spreadsheet formula. */ const s = typeof v !== "number" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const used = cols.filter((c) => c.label);
   return [used.map((c) => esc(c.label)).join(","), ...rows.map((r) => used.map((c) => esc(c.csv(r))).join(","))].join("\n");
 }
@@ -158,7 +159,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
-    queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch { return null; } },
+    queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
     mutationFn: () => api("POST", "/api/seo/report", body),
@@ -190,6 +191,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
 
   return (
     <div data-testid={`report-${table}`}>
+      {saved.isError && <p className="g-text-2 mb-2 text-[13px]" role="alert" data-testid="report-saved-error">Couldn't check for a saved copy of this report: {apiErrorMessage(saved.error)} <button type="button" className="g-link" onClick={() => void saved.refetch()}>Try again</button></p>}
       <form className="mb-3 flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={(e) => { e.preventDefault(); apply(); }} data-testid="report-filters">
         {has("position") && <>{numField("positionMin", "Position from", "w-[60px]")}{numField("positionMax", "to", "w-[60px]")}</>}
         {has("volume") && numField("volumeMin", "Volume ≥")}
@@ -231,7 +233,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       {!saved.isLoading && !page && (
         <Empty testId="report-not-run">
           <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : "This report hasn't been run with these settings"}</h3>
-          <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.</p>
+          <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.{holdNote(status, "reportPage")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate()} data-testid="button-run-report">
               {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}
@@ -269,7 +271,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <button type="button" className="g-pill g-pill--sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-prev-page">← Previous</button>
-            <button type="button" className="g-pill g-pill--sm" disabled={page.rows.length < limit || (page.total != null && to >= page.total) || offset + limit > 9900} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
+            <button type="button" className="g-pill g-pill--sm" disabled={(page.sourceRows ?? page.rows.length) < limit || (page.total != null && to >= page.total) || offset + limit > 9900} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
             <span className="g-text-2">A page you haven't opened yet costs about {price}.</span>
           </div>
         </>

@@ -1,0 +1,137 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "jobcam",
+  "title": "JobCam",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "chapter": "The feed",
+      "narration": "JobCam keeps every job-site photo and video in one feed. Here is how to find a shot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-grid\"]",
+      "caption": "Recent",
+      "narration": "Recent shows every job's shots, newest first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-05\"]",
+      "caption": "Tag, eye, star",
+      "narration": "Each shot shows its tag. The eye means the client can see it. The star marks a favorite."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"jobcam-search\"]",
+      "value": "Issue",
+      "caption": "Search",
+      "chapter": "Search and tags",
+      "narration": "Search by project, address, tag or person. We'll type Issue."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-04\"]",
+      "caption": "One result",
+      "narration": "Only the shot tagged Issue is left."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-clear\"]",
+      "caption": "Clear",
+      "narration": "Clear brings everything back."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-tags\"]",
+      "caption": "Tags",
+      "narration": "Tags lists every tag, with how many shots carry it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-tags-option-demo-tag-2\"]",
+      "caption": "Progress",
+      "narration": "Tick Progress, and the feed keeps the three progress shots."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Close the list",
+      "narration": "Close the list when you are done."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-clear\"]",
+      "caption": "Clear",
+      "narration": "Then choose Clear again."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-starred\"]",
+      "caption": "Starred",
+      "chapter": "Starred, type and dates",
+      "narration": "Starred keeps only the starred shots."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-starred\"]",
+      "caption": "Starred off",
+      "narration": "Click it again to turn it off."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-filter-photos\"]",
+      "caption": "Photos, Videos",
+      "narration": "Photos and Videos show one kind at a time."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-filter-dates\"]",
+      "caption": "Dates",
+      "narration": "Dates adds a from and a to date, to narrow the feed to those days."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-storage-meter\"]",
+      "caption": "Storage",
+      "narration": "Storage shows how much space your shots use."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Menu: JobCam",
+      "narration": "You'll find JobCam in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to find job-site photos in the JobCam feed | ConstructHUB CRM",
+    "description": "A short walkthrough of the JobCam feed in the ConstructHUB CRM. You will search the feed, filter it by tag, keep only starred shots, and narrow it to a range of dates.",
+    "tags": [
+      "job site photos",
+      "construction photo app",
+      "jobsite photo documentation",
+      "contractor photos",
+      "JobCam",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Find any job photo",
+    "accent": "photo",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}

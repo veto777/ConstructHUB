@@ -275,7 +275,7 @@ export function AdvancedSection({ value, onChange, disabled }: SectionProps<Adva
         options={[{ value: "low", label: "Low — only the obvious pitches" }, { value: "normal", label: "Normal" }, { value: "high", label: "High — flags sooner" }]}
         hint="Two near-certain spam calls from one number block it before the next call is answered." />
       <StringListEditor id="vocabulary" label="Words the listener should know" values={value.vocabulary} onChange={(v) => set("vocabulary", v)} disabled={disabled} testid="list-vocabulary" max={60}
-        placeholder="James Hardie, Ferndale, Snohomish" hint="Brand names and local place names the speech recognizer might otherwise mishear." />
+        placeholder="A brand you install, a nearby town" hint="Brand names and local place names the speech recognizer might otherwise mishear." />
     </SectionCard>
   );
 }

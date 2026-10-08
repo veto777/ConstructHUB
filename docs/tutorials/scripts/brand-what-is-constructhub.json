@@ -1,0 +1,183 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "brand-what-is-constructhub",
+  "title": "What is ConstructHUB?",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "card",
+      "card": {
+        "kicker": "Sound familiar?",
+        "headline": "Five apps to run one job?",
+        "accent": "Five apps",
+        "mascot": true
+      },
+      "chapter": "The problem",
+      "caption": "The hook",
+      "narration": "Five apps to run one job? Stop."
+    },
+    {
+      "action": "goto",
+      "url": "/",
+      "caption": "The dashboard",
+      "narration": "Leads in one app. Estimates in another. Photos on a phone. Permits, who knows where."
+    },
+    {
+      "action": "card",
+      "card": {
+        "headline": "Two products. One company.",
+        "accent": "Two products",
+        "columns": [
+          {
+            "title": "Business tools",
+            "lines": [
+              "Permit office directory",
+              "County property records",
+              "Your Google listing & reviews"
+            ]
+          },
+          {
+            "title": "ConstructHUB CRM",
+            "us": true,
+            "lines": [
+              "Leads & pipeline",
+              "Estimates signed online",
+              "Schedule · invoices · JobCam"
+            ]
+          }
+        ],
+        "footnote": "Two separate products, each with its own plans. JobCam: top CRM plan, or an add-on — constructhub.us/pricing"
+      },
+      "caption": "Two products",
+      "narration": "ConstructHUB is two products. Business tools find the work. The CRM runs it."
+    },
+    {
+      "action": "goto",
+      "url": "/databases",
+      "chapter": "Business tools",
+      "caption": "Permit office directory",
+      "narration": "Can your CRM find the permit office? This can."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-database-search\"]",
+      "value": "Houston",
+      "caption": "Type a city",
+      "narration": "Type a city."
+    },
+    {
+      "action": "wait-for",
+      "text": "Showing 1",
+      "timeoutMs": 20000,
+      "caption": "The list",
+      "narration": "Houston, Texas."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "punch": 1.25,
+      "caption": "Verified portal",
+      "narration": "A checked link to the office's own portal. No guessed addresses."
+    },
+    {
+      "action": "goto",
+      "url": "/property",
+      "caption": "Property records",
+      "narration": "County property records? Same deal."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "chapter": "The CRM",
+      "caption": "The CRM",
+      "narration": "Now run the job. Every job is a card, from lead to paid."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "punch": 1.3,
+      "caption": "One job",
+      "narration": "One job. One card."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates/demo-estimate-e-1998",
+      "caption": "The estimate",
+      "narration": "Send the estimate."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Approved by Nora Hadley/",
+      "caption": "Signed online",
+      "narration": "Your client signs online."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/schedule",
+      "caption": "Schedule",
+      "narration": "Put it on the schedule."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "narration": "Shoot the job with JobCam."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/invoices",
+      "caption": "Invoices",
+      "narration": "Send the invoice. Get paid."
+    },
+    {
+      "action": "card",
+      "card": {
+        "headline": "Buy one. Or both.",
+        "accent": "Or both",
+        "kicker": "Each has its own plans",
+        "footnote": "constructhub.us/pricing"
+      },
+      "chapter": "How to start",
+      "caption": "Buy one or both",
+      "narration": "Buy one, or both. Each has its own plans."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "constructhub.us",
+        "headline": "Run the whole job.",
+        "accent": "whole job",
+        "footnote": "Business tools and the CRM are separate products, each with its own plans.",
+        "mascot": true
+      },
+      "caption": "Run the whole job",
+      "narration": "ConstructHUB. Run the whole job."
+    }
+  ],
+  "youtube": {
+    "title": "What is ConstructHUB? Find the permit office. Run the whole job.",
+    "description": "ConstructHUB is two products for contractors: Business tools - a permit office directory, county property records and tools for your Google listing - and a CRM that runs the job from lead to paid. Buy one or both.",
+    "tags": [
+      "what is constructhub",
+      "contractor software",
+      "contractor CRM",
+      "permit office lookup",
+      "building permit lookup",
+      "software for contractors",
+      "ConstructHUB"
+    ],
+    "playlist": "Start here: what ConstructHUB is",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Five apps? Stop.",
+    "accent": "Stop.",
+    "kicker": "Start here",
+    "step": 0
+  }
+}

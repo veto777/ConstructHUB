@@ -865,9 +865,12 @@ const entries: Draft[] = [
  * Entries added after this file was written live ONE PER FILE under ./entries/<group>/<key>.ts and are
  * collected through the generated ./entries/index.ts — so several people can add help entries (one
  * per walkthrough video, say) without ever editing the same file. They follow the entries above, in
- * key order.
+ * key order (the "Start here" films first, in their own order).
  */
-const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => a.key.localeCompare(b.key));
+/** The overview films play in this order, not in key order: what it is, then a tour of each app, then why. */
+const START_HERE_ORDER = ["brand-what-is-constructhub", "brand-tour-crm", "brand-tour-business-tools", "brand-why-constructhub", "brand-vs-housecall-pro", "brand-vs-jobber", "brand-vs-leap"];
+const lead = (key: string) => { const i = START_HERE_ORDER.indexOf(key); return i === -1 ? START_HERE_ORDER.length : i; };
+const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => lead(a.key) - lead(b.key) || a.key.localeCompare(b.key));
 
 /** Every entry. `video` is the recorded walkthrough of its manifest file (./videos/<key>.json), else null. */
 export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map((e) => ({ ...e, video: helpVideoFor(e.key) }));
@@ -876,7 +879,7 @@ const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
 export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key);
 
 /** The features (one Tutorials card each), in sidebar order within their group. */
-export const HELP_FEATURES: readonly HelpEntry[] = HELP_ENTRIES.filter((e) => !e.parent);
+export const HELP_FEATURES: readonly HelpEntry[] = HELP_ENTRIES.filter((e) => !e.parent && !e.unlisted);
 /** A feature's sections, in page order. */
 export const helpSections = (featureKey: string): HelpEntry[] => HELP_ENTRIES.filter((e) => e.parent === featureKey);
 /** Features of one group. */
@@ -885,6 +888,8 @@ export const helpFeaturesIn = (group: HelpGroup): HelpEntry[] => HELP_FEATURES.f
 export const helpSummary = (e: HelpEntry): string => /^.*?[.!?](?=\s|$)/.exec(e.whatItIs)?.[0] ?? e.whatItIs;
 /** A section's short name ("Cloudflare → Sites" → "Sites"). */
 export const helpShortTitle = (e: HelpEntry): string => e.title.split(" → ").pop()!;
+/** Keys whose video waits for the owner's approval before it is posted anywhere (`youtube.hold` on the entry). */
+export const heldHelpKeys = (): string[] => HELP_ENTRIES.filter((e) => e.youtube?.hold === true).map((e) => e.key);
 /** CRM routes live on the CRM (portal) host. */
 export const isCrmRoute = (route: string): boolean => route === "/crm" || route.startsWith("/crm/");
 /** Does a help entry match a search? Every word must appear somewhere in its text (or its sections'). */

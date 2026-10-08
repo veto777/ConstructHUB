@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-project-costing",
+  "durationSec": 76,
+  "video": {
+    "key": "tutorials/crm-project-costing.e320403b.mp4",
+    "bytes": 5939157,
+    "sha256": "e320403b1390893608bfa08b58dcb3771262b67eaf81368d9d938bd33a89c9d1"
+  },
+  "captions": {
+    "key": "tutorials/crm-project-costing.0d70f109.vtt",
+    "bytes": 1426,
+    "sha256": "0d70f1090a7e66c6e00af1e9f761ee48a3b8976db5f7d6483bcebb8402ba9487"
+  },
+  "poster": {
+    "key": "tutorials/crm-project-costing.35f748d7.jpg",
+    "bytes": 84743,
+    "sha256": "35f748d7c97bb82e80f3ea7373eed45e67595ebbaec56028dadea37052231668"
+  },
+  "uploaded": {
+    "at": "2026-10-08T02:46:49.798Z",
+    "video": "0bd651dd354213ea32102e3bbac70415",
+    "captions": "e4745c391d0019e7d9596f567b197a90",
+    "poster": "5840da4d93e35e9bf55e986b77d024d6"
+  }
+}
