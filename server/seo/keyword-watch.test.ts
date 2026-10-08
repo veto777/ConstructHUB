@@ -8,6 +8,11 @@ const row = (keyword: unknown, rank: number, etv: number | null = 12.34) => ({ k
 describe("keyword watch", () => {
   it("reads a row; asks for the site's highest-traffic keywords in its country; a keyword is kept once", async () => {
     expect(parseSnapshotKeyword(row("Roof Repair ", 4))).toEqual({ keyword: "roof repair", position: 4, volume: 500, traffic: 12.34, path: "/roofing", url: null });
+    // The source's figure is kept as it is; a full address up to 2,048 characters is kept; one that cannot be used is said.
+    expect(parseSnapshotKeyword({ ...row("a", 1, 0.00016) }).traffic).toBe(0.00016);
+    const long = `https://store.example.com/${"p".repeat(900)}`;
+    expect(parseSnapshotKeyword({ keyword_data: { keyword: "a" }, ranked_serp_element: { serp_item: { rank_group: 1, url: long, relative_url: "/x" } } })!.url).toBe(long);
+    expect(parseSnapshotKeyword({ keyword_data: { keyword: "a" }, ranked_serp_element: { serp_item: { rank_group: 1, url: "ftp://x/y", relative_url: "/y" } } })).toMatchObject({ url: null, urlRejected: true });
     expect(parseSnapshotKeyword(row("", 4))).toBeNull();
     expect(parseSnapshotKeyword(row("x", 4, null))?.traffic).toBeNull();
     const real = keywordWatchDeps.request;
@@ -93,5 +98,16 @@ describe("keyword watch", () => {
     expect(pagesChanged(Array.from({ length: 300 }, (_, i) => kw(`k${i}`, { path: "/p", traffic: 0.04 })), [], "h")[0].after.visits).toBe(12);
     // The reasons reconcile with the counts on every page.
     for (const x of p4) expect(x.after.keywords).toBe(x.before.keywords + x.added - x.gone + x.movedIn - x.movedOut + x.pageNewlyGiven - x.pageNoLongerGiven);
+  });
+  it("an address cut short by an older snapshot is flagged however it was written; an unusable full address never takes the site's host", () => {
+    const kw = (keyword: string, o: Partial<SnapshotKeyword>): SnapshotKeyword => ({ keyword, position: 5, volume: 100, traffic: 10, path: null, ...o });
+    const abs = "https://alpine.example/" + "a".repeat(300 - "https://alpine.example/".length);
+    expect(pagesChanged([kw("a", { path: abs })], [], "alpine.example")[0].cut).toBe(true);
+    const p = pagesChanged([kw("b", { path: "/shop", urlRejected: true })], [], "alpine.example")[0];
+    expect([p.path, p.url]).toEqual(["/shop", null]);
+    // Parsed and added up: 300 tiny estimates come to their real total.
+    const rows = Array.from({ length: 300 }, (_, i) => parseSnapshotKeyword({ keyword_data: { keyword: `k${i}` }, ranked_serp_element: { serp_item: { rank_group: 9, etv: 0.00016, relative_url: "/p" } } })!);
+    expect(pagesChanged(rows, [], "h")[0].after.visits).toBe(0);   // 0.048, shown to one decimal
+    expect(rows.reduce((a, r) => a + (r.traffic ?? 0), 0)).toBeCloseTo(0.048, 6);
   });
 });

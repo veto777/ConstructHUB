@@ -155,6 +155,9 @@ export const SEO_SCHEMA_DDL = [
   // The name on the Google Business Profile (map-pack entries often carry no website), and alert settings.
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS business_name text`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alerts_enabled boolean NOT NULL DEFAULT true`,
+  // Unlinked mentions (server/seo/mentions.ts): the name searched last and the places a mention is read for.
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_name text`,
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_places text[]`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alert_drop integer NOT NULL DEFAULT 3`,
   // What changed between checks (server/seo/alerts.ts). `source` is what raised it (a rank run id, a snapshot date).
   `CREATE TABLE IF NOT EXISTS seo_alerts (

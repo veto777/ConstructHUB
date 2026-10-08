@@ -31,6 +31,8 @@ export const MIN_PHRASE = 6;
  * this is a frequency guess, and the view says so.
  */
 export const BOILERPLATE_SHARE = 0.5, BOILERPLATE_MIN_PAGES = 5;
+/** Crawls saved before the redirect-alias cap was raised and marked kept at most this many per page. */
+const LEGACY_ALIAS_CAP = 20;
 export type OppPage = { url: string; status: number; noindex: boolean; title: string | null; text: string; links: string[]; /** Addresses that redirected to this page in the crawl. */ redirects?: string[]; /** More redirected here than were kept. */ redirectsCut?: boolean; canonical?: string | null };
 export type OppTarget = {
   keywordId: number; keyword: string; volume: number | null; position: number | null; /** The site's page that ranks, in the keyword's newest check. */ url: string | null;
@@ -64,7 +66,7 @@ function contextOf(text: string, keyword: string): string {
   return `${a > 0 ? "…" : ""}${text.slice(a, b).replace(/\s+/g, " ").trim()}${b < text.length ? "…" : ""}`;
 }
 /** Identity of a suggested link: the two pages' identities (after aliases), hashed. */
-const pairOf = (fromKey: string, toKey: string) => createHash("sha256").update(`${fromKey}\u0000${toKey}`).digest("hex").slice(0, 24);
+export const pairOf = (fromKey: string, toKey: string) => createHash("sha256").update(`${fromKey}\u0000${toKey}`).digest("hex").slice(0, 24);
 export const pairKey = (from: string, to: string) => pairOf(sameUrlKey(from), sameUrlKey(to));
 
 
@@ -72,7 +74,7 @@ export const pairKey = (from: string, to: string) => pairOf(sameUrlKey(from), sa
  * Which crawled page an address stands for, by what the crawl saw: the page itself, an address that redirected to it,
  * or a page whose canonical names it. Anything else is itself.
  */
-function aliasesOf(pages: readonly OppPage[]): (u: string) => string {
+export function aliasesOf(pages: readonly Pick<OppPage, "url" | "redirects" | "canonical">[]): (u: string) => string {
   const to = new Map<string, string>();
   for (const p of pages) {
     const k = sameUrlKey(p.url);
@@ -106,12 +108,16 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   const crawled = new Set(pages.filter((p) => sameUrlKey(p.url) === resolve(p.url)).map((p) => sameUrlKey(p.url)));
   const byKey = new Map<string, OppPage>();
   for (const p of usable) { const k = resolve(p.url); if (sameUrlKey(p.url) === k && !byKey.has(k)) byKey.set(k, p); }
+  // Identities whose aliases may not all be known: a page — or a copy of it, anywhere along its chain — that had more
+  // addresses redirect to it than the crawl keeps (marked), or a list as long as an older crawl's cap (20), which may
+  // have been cut without being marked.
+  const aliasesIncomplete = new Set(pages.filter((p) => p.redirectsCut || (Array.isArray(p.redirects) && p.redirects.length >= LEGACY_ALIAS_CAP)).map((p) => resolve(p.url)));
   let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0, aliasesCut = 0;
   const known: (OppTarget & { url: string })[] = [];
   for (const t of targets) {
     if (!t.url || t.position === null) notRanking++;
     else if (!byKey.has(resolve(t.url))) { if (crawled.has(resolve(t.url))) notUsable++; else notCrawled++; }
-    else if (byKey.get(resolve(t.url))!.redirectsCut) aliasesCut++;
+    else if (aliasesIncomplete.has(resolve(t.url))) aliasesCut++;
     else if (flat(t.keyword).trim().length < MIN_PHRASE) tooShort++;
     else known.push(t as OppTarget & { url: string });
   }
@@ -187,19 +193,6 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
         AND c.checked_on = (SELECT max(c2.checked_on) FROM seo_rank_checks c2 WHERE c2.keyword_id=c.keyword_id AND c2.site_id=$1)
       ORDER BY c.keyword_id, (c.position IS NULL OR c.url IS NULL), c.position ASC, c.device`, [site.id, userId]);
   const checkedOn = targets.map((t: any) => String(t.checkedOn)).sort().pop() ?? null;
-  // Links planned before tasks were identified by their pair of pages ("link-opp:…") take the identity the suggestions
-  // use now — both addresses through this crawl's aliases — so a link planned from a copy of a page is the same link.
-  const { rows: legacy } = await pool.query("SELECT id, target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND source LIKE 'link-opp:%' AND target IS NOT NULL", [site.id, userId]);
-  if (legacy.length) {
-    const { rows: [j] } = await pool.query(`SELECT ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, userId]);
-    const resolve = aliasesOf((j?.pages ?? []) as OppPage[]);
-    for (const t of legacy) {
-      if (typeof t.link_to !== "string" || !t.link_to) continue;
-      // Left as it is when a task with the new identity is already there (the plan keeps one task per link).
-      await pool.query("UPDATE seo_tasks SET source=$1 WHERE id=$2 AND source LIKE 'link-opp:%' AND NOT EXISTS (SELECT 1 FROM seo_tasks WHERE site_id=$3 AND source=$1)",
-        [`link-pair:${pairOf(resolve(t.target), resolve(t.link_to))}`, t.id, site.id]).catch((e) => console.error(`[seo] link task ${t.id} kept its old identity: ${e?.message ?? e}`));
-    }
-  }
   const cacheKey = `${userId}:${newest.id}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
   const kept = worked.get(cacheKey);
   if (kept) return kept;
@@ -209,4 +202,23 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
   worked.set(cacheKey, result);
   if (worked.size > 20) worked.delete(worked.keys().next().value as string);
   return result;
+}
+
+/** The crawl's addresses only (no text): enough to know which addresses stand for the same page. */
+const ALIAS_PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object('url', p->>'url',
+    'canonical', CASE WHEN jsonb_typeof(p->'canonical')='string' THEN p->>'canonical' END, 'redirects', ${strings("redirects", 100)}))
+  FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
+ WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;
+/**
+ * Which addresses stand for the same page, by the site's newest finished crawl (`db` lets a caller read it inside its own
+ * transaction). With no crawl, an address is only itself (spelling aside).
+ */
+export async function linkResolverFor(userId: number, domain: string, db: { query: typeof pool.query } = pool): Promise<(u: string) => string> {
+  // Looked up without any chance of an error (the caller may be inside a transaction, which an error would end): no
+  // crawl table at all is simply no crawl.
+  const { rows: [t] } = await db.query("SELECT to_regclass('sitescan_jobs') IS NOT NULL AS ok");
+  if (!t?.ok) return aliasesOf([]);
+  const { rows: [job] } = await db.query(
+    `SELECT ${ALIAS_PAGES_SQL} AS pages FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [userId, auditDomainKey(domain)]);
+  return aliasesOf((job?.pages ?? []) as OppPage[]);
 }

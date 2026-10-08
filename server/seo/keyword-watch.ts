@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
-import { request, assertOk, taskItems, safeHttpUrl, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
 import { createHash } from "node:crypto";
 import { withBudget, SeoBudgetError } from "./budget";
 import { estimateLabsUsd } from "./pricing";
@@ -40,7 +40,13 @@ export type SnapshotKeyword = {
   keyword: string; position: number | null; volume: number | null; /** Estimated visits a month, at the source's precision (older snapshots: to 0.1). */ traffic: number | null;
   /** The ranking page's path as the source gave it (older snapshots kept only its first 300 characters). */ path: string | null;
   /** The ranking page's full address, when the source gave one (snapshots from 2026-10-08 on). */ url?: string | null;
+  /** The source gave a full address that could not be used (not http(s), unreadable, over 2,048 characters): the host is not known. */ urlRejected?: boolean;
 };
+/** A full address as kept in a snapshot: http(s), readable, up to 2,048 characters — longer than links shown elsewhere. */
+function snapshotUrl(v: unknown): string | null {
+  if (typeof v !== "string" || !v || v.length > 2048) return null;
+  try { const u = new URL(v); return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null; } catch { return null; }
+}
 export type KeywordSnapshot = {
   id: number; takenOn: string; locationCode: number; languageCode: string;
   /** How many keywords the source has for the site in all; null = it did not say. */ total: number | null;
@@ -62,7 +68,9 @@ export function parseSnapshotKeyword(item: any): SnapshotKeyword | null {
   const etv = num(serp.etv);
   // Kept whole: the address is the page's identity (a long one cut short could merge two pages).
   const path = typeof serp.relative_url === "string" && serp.relative_url.trim() && serp.relative_url.length <= 2048 ? serp.relative_url : null;
-  return { keyword, position: num(serp.rank_group) ?? num(serp.rank_absolute), volume: num(kd?.keyword_info?.search_volume), traffic: etv === null ? null : Math.round(etv * 1e4) / 1e4, path, url: safeHttpUrl(serp.url) };
+  const url = snapshotUrl(serp.url);
+  // The source's own figure, unrounded: it is rounded once, after adding up.
+  return { keyword, position: num(serp.rank_group) ?? num(serp.rank_absolute), volume: num(kd?.keyword_info?.search_volume), traffic: etv, path, url, ...(serp.url != null && !url ? { urlRejected: true } : {}) };
 }
 export async function fetchKeywordSnapshot(input: { domain: string; locationCode: number; languageCode: string }): Promise<{ data: { total: number | null; fetched: number; keywords: SnapshotKeyword[] }; costUsd: number }> {
   const task: DfsTask = assertOk(await keywordWatchDeps.request("POST", "/dataforseo_labs/google/ranked_keywords/live", [{
@@ -114,13 +122,18 @@ export const pageKey = (path: string | null): string | null => {
 const bareHost = (h: string) => h.toLowerCase().replace(/^www\./, "");
 /** Host and path of a keyword's page: from its full address when given, else from the path (which may itself be one). */
 function pageOf(k: SnapshotKeyword, siteHost: string): { key: string; host: string; path: string; cut: boolean } | null {
+  // Older snapshots kept only the first 300 characters of the path (full address or not): such an address may be
+  // incomplete — decided before anything is read from it.
+  const cut = !k.url && String(k.path ?? "").length === 300;
   for (const full of [k.url, /^https?:\/\//i.test(String(k.path ?? "")) ? k.path : null]) {
     if (!full) continue;
-    try { const u = new URL(full); const path = pageKey(u.pathname + u.search)!; const host = bareHost(u.hostname); return { key: `${host}${path}`, host, path, cut: false }; } catch { /* not an address */ }
+    try { const u = new URL(full); const path = pageKey(u.pathname + u.search)!; const host = bareHost(u.hostname); return { key: `${host}${path}`, host, path, cut }; } catch { /* not an address */ }
   }
   const path = pageKey(k.path);
   if (path === null) return null;
-  return { key: `${siteHost}${path}`, host: siteHost, path, cut: !k.url && String(k.path).length === 300 };
+  // A full address was given but could not be used: the host is not known, so the path is never put on the site's host.
+  if (k.urlRejected) return { key: `?${path}`, host: "", path, cut };
+  return { key: `${siteHost}${path}`, host: siteHost, path, cut };
 }
 /** Pure: keywords grouped by page in two snapshots of the same market. `siteHost` is the site's own host (for paths). */
 export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], siteHost = ""): PageChange[] {

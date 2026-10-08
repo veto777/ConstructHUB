@@ -241,6 +241,9 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "POST /api/seo/keywords/bulk": [{ url: "/api/seo/keywords/bulk", body: { keywords: ["roof repair", "metal roof cost"] } }],
   "POST /api/seo/content/metrics": [{ url: "/api/seo/content/metrics", body: { urls: ["https://example.org/guide"] } }],
   "POST /api/seo/directories": [{ url: "/api/seo/directories", body: { domain: "example.com", competitors: ["rival.com"] } }],
+  "GET /api/seo/sites/:id/mentions": [{ url: "/api/seo/sites/1/mentions" }],
+  "POST /api/seo/sites/:id/mentions": [{ url: "/api/seo/sites/1/mentions", body: { name: "Acme Roofing", refresh: true } }, { url: "/api/seo/sites/1/mentions", body: { name: "Acme Roofing", retryMissing: true } }],
+  "POST /api/seo/sites/:id/mentions/places": [{ url: "/api/seo/sites/1/mentions/places", body: { places: ["Tampa"] } }],
   "GET /api/seo/sites/:id/planner": [{ url: "/api/seo/sites/1/planner" }],
   "POST /api/seo/sites/:id/planner": [{ url: "/api/seo/sites/1/planner", body: { services: ["roof repair"], towns: ["tampa"] } }],
   "GET /api/seo/sites/:id/tasks": [{ url: "/api/seo/sites/1/tasks" }],
@@ -323,7 +326,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(81);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(84);
   });
 
   for (const mode of Object.keys(PROVIDER)) {
