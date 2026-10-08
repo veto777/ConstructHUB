@@ -30,7 +30,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { sendWithFallback } from "../email";
-import { clientPortalBaseUrl } from "../site-context";
+import { clientPortalBaseUrl, portalBaseUrl } from "../site-context";
 import { financingLinksOf, getPrimaryFinancing } from "./financing";
 import { logEvent } from "./entities";
 import { themePayload } from "@shared/theme-colors";
@@ -87,7 +87,10 @@ function setSessionCookie(res: any, token: string, maxAgeMs: number) {
   const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAgeMs / 1000)}${secure}`,
+    // Encoded (parseCookies decodes): a preview grant carries the customer id
+    // verbatim, and an id is not guaranteed to be cookie-safe. Hex session
+    // tokens are unchanged by this.
+    `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(maxAgeMs / 1000)}${secure}`,
   );
 }
 
@@ -114,7 +117,13 @@ export function mintPortalPreviewGrant(customerId: string): string {
 export function verifyPortalPreviewGrant(grant: string): string | null {
   const secret = previewSecret();
   if (!secret) return null;
-  const m = /^([0-9a-fA-F-]{36})\.(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
+  // `<customerId>.<exp>.<sig>`, split from the RIGHT. The id is whatever the
+  // row's primary key is — it used to be matched as a 36-char UUID, so a
+  // grant minted for any other id (crm_customers.id is a free varchar; the
+  // demo workspace's are "demo-client-…") was minted fine and then rejected
+  // here, dropping the contractor on the client sign-in screen. The HMAC
+  // below is what binds the id; its format is not a security property.
+  const m = /^([\s\S]{1,128})\.(\d{10,16})\.([0-9a-f]{32})$/.exec(grant);
   if (!m) return null;
   const [, customerId, expS, sig] = m;
   const exp = Number(expS);
@@ -366,11 +375,22 @@ export function registerCrmClientAuthRoutes(app: Express): void {
   // the contractor can open the portal exactly as their client sees it. The
   // grant becomes a `prev.` cookie: 15-minute, read-only, never tracked.
   app.get("/api/client/auth/preview", async (req: any, res) => {
-    const devOnly = req.query?.client === "1" ? "?client=1" : "";
+    const dev = req.query?.client === "1";
     const customerId = verifyPortalPreviewGrant(String(req.query?.grant || ""));
-    if (!customerId) return res.redirect(302, `/${devOnly}`);
+    // A grant that does not verify (expired after 15 minutes, re-opened from
+    // history, minted by another deployment) must SAY so: a bare redirect to
+    // "/" left the contractor on the client sign-in screen with no reason.
+    // The portal page renders ?preview=expired as an error with a way back.
+    if (!customerId) return res.redirect(302, `/?preview=expired${dev ? "&client=1" : ""}`);
     setSessionCookie(res, `${PREVIEW_COOKIE_PREFIX}${String(req.query.grant)}`, PORTAL_PREVIEW_TTL_MS);
-    res.redirect(302, `/${devOnly}`);
+    res.redirect(302, `/${dev ? "?client=1" : ""}`);
+  });
+
+  // Where "Back to the CRM" points from the preview error state. Public and
+  // static (the CRM origin for this domain) — never taken from the query, so
+  // a crafted preview link cannot plant a destination.
+  app.get("/api/client/auth/preview-return", (req: any, res) => {
+    res.json({ crmUrl: `${portalBaseUrl(req)}/crm/clients` });
   });
 
   // ── Sign out ──────────────────────────────────────────────────────────────
@@ -492,6 +512,11 @@ export function registerCrmClientAuthRoutes(app: Express): void {
       // Read-only contractor preview ("see what the client sees") — the
       // portal shows a banner and every write refuses.
       contractorPreview: client.contractorPreview === true || undefined,
+      // The way back from a preview — the CRM page it was opened from. The id
+      // is the grant's own (HMAC-verified), never a request parameter.
+      previewReturnUrl: client.contractorPreview === true
+        ? `${portalBaseUrl(req)}/crm/clients/${encodeURIComponent(client.customerIds[0])}`
+        : undefined,
       financing,
       customer: primary
         ? { displayName: primary.displayName, email: primary.email }

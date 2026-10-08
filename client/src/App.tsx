@@ -553,7 +553,9 @@ function PortalPublicRouter() {
  */
 function ClientRouter() {
   return (
-    <Suspense fallback={null}>
+    // Never a blank page while the portal's chunk loads (a null fallback is
+    // what a slow first load of "See what the client sees" looked like).
+    <Suspense fallback={<div className="flex justify-center p-20" data-testid="client-portal-loading"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
     <Switch>
       <Route path="/" component={ClientPortalPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
