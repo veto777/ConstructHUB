@@ -28,6 +28,7 @@ import fs from "fs";
 import archiver from "archiver";
 import { z } from "zod";
 import { registerTutorialMediaRoutes } from "./tutorials/media";
+import { registerTutorialFixtures } from "./tutorials/fixtures";
 import { processPhoto, generateFileName, analyzePhoto } from "./photo-processor";
 import { registerStripeRoutes } from "./stripe";
 import { registerTrackingRoutes } from "./tracking-script";
@@ -6159,6 +6160,9 @@ function main() {
 
   // Walkthrough videos (help registry): public, immutable, Range-aware — see server/tutorials/media.ts.
   registerTutorialMediaRoutes(app);
+  // Tutorial fixtures: stand-ins for outside providers, in a recording slot and NOWHERE else — a no-op
+  // unless server/tutorials/fixtures/gate.ts says so (never under NODE_ENV=production).
+  registerTutorialFixtures(app);
 
   app.get("/api/files/:folder/:subfolder/:filename", async (req, res) => {
     try {

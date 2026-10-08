@@ -1,0 +1,152 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-upload",
+  "title": "Add photos to JobCam",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "chapter": "Open the camera",
+      "narration": "Add photos you already have to a job, then show them to your client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-open-camera\"]",
+      "caption": "Open camera",
+      "narration": "On JobCam, choose Open camera."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"jobcam-project-search\"]",
+      "value": "Ellison",
+      "caption": "Which job?",
+      "narration": "First, the job the photos belong to. Search for it."
+    },
+    {
+      "action": "click",
+      "selector": "article[data-testid^=\"jobcam-project-\"]:has-text(\"Ellison\") button",
+      "caption": "Choose the job",
+      "narration": "And choose it."
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid=\"jobcam-last-shot\"]",
+      "files": [
+        "photos/site-06.jpg",
+        "photos/site-01.jpg",
+        "photos/site-07.jpg"
+      ],
+      "caption": "Add photos from your library",
+      "chapter": "Add your photos",
+      "narration": "This button adds photos from your computer or camera roll."
+    },
+    {
+      "action": "wait-for",
+      "text": "processing",
+      "state": "hidden",
+      "timeoutMs": 45000,
+      "caption": "Uploading in the background",
+      "narration": "They upload in the background, so you can keep working."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-last-shot\"]",
+      "caption": "Open the job's photos",
+      "narration": "Choose the last photo to open the job."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-grid\"]",
+      "caption": "Filed to the job",
+      "chapter": "Show them to your client",
+      "narration": "Here they are, filed to the job. So far, only your team can see them."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-select-toggle\"]",
+      "caption": "Select",
+      "narration": "To share some with your client, choose Select."
+    },
+    {
+      "action": "click",
+      "selector": "button[data-testid^=\"jobcam-tile-\"] >> nth=0",
+      "caption": "Tick a photo",
+      "narration": "Tick the photos they should see."
+    },
+    {
+      "action": "click",
+      "selector": "button[data-testid^=\"jobcam-tile-\"] >> nth=1",
+      "caption": "And another",
+      "narration": "This one too."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-bulk-client-show\"]",
+      "caption": "Show to client",
+      "narration": "Then choose Show to client."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "greta.ellison@example.com"
+      },
+      "caption": "The client's portal",
+      "chapter": "What your client sees",
+      "narration": "Now your client. They sign in to their portal with a link sent to their email."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-photos\"]",
+      "caption": "Photos",
+      "narration": "They choose Photos."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-timeline\"]",
+      "caption": "The shared photos",
+      "narration": "And there are the two photos you shared. The third one stays with your team."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Back to the CRM",
+      "narration": "Back in your CRM, you can hide a photo again the same way."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Where to find it",
+      "narration": "JobCam is in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to add job photos and share them with a client | ConstructHUB CRM",
+    "description": "Add photos from your computer or camera roll to a job in ConstructHUB JobCam, choose which ones your client may see, and look at them in the client portal. Recorded in a demo workspace; the pictures are drawings made for the demo.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "JobCam",
+      "job site photos",
+      "client portal",
+      "share photos with clients",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Share job photos",
+    "accent": "photos",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

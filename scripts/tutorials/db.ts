@@ -5,8 +5,12 @@
  *   tsx scripts/tutorials/db.ts fresh <name>     drop + copy of constructhub_tut_template
  *   tsx scripts/tutorials/db.ts drop  <name>
  *   tsx scripts/tutorials/db.ts template [--rebuild]   build the template (schema, demo owner, demo seed)
- *   tsx scripts/tutorials/db.ts reseed           apply scripts/tutorials/seed-demo.ts to the EXISTING template —
- *                                                safe while producers are recording (see TEMPLATE_LOCK)
+ *   tsx scripts/tutorials/db.ts reseed [--fixtures]   apply scripts/tutorials/seed-demo.ts (and, with --fixtures,
+ *                                                seed-fixtures.ts) to the EXISTING template — safe while producers
+ *                                                are recording (see TEMPLATE_LOCK). It prints the workspace's row
+ *                                                counts before and after and refuses a template with ids the app
+ *                                                would reject. `--without-lock`: only past a dead producer's lock
+ *   tsx scripts/tutorials/db.ts census <name>    row counts of the demo workspace, and ids the app would refuse (must be 0)
  *   tsx scripts/tutorials/db.ts list | mode
  *
  * SAFETY (not configurable):
@@ -31,6 +35,7 @@ import fs from "fs";
 import path from "path";
 import pg from "pg";
 import { ROOT, WORK_DIR, parseArgs, readEnvFile, run, withLock } from "./lib";
+import { UUID_ID_TABLES } from "./demo-ids";
 
 export const TUT_NAME = /^constructhub_tut_[a-z0-9_]+$/;
 export const TEMPLATE = "constructhub_tut_template";
@@ -164,12 +169,18 @@ async function copyTemplate(name: string): Promise<void> {
   restore.stderr.on("data", (d) => { restoreErr += d; });
   dump.stdout.setEncoding("utf8");
   restore.stdin.on("error", () => { /* psql stopped early; its exit code says why */ });
+  // psql can stop before the dump ends (an error in the copy). Nothing will then drain its input, so a
+  // paused dump would never be read to its end, never close, and this copy would wait for ever —
+  // holding the template lock shared and blocking every reseed (seen 2026-10-08). Let the dump run out.
+  let restoreGone = false;
+  restore.on("close", () => { restoreGone = true; dump.stdout.resume(); dump.kill(); });
   dump.stdout.on("data", (chunk: string) => {
+    if (restoreGone) return;
     // This box's pg_dump can emit a setting the running server predates; it is harmless to leave out.
     const out = rename.push(chunk).replace(/^SET transaction_timeout.*\n/m, "");
     if (out && !restore.stdin.write(out)) { dump.stdout.pause(); restore.stdin.once("drain", () => dump.stdout.resume()); }
   });
-  const dumped = new Promise<number>((r) => dump.on("close", (c) => { restore.stdin.end(rename.end()); r(c ?? 1); }));
+  const dumped = new Promise<number>((r) => dump.on("close", (c) => { if (!restoreGone) restore.stdin.end(rename.end()); r(c ?? 1); }));
   const restored = new Promise<number>((r) => restore.on("close", (c) => r(c ?? 1)));
   const [a, b] = await Promise.all([dumped, restored]);
   if (a !== 0 || b !== 0) { await drop(name).catch(() => {}); throw new Error(`copying the template failed (pg_dump ${a}, psql ${b})\n${(dumpErr + restoreErr).slice(-1500)}`); }
@@ -183,16 +194,60 @@ export async function seedDemo(name: string): Promise<string> {
 }
 
 /**
+ * The tutorial fixture rows (a connected payment account, online payments in every state, the
+ * calendar / texting / HOVER connection settings) — after seedDemo, one transaction, idempotent.
+ * seed-fixtures.ts itself refuses without TUTORIAL_FIXTURES=1 and outside a recording database.
+ */
+export async function seedFixtures(name: string): Promise<string> {
+  return (await run(path.join(ROOT, "node_modules/.bin/tsx"), [path.join(ROOT, "scripts/tutorials/seed-fixtures.ts")], { env: { ...process.env, TUTORIAL_FIXTURES: "1", DATABASE_URL: await databaseUrl(name) }, cwd: ROOT })).stdout.trim();
+}
+
+/**
+ * What a recording database holds, for the before / after of a seed change: rows per demo table of
+ * the demo workspace, and `nonUuidIds` — rows of the tables whose ids the app shape-checks
+ * (demo-ids.ts UUID_ID_TABLES) that are not uuids. That one must be 0.
+ */
+export async function census(name: string): Promise<Record<string, number>> {
+  const [database, schema] = await locate(name);
+  const uuid = "'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'";
+  const of = (t: string, extra = "") => `(select count(*) from ${t} where org_id = o.id${extra})::int`;
+  const [row] = await query(database, schema, `select ${of("crm_customers")} as clients, ${of("crm_projects")} as projects, ${of("crm_estimates")} as estimates,
+      ${of("crm_estimate_items")} as "estimateLines", ${of("crm_invoices")} as invoices, ${of("crm_invoice_items")} as "invoiceLines", ${of("crm_payments")} as payments,
+      ${of("crm_appointments")} as appointments, ${of("crm_client_comments")} as messages, (select count(distinct customer_id) from crm_client_comments where org_id = o.id)::int as threads,
+      ${of("crm_members")} as members, ${of("jobcam_media")} as photos,
+      ${UUID_ID_TABLES.map((t) => of(t, ` and id !~* ${uuid}`)).join(" + ")} as "nonUuidIds"
+    from crm_orgs o where o.name = 'Aspire Interiors' order by o.created_at limit 1`);
+  if (!row) throw new Error(`${name} has no Aspire Interiors workspace`);
+  return row;
+}
+const censusLine = (c: Record<string, number>) => Object.entries(c).map(([k, v]) => `${k} ${v}`).join(" · ");
+
+/**
  * Apply the demo seed to the template that exists: new demo rows reach every copy made from now on,
  * also copies made by a working copy whose own seed-demo.ts is older. One transaction (seed-demo.ts).
  */
-export async function reseedTemplate(): Promise<string> {
+export async function reseedTemplate(opts: { fixtures?: boolean; withoutLock?: boolean } = {}): Promise<string> {
   if (!(await exists(TEMPLATE))) throw new Error(`${TEMPLATE} does not exist — run: npx tsx scripts/tutorials/db.ts template`);
-  return withLock(TEMPLATE_LOCK, async () => {
-    const out = await seedDemo(TEMPLATE);
+  // `--without-lock` is for ONE case: a producer that died or hung while copying still holds the lock
+  // shared (`ps -ef | grep template.lock` shows it) and a reseed would wait for ever. The lock is a
+  // courtesy (TEMPLATE_LOCK); what protects a copy is that each seed is one transaction and a copy
+  // reads one snapshot — true with or without it. Never two reseeds at once: that IS what the lock is for.
+  const locked = <T>(fn: () => Promise<T>): Promise<T> => opts.withoutLock ? fn() : withLock(TEMPLATE_LOCK, fn);
+  return locked(async () => {
+    // Before and after are read under the exclusive lock: nothing else that has this code is writing.
+    const before = await census(TEMPLATE);
+    let out = await seedDemo(TEMPLATE);
+    // `--fixtures`: also the fixture rows, each seed its own single transaction of rows only, under
+    // this one exclusive lock. Every copy made afterwards carries them — also the copies of working
+    // copies WITHOUT the fixture code, whose Payments page then lists the five online payments
+    // (their pages still say "not configured"). produce.ts applies them per slot anyway, so the
+    // template only needs them once every producer has this code.
+    if (opts.fixtures) out += `\n${await seedFixtures(TEMPLATE)}`;
     const [database, schema] = await locate(TEMPLATE);
     await query(database, schema, "analyze");
-    return out;
+    const after = await census(TEMPLATE);
+    if (after.nonUuidIds) throw new Error(`the template has ${after.nonUuidIds} client / project row(s) whose id is not a uuid — their pages say "not found" (scripts/tutorials/demo-ids.ts)`);
+    return `before: ${censusLine(before)}\nafter:  ${censusLine(after)}\n${out}`;
   });
 }
 
@@ -249,6 +304,7 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
   });
   await step("scripts/seed-crm-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/seed-crm-demo.ts")], { env, cwd: ROOT }));
   await step("scripts/tutorials/seed-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/tutorials/seed-demo.ts")], { env, cwd: ROOT }));
+  await step("scripts/tutorials/seed-fixtures.ts", () => seedFixtures(TEMPLATE));
   // A second boot settles whatever the app creates lazily or re-checks after its first run (seed_state,
   // the appraiser and portal passes), so the copies start in seconds instead of redoing it.
   for (const n of ["second", "third"])
@@ -258,13 +314,14 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["rebuild"]);
+  const args = parseArgs(process.argv.slice(2), ["rebuild", "fixtures", "without-lock"]);
   const [cmd, name] = args._;
   if (cmd === "mode") { console.log(await dbMode()); return; }
   if (cmd === "list") { console.log((await list()).join("\n")); return; }
   if (cmd === "template") { await buildTemplate(!!args.flags.rebuild); return; }
-  if (cmd === "reseed") { console.log(await reseedTemplate()); console.log(`${TEMPLATE} reseeded at ${new Date().toISOString()}`); return; }
-  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | reseed | list | mode");
+  if (cmd === "census" && name) { console.log(censusLine(await census(assertName(name)))); return; }
+  if (cmd === "reseed") { console.log(await reseedTemplate({ fixtures: !!args.flags.fixtures, withoutLock: !!args.flags["without-lock"] })); console.log(`${TEMPLATE} reseeded at ${new Date().toISOString()}`); return; }
+  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | reseed [--fixtures] [--without-lock] | census <name> | list | mode");
   assertName(name);
   if (cmd === "drop" && name === TEMPLATE && !args.flags.rebuild) throw new Error("dropping the template takes --rebuild on `template`, not `drop`");
   const t = Date.now();

@@ -41,10 +41,16 @@ import {
   type ICalEvent,
 } from "./ical";
 
+import { providerFixture, type GoogleCalendarFixture } from "../tutorials/fixtures";
+
 type GetUser = (req: any, res: any) => any;
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+// Tutorial recording slots only (null everywhere else — server/tutorials/fixtures/gate.ts): an
+// in-memory stand-in calendar answers the Google calls, so the sync below runs for real.
+const gcalFx = providerFixture<GoogleCalendarFixture>("google-calendar");
+const googleFetch: typeof fetch = gcalFx ? gcalFx.fetch : (input, init) => fetch(input, init);
+const GOOGLE_CLIENT_ID = gcalFx?.clientId ?? process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = gcalFx?.clientSecret ?? process.env.GOOGLE_CLIENT_SECRET;
 // calendar.app.created: create our own secondary calendar and manage events on it — and nothing
 // else. (calendar.events cannot create calendars: Google answers "insufficient authentication scopes".)
 const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created";
@@ -178,7 +184,7 @@ async function saveMemberConnection(orgId: string, memberId: string, gc: GoogleC
 }
 
 async function googleTokenRequest(params: Record<string, string>): Promise<any> {
-  const r = await fetch("https://oauth2.googleapis.com/token", {
+  const r = await googleFetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(params).toString(),
@@ -209,7 +215,7 @@ async function googleAccessToken(gc: GoogleConnection): Promise<{ token: string;
 }
 
 async function googleApi(token: string, path: string, init: RequestInit = {}): Promise<any> {
-  const r = await fetch(`https://www.googleapis.com/calendar/v3${path}`, {
+  const r = await googleFetch(`https://www.googleapis.com/calendar/v3${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${token}`,
@@ -605,7 +611,7 @@ export function registerCrmCalendarRoutes(app: Express, getDevUser: GetUser): vo
     // Best-effort revoke at Google; the local connection is dropped regardless
     // so the UI never shows a connection the contractor thinks they removed.
     if (gc.refreshToken) {
-      await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(gc.refreshToken)}`, {
+      await googleFetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(gc.refreshToken)}`, {
         method: "POST",
       }).catch((e: any) => console.error("[crm] google revoke:", e?.message || e));
     }

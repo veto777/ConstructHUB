@@ -64,12 +64,21 @@ import { allow as rateAllow } from "./client-auth";
 import { storeGeneratedPdf, storeGeneratedFile } from "./attachments";
 import { oauthBaseUrl } from "../site-context";
 import { recordFailure } from "../ops/issues";
+import { providerFixture, type HoverFixture } from "../tutorials/fixtures";
 
 type GetUser = (req: any, res: any) => any;
 
 // ── Endpoint configuration ──────────────────────────────────────────────────
 
+// Tutorial recording slots only (null everywhere else — server/tutorials/fixtures/gate.ts): a
+// stand-in HOVER API on this machine, so the token refresh, sync and ingest below run for real.
+const hoverFx = () => providerFixture<HoverFixture>("hover");
+const hoverClientId = () => hoverFx()?.clientId ?? process.env.HOVER_CLIENT_ID;
+const hoverClientSecret = () => hoverFx()?.clientSecret ?? process.env.HOVER_CLIENT_SECRET;
+
 function hoverBases(): { oauthBase: string; apiBase: string } {
+  const fx = hoverFx();
+  if (fx) return { oauthBase: fx.oauthBase, apiBase: fx.apiBase };
   let oauthBase = (process.env.HOVER_OAUTH_BASE || "https://hover.to").replace(/\/+$/, "");
   let apiBase = (process.env.HOVER_API_BASE || "https://hover.to/api").replace(/\/+$/, "");
   if (process.env.NODE_ENV !== "production") {
@@ -87,7 +96,7 @@ function hoverBases(): { oauthBase: string; apiBase: string } {
 }
 
 const hoverConfigured = () =>
-  Boolean(process.env.HOVER_CLIENT_ID && process.env.HOVER_CLIENT_SECRET);
+  Boolean(hoverClientId() && hoverClientSecret());
 
 // ── Secret box (AES-256-GCM, keyed off SESSION_SECRET) ──────────────────────
 
@@ -258,8 +267,8 @@ export async function getHoverAccessToken(orgId: string, fetchFn: FetchFn = fetc
     body: JSON.stringify({
       grant_type: "refresh_token",
       refresh_token: refresh,
-      client_id: process.env.HOVER_CLIENT_ID,
-      client_secret: process.env.HOVER_CLIENT_SECRET,
+      client_id: hoverClientId(),
+      client_secret: hoverClientSecret(),
     }),
   });
   if (!res.ok) {
@@ -1317,7 +1326,7 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
     }
     const { oauthBase } = hoverBases();
     const u = new URL(`${oauthBase}/oauth/authorize`);
-    u.searchParams.set("client_id", process.env.HOVER_CLIENT_ID!);
+    u.searchParams.set("client_id", hoverClientId()!);
     u.searchParams.set("redirect_uri", callbackUrl(req));
     u.searchParams.set("response_type", "code");
     u.searchParams.set("state", mintHoverState(ctx.org.id));
@@ -1343,8 +1352,8 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
       body: JSON.stringify({
         grant_type: "authorization_code",
         code,
-        client_id: process.env.HOVER_CLIENT_ID,
-        client_secret: process.env.HOVER_CLIENT_SECRET,
+        client_id: hoverClientId(),
+        client_secret: hoverClientSecret(),
         redirect_uri: callbackUrl(req),
       }),
     }).catch(() => null);

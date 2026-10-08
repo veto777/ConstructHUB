@@ -46,9 +46,15 @@ import { pushSoon } from "../apns";
 import { getCrmEntitlements } from "./entitlements";
 import { CRM_PLANS, CRM_PLAN_KEYS, type CrmPlanLimits } from "@shared/crm-plans";
 
+import { providerFixture, type SmsFixture } from "../tutorials/fixtures";
+
 type GetUser = (req: any, res: any) => any;
 
 // ── Configuration ───────────────────────────────────────────────────────────
+
+// Tutorial recording slots only (null everywhere else — server/tutorials/fixtures/gate.ts): a
+// stand-in carrier that writes each text to the slot's outbox file instead of sending it.
+const smsFx = () => providerFixture<SmsFixture>("sms");
 
 export const SIGNALWIRE_ENV_VARS = [
   "SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER",
@@ -56,6 +62,7 @@ export const SIGNALWIRE_ENV_VARS = [
 
 /** Names of the env vars that still need to be set (empty = fully configured). */
 export function smsMissingEnv(): string[] {
+  if (smsFx()) return [];
   return SIGNALWIRE_ENV_VARS.filter((k) => !process.env[k]);
 }
 
@@ -266,6 +273,8 @@ export type SmsSender = {
 /** The platform sender from env, or null when the platform isn't configured. */
 function platformSender(): Omit<SmsSender, "mode"> | null {
   if (!smsConfigured()) return null;
+  const fx = smsFx();
+  if (fx) return { ...fx.platform };
   return {
     space: process.env.SIGNALWIRE_SPACE_URL!.replace(/^https?:\/\//, "").replace(/\/$/, ""),
     project: process.env.SIGNALWIRE_PROJECT_ID!,
@@ -373,7 +382,7 @@ function logProviderSend(to: string, body: string): SmsResult {
 async function signalwireSend(to: string, body: string, sender: SmsSender): Promise<SmsResult> {
   const { space, project, token, from } = sender;
   try {
-    const resp = await fetch(
+    const resp = await (smsFx()?.fetch ?? fetch)(
       `https://${space}/api/laml/2010-04-01/Accounts/${encodeURIComponent(project)}/Messages.json`,
       {
         method: "POST",

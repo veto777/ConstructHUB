@@ -36,6 +36,7 @@ import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
 import { uploadToR2, getR2Url } from "../r2";
+import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
 
 type GetUser = (req: any, res: any) => any;
 
@@ -53,13 +54,16 @@ async function hasOpenSession(where: any): Promise<boolean> {
   return rows.length > 0;
 }
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
+// Tutorial recording slots only (null everywhere else — server/tutorials/fixtures/gate.ts): the
+// real SDK answered on this machine by a stand-in, so the pages below run as they do once connected.
+const stripeFx = providerFixture<StripeFixture>("stripe");
+const STRIPE_KEY = stripeFx?.secretKey ?? process.env.STRIPE_SECRET_KEY;
 // Connect OAuth needs the platform's client id from the Stripe dashboard
 // (Settings → Connect → Onboarding options). Without it we report "not
 // configured" rather than rendering a broken Connect button.
-const CONNECT_CLIENT_ID = process.env.STRIPE_CONNECT_CLIENT_ID;
+const CONNECT_CLIENT_ID = stripeFx?.connectClientId ?? process.env.STRIPE_CONNECT_CLIENT_ID;
 
-const stripe = STRIPE_KEY ? new Stripe(STRIPE_KEY) : null;
+const stripe = stripeFx ? stripeFx.client : STRIPE_KEY ? new Stripe(STRIPE_KEY) : null;
 
 export function stripeConnectConfigured(): boolean {
   return Boolean(stripe && CONNECT_CLIENT_ID);

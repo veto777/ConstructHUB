@@ -1,6 +1,6 @@
 # Producing a walkthrough video — the recipe
 
-One person (or agent), one video at a time, one **slot**. Four slots (1–4) can work at once. Read
+One person (or agent), one video at a time, one **slot**. Eight slots (1–8) can work at once. Read
 `CLAUDE.md` first; the pipeline's internals are in `VIDEO-PIPELINE.md`; the list of CRM videos and who
 takes which is `CRM-VIDEO-PLAN.md`.
 
@@ -18,7 +18,7 @@ takes which is `CRM-VIDEO-PLAN.md`.
 
 ```bash
 K=crm-pipeline          # the helpKey: its row in CRM-VIDEO-PLAN.md
-N=2                     # your slot, 1–4 (ports 8181–8184); one producer per slot
+N=2                     # your slot, 1–8 (ports 8181–8188); one producer per slot
 ```
 
 1. **Help entry.** If `K` is not already a key in `shared/help/registry.ts`, write
@@ -108,11 +108,58 @@ The client list shows the newest first and mixes the states: Vince Castellano, C
 Lan Nguyen, Rosa & Stefan Ferrante, Tom & Priya Bauer, Imani Brewster, Greta Ellison, Tunde Oyelaran,
 The Mercer Group, Rafael Quintanilla, Luis Orozco, Hannah Lindqvist, Dana Whitfield, Halvorsen-Quist
 Properties, Joe & Mary Kane, Wrenhaven Dental Studio. The New York and Texas documents carry numbers
-below the Florida ones, so the next document made on camera is still E-2003, INV-2003 or P-2009. Their
-ids start `demo-` (`demo-client-hadley`, `demo-project-p-1997`, `demo-estimate-e-1998`,
-`demo-invoice-inv-2000`, `demo-appt-13`…`16`, `demo-msg-07`…`11`, `demo-pay-05`…`07`) and are fixed.
+below the Florida ones, so the next document made on camera is still E-2003, INV-2003 or P-2009.
 With sixteen clients a short search can match more than one of them — type enough letters, and
 look at the frame.
+
+**The jobs, by state** — every one has a working project page (`/crm/projects/<id>`), a JobCam page
+and a card on the pipeline. Use the name or the number in narration and in `:has-text("…")`.
+
+| State | Number | Project name (exact) | Client | Stage | City |
+| --- | --- | --- | --- | --- | --- |
+| FL | P-2001 | Kane — whole-house hardwood | Joe & Mary Kane | In Progress | Sarasota |
+| FL | P-2002 | Whitfield — kitchen backsplash + floors | Dana Whitfield | Lead | Osprey |
+| FL | P-2003 | Orozco — LVP downstairs | Luis Orozco | Estimating | Bradenton |
+| FL | P-2004 | Mercer — lobby refresh | The Mercer Group | Proposal Sent | Sarasota |
+| FL | P-2005 | Ellison — master suite floors | Greta Ellison | Scheduled | Venice |
+| FL | P-2006 | Bauer — cabinet refinishing | Tom & Priya Bauer | Waiting on Trades | Sarasota |
+| FL | P-2007 | Nguyen — rental turnover LVP | Lan Nguyen | Punch List | Bradenton |
+| FL | P-2008 | Castellano — guest bath tile | Vince Castellano | Paid | Venice |
+| NY | P-1993 | Ferrante — parlor floor white oak | Rosa & Stefan Ferrante | Lead | Brooklyn |
+| NY | P-1994 | Oyelaran — galley kitchen floor and tile | Tunde Oyelaran | Approved | Albany |
+| NY | P-1995 | Lindqvist — baseboards and stair trim | Hannah Lindqvist | Invoiced | Buffalo |
+| NY | P-1996 | Wrenhaven — reception flooring | Wrenhaven Dental Studio | Estimating | White Plains |
+| TX | P-1997 | Hadley — bungalow LVP | Caleb & Nora Hadley | Scheduled | Austin |
+| TX | P-1998 | Brewster — subway tile backsplash | Imani Brewster | Estimating | Dallas |
+| TX | P-1999 | Quintanilla — kitchen cabinet respray | Rafael Quintanilla | Complete | Houston |
+| TX | P-2000 | Halvorsen-Quist — duplex flooring, both units | Halvorsen-Quist Properties | Proposal Sent | San Antonio |
+
+**Ids — find rows by name, not by id.** The ids of the Florida clients, jobs and documents are made
+by the database and differ in every template build. The New York and Texas rows have fixed ids:
+
+- **Clients and projects: uuids** (since the reseed of 2026-10-08 02:58 UTC / 2026-10-07 22:58 Eastern).
+  They used to be `demo-client-hadley` / `demo-project-p-1997`, and the app refused those: the
+  project page said "Project not found" and "See what the client sees" opened a signed-out portal.
+  A selector that still names one (`card-project-demo-project-p-1994`, `project-demo-project-p-1998`,
+  `pick-client-demo-client-ferrante`, `client-demo-client-…`, `thread-demo-client-…`) no longer
+  matches — select by text (`[data-testid^="card-project-"]:has-text("P-1994")`) or use the id below.
+
+  | Client | id | Project | id |
+  | --- | --- | --- | --- |
+  | Rosa & Stefan Ferrante | `e3d0aeaa-fa3e-5c70-847c-c758e5d4cf13` | P-1993 | `3f0147f4-5e28-5a22-8909-78d326b3a525` |
+  | Tunde Oyelaran | `3d523658-5af0-5414-a9fc-23d1bd383a4e` | P-1994 | `e809dd9f-f4f3-5a0f-b8e7-b5bfda4c464a` |
+  | Hannah Lindqvist | `c81a2dac-e323-5227-a95f-31409db3fc00` | P-1995 | `a8f16f80-e572-5aa3-8b17-685c69a55304` |
+  | Wrenhaven Dental Studio | `51c23c0b-f6a4-5421-8722-3ded98941a9e` | P-1996 | `8e76e74e-9392-58fc-ae7f-6100a679dc3b` |
+  | Caleb & Nora Hadley | `b5ac6e7a-ce39-50b1-a39e-5b326d166d80` | P-1997 | `51f02ef8-0dfa-50a4-8247-eb2012cb5482` |
+  | Imani Brewster | `8b05f9de-dd79-5719-bbc6-622c2d75e07c` | P-1998 | `a8b8ca24-bbe4-5d0a-9771-c35aad18e517` |
+  | Rafael Quintanilla | `106e2cea-befe-51ee-b75a-64890a2e5648` | P-1999 | `60e6b77c-b3f2-5866-850a-608ad8271f61` |
+  | Halvorsen-Quist Properties | `922d4e0c-ba4f-5af1-882a-e3446b1f3772` | P-2000 | `00f12701-566f-50c4-acab-6b00c417dc58` |
+
+- **Everything else keeps its readable id**, unchanged: `demo-estimate-e-1997`…`e-2000`,
+  `demo-invoice-inv-1999`, `demo-invoice-inv-2000`, `demo-appt-01`…`16`, `demo-msg-01`…`11`,
+  `demo-pay-01`…`07`, `demo-member-priya`, `demo-member-owen`, `demo-tag-1`…`4`, `demo-photo-01`…`06`.
+  No page checks the shape of those (the page walk below opens every one), and scripts already
+  select them (`invoice-demo-invoice-inv-2000`, `appointment-demo-appt-04`).
 
 **Sales tax — what is true on screen (operated 2026-10-07, the same for FL, NY and TX).** The app does
 not know a state's tax rate. A new estimate takes its rate from the job's *city* in a division's
@@ -129,12 +176,34 @@ has none of the three set. So:
   each document, like the "Tax %" field of the estimate editor does. You may say an estimate "shows
   its tax above the total"; do not say the app worked the rate out from the state.
 
-**Changing the demo data.** Add rows to `scripts/tutorials/seed-demo.ts` (fixed `demo-` ids,
+**Changing the demo data.** Add rows to `scripts/tutorials/seed-demo.ts` (fixed ids,
 insert-if-absent, dates relative to now) — never rename, reorder or delete one, scripts find rows by
-name. Then `npx tsx scripts/tutorials/db.ts reseed`: it applies the seed to the template in one
-transaction, so producers can keep recording — a copy made at that moment holds the old data or the
-new, never half. (`db.ts template --rebuild` drops the template and needs every producer stopped.)
-A reseed changes counts and totals on Home, Pipeline and the lists: check your frames after one.
+name. **A new client or project gets a uuid from `scripts/tutorials/demo-ids.ts`** (`demoClientId`,
+`demoProjectId` — add its key to the list there), never a readable `demo-…` id: the app refuses those
+(the file says where). Other tables may keep readable ids. Then, in this order:
+
+```bash
+npx vitest run server/tutorials                      # demo-ids.test.ts: every such id is a uuid the app accepts
+npx tsx scripts/tutorials/app.ts up 8 --no-warm      # a free slot: a copy of the template + YOUR seeds
+npx tsx scripts/tutorials/check-demo.ts 8            # opens every demo client, job, estimate, invoice, payment,
+                                                     # visit and message thread; exit 1 on "not found", an error or a 4xx/5xx
+npx tsx scripts/tutorials/db.ts reseed               # only now: the template, one transaction
+npx tsx scripts/tutorials/app.ts down 8 && npx tsx scripts/tutorials/app.ts up 8 --no-warm
+npx tsx scripts/tutorials/check-demo.ts 8            # the same walk on a fresh copy of the new template
+npx tsx scripts/tutorials/app.ts down 8
+```
+
+**`check-demo.ts <slot>` is the thing to run after any seed change** — about three minutes, read-only,
+some 85 pages. It reads the entities from the slot's database, so a row you add is walked without
+touching the script. `db.ts reseed` applies the seed to the template in one transaction, so producers
+can keep recording — a copy made at that moment holds the old data or the new, never half; it prints
+the workspace's row counts before and after (`db.ts census <name>` prints them for any slot) and
+refuses to finish if a client or project id is not a uuid. Never pass `--fixtures` to a reseed while a
+producer is on older code (its pages would show accounts as connected that it cannot serve);
+`produce.ts` adds the fixture rows to each slot. If a reseed waits for ever, a dead producer is holding
+the template lock (`ps -ef | grep template.lock`): once you are sure it is dead, `reseed --without-lock`
+— still one transaction. (`db.ts template --rebuild` drops the template and needs every producer
+stopped.) A reseed changes counts and totals on Home, Pipeline and the lists: check your frames after one.
 
 ## House style
 
@@ -155,15 +224,21 @@ screen shows it ("Choose Send estimate", "Tick who is going"). Phrase clicks as 
 tick / type / open* — never "simply", "just", "easily". Open by saying what the viewer will do; end
 on where the feature is in the menu. No "welcome", no sign-off, no music.
 
+**The demo is a demo.** Narration must never claim the demo company or its numbers are real customers
+or real results — no "our customer", no "contractors see", no "this company made". Say what the screen
+does.
+
 **Forbidden.** Real customer or company names; emails that are not `@example.com`; phones outside
 `555-01xx`; any price or plan price; claims about features that are not built or not configured in
-the slot (a page that says "not configured" is not recorded — see BLOCKED in the plan); how the video
+the slot (a page that says "not configured" is not recorded — see BLOCKED in the plan); a provider's
+own screen imitated (the checkout stand-in is said to be a stand-in); how the video
 was made (tools, voices, vendors); anything typed that looks like a secret (use `{{PLACEHOLDER}}` +
 `"redact": true`).
 
 **Pointing.** `highlight` for "look here", `hover` for links, `click`, `type` (replaces the field;
 date and time fields take `2026-10-09` / `13:30`), `select` (native and custom lists, by visible
-name), `back`, `goto`, `wait`. The ring is the brand orange everywhere. Use `{{DATE}}`, `{{DATE+1}}`
+name), `back`, `goto`, `wait` — and `upload`, `drag`, `session`, `fixture`, `wait-for` (next section).
+The ring is the brand orange everywhere. Use `{{DATE}}`, `{{DATE+1}}`
 for dates — the demo data moves with the calendar, so never name a weekday or a date in narration.
 
 **Selectors.** Prefer `[data-testid="…"]` (the dry run lists them). A row by its text:
@@ -180,6 +255,55 @@ selectors (`text=Outstanding balance`) only where there is no test id.
 - `thumbnail.headline`: 2–5 punchy words, true to the video; `accent`: the one word on the orange
   pill; `step`: a `highlight`/`type`/`hover` step whose ring marks the key element (a `click` loses
   its ring).
+
+## Uploads, drags, a second person, connected accounts
+
+A slot runs with the **tutorial fixtures** (`FIXTURES.md`): the demo company's Stripe account, HOVER,
+Google Calendar and texting number read as connected, with stand-ins answering on this machine. Nothing
+to set up — `produce.ts` and `app.ts up` do it (`--no-fixtures` for the workspace without them).
+
+| Step | Fields | What happens on camera |
+| --- | --- | --- |
+| `upload` | `selector`, `files` | The pointer clicks the button or drop area and the files are chosen (the system file dialog is never shown). `files` are demo files under `scripts/tutorials/assets/` only: `photos/site-01.jpg` … `site-08.jpg` (drawn job-site scenes), `clip-floor-walkthrough.mp4`, `logo-aspire-interiors.png`, `care-guide.pdf`, `clients-import.csv`. A hidden `input[type=file]` can be the target too (no pointer). The dry run lists every file input (`⬆`). |
+| `drag` | `selector`, `to` | Press, carry (the card is drawn following the pointer), drop. Works on the pipeline board. The dry run marks what can be dragged (`⇄`). |
+| `session` | `session`, and `url` or `fixture` + `input` | The camera switches to another person's browser: `"owner"`, `"client"` (the homeowner, own cookies), `"member:Marco Delgado"` (really signed in as that team member — not relabelled). The previous picture is held until the new page has drawn. |
+| `fixture` | `fixture`, `input`, `open` | Calls a fixture helper (`FIXTURES.md` lists them). `"open": true` opens the address it answers with — the link in an email, the checkout link — in the current session. |
+| `wait-for` | `selector` and/or `text`, `state`, `timeoutMs` | Waits until it is on screen (or `"state": "hidden"`: gone). Use it for uploads and anything that finishes on its own time. It still needs a narration line. |
+
+Patterns that work (see `crm-payment-link.json`, `crm-jobcam-upload.json`):
+
+- **The homeowner, already signed in** — `{ "action": "session", "session": "client", "fixture": "email.signIn", "input": { "to": "greta.ellison@example.com" } }`
+  opens their portal; add `"invoice": "INV-1999"` (or `"estimate"`) to land on that document instead.
+- **The link in an email you just sent** — `{ "action": "session", "session": "client", "fixture": "email.link", "input": { "to": "…@example.com" } }`.
+- **A payment** — create the link in the CRM, then in the client's session
+  `{ "action": "fixture", "fixture": "stripe.checkout", "open": true }`, choose a method, click
+  `button-checkout-pay`. Say that the checkout page is a stand-in.
+- **Later** — `{ "action": "fixture", "fixture": "stripe.settle" }` (a bank payment clears),
+  `email.opened` (the client opened the estimate ninety minutes ago).
+
+Rules: a session switch is a cut, so say whose screen it is ("Now your client."). Connecting an account
+is the provider's own screen and is never filmed or imitated — start from the connected state. Give a
+`session` step back to `"owner"` a `holdMs` of a second so the page is seen before the next line.
+
+## After merging `video-fixtures`
+
+Your working copy keeps recording as it is until you merge; the template it copies is already the
+new one. Merge `video-fixtures` into your branch when your current video is done, then:
+
+- **New recorder actions** — `upload`, `drag`, `session`, `fixture`, `wait-for` (the table above;
+  `FIXTURES.md` lists the fixture helpers).
+- **Eight slots** — `--slot 1`…`8` (ports 8181–8188). Keep to the slot you were given.
+- **Fixtures are on by default** in `produce.ts` and `app.ts up`: Stripe, HOVER, Google Calendar and
+  texting read as connected, and five online payments are on the Payments page. Counts on Payments and
+  on some client pages differ from what you recorded before — look at your frames. `--no-fixtures`
+  records the workspace as it was.
+- **Rows that are now recordable** — `CRM-VIDEO-PLAN.md`, "Unblocked on 2026-10-08": payments and
+  payment links, the client's view of estimates and invoices, HOVER, Google Calendar, texting,
+  uploads (photos, CSV import, attachments, logo), the pipeline drag, a team member's own view — and
+  every row filmed on a New York or Texas project page.
+- **Old ids in your scripts** — `grep -l 'demo-\(client\|project\)-' docs/tutorials/scripts/*.json`
+  and replace each with the uuid from "Demo data" (or a `:has-text` selector) before you re-record.
+- **After any change of yours to the seeds** — `check-demo.ts <slot>` ("Demo data").
 
 ## Publishing to YouTube
 
@@ -322,6 +446,21 @@ The in-app poster stays a plain frame of the video (`poster.jpg`) — the thumbn
   with `search_path` (see `db.ts`). The app works in it; code that hard-codes `public.` (account
   erase/delete, the public API's key tables) would read the dev tables — none of that is in a CRM
   flow, but do not record those pages until the role has CREATEDB.
-- **Stripe and HOVER are not configured in a slot** — on purpose (no outside keys). Their pages say
-  so on screen; those videos are BLOCKED in the plan.
+- **Stripe, HOVER, Google Calendar and texting read as connected in a slot** — through the tutorial
+  fixtures, with no outside key (`FIXTURES.md`). `--no-fixtures` gives the old "not configured" pages.
+- **Do not run anything heavy while a recording is being filmed** (tests, a build, another slot's
+  boot): the page slows down, dialogs open late and a short step can end before its ring is seen. The
+  recorder now holds every step at least 0.7 s after its action, but a quiet machine is the real fix.
+- **A click that landed where the target used to be** (a bar slid in, a late scroll): the recorder looks
+  again after the pointer has travelled and follows the target.
+- **"Project not found" on a New York or Texas job** was a seed defect (readable ids like
+  `demo-project-p-1997`; `GET /api/crm/projects/:id` only accepts a uuid), fixed in the template on
+  2026-10-08 02:58 UTC: those clients and jobs now have uuids ("Demo data" lists them) and all
+  sixteen project pages can be filmed. A script written before that which names an old id in a
+  selector stops at that step with "no element" — replace the selector, the rest is unchanged.
+  `check-demo.ts` and `server/tutorials/demo-ids.test.ts` keep it from coming back.
+- **A copy of the template that never finishes** ("fresh database" for more than a few minutes, no
+  `pg_dump` in `ps`): psql had stopped on an error and the copy waited for ever, holding the template
+  lock. Fixed in `db.ts` on `video-fixtures` (the copy now fails with psql's message); on older code,
+  kill that `produce.ts` and start it again.
 - **Two producers copying the template at once** take about twice as long for that step; nothing breaks.

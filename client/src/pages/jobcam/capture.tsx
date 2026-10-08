@@ -214,13 +214,15 @@ function CaptureCamera() {
   // ── Picked files (native camera or the library) ───────────────────────────
   const onFiles = async (files: FileList | null, kindHint?: "photo" | "video") => {
     if (!files?.length) return;
-    for (const f of Array.from(files)) {
+    // A FileList is live: the input is cleared after this call starts, so its length reads 0 by the time the toast is made.
+    const picked = Array.from(files);
+    for (const f of picked) {
       const kind = f.type.startsWith("video/") ? "video" : f.type.startsWith("image/") ? "photo" : kindHint ?? "photo";
       let durationS: number | null = null;
       if (kind === "video") durationS = await probeDuration(f);
       await add(f, { fileName: f.name || `JobCam.${kind === "video" ? "mp4" : "jpg"}`, mime: f.type || (kind === "video" ? "video/mp4" : "image/jpeg"), kind, durationS, capturedAt: f.lastModified ? new Date(f.lastModified).toISOString() : null });
     }
-    toast({ title: files.length === 1 ? "Added to the upload queue" : `${files.length} added to the upload queue` });
+    toast({ title: picked.length === 1 ? "Added to the upload queue" : `${picked.length} added to the upload queue` });
   };
 
   const back = () => navigate(project ? `/crm/projects/${project.id}/jobcam` : "/crm/jobcam");
@@ -341,7 +343,7 @@ function CaptureCamera() {
 
       {/* Project picker */}
       <Sheet open={pickerOpen} onOpenChange={setPickerOpen}>
-        <SheetContent side="bottom" className="g-surface max-h-[85dvh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="jobcam-project-picker">
+        <SheetContent side="bottom" className="g-surface z-[70] max-h-[85dvh] overflow-y-auto rounded-t-2xl px-4 pb-[calc(1.25rem+env(safe-area-inset-bottom))]" data-testid="jobcam-project-picker">
           <SheetHeader className="text-left"><SheetTitle>Which job?</SheetTitle></SheetHeader>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -1,0 +1,163 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-payment-link",
+  "title": "Send a payment link",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/payments",
+      "caption": "The Payments page",
+      "chapter": "Your payment account",
+      "narration": "Send your client a link, and get paid online. It starts on the Payments page."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Your payment account\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "The connected account",
+      "narration": "Your own Stripe account is connected here, with bank payments and cards switched on."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-take-client-search\"]",
+      "value": "Hannah",
+      "caption": "Search for the client",
+      "chapter": "Create the link",
+      "narration": "Under Take a payment, search for your client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"take-client-\"]:has-text(\"Hannah Lindqvist\")",
+      "caption": "Choose the client",
+      "narration": "Choose her from the list."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-open-take-payment\"]",
+      "caption": "Take a payment",
+      "narration": "Then choose Take a payment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-take-invoice\"]",
+      "caption": "The invoice",
+      "narration": "Her open invoice is already picked."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-create-checkout-link\"]",
+      "caption": "Create payment link",
+      "narration": "Choose Create payment link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-checkout-link\"]",
+      "caption": "The link",
+      "narration": "A secure link appears. Copy it, then text or email it to your client.",
+      "holdMs": 400
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "hannah.lindqvist@example.com",
+        "invoice": "INV-1999"
+      },
+      "caption": "The client's invoice",
+      "chapter": "What your client sees",
+      "narration": "Now the other side. This is that invoice, as your client sees it."
+    },
+    {
+      "action": "fixture",
+      "fixture": "stripe.checkout",
+      "open": true,
+      "caption": "The client opens the link",
+      "narration": "Your link opens a secure checkout page. In this demo, it is a stand-in page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"checkout-summary\"]",
+      "caption": "Who, what and how much",
+      "narration": "It shows who they are paying, what for, and the amount."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkout-method-card\"]",
+      "caption": "Bank account or card",
+      "narration": "Your client chooses bank account or card."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-checkout-pay\"]",
+      "caption": "Pay",
+      "narration": "And pays."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Paid — thank you!\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Paid",
+      "narration": "They are back on the invoice. It says paid, and that you have been notified."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/payments",
+      "caption": "Back to Payments",
+      "chapter": "The money shows up",
+      "narration": "Back to your own Payments page.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"payment-\"]:has-text(\"Hannah Lindqvist\")",
+      "caption": "Recent payments",
+      "narration": "The payment is at the top of Recent payments, marked succeeded."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/invoices",
+      "caption": "Invoices",
+      "narration": "And on Invoices, that invoice is now marked paid."
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has-text(\"INV-1999\")",
+      "caption": "INV-1999 is paid",
+      "narration": "Nothing to type in, and nothing to chase."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-payments\"]",
+      "caption": "Where to find it",
+      "narration": "You will find Payments in the left menu of your CRM."
+    }
+  ],
+  "youtube": {
+    "title": "How to send a payment link and get paid online | ConstructHUB CRM",
+    "description": "Create a secure payment link for an open invoice in ConstructHUB CRM, send it to your client, and watch the payment land on your Payments page. The walkthrough uses a demo company and a demonstration checkout page in place of the real hosted checkout.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "payment link",
+      "get paid online",
+      "invoice payment",
+      "ACH payments",
+      "card payments",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Get paid online",
+    "accent": "paid",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
