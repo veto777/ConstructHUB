@@ -4,6 +4,9 @@
  * field, Anton, the orange pill, optionally the gator. The recorder draws the card over the page it
  * is on (inside its own overlay; nothing of it ships in the app) and films it like any other step.
  *
+ * A column's figure is drawn as it is, at once: only a stat's own figure counts up (a price that
+ * passes through other prices on its way is, for half a second, a wrong price).
+ *
  * Pure: `cardHtml` turns a spec into markup and escapes every word of it. What a card may SAY is not
  * decided here — a number on a card is a claim, and shared/help/step-script.ts refuses a card that
  * shows a price without a footnote saying whose price it is and as of when.
@@ -74,7 +77,7 @@ export const CARD_CSS = (font: string) => `
 
 /** The card's markup (its own <style> included). `a` = cardAssets(); tests pass stand-ins. */
 export function cardHtml(card: TutorialCard, a: { font: string; gator: string } = cardAssets()): string {
-  const cols = card.columns?.map((c) => `<div class="col${c.us ? " us" : ""}"><div class="t">${esc(c.title)}</div>${c.value ? `<div class="v"${/^\$?\d+$/.test(c.value) ? ` data-count="${esc(c.value)}"` : ""}>${esc(c.value)}</div>` : ""}${c.unit ? `<div class="u">${esc(c.unit)}</div>` : ""}`
+  const cols = card.columns?.map((c) => `<div class="col${c.us ? " us" : ""}"><div class="t">${esc(c.title)}</div>${c.value ? `<div class="v">${esc(c.value)}</div>` : ""}${c.unit ? `<div class="u">${esc(c.unit)}</div>` : ""}`
     + `${c.lines?.length ? `<ul>${c.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>`).join("") ?? "";
   const small = !!card.columns || (!!card.stat && card.headline.length > 18) || card.headline.length > 34;
   return `<div class="tc"><style>${CARD_CSS(a.font)}</style><div class="rays"></div>`

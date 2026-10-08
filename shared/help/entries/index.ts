@@ -56,4 +56,8 @@ export { default as e_crm_sms_setup } from "./crm/crm-sms-setup";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
 export { default as e_brand_tour_crm } from "./start-here/brand-tour-crm";
+export { default as e_brand_vs_housecall_pro } from "./start-here/brand-vs-housecall-pro";
+export { default as e_brand_vs_jobber } from "./start-here/brand-vs-jobber";
+export { default as e_brand_vs_leap } from "./start-here/brand-vs-leap";
 export { default as e_brand_what_is_constructhub } from "./start-here/brand-what-is-constructhub";
+export { default as e_brand_why_constructhub } from "./start-here/brand-why-constructhub";

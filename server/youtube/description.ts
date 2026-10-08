@@ -89,6 +89,9 @@ export type DescriptionInput = {
    * tutorial's. Default: "brand" when the help entry's group is "Start here", else "tutorial".
    */
   variant?: "tutorial" | "brand";
+  /** Brand films: where a competitor's figures were read (the step script's youtube.sources), and the companies named (youtube.names). */
+  sources?: readonly { label: string; url: string; read: string }[] | null;
+  names?: readonly string[] | null;
 };
 export type BuiltDescription = {
   helpKey: string; title: string; description: string; tags: string[];
@@ -105,6 +108,8 @@ export type BuiltDescription = {
    */
   underTarget: boolean;
   variant: "tutorial" | "brand";
+  /** Addresses outside constructhub.us that the description carries on purpose: the sources of a comparison. */
+  sourceUrls: string[];
   /** What the builder left out or changed, for the person reading the dry run. */
   notes: string[];
 };
@@ -684,7 +689,7 @@ export function buildDescription(input: DescriptionInput): BuiltDescription {
   if (bad.length) throw new Error(`${key}: the description says ${bad.join(", ")}`);
   return {
     helpKey: key, title, description: text, tags: buildTags(input, area), length: text.length, bytes: utf8Bytes(text),
-    sha256: createHash("sha256").update(text).digest("hex"), area, hashtags, chapters: chaptersOk, underTarget, variant: "tutorial", notes: Array.from(new Set(notes)),
+    sha256: createHash("sha256").update(text).digest("hex"), area, hashtags, chapters: chaptersOk, underTarget, variant: "tutorial", sourceUrls: [], notes: Array.from(new Set(notes)),
   };
 }
 
@@ -731,12 +736,21 @@ function buildBrandDescription(input: DescriptionInput): BuiltDescription {
   const chaptersOk = validChapters(input.chapters, input.durationSec);
   if (input.chapters?.length && !chaptersOk) notes.push("the chapter times are not a list YouTube accepts (first at 0:00, three or more, 10 s apart): left out");
   const needs = (entry?.needs ?? []).map((n) => clean(n, notes, "help entry")).filter(Boolean);
+  // A comparison: where each of the other company's figures was read and when, and whose names they are.
+  const sources = (input.sources ?? []).filter((x) => /^https:\/\/[^\s<>]+$/.test(x.url));
+  const names = (input.names ?? []).map((n) => plain(n)).filter(Boolean);
+  const compare: string[] = [
+    ...sources.map((x) => `• ${plain(x.label)} - read ${x.read}: ${x.url}`),
+    ...(sources.length ? ["List prices change. Plans differ in what they include: compare the feature lists on both sites before you decide."] : []),
+    ...(names.length ? [`${names.join(", ")} ${names.length === 1 ? "is a trademark of its owner" : "are trademarks of their owners"}. ConstructHUB is not affiliated with ${names.length === 1 ? "it" : "them"}.`] : []),
+  ];
 
   const render = (withTranscript: boolean): string => {
     const out: string[] = [/constructhub/i.test(opening.slice(0, 180)) ? opening : `ConstructHUB - ${opening}`, "", "Try ConstructHUB: https://constructhub.us"];
     const section = (label: string, lines: string[]) => { if (lines.length) out.push("", label, ...lines); };
     section("THE TWO PRODUCTS", [...BRAND_PRODUCTS]);
     section("LINKS", BRAND_LINKS(key));
+    section(sources.length ? "SOURCES" : "NAMES", compare);
     if (chaptersOk) section("CHAPTERS", input.chapters!.map((c) => `${c.at.trim()} ${plain(c.title)}`));
     if (withTranscript) section("WHAT THE FILM SAYS", groups.flatMap((g) => [...(g.title ? [`▶ ${g.title}`] : []), g.lines.join(" ")]));
     if (entry) {
@@ -761,7 +775,7 @@ function buildBrandDescription(input: DescriptionInput): BuiltDescription {
   }
   return {
     helpKey: key, title, description: text, tags, length: text.length, bytes: utf8Bytes(text), sha256: createHash("sha256").update(text).digest("hex"),
-    area: "brand", hashtags: [...BRAND_HASHTAGS], chapters: chaptersOk, underTarget: false, variant: "brand", notes: Array.from(new Set(notes)),
+    area: "brand", hashtags: [...BRAND_HASHTAGS], chapters: chaptersOk, underTarget: false, variant: "brand", sourceUrls: sources.map((x) => x.url), notes: Array.from(new Set(notes)),
   };
 }
 
@@ -773,7 +787,7 @@ function buildBrandDescription(input: DescriptionInput): BuiltDescription {
  * the machine (a report, not a test: an unfinished script in someone else's folder is their news).
  * Length UNDER the target is not in this list: see `underTarget`.
  */
-export function lintDescription(d: Pick<BuiltDescription, "helpKey" | "title" | "description" | "tags" | "length" | "bytes">): string[] {
+export function lintDescription(d: Pick<BuiltDescription, "helpKey" | "title" | "description" | "tags" | "length" | "bytes"> & { sourceUrls?: readonly string[] }): string[] {
   const bad: string[] = [], text = d.description;
   const need = (ok: boolean, what: string) => { if (!ok) bad.push(what); };
   need(d.length === text.length, "length is not the text's length");
@@ -791,8 +805,8 @@ export function lintDescription(d: Pick<BuiltDescription, "helpKey" | "title" | 
   need((text.match(/\b\d{1,2}:\d{2}\b/g) ?? []).length === ch.length, "a time outside the chapter list (YouTube would read it as a chapter)");
   const tags = text.match(/(?:^|\s)#[A-Za-z]\w*/g) ?? [];
   need(tags.length >= 3 && tags.length <= MAX_HASHTAGS, `${tags.length} hashtags (3 to ${MAX_HASHTAGS})`);
-  // The only addresses: the site and YouTube's own watch links.
-  for (const url of text.match(/https?:\/\/[^\s)]+/g) ?? []) need(/^https:\/\/(constructhub\.us(\/|$)|www\.youtube\.com\/watch\?v=)/.test(url), `an outside address: ${url}`);
+  // The only addresses: the site, YouTube's own watch links, and — in a comparison — the sources it names.
+  for (const url of text.match(/https?:\/\/[^\s)]+/g) ?? []) need(/^https:\/\/(constructhub\.us(\/|$)|www\.youtube\.com\/watch\?v=)/.test(url) || (d.sourceUrls ?? []).includes(url), `an outside address: ${url}`);
   need(/ConstructHUB/.test(text.slice(0, 200)), "the opening does not name ConstructHUB");
   need(text.includes("Try ConstructHUB: https://constructhub.us"), "no \"Try ConstructHUB\" line");
   need(d.title.length <= TITLE_MAX, `title of ${d.title.length} characters`);

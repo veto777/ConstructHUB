@@ -891,7 +891,7 @@ async function main() {
     // Never shorter than the line — and never so short after a slow action that its result is not seen:
     // a page this step opened whole (its load is not filmed) gets its minimum time on screen from when it drew.
     const opened = current!.shownAtMs != null && current!.shownAtMs >= startMs ? current!.shownAtMs : null;
-    const until = dry ? now() + 350 : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad, opened == null ? 0 : opened + MIN_PAGE_DWELL_MS) + (step.holdMs ?? 0);
+    const until = dry ? now() + (step.action === "card" ? 1400 : 350) : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad, opened == null ? 0 : opened + MIN_PAGE_DWELL_MS) + (step.holdMs ?? 0);
     while (until - now() > 300) { await sleep(250); await player.keepRing(); }
     await sleep(Math.max(0, until - now()));
     if (script.thumbnail?.step === i) {

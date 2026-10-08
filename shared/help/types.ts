@@ -60,6 +60,13 @@ export type HelpEntry = {
    * films ("Start here"): what they say about the company is the owner's to approve.
    */
   youtube?: { hold?: boolean };
+  /**
+   * Not shown anywhere in the app yet: no card on /tutorials, no "i" panel — the entry exists only so
+   * its step script, its YouTube description and its tests have something to belong to. For a film
+   * that waits for the owner's release (the named comparisons): remove this line, and commit the
+   * video's manifest, when it is released.
+   */
+  unlisted?: boolean;
   /** null until the walkthrough is recorded. */
   video: HelpVideo | null;
 };

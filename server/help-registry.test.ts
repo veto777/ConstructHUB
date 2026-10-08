@@ -329,7 +329,26 @@ describe("tutorial step scripts", () => {
       const said = [script.title, script.youtube!.title, script.youtube!.description, ...script.youtube!.tags, ...script.steps.map((s) => s.narration)].join(" ");
       // Nothing about how the video was made, and no price: prices live in the plan model, not in a recording.
       expect(said, f).not.toMatch(/higgsfield|kokoro|playwright|ffmpeg|\bAI voice\b/i);
-      expect(script.steps.map((s) => s.narration).join(" "), `${f} narrates a price`).not.toMatch(/\$\s?\d/);
+      // A tutorial never says or shows a price. An overview film (a `brand-` script) may — the owner asked for
+      // named, dated price comparisons — but only with its sources in the script (they go into the description),
+      // and a spoken amount belongs to a card that shows it with its dated footnote.
+      const priced = (t: string) => /\$\s?\d|\bdollars?\b/i.test(t);
+      const cardText = (s: (typeof script.steps)[number]) => s.card ? JSON.stringify(s.card) : "";
+      if (!script.helpKey.startsWith("brand-")) expect(script.steps.map((s) => s.narration + cardText(s)).join(" "), `${f} narrates a price`).not.toMatch(/\$\s?\d|\bdollars?\b/i);
+      else if (script.steps.some((s) => priced(s.narration) || priced(cardText(s)))) {
+        expect(script.youtube!.sources?.length ?? 0, `${f}: a film that names a price lists where it was read (youtube.sources)`).toBeGreaterThan(0);
+        expect(script.steps.some((s) => s.action === "card" && /constructhub\.us\/pricing/.test(s.card?.footnote ?? "")), `${f}: our own price is sourced on a card too`).toBe(true);
+        for (const s of script.steps.filter((x) => priced(x.narration))) {
+          expect(s.action, `${f}: "${s.narration.slice(0, 40)}…" says an amount — it belongs on a card`).toBe("card");
+          expect(s.card?.footnote ?? "", `${f}: the card under a spoken amount carries the dated footnote`).toMatch(/\b20\d\d\b/);
+        }
+      }
+      // A film that names another company says whose trademark the name is, and never judges them.
+      if (script.youtube?.names?.length) {
+        const all = script.steps.map((s) => s.narration + " " + cardText(s)).join(" ");
+        expect(all, `${f}: a comparison states facts, not opinions of the other company`).not.toMatch(/rip-?off|scam|overpriced|greedy|they hide|nobody uses|terrible|worse|junk|\bcheapest\b|#1|\bbest\b/i);
+        expect(all, `${f}: a comparison says the plans differ`).toMatch(/different features|features differ|not the same features|tools we (do not|don.t) have/i);
+      }
       // Demo identities only: typed emails are example.com, typed phones are 555-01xx.
       for (const s of script.steps.filter((x) => x.action === "type" && x.value)) {
         for (const email of s.value!.match(/[\w.+-]+@[\w.-]+/g) ?? []) expect(email, f).toMatch(/@(?:[\w-]+\.)*example\.com$/);

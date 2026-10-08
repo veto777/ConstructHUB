@@ -254,7 +254,8 @@ describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
     expect(html).toContain("List &quot;price&quot;, 2026");
     expect(html).toContain(`<span class="o">Half</span> the price?`);
     expect(html).toContain(`<div class="col us">`);
-    expect(html).toContain(`data-count="$49"`);
+    expect(html).not.toContain("data-count"); // a column's price never counts up through other prices
+    expect(cardHtml({ headline: "Five seats", stat: { value: "5", label: "seats" } }, a)).toContain(`data-count="5"`);
     expect(html).toContain(`src="${a.gator}"`);
     expect(html.split(a.font).join("").split(a.gator).join("")).not.toMatch(/https?:\/\/|file:/); // nothing fetched: the font and the mascot are inlined
     expect(html.match(/url\(/g)).toHaveLength(1);

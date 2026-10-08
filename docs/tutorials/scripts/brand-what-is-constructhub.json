@@ -10,142 +10,174 @@
   "narrator": "janice",
   "steps": [
     {
+      "action": "card",
+      "card": {
+        "kicker": "Sound familiar?",
+        "headline": "Five apps to run one job?",
+        "accent": "Five apps",
+        "mascot": true
+      },
+      "chapter": "The problem",
+      "caption": "The hook",
+      "narration": "Five apps to run one job? Stop."
+    },
+    {
       "action": "goto",
       "url": "/",
       "caption": "The dashboard",
-      "chapter": "The problem",
-      "narration": "Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online."
+      "narration": "Leads in one app. Estimates in another. Photos on a phone. Permits, who knows where."
     },
     {
-      "action": "highlight",
-      "selector": "a:has-text(\"Open CRM\")",
+      "action": "card",
+      "card": {
+        "headline": "Two products. One company.",
+        "accent": "Two products",
+        "columns": [
+          {
+            "title": "Business tools",
+            "lines": [
+              "Permit office directory",
+              "County property records",
+              "Your Google listing & reviews"
+            ]
+          },
+          {
+            "title": "ConstructHUB CRM",
+            "us": true,
+            "lines": [
+              "Leads & pipeline",
+              "Estimates signed online",
+              "Schedule · invoices · JobCam"
+            ]
+          }
+        ],
+        "footnote": "Two separate products, each with its own plans. JobCam: top CRM plan, or an add-on — constructhub.us/pricing"
+      },
       "caption": "Two products",
-      "narration": "ConstructHUB is two products: Business tools, and a CRM."
+      "narration": "ConstructHUB is two products. Business tools find the work. The CRM runs it."
     },
     {
       "action": "goto",
       "url": "/databases",
-      "caption": "Database Directory",
       "chapter": "Business tools",
-      "narration": "Business tools start with a directory of county and city permit offices."
+      "caption": "Permit office directory",
+      "narration": "Can your CRM find the permit office? This can."
     },
     {
       "action": "type",
       "selector": "[data-testid=\"input-database-search\"]",
       "value": "Houston",
-      "caption": "Search a city",
-      "narration": "Type a city or a county.",
-      "holdMs": 1500
+      "caption": "Type a city",
+      "narration": "Type a city."
+    },
+    {
+      "action": "wait-for",
+      "text": "Showing 1",
+      "timeoutMs": 20000,
+      "caption": "The list",
+      "narration": "Houston, Texas."
     },
     {
       "action": "highlight",
       "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
+      "punch": 1.25,
       "caption": "Verified portal",
-      "narration": "A checked link opens the office's own permit portal. No guessed addresses."
+      "narration": "A checked link to the office's own portal. No guessed addresses."
     },
     {
       "action": "goto",
       "url": "/property",
-      "caption": "Property Records",
-      "narration": "County property records offices are listed the same way."
-    },
-    {
-      "action": "goto",
-      "url": "/features",
-      "caption": "Every feature",
-      "narration": "The same product looks after your Google listing, your reviews and your website."
+      "caption": "Property records",
+      "narration": "County property records? Same deal."
     },
     {
       "action": "goto",
       "url": "/crm/pipeline",
-      "caption": "The CRM: pipeline",
       "chapter": "The CRM",
-      "narration": "The second product is the CRM. Every job is a card, from lead to paid."
+      "caption": "The CRM",
+      "narration": "Now run the job. Every job is a card, from lead to paid."
     },
     {
       "action": "highlight",
       "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "punch": 1.3,
       "caption": "One job",
-      "narration": "Open a job, and its estimate, schedule and invoices are together."
+      "narration": "One job. One card."
     },
     {
       "action": "goto",
       "url": "/crm/estimates/demo-estimate-e-1998",
-      "caption": "A signed estimate",
-      "narration": "Send an estimate from your price book."
+      "caption": "The estimate",
+      "narration": "Send the estimate."
     },
     {
       "action": "highlight",
       "selector": "text=/Approved by Nora Hadley/",
-      "caption": "Approved online",
-      "narration": "Your client approves it online."
+      "caption": "Signed online",
+      "narration": "Your client signs online."
     },
     {
       "action": "goto",
       "url": "/crm/schedule",
       "caption": "Schedule",
-      "narration": "Put the visit"
-    },
-    {
-      "action": "highlight",
-      "selector": "[data-testid^=\"event-\"]:has-text(\"Hadl\")",
-      "caption": "On the calendar",
-      "narration": "on the schedule."
+      "narration": "Put it on the schedule."
     },
     {
       "action": "goto",
       "url": "/crm/jobcam",
       "caption": "JobCam",
-      "narration": "File job-site photos to the job"
-    },
-    {
-      "action": "highlight",
-      "selector": "[data-testid=\"jobcam-grid\"]",
-      "caption": "JobCam feed",
-      "narration": "with JobCam."
+      "narration": "Shoot the job with JobCam."
     },
     {
       "action": "goto",
       "url": "/crm/invoices",
       "caption": "Invoices",
-      "narration": "Then send the invoice,"
+      "narration": "Send the invoice. Get paid."
     },
     {
-      "action": "highlight",
-      "selector": "tr:has-text(\"INV-2001\")",
-      "caption": "Paid",
-      "narration": "and record the payment."
-    },
-    {
-      "action": "goto",
-      "url": "/features",
-      "caption": "How to start",
+      "action": "card",
+      "card": {
+        "headline": "Buy one. Or both.",
+        "accent": "Or both",
+        "kicker": "Each has its own plans",
+        "footnote": "constructhub.us/pricing"
+      },
       "chapter": "How to start",
-      "narration": "Buy one or both. Each has its own plans, at ConstructHUB dot U S."
+      "caption": "Buy one or both",
+      "narration": "Buy one, or both. Each has its own plans."
+    },
+    {
+      "action": "card",
+      "card": {
+        "kicker": "constructhub.us",
+        "headline": "Run the whole job.",
+        "accent": "whole job",
+        "footnote": "Business tools and the CRM are separate products, each with its own plans.",
+        "mascot": true
+      },
+      "caption": "Run the whole job",
+      "narration": "ConstructHUB. Run the whole job."
     }
   ],
   "youtube": {
-    "title": "What is ConstructHUB? Business tools and a CRM for contractors",
-    "description": "ConstructHUB is two products for contractors. Business tools hold a directory of county and city permit offices, county property records, and tools for your Google listing, reviews and website. The CRM runs the job: pipeline, estimates your client approves online, schedule, job photos, invoices and payments. Each product has its own plans.",
+    "title": "What is ConstructHUB? Find the permit office. Run the whole job.",
+    "description": "ConstructHUB is two products for contractors: Business tools - a permit office directory, county property records and tools for your Google listing - and a CRM that runs the job from lead to paid. Buy one or both.",
     "tags": [
-      "ConstructHUB",
+      "what is constructhub",
       "contractor software",
       "contractor CRM",
-      "permit office directory",
-      "building permits",
-      "estimating software",
-      "job site photos",
-      "Google Business Profile",
-      "construction business",
-      "contractor tools"
+      "permit office lookup",
+      "building permit lookup",
+      "software for contractors",
+      "ConstructHUB"
     ],
     "playlist": "Start here: what ConstructHUB is",
     "category": 28
   },
   "thumbnail": {
-    "headline": "What is ConstructHUB?",
-    "accent": "ConstructHUB?",
+    "headline": "Five apps? Stop.",
+    "accent": "Stop.",
     "kicker": "Start here",
-    "step": 8
+    "step": 0
   }
 }

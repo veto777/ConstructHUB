@@ -37,7 +37,7 @@ export type StepAction = (typeof STEP_ACTIONS)[number];
  */
 export const tutorialCardSchema = z.object({
   /** The small label above the headline ("As of October 2026"). */
-  kicker: z.string().min(2).max(44).optional(),
+  kicker: z.string().min(2).max(56).optional(),
   headline: z.string().min(2).max(64),
   /** Word(s) of the headline to set on the orange pill. */
   accent: z.string().min(1).max(28).optional(),
@@ -172,6 +172,14 @@ export const tutorialScriptSchema = z.object({
     playlist: z.string().min(3).max(100).default("ConstructHUB CRM tutorials"),
     /** 28 Science & Technology, 27 Education. */
     category: z.union([z.literal(27), z.literal(28)]).default(28),
+    /**
+     * Overview films only. Where every number on screen about ANOTHER company was read, and when: the
+     * description prints them under SOURCES. A script whose cards or narration name a competitor's
+     * price must list its source here (server/help-registry.test.ts).
+     */
+    sources: z.array(z.object({ label: z.string().min(3).max(120), url: z.string().url().startsWith("https://").max(200), read: z.string().regex(/^20\d\d-\d\d-\d\d$/) })).max(6).optional(),
+    /** Companies the film names: the description says their names are their owners' trademarks and that ConstructHUB is not affiliated. */
+    names: z.array(z.string().min(2).max(40)).max(6).optional(),
   }).optional(),
   /** The designed 1280×720 thumbnail (scripts/tutorials/thumbnail.ts). */
   thumbnail: z.object({

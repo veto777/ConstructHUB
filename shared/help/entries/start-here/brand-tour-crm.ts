@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** The CRM tour's entry: one job from lead to paid. Written from the CRM pages as they run in the demo workspace. */
 const entry: HelpDraft = {
-  key: "brand-tour-crm", group: "Start here", route: "/crm", title: "ConstructHUB CRM in 2 minutes",
+  key: "brand-tour-crm", group: "Start here", route: "/crm", title: "ConstructHUB CRM: one job, lead to paid",
   whatItIs: "The CRM follows one job from the first call to the last payment: lead, estimate, approval, schedule, job photos, invoice, paid.",
   whatItDoes: "A lead becomes a client with a project on the pipeline. You price the work from your price book and send the estimate; the client approves it online by typing their name. The visit goes on the schedule, JobCam files the crew’s photos to the project, and the approved estimate becomes an invoice you can take payment on.",
   howToUse: [

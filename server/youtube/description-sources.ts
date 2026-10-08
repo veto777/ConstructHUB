@@ -111,6 +111,8 @@ export async function describeVideo(helpKey: string, ctx: DescribeContext, known
     playlist: typeof meta?.playlist === "string" ? meta.playlist : typeof y?.playlist === "string" ? y.playlist : null,
     track: ctx.tracks.find((t) => t.keys.includes(helpKey))?.name ?? null,
     related: relatedFor(helpKey, ctx.tracks, titleOf, urlOf),
+    sources: Array.isArray(y?.sources) ? y.sources.filter((x: any) => typeof x?.label === "string" && typeof x?.url === "string" && typeof x?.read === "string") : null,
+    names: Array.isArray(y?.names) ? y.names.map(String) : null,
   };
   return { ...buildDescription(input), input, scriptFile: found, outDir: dir };
 }
