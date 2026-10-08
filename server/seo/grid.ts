@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { pool } from "../db";
 import { request, assertOk, taskItems, safeDomain, normalizeBusinessName, type DfsTask } from "./dataforseo";
+import { publicNote } from "./public-errors";
 
 export const GRID_SIZES = [3, 5, 7] as const;
 /** Miles between neighbouring points. */
@@ -254,5 +255,5 @@ export async function getScan(userId: number, siteId: number, scanId: number): P
     `SELECT id, scan, status, error, created_at < now() - interval '${GRID_STALE_MINUTES} minutes' AS stale FROM seo_grid_scans WHERE id=$1 AND site_id=$2 AND user_id=$3`, [scanId, siteId, userId]);
   if (!row) return null;
   if (row.status === "running" && row.stale) return { id: row.id, status: "failed", scan: null, error: "The scan was interrupted before it finished. Lookups it had not made were not charged." };
-  return { id: row.id, status: row.status, scan: row.status === "done" && row.scan ? { ...(row.scan as GridScan), id: row.id } : null, error: row.status === "failed" ? row.error ?? "The scan could not be completed." : null };
+  return { id: row.id, status: row.status, scan: row.status === "done" && row.scan ? { ...(row.scan as GridScan), id: row.id } : null, error: row.status === "failed" ? publicNote(row.error, "The scan could not be completed.") ?? "The scan could not be completed." : null };
 }

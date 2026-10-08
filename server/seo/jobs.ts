@@ -27,6 +27,7 @@ import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksLis
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
 import { raiseRankAlerts, raiseLinkAlerts } from "./alerts";
+import { publicFailure } from "./public-errors";
 
 const TICK_MS = 60_000;
 const LOCK_KEY = 7192;
@@ -114,9 +115,12 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
       }
     }
     // What the source reported is never trimmed; what it may have charged for a chunk that never answered is added for our ledger only.
-    await settleBudget(reservation, costUsd + unknownUsd, costUsd);
+    // A run in which nothing was accepted delivers nothing: like any failed lookup, it costs the customer nothing.
+    await settleBudget(reservation, costUsd + unknownUsd, posted.length ? costUsd : 0);
     if (!posted.length) {
-      await finishRun(run.id, "failed", firstError ?? "DataForSEO accepted none of the tasks", costUsd);
+      // The note is the customer's (it is shown on the rank tracker); why it happened is in the log lines above.
+      if (!firstError) console.warn(`[seo] run ${run.id}: the source accepted none of the ${inputs.length} tasks`);
+      await finishRun(run.id, "failed", "None of the checks were accepted by the search data service. Your credits were not charged.", costUsd);
       return true;
     }
     await pool.query(
@@ -126,7 +130,9 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
   } catch (e: any) {
     // Checks already accepted (and paid for) are kept: the run goes on to collect them instead of being wiped.
     const { rowCount } = await pool.query("UPDATE seo_rank_runs SET lease_until=NULL, posted=jsonb_array_length(tasks), total=greatest(total, jsonb_array_length(tasks)) WHERE id=$1 AND jsonb_array_length(tasks)>0", [run.id]).catch(() => ({ rowCount: 0 }));
-    if (!rowCount) await finishRun(run.id, "failed", e?.message ?? String(e));
+    // The run's note is shown to the customer: never the error's own text (that goes to the log and the issue desk).
+    console.error(`[seo] run ${run.id} could not be posted: ${e?.message ?? e}`);
+    if (!rowCount) await finishRun(run.id, "failed", publicFailure(e, "The check could not be started — try again in a few minutes."));
     void recordFailure("job", "SEO rank run post", e);
   }
   return true;

@@ -24,7 +24,7 @@ import { pool } from "../db";
 import { isPlatformAdmin } from "../admin";
 import { requirePlan, sendLimitReached, raiseHint, plural, type Entitlements } from "../entitlements";
 import { monthlyUsage, reserveQuotaFor, refundReservation, resetsAt } from "../growth-quotas";
-import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey } from "./budget";
+import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey, BUDGET_PAUSED_MESSAGE } from "./budget";
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
@@ -60,6 +60,9 @@ import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
+import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME } from "./public-errors";
+import { recordUnhandledError } from "../ops/server-errors";
+import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
 
 /**
@@ -181,17 +184,6 @@ const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
 
-/** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
-function vendorErrorMessage(e: DataForSeoError): string {
-  switch (e.code) {
-    case "not_configured": return SEO_NOT_READY_MESSAGE;
-    case "rate_limited": return "The search data service is busy — try again in a minute.";
-    case "invalid": return "That request couldn't be run — check the keyword or domain and try again.";
-    case "task_failed": return "That check didn't complete — try again in a few minutes.";
-    default: return "The search data service didn't answer — try again in a few minutes.";
-  }
-}
-
 export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => any) {
   const route = (method: "get" | "post" | "delete", path: string, fn: (req: any, res: any, user: number, ent: Entitlements) => Promise<any>) =>
     app[method](path, async (req, res, next) => {
@@ -202,16 +194,15 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         if (!ent) return;
         await fn(req, res, u.id, ent);
       } catch (e: any) {
-        if (e instanceof z.ZodError) return void res.status(400).json({ message: "Invalid input", issues: e.issues.slice(0, 3) });
-        // The internal cap tripped: a neutral "paused" to the customer; the dollars are already in the log.
-        if (e instanceof ListError) return void res.status(e.status).json({ message: e.message });
-        if (e instanceof SeoBudgetError) return void res.status(402).json({ code: e.code, message: e.message, ...(e.code === "seo_credits" ? { packs: SEO_CREDIT_PACKS } : {}) });
-        if (e instanceof DataForSeoError) {
-          const status = e.code === "not_configured" ? 503 : e.code === "auth" ? 502 : e.code === "rate_limited" ? 429 : e.code === "invalid" || e.code === "task_failed" ? 400 : 502;
-          console.warn(`[seo] vendor error ${e.code} on ${req.method} ${req.path}: ${e.message}`);
-          return void res.status(status).json({ code: `seo_source_${e.code}`, message: vendorErrorMessage(e) });
-        }
-        next(e);
+        // The one way an error leaves an SEO route (server/seo/public-errors.ts): the customer gets neutral copy,
+        // the exact wording — vendor, upstream text, wholesale dollars — goes to the log, the issue desk and admins.
+        const out = seoErrorResponse(e, { admin: isPlatformAdmin(req.user) });
+        if (e instanceof DataForSeoError) console.warn(`[seo] vendor error ${e.code} on ${req.method} ${req.path}: ${e.message}`);
+        else if (out.unexpected) console.error(`[seo] ${req.method} ${req.path} failed:`, e);
+        // The issue desk hears of every 5xx except "not switched on yet", which is a state, not a failure.
+        if (!(e instanceof DataForSeoError && e.code === "not_configured")) recordUnhandledError(req, res, e, out.status);
+        if (res.headersSent) return;
+        res.status(out.status).json(out.body);
       }
     });
 
@@ -286,7 +277,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const body: Record<string, unknown> = { configured: isConfigured(), alertsUnread: await unreadAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
-      body.admin = { vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
+      body.admin = { vendor: SEO_VENDOR_NAME, configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
     }
     res.json(body);
   });
@@ -302,7 +293,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       const totalUsd = Math.round(accounts.reduce((a, b) => a + b.costUsd, 0) * 1e6) / 1e6;
       const capUsd = monthlyBudgetUsd();
       res.setHeader("Cache-Control", "no-store");
-      res.json({ vendor: "DataForSEO", configured: isConfigured(), env: SEO_ENV_VARS, month, capUsd, totalUsd, remainingUsd: Math.max(0, Math.round((capUsd - totalUsd) * 1e6) / 1e6), accounts });
+      res.json({ vendor: SEO_VENDOR_NAME, configured: isConfigured(), env: SEO_ENV_VARS, month, capUsd, totalUsd, remainingUsd: Math.max(0, Math.round((capUsd - totalUsd) * 1e6) / 1e6), accounts });
     } catch (e) { next(e); }
   });
 
@@ -383,7 +374,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     };
     const estimate = estimateRankCheckUsd(keywords.map((k: any) => k.keyword), site.devices, site.serp_depth);
     res.json({
-      site: siteView({ ...site, keyword_count: keywords.length }), devices, summary, rows, runs, searchConsole: gsc,
+      site: siteView({ ...site, keyword_count: keywords.length }), devices, summary, rows, runs: runs.map((r: any) => runView(r, isPlatformAdmin(req.user))), searchConsole: gsc,
       nextCheck: { serps: estimate.serps, priceCents: retailCents(estimate.usd), nextAt: site.next_rank_check_at ?? null },
     });
   });
@@ -462,7 +453,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const budget = await budgetStatus(user);
     if (estimate.usd > budget.remainingUsd) {
       console.warn(`[seo] cost refused user=${user} rank-check site=${site.id} estimate=$${estimate.usd} remaining=$${budget.remainingUsd} cap=$${budget.capUsd}`);
-      return res.status(402).json({ code: "seo_budget", message: "SEO checks are paused for the rest of the month — the monthly data allowance for rank tracking is used up. It comes back on the 1st." });
+      return res.status(402).json({ code: "seo_budget", message: BUDGET_PAUSED_MESSAGE });
     }
     // The customer's own credit: say so now rather than failing the run a moment later.
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
@@ -478,7 +469,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/runs", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const { rows } = await pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 20", [site.id]);
-    res.json(rows);
+    res.json(rows.map((r: any) => runView(r, isPlatformAdmin(req.user))));
   });
 
   // Keyword research: seed → suggestions with volume / CPC / difficulty (up to 50 rows). One keyword search of the plan.
@@ -629,8 +620,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
           catch (e: any) { if (attempt >= 3) { console.error(`[seo] local grid scan ${id} was paid for but could not be saved: ${e?.message ?? e}`); await failScan(id, "The scan ran but its results could not be saved.").catch(() => {}); break; } await new Promise((r) => setTimeout(r, 500 * attempt)); }
         }
       } catch (e: any) {
-        if (!(e instanceof SeoBudgetError)) console.warn(`[seo] local grid scan ${id} failed: ${e?.message ?? e}`);
-        await failScan(id, e instanceof SeoBudgetError ? e.message : e instanceof DataForSeoError ? vendorErrorMessage(e) : "The scan could not be completed. Try again in a few minutes.").catch(() => {});
+        if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${id} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
+        await failScan(id, publicFailure(e, "The scan could not be completed. Try again in a few minutes.")).catch(() => {});
       }
     })();
     res.status(202).json({ id, running: true });
@@ -1015,6 +1006,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await once(`competitors:${user}:${site.id}:${competitor}`, () => withBudget(user, estimateLabsUsd(GAP_LIMIT), () => labsDomainIntersection({ competitor, ours: site.domain, locationCode: site.location_code, languageCode: site.language_code, limit: GAP_LIMIT }), { label: `Competitor gap — ${site.domain} vs ${competitor}` }));
     res.json({ competitor, ours: site.domain, items: out.data.items, totalCount: out.data.totalCount, usage: await planUsage(user, ent) });
   });
+}
+
+/**
+ * A rank run as the account sees it. The saved note is made safe on the way out (rows written by earlier
+ * versions can hold an error's own text); a platform admin gets it as saved.
+ */
+function runView(r: any, admin: boolean) {
+  return { ...r, error: admin ? r.error ?? null : publicNote(r.error) };
 }
 
 function siteView(s: any) {
