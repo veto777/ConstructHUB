@@ -11,7 +11,7 @@ import { Empty, fmtDate, fmtNum, isNotRunYet, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Item = { keywordId: number; keyword: string; volume: number | null; position: number | null; checkedOn: string | null; device: string | null; place: string | null; to: string; from: string; fromTitle: string | null; context: string; pair: string };
-type Data = { jobId: string; scannedAt: string | null; checkedOn: string | null; linksMeasured: boolean; targets: number; boilerplate: number; notRanking: number; notCrawled: number; notUsable: number; tooShort: number; cutPages: number; items: Item[]; more: number };
+type Data = { jobId: string; scannedAt: string | null; checkedOn: string | null; linksMeasured: boolean; targets: number; boilerplate: number; notRanking: number; notCrawled: number; notUsable: number; tooShort: number; aliasesCut?: number; cutPages: number; items: Item[]; more: number };
 const plural = (n: number, one: string, many: string) => `${fmtNum(n)} ${n === 1 ? one : many}`;
 /** "position 8 on desktop, Oct 1, Bellingham, WA" — what a position rests on. */
 const rankBasis = (i: Item) => [i.device, i.checkedOn ? fmtDate(i.checkedOn) : null, i.place].filter(Boolean).join(", ");
@@ -53,7 +53,7 @@ export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">Pages of your site that use the words of a keyword another of your pages ranks for, but don't link to it. A link there — on those words — points visitors and search engines at the page you want found for them. Whether it reads naturally is your call: the words around each mention are shown.</p>
       {!d.linksMeasured ? (
         <Empty testId="link-opps-unmeasured"><h3>The crawl can't see this site's links</h3><p>Most of its pages link nowhere in their HTML — usual when menus and links are added by JavaScript. Without knowing which links exist, nothing can be suggested here. The <b>Rendering</b> tab shows what a browser sees that the HTML does not.</p></Empty>
-      ) : d.targets + d.notCrawled + d.notRanking + d.notUsable + d.tooShort + d.boilerplate === 0 ? (
+      ) : d.targets + d.notCrawled + d.notRanking + d.notUsable + d.tooShort + d.boilerplate + (d.aliasesCut ?? 0) === 0 ? (
         <Empty testId="link-opps-no-keywords"><h3>Nothing to look for yet</h3><p>This uses the keywords you track that your site ranks for. Add keywords in the <Link href="/seo/rank-tracker" className="g-link">rank tracker</Link> and run a check; once a page of yours ranks, mentions of that keyword on your other pages are looked for.</p></Empty>
       ) : (
         <>
@@ -64,11 +64,12 @@ export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
               <button type="button" className="g-pill g-pill--sm" disabled={!d.items.length} onClick={exportCsv} data-testid="button-link-opps-export"><Download /> Export</button>
             </span>
           </div>
-          {(d.notRanking + d.notCrawled + d.notUsable + d.tooShort + d.boilerplate) > 0 && (
+          {(d.notRanking + d.notCrawled + d.notUsable + d.tooShort + d.boilerplate + (d.aliasesCut ?? 0)) > 0 && (
             <ul className="g-text-2 mb-2 list-disc pl-5 text-[12px]" data-testid="list-link-opps-left-out">
               {d.notRanking > 0 && <li>{plural(d.notRanking, "keyword did", "keywords did")} not rank in {d.notRanking === 1 ? "its" : "their"} newest check, so there is no page to link to.</li>}
               {d.notCrawled > 0 && <li>{plural(d.notCrawled, "keyword ranks", "keywords rank")} with a page the crawl did not reach.</li>}
               {d.notUsable > 0 && <li>{plural(d.notUsable, "keyword ranks", "keywords rank")} with a page that, in the crawl, answered an error or a redirect or is marked noindex.</li>}
+              {(d.aliasesCut ?? 0) > 0 && <li>{plural(d.aliasesCut!, "keyword ranks", "keywords rank")} with a page more addresses redirect to than the crawl kept, so a page could already link to it through one of them — nothing is suggested for {d.aliasesCut === 1 ? "it" : "them"}.</li>}
               {d.tooShort > 0 && <li>{plural(d.tooShort, "keyword is", "keywords are")} too short to look for (fewer than 6 letters match too much).</li>}
               {d.boilerplate > 0 && <li>{plural(d.boilerplate, "keyword is", "keywords are")} on more than half of the other pages and taken to be menu or footer text — a rule of thumb (the crawl does not keep which part of a page words came from), applied when there are at least 5 other pages.</li>}
             </ul>

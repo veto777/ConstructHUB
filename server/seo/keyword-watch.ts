@@ -17,7 +17,8 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
-import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, safeHttpUrl, type DfsTask } from "./dataforseo";
+import { createHash } from "node:crypto";
 import { withBudget, SeoBudgetError } from "./budget";
 import { estimateLabsUsd } from "./pricing";
 import { saveAlert, deliverAlert } from "./alerts";
@@ -35,7 +36,11 @@ export const watchSetting = z.object({ watch: z.boolean() }).strict();
 export class KeywordWatchBusy extends SeoCustomerError { constructor() { super("A snapshot of this site is being taken right now. It will be here in a moment.", 409); } }
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
-export type SnapshotKeyword = { keyword: string; position: number | null; volume: number | null; /** Estimated visits a month. */ traffic: number | null; /** The ranking page's path. */ path: string | null };
+export type SnapshotKeyword = {
+  keyword: string; position: number | null; volume: number | null; /** Estimated visits a month, at the source's precision (older snapshots: to 0.1). */ traffic: number | null;
+  /** The ranking page's path as the source gave it (older snapshots kept only its first 300 characters). */ path: string | null;
+  /** The ranking page's full address, when the source gave one (snapshots from 2026-10-08 on). */ url?: string | null;
+};
 export type KeywordSnapshot = {
   id: number; takenOn: string; locationCode: number; languageCode: string;
   /** How many keywords the source has for the site in all; null = it did not say. */ total: number | null;
@@ -55,7 +60,9 @@ export function parseSnapshotKeyword(item: any): SnapshotKeyword | null {
   if (!keyword) return null;
   const serp = item?.ranked_serp_element?.serp_item ?? {};
   const etv = num(serp.etv);
-  return { keyword, position: num(serp.rank_group) ?? num(serp.rank_absolute), volume: num(kd?.keyword_info?.search_volume), traffic: etv === null ? null : Math.round(etv * 10) / 10, path: typeof serp.relative_url === "string" ? serp.relative_url.slice(0, 300) : null };
+  // Kept whole: the address is the page's identity (a long one cut short could merge two pages).
+  const path = typeof serp.relative_url === "string" && serp.relative_url.trim() && serp.relative_url.length <= 2048 ? serp.relative_url : null;
+  return { keyword, position: num(serp.rank_group) ?? num(serp.rank_absolute), volume: num(kd?.keyword_info?.search_volume), traffic: etv === null ? null : Math.round(etv * 1e4) / 1e4, path, url: safeHttpUrl(serp.url) };
 }
 export async function fetchKeywordSnapshot(input: { domain: string; locationCode: number; languageCode: string }): Promise<{ data: { total: number | null; fetched: number; keywords: SnapshotKeyword[] }; costUsd: number }> {
   const task: DfsTask = assertOk(await keywordWatchDeps.request("POST", "/dataforseo_labs/google/ranked_keywords/live", [{
@@ -87,36 +94,88 @@ export type KeywordComparison = {
    */
   pages: PageChange[];
 };
-export type PageSide = { keywords: number; visits: number; unknown: number };
-export type PageChange = { path: string | null; before: PageSide; after: PageSide; added: number; gone: number; movedIn: number; movedOut: number };
-/** One spelling of a page's path for comparing: no trailing slash (but "/"), no fragment; the query kept. Pure. */
+export type PageSide = { keywords: number; visits: number; /** Keywords with no visit estimate: the visits figure leaves them out. */ unknown: number };
+export type PageChange = {
+  /** Stable identity (a hash of host and path): the same page in any snapshot. */ id: string;
+  /** What to show: the path on the site's own host, the full address on another host; null = the source gave no page. */ path: string | null;
+  /** The page's full address when it is known (from the source, or the site's own host and the path); null when not. */ url: string | null;
+  /** The path was kept only to its first 300 characters (older snapshots): two long addresses could be one row here. */ cut: boolean;
+  before: PageSide; after: PageSide;
+  /** Keywords on this page in only one of the two snapshots (what that means depends on the comparison's basis). */ added: number; gone: number;
+  /** Keywords in both snapshots that the source has with another page in the other one (both pages given). */ movedIn: number; movedOut: number;
+  /** Keywords in both snapshots whose page was not given in the other one: no move is claimed. */ pageNewlyGiven: number; pageNoLongerGiven: number;
+};
+/** One spelling of a path for comparing: no trailing slash (but "/"), no fragment; case and the query kept. Pure. */
 export const pageKey = (path: string | null): string | null => {
-  if (path === null || path === undefined) return null;
+  if (path === null || path === undefined || !String(path).trim()) return null;
   const p = String(path).replace(/#.*$/, ""), [base, ...q] = p.split("?");
   return `${base.replace(/\/+$/, "") || "/"}${q.length ? `?${q.join("?")}` : ""}`;
 };
-/** Pure: keywords grouped by page in two snapshots of the same market. */
-export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[]): PageChange[] {
+const bareHost = (h: string) => h.toLowerCase().replace(/^www\./, "");
+/** Host and path of a keyword's page: from its full address when given, else from the path (which may itself be one). */
+function pageOf(k: SnapshotKeyword, siteHost: string): { key: string; host: string; path: string; cut: boolean } | null {
+  for (const full of [k.url, /^https?:\/\//i.test(String(k.path ?? "")) ? k.path : null]) {
+    if (!full) continue;
+    try { const u = new URL(full); const path = pageKey(u.pathname + u.search)!; const host = bareHost(u.hostname); return { key: `${host}${path}`, host, path, cut: false }; } catch { /* not an address */ }
+  }
+  const path = pageKey(k.path);
+  if (path === null) return null;
+  return { key: `${siteHost}${path}`, host: siteHost, path, cut: !k.url && String(k.path).length === 300 };
+}
+/** Pure: keywords grouped by page in two snapshots of the same market. `siteHost` is the site's own host (for paths). */
+export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], siteHost = ""): PageChange[] {
+  const host = bareHost(siteHost);
   const pages = new Map<string, PageChange>();
   const side = (): PageSide => ({ keywords: 0, visits: 0, unknown: 0 });
-  const at = (path: string | null) => { const k = pageKey(path) ?? "\u0000"; return pages.get(k) ?? pages.set(k, { path: pageKey(path), before: side(), after: side(), added: 0, gone: 0, movedIn: 0, movedOut: 0 }).get(k)!; };
+  const at = (pg: ReturnType<typeof pageOf>) => {
+    const k = pg?.key ?? "\u0000";
+    let row = pages.get(k);
+    if (!row) {
+      const shown = pg ? (pg.host === host ? pg.path : `${pg.host}${pg.path}`) : null;
+      row = { id: createHash("sha256").update(k).digest("hex").slice(0, 16), path: shown, url: pg && pg.host ? `https://${pg.host}${pg.path}` : null, cut: !!pg?.cut,
+        before: side(), after: side(), added: 0, gone: 0, movedIn: 0, movedOut: 0, pageNewlyGiven: 0, pageNoLongerGiven: 0 };
+      pages.set(k, row);
+    }
+    if (pg?.cut) row.cut = true;
+    return row;
+  };
   const add = (x: PageSide, k: SnapshotKeyword) => { x.keywords++; if (k.traffic === null) x.unknown++; else x.visits += k.traffic; };
   const was = new Map(before.map((k) => [k.keyword, k] as const)), is = new Map(now.map((k) => [k.keyword, k] as const));
-  for (const k of before) { const pg = at(k.path); add(pg.before, k); const n = is.get(k.keyword); if (!n) pg.gone++; else if (pageKey(n.path) !== pageKey(k.path)) pg.movedOut++; }
-  for (const k of now) { const pg = at(k.path); add(pg.after, k); const b = was.get(k.keyword); if (!b) pg.added++; else if (pageKey(b.path) !== pageKey(k.path)) pg.movedIn++; }
-  const round = (x: PageSide) => ({ ...x, visits: Math.round(x.visits * 10) / 10 });
-  return [...pages.values()].map((p) => ({ ...p, before: round(p.before), after: round(p.after) }))
-    .sort((a, b) => Math.abs(b.after.visits - b.before.visits) - Math.abs(a.after.visits - a.before.visits) || Math.abs(b.after.keywords - b.before.keywords) - Math.abs(a.after.keywords - a.before.keywords) || String(a.path).localeCompare(String(b.path)));
+  for (const k of before) {
+    const pg = pageOf(k, host), row = at(pg); add(row.before, k);
+    const n = is.get(k.keyword);
+    if (!n) { row.gone++; continue; }
+    const npg = pageOf(n, host);
+    if (pg && npg && pg.key !== npg.key) row.movedOut++;
+    else if (pg && !npg) row.pageNoLongerGiven++;
+    else if (!pg && npg) row.movedOut++;   // the "page not given" row: it now has one
+  }
+  for (const k of now) {
+    const pg = pageOf(k, host), row = at(pg); add(row.after, k);
+    const b = was.get(k.keyword);
+    if (!b) { row.added++; continue; }
+    const bpg = pageOf(b, host);
+    if (pg && bpg && pg.key !== bpg.key) row.movedIn++;
+    else if (pg && !bpg) row.pageNewlyGiven++;
+    else if (!pg && bpg) row.movedIn++;    // the "page not given" row: it had one before
+  }
+  const done = (x: PageSide) => ({ ...x, visits: Math.round(x.visits * 10) / 10 });
+  // Visits are compared only where every keyword on both sides has an estimate; elsewhere the keyword count decides.
+  const visitChange = (p: PageChange) => (p.before.unknown === 0 && p.after.unknown === 0 ? Math.abs(p.after.visits - p.before.visits) : -1);
+  return [...pages.values()].map((p) => ({ ...p, before: done(p.before), after: done(p.after) }))
+    .sort((a, b) => visitChange(b) - visitChange(a) || Math.abs(b.after.keywords - b.before.keywords) - Math.abs(a.after.keywords - a.before.keywords) || String(a.path).localeCompare(String(b.path)));
 }
+/** Whether a page's visits can be compared at all: every keyword on both sides has an estimate. Pure. */
+export const visitsComparable = (p: PageChange) => p.before.unknown === 0 && p.after.unknown === 0;
 /** Pure. */
-export function compareKeywordSnapshots(now: KeywordSnapshot, before: KeywordSnapshot): KeywordComparison {
+export function compareKeywordSnapshots(now: KeywordSnapshot, before: KeywordSnapshot, siteHost = ""): KeywordComparison {
   const head = { since: before.takenOn, takenOn: now.takenOn, locationCode: now.locationCode, languageCode: now.languageCode, now: { keywords: now.keywords.length, total: now.total }, before: { keywords: before.keywords.length, total: before.total } };
   if (now.locationCode !== before.locationCode || now.languageCode !== before.languageCode) return { ...head, basis: "none", added: [], gone: [], pages: [] };
   const was = new Map(before.keywords.map((k) => [k.keyword, k] as const)), is = new Set(now.keywords.map((k) => k.keyword));
   const added = now.keywords.filter((k) => !was.has(k.keyword)).sort((a, b) => (b.traffic ?? -1) - (a.traffic ?? -1) || (a.position ?? 999) - (b.position ?? 999) || (a.keyword < b.keyword ? -1 : 1));
   const gone = before.keywords.filter((k) => !is.has(k.keyword)).map((k) => ({ ...k, was: k.position })).sort((a, b) => (a.position ?? 999) - (b.position ?? 999) || (b.volume ?? -1) - (a.volume ?? -1) || (a.keyword < b.keyword ? -1 : 1));
   const a = coverage(now), b = coverage(before);
-  return { ...head, basis: a === null || b === null ? "unknown" : a && b ? "whole" : "top", added, gone, pages: pagesChanged(now.keywords, before.keywords) };
+  return { ...head, basis: a === null || b === null ? "unknown" : a && b ? "whole" : "top", added, gone, pages: pagesChanged(now.keywords, before.keywords, siteHost) };
 }
 /** Which changes are worth an alert — from the whole lists, and only when both snapshots hold everything the source has. Pure. */
 export function keywordAlerts(c: KeywordComparison): { added: KeywordChange[]; gone: KeywordChange[] } {
@@ -341,7 +400,7 @@ export type KeywordWatchView = {
   /** The site's snapshots, newest first, up to KW_HISTORY_LIMIT, and how many there are in all. */
   snapshots: SnapshotSummary[]; snapshotCount: number;
 };
-export async function keywordWatchView(userId: number, site: { id: number; kw_watch?: boolean; next_kw_snapshot_at?: unknown; location_code?: number; language_code?: string; alerts_enabled?: boolean }, pick?: z.infer<typeof comparePick>): Promise<KeywordWatchView> {
+export async function keywordWatchView(userId: number, site: { id: number; domain?: string; kw_watch?: boolean; next_kw_snapshot_at?: unknown; location_code?: number; language_code?: string; alerts_enabled?: boolean }, pick?: z.infer<typeof comparePick>): Promise<KeywordWatchView> {
   const [now, before] = await latestSnapshots(userId, site.id);
   // Two chosen snapshots: both this site's and this account's, the "now" one the later of the two.
   let chosen: [KeywordSnapshot, KeywordSnapshot] | null = null;
@@ -366,7 +425,7 @@ export async function keywordWatchView(userId: number, site: { id: number; kw_wa
     latest: now ? { takenOn: now.takenOn, keywords: now.keywords.length, total: now.total, whole: coverage(now), locationCode: now.locationCode, languageCode: now.languageCode, today: now.takenOn === String(d.today).slice(0, 10) } : null,
     nextDayAt: new Date(d.next).toISOString(),
     sameMarket: !now || (now.locationCode === (site.location_code ?? 2840) && now.languageCode === (site.language_code ?? "en")),
-    comparison: cNow && cBefore ? compareKeywordSnapshots(cNow, cBefore) : null,
+    comparison: cNow && cBefore ? compareKeywordSnapshots(cNow, cBefore, site.domain ?? "") : null,
     pair: cNow && cBefore ? { nowId: cNow.id, beforeId: cBefore.id, chosen: !!chosen, now: summary(cNow), before: summary(cBefore) } : null,
     snapshots, snapshotCount: list.length ? Number(list[0].all_count) : 0,
   };

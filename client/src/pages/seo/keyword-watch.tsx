@@ -15,10 +15,10 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Kw = { keyword: string; position: number | null; volume: number | null; traffic: number | null; path: string | null; was?: number | null };
 type Side = { keywords: number; visits: number; unknown: number };
-type PageChange = { path: string | null; before: Side; after: Side; added: number; gone: number; movedIn: number; movedOut: number };
+type PageChange = { id: string; path: string | null; url: string | null; cut: boolean; before: Side; after: Side; added: number; gone: number; movedIn: number; movedOut: number; pageNewlyGiven: number; pageNoLongerGiven: number };
 type Comparison = { pages?: PageChange[]; since: string; takenOn: string; locationCode: number; languageCode: string; basis: "whole" | "top" | "unknown" | "none"; added: Kw[]; gone: Kw[]; now: { keywords: number; total: number | null }; before: { keywords: number; total: number | null } };
 type Snap = { id: number; takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string };
-export type KwPick = { siteId: number; now: number; before: number; /** Opened from an alert: focus moves to the comparison once it has loaded. */ fromAlert?: boolean };
+export type KwPick = { siteId: number; now: number; before: number; /** Opened from an alert (a new number each time): focus moves to the comparison once it has loaded. */ fromAlert?: number };
 type View = { pair: { nowId: number; beforeId: number; chosen: boolean; now: Snap; before: Snap } | null; snapshots: Snap[]; snapshotCount: number; watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; nextDayAt?: string; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 
@@ -41,7 +41,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   const placeholder = q.isPlaceholderData;
   // Opened from an alert: once that pair has loaded, keyboard and screen-reader focus moves to it (not on every pick —
   // choosing a snapshot in a select must leave focus in the select).
-  const focusFor = mine?.fromAlert && q.data && !placeholder && q.data.pair?.nowId === mine.now && q.data.pair.beforeId === mine.before ? `${mine.now}-${mine.before}` : null;
+  const focusFor = mine?.fromAlert && q.data && !placeholder && q.data.pair?.nowId === mine.now && q.data.pair.beforeId === mine.before ? `${mine.now}-${mine.before}-${mine.fromAlert}` : null;
   useEffect(() => { if (focusFor) document.getElementById("keyword-watch-heading")?.focus({ preventScroll: true }); }, [focusFor]);
   const [tab, setTab] = useState<"added" | "gone" | "pages">("added");
   // The day for snapshots changes at midnight UTC: when it does, what can be taken changes, so the panel asks again then.
@@ -79,15 +79,25 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   const pages = c?.pages ?? [];
   // Visits: an estimate known for none of a page's keywords is "not known", not zero.
   const visits = (x: Side) => (x.keywords > 0 && x.unknown === x.keywords ? "—" : `${fmtNum(Math.round(x.visits))}${x.unknown > 0 ? "*" : ""}`);
-  // A page that lost keywords or visits between the two snapshots can go on the plan, with what it rests on.
-  const declined = (p: PageChange) => p.path !== null && p.path.length <= 150 && (p.after.keywords < p.before.keywords || p.after.visits < p.before.visits);
+  // Visits are compared only when every keyword on both sides has an estimate: a missing estimate is not a fall.
+  const comparable = (p: PageChange) => p.before.unknown === 0 && p.after.unknown === 0;
+  // A page that lost keywords — or, where they can be compared, visits — can go on the plan with what it rests on.
+  // Its address must be known and fit a task; otherwise the row says why it cannot be planned.
+  const declined = (p: PageChange) => p.after.keywords < p.before.keywords || (comparable(p) && p.after.visits < p.before.visits);
+  const plannable = (p: PageChange) => !!p.url && p.url.length <= 500;
+  const words = c?.basis === "whole" ? { in: "newly seen", out: "no longer seen" } : c?.basis === "top" ? { in: `entered the top ${fmtNum(d.rows)}`, out: `left the top ${fmtNum(d.rows)}` } : { in: "in the newer snapshot only", out: "in the older snapshot only" };
   const pageTask = (p: PageChange): PlanTask => ({
     kind: "page", title: `Review ${p.path}: ${p.before.keywords} → ${p.after.keywords} keywords in the search data (${fmtDate(c!.since)} → ${fmtDate(c!.takenOn)})`.slice(0, 200),
-    target: `https://${site.domain}${p.path}`.slice(0, 500),
-    facts: { keywordsBefore: p.before.keywords, keywordsAfter: p.after.keywords, visitsBefore: Math.round(p.before.visits), visitsAfter: Math.round(p.after.visits), noLongerSeen: p.gone, nowAnotherPage: p.movedOut, since: c!.since, takenOn: c!.takenOn, basis: c!.basis },
-    source: `kw-page:${d.pair?.beforeId}-${d.pair?.nowId}:${p.path}`,
+    target: p.url,
+    facts: {
+      keywordsBefore: p.before.keywords, keywordsAfter: p.after.keywords,
+      // Visits only where they can be compared; otherwise null, with how many keywords had no estimate.
+      visitsBefore: comparable(p) ? Math.round(p.before.visits) : null, visitsAfter: comparable(p) ? Math.round(p.after.visits) : null, noEstimate: p.before.unknown + p.after.unknown,
+      onlyInOlder: p.gone, nowAnotherPage: p.movedOut, since: c!.since, takenOn: c!.takenOn, basis: c!.basis, market: place(c!).slice(0, 60),
+    },
+    source: `kw-page:${d.pair?.beforeId}-${d.pair?.nowId}:${p.id}`,
   });
-  const why = (p: PageChange) => [p.added && `${p.added} newly seen`, p.movedIn && `${p.movedIn} now with this page (another before)`, p.gone && `${p.gone} no longer seen`, p.movedOut && `${p.movedOut} now with another page`].filter(Boolean).join(", ") || "same keywords";
+  const why = (p: PageChange) => [p.added && `${p.added} ${words.in}`, p.movedIn && `${p.movedIn} ${p.path === null ? "with no page given now" : "now with this page (another before)"}`, p.pageNewlyGiven && `${p.pageNewlyGiven} whose page was not given before`, p.gone && `${p.gone} ${words.out}`, p.movedOut && `${p.movedOut} ${p.path === null ? "with a page given now" : "now with another page"}`, p.pageNoLongerGiven && `${p.pageNoLongerGiven} whose page is not given now`].filter(Boolean).join(", ") || "same keywords";
   const whole = c?.basis === "whole";
   const place = (x: { locationCode: number; languageCode: string }) => marketLabel(x.locationCode, x.languageCode);
   const snapLabel = (x: Snap) => `${fmtDate(x.takenOn)} — ${fmtNum(x.keywords)} keyword${x.keywords === 1 ? "" : "s"}${x.whole === false ? " (cut at the limit)" : x.whole === null ? " (total not known)" : ""}`;
@@ -104,7 +114,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
           <h2 id="keyword-watch-heading" tabIndex={-1} className="g-text text-[16px] font-medium outline-none">Searches newly seen, and no longer seen, for {site.domain}</h2>
           <p className="g-text-2 mt-1 max-w-3xl text-[13px]">Once a month, a snapshot of the searches our search data has the site ranking for — up to its {fmtNum(d.rows)} highest-traffic ones — is compared with the snapshot before it. It goes beyond the keywords you track, but it is the data's view, not Google's own: a search can be "newly seen" because the data started measuring it, and "no longer seen" while the site still ranks. The monthly snapshot uses your included SEO data only{price != null ? ` (up to ${money(price)} each)` : ""}; when that has run out it is skipped, never charged to credit you bought.</p>
         </div>
-        <label className="flex min-h-9 items-center gap-2 text-[13px]"><input type="checkbox" checked={set.isPending && set.variables ? set.variables.watch : d.watch} aria-busy={set.isPending} disabled={placeholder} onChange={(e) => { if (!set.isPending && !placeholder) set.mutate({ siteId: site.id, watch: e.target.checked }); }} data-testid="checkbox-keyword-watch" /><span className="g-text">Watch every month</span></label>
+        <label className="flex min-h-9 items-center gap-2 text-[13px]"><input type="checkbox" checked={set.isPending && set.variables?.siteId === site.id ? set.variables.watch : d.watch} aria-busy={set.isPending && set.variables?.siteId === site.id} disabled={placeholder} onChange={(e) => { if (!(set.isPending && set.variables?.siteId === site.id) && !placeholder) set.mutate({ siteId: site.id, watch: e.target.checked }); }} data-testid="checkbox-keyword-watch" /><span className="g-text">Watch every month</span></label>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px]">
         <span className="g-text-2" data-testid="text-keyword-watch-state">
@@ -160,12 +170,12 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
                 <thead><tr><th>Page</th><th className="num">Keywords {fmtDate(c.since)}</th><th className="num">Keywords {fmtDate(c.takenOn)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.since)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.takenOn)}</th><th>What moved</th><th><span className="sr-only">Action plan</span></th></tr></thead>
                 <tbody>
                   {pages.slice(0, shown).map((p) => (
-                    <tr key={p.path ?? "(none)"}>
-                      <td className="max-w-[16rem] truncate" title={p.path ?? undefined}>{p.path ?? <span className="g-text-2">page not given</span>}</td>
+                    <tr key={p.id}>
+                      <td className="max-w-[18rem] !whitespace-normal break-all" data-label="Page">{p.path ?? <span className="g-text-2">page not given</span>}{p.cut && <span className="g-text-2 block text-[11px]">address kept only to 300 characters in an older snapshot</span>}</td>
                       <td className="num" data-label={`Keywords ${fmtDate(c.since)}`}>{fmtNum(p.before.keywords)}</td><td className="num" data-label={`Keywords ${fmtDate(c.takenOn)}`}>{fmtNum(p.after.keywords)}</td>
                       <td className="num" data-label={`Est. visits ${fmtDate(c.since)}`}>{visits(p.before)}</td><td className="num" data-label={`Est. visits ${fmtDate(c.takenOn)}`}>{visits(p.after)}</td>
                       <td className="g-text-2 !whitespace-normal text-[12px]" data-label="What moved">{why(p)}</td>
-                      <td className="num">{declined(p) && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-kwpage-${p.path}`} tasks={[pageTask(p)]} />}</td>
+                      <td className="num">{declined(p) && (plannable(p) ? <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-kwpage-${p.id}`} tasks={[pageTask(p)]} /> : <span className="g-text-2 text-[12px]">{p.url ? "Address too long to plan" : "Page not known"}</span>)}</td>
                     </tr>
                   ))}
                 </tbody>

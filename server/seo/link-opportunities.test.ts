@@ -46,7 +46,7 @@ describe("internal links to add", () => {
     const both = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding"), ...Array.from({ length: 8 }, (_, i) => page(`/a-${i}`, "our cedar siding repair work")), ...Array.from({ length: 8 }, (_, i) => page(`/b-${i}`, "about cedar shingle siding")), ...Array.from({ length: 30 }, (_, i) => page(`/x-${i}`, "other"))], [target(1, "cedar siding repair", "/siding"), target(2, "cedar shingle siding", "/siding")]);
     expect(both.items).toHaveLength(LINK_OPP_PER_TARGET);
     // No crawled pages at all: nothing is known about the links, and nothing is suggested.
-    expect(findLinkOpportunities([], [])).toEqual({ linksMeasured: false, targets: 0, boilerplate: 0, notRanking: 0, notCrawled: 0, notUsable: 0, tooShort: 0, cutPages: 0, items: [], more: 0 });
+    expect(findLinkOpportunities([], [])).toEqual({ linksMeasured: false, targets: 0, boilerplate: 0, notRanking: 0, notCrawled: 0, notUsable: 0, tooShort: 0, aliasesCut: 0, cutPages: 0, items: [], more: 0 });
   });
   it("a keyword that did not rank in its newest check is not looked for; an error or noindex page is counted apart from one not reached", () => {
     const out = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding"), page("/old", "x", [`${H}/`], { status: 404 }), page("/post", "vinyl siding and metal roofing and gutter guards"), ...filler],
@@ -105,5 +105,12 @@ describe("internal links to add", () => {
     // The task identity does not depend on which copy the crawl found first.
     const reversed = findLinkOpportunities([page("/", "Home", [`${H}/gutters`]), page("/gutters", "Gutters"), ...[...copies].reverse(), ...filler], [target(1, "seamless gutters", "/gutters")]);
     expect(reversed.items.map((i) => i.pair)).toEqual(once.items.map((i) => i.pair));
+  });
+  it("a chain of any length resolves; a ranking page with more aliases than were kept gets no suggestions", () => {
+    const chain = Array.from({ length: 70 }, (_, i) => page(`/r${i}`, "x", [`${H}/`], { canonical: i < 69 ? `${H}/r${i + 1}` : `${H}/siding` }));
+    const long = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding"), ...chain, page("/post", "We install vinyl siding.", [`${H}/r0`]), ...filler], [target(1, "vinyl siding", "/siding")]);
+    expect(long.items).toEqual([]);   // /post links to /r0, which leads (70 steps on) to /siding
+    const cut = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding", [`${H}/`], { redirectsCut: true }), page("/post", "We install vinyl siding."), ...filler], [target(1, "vinyl siding", "/siding")]);
+    expect([cut.items, cut.aliasesCut]).toEqual([[], 1]);
   });
 });

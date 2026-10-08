@@ -31,7 +31,7 @@ export const MIN_PHRASE = 6;
  * this is a frequency guess, and the view says so.
  */
 export const BOILERPLATE_SHARE = 0.5, BOILERPLATE_MIN_PAGES = 5;
-export type OppPage = { url: string; status: number; noindex: boolean; title: string | null; text: string; links: string[]; /** Addresses that redirected to this page in the crawl. */ redirects?: string[]; canonical?: string | null };
+export type OppPage = { url: string; status: number; noindex: boolean; title: string | null; text: string; links: string[]; /** Addresses that redirected to this page in the crawl. */ redirects?: string[]; /** More redirected here than were kept. */ redirectsCut?: boolean; canonical?: string | null };
 export type OppTarget = {
   keywordId: number; keyword: string; volume: number | null; position: number | null; /** The site's page that ranks, in the keyword's newest check. */ url: string | null;
   /** The newest check of the keyword: its day, the device the position is from, the place it was checked from. */ checkedOn: string | null; device: string | null; place: string | null;
@@ -48,6 +48,7 @@ export type LinkOpportunities = {
   /** Tracked keywords left out as menu or footer text (see BOILERPLATE_SHARE); not counted in `targets`. */ boilerplate: number;
   /** Tracked keywords not looked for, by reason: no ranking page in the newest check; the ranking page was not reached by the crawl; it was reached but answered an error, a redirect or noindex; the words are too short to mean anything. */
   notRanking: number; notCrawled: number; notUsable: number; tooShort: number;
+  /** Ranking pages more addresses redirected to than the crawl kept: a page may already link through one of them, so nothing is suggested for them. */ aliasesCut: number;
   /** Pages whose text was longer than was read (LINK_OPP_TEXT): a mention further down is not seen. */ cutPages: number;
   items: LinkOpportunity[]; /** More were found than are listed. */ more: number;
 };
@@ -65,8 +66,7 @@ function contextOf(text: string, keyword: string): string {
 /** Identity of a suggested link: the two pages' identities (after aliases), hashed. */
 const pairOf = (fromKey: string, toKey: string) => createHash("sha256").update(`${fromKey}\u0000${toKey}`).digest("hex").slice(0, 24);
 export const pairKey = (from: string, to: string) => pairOf(sameUrlKey(from), sameUrlKey(to));
-/** How far an alias chain is followed; a longer one, or a loop, is left unresolved (the address stands for itself). */
-const MAX_ALIAS_HOPS = 50;
+
 
 /**
  * Which crawled page an address stands for, by what the crawl saw: the page itself, an address that redirected to it,
@@ -82,14 +82,14 @@ function aliasesOf(pages: readonly OppPage[]): (u: string) => string {
     const k = sameUrlKey(p.url);
     if (typeof p.canonical === "string" && p.canonical && !to.has(k)) { const c = sameUrlKey(p.canonical); if (c !== k) to.set(k, c); }
   }
-  // Followed to its end (redirect -> copy -> the page it names canonical). A loop, or a chain longer than
-  // MAX_ALIAS_HOPS, has no end: the address is then left as itself, the same whichever address of it is asked about.
+  // Followed to its end (redirect -> copy -> the page it names canonical) however long — the chain can be no longer
+  // than the crawl's own addresses. A loop has no end: its addresses are left as themselves, whichever is asked about.
   return (u: string) => {
     const start = sameUrlKey(u);
     let k = start;
-    for (let n = 0, seen = new Set([k]); to.has(k); n++) {
+    for (const seen = new Set([k]); to.has(k); ) {
       const next = to.get(k)!;
-      if (seen.has(next) || n >= MAX_ALIAS_HOPS) return start;
+      if (seen.has(next)) return start;
       seen.add(next); k = next;
     }
     return k;
@@ -106,16 +106,17 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   const crawled = new Set(pages.filter((p) => sameUrlKey(p.url) === resolve(p.url)).map((p) => sameUrlKey(p.url)));
   const byKey = new Map<string, OppPage>();
   for (const p of usable) { const k = resolve(p.url); if (sameUrlKey(p.url) === k && !byKey.has(k)) byKey.set(k, p); }
-  let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0;
+  let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0, aliasesCut = 0;
   const known: (OppTarget & { url: string })[] = [];
   for (const t of targets) {
     if (!t.url || t.position === null) notRanking++;
     else if (!byKey.has(resolve(t.url))) { if (crawled.has(resolve(t.url))) notUsable++; else notCrawled++; }
+    else if (byKey.get(resolve(t.url))!.redirectsCut) aliasesCut++;
     else if (flat(t.keyword).trim().length < MIN_PHRASE) tooShort++;
     else known.push(t as OppTarget & { url: string });
   }
   const cutPages = usable.filter((p) => p.text.length >= LINK_OPP_TEXT).length;
-  const empty = { linksMeasured: measured, targets: known.length, boilerplate: 0, notRanking, notCrawled, notUsable, tooShort, cutPages, items: [], more: 0 };
+  const empty = { linksMeasured: measured, targets: known.length, boilerplate: 0, notRanking, notCrawled, notUsable, tooShort, aliasesCut, cutPages, items: [], more: 0 };
   if (!measured || !known.length) return empty;
   // One source per identity: copies of a page (they name it canonical) are that page, counted once — the page itself
   // when it is usable, otherwise the copy with the first address in order (the same whatever order the crawl found them).
@@ -163,7 +164,7 @@ const TEXT_PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'noindex', COALESCE(p->'noindex' = 'true'::jsonb, false), 'title', p->>'title',
     'text', left(COALESCE(p->>'text', ''), ${LINK_OPP_TEXT}),
     'canonical', CASE WHEN jsonb_typeof(p->'canonical')='string' THEN p->>'canonical' END,
-    'redirects', ${strings("redirects", 100)},
+    'redirects', ${strings("redirects", 100)}, 'redirectsCut', COALESCE(p->'redirectsCut' = 'true'::jsonb, false),
     'links', ${strings("links", LINK_OPP_LINKS)}) ORDER BY ord)
   FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
  WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;
@@ -186,6 +187,19 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
         AND c.checked_on = (SELECT max(c2.checked_on) FROM seo_rank_checks c2 WHERE c2.keyword_id=c.keyword_id AND c2.site_id=$1)
       ORDER BY c.keyword_id, (c.position IS NULL OR c.url IS NULL), c.position ASC, c.device`, [site.id, userId]);
   const checkedOn = targets.map((t: any) => String(t.checkedOn)).sort().pop() ?? null;
+  // Links planned before tasks were identified by their pair of pages ("link-opp:…") take the identity the suggestions
+  // use now — both addresses through this crawl's aliases — so a link planned from a copy of a page is the same link.
+  const { rows: legacy } = await pool.query("SELECT id, target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND source LIKE 'link-opp:%' AND target IS NOT NULL", [site.id, userId]);
+  if (legacy.length) {
+    const { rows: [j] } = await pool.query(`SELECT ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, userId]);
+    const resolve = aliasesOf((j?.pages ?? []) as OppPage[]);
+    for (const t of legacy) {
+      if (typeof t.link_to !== "string" || !t.link_to) continue;
+      // Left as it is when a task with the new identity is already there (the plan keeps one task per link).
+      await pool.query("UPDATE seo_tasks SET source=$1 WHERE id=$2 AND source LIKE 'link-opp:%' AND NOT EXISTS (SELECT 1 FROM seo_tasks WHERE site_id=$3 AND source=$1)",
+        [`link-pair:${pairOf(resolve(t.target), resolve(t.link_to))}`, t.id, site.id]).catch((e) => console.error(`[seo] link task ${t.id} kept its old identity: ${e?.message ?? e}`));
+    }
+  }
   const cacheKey = `${userId}:${newest.id}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
   const kept = worked.get(cacheKey);
   if (kept) return kept;

@@ -53,6 +53,8 @@ export type Page = {
     viewport: boolean;
   };
   redirects: string[];
+  /** More addresses redirected here than are kept (100): which addresses lead to this page is not fully known. */
+  redirectsCut?: boolean;
 };
 /**
  * Addresses that have no page, asked for once per crawl to see how the site answers for a missing page. They are
@@ -463,8 +465,10 @@ export async function crawl(
         if (saved) {
           // The address that led here is an alias of the saved page: kept, so "this page already links there" can see it.
           for (const redirect of r.redirects)
-            if (!saved.redirects.includes(redirect) && saved.redirects.length < 100)
-              saved.redirects.push(redirect);
+            if (!saved.redirects.includes(redirect)) {
+              if (saved.redirects.length < 100) saved.redirects.push(redirect);
+              else saved.redirectsCut = true;
+            }
           state.queue.shift();
           await checkpoint(state);
           continue;

@@ -35,7 +35,11 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
   // vinyl siding: ranked 5 days ago, NOT ranked in its newest check (yesterday). metal roofing: newest check today, better on mobile.
   await check(vinyl, 5, "desktop", 7, `${H}/siding`); await check(vinyl, 1, "desktop", null, null); await check(vinyl, 1, "mobile", null, null);
   await check(metal, 0, "desktop", 14, `${H}/roofing`); await check(metal, 0, "mobile", 9, `${H}/roofing`);
+  // A link planned under the old identity, written another way and pointing at the printable copy of /roofing.
+  const { rows: [old] } = await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES(1,$1,'page','old','http://www.linkopps.example/blog/a/',$2,'link-opp:9:/blog/a') RETURNING id", [site.id, JSON.stringify({ linkTo: `${H}/roofing-print` })]);
   const a = await linkOpportunities(1, site);
+  const migrated = (await pool.query("SELECT source FROM seo_tasks WHERE id=$1", [old.id])).rows[0].source;
+  ok(a && migrated === `link-pair:${a.items[0]?.pair}`, `an old link task takes the identity of the same link today (through the copy's canonical): ${migrated} vs ${a?.items[0]?.pair}`);
   ok(a && a.items.length === 1 && a.items[0].keyword === "metal roofing" && a.items[0].from === `${H}/blog/a`, `only the keyword that ranks in its newest check is looked for: ${JSON.stringify(a?.items.map((i) => i.keyword))}`);
   ok(a && a.notRanking === 1, "the keyword that stopped ranking is counted as not ranking, not looked for with its old page");
   ok(a && a.items.length === 1 && a.items[0].to === `${H}/roofing`, `the destination is the ranking page, not its canonical copy, and the post linking through the old address is left alone: ${JSON.stringify(a?.items.map((i) => [i.from, i.to]))}`);
