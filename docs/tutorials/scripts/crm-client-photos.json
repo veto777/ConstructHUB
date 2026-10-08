@@ -1,0 +1,159 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-photos",
+  "title": "Keep before-and-after photos on a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "narration": "Keep before and after photos with the client they belong to. Start by opening the client.",
+      "chapter": "Open the client"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Rosa & Stefan Ferrante\")",
+      "caption": "Open the client",
+      "narration": "We'll use Rosa and Stefan Ferrante.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-customer-photos\"]",
+      "caption": "Project Photos",
+      "narration": "Scroll down to Project Photos. There is nothing here for this client yet."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-photo-stage\"]",
+      "caption": "The stage",
+      "narration": "Photos are filed as In progress or Finished. The list starts on In progress.",
+      "chapter": "Add in-progress photos"
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid=\"button-add-project-photos\"]",
+      "files": [
+        "photos/site-06.jpg",
+        "photos/site-03.jpg"
+      ],
+      "caption": "Add photos",
+      "narration": "Choose Add photos, and pick them from your computer or your phone."
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid=\"customer-photo-strip\"] >> text=In progress >> nth=1",
+      "timeoutMs": 60000,
+      "caption": "Uploading",
+      "narration": "They upload one after the other."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"customer-photo-strip\"]",
+      "caption": "Tagged In progress",
+      "narration": "Here they are. Each one is tagged In progress."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-photo-stage\"]",
+      "value": "Finished",
+      "caption": "Switch to Finished",
+      "chapter": "Add the finished photo",
+      "narration": "When the job is done, switch the list to Finished."
+    },
+    {
+      "action": "upload",
+      "selector": "[data-testid=\"button-add-project-photos\"]",
+      "files": [
+        "photos/site-02.jpg"
+      ],
+      "caption": "Add the after shot",
+      "narration": "Then add the after shot the same way."
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid=\"customer-photo-strip\"] >> text=Finished",
+      "timeoutMs": 60000,
+      "caption": "Uploading",
+      "narration": "Give it a moment."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"customer-photo-strip\"]",
+      "caption": "Before and after",
+      "narration": "Now the before and the after sit side by side, each with its tag."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid=\"customer-photo-strip\"] [data-testid^=\"customer-photo-\"] >> nth=0",
+      "caption": "Delete",
+      "narration": "Point at a photo and a small bin appears, to delete it."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "ferrantes@example.com"
+      },
+      "caption": "The client's portal",
+      "chapter": "What your client sees",
+      "narration": "Now your client, signed in to their portal."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"portal-nav-photos\"]",
+      "caption": "Photos",
+      "narration": "They choose Photos.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"client-photo-grid\"]",
+      "caption": "The same photos",
+      "narration": "The same three photos are there. They can add their own with Add a photo."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/clients",
+      "holdMs": 1200,
+      "caption": "Back in the CRM",
+      "narration": "Back in your CRM,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "Project Photos is on every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to keep before-and-after photos on a client | ConstructHUB CRM",
+    "description": "Add in-progress and finished photos to a client's page in ConstructHUB CRM, see each one tagged with its stage, and check how the client sees them in their portal. The walkthrough uses a demo company, a demo client and drawn sample photos.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "before and after photos",
+      "job photos",
+      "client portal",
+      "project photos",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Before and after",
+    "accent": "after",
+    "kicker": "CRM Tutorial",
+    "step": 10
+  }
+}
