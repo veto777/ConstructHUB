@@ -30,6 +30,7 @@ export { default as v_crm_estimate_client_view } from "./crm-estimate-client-vie
 export { default as v_crm_estimate_discounts } from "./crm-estimate-discounts.json";
 export { default as v_crm_estimate_edit } from "./crm-estimate-edit.json";
 export { default as v_crm_estimate_options } from "./crm-estimate-options.json";
+export { default as v_crm_estimate_client_options } from "./crm-estimate-client-options.json";
 export { default as v_crm_estimate_quick } from "./crm-estimate-quick.json";
 export { default as v_crm_estimate_tracking } from "./crm-estimate-tracking.json";
 export { default as v_crm_estimates } from "./crm-estimates.json";
