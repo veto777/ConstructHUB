@@ -73,6 +73,7 @@ export const GRID_WATCH_DDL = [
   `DO $$ BEGIN
      LOCK TABLE seo_alerts IN SHARE ROW EXCLUSIVE MODE;
      IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'seo_alerts'::regclass AND conname = 'seo_alerts_kind_check' AND pg_get_constraintdef(oid) LIKE '%grid_down%') THEN
+       -- A later step (server/seo/keyword-watch.ts) widens this rule again; once it has, this one finds 'grid_down' and leaves it alone.
        ALTER TABLE seo_alerts DROP CONSTRAINT IF EXISTS seo_alerts_kind_check;
        ALTER TABLE seo_alerts ADD CONSTRAINT seo_alerts_kind_check CHECK (kind IN ('rank_drop','rank_gain','links_lost','links_gained','grid_down','grid_up'));
      END IF;

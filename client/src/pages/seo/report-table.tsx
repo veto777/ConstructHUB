@@ -173,14 +173,39 @@ const HAS: Record<string, TableKey[]> = {
 };
 /** Reports that can be narrowed to one section or one page of the site (server/seo/reports.ts SCOPED_TABLES). */
 const SCOPED: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
-/** What was typed, as a path on the site: a pasted address is cut down to its path; "blog" becomes "/blog". null = not usable. */
-export function scopePathOf(raw: string, domain: string): string | null {
+/**
+ * What was typed, as a path on the site. A pasted address must be on this site (with or without "www") — one from
+ * another site is refused, not quietly applied here; its #fragment is dropped (a place on a page, not a page);
+ * "blog" becomes "/blog". Pure.
+ */
+export function scopePathOf(raw: string, domain: string): { path: string } | { error: string } {
   let v = raw.trim();
-  if (!v) return null;
-  if (/^https?:\/\//i.test(v)) { try { const u = new URL(v); v = u.pathname + u.search; } catch { return null; } }
-  else { const bare = domain.replace(/^www\./, ""); const m = v.replace(/^www\./, ""); if (m.toLowerCase().startsWith(`${bare.toLowerCase()}/`)) v = m.slice(bare.length); }
-  if (!v.startsWith("/")) v = `/${v}`;
-  return /^\/[^\s%\\]*$/.test(v) && v.length <= 300 ? v : null;
+  const site = domain.toLowerCase().replace(/^www\./, "");
+  const bad = { error: "Enter a path on this site, such as /blog/ — no spaces." };
+  if (!v) return bad;
+  // An address in any of the ways one is pasted: with its scheme, without it ("//host/…"), or starting with the site's own name.
+  const asUrl = /^https?:\/\//i.test(v) ? v : v.startsWith("//") ? `https:${v}` : new RegExp(`^(www\\.)?${site.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([:/]|$)`, "i").test(v) ? `https://${v}` : null;
+  if (asUrl) {
+    let u: URL; try { u = new URL(asUrl); } catch { return bad; }
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    if (host !== site) return { error: `That address is on ${u.hostname}, not ${domain}. Open that site in Site explorer to look at its pages${host.endsWith(`.${site}`) ? " — a sub-domain is its own site here" : ""}.` };
+    // What cannot be matched is said, not quietly dropped: another port is another site to a browser, and a sign-in is not part of an address.
+    if (u.port) return { error: `That address is on port ${u.port}. Only the site's ordinary address can be looked at here — leave the port out if the page is the same.` };
+    if (u.username || u.password) return { error: "Leave the user name and password out of the address." };
+    v = u.pathname + u.search;
+  } else {
+    v = v.split("#")[0];
+    if (!v.startsWith("/")) v = `/${v}`;
+  }
+  // A "?" with nothing after it is no query (the server reads it the same way).
+  v = v.replace(/\?$/, "");
+  return /^\/(?!\/)[^\s\\#]*$/.test(v) && v.length <= 300 ? { path: v } : bad;
+}
+/** The one spelling of a scope (the server's rule, server/seo/reports.ts canonicalScope): no last slash unless there is a query; the section "/" is the whole site. */
+export function canonicalScope(path: string, exact: boolean): { path: string; exact: boolean } | null {
+  const q = path.replace(/\?$/, "");
+  const p = q.includes("?") ? q : q.replace(/\/+$/, "") || "/";
+  return p === "/" && !exact ? null : { path: p, exact };
 }
 const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains", competitors: "Domain contains", bestByLinks: "URL contains" };
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
@@ -194,6 +219,7 @@ function csvOf(cols: Col[], rows: any[]): string {
 /** Reports that differ by country; link reports are the same everywhere, so they are not bought again per country. */
 const BY_COUNTRY: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "competitors", "subdomains", "ads", "matchingTerms", "relatedTerms", "questions"]);
 
+const sortKeyOf = (table: TableKey, sort: string) => (SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0]);
 export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction, market }: {
   /** The country to look at (United States when absent). */
   market?: { locationCode: number; languageCode: string };
@@ -202,7 +228,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
   onExplore?: (domain: string) => void;
   /** Keyword tables: track the ticked keywords (the page supplies the site). */
-  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => void;
+  onTrack?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[]) => void | Promise<unknown>;
   trackLabel?: string;
 }) {
   const qc = useQueryClient();
@@ -218,10 +244,11 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState<25 | 50 | 100>(50);
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** A tracking request is on its way: the button waits, and the ticks are cleared only when it has succeeded. */
+  const [tracking, setTracking] = useState(false);
   // A different report or target starts clean.
   useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); setScopeDraft({ text: "", exact: false }); setScope(null); setScopeError(null); }, [table, target]);
   const scoped = !!domain && SCOPED.has(table);
-
   // Belt and braces with the remount: a sort the report does not have is never sent.
   const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
   const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
@@ -231,6 +258,10 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
+  const rowsOf = saved.data?.page?.fetchedAt ?? null;
+  // The ticks belong to the rows on screen: another page of rows starts with none, so the number on the button is what is sent.
+  // ("rowsOf" changes when the rows themselves are replaced under the same page — a fresh purchase, a refresh.)
+  useEffect(() => { setPicked(new Set()); }, [offset, limit, sortKeyOf(table, sort), rowsOf]); // eslint-disable-line react-hooks/exhaustive-deps
   const run = useMutation({
     mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/report", v.body),
     onSuccess: (data: { page: Page; saved?: boolean }, v) => {
@@ -258,11 +289,11 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     // The section first: a path that cannot be used is said, and nothing else changes until it is put right.
     if (scoped) {
       const typed = scopeDraft.text.trim();
-      const path = typed ? scopePathOf(typed, domain!) : null;
-      if (typed && !path) { setScopeError("Enter a path on this site, such as /blog/ — no spaces or % signs."); return; }
-      if (scopeDraft.exact && !path) { setScopeError("Say which page: a path such as /services/roofing."); return; }
+      const parsed = typed ? scopePathOf(typed, domain!) : null;
+      if (parsed && "error" in parsed) { setScopeError(parsed.error); return; }
+      if (scopeDraft.exact && !parsed) { setScopeError("Say which page: a path such as /services/roofing."); return; }
       setScopeError(null);
-      setScope(path && !(path === "/" && !scopeDraft.exact) ? { path, exact: scopeDraft.exact } : null);
+      setScope(parsed ? canonicalScope(parsed.path, scopeDraft.exact) : null);
     }
     setFilters(Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters); setOffset(0); setPicked(new Set());
   };
@@ -270,7 +301,10 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     if (!page) return;
     const blob = new Blob([csvOf(cols, page.rows)], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = `${target.replace(/[^a-z0-9.-]+/gi, "-")}-${table}-${offset + 1}-${offset + page.rows.length}.csv`;
+    // The file name says what the rows are: the site, the section or page when narrowed, the report, the country when it matters, the rows.
+    const slug = (v: string) => v.replace(/[^a-z0-9.-]+/gi, "-").replace(/^-+|-+$/g, "");
+    const scopeName = scoped && scope ? `-${scope.exact ? "page" : "section"}-${slug(scope.path) || "home"}` : "";
+    a.href = URL.createObjectURL(blob); a.download = `${slug(target)}${scopeName}-${table}${loc ? `-${loc}-${lang}` : ""}-${offset + 1}-${offset + page.rows.length}.csv`;
     a.click(); URL.revokeObjectURL(a.href);
   };
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
@@ -327,7 +361,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       {scopeError && <p id={`scope-error-${table}`} className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="scope-error">{scopeError}</p>}
       {scoped && scope && (
         <p className="g-text mb-2 text-[13px]" role="status" data-testid="text-scope">
-          Narrowed to {scope.exact ? "the page" : "pages under"} <b className="font-medium">{domain}{scope.path}</b>{scope.exact ? " (with or without its last slash)" : ""}{domain && !scope.exact ? " — including the same path on any sub-domain" : ""}. A narrowed report is saved, and paid for, separately from the whole site's.{" "}
+          Narrowed to {scope.exact ? "the page" : "the section"} <b className="font-medium">{domain}{scope.path}</b>
+          {scope.exact ? (scope.path.includes("?") ? " — that address exactly as written" : " — with or without its last slash") : ` — that page and everything under it (${scope.path}/…), not paths that merely begin the same`}, on {domain} with or without "www"; sub-domains are not included. A narrowed report is saved, and paid for, separately from the whole site's.{" "}
           <button type="button" className="g-link" onClick={() => { setScope(null); setScopeDraft({ text: "", exact: false }); setOffset(0); setPicked(new Set()); }} data-testid="button-scope-clear">Show the whole site</button>
         </p>
       )}
@@ -362,12 +397,18 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
               {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""} · as of {fmtDate(page.fetchedAt)}
             </span>
             <span className="flex flex-wrap items-center gap-2">
-              {trackable && extraAction && picked.size > 0 && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
-              {trackable && onTrack && picked.size > 0 && <Button size="sm" onClick={() => { onTrack(page.rows.filter((r) => picked.has(r.keyword))); setPicked(new Set()); }} data-testid="button-track-picked">{trackLabel ?? "Track"} ({picked.size})</Button>}
+              {trackable && extraAction && page.rows.some((r) => picked.has(r.keyword)) && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
+              {trackable && onTrack && page.rows.some((r) => picked.has(r.keyword)) && (
+                <Button size="sm" disabled={tracking} aria-busy={tracking} data-testid="button-track-picked" onClick={() => {
+                  const out = onTrack(page.rows.filter((r) => picked.has(r.keyword)));
+                  // The page says when tracking has finished (it returns a promise): the ticks go only on success; on failure they stay for another try.
+                  if (out && typeof (out as Promise<unknown>).then === "function") { setTracking(true); (out as Promise<unknown>).then(() => setPicked(new Set()), () => {}).finally(() => setTracking(false)); }
+                }}>{tracking ? "Tracking…" : `${trackLabel ?? "Track"} (${page.rows.filter((r) => picked.has(r.keyword)).length})`}</Button>
+              )}
               <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={download} data-testid="button-export-csv"><Download /> Export CSV</button>
             </span>
           </div>
-          {page.rows.length === 0 ? <Empty testId="report-empty">{Object.keys(filters).length ? "Nothing matches. Try wider filters." : EMPTY_NOTE[table] ?? "Nothing was found for this site."}</Empty> : (
+          {page.rows.length === 0 ? <Empty testId="report-empty">{scoped && scope ? <>Nothing {Object.keys(filters).length ? "matches these filters" : "was found"} for {scope.exact ? "the page" : "the section"} {domain}{scope.path}. <button type="button" className="g-link" onClick={() => { setScope(null); setScopeDraft({ text: "", exact: false }); setOffset(0); setPicked(new Set()); }}>Show the whole site</button></> : Object.keys(filters).length ? "Nothing matches. Try wider filters." : EMPTY_NOTE[table] ?? "Nothing was found for this site."}</Empty> : (
             <div className="overflow-x-auto">
               <table className="g-table" data-testid={`table-${table}`}>
                 <thead><tr>{trackable && <th className="w-8"></th>}{cols.map((c) => <th key={c.key} className={c.num ? "num" : undefined}>{c.label}</th>)}</tr></thead>

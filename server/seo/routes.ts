@@ -52,7 +52,9 @@ import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from ".
 import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
+import { serpGroups } from "./serp-groups";
 import { aiSummary } from "./ai-summary";
+import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
@@ -119,6 +121,8 @@ export const SEO_PRICES = {
   /** Local grid: finding the business on Google Maps, and so much per 100 points scanned. */
   gridLocate: retailCents(GRID_POINT_USD),
   gridPer100: retailCents(100 * GRID_POINT_USD),
+  /** Keyword watch: one snapshot of the searches a site ranks for. */
+  keywordSnapshot: retailCents(KW_SNAPSHOT_ESTIMATE_USD),
   /** Per 100 rank checks (one keyword on one device is one check, top 10). */
   rankChecksPer100: retailCents(estimateRankCheckUsd(Array.from({ length: 100 }, (_, i) => `k${i}`), "desktop", 10).usd),
 };
@@ -150,6 +154,7 @@ export const SEO_HOLDS = {
   contentSearch: retailCents(CONTENT_ESTIMATE_USD),
   gridLocate: retailCents(gridEstimateUsd(1)),
   gridPer100: retailCents(gridEstimateUsd(100)),
+  keywordSnapshot: retailCents(KW_SNAPSHOT_ESTIMATE_USD),
   plannerBase: retailCents(2 * LABS_TASK_USD),
   plannerPer100: retailCents(2 * 100 * LABS_ITEM_USD),
   /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
@@ -1237,10 +1242,40 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ device, devices, tag: q.tag ?? null, tags: tags.map((t: any) => t.tag), days: await rankHistory(site.id, device, q.tag ?? null) });
   });
 
+  // ── Keyword watch: a monthly snapshot of what the site ranks for, compared with the one before ──
+  // The setting, the newest snapshot and what changed since the one before. Saved rows only.
+  route("get", "/api/seo/sites/:id/keyword-watch", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    res.json(await keywordWatchView(user, site));
+  });
+  // Turn the monthly snapshot on or off. Spends nothing itself; the scheduler takes snapshots from the month's included data.
+  route("post", "/api/seo/sites/:id/keyword-watch", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    await setKeywordWatch(user, site.id, watchSetting.parse(req.body).watch);
+    res.json(await keywordWatchView(user, await ownedSite(user, req.params.id)));
+  });
+  // Take today's snapshot — or get it back if it has been taken (one a day, never rewritten; nothing is bought twice).
+  // One at a time per site by a claim in the database, shared with the monthly schedule. Saved before it is charged.
+  route("post", "/api/seo/sites/:id/keyword-watch/snapshot", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    if (!isConfigured()) return notReady(res);
+    const out = await takeKeywordSnapshot(site as any, false);
+    res.status(out.reused ? 200 : 201).json(out);
+  });
+
   // Tracked keywords for which Google has shown different pages of the site from check to check. Saved checks only.
   route("get", "/api/seo/sites/:id/rank-competing", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     res.json(await competingPages(user, site.id));
+  });
+
+  // Tracked keywords whose saved first-page results largely coincide (Google reads them as one question). Saved checks only.
+  route("get", "/api/seo/sites/:id/serp-groups", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const q = historyInput.parse(req.query || {});
+    const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
+    const device = (q.device && devices.includes(q.device) ? q.device : devices[0]) as "desktop" | "mobile";
+    res.json(await serpGroups(user, site.id, device));
   });
 
   // One tracked keyword's position at every saved check.

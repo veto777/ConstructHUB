@@ -5,6 +5,7 @@ import { VOICE_SCHEMA_DDL } from "./voice";
 import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { GRID_SCHEMA_DDL } from "./grid";
 import { RENDER_SCHEMA_DDL } from "./render-check";
+import { KEYWORD_WATCH_DDL, KEYWORD_WATCH_ALERT_DDL } from "./keyword-watch";
 import { GRID_WATCH_DDL } from "./grid-monitor";
 import { TASK_SCHEMA_DDL } from "./tasks";
 import { pool } from "../db";
@@ -124,6 +125,8 @@ export const SEO_SCHEMA_DDL = [
   ...GRID_SCHEMA_DDL,
   // Rendering checks: pages fetched plain and in a browser (server/seo/render-check.ts).
   ...RENDER_SCHEMA_DDL,
+  // Keyword watch: monthly snapshots of what a site ranks for (server/seo/keyword-watch.ts).
+  ...KEYWORD_WATCH_DDL,
   // Followed competitors and the saved result pages (server/seo/voice.ts).
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
@@ -200,6 +203,8 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS planner jsonb`,
   // Last: it changes a rule on seo_alerts, which must exist by now.
   ...GRID_WATCH_DDL,
+  // After the grid's: the alert kinds for the keyword watch (it replaces the same rule with the full list).
+  ...KEYWORD_WATCH_ALERT_DDL,
 ];
 
 export async function ensureSeoSchema() {

@@ -62,8 +62,8 @@ export type ReportFilters = z.infer<typeof reportFilters>;
  * point at, pages. The others (linking sites, anchors, competitors…) are counted for the whole site by the source.
  */
 export const SCOPED_TABLES: ReadonlySet<ReportTable> = new Set<ReportTable>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
-/** A path on the site: starts with "/", no spaces, and none of the characters the source's pattern matching treats as "anything" (% and \). */
-export const scopePath = z.string().trim().min(1).max(300).regex(/^\/[^\s%\\]*$/, "Start the path with / and leave out spaces, % and \\");
+/** A path on the site: starts with "/", no spaces, no backslash and no "#" (a fragment is a place on a page, not a page). */
+export const scopePath = z.string().trim().min(1).max(300).regex(/^\/(?!\/)[^\s\\#]*$/, "Start the path with one / and leave out spaces, # and \\");
 export class TooManyFilters extends Error { constructor() { super("Too many filters at once — remove one and try again."); } }
 
 export const reportInput = z.object({
@@ -146,26 +146,42 @@ export const FILTERS_FOR: Record<ReportTable, readonly (keyof ReportFilters)[]> 
 export function effectiveReport<T extends ReportInput>(input: T): T {
   const allowed = FILTERS_FOR[input.table] as readonly string[];
   const filters = Object.fromEntries(Object.entries(input.filters).filter(([k, v]) => allowed.includes(k) && v !== undefined && v !== false)) as ReportFilters;
-  // "/" alone is the whole site; a report that cannot be narrowed is never keyed (or bought) per section.
-  const path = SCOPED_TABLES.has(input.table) && input.path && !(input.path === "/" && !input.exactPage) ? input.path : undefined;
-  return { ...input, filters, path, exactPage: !!path && !!input.exactPage, sort: input.sort !== undefined && hasSort(input.table, input.sort) ? input.sort : defaultSort(input.table) };
+  // A report that cannot be narrowed is never keyed (or bought) per section, and the whole site is not a "section".
+  const scope = SCOPED_TABLES.has(input.table) ? canonicalScope(input.path, !!input.exactPage) : null;
+  return { ...input, filters, path: scope?.path, exactPage: !!scope?.exact, sort: input.sort !== undefined && hasSort(input.table, input.sort) ? input.sort : defaultSort(input.table) };
 }
 /**
- * The condition that narrows a report to a section or a page. Keyword reports compare the ranking page's path;
- * the others compare a whole address, so the pattern starts with "anything" (the scheme, "www", a sub-domain) and
- * then the site and the path. A section matches every address that goes on from there; one page matches the path
- * as written and the same with or without its last slash. Checked against the source 2026-10-08.
+ * One spelling per scope, so the same section or page is one saved report however it was typed:
+ *  - a path without a query loses its last slash ("/blog/" and "/blog" are the same section, and the same page);
+ *  - a path WITH a query is kept exactly as written — there the slash and every character can matter;
+ *  - the section "/" is the whole site, so it is no scope at all (the PAGE "/" is the home page).
  */
-export function scopeClauses(input: { table: ReportTable; target: string; path?: string; exactPage?: boolean }): (Clause | unknown[])[] {
-  if (!input.path || !SCOPED_TABLES.has(input.table)) return [];
-  const p = input.path, other = p.endsWith("/") ? p.slice(0, -1) : `${p}/`;
-  const both = (field: string, op: string, a: string, b: string): unknown[] => (b === a || b === "" ? [field, op, a] : [[field, op, a], "or", [field, op, b]]);
-  if (input.table === "keywords" || input.table === "paidKeywords") {
-    const field = "ranked_serp_element.serp_item.relative_url";
-    return [input.exactPage ? both(field, "=", p, p.includes("?") ? p : other) : [field, "like", `${p}%`]];
-  }
-  const field = input.table === "pages" ? "page_address" : input.table === "bestByLinks" ? "url" : "url_to";
-  return [input.exactPage ? both(field, "like", `%${input.target}${p}`, p.includes("?") ? `%${input.target}${p}` : `%${input.target}${other}`) : [field, "like", `%${input.target}${p}%`]];
+export function canonicalScope(path: string | undefined, exact: boolean): { path: string; exact: boolean } | null {
+  if (!path) return null;
+  // A "?" with nothing after it is no query: "/p?" is "/p".
+  const q = path.replace(/\?$/, "");
+  const p = q.includes("?") ? q : q.replace(/\/+$/, "") || "/";
+  if (p === "/" && !exact) return null;
+  return { path: p, exact };
+}
+const reEscape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * The ONE condition that narrows a report, as a pattern on a whole address (checked against the source 2026-10-08):
+ *   - the host is the site itself, with or without "www", in any letter case, with or without its scheme's own port
+ *     (:80, :443) — never a sub-domain, never a host that merely ends the same, never another port;
+ *   - a section is the path itself and everything under it ("/blog", "/blog/x", "/blog?p=2" — not "/blogging");
+ *   - one page is the path with or without its last slash, or — when it has a query — exactly as written.
+ * Keyword reports are matched on the ranking page's address; link reports on the address linked to.
+ */
+export function scopeClauses(input: { table: ReportTable; target: string; path?: string; exactPage?: boolean }): Clause[] {
+  const scope = SCOPED_TABLES.has(input.table) ? canonicalScope(input.path, !!input.exactPage) : null;
+  if (!scope) return [];
+  // The scheme and host are matched without regard to case (hosts are case-insensitive); the path keeps its case.
+  const host = `^(?i:https?://(www\\.)?${reEscape(input.target.toLowerCase().replace(/^www\./, ""))})(:(80|443))?`;
+  const base = scope.path.includes("?") || scope.path !== "/" ? reEscape(scope.path) : "";
+  const tail = scope.exact ? (scope.path.includes("?") ? "$" : "/?$") : "(/|\\?|$)";
+  const field = input.table === "keywords" || input.table === "paidKeywords" ? "ranked_serp_element.serp_item.url" : input.table === "pages" ? "page_address" : input.table === "bestByLinks" ? "url" : "url_to";
+  return [[field, "regex", `${host}${base}${tail}`]];
 }
 
 /** How a question starts, by language (the Questions report keeps only searches that start this way). */
@@ -518,7 +534,8 @@ export const reportCacheKey = (i: ReportInput & { target: string }) =>
   // A report that does not depend on the country is keyed as the United States whatever was sent, so it is one saved page, not one per country.
   cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, COUNTRY_TABLES.has(i.table) ? i.locationCode : 2840, COUNTRY_TABLES.has(i.table) ? i.languageCode : "en", Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b)),
     // Only when narrowed, so pages saved before sections existed are still found.
-    ...(effectiveReport(i).path ? [effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
+    // "v2": the rule for what a section or page matches changed (exact boundaries), so pages saved under the first rule are not reused.
+    ...(effectiveReport(i).path ? ["scope-v3", effectiveReport(i).path, effectiveReport(i).exactPage ? "page" : "section"] : [])]);
 
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(

@@ -60,6 +60,8 @@ function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCoun
     if (/status IN \('done','failed'\)/.test(sql)) return many(db.scans.filter((x) => x.status !== "running").map((x) => ({ id: x.id, keyword: x.keyword ?? "roofer", size: 3, spacing: 2, status: x.status, error: x.error, center: null, avgRank: null, points: 9, checked: 0, found: 0, top3: 0, at: "2026-10-01T00:00:00Z" })));
     return many([]);
   }
+  // Keyword watch: the claim on the site is free, so a snapshot goes on to ask the provider.
+  if (/^UPDATE seo_sites SET kw_snapshot_claim = now\(\)/.test(sql)) return { rows: [], rowCount: 1 };
   // Rendering checks: started, failed in the background with the error's own text, read back by the page.
   if (/seo_render_runs/.test(sql)) {
     if (/^INSERT INTO seo_render_runs/.test(sql)) { const id = db.renders.length + 1; db.renders.push({ id, status: "running", urls: JSON.parse(params[2]), result: null, error: null, created_at: "2026-10-01T00:00:00Z" }); return many([{ id }]); }
@@ -276,7 +278,11 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "GET /api/seo/sites/:id/audit/pages": [{ url: "/api/seo/sites/1/audit/pages" }],
   "GET /api/seo/sites/:id/rank-history": [{ url: "/api/seo/sites/1/rank-history" }],
   "GET /api/seo/sites/:id/rank-competing": [{ url: "/api/seo/sites/1/rank-competing" }],
+  "GET /api/seo/sites/:id/serp-groups": [{ url: "/api/seo/sites/1/serp-groups" }],
   "GET /api/seo/sites/:id/ai/summary": [{ url: "/api/seo/sites/1/ai/summary" }],
+  "GET /api/seo/sites/:id/keyword-watch": [{ url: "/api/seo/sites/1/keyword-watch" }],
+  "POST /api/seo/sites/:id/keyword-watch": [{ url: "/api/seo/sites/1/keyword-watch", body: { watch: true } }],
+  "POST /api/seo/sites/:id/keyword-watch/snapshot": [{ url: "/api/seo/sites/1/keyword-watch/snapshot" }],
   "GET /api/seo/keywords/:id/history": [{ url: "/api/seo/keywords/1/history" }],
   "POST /api/seo/keywords/:id/tags": [{ url: "/api/seo/keywords/1/tags", body: { tags: ["roofing"] } }],
   "POST /api/seo/sites/:id/competitors": [{ url: "/api/seo/sites/1/competitors", body: { competitor: "rival.com" } }],
@@ -284,7 +290,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
 /** Routes that ask the provider while the request waits: with the provider down they must answer with the neutral error. */
 const ASKS_PROVIDER = new Set([
   "POST /api/seo/sites/:id/keywords/volumes", "POST /api/seo/keywords/research", "POST /api/seo/sites/:id/backlinks/refresh", "POST /api/seo/explorer", "POST /api/seo/report",
-  "POST /api/seo/sites/:id/grid/locate", "POST /api/seo/opportunities", "POST /api/seo/keyword", "POST /api/seo/gap", "POST /api/seo/keywords/bulk", "POST /api/seo/content", "POST /api/seo/batch",
+  "POST /api/seo/sites/:id/grid/locate", "POST /api/seo/sites/:id/keyword-watch/snapshot", "POST /api/seo/opportunities", "POST /api/seo/keyword", "POST /api/seo/gap", "POST /api/seo/keywords/bulk", "POST /api/seo/content", "POST /api/seo/batch",
   "POST /api/seo/sites/:id/ai/ask", "POST /api/seo/ai/mentions", "GET /api/seo/locations", "POST /api/seo/sites/:id/competitors",
 ]);
 
@@ -316,7 +322,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(76);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(80);
   });
 
   for (const mode of Object.keys(PROVIDER)) {
