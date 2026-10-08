@@ -1,0 +1,114 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-invoice-receipt",
+  "title": "Send a receipt",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Find the invoice",
+      "narration": "Send a client a receipt for what they have paid so far. Start on Clients."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Quintanilla",
+      "caption": "Search for the client",
+      "narration": "Search for the client.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Rafael Quintanilla\")",
+      "caption": "Open the client",
+      "narration": "And open their page.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"invoice-demo-invoice-inv-2000\"]",
+      "caption": "The invoice",
+      "narration": "Under Invoices, find the invoice. This one is part paid, with a balance still due."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-receipt-demo-invoice-inv-2000\"]",
+      "caption": "Receipt",
+      "chapter": "Read and send the receipt",
+      "narration": "Choose Receipt.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"receipt-preview\"]",
+      "caption": "The receipt to date",
+      "narration": "This is the receipt to date: the invoice, and every payment received on it."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"receipt-balance\"]/ancestor::div[2]",
+      "caption": "Paid and owing",
+      "narration": "At the bottom are the total paid, and the balance still owing."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send-receipt\"]",
+      "caption": "Send receipt",
+      "narration": "Choose Send receipt."
+    },
+    {
+      "action": "wait-for",
+      "text": "Receipt emailed",
+      "timeoutMs": 15000,
+      "caption": "Emailed",
+      "narration": "It is emailed to the address on the client's file."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "Automatic receipts",
+      "narration": "One more thing, in Settings."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"switch-notif-paymentReceipt\"]",
+      "caption": "Payment receipts",
+      "narration": "With Payment receipts switched on, a receipt also goes out by email when a payment is recorded."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "The Receipt button is on the client's page, under Clients in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to send a client a receipt | ConstructHUB CRM",
+    "description": "Open the receipt for a paid or part-paid invoice in ConstructHUB CRM, check the payments received and the balance owing, and email it to your client. Also shows the setting that sends a receipt when a payment is recorded. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "send a receipt",
+      "payment receipt",
+      "invoices",
+      "partial payment",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Send a receipt",
+    "accent": "receipt",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}
