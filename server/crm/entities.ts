@@ -1,4 +1,5 @@
 import { invoiceRefundTotals } from "./refund-summary";
+import type { CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 import { csvCell } from "./csv";
 /**
@@ -641,13 +642,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.customerId, c.id)))
       .orderBy(desc(crmEstimates.createdAt));
 
-    res.json({
+    // The shape is a shared type (shared/crm-customer-detail.ts): the record
+    // sits under `customer`, and consumers type their query with it.
+    const body: CrmCustomerDetailResponse = {
       customer: { ...c, portalToken: undefined },
       // Only someone who can manage customers gets the shareable portal link.
       portalPath: canShareWholeClientPortal(ctx) ? `/portal/${c.portalToken}` : undefined,
       projects: (await objectPolicy(ctx).filter("projects", projects)).map((p) => presentProject(p, ctx)),
       estimates: (await objectPolicy(ctx).filter("estimates", estimates)).map((e) => presentEstimate(e, ctx)),
-    });
+    };
+    res.json(body);
   });
 
   /** Field edits from the client page's Edit dialog; the activity log names
