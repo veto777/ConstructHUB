@@ -277,7 +277,7 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
 }
 
 /** Overview + today's top results + their authority: three calls. */
-export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number }> {
+export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; costUnknown?: boolean }> {
   let costUsd = 0;
   const call = async (path: string, body: Record<string, unknown>) => {
     try {
@@ -286,9 +286,11 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
       return task;
     } catch (e: any) {
       costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+      if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) costUnknown = true;
       throw e;
     }
   };
+  let costUnknown = false;
   const missing: string[] = [];
   const loc = { location_code: input.locationCode, language_code: input.languageCode };
   // The overview is required; if it fails we still wait for the results call, so the error carries the full cost.
@@ -297,14 +299,14 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
     call("/dataforseo_labs/google/keyword_overview/live", { ...loc, keywords: [input.keyword], include_serp_info: true }).catch((e) => { failure = e; return null; }),
     call("/serp/google/organic/live/advanced", { ...loc, keyword: input.keyword, depth: 10, device: "desktop" }).catch((e: any) => { console.warn(`[seo] keyword ${input.keyword}: results unavailable — ${e?.message ?? e}`); return null; }),
   ]);
-  if (failure || !overview) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure ?? "overview unavailable")), { costUsd });
+  if (failure || !overview) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure ?? "overview unavailable")), { costUsd, costUnknown });
   if (!serp) missing.push("results");
   const serpItems = serp ? taskItems(serp) : [];
   const domains = [...new Set(serpItems.filter((s) => s?.type === "organic" && typeof s.domain === "string").slice(0, 10).map((s) => String(s.domain).replace(/^www\./, "")))];
   const ranks = domains.length
     ? await call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => { missing.push("authority"); return []; })
     : [];
-  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), missing }, costUsd };
+  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), missing }, costUsd, costUnknown };
 }
 
 // ── Saved pages ────────────────────────────────────────────────────────────

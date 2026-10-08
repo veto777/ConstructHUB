@@ -60,7 +60,7 @@ describe("auditSummary", () => {
   };
   it("counts statuses, totals and sorts errors first", () => {
     const s = auditSummary(report, pages);
-    expect(s.statuses).toEqual({ ok: 1, redirected: 1, clientError: 1, serverError: 1, failed: 1 });
+    expect(s.statuses).toEqual({ ok: 1, redirected: 1, clientError: 1, serverError: 1, failed: 1, excluded: 0 });
     expect(s.totals).toEqual({ error: { issues: 1, affected: 2 }, warning: { issues: 1, affected: 3 }, notice: { issues: 1, affected: 1 } });
     expect(s.issues.map((i) => i.key)).toEqual(["status", "thin", "llms"]);
     expect(s.health).toBe(40);
@@ -89,5 +89,37 @@ describe("auditSummary", () => {
     const s = auditSummary({ findings: [finding("thin", "warning", urls)] }, []);
     expect(s.issues[0].count).toBe(ITEM_CAP + 20);
     expect(s.issues[0].items).toHaveLength(ITEM_CAP);
+  });
+});
+
+describe("what counts as broken, and what counts as fixed", () => {
+  it("a file or an off-site redirect the crawler skipped is an exclusion, not a failure", () => {
+    const report: AuditReport = { errors: [
+      { url: "a.pdf", message: "Non-HTML response excluded from page checks." },
+      { url: "out", message: "Redirect leaves the selected origin; destination excluded from audit." },
+      { url: "down", message: "Request failed, exceeded a limit, or was blocked by the network safety policy." },
+    ] };
+    const s = auditSummary(report, [page("a")]);
+    expect(s.statuses.failed).toBe(1);
+    expect(s.statuses.excluded).toBe(2);
+    expect(s.health).toBe(50); // "a" is fine, "down" failed; the two exclusions are not counted
+  });
+  it("an issue whose pages were not crawled this time is 'not re-checked', not fixed", () => {
+    const before = { report: { findings: [finding("thin", "warning", ["https://x/old"], "Thin content"), finding("alt", "warning", ["https://x/a"], "Images without alt text")] }, pages: [page("https://x/old"), page("https://x/a")] };
+    const s = auditSummary({ findings: [] }, [page("https://x/a")], before);
+    expect(s.fixed.map((f) => f.key)).toEqual(["alt"]);
+    expect(s.notRechecked.map((f) => f.key)).toEqual(["thin"]);
+  });
+  it("Google-profile checks are 'not re-checked' when this crawl had no profile", () => {
+    const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };
+    const before = { report: { profile: { id: 7 }, findings: [local] }, pages: [page("https://x/")] };
+    expect(auditSummary({ findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
+    expect(auditSummary({ profile: { id: 7 }, findings: [] }, [page("https://x/")], before).fixed.map((f) => f.key)).toEqual(["gap-services"]);
+  });
+  it("a malformed stored report is read as empty instead of throwing", () => {
+    const s = auditSummary({ findings: "nope", errors: { a: 1 } } as any, []);
+    expect(s.issues).toEqual([]);
+    expect(s.health).toBeNull();
+    expect(groupFindings([{ id: "x", severity: "warning", category: "content", title: 5, urls: "u" } as any]).get("x")!.items).toEqual([]);
   });
 });

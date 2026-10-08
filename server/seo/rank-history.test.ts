@@ -42,8 +42,8 @@ describe("keywordSeries", () => {
       { checkedOn: "2026-10-01", device: "desktop", position: 9, url: "a" },
       { checkedOn: "2026-10-08", device: "desktop", position: 4, url: "b" },
     ])).toEqual([
-      { date: "2026-10-01", desktop: 9, mobile: null, url: "a" },
-      { date: "2026-10-08", desktop: 4, mobile: 5, url: "b" },
+      { date: "2026-10-01", desktop: 9, mobile: null, url: "a", checked: { desktop: true, mobile: false } },
+      { date: "2026-10-08", desktop: 4, mobile: 5, url: "b", checked: { desktop: true, mobile: true } },
     ]);
   });
 });

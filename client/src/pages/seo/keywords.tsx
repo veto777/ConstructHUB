@@ -8,7 +8,7 @@
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
 import { useEffect, useState } from "react";
-import { isNotRunYet } from "./shell";
+import { holdNote, isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Loader2, Plus, Search } from "lucide-react";
@@ -102,7 +102,7 @@ export default function SeoKeywordsPage() {
         </Button>
       </form>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
-        A keyword's overview costs about {price} of your SEO data and is free to reopen for a week. United States, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
+        A keyword's overview costs about {price} of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} United States, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
       </p>
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and today's results…" : "Opening the saved overview…"}</p>}
       {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who holds the top ten today — and hundreds of related searches you can track.</p></Empty>}

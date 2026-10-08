@@ -26,7 +26,7 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  B6  Organic keywords filters: position range, volume, difficulty, intent, keyword contains; sort by traffic / volume / position / difficulty / CPC.
 - [x] DONE  B7  Tick keywords in a report and add them to the rank tracker.
 - [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
-- [ ] TODO  B9  Content gap inside the explorer (exists as the separate Competitors tab) and Link intersect.
+- [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). NOT seen in a browser.
 - [ ] TODO  B10 Traffic by country; multi-year history; compare two dates.
 - [ ] TODO  B11 Organic keywords history chart by position bucket (1–3, 4–10, 11–20 …) over time.
 - [ ] TODO  B12 Paid ads copy and paid pages.
@@ -57,8 +57,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  E4  Nothing sold inside the iPhone apps.
 - [ ] TODO  E5  A usage history screen (what each lookup cost and when).
 - [x] DONE  E6  Automatic jobs (weekly rank check, monthly backlink snapshot) spend the month's included data only - never credit the customer bought. (Codex finding 6.)
-- [ ] TODO  E7  Rank checks that never come back from the queue are noted on the run but not refunded (Codex finding 7). Paid task ids are saved only after all batches post (finding 3, jobs).
-- [ ] TODO  E8  Durable reservation ids in the database (today exactly-once is enforced in the app process; production runs one process).
+- [x] PART  E7  Rank runs: task ids are saved after every batch (a crash no longer loses paid ids); a removed keyword or a run stuck for hours can no longer jam a site. STILL OPEN: checks that never come back from the queue are noted on the run but not refunded.
+- [x] DONE  E8  Durable reservations (table seo_reservations): the reservation row, the customer's credit and our ledger settle in one transaction; a reservation the process never settled is finished by a reconciler after 30 minutes (customer charged nothing). Verified on a real Postgres with script/seo-ledger-check.ts: 24/24.
 
 ## F. Site Audit
 - [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). NOT seen in a browser.
@@ -91,6 +91,27 @@ Its 17 defects, and what was done the same day:
 17 no billing fault tests ............. PART (two new test files; no database race tests yet)
 B5 (no filters on competitors / best-by-links) remains FAIL.
 
+## Codex audit #3 (2026-10-08, re-check of the fixes; report: tower1 ~/codex-audits/out/seo-audit-3.md)
+Verdict: "The fixes are substantive, but 'fixed most defects' overstates the result." Coverage: about 35% of Ahrefs (30-40%).
+Of the 17: FIXED 2 (6, 12) - PARTLY 13 - NOT FIXED 2 (7, 15). It also raised 12 new defects. Done the same day:
+ N1 settlement could be lost for good ...... FIXED (E8, durable + reconciler, real-database check)
+ N2 our cost understated on mixed failures . FIXED (unknown cost keeps the estimate on our ledger; cut-off responses normalised)
+ N3 a removed keyword could jam a site ..... FIXED (real-database check 7c-7f)
+ N4 dedup incomplete / wrong `reused` ...... FIXED (every paid route; saved copy re-checked inside; waiters get reused:true)
+ N5 malformed crawl JSON breaks dashboard .. FIXED (type-guarded SQL, per-site isolation, test)
+ N6 "fixed" may mean "not re-checked" ...... FIXED (separate "Not re-checked" list; the next crawl reuses the same Google profile)
+ N7 dashboard query count .................. PART (ranks in one query; audit summaries are still computed from the stored crawl)
+ N8 stale history / dashboard after a run .. FIXED
+ N9 "not ranked" vs "not checked" .......... FIXED (per-device checked flag; chart leaves gaps). Checks remain one per day.
+ N10 CSV carriage-return splitting ......... FIXED
+ N11 history controls hidden when empty .... FIXED
+ N12 rank tracker loading/error, labels .... FIXED (plus a table version of the charts)
+Earlier items moved on: 3 (volume/backlink saves still not protected), 8 (the amount set aside is now stated next to each price),
+9, 10, 13 (limits match the columns; site limit counts only new keywords), 14 (language is always part of the lookup), 16.
+STILL OPEN: 7 (no refund for checks that never return), 11 (a partial explorer report still needs a full refresh),
+15 (agency delegation), 17 (ledger checks are a manual script, not in CI), B5 filters on competitors / best-by-links.
+Health score: non-page files and off-site redirects no longer count as failures (Codex, section 4).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -98,3 +119,5 @@ B5 (no filters on competitors / best-by-links) remains FAIL.
   NOT yet verified by the builder in a browser (no browser on vb11): layout and visual quality are unconfirmed.
 - 2026-10-08 (slice 2): Site audit, rank history, and the Codex fixes. 86 SEO unit tests pass. The audit summary was run
   against the real stored crawl. Still NOT seen in a browser by the builder; the rank-history charts have never had real data.
+- 2026-10-08 (slice 3): Content gap + Link intersect, durable ledger, Codex audit #3 fixes. 100 SEO unit tests pass;
+  script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still NOT seen in a browser.

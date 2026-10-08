@@ -52,14 +52,15 @@ export async function rankHistory(siteId: number, device: "desktop" | "mobile", 
   return summarizeChecks(rows);
 }
 
-export type KeywordPoint = { date: string; desktop: number | null; mobile: number | null; url: string | null };
+/** `checked` says which devices were actually checked that day: a null position on a checked device means "not ranked", on an unchecked one "no data". */
+export type KeywordPoint = { date: string; desktop: number | null; mobile: number | null; url: string | null; checked: { desktop: boolean; mobile: boolean } };
 
 /** One row per check date with both devices side by side, oldest first. */
 export function keywordSeries(rows: { checkedOn: string; device: string; position: number | null; url: string | null }[]): KeywordPoint[] {
   const byDate = new Map<string, KeywordPoint>();
   for (const r of rows) {
-    const p = byDate.get(r.checkedOn) ?? { date: r.checkedOn, desktop: null, mobile: null, url: null };
-    if (r.device === "desktop" || r.device === "mobile") p[r.device] = r.position;
+    const p = byDate.get(r.checkedOn) ?? { date: r.checkedOn, desktop: null, mobile: null, url: null, checked: { desktop: false, mobile: false } };
+    if (r.device === "desktop" || r.device === "mobile") { p[r.device] = r.position; p.checked[r.device] = true; }
     if (r.url && (!p.url || r.device === "desktop")) p.url = r.url;
     byDate.set(r.checkedOn, p);
   }

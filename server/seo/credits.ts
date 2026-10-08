@@ -38,6 +38,21 @@ export const CREDIT_SCHEMA_DDL = [
     stripe_session_id text NOT NULL UNIQUE,
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+  // One row per reserved lookup (server/seo/budget.ts). Open until settled, so a
+  // reservation the process never got to settle (crash, restart, database error)
+  // is found and finished by reconcileReservations instead of staying charged.
+  `CREATE TABLE IF NOT EXISTS seo_reservations (
+    id uuid PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    month text NOT NULL,
+    estimate_usd numeric(12,6) NOT NULL,
+    credit jsonb,
+    actual_usd numeric(12,6),
+    customer_usd numeric(12,6),
+    settled_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS seo_reservations_open ON seo_reservations(created_at) WHERE settled_at IS NULL`,
 ];
 
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
@@ -73,7 +88,7 @@ export async function creditStatus(userId: number, allowanceCents: number): Prom
  * SeoCreditShort and take nothing. One transaction with the account's rows locked,
  * so two lookups at once cannot both spend the last dollar.
  */
-export async function reserveCredits(userId: number, allowanceCents: number, cents: number, opts: { allowanceOnly?: boolean } = {}): Promise<CreditReservation | null> {
+export async function reserveCredits(userId: number, allowanceCents: number, cents: number, opts: { allowanceOnly?: boolean; /** seo_reservations row to record this on, in the same transaction. */ reservationId?: string } = {}): Promise<CreditReservation | null> {
   if (allowanceCents === UNLIMITED || cents <= 0) return null;
   const month = monthKey();
   const client: PoolClient = await pool.connect();
@@ -93,8 +108,10 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
       `UPDATE seo_credit_usage SET included_cents=included_cents+$3, wallet_cents=wallet_cents+$4, requests=requests+1, updated_at=now() WHERE user_id=$1 AND month=$2`,
       [userId, month, split.fromIncluded, split.fromWallet]);
     if (split.fromWallet) await client.query(`UPDATE seo_credit_wallets SET balance_cents=balance_cents-$2, updated_at=now() WHERE user_id=$1`, [userId, split.fromWallet]);
+    const reservation: CreditReservation = { userId, month, fromIncluded: split.fromIncluded, fromWallet: split.fromWallet, allowanceCents, allowanceOnly: !!opts.allowanceOnly };
+    if (opts.reservationId) await client.query(`UPDATE seo_reservations SET credit=$2 WHERE id=$1`, [opts.reservationId, JSON.stringify(reservation)]);
     await client.query("COMMIT");
-    return { userId, month, fromIncluded: split.fromIncluded, fromWallet: split.fromWallet, allowanceCents, allowanceOnly: !!opts.allowanceOnly };
+    return reservation;
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;
@@ -109,14 +126,12 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
  * More than reserved: the extra comes from the allowance, then purchased credit,
  * and never drives a balance below zero.
  */
-export async function settleCredits(r: CreditReservation | null, actualCents: number): Promise<void> {
+export async function settleCredits(r: CreditReservation | null, actualCents: number, tx?: PoolClient): Promise<void> {
   if (!r) return;
   const reserved = r.fromIncluded + r.fromWallet;
   const delta = actualCents - reserved;
   if (delta === 0) return;
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const apply = async (client: PoolClient) => {
     const { rows: [u] } = await client.query(`SELECT included_cents FROM seo_credit_usage WHERE user_id=$1 AND month=$2 FOR UPDATE`, [r.userId, r.month]);
     const { rows: [w] } = await client.query(`SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [r.userId]);
     let dIncluded = 0, dWallet = 0;
@@ -134,6 +149,14 @@ export async function settleCredits(r: CreditReservation | null, actualCents: nu
       `UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents+$3), wallet_cents=greatest(0,wallet_cents+$4), updated_at=now() WHERE user_id=$1 AND month=$2`,
       [r.userId, r.month, dIncluded, dWallet]);
     if (dWallet) await client.query(`UPDATE seo_credit_wallets SET balance_cents=greatest(0,balance_cents-$2), updated_at=now() WHERE user_id=$1`, [r.userId, dWallet]);
+  };
+  // Inside the caller's transaction (budget.ts settles the reservation row and both ledgers together)...
+  if (tx) return apply(tx);
+  // ...or in one of its own.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await apply(client);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});

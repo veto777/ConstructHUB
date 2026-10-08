@@ -3,7 +3,7 @@
  * tracked keywords spread across the result pages at each check, and one
  * keyword's position history. All from saved checks — free to open.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Loader2 } from "lucide-react";
@@ -28,6 +28,8 @@ const BUCKETS = [
 export function RankHistoryPanel({ site }: { site: SeoSite }) {
   const [device, setDevice] = useState<Device | "">("");
   const [tag, setTag] = useState("");
+  // Another site has its own devices and tags.
+  useEffect(() => { setDevice(""); setTag(""); }, [site.id]);
   const params = new URLSearchParams();
   if (device) params.set("device", device);
   if (tag) params.set("tag", tag);
@@ -36,7 +38,9 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
   const h = q.data;
   if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading history…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load the history: {apiErrorMessage(q.error)}</p>;
-  if (!h || (h.days.length === 0 && !tag)) return null;
+  if (!h) return null;
+  // Nothing checked yet and nothing to choose between: stay out of the way.
+  if (h.days.length === 0 && !tag && h.devices.length < 2 && h.tags.length === 0) return null;
   const last = h.days[h.days.length - 1], first = h.days[0];
   return (
     <section className="mb-5" data-testid="rank-history">
@@ -56,7 +60,7 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
           </label>
         )}
       </div>
-      {h.days.length === 0 && <p className="g-text-2 text-[13px]">No checks yet for keywords tagged "{tag}".</p>}
+      {h.days.length === 0 && <p className="g-text-2 text-[13px]" data-testid="rank-history-empty">No checks yet{tag ? ` for keywords tagged "${tag}"` : ""} on {h.device}.</p>}
       {h.days.length === 1 && <p className="g-text-2 mb-2 text-[13px]">One check so far ({fmtDate(first.date)}). The trend lines appear after the next weekly check.</p>}
       {h.days.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -99,11 +103,20 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
           </div>
         </div>
       )}
+      {h.days.length > 0 && (
+        <details className="mt-2 text-[13px]" data-testid="rank-history-table">
+          <summary className="g-link cursor-pointer">Show these numbers as a table</summary>
+          <table className="g-table mt-2">
+            <thead><tr><th>Checked</th><th className="num">Visibility</th><th className="num">Average position</th>{BUCKETS.map((b) => <th key={b.key} className="num">{b.label}</th>)}</tr></thead>
+            <tbody>{[...h.days].reverse().map((d) => <tr key={d.date}><td>{fmtDate(d.date)}</td><td className="num">{d.visibility}%</td><td className="num">{d.averagePosition ?? "—"}</td>{BUCKETS.map((b) => <td key={b.key} className="num">{d[b.key]}</td>)}</tr>)}</tbody>
+          </table>
+        </details>
+      )}
     </section>
   );
 }
 
-type Point = { date: string; desktop: number | null; mobile: number | null; url: string | null };
+type Point = { date: string; desktop: number | null; mobile: number | null; url: string | null; checked?: { desktop: boolean; mobile: boolean } };
 
 /** One keyword's position at every saved check. Lower on the chart is worse: position 1 is at the top. */
 export function KeywordHistory({ id, devices }: { id: number; devices: Device[] }) {
@@ -123,8 +136,8 @@ export function KeywordHistory({ id, devices }: { id: number; devices: Device[] 
               <YAxis reversed allowDecimals={false} domain={[1, "auto"]} tick={tick} axisLine={false} tickLine={false} width={30} />
               <Tooltip labelFormatter={(v) => fmtDate(String(v))} contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              {devices.includes("desktop") && <Line type="monotone" dataKey="desktop" name="Desktop" stroke="#1a73e8" strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />}
-              {devices.includes("mobile") && <Line type="monotone" dataKey="mobile" name="Mobile" stroke="#e8710a" strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />}
+              {devices.includes("desktop") && <Line type="monotone" dataKey="desktop" name="Desktop" stroke="#1a73e8" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />}
+              {devices.includes("mobile") && <Line type="monotone" dataKey="mobile" name="Mobile" stroke="#e8710a" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -135,7 +148,7 @@ export function KeywordHistory({ id, devices }: { id: number; devices: Device[] 
           {[...points].reverse().slice(0, 12).map((p) => (
             <tr key={p.date}>
               <td>{fmtDate(p.date)}</td>
-              {devices.map((d) => <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p[d] ?? "not ranked"}</td>)}
+              {devices.map((d) => <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p[d] ?? (p.checked?.[d] === false ? <span className="g-text-2" title="Not checked on this device that day">—</span> : "not ranked")}</td>)}
               <td data-label="Page" className="max-w-[320px] truncate">{p.url ? <a href={p.url} className="g-link" target="_blank" rel="noreferrer">{p.url.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span className="g-text-2">—</span>}</td>
             </tr>
           ))}

@@ -6,7 +6,7 @@
  * and only spends when the person presses Run.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { isNotRunYet } from "./shell";
+import { holdNote, isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -131,7 +131,7 @@ const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
 
 function csvOf(cols: Col[], rows: any[]): string {
-  const esc = (v: unknown) => { const raw = v == null ? "" : String(v); /* A cell from the open web must not run as a spreadsheet formula. */ const s = typeof v !== "number" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw; return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const esc = (v: unknown) => { const raw = v == null ? "" : String(v); /* A cell from the open web must not run as a spreadsheet formula. */ const s = typeof v !== "number" && /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw; return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
   const used = cols.filter((c) => c.label);
   return [used.map((c) => esc(c.label)).join(","), ...rows.map((r) => used.map((c) => esc(c.csv(r))).join(","))].join("\n");
 }
@@ -233,7 +233,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       {!saved.isLoading && !page && (
         <Empty testId="report-not-run">
           <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : "This report hasn't been run with these settings"}</h3>
-          <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.</p>
+          <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.{holdNote(status, "reportPage")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate()} data-testid="button-run-report">
               {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}

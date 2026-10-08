@@ -28,7 +28,7 @@ export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
 export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
-export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number };
+export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;
@@ -62,7 +62,13 @@ export const money = (cents: number | null | undefined) => cents == null ? "—"
 export const priceOf = (status: SeoStatus | undefined, key: keyof SeoPrices) => status?.prices ? `about ${money(status.prices[key])}` : "";
 /** Enough credit for this lookup? (true while the status is loading, so buttons are not disabled for nothing) */
 export const canAfford = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
-  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices[key]);
+  !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= (status.holds?.[key] ?? status.prices[key] ?? 0);
+
+/** Says so when more than the typical price is set aside while a lookup runs. */
+export const holdNote = (status: SeoStatus | undefined, key: keyof SeoPrices) => {
+  const hold = status?.holds?.[key], price = status?.prices?.[key];
+  return hold != null && price != null && hold > price ? ` Up to ${money(hold)} is set aside while it runs; what isn't used comes straight back.` : "";
+};
 
 /** A saved-copy check that answered 404: not run yet — as opposed to a check that failed. */
 export const isNotRunYet = (e: unknown) => /^404:/.test(String((e as { message?: unknown } | null)?.message ?? ""));

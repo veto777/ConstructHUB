@@ -1,5 +1,5 @@
 /** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Play, Plus, Trash2 } from "lucide-react";
@@ -33,7 +33,9 @@ export default function SeoOverviewPage() {
     queryKey: [`/api/seo/sites/${site?.id}/overview`], enabled: !!site,
     refetchInterval: (q) => q.state.data?.runs.some((r) => r.status === "queued" || r.status === "running") ? 20_000 : false,
   });
-  const invalidate = () => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/overview`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); };
+  // The history charts (their keys carry the device/tag) and the dashboard change with every check and keyword edit.
+  const refreshHistory = () => { void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-history`) || /^\/api\/seo\/keywords\/\d+\/history$/.test(q.queryKey[0])) }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
+  const invalidate = () => { refreshHistory(); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/overview`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); };
   const runNow = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/rank-check`),
     onSuccess: (r: { serps: number; reused: boolean }) => { invalidate(); toast({ title: r.reused ? "A check is already running" : "Rank check started", description: r.reused ? "Results arrive over the next few minutes." : `${r.serps} search result page${r.serps === 1 ? "" : "s"} queued. Results arrive over the next few minutes.` }); },
@@ -47,6 +49,9 @@ export default function SeoOverviewPage() {
   const o = overview.data;
   const configured = !!status.data?.configured;
   const running = o?.runs.some((r) => r.status === "queued" || r.status === "running");
+  // A check that just finished has new numbers for the history charts and the dashboard.
+  const wasRunning = useRef(false);
+  useEffect(() => { if (wasRunning.current && !running) refreshHistory(); wasRunning.current = !!running; }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <SeoShell
       title="Rank tracker" description="Where your site ranks on Google for the keywords you chose, checked every week." site={site} onSite={onSite} sites={sites} status={status}
@@ -58,6 +63,8 @@ export default function SeoOverviewPage() {
       )}
     >
       {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add the domain you want to track. Then add the keywords you care about, and the first check runs on the next weekly tick — or straight away with "Run check now".</p></Empty>}
+      {site && overview.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your rankings…</p>}
+      {site && overview.isError && <div className="g-callout" role="alert" data-testid="rank-overview-error"><h3>Couldn't load your rankings</h3><p>{apiErrorMessage(overview.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void overview.refetch()}>Try again</button></div>}
       {site && o && (
         <>
           <div className="g-tiles mb-5">
@@ -132,7 +139,7 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
     <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); m.mutate(); }} data-testid="form-add-keywords">
       <h3>Keywords to track for {site.domain}</h3>
       <p>One per line (or comma-separated). Each is checked on {site.devices === "both" ? "desktop and mobile" : site.devices} every week.</p>
-      <textarea className="g-input mt-2 min-h-[120px] py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"roofing contractor tampa\nroof repair near me"} data-testid="textarea-keywords" />
+      <textarea aria-label={`Keywords to track for ${site.domain}, one per line`} className="g-input mt-2 min-h-[120px] py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"roofing contractor tampa\nroof repair near me"} data-testid="textarea-keywords" />
       <label className="mt-2 block text-[13px]"><span className="g-text-2">Tag (optional) — group these keywords, e.g. a service or a city</span>
         <input className="g-input mt-1" value={tag} maxLength={40} onChange={(e) => setTag(e.target.value)} placeholder="roofing" data-testid="input-keyword-tag" />
       </label>

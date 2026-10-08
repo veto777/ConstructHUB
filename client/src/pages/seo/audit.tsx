@@ -5,7 +5,7 @@
  * data; "Run new crawl" starts a Site Scan (POST /api/sitescan), one of the
  * plan's monthly scans.
  */
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -21,12 +21,12 @@ type Run = { id: string; status: string; error: string | null; createdAt: string
 type Audit = {
   jobId: string; scannedAt: string | null; url: string | null; health: number | null; healthChange: number | null;
   crawled: number; pageCap: number | null; notCrawled: number; blockedByRobots: number;
-  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number };
+  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded?: number };
   totals: Record<Severity, { issues: number; affected: number }>;
   scores: { overall: number | null; categories: Record<string, number | null> } | null;
-  issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[];
+  issues: Issue[]; fixed: { key: string; title: string; severity: Severity; previous: number }[]; notRechecked?: { key: string; title: string; severity: Severity; previous: number }[];
 };
-type AuditData = { audit: Audit | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
+type AuditData = { locationId: number | null; audit: Audit | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: Run | null; lastFailed: Run | null };
 
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
@@ -91,11 +91,15 @@ export default function SeoAuditPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const start = useMutation({
-    mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1 }),
+    // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
+    mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: "Crawl started", description: "Results appear here when it finishes — usually a few minutes." }); },
     onError: (e) => toast({ title: "Couldn't start the crawl", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const d = q.data, a = d?.audit ?? null, running = d?.running ?? null;
+  // A crawl that just finished changes the health score on the dashboard too.
+  const wasRunning = useRef(false);
+  useEffect(() => { if (wasRunning.current && !running) void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); wasRunning.current = !!running; }, [running, qc]);
   const issues = (a?.issues ?? []).filter((i) => (severity === "all" || i.severity === severity) && (category === "all" || i.category === category));
   const categories = [...new Set((a?.issues ?? []).map((i) => i.category))];
   const total = a ? a.crawled + a.statuses.failed : 0;
@@ -154,6 +158,7 @@ export default function SeoAuditPage() {
               <ul className="space-y-1 text-[13px]">
                 {STATUS.map((s) => <li key={s.key} className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden /><span className="g-text-2">{s.label}</span><span className="g-text ml-auto tabular-nums">{fmtNum(a.statuses[s.key])}</span></li>)}
               </ul>
+              {(a.statuses.excluded ?? 0) > 0 && <p className="g-text-2 mt-2 text-[12px]">{fmtNum(a.statuses.excluded)} more address{a.statuses.excluded === 1 ? " was" : "es were"} found but not audited (files such as PDFs, or links that leave the site). They don't affect the health score.</p>}
               {(a.notCrawled > 0 || a.blockedByRobots > 0) && <p className="g-text-2 mt-2 text-[12px]">{a.notCrawled > 0 ? `${fmtNum(a.notCrawled)} more pages were found but not crawled (the crawl stops at ${fmtNum(a.pageCap)}). ` : ""}{a.blockedByRobots > 0 ? `${fmtNum(a.blockedByRobots)} blocked by robots.txt.` : ""}</p>}
             </section>
             <section className="rounded-lg border p-4" style={card} data-testid="audit-totals">
@@ -260,6 +265,15 @@ export default function SeoAuditPage() {
                 })}
               </tbody>
             </table>
+          )}
+          {(a.notRechecked?.length ?? 0) > 0 && (
+            <section className="mt-6" data-testid="audit-not-rechecked">
+              <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
+              <p className="g-text-2 mb-2 text-[13px]">The crawl before found these, and this crawl didn't look at the same pages (or had no Google profile to compare with) — so they are not counted as fixed.</p>
+              <ul className="g-text-2 space-y-1 text-[13px]">
+                {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
+              </ul>
+            </section>
           )}
           {a.fixed.length > 0 && (
             <section className="mt-6" data-testid="audit-fixed">

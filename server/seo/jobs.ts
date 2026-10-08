@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { getEntitlements } from "../entitlements";
 import { recordFailure } from "../ops/issues";
-import { reserveBudget, settleBudget, withBudget, SeoBudgetError } from "./budget";
+import { reserveBudget, settleBudget, withBudget, reconcileReservations, SeoBudgetError } from "./budget";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, type PostedRankTask, type Device } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, type DeviceSet } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
@@ -86,6 +86,8 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     }
     const posted: PostedRankTask[] = [];
     let costUsd = 0;
+    // What a chunk that never answered may have cost us (the customer is not charged for it).
+    let unknownUsd = 0;
     let firstError: string | null = null;
     for (let i = 0; i < inputs.length; i += MAX_TASKS_PER_POST) {
       const chunk = inputs.slice(i, i + MAX_TASKS_PER_POST);
@@ -93,14 +95,17 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
         const out = await seoJobDeps.serpTaskPost({ tasks: chunk, locationCode: site.location_code, languageCode: site.language_code, depth: site.serp_depth, targetDomain: site.domain });
         posted.push(...out.data);
         costUsd += out.costUsd;
+        // Saved chunk by chunk: a crash mid-posting must not lose task ids that were already paid for.
+        await pool.query("UPDATE seo_rank_runs SET tasks=$2, lease_until=now()+interval '5 minutes' WHERE id=$1", [run.id, JSON.stringify(posted)]);
       } catch (e: any) {
         firstError ??= e?.message ?? String(e);
         costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+        if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) unknownUsd += estimate.usd * (chunk.length / inputs.length);
         console.warn(`[seo] run ${run.id} task_post chunk ${i / MAX_TASKS_PER_POST} failed: ${firstError}`);
         firstError = "Some checks were not accepted by the search data service.";
       }
     }
-    await settleBudget(reservation, costUsd);
+    await settleBudget(reservation, Math.min(estimate.usd, costUsd + unknownUsd), costUsd);
     if (!posted.length) {
       await finishRun(run.id, "failed", firstError ?? "DataForSEO accepted none of the tasks", costUsd);
       return true;
@@ -124,6 +129,11 @@ async function finishRun(id: string, status: "done" | "failed", error: string | 
 
 /** Poll the queue for running runs; write every finished check; close runs that are complete or past the window. */
 export async function collectRunningRuns(): Promise<void> {
+  // A run can never stay open for good (one open run per site: a stuck one would block every later check).
+  await pool.query(
+    `UPDATE seo_rank_runs SET status='failed', finished_at=now(), lease_until=NULL, tasks='[]'::jsonb,
+            error=concat_ws(' · ', error, 'The check stopped before it finished.')
+      WHERE (status='running' AND started_at < now() - interval '3 hours') OR (status='queued' AND created_at < now() - interval '24 hours')`).catch(() => {});
   const { rows: runs } = await pool.query(
     `UPDATE seo_rank_runs SET lease_until=now()+interval '5 minutes'
      WHERE id IN (SELECT id FROM seo_rank_runs WHERE status='running' AND (lease_until IS NULL OR lease_until<now()) ORDER BY started_at FOR UPDATE SKIP LOCKED LIMIT 20)
@@ -148,12 +158,17 @@ export async function collectRunningRuns(): Promise<void> {
           if (r.value.status === "pending") { pending.push(t); continue; }
           if (r.value.status === "failed") { console.warn(`[seo] run ${run.id} check failed ${t.keyword} (${t.device}): ${r.value.message}`); failures.push(`${t.keyword} (${t.device})`); continue; }
           const res = r.value.result;
+          try {
           await pool.query(
             `INSERT INTO seo_rank_checks(keyword_id,site_id,run_id,checked_on,device,position,url,serp_features)
              VALUES($1,$2,$3,current_date,$4,$5,$6,$7)
              ON CONFLICT(keyword_id,checked_on,device) DO UPDATE SET position=EXCLUDED.position,url=EXCLUDED.url,serp_features=EXCLUDED.serp_features,run_id=EXCLUDED.run_id`,
             [t.keywordId, run.site_id, run.id, t.device, res.position, res.url, JSON.stringify(res.serpFeatures)]);
           written++;
+          } catch (e: any) {
+            // 23503: the keyword was removed while its check was in the queue — drop the result, keep the run going.
+            if (e?.code !== "23503") throw e;
+          }
         }
       }
       const remaining = [...pending, ...rest];
@@ -234,6 +249,7 @@ export async function seoTick(): Promise<void> {
     const { rows: [{ locked }] } = await client.query("SELECT pg_try_advisory_lock($1) AS locked", [LOCK_KEY]);
     if (!locked) return;
     try {
+      await reconcileReservations().catch((e) => console.error("[seo] reconcile failed", e?.message ?? e));
       await scheduleWeeklyRuns();
       for (let i = 0; i < 10 && (await postQueuedRun()); i++) { /* post up to 10 queued runs per tick */ }
       await collectRunningRuns();

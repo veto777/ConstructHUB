@@ -10,7 +10,7 @@ import { pool } from "../db";
 export type AuditSeverity = "error" | "warning" | "notice";
 export type AuditPage = { url: string; status: number; redirects: number };
 type Finding = { id: string; category: string; severity: string; title: string; urls?: string[]; why?: string; fix?: string };
-export type AuditReport = { scannedAt?: string; url?: string; remaining?: number; blocked?: number; errors?: { url: string }[]; findings?: Finding[]; scores?: { overall: number | null; categories: Record<string, number | null> }; coverage?: { pageCap?: number } };
+export type AuditReport = { scannedAt?: string; url?: string; remaining?: number; blocked?: number; errors?: { url: string; message?: string }[]; profile?: unknown; findings?: Finding[]; scores?: { overall: number | null; categories: Record<string, number | null> }; coverage?: { pageCap?: number } };
 
 export type AuditIssue = {
   key: string; title: string; category: string; severity: AuditSeverity;
@@ -24,12 +24,15 @@ export type AuditSummary = {
   scannedAt: string | null; url: string | null;
   health: number | null; healthChange: number | null;
   crawled: number; pageCap: number | null; notCrawled: number; blockedByRobots: number;
-  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number };
+  /** `failed`: could not be fetched. `excluded`: found but deliberately not audited (not a web page, or leaves the site). */
+  statuses: { ok: number; redirected: number; clientError: number; serverError: number; failed: number; excluded: number };
   totals: Record<AuditSeverity, { issues: number; affected: number }>;
   scores: AuditReport["scores"] | null;
   issues: AuditIssue[];
   /** Issues the previous crawl had that this one no longer finds. */
   fixed: { key: string; title: string; severity: AuditSeverity; previous: number }[];
+  /** Issues the previous crawl had that this crawl could not re-check (other pages crawled, or no Google profile attached). */
+  notRechecked: { key: string; title: string; severity: AuditSeverity; previous: number }[];
 };
 
 export const ITEM_CAP = 500;
@@ -42,13 +45,13 @@ const ROLLUPS: { test: RegExp; key: (m: RegExpMatchArray) => string; title: (m: 
     test: /^gap-([a-z_]+)-/,
     key: (m) => `gap-${m[1]}`,
     title: (m) => `Google Business Profile ${m[1].replace(/_/g, " ")} with no matching page`,
-    item: (f) => f.title.replace(/^No matching [^:]+: /, ""),
+    item: (f) => String(f.title ?? f.id).replace(/^No matching [^:]+: /, ""),
   },
   {
     test: /^psi-(mobile|desktop)-/,
     key: (m) => `psi-${m[1]}`,
     title: (m) => `${m[1] === "mobile" ? "Mobile" : "Desktop"} PageSpeed score below 90`,
-    item: (f) => `${f.urls?.[0] ?? ""} — score ${f.title.split(": ").pop()}`,
+    item: (f) => `${(Array.isArray(f.urls) && f.urls[0]) || ""} — score ${String(f.title ?? "").split(": ").pop()}`,
   },
 ];
 
@@ -61,10 +64,10 @@ type Group = { key: string; title: string; category: string; severity: AuditSeve
 
 export function groupFindings(findings: Finding[] | undefined): Map<string, Group> {
   const groups = new Map<string, Group>();
-  for (const f of findings ?? []) {
+  for (const f of Array.isArray(findings) ? findings : []) {
     if (!f || typeof f.id !== "string") continue;
     const severity = SEVERITY[f.severity] ?? "notice";
-    let key = f.id, title = f.title, items = (f.urls ?? []).filter((u) => typeof u === "string");
+    let key = f.id, title = typeof f.title === "string" ? f.title : f.id, items = (Array.isArray(f.urls) ? f.urls : []).filter((u) => typeof u === "string");
     for (const r of ROLLUPS) {
       const m = f.id.match(r.test);
       if (m) { key = r.key(m); title = r.title(m); items = [r.item(f)]; break; }
@@ -83,13 +86,17 @@ export function groupFindings(findings: Finding[] | undefined): Map<string, Grou
  * with no error-level issue. A URL that returned 4xx/5xx or could not be
  * fetched counts as having an error. null when nothing was crawled.
  */
+/** Crawl errors that are real fetch failures; the rest ("not a web page", "leaves the site") are exclusions, not faults. */
+export const failedFetches = (report: AuditReport) => (Array.isArray(report?.errors) ? report.errors : []).filter((e) => e && typeof e.url === "string" && (!e.message || /^Request failed/i.test(e.message)));
+const excludedCount = (report: AuditReport) => (Array.isArray(report?.errors) ? report.errors.length : 0) - failedFetches(report).length;
+
 export function healthScore(report: AuditReport, pages: AuditPage[]): number | null {
-  const failed = new Set((report.errors ?? []).map((e) => e.url));
+  const failed = new Set(failedFetches(report).map((e) => e.url));
   const all = new Set<string>([...pages.map((p) => p.url), ...failed]);
   if (!all.size) return null;
   const bad = new Set<string>(failed);
   for (const p of pages) if (p.status >= 400) bad.add(p.url);
-  for (const f of report.findings ?? []) if (f.severity === "critical") for (const u of f.urls ?? []) if (all.has(u)) bad.add(u);
+  for (const f of Array.isArray(report.findings) ? report.findings : []) if (f?.severity === "critical") for (const u of Array.isArray(f.urls) ? f.urls : []) if (all.has(u)) bad.add(u);
   return Math.round(((all.size - bad.size) / all.size) * 100);
 }
 
@@ -103,11 +110,21 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
       why: g.why, fix: g.fix, items: g.items.slice(0, ITEM_CAP),
     };
   }).sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.count - a.count || a.title.localeCompare(b.title));
-  const fixed = before ? [...before.values()].filter((g) => !now.has(g.key)).map((g) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length })) : [];
+  // An issue that is gone is "fixed" only if this crawl could have found it again: at least one of its pages was
+  // crawled this time, and (for the checks that compare with the Google profile) a profile was attached this time too.
+  const crawledNow = new Set(pages.map((p) => p.url));
+  const gone = before ? [...before.values()].filter((g) => !now.has(g.key)) : [];
+  const recheckable = (g: Group) => {
+    if (g.category === "local" && !report.profile && previous?.report.profile) return false;
+    const urls = g.items.filter((i) => /^https?:\/\//.test(i));
+    return urls.length === 0 || urls.some((u) => crawledNow.has(u));
+  };
+  const brief = (g: Group) => ({ key: g.key, title: g.title, severity: g.severity, previous: g.items.length });
+  const fixed = gone.filter(recheckable).map(brief), notRechecked = gone.filter((g) => !recheckable(g)).map(brief);
   const totals = { error: { issues: 0, affected: 0 }, warning: { issues: 0, affected: 0 }, notice: { issues: 0, affected: 0 } };
   for (const i of issues) { totals[i.severity].issues++; totals[i.severity].affected += i.count; }
   const health = healthScore(report, pages), prevHealth = previous ? healthScore(previous.report, previous.pages) : null;
-  const statuses = { ok: 0, redirected: 0, clientError: 0, serverError: 0, failed: (report.errors ?? []).length };
+  const statuses = { ok: 0, redirected: 0, clientError: 0, serverError: 0, failed: failedFetches(report).length, excluded: excludedCount(report) };
   for (const p of pages) {
     if (p.status >= 500) statuses.serverError++;
     else if (p.status >= 400) statuses.clientError++;
@@ -118,38 +135,48 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     scannedAt: report.scannedAt ?? null, url: report.url ?? null,
     health, healthChange: health !== null && prevHealth !== null ? health - prevHealth : null,
     crawled: pages.length, pageCap: report.coverage?.pageCap ?? null, notCrawled: report.remaining ?? 0, blockedByRobots: report.blocked ?? 0,
-    statuses, totals, scores: report.scores ?? null, issues, fixed,
+    statuses, totals, scores: report.scores ?? null, issues, fixed, notRechecked,
   };
 }
 
 /** sitescan_jobs.url → the bare host seo_sites.domain stores. */
 const HOST_SQL = `regexp_replace(regexp_replace(lower(url), '^https?://(www\\.)?', ''), '[/:?#].*$', '')`;
 const bare = (domain: string) => domain.toLowerCase().replace(/^www\./, "");
-const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object('url', p->>'url', 'status', COALESCE((p->>'status')::int, 0), 'redirects', jsonb_array_length(COALESCE(p->'redirects', '[]'::jsonb))))
-                              FROM jsonb_array_elements(state->'pages') p), '[]'::jsonb)`;
+// Tolerant of a malformed stored crawl: anything that is not the expected JSON type reads as empty, never as an error.
+const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                                'url', p->>'url',
+                                'status', CASE WHEN jsonb_typeof(p->'status')='number' THEN (p->>'status')::numeric::int ELSE 0 END,
+                                'redirects', CASE WHEN jsonb_typeof(p->'redirects')='array' THEN jsonb_array_length(p->'redirects') ELSE 0 END))
+                              FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) p
+                             WHERE jsonb_typeof(p)='object'), '[]'::jsonb)`;
+const CRAWLED_SQL = `CASE WHEN jsonb_typeof(state->'pages')='array' THEN jsonb_array_length(state->'pages') ELSE 0 END`;
+const DONE_SQL = `status='completed' AND jsonb_typeof(report)='object'`;
 
 export type AuditRun = { id: string; status: string; error: string | null; createdAt: string; crawled: number; pageCap: number };
 
 /** The newest audit of a domain with the crawl before it, the health trend and any crawl in progress. */
-export async function siteAudit(user: number, domain: string): Promise<{ audit: (AuditSummary & { jobId: string }) | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
+export async function siteAudit(user: number, domain: string): Promise<{ /** The Google profile the newest crawl was compared with: the next crawl uses it too, so the same checks run. */ locationId: number | null; audit: (AuditSummary & { jobId: string }) | null; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number }[]; running: AuditRun | null; lastFailed: AuditRun | null }> {
   const d = bare(domain);
   const [{ rows: done }, { rows: open }] = await Promise.all([
     pool.query(
-      `SELECT id, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs
-        WHERE user_id=$1 AND status='completed' AND report IS NOT NULL AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
+      `SELECT id, completed_at, report, profile->>'id' AS location_id, ${PAGES_SQL} AS pages FROM sitescan_jobs
+        WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 12`, [user, d]),
     pool.query(
-      `SELECT id, status, error, created_at, jsonb_array_length(state->'pages') AS crawled, page_cap FROM sitescan_jobs
+      `SELECT id, status, error, created_at, ${CRAWLED_SQL} AS crawled, page_cap FROM sitescan_jobs
         WHERE user_id=$1 AND ${HOST_SQL}=$2 ORDER BY created_at DESC LIMIT 1`, [user, d]),
   ]);
   const run = (r: any): AuditRun => ({ id: r.id, status: r.status, error: r.error, createdAt: r.created_at, crawled: r.crawled ?? 0, pageCap: r.page_cap });
   const newest = open[0];
   const audit = done[0] ? { jobId: done[0].id as string, ...auditSummary(done[0].report, done[0].pages, done[1] ? { report: done[1].report, pages: done[1].pages } : null) } : null;
-  const history = done.map((j: any) => {
-    const s = auditSummary(j.report, j.pages);
-    return { jobId: j.id, at: j.completed_at, health: s.health, errors: s.totals.error.affected, warnings: s.totals.warning.affected, notices: s.totals.notice.affected, crawled: s.crawled };
+  const history = done.flatMap((j: any) => {
+    try {
+      const s = auditSummary(j.report, j.pages);
+      return [{ jobId: j.id, at: j.completed_at, health: s.health, errors: s.totals.error.affected, warnings: s.totals.warning.affected, notices: s.totals.notice.affected, crawled: s.crawled }];
+    } catch { return []; }
   }).reverse();
+  const locationId = Number(done[0]?.location_id) > 0 ? Number(done[0].location_id) : null;
   return {
-    audit, history,
+    locationId, audit, history,
     running: newest && (newest.status === "queued" || newest.status === "running") ? run(newest) : null,
     lastFailed: newest && newest.status === "failed" ? run(newest) : null,
   };
@@ -162,11 +189,14 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   const { rows } = await pool.query(
     `SELECT DISTINCT ON (host) host, completed_at, report, pages FROM (
        SELECT ${HOST_SQL} AS host, completed_at, report, ${PAGES_SQL} AS pages FROM sitescan_jobs
-        WHERE user_id=$1 AND status='completed' AND report IS NOT NULL AND ${HOST_SQL} = ANY($2)) j
+        WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j
       ORDER BY host, completed_at DESC`, [user, domains.map(bare)]);
   for (const r of rows) {
-    const s = auditSummary(r.report, r.pages);
-    out.set(r.host, { health: s.health, errors: s.totals.error.affected, scannedAt: r.completed_at });
+    // One unreadable crawl must not take the whole dashboard down.
+    try {
+      const s = auditSummary(r.report, r.pages);
+      out.set(r.host, { health: s.health, errors: s.totals.error.affected, scannedAt: r.completed_at });
+    } catch (e: any) { console.warn(`[seo] audit of ${r.host} could not be read: ${e?.message ?? e}`); }
   }
   return out;
 }

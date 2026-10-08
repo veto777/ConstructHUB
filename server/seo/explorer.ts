@@ -248,7 +248,7 @@ export function buildDomainReport(input: { domain: string; locationCode: number;
 }
 
 /** Run the eight calls. The overview and the backlink summary must succeed; the lists are best effort. */
-export async function fetchDomainReport(input: { domain: string; locationCode: number; languageCode: string }): Promise<{ data: DomainReport; costUsd: number }> {
+export async function fetchDomainReport(input: { domain: string; locationCode: number; languageCode: string }): Promise<{ data: DomainReport; costUsd: number; costUnknown?: boolean }> {
   const labs = { target: input.domain, location_code: input.locationCode, language_code: input.languageCode };
   const links = { target: input.domain, include_subdomains: true, backlinks_status_type: "live", rank_scale: "one_thousand" };
   let costUsd = 0;
@@ -260,9 +260,12 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
     } catch (e: any) {
       // A task the source charged for and then failed still counts toward what this report cost us.
       costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+      // No answer at all: the source may have run and charged it. The caller's ledger keeps the estimate.
+      if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) costUnknown = true;
       throw e;
     }
   };
+  let costUnknown = false;
   // A required call that fails waits for the others to finish, so the error carries everything that was spent.
   let failure: unknown = null;
   const required = <T>(p: Promise<T>): Promise<T> => p.catch((e) => { failure ??= e; return undefined as unknown as T; });
@@ -286,8 +289,8 @@ export async function fetchDomainReport(input: { domain: string; locationCode: n
     optional("referringDomains", () => list("/backlinks/referring_domains/live", { ...links, limit: LINK_ROWS, order_by: ["rank,desc"] }).then((r) => r.items)),
     optional("anchors", () => list("/backlinks/anchors/live", { ...links, limit: LINK_ROWS, order_by: ["backlinks,desc"] }).then((r) => r.items)),
   ]);
-  if (failure) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure)), { costUsd });
-  return { data: buildDomainReport(input, { overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors }), costUsd };
+  if (failure) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure)), { costUsd, costUnknown });
+  return { costUnknown, data: buildDomainReport(input, { overview, summary, history, linkHistory, keywords, pages, competitors, referringDomains, anchors }), costUsd };
 }
 
 // ── Storage ────────────────────────────────────────────────────────────────
@@ -307,10 +310,10 @@ export const EXPLORER_SCHEMA_DDL = [
 ];
 
 /** This account's newest report for the domain, with whether it is still inside the free window. */
-export async function latestReport(userId: number, domain: string, locationCode: number, languageCode?: string): Promise<{ report: DomainReport; fresh: boolean } | null> {
+export async function latestReport(userId: number, domain: string, locationCode: number, languageCode = "en"): Promise<{ report: DomainReport; fresh: boolean } | null> {
   const { rows: [row] } = await pool.query(
     `SELECT report, (created_at > now() - make_interval(days => $4)) AS fresh FROM seo_domain_reports
-      WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND ($5::text IS NULL OR language_code=$5) ORDER BY created_at DESC LIMIT 1`, [userId, domain, locationCode, REPORT_TTL_DAYS, languageCode ?? null]);
+      WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$5 ORDER BY created_at DESC LIMIT 1`, [userId, domain, locationCode, REPORT_TTL_DAYS, languageCode]);
   return row ? { report: row.report, fresh: row.fresh === true } : null;
 }
 
