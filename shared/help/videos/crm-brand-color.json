@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-brand-color",
+  "durationSec": 60,
+  "video": {
+    "key": "tutorials/crm-brand-color.96113a10.mp4",
+    "bytes": 4943450,
+    "sha256": "96113a10167b414bd698d80d7ad8a74c8afdae7c694b3c3424876ebd44f555f0"
+  },
+  "captions": {
+    "key": "tutorials/crm-brand-color.b21c4dc0.vtt",
+    "bytes": 1291,
+    "sha256": "b21c4dc06cae7f00838beffd7b2bbf213b3e77b65ce366af6558281d6d4602ee"
+  },
+  "poster": {
+    "key": "tutorials/crm-brand-color.7834994e.jpg",
+    "bytes": 98102,
+    "sha256": "7834994eb827284cf09fc28a6ab030eadd0b54fe852c3e0eba6aa2e1163a52a0"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:34:27.273Z",
+    "video": "2e05edeec7bc71cb358c32092d0d8396",
+    "captions": "30e2b3632129c02ac680104a93543145",
+    "poster": "279e8f30c148779e50e82211688a4846"
+  }
+}
