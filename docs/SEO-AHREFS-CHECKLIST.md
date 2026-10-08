@@ -17,12 +17,10 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 
 ## B. Site Explorer (`/seo/explorer`, explorer.tsx + report-table.tsx; server/seo/explorer.ts, reports.ts)
 - [x] DONE  B1  Overview for any domain: authority ring, backlinks, referring domains, followed vs not, organic keywords / traffic / value, paid keywords / traffic.
-- [x] PART  B2  Performance chart (organic traffic, keywords, top-10 keywords) with selectable series. 6 months only; Ahrefs shows years. (Codex: FAIL as DONE.)
+- [x] DONE  B2  Performance chart (organic traffic, keywords, top-10 keywords) with selectable series, two years of monthly history (was six months; a report now costs about $1.20 instead of $1.12 because the history call costs more). Ahrefs goes back further.
 - [x] DONE  B3  Backlink growth chart: referring domains, backlinks, new and lost links per month, 12 months.
 - [x] PART  B4  Organic positions distribution; keywords by intent covers the top 100 keywords only, and says so. (Codex: FAIL as DONE.)
-- [x] DONE  B5  Left menu of reports, each with filters, sort, paging (25/50/100), CSV export, saved for a day:
-              Backlinks · New backlinks · Lost backlinks · Broken backlinks · Referring domains · Anchors · Best pages by links ·
-              Organic keywords · Top pages · Organic competitors · Paid keywords.
+- [x] DONE  B5  Left menu of reports, each with filters, sort, paging (25/50/100), CSV export, saved for a day: Backlinks, New / Lost / Broken backlinks, Referring domains, Anchors, Best pages by links, Organic keywords, Top pages, Organic competitors, Paid keywords. Organic competitors and Best pages by links got their filters 10-08 (tested live).
 - [x] DONE  B6  Organic keywords filters: position range, volume, difficulty, intent, keyword contains; sort by traffic / volume / position / difficulty / CPC.
 - [x] DONE  B7  Tick keywords in a report and add them to the rank tracker.
 - [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
@@ -46,7 +44,7 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 ## D. Rank tracker (`/seo/rank-tracker`, index.tsx)
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
 - [x] DONE  D2  History: project chart (visibility %, average position) and positions-by-band chart per check date; click a keyword for its own history chart and table. Built from saved checks, free. NOT yet seen with real check data (no tracked sites exist on production yet).
-- [x] PART  D3  Tags: set a tag when adding keywords, filter the history by tag. TODO: edit tags in the table (API exists), competitors on the same keywords, share of voice vs competitors.
+- [x] DONE  D3  Tags (set when adding keywords, filter the history). Competitors: follow up to 5 per site; share of voice against them; the other sites seen most on your keywords (one click to follow); who is in the map pack; the first page of Google saved per keyword at each check. All from the checks already paid for. Seen in a browser 10-08 with seeded result pages; competitor positions beyond the top ten start with the next real check.
 - [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. Seen in a browser 10-08. US only.
 - [x] PART  D5  Scheduled email report: done (G5). SERP features won per keyword: only the map pack is tracked.
 
@@ -135,6 +133,28 @@ Re-check of the earlier items: FIXED N3 N9 N10 N11, older 9 14 16 - the rest PAR
 STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / backlink saves), 11 (partial explorer report needs a full refresh),
 15 (agency delegation), 17 (database checks are manual scripts, not CI); B5 filters on competitors / best-by-links.
 
+## Codex audit #5 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-5.md)
+Verdict: "Substantial progress, but billing recovery and outbound reports still need fixes." Coverage: about 45% (40-50%).
+Audit #4's 15: FIXED 8, PARTLY 6, NOT FIXED 1 (#13 per-process locks). 15 new defects; done the same day:
+ 1 report emails had no way to stop them ..... FIXED: every email says who asked for it and carries a signed stop link; an address that
+   used it is never mailed again by that account; nothing is sent once the account has no SEO tools. NOT done: asking a new address to confirm first.
+ 2 schedule marked sent before sending ....... FIXED (leased for an hour, moved on only when every address was dealt with; retried otherwise)
+ 3 failed late settlement forgotten .......... FIXED (kept on the row, applied by the reconciler; real-database check 12)
+ 4 rank refunds could disappear .............. FIXED (the run carries its reservation before posting; a refund that cannot be made is owed and retried; check 13)
+ 5 failed checks stayed charged .............. FIXED (refunded with the ones that never return; check 14). Share is by number of checks, not per-keyword price.
+ 6 alert claim was not a delivery record ..... FIXED (five-minute lease; sent only when it went out; retried for three days)
+ 7 usage could invent a charge ............... FIXED (the amount is the row's final credit, nothing computed)
+ 8 unknown cost is a flag, not an amount ..... OPEN (rank posting is additive; gap and backlinks still use max(reported, estimate))
+ 9 back-fill could collide ................... FIXED (rows that would collide are left alone)
+10 list limits could be raced ................ FIXED (one request at a time per account; one name per account whatever the capitals)
+11 "Refresh numbers" did not refresh the list  FIXED (all keywords, in batches of 200, written back; tested live)
+12 usage stale / wrong "this month" .......... FIXED. Paging beyond 200 rows: OPEN.
+13 report hid a partial check ................ FIXED (checked vs tracked, all movers counted, device named)
+14 place lookup counted 62,000 rows each time  FIXED (one indexed read, at most hourly; removed places are deleted)
+15 small loading / keyboard faults ........... FIXED
+STILL OPEN: 8, 12 (paging), #13 of audit 4 (locks are per process; production runs one), agency delegation, audit summaries computed on read,
+a partly-loaded explorer report needs a full refresh, database checks are manual scripts.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -154,3 +174,6 @@ STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / b
   "city, state" not matching in the place picker, no way to get search volumes in the tracker, arrow glyphs missing in the PDF.
   All fixed. How to repeat it: scripts/seoshots*.tmp.ts in vb11 ~/ConstructHUB-seoshots (not committed).
 - 2026-10-08 (slice 7): reports. 142 SEO unit tests pass.
+- 2026-10-08 (slice 8): followed competitors / share of voice, filters on the last two reports, two-year history, Codex audit #5 fixes.
+  150 SEO unit tests; script/seo-ledger-check.ts 44/44 and seo-local-check.ts 20/20 on a fresh Postgres; unsubscribe, opt-out skipping and
+  list refresh exercised end to end in the recording environment; the competitor panel was looked at in a browser.
