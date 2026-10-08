@@ -41,6 +41,7 @@ const report = (over: Partial<SiteReport> = {}): SiteReport => ({
     keywords: [{ keyword: "roof repair", location: "Tampa, Florida", position: 3, previous: 9, local: 2, volume: 880 }] },
   search: { fetchedAt: "2026-10-07T00:00:00Z", authority: 37, referringDomains: 2660, backlinks: 32000, organicKeywords: 74, organicTraffic: 54, trafficValue: 997, trafficChange: 12, keywordsChange: -3, referringDomainsChange: 0 },
   audit: { scannedAt: "2026-10-06T00:00:00Z", health: 97, healthChange: 3, crawled: 150, errors: 4, warnings: 216, notices: 2, topIssues: [{ title: "HTTP errors", severity: "error", count: 4 }] },
+  searchConsole: { clicks: 412, impressions: 18300, position: 14.2, previousClicks: 380, previousImpressions: 19000 },
   alerts: [{ title: "2 rankings fell for example.com", kind: "rank_drop", createdAt: "2026-10-08T00:00:00Z" }],
   ...over,
 });
@@ -53,6 +54,8 @@ describe("words", () => {
     const partial = report(); partial.rankings!.tracked = 10;
     expect(Object.fromEntries(reportHighlights(partial))["Not covered by the latest check"]).toBe("6 of 10 tracked keywords");
     expect(rows["Average position"]).toBe("6 (was 7)");
+    expect(rows["Clicks from Google, last 28 days"]).toBe("412 (+32)");
+    expect(rows["Times shown in Google, last 28 days"]).toBe("18,300 (−700)");
     expect(rows["In the Google map pack"]).toBe("1 of 2 searches that show a map");
     expect(rows["Keywords the site ranks for"]).toBe("74 (−3)");
     expect(rows["Websites linking to it"]).toBe("2,660");
@@ -65,13 +68,14 @@ describe("words", () => {
   });
   it("knows when there is nothing to report", () => {
     expect(reportIsEmpty(report())).toBe(false);
-    expect(reportIsEmpty(report({ rankings: null, search: null, audit: null }))).toBe(true);
+    expect(reportIsEmpty(report({ rankings: null, search: null, audit: null, searchConsole: null }))).toBe(true);
+    expect(reportIsEmpty(report({ rankings: null, search: null, audit: null }))).toBe(false);
   });
 });
 
 describe("PDF", () => {
   it("renders a real PDF for a full report, an empty one and a bad logo", async () => {
-    for (const [r, brand] of [[report(), { name: "Aspire Marketing", logo: null }], [report({ rankings: null, search: null, audit: null, alerts: [] }), null], [report(), { name: "X", logo: "data:image/png;base64,not-an-image" }]] as const) {
+    for (const [r, brand] of [[report(), { name: "Aspire Marketing", logo: null }], [report({ rankings: null, search: null, audit: null, searchConsole: null, alerts: [] }), null], [report(), { name: "X", logo: "data:image/png;base64,not-an-image" }]] as const) {
       const pdf = await renderReportPdf(r, brand);
       expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
       expect(pdf.length).toBeGreaterThan(800);

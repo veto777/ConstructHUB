@@ -28,7 +28,7 @@ export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
 export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
-export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number };
+export type SeoPrices = { explorerReport: number; reportPage: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number };
 export type SeoStatus = {
   configured: boolean;
   usage: SeoUsage;
@@ -37,7 +37,7 @@ export type SeoStatus = {
   /** Alerts not yet read (the badge on the Alerts tab). */
   alertsUnread?: number;
   /** The most a lookup can cost: what must be available for it to start. */
-  holds?: Partial<SeoPrices>;
+  holds?: Partial<Record<keyof SeoPrices, number>>;
   packs: number[];
   resetsAt: string;
   /** Platform admins only: the real state of the data source. */
@@ -98,12 +98,14 @@ const TABS = [
   { href: "/seo", label: "Dashboard" },
   { href: "/seo/explorer", label: "Site explorer" },
   { href: "/seo/keywords", label: "Keywords explorer" },
+  { href: "/seo/content", label: "Content explorer" },
   { href: "/seo/rank-tracker", label: "Rank tracker" },
   { href: "/seo/audit", label: "Site audit" },
+  { href: "/seo/ai", label: "AI visibility" },
   { href: "/seo/alerts", label: "Alerts" },
   { href: "/seo/reports", label: "Reports" },
   { href: "/seo/backlinks", label: "Backlinks" },
-  { href: "/seo/competitors", label: "Competitors" },
+  { href: "/seo/batch", label: "Batch analysis" },
   { href: "/seo/usage", label: "Usage" },
 ];
 
@@ -129,7 +131,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
           <PlanGate requiredPlan={gate.requiredPlan} message={gate.message} />
         ) : (
           <>
-            <nav className="g-tabs" aria-label="SEO sections">
+            <nav className="g-tabs sm:!flex-wrap sm:!overflow-visible" aria-label="SEO sections">
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
             </nav>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}

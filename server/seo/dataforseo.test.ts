@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   dataforseoDeps, isConfigured, assertOk, isTaskInProgress, isNoResultsTask, buildRankResult, parseTaskPost, parseTaskGet,
   parseKeywordItem, parseIntersectionItem, parseBacklinkSummary, parseBacklinkRow, parseAdsVolumeItem, normalizeDomain,
-  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
+  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, safeHttpUrl, safeDomain, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
   DataForSeoError, API_BASE,
 } from "./dataforseo";
 
@@ -146,6 +146,18 @@ describe("rank checks (standard queue)", () => {
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com", businessName: "Precision Roofing" }, pack).localPosition).toBe(2);
     // a tagline after a separator is not part of the name
     expect(isOurListing({ title: "Alpine Exteriors | Siding, Roofing & Windows" }, "x.com", "Alpine Exteriors")).toBe(true);
+  });
+  it("what is saved from a result page is safe to show: http(s) links only, host-shaped domains, bounded", () => {
+    const r = buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com" }, [
+      { type: "organic", rank_group: 1, domain: "evil.example", url: "javascript:alert(1)", title: "t".repeat(500) },
+      { type: "organic", rank_group: 2, domain: "bad domain<script>", url: "https://ok.example/" },
+      { type: "organic", rank_group: 3, domain: "WWW.Fine.example", url: "https://fine.example/page" },
+      { type: "local_pack", rank_group: 1, title: "n".repeat(400), domain: "x<y" },
+    ]);
+    expect(r.serpTop).toEqual([{ position: 1, domain: "evil.example", url: null, title: "t".repeat(120) }, { position: 3, domain: "fine.example", url: "https://fine.example/page", title: null }]);
+    expect(r.localPack[0]).toEqual({ position: 1, title: "n".repeat(160), domain: null });
+    expect(safeHttpUrl("data:text/html,x")).toBeNull();
+    expect(safeDomain("a.b-c.com")).toBe("a.b-c.com");
   });
   it("business names compare without punctuation or company suffixes", () => {
     expect(normalizeBusinessName("Alpine Exteriors, LLC")).toBe("alpine exteriors");

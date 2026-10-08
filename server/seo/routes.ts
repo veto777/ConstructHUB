@@ -16,6 +16,7 @@
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
 import type { Express } from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { isPlatformAdmin } from "../admin";
@@ -38,16 +39,22 @@ import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
+import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
-import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, listItemsInput, ListError, type BulkPage } from "./lists";
+import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
+import { reportDeps } from "./site-report";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
 import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
 import { takeBudget } from "../growth-limits";
 import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
 import { listingNamed } from "./dataforseo";
+import { contentInput, fetchContent, CONTENT_ESTIMATE_USD, CONTENT_TYPICAL_USD, type ContentPage } from "./content";
+import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage } from "./batch";
+import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
+import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -64,6 +71,16 @@ export const SEO_PRICES = {
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
   backlinkRefresh: retailCents(estimateBacklinkSnapshotUsd(100)),
+  /** Content explorer: one page of results. */
+  contentSearch: retailCents(CONTENT_TYPICAL_USD),
+  /** Batch analysis: a flat part plus so much per 100 websites. */
+  batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
+  batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD + LABS_ITEM_USD)),
+  /** AI visibility: one question to one assistant, and one AI-mentions lookup. */
+  aiChatgpt: retailCents(AI_ENGINES.chatgpt.typicalUsd),
+  aiGemini: retailCents(AI_ENGINES.gemini.typicalUsd),
+  aiPerplexity: retailCents(AI_ENGINES.perplexity.typicalUsd),
+  aiMentions: retailCents(AI_MENTIONS_TYPICAL_USD),
   /** Search volumes for a site's tracked keywords (one lookup covers up to 1,000). */
   searchVolumes: retailCents(estimateAdsVolumeUsd(1)),
   /** Bulk keyword analysis: a flat part plus so much per 100 keywords. */
@@ -83,6 +100,11 @@ export const SEO_HOLDS = {
   explorerReport: retailCents(EXPLORER_ESTIMATE_USD),
   reportPage: retailCents(REPORT_ESTIMATE_USD),
   keywordOverview: retailCents(KEYWORD_OVERVIEW_ESTIMATE_USD),
+  aiChatgpt: retailCents(AI_ENGINES.chatgpt.estimateUsd),
+  aiGemini: retailCents(AI_ENGINES.gemini.estimateUsd),
+  aiPerplexity: retailCents(AI_ENGINES.perplexity.estimateUsd),
+  aiMentions: retailCents(AI_MENTIONS_ESTIMATE_USD),
+  contentSearch: retailCents(CONTENT_ESTIMATE_USD),
 };
 
 /** Report names as the customer sees them (usage history). */
@@ -192,24 +214,24 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     return p;
   };
   /** Save a paid result. A failed save must not cost the customer the data they just paid for: they still get the response. */
-  const keep = async (what: string, save: () => Promise<void>) => {
-    try { await save(); } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
+  const keep = async (what: string, save: () => Promise<void>): Promise<boolean> => {
+    try { await save(); return true; } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); return false; }
   };
   /**
    * Buy a cacheable result once. The first request runs it; anyone asking for the same thing meanwhile waits and
    * gets the same result marked `reused` (they bought nothing). The saved copy is checked again inside, so a
    * request arriving just after another finished does not buy it a second time.
    */
-  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean }> => {
+  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean; /** false: bought and returned, but it could not be kept — reopening it will not be free. */ saved: boolean }> => {
     const flight = `${kind}:${user}:${key}`;
     const waiting = inflight.has(flight);
     const out = await once(flight, async () => {
-      if (!skipSaved) { const again = await cached<T>(user, key, maxAgeHours); if (again) return { data: again, bought: false }; }
+      if (!skipSaved) { const again = await cached<T>(user, key, maxAgeHours); if (again) return { data: again, bought: false, saved: true }; }
       const o = await withBudget(user, estimateUsd, fetch, { label });
-      await keep(`${kind} for account ${user}`, () => saveCached(user, key, kind, o.data, o.costUsd));
-      return { data: o.data, bought: true };
+      const saved = await keep(`${kind} for account ${user}`, () => saveCached(user, key, kind, o.data, o.costUsd));
+      return { data: o.data, bought: true, saved };
     });
-    return { data: out.data, reused: waiting || !out.bought };
+    return { data: out.data, reused: waiting || !out.bought, saved: out.saved };
   };
   /** Requests for one key run one after another (keyword imports: the plan limit is counted, then inserted). */
   const queues = new Map<string, Promise<unknown>>();
@@ -529,7 +551,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<ReportPage>(user, key, `report:${input.table}`, CACHE_HOURS, REPORT_ESTIMATE_USD, () => fetchReportPage(full), false, `${REPORT_NAMES[input.table] ?? input.table} — ${target}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Keywords Explorer: one keyword's overview ───────────────────────────────
@@ -546,7 +568,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
-    res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Content gap / Link intersect (Site Explorer) ────────────────────────────
@@ -566,7 +588,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<GapPage>(user, key, `gap:${input.kind}`, CACHE_HOURS, gapEstimateUsd(input.kind, competitors.length, limit),
       () => fetchGap({ kind: input.kind, target, competitors, limit, offset, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `${content ? "Content gap" : "Link intersect"} — ${target} vs ${competitors.join(", ")}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Dashboard: every tracked site with its saved numbers (never a vendor call) ──
@@ -616,7 +638,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<BulkPage>(user, key, "keywords-bulk", CACHE_HOURS, bulkEstimateUsd(keywords.length),
       () => fetchBulkKeywords({ keywords, locationCode: input.locationCode, languageCode: input.languageCode }), false, `Bulk keyword analysis — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}`);
-    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused });
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
@@ -630,13 +652,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { list, items } = await listItems(user, id.parse(req.params.id));
     const keywords = items.map((i: any) => i.keyword as string);
     if (!keywords.length) return res.status(400).json({ message: "This list is empty." });
-    let updated = 0;
+    let updated = 0, failed = 0, attempted = 0, problem: string | null = null;
     for (let i = 0; i < keywords.length; i += BULK_MAX) {
       const chunk = keywords.slice(i, i + BULK_MAX);
-      const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
-      if (out.data.rows.length) updated += (await addToList(user, { listId: list.id, items: out.data.rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent })) })).total ? out.data.rows.length : 0;
+      try {
+        const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
+        updated += await refreshListMetrics(list.id, out.data.rows, out.data.notFound);
+        attempted += chunk.length;
+      } catch (e: any) {
+        // What was done stays done and is reported; out of credit stops here, anything else moves on to the next batch.
+        failed += chunk.length;
+        problem = e instanceof SeoBudgetError ? e.message : "Some keywords could not be refreshed — try again in a few minutes.";
+        if (e instanceof SeoBudgetError || e instanceof ListError) break;
+      }
     }
-    res.json({ updated, total: keywords.length });
+    res.json({ updated, total: keywords.length, failed, notAttempted: Math.max(0, keywords.length - attempted - failed), problem });
   }));
   route("get", "/api/seo/lists/:id", async (req, res, user) => { res.json(await listItems(user, id.parse(req.params.id))); });
   route("post", "/api/seo/lists/:id/remove", async (req, res, user) => {
@@ -644,16 +674,96 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
 
+  // ── Content explorer: pages across the web about a topic. Saved for a day; `peek` never buys. ──
+  route("post", "/api/seo/content", async (req, res, user) => {
+    const input = contentInput.parse(req.body);
+    const { peek, ...search } = input;
+    const key = cacheKey("content", [cleanKeyword(search.query), search.sort, search.sinceDays ?? 0, search.minAuthority ?? 0, search.kind ?? "", search.exclude ? normalizeDomain(search.exclude) ?? "" : "", search.limit, search.offset]);
+    const saved = await cached<ContentPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (peek) return res.status(404).json({ code: "no_report", message: "Not searched yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<ContentPage>(user, key, "content", CACHE_HOURS, CONTENT_ESTIMATE_USD, () => fetchContent(input), false, `Content explorer — "${search.query}"${search.offset ? ` (results ${search.offset + 1}–${search.offset + search.limit})` : ""}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Batch analysis: headline numbers for up to 100 websites. Saved for a day; `peek` never buys. ──
+  route("post", "/api/seo/batch", async (req, res, user) => {
+    const input = batchInput.parse(req.body);
+    const { domains, rejected } = cleanDomains(input.domains);
+    if (!domains.length) return res.status(400).json({ message: "Enter at least one website like example.com" });
+    const key = cacheKey("batch", [...domains].sort());
+    const saved = input.refresh ? null : await cached<BatchPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true, rejected });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<BatchPage>(user, key, "batch", CACHE_HOURS, batchEstimateUsd(domains.length), () => fetchBatch(domains), input.refresh, `Batch analysis — ${domains.length} website${domains.length === 1 ? "" : "s"}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved, rejected });
+  });
+
+  // ── AI visibility ───────────────────────────────────────────────────────────
+  // The site's saved questions with the newest answer from each assistant. Saved rows only.
+  route("get", "/api/seo/sites/:id/ai", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const [prompts, { rows: keywords }] = await Promise.all([
+      aiHistory(user, site.id),
+      pool.query("SELECT keyword, location_name AS location FROM seo_keywords WHERE site_id=$1 ORDER BY (location_name IS NOT NULL AND location_name <> 'United States') DESC, search_volume DESC NULLS LAST, id LIMIT 40", [site.id]),
+    ]);
+    res.json({ businessName: site.business_name ?? null, domain: site.domain, prompts, suggestions: suggestPrompts(keywords), tracked: await trackedPrompts(site.id), maxTracked: MAX_TRACKED_PROMPTS });
+  });
+  // Ask the chosen assistants one question. One purchase per identical question in flight; an assistant that
+  // fails is not charged; the answers are saved so the history builds up.
+  route("post", "/api/seo/sites/:id/ai/ask", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = askInput.parse(req.body);
+    if (!isConfigured()) return notReady(res);
+    // This is a visibility check, not a chatbot: a generous ceiling on how many questions an account asks in an hour.
+    if (!(await takeBudget(`seo:ai:${user}`, 40, 1, 3_600_000))) return res.status(429).json({ message: "That is a lot of questions in one hour — try again in a little while." });
+    const engines = [...new Set(input.engines)];
+    const out = await once(`ai:${user}:${site.id}:${engines.join(",")}:${cleanKeyword(input.prompt)}`, async () => {
+      const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")})` });
+      // Saved as one run. If saving fails the customer still gets the answers, and is told they are not in the history.
+      const runId = randomUUID();
+      let saved = true;
+      try { await saveAiAnswers(user, site.id, input.prompt, o.data.answers, o.costUsd, runId); }
+      catch (e: any) { saved = false; console.error(`[seo] AI answers for site ${site.id} were paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
+      return { ...o, runId, saved };
+    });
+    res.status(201).json({ siteId: site.id, prompt: input.prompt, runId: out.runId, saved: out.saved, answers: out.data.answers, failed: out.data.failed });
+  });
+  // Ask a question again every month, or stop. One at a time per account, so the limit cannot be raced.
+  route("post", "/api/seo/sites/:id/ai/track", (req, res, user) => serial(`aitrack:${user}`, async () => {
+    const site = await ownedSite(user, req.params.id);
+    const input = trackInput.parse(req.body);
+    if (!(await setTracked(user, site.id, input))) return res.status(403).json({ message: `You can have up to ${MAX_TRACKED_PROMPTS} questions asked every month per site. Stop one first.` });
+    res.json({ tracked: await trackedPrompts(site.id) });
+  }));
+
+  // The questions for which an AI answer already uses a site as a source. Saved for a week; `peek` never buys.
+  route("post", "/api/seo/ai/mentions", async (req, res, user) => {
+    const input = mentionsInput.parse(req.body);
+    const domain = normalizeDomain(input.domain);
+    if (!domain) return res.status(400).json({ message: "Enter a website like example.com" });
+    const key = cacheKey("ai-mentions", [domain, input.platform]);
+    const saved = await cached<AiMentionsPage>(user, key, 7 * 24);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<AiMentionsPage>(user, key, "ai-mentions", 7 * 24, AI_MENTIONS_ESTIMATE_USD, () => fetchAiMentions({ domain, platform: input.platform }), false, `AI mentions — ${domain} (${input.platform === "google" ? "Google AI Overviews" : "ChatGPT"})`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+  });
+
   // ── Rank tracker competitors: share of voice, who else is seen on these keywords, map-pack leaders. Saved checks only. ──
   route("get", "/api/seo/sites/:id/voice", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
     const device = (devices.includes(String(req.query.device)) ? String(req.query.device) : devices[0]) as "desktop" | "mobile";
-    const [competitors, { checks, checkedOn }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device)]);
+    const [competitors, { checks, checkedOn, tracked }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device)]);
     const voice = shareOfVoice(checks, site.domain, competitors, (e) => listingNamed(e, site.business_name));
-    res.json({ device, checkedOn, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
+    res.json({ device, devices, checkedOn, tracked, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
   });
-  route("post", "/api/seo/sites/:id/tracked-competitors", async (req, res, user) => {
+  // One at a time per account, so two requests cannot both take the last place.
+  route("post", "/api/seo/sites/:id/tracked-competitors", (req, res, user) => serial(`follow:${user}`, async () => {
     const site = await ownedSite(user, req.params.id);
     const domain = normalizeDomain(followInput.parse(req.body).domain);
     if (!domain) return res.status(400).json({ message: "Enter the competitor's website like example.com" });
@@ -662,7 +772,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!have.includes(domain) && have.length >= MAX_TRACKED_COMPETITORS) return res.status(403).json({ message: `You can follow up to ${MAX_TRACKED_COMPETITORS} competitors per site. Remove one first.` });
     await pool.query("INSERT INTO seo_site_competitors(site_id, domain) VALUES($1,$2) ON CONFLICT DO NOTHING", [site.id, domain]);
     res.status(201).json({ competitors: await trackedCompetitors(site.id) });
-  });
+  }));
   route("delete", "/api/seo/sites/:id/tracked-competitors/:domain", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     await pool.query("DELETE FROM seo_site_competitors WHERE site_id=$1 AND domain=$2", [site.id, String(req.params.domain).toLowerCase().slice(0, 253)]);
@@ -671,17 +781,30 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // The link in every report email: no sign-in (the person clicking is the recipient, not the customer). The token
   // proves the link came from an email we sent to that address for that account; using it stops all further reports.
-  app.get("/api/seo/report-unsubscribe", async (req, res) => {
-    const userId = Number(req.query.u), email = String(req.query.e ?? "").slice(0, 254), token = String(req.query.t ?? "");
-    const page = (title: string, body: string, status = 200) => res.status(status).type("html").send(
-      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>` +
-      `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;color:#1a1a2e"><h1 style="font-size:22px">${title}</h1><p style="line-height:1.6;color:#444">${body}</p></div>`);
-    try {
-      if (!Number.isInteger(userId) || userId <= 0 || !validUnsubscribe(userId, email, token)) return page("This link is not valid", "It may have been cut off by your email program. Open the link from the newest report email, or reply to the person who sends you the reports.", 400);
-      await optOut(userId, email);
-      page("You won't get these reports any more", "Your address has been removed from this sender's SEO reports. Nothing else is needed.");
-    } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); page("Something went wrong", "Please try the link again in a minute.", 500); }
+  const unsubscribePage = (res: any, title: string, body: string, status = 200) => res.status(status).type("html").send(
+    `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>` +
+    `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;color:#1a1a2e"><h1 style="font-size:22px">${title}</h1>${body}</div>`);
+  const unsubscribeAsk = (req: any) => ({ userId: Number(req.query.u), email: String(req.query.e ?? "").slice(0, 254), token: String(req.query.t ?? "") });
+  const BAD_LINK = `<p style="line-height:1.6;color:#444">It may have been cut off by your email program. Open the link from the newest report email, or reply to the person who sends you the reports.</p>`;
+  // Opening the link only asks; mail scanners and previews open links, and must not unsubscribe anyone.
+  app.get("/api/seo/report-unsubscribe", (req, res) => {
+    const { userId, email, token } = unsubscribeAsk(req);
+    if (!Number.isInteger(userId) || userId <= 0 || !validUnsubscribe(userId, email, token)) return unsubscribePage(res, "This link is not valid", BAD_LINK, 400);
+    unsubscribePage(res, "Stop these SEO reports?",
+      `<p style="line-height:1.6;color:#444">You will no longer get SEO reports from this sender at this address.</p>` +
+      `<form method="post" action="/api/seo/report-unsubscribe?u=${userId}&e=${encodeURIComponent(email)}&t=${encodeURIComponent(token)}"><button style="background:#1a73e8;color:#fff;border:0;border-radius:8px;padding:12px 20px;font-size:15px;cursor:pointer">Stop the reports</button></form>`);
   });
+  app.post("/api/seo/report-unsubscribe", async (req, res) => {
+    const { userId, email, token } = unsubscribeAsk(req);
+    try {
+      if (!Number.isInteger(userId) || userId <= 0 || !validUnsubscribe(userId, email, token)) return unsubscribePage(res, "This link is not valid", BAD_LINK, 400);
+      await optOut(userId, email);
+      unsubscribePage(res, "You won't get these reports any more", `<p style="line-height:1.6;color:#444">Your address has been removed from this sender's SEO reports. Nothing else is needed.</p>`);
+    } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); unsubscribePage(res, "Something went wrong", `<p style="line-height:1.6;color:#444">Please try again in a minute.</p>`, 500); }
+  });
+
+  // The report reads Search Console through this file's own summary (the same one the rank tracker shows).
+  reportDeps.searchConsole = async (userId, domain) => searchConsoleSummary(userId, domain);
 
   // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
   const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
@@ -756,6 +879,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/audit", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     res.json({ site: siteView(site), ...(await siteAudit(user, site.domain)) });
+  });
+
+  // Site Audit → Pages: every page of the newest crawl with indexability, click depth and internal links. Saved crawl only.
+  route("get", "/api/seo/sites/:id/audit/pages", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const pages = await auditPages(user, site.domain);
+    if (!pages) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
+    res.json(pages);
   });
 
   // Rank tracker history: one summary per check date for a device, optionally one tag. Saved checks only.

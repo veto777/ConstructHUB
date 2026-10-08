@@ -109,15 +109,19 @@ export async function trackedCompetitors(siteId: number): Promise<string[]> {
   return rows.map((r: any) => r.domain);
 }
 
-/** The newest check of every keyword of a site on one device. */
-export async function latestChecks(siteId: number, device: "desktop" | "mobile"): Promise<{ checks: VoiceCheck[]; checkedOn: string | null }> {
+/**
+ * The checks of the site's most recent check day on one device — one cohort, not each keyword's own newest check, so
+ * the figures compare like with like. `tracked` says how many keywords the site tracks in all.
+ */
+export async function latestChecks(siteId: number, device: "desktop" | "mobile"): Promise<{ checks: VoiceCheck[]; checkedOn: string | null; tracked: number }> {
+  const { rows: [t] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [siteId]);
   const { rows } = await pool.query(
-    `SELECT DISTINCT ON (c.keyword_id) c.keyword_id AS "keywordId", c.position, k.search_volume AS volume, c.serp_top AS "serpTop", c.rivals, c.local_pack AS "localPack", c.checked_on::text AS "checkedOn"
+    `SELECT c.keyword_id AS "keywordId", c.position, k.search_volume AS volume, c.serp_top AS "serpTop", c.rivals, c.local_pack AS "localPack", c.checked_on::text AS "checkedOn"
        FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id
-      WHERE c.site_id=$1 AND c.device=$2 ORDER BY c.keyword_id, c.checked_on DESC`, [siteId, device]);
+      WHERE c.site_id=$1 AND c.device=$2 AND c.checked_on = (SELECT max(checked_on) FROM seo_rank_checks WHERE site_id=$1 AND device=$2)`, [siteId, device]);
   const arr = (v: unknown) => (Array.isArray(v) ? v : null);
   return {
     checks: rows.map((r: any) => ({ keywordId: r.keywordId, position: r.position, volume: r.volume, serpTop: arr(r.serpTop), rivals: r.rivals && typeof r.rivals === "object" && !Array.isArray(r.rivals) ? r.rivals : null, localPack: arr(r.localPack) })),
-    checkedOn: rows.reduce((m: string | null, r: any) => (!m || r.checkedOn > m ? r.checkedOn : m), null),
+    checkedOn: rows[0]?.checkedOn ?? null, tracked: Number(t?.n ?? 0),
   };
 }

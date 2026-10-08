@@ -106,8 +106,8 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
     queryFn: async () => { try { return await api("POST", "/api/seo/keywords/bulk", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/keywords/bulk", body),
-    onSuccess: (data: unknown) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/keywords/bulk", v.body),
+    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't analyse those keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
@@ -131,7 +131,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
           <Empty testId="bulk-not-run">
             <h3>{asked.length} keyword{asked.length === 1 ? "" : "s"} ready to analyse</h3>
             <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
-            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate()} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+            <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-bulk-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
           </Empty>
         )}
         {page && (
@@ -187,8 +187,10 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   const price = batches.length && bulkPrice(status, 1) != null ? batches.reduce((a, n) => a + (bulkPrice(status, n) ?? 0), 0) : null;
   const renew = useMutation({
     mutationFn: () => api("POST", `/api/seo/lists/${current}/refresh`),
-    onSuccess: (r: { updated: number; total: number }) => { refresh(); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Numbers refreshed for ${r.updated} of ${r.total} keywords`, description: r.updated < r.total ? "The rest have too few searches to measure." : undefined }); },
+    onSuccess: (r: { updated: number; total: number; failed?: number; notAttempted?: number; problem?: string | null }) => toast({ title: `Numbers refreshed for ${r.updated} of ${r.total} keywords`, description: r.problem ? `${r.problem}${r.notAttempted ? ` ${r.notAttempted} were not attempted and were not charged.` : ""}` : (r.updated < r.total ? "The rest have too few searches to measure; their old numbers were cleared." : undefined), variant: r.problem ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't refresh the numbers", description: apiErrorMessage(e), variant: "destructive" }),
+    // Whatever happened, show what is stored now and what it cost.
+    onSettled: () => { refresh(); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
   });
   return (
     <div data-testid="keyword-lists">

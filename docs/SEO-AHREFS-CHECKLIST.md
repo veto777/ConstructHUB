@@ -26,9 +26,9 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
 - [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). Seen in a browser 10-08.
 - [ ] TODO  B10 Traffic by country; multi-year history; compare two dates.
-- [ ] TODO  B11 Organic keywords history chart by position bucket (1–3, 4–10, 11–20 …) over time.
+- [x] DONE  B11 Organic keywords by position over time (top 3 / 4-10 / the rest) from the saved two-year history.
 - [ ] TODO  B12 Paid ads copy and paid pages.
-- [ ] TODO  B13 AI responses panel (ChatGPT, Gemini, Perplexity, AI Overviews).
+- [x] DONE  B13 AI visibility (`/seo/ai`): ask ChatGPT, Google Gemini and Perplexity a customer's question (web search on) and see for each whether the business is named, where in the list, whether its site is a source, who else is named, which sites were used and what was searched; saved history per question. Plus AI mentions: the questions for which Google AI Overviews / ChatGPT already use a site. Run live and seen in a browser 10-08 (ChatGPT named Alpine Exteriors first; Gemini and Perplexity did not).
 - [ ] TODO  B14 Filter chips for URL / subdomain / exact-path scope ("Subdomains" selector).
 
 ## C. Keywords Explorer (`/seo/keywords`, keywords.tsx)
@@ -60,13 +60,15 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 
 ## F. Site Audit
 - [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). Seen in a browser 10-08.
-- [x] PART  F2  HTTP status distribution (2xx / 3xx / 4xx / 5xx / failed) and per-area scores. TODO: crawl depth, indexability report, internal-link report, per-page explorer, pause/resume, custom page limit (fixed at 150).
+- [x] DONE  F2  Site audit -> Pages: every crawled page with status, whether it can be indexed and why not, clicks from the home page, links to it, words, title and description length, size, the issues it is listed under; quick filters, search, sort, export. When a site's links only exist after JavaScript runs (true of alpineexteriorswa.com), link counts and depth are shown as not measurable instead of wrong. TODO: pause/resume, custom page limit (fixed at 150), JavaScript rendering.
 
 ## G. Other Ahrefs tools
-- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.
+- [x] PART  G1  Content explorer (`/seo/content`): search the web for pages about a topic; title, site, authority, date, author, excerpt; sort by relevance / strongest sites / newest; filters for date, authority, kind of site, leaving out your own; paging, export, open a site in Site explorer. Run live and seen in a browser 10-08. Not Ahrefs' depth: no traffic or linking-site numbers per page.
+- [ ] TODO  G3  Web Analytics.
+- [x] DONE  G2  Brand Radar / AI visibility: see B13. A question can be asked again every month (up to 5 per site), from the included data only. Not yet: competitor share across many questions.
 - [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
 - [x] DONE  G5  Reports (`/seo/reports`): the site's report on screen, as a PDF (the account's own name and logo when set), and emailed weekly or monthly to up to 5 addresses, or sent now. Built from saved numbers - free. Seen in a browser; the PDF was rendered and read (and two faults found that way were fixed).
-- [ ] TODO  G6  Batch analysis of many domains.
+- [x] DONE  G6  Batch analysis (`/seo/batch`): up to 100 websites at once - authority, linking sites, links, estimated search visits, keywords; sort, export, open any in Site explorer. Run live and seen in a browser 10-08.
 
 ## Codex audit #2 (2026-10-08, read-only, in a container; report: tower1 ~/codex-audits/out/seo-audit-2.md)
 Verdict: "a substantive SEO MVP, roughly 30-40% of the requested Ahrefs surface, not an Ahrefs equivalent."
@@ -155,6 +157,70 @@ Audit #4's 15: FIXED 8, PARTLY 6, NOT FIXED 1 (#13 per-process locks). 15 new de
 STILL OPEN: 8, 12 (paging), #13 of audit 4 (locks are per process; production runs one), agency delegation, audit summaries computed on read,
 a partly-loaded explorer report needs a full refresh, database checks are manual scripts.
 
+## Codex audit #6 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-6.md)
+Verdict: "Substantial progress, but billing recovery and outbound delivery remain unreliable." Coverage: about 45% (40-50%), with Brand Radar / AI and
+the audit page explorer both counted as missing at the time (both since built).
+Audit #5's 15: FIXED 5, PARTLY 8, NOT FIXED 1, FIX IS WRONG 1 (alert delivery: the shared notifier swallows email errors). 14 new defects; done the same day:
+ 7 saved result pages unvalidated ......... FIXED (http(s) links only, host-shaped domains, bounded sizes; test)
+ 9 share of voice mixed check dates ....... FIXED (one cohort: the latest check day; says how many of the tracked keywords it covers; called an estimate)
+ 8 competitor positions cut off ........... SAID ON THE PAGE (a check reads only as far as the page the customer's own site is on); not changed, it would raise the cost of every check
+10 competitor limit could be raced ........ FIXED
+11 half-finished place load looked fresh .. FIXED (a load counts only when it finishes)
+13 opening the unsubscribe link opted out . FIXED (the link asks; a button press does it)
+14 two months at midnight on the 1st ...... FIXED (one month per reservation, used for refunds too)
+ 5/6 list refresh ......................... FIXED (replaces the numbers, keeps what was done when a batch fails, never re-adds a removed keyword)
+ 3 owed refund lost on an abandoned reservation  FIXED (stays owed until the reservation is really settled)
+OPEN: 1 and 2 (the shared email / notification helpers record "sent" before sending and swallow errors - outside this module),
+4 (cost of posting tasks the source rejected), 12 (a list-name index would fail on pre-existing names differing only by capitals; there are none),
+audit #5's 8 (unknown cost as an amount) and 12 (usage paging), audit #4's 13 (per-process locks), agency delegation.
+
+## Codex audit #7 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-7.md)
+Verdict: "The fixes are substantial, but billing on partial failures, delivery recovery, and the accuracy of customer-facing conclusions still need work."
+Coverage: about 50% (45-55%). 13 new defects, on AI visibility and the audit page explorer; done the same day:
+ 1 an assistant that failed could still be charged ... FIXED (the customer pays only for the parts delivered: AI, content gap, batch; test)
+ 2 a verdict could be fooled .......................... FIXED in part: a one-word name counts only as a named business, not in running text; the web address
+   must be a whole address; a question that names the business says so on the page. The list of businesses is still read from the answer's bold names.
+ 3 a source inferred from a title ..................... FIXED (a title is read as the site only for Gemini's own redirect address; test)
+ 4 paid answers lost from view if saving failed ....... FIXED (shown at once; a notice when they could not be saved)
+ 5 answers from different asks counted together ....... FIXED (the header counts one ask; an older answer is marked as such)
+ 6 "can be indexed" said too much ..................... FIXED ("nothing blocking Google" / "blocked from Google" / response not recorded)
+ 7 the JavaScript diagnosis was too sure .............. FIXED (five pages or more before it is made; worded as the usual cause, not a proven one)
+ 8 big crawls worked out on every read ................ FIXED (kept per crawl; 1,000 pages and 500 links a page at most)
+ 9 list refresh could re-add a removed keyword ........ FIXED (update-only; keywords the source has nothing for are cleared)
+10 alert lease had no owner ........................... FIXED (token). The shared notifier still swallows email errors.
+11 AI as a general chatbot ............................ PART (40 questions an hour per account)
+13 affordability used the usual price ................. FIXED (uses the amount that must be available)
+OPEN: 12 (back-fill is not a versioned migration), the shared email / notification helpers, cost of posting tasks the source rejects,
+per-process locks, usage paging, agency delegation, no way to delete a saved AI question.
+
+## Codex audit #8 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-8.md)
+Verdict: "Substantial SEO functionality, but billing recovery, automatic AI tracking, and customer-facing conclusions still need fixes. This is not
+yet an Ahrefs equivalent." Coverage: 50-60%, midpoint 55%, with Content Explorer still counted as 0-5% (built the same day). 12 new defects:
+ 1 a tracked AI question could drop out of view ..... FIXED (every tracked question is listed with its own Stop; one spelling of a question everywhere)
+ 5 answers of different asks counted together ....... FIXED (run id; saved all-or-none; the server says whether they were saved)
+ 6 a failed monthly ask was lost for 30 days ........ FIXED (leased for an hour; the month moves on only after the answers are saved)
+ 7 an answer could land under another site ......... FIXED (bound to the site it was asked for)
+ 8 batch analysis invented zeros / no retry ........ FIXED (unknown is shown as unknown; a column that did not load can be retried)
+10 canonical tag called a block .................... FIXED (its own filter, described as a request Google usually follows); links are judged on any same-site link
+11 crawl limits applied after reading everything ... FIXED (1,000 pages and 500 links a page inside the query)
+OPEN: 2 (refund intent not written atomically with the run closing), 3 (cost of rank tasks the source rejects), 4 (the shared notifier),
+9 (unknown cost as an amount, outside rank posting), 12 (the back-fill is not a versioned migration).
+
+## Codex audit #9 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-9.md)
+Verdict: "Substantial SEO functionality, but billing recovery and scheduled delivery still need work. This is not an Ahrefs equivalent."
+Coverage: 55% (50-60%); Content Explorer now counted at 20-35%. 10 new defects; done the same day:
+ 1 monthly AI ask could be bought again if saving failed .. FIXED (the month moves on as soon as it is paid for; saving is retried, never the purchase)
+ 2 a result could be stored under another search ......... FIXED on every paid page (the result is written under the request it answers)
+ 3 content paging could strand you on an unbought page ... FIXED (a way back is always there)
+ 4 Stop could miss an older tracked question ............. FIXED (compared in one spelling)
+ 5 answers from different asks shown together ............ FIXED (exact run only; an older answer in the table carries its date)
+ 6 batch: a missing estimate shown as zero; affordability  FIXED
+ 7 content wording said more than the data ............... FIXED ("matches", authority as one sign)
+ 8 "reopens free" could fail silently .................... FIXED (the page says when a result could not be kept)
+ 9 outgoing links shown when links are unmeasurable ...... FIXED
+10 an invalid site to leave out was ignored .............. FIXED (refused)
+Also: the report now carries real clicks and impressions from Google Search Console when the site's property is connected.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -177,3 +243,11 @@ a partly-loaded explorer report needs a full refresh, database checks are manual
 - 2026-10-08 (slice 8): followed competitors / share of voice, filters on the last two reports, two-year history, Codex audit #5 fixes.
   150 SEO unit tests; script/seo-ledger-check.ts 44/44 and seo-local-check.ts 20/20 on a fresh Postgres; unsubscribe, opt-out skipping and
   list refresh exercised end to end in the recording environment; the competitor panel was looked at in a browser.
+- 2026-10-08 (slice 9): audit page explorer, AI visibility, Codex audit #6 fixes. 174 SEO unit tests. Both new screens run on real data and looked at
+  in a browser; looking at the page explorer on the real crawl is what showed that link counts cannot be trusted on a JavaScript-built site.
+- 2026-10-08 (slice 10): batch analysis, positions over time, monthly AI questions, Codex audit #7 fixes. 181 SEO unit tests.
+  Batch analysis and the monthly AI question were run for real; every SEO tab was opened in the browser with no page errors.
+- 2026-10-08 (slice 11): Content explorer, Codex audit #8 fixes, section tabs wrap to two lines on a wide screen. 188 SEO unit tests.
+  Content explorer run live; the AI page re-run in the browser after the run-id change.
+- 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
+  a report page) were run in the browser.

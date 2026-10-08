@@ -164,8 +164,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/report", body),
-    onSuccess: (data: { page: Page }) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/report", v.body),
+    onSuccess: (data: { page: Page }, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't run the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
@@ -237,7 +237,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : "This report hasn't been run with these settings"}</h3>
           <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.{holdNote(status, "reportPage")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate()} data-testid="button-run-report">
+            <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-run-report">
               {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}
             </Button>
             {offset > 0 && <button type="button" className="g-pill" onClick={() => setOffset(Math.max(0, offset - limit))}>Back</button>}

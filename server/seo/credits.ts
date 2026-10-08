@@ -88,9 +88,9 @@ export async function creditStatus(userId: number, allowanceCents: number): Prom
  * SeoCreditShort and take nothing. One transaction with the account's rows locked,
  * so two lookups at once cannot both spend the last dollar.
  */
-export async function reserveCredits(userId: number, allowanceCents: number, cents: number, opts: { allowanceOnly?: boolean; /** seo_reservations row to record this on, in the same transaction. */ reservationId?: string } = {}): Promise<CreditReservation | null> {
+export async function reserveCredits(userId: number, allowanceCents: number, cents: number, opts: { allowanceOnly?: boolean; /** seo_reservations row to record this on, in the same transaction. */ reservationId?: string; /** The usage month, chosen once by the caller so both ledgers agree across midnight on the 1st. */ month?: string } = {}): Promise<CreditReservation | null> {
   if (allowanceCents === UNLIMITED || cents <= 0) return null;
-  const month = monthKey();
+  const month = opts.month ?? monthKey();
   const client: PoolClient = await pool.connect();
   try {
     await client.query("BEGIN");

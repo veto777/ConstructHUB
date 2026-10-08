@@ -2,6 +2,7 @@ import { LOCATION_SCHEMA_DDL } from "./locations";
 import { LIST_SCHEMA_DDL } from "./lists";
 import { REPORT_SCHEDULE_DDL } from "./site-report";
 import { VOICE_SCHEMA_DDL } from "./voice";
+import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -108,6 +109,8 @@ export const SEO_SCHEMA_DDL = [
   ...CREDIT_SCHEMA_DDL,
   // Saved pages of Site Explorer reports and keyword overviews (server/seo/reports.ts).
   ...REPORT_SCHEMA_DDL,
+  // AI visibility: saved answers from the assistants (server/seo/ai-visibility.ts).
+  ...AI_SCHEMA_DDL,
   // Followed competitors and the saved result pages (server/seo/voice.ts).
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
@@ -165,6 +168,7 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS refund_due integer NOT NULL DEFAULT 0`,
   // Alerts: a delivery in progress holds a short lease; notified_at is set only once it went out.
   `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claimed_at timestamptz`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claim_token text`,
   // One list name per account, whatever the capitals.
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_keyword_lists_name ON seo_keyword_lists(user_id, lower(name))`,
   // People who asked not to get an account's reports any more (server/seo/site-report-send.ts).

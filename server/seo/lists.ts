@@ -114,7 +114,8 @@ export async function listItems(userId: number, listId: number) {
 }
 
 /** Add keywords to a list (creating it by name when asked). Keywords already there get their numbers refreshed. */
-export async function addToList(userId: number, input: z.infer<typeof listItemsInput>): Promise<{ list: { id: number; name: string }; added: number; total: number }> {
+/** `replace`: a refresh — the numbers handed in are today's and overwrite what is stored, even with "none". */
+export async function addToList(userId: number, input: z.infer<typeof listItemsInput>, replace = false): Promise<{ list: { id: number; name: string }; added: number; total: number }> {
   let list: { id: number; name: string };
   if (input.listId !== undefined) list = await ownedList(userId, input.listId);
   else {
@@ -138,11 +139,32 @@ export async function addToList(userId: number, input: z.infer<typeof listItemsI
     await pool.query(
       `INSERT INTO seo_keyword_list_items(list_id, keyword, volume, cpc, difficulty, intent)
        SELECT $1, * FROM unnest($2::text[], $3::int[], $4::numeric[], $5::int[], $6::text[])
-       ON CONFLICT (list_id, keyword) DO UPDATE SET volume=coalesce(EXCLUDED.volume, seo_keyword_list_items.volume), cpc=coalesce(EXCLUDED.cpc, seo_keyword_list_items.cpc),
-         difficulty=coalesce(EXCLUDED.difficulty, seo_keyword_list_items.difficulty), intent=coalesce(EXCLUDED.intent, seo_keyword_list_items.intent)`,
-      [list.id, keywords, col((i) => i.volume ?? null), col((i) => i.cpc ?? null), col((i) => i.difficulty ?? null), col((i) => i.intent ?? null)]);
+       ON CONFLICT (list_id, keyword) DO UPDATE SET
+         volume=CASE WHEN $7 THEN EXCLUDED.volume ELSE coalesce(EXCLUDED.volume, seo_keyword_list_items.volume) END,
+         cpc=CASE WHEN $7 THEN EXCLUDED.cpc ELSE coalesce(EXCLUDED.cpc, seo_keyword_list_items.cpc) END,
+         difficulty=CASE WHEN $7 THEN EXCLUDED.difficulty ELSE coalesce(EXCLUDED.difficulty, seo_keyword_list_items.difficulty) END,
+         intent=CASE WHEN $7 THEN EXCLUDED.intent ELSE coalesce(EXCLUDED.intent, seo_keyword_list_items.intent) END`,
+      [list.id, keywords, col((i) => i.volume ?? null), col((i) => i.cpc ?? null), col((i) => i.difficulty ?? null), col((i) => i.intent ?? null), replace]);
   }
   return { list, added: adding, total: have + adding };
+}
+
+/**
+ * Write today's numbers onto keywords that are IN the list (never adds one — a keyword removed meanwhile stays removed),
+ * and clear the numbers of keywords the source has nothing for, so an old figure cannot pass for a current one.
+ */
+export async function refreshListMetrics(listId: number, rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null }[], notFound: string[]): Promise<number> {
+  let updated = 0;
+  if (rows.length) {
+    const { rowCount } = await pool.query(
+      `UPDATE seo_keyword_list_items i SET volume=v.volume, cpc=v.cpc, difficulty=v.difficulty, intent=v.intent
+         FROM unnest($2::text[], $3::int[], $4::numeric[], $5::int[], $6::text[]) AS v(keyword, volume, cpc, difficulty, intent)
+        WHERE i.list_id=$1 AND i.keyword=v.keyword`,
+      [listId, rows.map((r) => r.keyword), rows.map((r) => (r.volume == null ? null : Math.round(r.volume))), rows.map((r) => r.cpc), rows.map((r) => (r.difficulty == null ? null : Math.round(r.difficulty))), rows.map((r) => r.intent)]);
+    updated = rowCount ?? 0;
+  }
+  if (notFound.length) await pool.query("UPDATE seo_keyword_list_items SET volume=NULL, cpc=NULL, difficulty=NULL, intent=NULL WHERE list_id=$1 AND keyword = ANY($2::text[])", [listId, notFound]);
+  return updated;
 }
 
 export async function removeFromList(userId: number, listId: number, keywords: string[]): Promise<number> {

@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, fmtDate, fmtNum, type SeoSite } from "./shell";
 
 type Row = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null };
-type Voice = { device: string; checkedOn: string | null; hasPages: boolean; max: number; keywords: number; competitors: string[]; domains: Row[];
+type Voice = { device: string; devices?: string[]; tracked?: number; checkedOn: string | null; hasPages: boolean; max: number; keywords: number; competitors: string[]; domains: Row[];
   seenMost: { domain: string; keywords: number; bestPosition: number }[]; mapLeaders: { title: string; domain: string | null; keywords: number; isSite: boolean }[] };
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
@@ -21,7 +21,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
   const qc = useQueryClient();
   const { toast } = useToast();
   const [input, setInput] = useState("");
-  const key = `/api/seo/sites/${site.id}/voice`;
+  const [device, setDevice] = useState("");
+  const key = `/api/seo/sites/${site.id}/voice${device ? `?device=${device}` : ""}`;
   const q = useQuery<Voice>({ queryKey: [key], refetchOnMount: "always" });
   const done = () => { void qc.invalidateQueries({ queryKey: [key] }); };
   const add = useMutation({
@@ -37,19 +38,20 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
   const v = q.data;
   if (q.isLoading) return <p className="g-text-2 mb-4 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading competitors…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load competitors: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
-  if (!v || v.keywords === 0) return null;
+  if (!v) return null;
   const full = v.competitors.length >= v.max;
   const top = Math.max(1, ...v.domains.map((d) => d.visibility));
   return (
     <section className="mb-5" data-testid="rank-competitors">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
         <h2 className="g-text text-[16px] font-medium">Competitors</h2>
-        <span className="g-text-2 text-[12px]">on your {fmtNum(v.keywords)} tracked keyword{v.keywords === 1 ? "" : "s"} · {v.device} · checked {fmtDate(v.checkedOn)}</span>
+        {v.keywords > 0 && <span className="g-text-2 text-[12px]" data-testid="text-voice-coverage">{fmtNum(v.keywords)}{v.tracked != null && v.tracked > v.keywords ? ` of your ${fmtNum(v.tracked)}` : ""} tracked keyword{v.keywords === 1 ? "" : "s"}, checked {fmtDate(v.checkedOn)}</span>}
+        {(v.devices?.length ?? 0) > 1 && <span className="flex gap-1" role="group" aria-label="Device">{v.devices!.map((d) => <button key={d} type="button" className="g-pill g-pill--sm" aria-pressed={v.device === d} style={v.device === d ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => setDevice(d)}>{d === "desktop" ? "Desktop" : "Mobile"}</button>)}</span>}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-lg border p-4" style={card} data-testid="voice-share">
           <h3 className="g-text text-[14px] font-medium">Share of voice</h3>
-          <p className="g-text-2 mb-3 text-[12px]">The share of clicks each site wins on these keywords. 100% would mean first place for all of them.</p>
+          <p className="g-text-2 mb-3 text-[12px]">An estimate of the share of clicks each site wins on these keywords, from where it ranks: 100% would mean first place for all of them.{v.keywords === 0 ? " Follow your competitors now; the figures appear after the next check." : ""}</p>
           <ul className="space-y-2">
             {v.domains.map((d) => (
               <li key={d.domain} data-testid={`voice-${d.domain}`}>
@@ -68,7 +70,7 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
             <button type="submit" className="g-pill" disabled={full || !input.trim() || add.isPending}>{add.isPending ? <Loader2 className="animate-spin" /> : <Plus />} Follow</button>
           </form>
           {!v.hasPages && <p className="g-text-2 mt-2 text-[12px]">Competitor positions fill in at the next check — checks made before today did not save the result page.</p>}
-          {v.hasPages && v.competitors.length > 0 && <p className="g-text-2 mt-2 text-[12px]">A competitor you just followed is measured in the top ten right away, and at any position from the next check.</p>}
+          {v.hasPages && v.competitors.length > 0 && <p className="g-text-2 mt-2 text-[12px]">A competitor you just followed is measured in the top ten right away, and further down from the next check. A check reads Google's results only as far as the page your own site is on, so a competitor ranking below you may show as not found.</p>}
         </div>
         <div className="space-y-4">
           <div className="rounded-lg border p-4" style={card} data-testid="voice-seen-most">

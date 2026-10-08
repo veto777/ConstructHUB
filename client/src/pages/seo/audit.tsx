@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { AuditPages } from "./audit-pages";
 
 type Severity = "error" | "warning" | "notice";
 type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; why: string; fix: string; items: string[] };
@@ -90,6 +91,7 @@ export default function SeoAuditPage() {
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [view, setView] = useState<"issues" | "pages">("issues");
   const start = useMutation({
     // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
     mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
@@ -213,6 +215,11 @@ export default function SeoAuditPage() {
             </div>
           )}
 
+          <nav className="g-tabs" aria-label="Audit views">
+            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
+          </nav>
+          {view === "pages" && <AuditPages site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <nav className="g-tabs !mb-0" aria-label="Issue severity">
               {(["all", "error", "warning", "notice"] as const).map((s) => <a key={s} href={`#${s}`} aria-current={severity === s ? "page" : undefined} onClick={(e) => { e.preventDefault(); setSeverity(s); }} data-testid={`tab-audit-${s}`}>{s === "all" ? `All issues (${a.issues.length})` : `${SEVERITY[s].plural} (${a.totals[s].issues})`}</a>)}
@@ -285,6 +292,7 @@ export default function SeoAuditPage() {
               </ul>
             </section>
           )}
+          </>)}
         </>
       )}
     </SeoShell>
