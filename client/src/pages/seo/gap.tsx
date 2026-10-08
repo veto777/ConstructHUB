@@ -3,6 +3,7 @@
  * competitors; the result is saved for a day (POST /api/seo/gap, peek first),
  * so reopening it costs nothing. The price is shown before anything is bought.
  */
+import { findMarket } from "@shared/seo-markets";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Plus, X } from "lucide-react";
@@ -60,7 +61,10 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
   });
   const run = useMutation({
     mutationFn: (v: { body: Record<string, unknown>; key: readonly unknown[]; again: boolean }) => api("POST", "/api/seo/gap", v.again ? { ...v.body, refresh: true } : v.body),
-    onSuccess: (data: { page: Page }, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onSuccess: (data: { page: Page; saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this comparison again will not be free. Export it now if you need it.", variant: "destructive" });
+    },
     onError: (e) => toast({ title: "Couldn't run the comparison", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
@@ -137,7 +141,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
               {kind === "content" ? `${fmtNum(page.rows.length)} keywords` : `${fmtNum(page.offset + 1)}–${fmtNum(page.offset + page.rows.length)}${page.total != null ? ` of ${fmtNum(page.total)}` : ""} sites`} · as of {fmtDate(page.fetchedAt)}
             </span>
             <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportRows} disabled={!page.rows.length} data-testid="button-gap-export"><Download /> Export</button>
-            {kind === "content" && <AddToList rows={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent }))} onDone={() => setPicked(new Set())} />}
+            {kind === "content" && <AddToList market={market ? findMarket(market.locationCode, market.languageCode) ?? undefined : undefined} rows={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent }))} onDone={() => setPicked(new Set())} />}
             {kind === "content" && onTrack && <button type="button" className="g-pill g-pill--sm" disabled={!picked.size} onClick={() => { onTrack((page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))); setPicked(new Set()); }} data-testid="button-gap-track"><Plus /> Add {picked.size || ""} to rank tracker</button>}
           </div>
           {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}

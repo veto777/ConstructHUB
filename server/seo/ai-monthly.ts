@@ -18,7 +18,7 @@ import { AI_ENGINES, AI_ENGINE_KEYS, askAi, askEstimateUsd, saveAiAnswers, type 
 export async function fileWaitingAiAnswers(): Promise<number> {
   const { rows } = await pool.query(
     `UPDATE seo_ai_unsaved SET tries = tries + 1, next_at = now() + least(tries + 1, 36) * interval '10 minutes'
-      WHERE id IN (SELECT id FROM seo_ai_unsaved WHERE next_at <= now() ORDER BY id LIMIT 5 FOR UPDATE SKIP LOCKED)
+      WHERE id IN (SELECT id FROM seo_ai_unsaved WHERE state='paid' AND next_at <= now() ORDER BY id LIMIT 5 FOR UPDATE SKIP LOCKED)
      RETURNING id, user_id, site_id, prompt, answers, cost_usd, run_id, tries`);
   let filed = 0;
   for (const w of rows) {
@@ -32,14 +32,26 @@ export async function fileWaitingAiAnswers(): Promise<number> {
   return filed;
 }
 
+type Tracked = { id: number; user_id: number; site_id: number; prompt: string };
+/**
+ * Open the run BEFORE anything is bought. If the process dies between here and the answers being parked, this row is
+ * what says "an ask for this question was started and its outcome is unknown" — and such a question is not asked
+ * again on its own (see the top of the loop in runDueAiChecks).
+ */
+async function openRun(t: Tracked, runId: string): Promise<void> {
+  await pool.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, run_id, state, tracked_id, next_at) VALUES($1,$2,$3,NULL,$4,'asking',$5, now())", [t.user_id, t.site_id, t.prompt, runId, t.id]);
+}
+/** The ask failed and nothing came back: the run is closed, and the question may be asked again when its lease runs out. */
+const closeRun = (runId: string) => pool.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1 AND state='asking'", [runId]);
 /** After a paid ask, in one step: the month moves on and the answers go on the waiting list. */
-async function parkPaidAnswers(t: { id: number; user_id: number; site_id: number; prompt: string }, answers: unknown, costUsd: number, runId: string): Promise<void> {
+async function parkPaidAnswers(t: Tracked, answers: unknown, costUsd: number, runId: string): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     await client.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [t.id]);
-    await client.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, cost_usd, run_id, next_at) VALUES($1,$2,$3,$4,$5,$6, now() + interval '5 minutes') ON CONFLICT (run_id) DO NOTHING",
-      [t.user_id, t.site_id, t.prompt, JSON.stringify(answers), costUsd, runId]);
+    const { rowCount } = await client.query("UPDATE seo_ai_unsaved SET answers=$2, cost_usd=$3, state='paid', next_at = now() + interval '5 minutes' WHERE run_id=$1", [runId, JSON.stringify(answers), costUsd]);
+    if (!rowCount) await client.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, cost_usd, run_id, state, tracked_id, next_at) VALUES($1,$2,$3,$4,$5,$6,'paid',$7, now() + interval '5 minutes') ON CONFLICT (run_id) DO NOTHING",
+      [t.user_id, t.site_id, t.prompt, JSON.stringify(answers), costUsd, runId, t.id]);
     await client.query("COMMIT");
   } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; } finally { client.release(); }
 }
@@ -47,7 +59,7 @@ async function parkPaidAnswers(t: { id: number; user_id: number; site_id: number
 export async function runDueAiChecks(): Promise<number> {
   await fileWaitingAiAnswers().catch((e) => console.error("[seo] filing waiting AI answers failed", e?.message ?? e));
   if (!isConfigured()) return 0;
-  // Leased for an hour first: a crash or a failed call leaves the question due again when the lease runs out. Once an
+  // Leased for an hour first: a failed call leaves the question due again when the lease runs out. Once an
   // ask is paid for, the month moves on together with putting its answers on the waiting list (parkPaidAnswers).
   const { rows: due } = await pool.query(
     `UPDATE seo_ai_tracked SET next_at = now() + interval '1 hour'
@@ -57,27 +69,43 @@ export async function runDueAiChecks(): Promise<number> {
   let done = 0;
   for (const t of due) {
     try {
+      // An earlier ask for this question was started and never finished (the process stopped mid-ask): it may have been
+      // paid for. It is not bought again on our own — the month moves on and the loss is recorded for a person to see.
+      const { rows: unsure } = await pool.query("DELETE FROM seo_ai_unsaved WHERE tracked_id=$1 AND state='asking' RETURNING run_id, created_at", [t.id]);
+      if (unsure.length) {
+        console.error(`[seo] monthly AI question ${t.id} (site ${t.site_id}): an ask started ${new Date(unsure[0].created_at).toISOString()} never finished (run ${unsure[0].run_id}); not asking again this month`);
+        await pool.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [t.id]);
+        continue;
+      }
       // No SEO tools on the account, or the site is gone: look again tomorrow, spend nothing.
       if (!seoIncluded(await getEntitlements(t.user_id))) { await later(t.id, "1 day"); continue; }
       const { rows: [site] } = await pool.query("SELECT domain, business_name FROM seo_sites WHERE id=$1 AND user_id=$2", [t.site_id, t.user_id]);
       const engines = (t.engines as string[]).filter((e): e is AiEngine => (AI_ENGINE_KEYS as string[]).includes(e));
       if (!site || !engines.length) { await later(t.id, "1 day"); continue; }
-      const out = await withBudget(t.user_id, askEstimateUsd(engines), () => askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name }),
-        { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
+      const runId = randomUUID();
+      await openRun(t, runId); // if this cannot be written, nothing is bought
+      let out;
+      try {
+        out = await withBudget(t.user_id, askEstimateUsd(engines), () => askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name }),
+          { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
+      } catch (e) {
+        // A known failure (refused, out of data, the source said no): nothing to keep; the run is closed.
+        await closeRun(runId).catch(() => {});
+        throw e;
+      }
       // Paid. In one step the month moves on and the answers go on the waiting list, so from here on a saving
       // problem can neither buy the same answers again nor lose them: fileWaitingAiAnswers keeps trying.
-      const runId = randomUUID();
       let parked = false;
       for (let attempt = 1; attempt <= 3 && !parked; attempt++) {
         try { await parkPaidAnswers(t, out.data.answers, out.costUsd, runId); parked = true; }
         catch (e: any) { if (attempt === 3) console.error(`[seo] monthly AI answers for site ${t.site_id} could not be put on the waiting list: ${e?.message ?? e}`); else await new Promise((r) => setTimeout(r, 500 * attempt)); }
       }
       try {
-        await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, runId);
-        // Filed without having been parked (the database refused the first step): the month still has to move on.
-        if (!parked) await pool.query("UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1", [t.id]);
+        // Filing takes the run off the waiting list and (if parking never worked) moves the month on, all in one transaction.
+        await saveAiAnswers(t.user_id, t.site_id, t.prompt, out.data.answers, out.costUsd, runId, parked ? {} : { advanceTrackedId: t.id });
       } catch (e: any) {
-        console.error(`[seo] monthly AI answers for site ${t.site_id} were paid for and ${parked ? "are waiting to be filed" : "COULD NOT BE KEPT (database unavailable)"}: ${e?.message ?? e}`);
+        // Not parked and not filed: the 'asking' row stays, so the next pass will not buy this question again.
+        console.error(`[seo] monthly AI answers for site ${t.site_id} were paid for and ${parked ? "are waiting to be filed" : "COULD NOT BE KEPT (database unavailable); the question will not be asked again this month"}: ${e?.message ?? e}`);
       }
       done++;
     } catch (e: any) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adsPage, adsSnapshot, effectiveReport, parseAd, parseLinkCompetitor, parseReferringIp, parseSubdomain, reportCacheKey, reportInput, reportRequest } from "./reports";
+import { adsPage, adsSnapshot, effectiveReport, hasSort, questionRe, parseAd, parseLinkCompetitor, parseReferringIp, parseSubdomain, reportCacheKey, reportInput, reportRequest } from "./reports";
 
 const req = (table: string, extra: Record<string, unknown> = {}) => reportRequest({ ...reportInput.parse({ domain: "a.com", table, ...extra }), target: "a.com" });
 
@@ -57,5 +57,29 @@ describe("the later Site Explorer reports", () => {
     expect(parseAd(ad)).toEqual({ advertiser: "James Hardie Building Products Inc", format: "text", verified: true, firstShown: "2026-04-01", lastShown: "2026-10-08", url: "https://adstransparency.google.com/advertiser/AR1/creative/CR1?region=US" });
     expect(parseAd({ ...ad, url: "https://evil.example/x" })!.url).toBeNull();
     expect(parseAd({ ...ad, type: "organic" })).toBeNull();
+  });
+  it("a sort name every object has is not a sort", () => {
+    expect(hasSort("keywords", "volume")).toBe(true);
+    for (const bad of ["constructor", "toString", "hasOwnProperty", "valueOf"]) {
+      expect(hasSort("keywords", bad)).toBe(false);
+      const r = { ...reportInput.parse({ domain: "a.com", table: "keywords", sort: bad }), target: "a.com" };
+      expect(effectiveReport(r).sort).toBe("traffic");
+      expect(reportRequest(r).body.order_by).toEqual(["ranked_serp_element.serp_item.etv,desc"]);
+    }
+  });
+  it("a link report is one saved page whatever country is sent; a keyword report is one per country", () => {
+    const key = (table: string, extra: object) => reportCacheKey({ ...reportInput.parse({ domain: "a.com", table, ...extra }), target: "a.com" });
+    expect(key("backlinks", { locationCode: 2124, languageCode: "fr" })).toBe(key("backlinks", {}));
+    expect(key("referringIps", { locationCode: 2826 })).toBe(key("referringIps", {}));
+    expect(key("keywords", { locationCode: 2124, languageCode: "fr" })).not.toBe(key("keywords", {}));
+  });
+  it("questions are recognised in the language asked for", () => {
+    const q = (languageCode: string) => JSON.stringify(reportRequest({ ...reportInput.parse({ keyword: "toiture", table: "questions", languageCode }), target: "toiture" }).body.filters);
+    expect(q("fr")).toContain("comment|pourquoi");
+    expect(q("es")).toContain("cómo|como");
+    expect(q("en")).toContain("how|what");
+    expect(new RegExp(questionRe("fr")).test("comment poser un bardage")).toBe(true);
+    expect(new RegExp(questionRe("es")).test("cuánto cuesta un techo nuevo")).toBe(true);
+    expect(new RegExp(questionRe("fr")).test("how to install siding")).toBe(false);
   });
 });

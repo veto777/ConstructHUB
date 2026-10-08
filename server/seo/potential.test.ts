@@ -5,12 +5,12 @@ import { DEFAULT_MARKET, SEO_MARKETS, findMarket, marketKey, marketLabel } from 
 const loc = { location_code: 2840, language_code: "en" };
 
 describe("traffic potential and parent topic", () => {
-  it("asks for the first page's own keywords, biggest earner first", () => {
+  it("asks for that exact page's own organic rankings, biggest earner first", () => {
     expect(potentialRequest("https://www.jameshardie.com/siding/plank/?a=1#top", loc)).toEqual({
-      ...loc, target: "jameshardie.com", limit: 1, order_by: ["ranked_serp_element.serp_item.etv,desc"],
-      filters: ["ranked_serp_element.serp_item.relative_url", "=", "/siding/plank/?a=1"],
+      ...loc, target: "https://www.jameshardie.com/siding/plank/?a=1", item_types: ["organic"], limit: 1, order_by: ["ranked_serp_element.serp_item.etv,desc"],
     });
-    expect(potentialRequest("https://example.com", loc)!.filters).toEqual(["ranked_serp_element.serp_item.relative_url", "=", "/"]);
+    // The host is kept as it is: www.example.com and example.com are different pages to the source.
+    expect(potentialRequest("https://example.com", loc)!.target).toBe("https://example.com/");
   });
   it("never builds a request from something that is not a web address", () => {
     expect(potentialRequest("javascript:alert(1)", loc)).toBeNull();
@@ -24,6 +24,8 @@ describe("traffic potential and parent topic", () => {
     expect(parsePotential(undefined, "https://a.com/x")).toBeNull();
     expect(parsePotential({ items: [] }, "https://a.com/x")).toBeNull();
     expect(parsePotential({ metrics: { organic: { etv: 0, count: 0 } }, items: [] }, "https://a.com/x")).toEqual({ url: "https://a.com/x", traffic: 0, keywords: 0, parentTopic: null, parentVolume: null });
+    // A keyword came back but no traffic figure: unknown, not zero.
+    expect(parsePotential({ items: [{ keyword_data: { keyword: "k", keyword_info: {} } }] }, "https://a.com/x")).toEqual({ url: "https://a.com/x", traffic: null, keywords: null, parentTopic: "k", parentVolume: null });
   });
 });
 

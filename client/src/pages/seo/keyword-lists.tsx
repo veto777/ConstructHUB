@@ -4,7 +4,7 @@
  * and "Refresh numbers" buy data, and both show the price first.
  */
 import { MarketPicker } from "./market";
-import type { SeoMarket } from "@shared/seo-markets";
+import { DEFAULT_MARKET, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, type SeoSite, type SeoStatus } from "./shell";
 
 export type KwRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null };
-type List = { id: number; name: string; createdAt: string; keywords: number; volume: number };
+type List = { id: number; name: string; locationCode?: number; languageCode?: string; createdAt: string; keywords: number; volume: number };
+const sameMarket = (l: { locationCode?: number; languageCode?: string }, m: { locationCode: number; languageCode: string }) => (l.locationCode ?? 2840) === m.locationCode && (l.languageCode ?? "en") === m.languageCode;
 const MAX_BULK = 200;
 
 const csvCell = (v: string | number | null | undefined) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
@@ -30,7 +31,7 @@ export const bulkPrice = (status: SeoStatus | undefined, n: number) => status?.p
 const affordable = (status: SeoStatus | undefined, cents: number | null) => cents == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= cents;
 
 /** "Add to list": pick one of the account's lists or name a new one. */
-export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwRow[]; onDone?: () => void; label?: string }) {
+export function AddToList({ rows, onDone, label = "Add to a list", market = DEFAULT_MARKET }: { rows: KwRow[]; onDone?: () => void; label?: string; /** The country these numbers are for; a list holds one country's keywords. */ market?: SeoMarket }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -38,7 +39,7 @@ export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwR
   const [name, setName] = useState("");
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"], enabled: open });
   const m = useMutation({
-    mutationFn: () => api("POST", "/api/seo/lists/items", { ...(listId === "new" ? { name: name.trim() } : { listId }), items: rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent ?? null })) }),
+    mutationFn: () => api("POST", "/api/seo/lists/items", { ...(listId === "new" ? { name: name.trim() } : { listId }), locationCode: market.locationCode, languageCode: market.languageCode, items: rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent ?? null })) }),
     onSuccess: (r: { list: { name: string }; added: number }) => {
       void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/seo/lists") });
       toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to "${r.list.name}"`, description: r.added < rows.length ? "The rest were already in it." : undefined });
@@ -52,7 +53,7 @@ export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwR
       <label className="flex items-center gap-2"><span className="g-text-2">List</span>
         <select className="g-select" value={listId} onChange={(e) => setListId(e.target.value === "new" ? "new" : Number(e.target.value))} data-testid="select-list">
           <option value="new">New list…</option>
-          {(lists.data?.lists ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} ({l.keywords})</option>)}
+          {(lists.data?.lists ?? []).map((l) => <option key={l.id} value={l.id} disabled={!sameMarket(l, market)}>{l.name} ({l.keywords}){sameMarket(l, market) ? "" : ` — ${marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")} list`}</option>)}
         </select>
       </label>
       {lists.isLoading && <span className="g-text-2 flex items-center gap-1" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" /> loading your lists…</span>}
@@ -110,7 +111,10 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
   });
   const run = useMutation({
     mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/keywords/bulk", v.body),
-    onSuccess: (data: unknown, v) => { qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onSuccess: (data: { saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this analysis again will not be free. Export it now if you need it.", variant: "destructive" });
+    },
     onError: (e) => toast({ title: "Couldn't analyse those keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
@@ -144,7 +148,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
               <span className="g-text-2" data-testid="text-bulk-meta">{fmtNum(page.rows.length)} of {fmtNum(asked.length)} keywords have numbers · as of {fmtDate(page.fetchedAt)}</span>
               <button type="button" className="g-pill g-pill--sm" onClick={() => set(new Set(picked.size === page.rows.length ? [] : page.rows.map((r) => r.keyword)))} disabled={!page.rows.length}>{picked.size === page.rows.length && page.rows.length ? "Select none" : "Select all"}</button>
               <span className="ml-auto flex flex-wrap items-center gap-2">
-                <AddToList rows={chosen} onDone={clear} />
+                <AddToList market={market} rows={chosen} onDone={clear} />
                 {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                 <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
@@ -167,7 +171,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   const { picked, toggle, clear } = usePicked();
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"] });
   const current = openId ?? lists.data?.lists[0]?.id ?? null;
-  const items = useQuery<{ list: { id: number; name: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
+  const items = useQuery<{ list: { id: number; name: string; locationCode?: number; languageCode?: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/seo/lists") });
   const create = useMutation({
     mutationFn: () => api("POST", "/api/seo/lists/items", { name: name.trim(), items: [] }),
@@ -211,7 +215,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
               <ul className="space-y-0.5" aria-label="Your keyword lists">
                 {all.map((l) => (
                   <li key={l.id}><button type="button" onClick={() => { setOpenId(l.id); clear(); }} aria-current={current === l.id ? "true" : undefined} className={`flex w-full items-baseline gap-2 rounded px-2 py-1.5 text-left text-[13px] ${current === l.id ? "g-text font-medium" : "g-text-2"}`} style={current === l.id ? { background: "var(--g-hover)" } : undefined} data-testid={`list-${l.id}`}>
-                    <span className="min-w-0 flex-1 truncate">{l.name}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
+                    <span className="min-w-0 flex-1 truncate">{l.name}{sameMarket(l, DEFAULT_MARKET) ? "" : <span className="g-text-2 font-normal"> · {marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")}</span>}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
                   </button></li>
                 ))}
               </ul>
