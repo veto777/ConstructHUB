@@ -604,7 +604,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Every estimate carries an expiry date — after it, the price is no longer guaranteed. It's printed on the client's page so there's no ambiguity.",
       "Expiry is a selling tool, not a punishment: it protects you from material-price swings and gives the client a fair reason to decide now instead of \"someday\". Estimates expire 7 days after you send them.",
-      "If a good client needs more time, Extend adds seven days with one tap — you stay generous without your price book drifting.",
+      "If a good client needs more time, Extend adds seven days with one tap — on top of whatever time is left, or seven days from today if it has already expired. It never shortens the window. You stay generous without your price book drifting.",
       "Example: lumber spikes 15% in a month. Your old bids expired after a week, so you're re-quoting at honest prices instead of eating the difference on a job you priced in the spring.",
     ],
   },

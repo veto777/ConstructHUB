@@ -89,6 +89,26 @@ export function estimateExpiryOnSend(sentAt: Date, days: number = ESTIMATE_EXPIR
 }
 
 /**
+ * "Extend" ADDS time; it never takes any away. The new expiry is counted from
+ * whichever is later — the current expiry or now:
+ *   - weeks still left  → the days are added on top of what the client has;
+ *   - already expired   → the client gets a fresh `days` from now (counting
+ *     from the old date could leave the link expired, which is no extension);
+ *   - no expiry stamped → `days` from now.
+ * Counting from now regardless (the old rule) moved an estimate with weeks
+ * left EARLIER, e.g. 11/2 → 10/15.
+ */
+export function estimateExpiryOnExtend(
+  currentExpiresAt: Date | null | undefined,
+  now: Date = new Date(),
+  days: number = ESTIMATE_EXPIRY_DAYS,
+): Date {
+  const current = currentExpiresAt ? currentExpiresAt.getTime() : NaN;
+  const base = Number.isFinite(current) ? Math.max(current, now.getTime()) : now.getTime();
+  return new Date(base + days * 86_400_000);
+}
+
+/**
  * "Expired" is DERIVED, never written by a job: an estimate that went out
  * (sent/viewed), was never answered, and is past its expiry date. Same idea
  * as an invoice's derived "overdue".
