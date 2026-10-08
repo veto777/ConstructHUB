@@ -332,9 +332,11 @@ describe("tutorial step scripts", () => {
       // A tutorial never says or shows a price. An overview film (a `brand-` script) may — the owner asked for
       // named, dated price comparisons — but only with its sources in the script (they go into the description),
       // and a spoken amount belongs to a card that shows it with its dated footnote.
-      const priced = (t: string) => /\$\s?\d|\bdollars?\b/i.test(t);
+      // An amount of money: "$189", "189 dollars", "ninety-four dollars". (Not the word alone — "type the amount in dollars" names a unit.)
+      const AMOUNT = /\$\s?\d|\b(?:\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|[a-z]+teen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand)(?:[\s-]+(?:and\s+)?(?:one|two|three|four|five|six|seven|eight|nine))?\s+dollars?\b/i;
+      const priced = (t: string) => AMOUNT.test(t);
       const cardText = (s: (typeof script.steps)[number]) => s.card ? JSON.stringify(s.card) : "";
-      if (!script.helpKey.startsWith("brand-")) expect(script.steps.map((s) => s.narration + cardText(s)).join(" "), `${f} narrates a price`).not.toMatch(/\$\s?\d|\bdollars?\b/i);
+      if (!script.helpKey.startsWith("brand-")) expect(priced(script.steps.map((s) => s.narration + cardText(s)).join(" ")), `${f} narrates a price`).toBe(false);
       else if (script.steps.some((s) => priced(s.narration) || priced(cardText(s)))) {
         expect(script.youtube!.sources?.length ?? 0, `${f}: a film that names a price lists where it was read (youtube.sources)`).toBeGreaterThan(0);
         expect(script.steps.some((s) => s.action === "card" && /constructhub\.us\/pricing/.test(s.card?.footnote ?? "")), `${f}: our own price is sourced on a card too`).toBe(true);

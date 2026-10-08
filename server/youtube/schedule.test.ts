@@ -682,12 +682,16 @@ describe("held for owner approval", () => {
 
   it("the registry holds both overview films, and nothing else", async () => {
     const { heldHelpKeys, helpEntry } = await import("../../shared/help/registry");
-    expect(heldHelpKeys().sort()).toEqual(["brand-tour-crm", "brand-vs-housecall-pro", "brand-vs-jobber", "brand-vs-leap", "brand-what-is-constructhub", "brand-why-constructhub"]);
+    // Every overview film is held. (Tutorials can be held too — a cut withdrawn until it is re-recorded: each
+    // such entry says why beside its flag, and docs/tutorials/held-manifests/README.md lists them.)
+    expect(heldHelpKeys().filter((k) => k.startsWith("brand-")).sort()).toEqual(["brand-tour-crm", "brand-vs-housecall-pro", "brand-vs-jobber", "brand-vs-leap", "brand-what-is-constructhub", "brand-why-constructhub"]);
+    const { HELP_ENTRIES } = await import("../../shared/help/registry");
+    expect(HELP_ENTRIES.filter((e) => e.key.startsWith("brand-") && !e.youtube?.hold).map((e) => e.key)).toEqual([]);
     // …and the named comparisons are not in the app at all until they are released.
     const { HELP_FEATURES } = await import("../../shared/help/registry");
     expect(HELP_FEATURES.filter((f) => f.key.startsWith("brand-vs-")).map((f) => f.key)).toEqual([]);
     for (const k of ["brand-vs-housecall-pro", "brand-vs-jobber", "brand-vs-leap"]) { expect(helpEntry(k)!.unlisted, k).toBe(true); expect(helpEntry(k)!.video, `${k} has no manifest in the app`).toBeNull(); }
-    for (const k of heldHelpKeys()) expect(helpEntry(k)!.group).toBe("Start here");
+    for (const k of heldHelpKeys().filter((x) => x.startsWith("brand-"))) expect(helpEntry(k)!.group).toBe("Start here");
   });
 });
 

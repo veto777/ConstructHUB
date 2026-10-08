@@ -275,6 +275,14 @@ function lintAll(all: Described[]) {
   return { short, worst };
 }
 
+describe("good / better / best is the name of three options, not a claim", () => {
+  it("reads past the phrase, and past Best as a label where the text is about the three options — and nowhere else", () => {
+    expect(bannedIn("Add a Good, a Better and a Best option.\n▶ Good\n▶ Better\n▶ Best\n13. Best: the top option")).toEqual([]);
+    expect(bannedIn("▶ Best\nThe best CRM")).toEqual(["best"]);                       // no three options here
+    expect(bannedIn("Good, better and best.\nIt is the best CRM.")).toEqual(["best"]); // a claim is still a claim
+  });
+});
+
 describe("lint: every step script's description", () => {
   it("this checkout: every script builds a description that keeps all the rules, and no two are near-copies", async () => {
     // Only what is committed: this checkout's scripts and entries, no production folder (chapter times come

@@ -2,14 +2,14 @@
   "helpKey": "crm-pipeline-move",
   "durationSec": 64,
   "video": {
-    "key": "tutorials/crm-pipeline-move.e3214716.mp4",
-    "bytes": 4985130,
-    "sha256": "e321471611029bada089a244d52bd4e23788c5ee47327721116eb50e8118948e"
+    "key": "tutorials/crm-pipeline-move.9bbdfcda.mp4",
+    "bytes": 4989415,
+    "sha256": "9bbdfcdade13cda5e94b499503aaa4e5867f20131074da330c8c71ef7edfd61a"
   },
   "captions": {
-    "key": "tutorials/crm-pipeline-move.d42f2e85.vtt",
+    "key": "tutorials/crm-pipeline-move.791d34dd.vtt",
     "bytes": 1333,
-    "sha256": "d42f2e85f2d0b509fcfe7dcccd11213ef4b7f98e69fb9683fa2e349cd343d018"
+    "sha256": "791d34dd37e9b0037d313270f1b6e7ea14b4bc1b78b1279bd4845c4d0ea53602"
   },
   "poster": {
     "key": "tutorials/crm-pipeline-move.485e5517.jpg",
@@ -17,9 +17,9 @@
     "sha256": "485e5517ad93e98d2a3a9404dc6d7d950ec4f45c2ae989a54fccb6e058772927"
   },
   "uploaded": {
-    "at": "2026-10-08T01:21:49.008Z",
-    "video": "3aa8536bd2312a0663d8381f44109783",
-    "captions": "9f96181e820eafd2441f444863a6466f",
+    "at": "2026-10-08T05:29:27.927Z",
+    "video": "485fe292ebf7ab1ad9de9be491b0bb71",
+    "captions": "97f6ffbee6592e71964eee5579157226",
     "poster": "5309fd2c0acd05244a95b9f1079bd4ae"
   }
 }

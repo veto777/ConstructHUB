@@ -120,9 +120,10 @@ describe("the app's id shape checks", () => {
       }
     };
     walk("server/crm"); walk("server/jobcam");
-    // entities.ts: the project page · client-auth.ts: the client's id in a portal-preview grant ·
-    // hover.ts: the WORKSPACE id in a HOVER connect state (the base seed's own uuid).
-    expect(found.sort()).toEqual(["server/crm/client-auth.ts", "server/crm/entities.ts", "server/crm/hover.ts"]);
+    // entities.ts: the project page · hover.ts: the WORKSPACE id in a HOVER connect state (the base seed's own
+    // uuid). (client-auth.ts used to be here: the portal-preview grant only took a 36-character client id —
+    // fix-crm-defects on main, 2026-10-08, made it accept any id. The demo clients keep their uuids all the same.)
+    expect(found.sort()).toEqual(["server/crm/entities.ts", "server/crm/hover.ts"]);
     expect(read("server/crm/entities.ts")).toContain('return res.status(404).json({ message: "Project not found" });');
   });
 

@@ -54,8 +54,15 @@ export const BANNED: readonly { name: string; re: RegExp }[] = [
   { name: "portal.constructhub", re: /portal\.constructhub/i },
 ];
 /** "Good / better / best" is the name of a kind of estimate (three package options), not a claim: it is read past. */
-const TIERS = /\bgood\b[\s,/&-]+(?:and\s+)?better\b[\s,/&-]+(?:and\s+|or\s+)?best\b/gi;
-export const bannedIn = (text: string): string[] => { const t = text.replace(TIERS, " "); return BANNED.filter((b) => b.re.test(t)).map((b) => b.name); };
+const TIERS = /\bgood\b[\s,/&-]+(?:(?:and|a|an|the)\s+)*better\b[\s,/&-]+(?:(?:and|or|a|an|the)\s+)*best\b/gi;
+/** …and where a text is about those three options, "Best" standing alone as a label (a chapter, a step's name: "▶ Best", "13. Best") is the option's name too. */
+const TIER_LABEL = /(^|\n)([^\na-zA-Z]*)Best(?=\s*(?:[:.]|-|$|\n))/g;
+export const bannedIn = (text: string): string[] => {
+  const tiered = new RegExp(TIERS.source, "i").test(text);
+  let t = text.replace(TIERS, " ");
+  if (tiered) t = t.replace(TIER_LABEL, "$1$2 ");
+  return BANNED.filter((b) => b.re.test(t)).map((b) => b.name);
+};
 
 /* ── Shapes ───────────────────────────────────────────────────────────────── */
 
