@@ -2,6 +2,7 @@
 // One line per recorded walkthrough (its manifest file).
 export { default as v_crm_client_portal_message } from "./crm-client-portal-message.json";
 export { default as v_crm_client_portal_preview } from "./crm-client-portal-preview.json";
+export { default as v_crm_client_portal_signin } from "./crm-client-portal-signin.json";
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_discount_defaults } from "./crm-discount-defaults.json";
