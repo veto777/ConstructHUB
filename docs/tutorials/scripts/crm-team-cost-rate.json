@@ -1,0 +1,100 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-team-cost-rate",
+  "title": "Set a crew member's hourly cost",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/team?tab=team",
+      "caption": "Team",
+      "narration": "Keep each crew member's hourly cost on their team card. It takes a few seconds.",
+      "chapter": "Find the cost rate"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\")",
+      "caption": "Marco's card",
+      "narration": "On the Team tab, every person has a card. Find the one you want."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") [data-testid^=\"input-cost-\"]",
+      "caption": "Cost rate / hr",
+      "narration": "Cost rate per hour is what an hour of their time costs your company."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") [data-testid^=\"input-cost-\"]",
+      "value": "34.50",
+      "caption": "Type the rate",
+      "narration": "To change it, click the field and type the new rate.",
+      "chapter": "Change it"
+    },
+    {
+      "action": "press",
+      "value": "Tab",
+      "caption": "Leave the field",
+      "narration": "Then press Tab, or click anywhere else. It saves by itself, and a note confirms it.",
+      "holdMs": 600
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") [data-testid^=\"input-cost-\"]",
+      "caption": "The new rate",
+      "narration": "The new rate now shows on his card."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") label:has([data-testid^=\"switch-seeCosts-\"])",
+      "caption": "See costs and margins",
+      "narration": "Cost rates stay private. Only people with See costs and margins can see them.",
+      "chapter": "Who can see it"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") label:has([data-testid^=\"switch-manageTeam-\"])",
+      "caption": "Manage team",
+      "narration": "And changing one also takes Manage team and invitations."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Marco Delgado\") [data-testid^=\"input-cost-\"]",
+      "caption": "Clear it",
+      "narration": "To remove a rate, clear the field and click away."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-team\"]",
+      "caption": "Where to find it",
+      "narration": "You will find it under Team and Company, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to set a crew member's hourly cost | ConstructHUB CRM",
+    "description": "Set the hourly cost rate for a team member in ConstructHUB CRM: find their card on the Team tab, type the rate and click away to save. See which permissions let someone view or change cost rates. The walkthrough uses a demo company and demo team.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "labor cost",
+      "hourly cost rate",
+      "crew cost",
+      "team management",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Crew hourly cost",
+    "accent": "cost",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}

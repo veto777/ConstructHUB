@@ -29,6 +29,7 @@ export { default as v_crm_estimate_approved } from "./crm-estimate-approved.json
 export { default as v_crm_estimate_client_options } from "./crm-estimate-client-options.json";
 export { default as v_crm_estimate_client_view } from "./crm-estimate-client-view.json";
 export { default as v_crm_estimate_discounts } from "./crm-estimate-discounts.json";
+export { default as v_crm_estimate_draft } from "./crm-estimate-draft.json";
 export { default as v_crm_estimate_edit } from "./crm-estimate-edit.json";
 export { default as v_crm_estimate_options } from "./crm-estimate-options.json";
 export { default as v_crm_estimate_quick } from "./crm-estimate-quick.json";
@@ -80,6 +81,7 @@ export { default as v_crm_scheduled_exports } from "./crm-scheduled-exports.json
 export { default as v_crm_search } from "./crm-search.json";
 export { default as v_crm_sms_setup } from "./crm-sms-setup.json";
 export { default as v_crm_team_activity } from "./crm-team-activity.json";
+export { default as v_crm_team_cost_rate } from "./crm-team-cost-rate.json";
 export { default as v_crm_team_crew_view } from "./crm-team-crew-view.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";
 export { default as v_crm_team_roles } from "./crm-team-roles.json";

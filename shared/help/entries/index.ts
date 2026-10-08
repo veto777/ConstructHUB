@@ -25,6 +25,7 @@ export { default as e_crm_estimate_approved } from "./crm/crm-estimate-approved"
 export { default as e_crm_estimate_client_options } from "./crm/crm-estimate-client-options";
 export { default as e_crm_estimate_client_view } from "./crm/crm-estimate-client-view";
 export { default as e_crm_estimate_discounts } from "./crm/crm-estimate-discounts";
+export { default as e_crm_estimate_draft } from "./crm/crm-estimate-draft";
 export { default as e_crm_estimate_edit } from "./crm/crm-estimate-edit";
 export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
 export { default as e_crm_estimate_quick } from "./crm/crm-estimate-quick";
@@ -72,6 +73,7 @@ export { default as e_crm_scheduled_exports } from "./crm/crm-scheduled-exports"
 export { default as e_crm_search } from "./crm/crm-search";
 export { default as e_crm_sms_setup } from "./crm/crm-sms-setup";
 export { default as e_crm_team_activity } from "./crm/crm-team-activity";
+export { default as e_crm_team_cost_rate } from "./crm/crm-team-cost-rate";
 export { default as e_crm_team_crew_view } from "./crm/crm-team-crew-view";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
