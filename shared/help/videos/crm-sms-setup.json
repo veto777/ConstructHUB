@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-sms-setup",
+  "durationSec": 57,
+  "video": {
+    "key": "tutorials/crm-sms-setup.585ff67a.mp4",
+    "bytes": 6555807,
+    "sha256": "585ff67a708f911c8205030628a65e6c5686b2020f12b1e2b29f242991d18795"
+  },
+  "captions": {
+    "key": "tutorials/crm-sms-setup.f93685af.vtt",
+    "bytes": 1244,
+    "sha256": "f93685af2a608315ce98f9a92e9ee2b753191a8c064970e456ef65e57e19f1c2"
+  },
+  "poster": {
+    "key": "tutorials/crm-sms-setup.78cef727.jpg",
+    "bytes": 90270,
+    "sha256": "78cef72728d0fb434bd178749a4609f01baf7196591d58cb6f373e8fdd6aab22"
+  },
+  "uploaded": {
+    "at": "2026-10-08T04:06:34.133Z",
+    "video": "a4c99e4b653fe0d5c32984ff03a5098c",
+    "captions": "1a0a907458e09a0b8ce940ed928a16fd",
+    "poster": "a2647d90b7d27613e9e7e5a61a6a09c8"
+  }
+}

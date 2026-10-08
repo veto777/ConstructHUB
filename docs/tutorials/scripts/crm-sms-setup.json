@@ -1,0 +1,105 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-sms-setup",
+  "title": "Turn on texting",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "The SMS card",
+      "narration": "Turn on texting, so the CRM can text your clients, and text you."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"pill-sms-status\"]",
+      "caption": "Configured",
+      "narration": "In Settings, scroll down to the SMS card. Configured means texting is ready to use."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-sms-mode\"]",
+      "caption": "Which number",
+      "narration": "First, choose which number your texts come from."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-sms-from\"]",
+      "caption": "Your own number",
+      "narration": "Texting clients needs a number of your own. It goes here."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-sms-estimates\"]",
+      "caption": "Text estimates to clients",
+      "chapter": "Switch on what you want",
+      "narration": "Switch on Text estimates to clients. When you send a bid, the client also gets a text with a link."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-sms-alerts\"]",
+      "caption": "Text me",
+      "narration": "Switch on Text me when a bid is signed or money lands, to get those alerts on your phone."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-sms-consent\"]",
+      "caption": "Your consent",
+      "narration": "Texts to you also need your consent. That is this tick box, above the SMS card."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-sms-test-to\"]",
+      "value": "+1 941 555 0142",
+      "caption": "A test number",
+      "chapter": "Send a test",
+      "narration": "To check it works, type a mobile number under Send a test text."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-sms-test-send\"]",
+      "caption": "Send test text",
+      "narration": "And choose Send test text."
+    },
+    {
+      "action": "wait-for",
+      "text": "Test text sent",
+      "timeoutMs": 15000,
+      "caption": "Sent",
+      "narration": "A note confirms that the test went out."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "All of this is in Settings, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to turn on texting for clients and alerts | ConstructHUB CRM",
+    "description": "Set up texting in ConstructHUB CRM: choose the number your texts come from, switch on texting estimates to clients and alerts to your own phone, and send a test text. Recorded in a demo workspace where texting is already set up; no real text is sent.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "text clients",
+      "SMS for contractors",
+      "estimate by text",
+      "text alerts",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Turn on texting",
+    "accent": "texting",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
