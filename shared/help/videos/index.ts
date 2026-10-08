@@ -8,6 +8,8 @@ export { default as v_crm_estimate_tracking } from "./crm-estimate-tracking.json
 export { default as v_crm_google_calendar } from "./crm-google-calendar.json";
 export { default as v_crm_invoice_client_view } from "./crm-invoice-client-view.json";
 export { default as v_crm_invoice_receipt } from "./crm-invoice-receipt.json";
+export { default as v_crm_jobcam_share_link } from "./crm-jobcam-share-link.json";
+export { default as v_crm_jobcam_upload } from "./crm-jobcam-upload.json";
 export { default as v_crm_project_edit } from "./crm-project-edit.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_sms_setup } from "./crm-sms-setup.json";

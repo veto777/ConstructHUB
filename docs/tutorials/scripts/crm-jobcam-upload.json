@@ -11,29 +11,31 @@
   "steps": [
     {
       "action": "goto",
-      "url": "/crm/jobcam",
-      "caption": "JobCam",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
       "chapter": "Open the camera",
       "narration": "Add photos you already have to a job, then show them to your client."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"jobcam-open-camera\"]",
-      "caption": "Open camera",
-      "narration": "On JobCam, choose Open camera."
-    },
-    {
-      "action": "type",
-      "selector": "[data-testid=\"jobcam-project-search\"]",
-      "value": "Ellison",
-      "caption": "Which job?",
-      "narration": "First, the job the photos belong to. Search for it."
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-2005\") a",
+      "caption": "Open the job",
+      "narration": "On Pipeline, click the job's name.",
+      "holdMs": 700
     },
     {
       "action": "click",
-      "selector": "article[data-testid^=\"jobcam-project-\"]:has-text(\"Ellison\") button",
-      "caption": "Choose the job",
-      "narration": "And choose it."
+      "selector": "[data-testid=\"tab-jobcam\"]",
+      "caption": "JobCam tab",
+      "narration": "Choose the JobCam tab.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-open-camera\"]",
+      "caption": "Open camera",
+      "narration": "Then Open camera. It opens on this job.",
+      "holdMs": 900
     },
     {
       "action": "upload",
@@ -59,7 +61,8 @@
       "action": "click",
       "selector": "[data-testid=\"jobcam-last-shot\"]",
       "caption": "Open the job's photos",
-      "narration": "Choose the last photo to open the job."
+      "narration": "Choose the last photo to open the job.",
+      "holdMs": 1500
     },
     {
       "action": "highlight",
