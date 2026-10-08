@@ -3,7 +3,14 @@
 export { default as e_crm_client_portal_message } from "./crm/crm-client-portal-message";
 export { default as e_crm_client_portal_preview } from "./crm/crm-client-portal-preview";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
+export { default as e_crm_discount_defaults } from "./crm/crm-discount-defaults";
+export { default as e_crm_financing } from "./crm/crm-financing";
+export { default as e_crm_follow_up_cadence } from "./crm/crm-follow-up-cadence";
 export { default as e_crm_hover } from "./crm/crm-hover";
 export { default as e_crm_jobcam_upload } from "./crm/crm-jobcam-upload";
+export { default as e_crm_migrate_assisted } from "./crm/crm-migrate-assisted";
 export { default as e_crm_migrate } from "./crm/crm-migrate";
 export { default as e_crm_payment_link } from "./crm/crm-payment-link";
+export { default as e_crm_payment_methods } from "./crm/crm-payment-methods";
+export { default as e_crm_price_floor } from "./crm/crm-price-floor";
+export { default as e_crm_scheduled_exports } from "./crm/crm-scheduled-exports";
