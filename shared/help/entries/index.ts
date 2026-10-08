@@ -2,6 +2,7 @@
 // One line per help entry file.
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_deposit_link } from "./crm/crm-deposit-link";
+export { default as e_crm_estimate_client_options } from "./crm/crm-estimate-client-options";
 export { default as e_crm_estimate_quick } from "./crm/crm-estimate-quick";
 export { default as e_crm_estimate_tracking } from "./crm/crm-estimate-tracking";
 export { default as e_crm_google_calendar } from "./crm/crm-google-calendar";
