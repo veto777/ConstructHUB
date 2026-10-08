@@ -329,6 +329,8 @@ describe("the line starts a slot with fixtures and nothing else", () => {
     expect(produce).toContain("startApp({ slot, database, fixtures })");
     const db = read("scripts/tutorials/db.ts");
     expect(db).toContain('await step("scripts/tutorials/seed-fixtures.ts", () => seedFixtures(TEMPLATE));');
-    expect(db).toMatch(/withLock\(TEMPLATE_LOCK, async \(\) => \{\s*let out = await seedDemo\(TEMPLATE\);[\s\S]*if \(opts\.fixtures\) out \+= /);
+    // The reseed: under the exclusive template lock unless told otherwise, the demo seed first, fixtures only on request.
+    expect(db).toContain("opts.withoutLock ? fn() : withLock(TEMPLATE_LOCK, fn);");
+    expect(db).toMatch(/return locked\(async \(\) => \{[\s\S]{0,200}const before = await census\(TEMPLATE\);\s*let out = await seedDemo\(TEMPLATE\);[\s\S]*if \(opts\.fixtures\) out \+= /);
   });
 });

@@ -7,7 +7,8 @@
  *   DATABASE_URL=<a recording database> npx tsx scripts/tutorials/seed-demo.ts
  *
  * Runs when the template is built AND on every fresh recording database (produce.ts): it is
- * idempotent (fixed ids, insert-if-absent), and it moves every date of the workspace forward by
+ * idempotent (fixed ids, insert-if-absent; the ids of clients and projects are uuids — demo-ids.ts
+ * says why — and a workspace seeded with the old readable ones is renamed first), and it moves every date of the workspace forward by
  * the days that have passed since it was seeded, so "today" on the schedule is always today.
  * Everything it writes is ONE transaction: a copy of the template taken while it runs (`db.ts
  * reseed` applies it to the live template) sees the workspace before it or after it, never half.
@@ -22,6 +23,7 @@ import { spawnSync } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
+import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
 
 const raw = process.env.DATABASE_URL;
 if (!raw) throw new Error("DATABASE_URL is not set");
@@ -45,10 +47,51 @@ function local(day: number, hour: number, minute = 0): Date {
 }
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60000);
 
+/**
+ * A workspace seeded before 2026-10-08 has its New York / Texas clients and projects under readable
+ * ids (`demo-client-hadley`, `demo-project-p-1997`) that the app refuses (demo-ids.ts). Rename them
+ * to their uuids — the row itself and every column that points at it — inside this seed's one
+ * transaction: nothing is deleted or re-made, so tokens, dates and document numbers stay as they
+ * were. The tables have no foreign keys; a reference is any text column holding the id, so every
+ * text column of every CRM / JobCam table is rewritten, and afterwards NOTHING may still hold an old
+ * id (not in an array or a JSON value either) and no table may have gained or lost a row — else the
+ * seed throws and the transaction rolls back. A no-op once done.
+ */
+async function renameLegacyIds(orgId: string): Promise<string | null> {
+  const map = legacyIdMap();
+  const from = map.map((m) => m.from), to = map.map((m) => m.to);
+  for (const id of to) if (!UUID_RE.test(id)) throw new Error(`${id} is not a uuid`);
+  const [{ n: present }] = await q(`select (select count(*) from crm_customers where id = any($1::text[]))::int + (select count(*) from crm_projects where id = any($1::text[]))::int as n`, [from]);
+  if (!present) return null;
+  const clash = await q(`select id from crm_customers where id = any($1::text[]) union all select id from crm_projects where id = any($1::text[])`, [to]);
+  if (clash.length) throw new Error(`cannot rename the old demo ids: ${clash.length} uuid row(s) already exist beside them (${clash[0].id}…) — this workspace was seeded twice`);
+  const cols = await q(`select c.table_name as t, c.column_name as c, c.data_type as d from information_schema.columns c
+      join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name and t.table_type = 'BASE TABLE'
+     where c.table_schema = current_schema() and (c.table_name like 'crm\\_%' or c.table_name like 'jobcam\\_%')
+       and c.data_type in ('character varying', 'text', 'ARRAY', 'jsonb', 'json') order by 1, 2`);
+  const tables = [...new Set(cols.map((c) => c.t as string))];
+  const census = async () => Object.fromEntries(await Promise.all(tables.map(async (t) => [t, Number((await q(`select count(*)::int as n from "${t}"`))[0].n)] as const)));
+  const before = await census();
+  let rows = 0;
+  for (const c of cols) if (c.d === "character varying" || c.d === "text")
+    rows += (await client.query(`update "${c.t}" as x set "${c.c}" = m.new from unnest($1::text[], $2::text[]) as m(old, new) where x."${c.c}" = m.old`, [from, to])).rowCount ?? 0;
+  for (const c of cols) {
+    const left = await q(`select "${c.c}"::text as v from "${c.t}" where "${c.c}"::text ~ 'demo-(client|project)-' limit 1`);
+    if (left.length) throw new Error(`after the rename ${c.t}.${c.c} still holds an old demo id (${String(left[0].v).slice(0, 80)})`);
+  }
+  const after = await census();
+  for (const t of tables) if (before[t] !== after[t]) throw new Error(`the rename changed the row count of ${t} (${before[t]} → ${after[t]})`);
+  const [{ n: now }] = await q(`select (select count(*) from crm_customers where org_id = $2 and id = any($1::text[]))::int + (select count(*) from crm_projects where org_id = $2 and id = any($1::text[]))::int as n`, [to, orgId]);
+  if (now !== present) throw new Error(`the rename moved ${now} of ${present} old demo rows`);
+  return `renamed ${present} old demo ids to uuids (${rows} values in ${tables.length} tables, row counts unchanged)`;
+}
+
 async function main() {
   const [org] = await q(`select id, owner_user_id from crm_orgs where name = 'Aspire Interiors' limit 1`);
   if (!org) throw new Error("Aspire Interiors does not exist — run scripts/seed-crm-demo.ts first");
   const orgId: string = org.id;
+  const seeded = demoUuidIds();
+  const renamed = await renameLegacyIds(orgId);
 
   // ── Keep "now" current: shift every date of the workspace by the days since the last run ─────────
   await q(`create table if not exists tutorial_demo_state (key text primary key, value text not null)`);
@@ -162,19 +205,19 @@ async function main() {
   // ones (7%): the app does not look a rate up by state. A rate has to be whole basis points.
   type NewClient = { id: string; name: string; company?: string; email: string; phone: string; line1: string; line2: string; city: string; state: "NY" | "TX"; zip: string; tags?: string[]; after: string };
   const newClients: NewClient[] = [
-    { id: "demo-client-ferrante", name: "Rosa & Stefan Ferrante", email: "ferrantes@example.com", phone: "(718) 555-0167", line1: "214 Alder Row", line2: "Apt 3B", city: "Brooklyn", state: "NY", zip: "11215", after: "Nguyen" },
-    { id: "demo-client-oyelaran", name: "Tunde Oyelaran", email: "tunde.oyelaran@example.com", phone: "(518) 555-0126", line1: "58 Wren Hollow Ln", line2: "Unit 2", city: "Albany", state: "NY", zip: "12203", after: "Ellison" },
-    { id: "demo-client-lindqvist", name: "Hannah Lindqvist", email: "hannah.lindqvist@example.com", phone: "(716) 555-0139", line1: "301 Tamarack St", line2: "Apt 4", city: "Buffalo", state: "NY", zip: "14222", after: "Orozco" },
-    { id: "demo-client-wrenhaven", name: "Wrenhaven Dental Studio", company: "Wrenhaven Dental Studio", email: "office@wrenhavendental.example.com", phone: "(914) 555-0184", line1: "40 Corbin Plaza", line2: "Suite 210", city: "White Plains", state: "NY", zip: "10601", tags: ["commercial"], after: "Kane" },
-    { id: "demo-client-hadley", name: "Caleb & Nora Hadley", email: "hadleys@example.com", phone: "(512) 555-0118", line1: "1712 Juniper Bend", line2: "Unit A", city: "Austin", state: "TX", zip: "78704", after: "Castellano" },
-    { id: "demo-client-brewster", name: "Imani Brewster", email: "imani.brewster@example.com", phone: "(214) 555-0172", line1: "905 Larkmoor Ave", line2: "Apt 12", city: "Dallas", state: "TX", zip: "75206", after: "Bauer" },
-    { id: "demo-client-quintanilla", name: "Rafael Quintanilla", email: "rafael.quintanilla@example.com", phone: "(713) 555-0155", line1: "433 Pecan Hollow Dr", line2: "Unit 6", city: "Houston", state: "TX", zip: "77008", after: "Mercer" },
-    { id: "demo-client-halvorsen-quist", name: "Halvorsen-Quist Properties", company: "Halvorsen-Quist Properties", email: "leasing@halvorsenquist.example.com", phone: "(210) 555-0164", line1: "2600 Stonewick Pkwy", line2: "Suite 140", city: "San Antonio", state: "TX", zip: "78209", tags: ["commercial"], after: "Whitfield" },
+    { id: demoClientId("ferrante"), name: "Rosa & Stefan Ferrante", email: "ferrantes@example.com", phone: "(718) 555-0167", line1: "214 Alder Row", line2: "Apt 3B", city: "Brooklyn", state: "NY", zip: "11215", after: "Nguyen" },
+    { id: demoClientId("oyelaran"), name: "Tunde Oyelaran", email: "tunde.oyelaran@example.com", phone: "(518) 555-0126", line1: "58 Wren Hollow Ln", line2: "Unit 2", city: "Albany", state: "NY", zip: "12203", after: "Ellison" },
+    { id: demoClientId("lindqvist"), name: "Hannah Lindqvist", email: "hannah.lindqvist@example.com", phone: "(716) 555-0139", line1: "301 Tamarack St", line2: "Apt 4", city: "Buffalo", state: "NY", zip: "14222", after: "Orozco" },
+    { id: demoClientId("wrenhaven"), name: "Wrenhaven Dental Studio", company: "Wrenhaven Dental Studio", email: "office@wrenhavendental.example.com", phone: "(914) 555-0184", line1: "40 Corbin Plaza", line2: "Suite 210", city: "White Plains", state: "NY", zip: "10601", tags: ["commercial"], after: "Kane" },
+    { id: demoClientId("hadley"), name: "Caleb & Nora Hadley", email: "hadleys@example.com", phone: "(512) 555-0118", line1: "1712 Juniper Bend", line2: "Unit A", city: "Austin", state: "TX", zip: "78704", after: "Castellano" },
+    { id: demoClientId("brewster"), name: "Imani Brewster", email: "imani.brewster@example.com", phone: "(214) 555-0172", line1: "905 Larkmoor Ave", line2: "Apt 12", city: "Dallas", state: "TX", zip: "75206", after: "Bauer" },
+    { id: demoClientId("quintanilla"), name: "Rafael Quintanilla", email: "rafael.quintanilla@example.com", phone: "(713) 555-0155", line1: "433 Pecan Hollow Dr", line2: "Unit 6", city: "Houston", state: "TX", zip: "77008", after: "Mercer" },
+    { id: demoClientId("halvorsen-quist"), name: "Halvorsen-Quist Properties", company: "Halvorsen-Quist Properties", email: "leasing@halvorsenquist.example.com", phone: "(210) 555-0164", line1: "2600 Stonewick Pkwy", line2: "Suite 140", city: "San Antonio", state: "TX", zip: "78209", tags: ["commercial"], after: "Whitfield" },
   ];
   // Lists show the newest client first. Each new client is filed just behind one of the original
   // eight (`after`), so the first row stays what it was and every screenful mixes the three states.
   for (const c of newClients) {
-    const [anchorRow] = await q(`select created_at from crm_customers where org_id = $1 and display_name like '%' || $2 || '%' and id not like 'demo-client-%' order by created_at limit 1`, [orgId, c.after]);
+    const [anchorRow] = await q(`select created_at from crm_customers where org_id = $1 and display_name like '%' || $2 || '%' and id <> all($3::text[]) order by created_at limit 1`, [orgId, c.after, seeded.crm_customers]);
     if (!anchorRow) throw new Error(`no original client matching "${c.after}"`);
     await q(`insert into crm_customers (id, org_id, display_name, company_name, email, phone, address_line1, address_line2, city, state, postal_code, tags, owner_member_id, portal_token, created_at, updated_at)
              values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14, $15::timestamp - interval '100 microseconds', $15::timestamp) on conflict (id) do nothing`,
@@ -184,7 +227,7 @@ async function main() {
 
   // Their documents carry numbers BELOW the original ones (P-2001…, E-2001…, INV-2001…) and are filed
   // as older, so the next document made on camera is still E-2003 / INV-2003 / P-2009, as before.
-  const oldest = async (table: string): Promise<Date> => (await q(`select min(created_at) as t from ${table} where org_id = $1 and id not like 'demo-%'`, [orgId]))[0].t;
+  const oldest = async (table: string): Promise<Date> => (await q(`select min(created_at) as t from ${table} where org_id = $1 and id not like 'demo-%' and id <> all($2::text[])`, [orgId, Object.values(seeded).flat()]))[0].t;
   const before = (t: Date, minutes: number) => new Date(t.getTime() - minutes * 60000);
 
   // Lines are priced from the price book as it stands (materials by SKU, labour by rate, the flat item by code).
@@ -217,7 +260,7 @@ async function main() {
   ];
   const docTotal = (number: string): number => { const d = [...estimates, ...invoices].find((x) => x.number === number)!; return totals(d.lines, d.bps).total; };
 
-  type NewProject = { number: string; client: string; name: string; status: string; city: string; state: "NY" | "TX"; trades: string[]; value?: number; pm?: string; sales?: string; stageDays: number; estimate?: string; invoice?: string };
+  type NewProject = { number: DemoProjectNumber; client: string; name: string; status: string; city: string; state: "NY" | "TX"; trades: string[]; value?: number; pm?: string; sales?: string; stageDays: number; estimate?: string; invoice?: string };
   const newProjects: NewProject[] = [
     { number: "P-1993", client: "Rosa & Stefan Ferrante", name: "Ferrante — parlor floor white oak", status: "lead", city: "Brooklyn", state: "NY", trades: ["flooring"], sales: "Priya Shah", stageDays: 2 },
     { number: "P-1994", client: "Tunde Oyelaran", name: "Oyelaran — galley kitchen floor and tile", status: "approved", city: "Albany", state: "NY", trades: ["tile", "flooring"], value: docTotal("E-1997"), sales: "Priya Shah", stageDays: 2, estimate: "E-1997" },
@@ -233,7 +276,7 @@ async function main() {
     const at = before(projectsOldest, newProjects.length - i);
     await q(`insert into crm_projects (id, org_id, customer_id, number, name, status, city, state, trades, contract_value_cents, project_manager_member_id, sales_member_id, stage_changed_at, completed_at, created_at, updated_at)
              values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15) on conflict (id) do nothing`,
-      [`demo-project-${p.number.toLowerCase()}`, orgId, customer(p.client), p.number, p.name, p.status, p.city, p.state, p.trades, p.value ?? null,
+      [demoProjectId(p.number), orgId, customer(p.client), p.number, p.name, p.status, p.city, p.state, p.trades, p.value ?? null,
         p.pm ? member(p.pm) : null, p.sales ? member(p.sales) : null, ago(p.stageDays * 24 * 60), p.status === "complete" ? ago(p.stageDays * 24 * 60) : null, at]);
   }
   projects = await q(`select id, number from crm_projects where org_id = $1`, [orgId]);
@@ -346,7 +389,13 @@ async function main() {
 
   const count = async (t: string) => Number((await q(`select count(*)::int as n from ${t} where org_id = $1`, [orgId]))[0].n);
   const states = (await q(`select state, count(*)::int as n from crm_customers where org_id = $1 group by state order by state`, [orgId])).map((r) => `${r.state} ${r.n}`).join(", ");
-  return `demo workspace: ${await count("crm_members")} team, ${await count("crm_customers")} clients (${states}), ${await count("crm_appointments")} appointments, `
+  // The app refuses a non-uuid id in these tables: none may exist when this seed is done.
+  for (const t of Object.keys(seeded)) {
+    const bad = await q(`select id from ${t} where org_id = $1 and id !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' limit 3`, [orgId]);
+    if (bad.length) throw new Error(`${t} has a row whose id is not a uuid (${bad.map((b) => b.id).join(", ")}) — its pages would say "not found"`);
+  }
+  if (DEMO_CLIENT_KEYS.length !== newClients.length || DEMO_PROJECT_NUMBERS.length !== newProjects.length) throw new Error("demo-ids.ts and seed-demo.ts disagree about the New York / Texas rows");
+  return (renamed ? `${renamed}\n` : "") + `demo workspace: ${await count("crm_members")} team, ${await count("crm_customers")} clients (${states}), ${await count("crm_appointments")} appointments, `
     + `${await count("crm_client_comments")} messages, ${await count("crm_payments")} payments, ${await count("jobcam_media")} photos`;
 }
 
