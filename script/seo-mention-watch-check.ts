@@ -95,6 +95,28 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   const fixed = await retryWatchedLinks(1, s.id, w2.id, 0.025);
   ok(fixed?.linksChecked === true && (await charged()) - before === 10 && (await pool.query("SELECT page->>'linksChecked' AS l FROM seo_mention_checks WHERE id=$1", [w2.id])).rows[0].l === "true", "the link check tried again is saved into the check and charged");
   ok((await retryWatchedLinks(2, s.id, w2.id, 0.025)) === null, "another account cannot touch the check");
+  // 12. Fifty pages that share one publication time: the next check moves a second past that moment and says so.
+  await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
+  mentionWatchDeps.request = (async () => { calls++; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.025, result: [{ total_count: 80, items: Array.from({ length: 50 }, (_, i) => item(`t${i}.com`, "Alpine Exteriors news", "/p", "2026-09-30 08:00:00 +00:00")) }] }] }; }) as any;
+  mentionsDeps.request = (async () => ok20([], 0.025)) as any;
+  const lease5 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
+  await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease5 });
+  const t1 = (await pool.query("SELECT page->>'resumeFrom' AS r, page->>'tieOverflow' AS t, cardinality(seen_keys) AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
+  ok(t1.t === "true" && String(t1.r).startsWith("2026-09-30T08:00:01") && Number(t1.n) === 50, `ties: resumes a second on, says so, keeps every page read (${JSON.stringify(t1)})`);
+  // 13. A business name written with two spaces is the same name: its check is saved (not refused forever).
+  await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
+  await pool.query("UPDATE seo_sites SET business_name='Alpine  Exteriors', mention_name=NULL WHERE id=$1", [s.id]);
+  mentionWatchDeps.request = (async () => { calls++; return ok20([], 0.025); }) as any;
+  const lease6 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
+  const spaced = await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine  Exteriors", lease: lease6 }).catch((e) => e);
+  ok(spaced && !(spaced instanceof Error) && spaced.id > 0, `a name with double spaces is followed and saved: ${spaced instanceof Error ? spaced.message : "saved"}`);
+  // 14. A name that cannot be searched: the watch waits a week and says why.
+  await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
+  await pool.query("UPDATE seo_sites SET business_name='Alpine \"Exteriors\"', next_mention_at = now() - interval '1 minute' WHERE id=$1", [s.id]);
+  calls = 0; await runDueMentionChecks();
+  const waiting = await site();
+  ok(calls === 0 && waiting.mention_watch_note === "bad_name" && new Date(waiting.next_mention_at).getTime() - Date.now() > 6 * 864e5, "a name that cannot be searched: nothing bought, waits a week, says why");
+  await pool.query("UPDATE seo_sites SET business_name='Alpine Exteriors' WHERE id=$1", [s.id]);
   // 8. Turned off: nothing due; another account cannot turn it on.
   await setMentionWatch(1, s.id, false);
   ok((await site()).next_mention_at === null, "turned off: nothing due");

@@ -27,6 +27,15 @@ async function main() {
   eq("1 a finding added twice is one task; a task with no source is always new", [first, again, (await tasksOf(1, s.id)).length], [{ added: 3, already: 0 }, { added: 1, already: 1 }, 4]);
   const kw = (await tasksOf(1, s.id)).find((x) => x.source === "kw:roof repair")!;
   eq("1b the first copy is the one kept, with its facts and a safe link", [kw.title, kw.facts, kw.url], ["Move \"roof repair\" up from position 7", { volume: 880, position: 7 }, "https://plan.example/roofing"]);
+  // Due date and owner: saved and read back as the same calendar date, taken away with null; a date that does not exist
+  // is refused; another account cannot set them.
+  const kwId = (await tasksOf(1, s.id)).find((x) => x.source === "kw:roof repair")!.id;
+  const dated = await updateTask(1, kwId, taskPatch.parse({ dueOn: "2026-10-31", owner: "  Sam   Lee " }));
+  eq("1d a due date and owner are kept as given", [dated.dueOn, dated.owner, (await tasksOf(1, s.id)).find((x) => x.id === kwId)?.dueOn], ["2026-10-31", "Sam Lee", "2026-10-31"]);
+  eq("1e a date that does not exist is refused", [taskPatch.safeParse({ dueOn: "2026-02-30" }).success, taskPatch.safeParse({ dueOn: "31/10/2026" }).success], [false, false]);
+  eq("1f another account cannot set them", await updateTask(2, kwId, taskPatch.parse({ owner: "Mallory" })).then(() => "changed", (e: any) => e?.status), 404);
+  const undated = await updateTask(1, kwId, taskPatch.parse({ dueOn: null, owner: null }));
+  eq("1g null takes them away", [undated.dueOn, undated.owner], [null, null]);
   // A suggested link planned under the old identity (keyword + page) is the same link under the new one (the pair of pages).
   await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES(1,$1,'page','old link task','https://plan.example/blog/a',$2,'link-opp:7:/blog/a')", [s.id, JSON.stringify({ linkTo: "https://plan.example/siding", words: "vinyl siding" })]);
   const pairAgain = await addTasks(1, s.id, [t({ kind: "page", title: "Link from /blog/a to /siding", target: "http://www.plan.example/blog/a/", facts: { linkTo: "https://plan.example/siding/" }, source: "link-pair:abc" }), t({ kind: "page", title: "Link from /blog/a to /roofing", target: "https://plan.example/blog/a", facts: { linkTo: "https://plan.example/roofing" }, source: "link-pair:def" })]);

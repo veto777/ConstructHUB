@@ -22,7 +22,7 @@ type Report = {
   searchConsole?: { clicks: number } | null;
   audit: { scannedAt: string | null; health: number | null; topIssues: { title: string; severity: string; count: number }[] } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
-  work?: { days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number } | null;
+  work?: { unavailable?: boolean; since?: string | null; days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number; today?: string; overdue?: { title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number } | null;
 };
 type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null };
 type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
@@ -106,12 +106,19 @@ export default function SeoReportsPage() {
             )}
             {r.work && (
               <section className="rounded-lg border p-4" style={card} data-testid="report-work">
-                <h2 className="g-text mb-2 text-[16px] font-medium">Work done <span className="g-text-2 text-[12px] font-normal">· the last {r.work.days} days, from the <Link href="/seo/plan" className="g-link">action plan</Link></span></h2>
-                {r.work.done.length === 0 ? <p className="g-text-2 text-[13px]">No task was marked done in this period.</p> : (
+                <h2 className="g-text mb-2 text-[16px] font-medium">Work done <span className="g-text-2 text-[12px] font-normal">· {r.work.since ? `since ${fmtDate(r.work.since)}` : `the last ${r.work.days} days`}, from the <Link href="/seo/plan" className="g-link">action plan</Link></span></h2>
+                {r.work.unavailable && <p className="text-[13px]" role="status" style={{ color: "#b06000" }}>The action plan couldn't be read just now, so nothing is said about the work done. Reload to try again.</p>}
+                {r.work.unavailable ? null : r.work.done.length === 0 ? <p className="g-text-2 text-[13px]">No task was marked done in this period.</p> : (
                   <ul className="g-text space-y-0.5 text-[13px]">{r.work.done.map((t, i) => <li key={i}><span className="g-text-2">{fmtDate(t.doneAt)}</span> — {t.title}{t.note && <span className="g-text-2"> ({t.note})</span>}</li>)}</ul>
                 )}
                 {r.work.doneCount > r.work.done.length && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(r.work.doneCount - r.work.done.length)} more.</p>}
-                <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>
+                {(r.work.overdue?.length ?? 0) > 0 && (
+                  <div className="mt-2" data-testid="report-overdue">
+                    <p className="text-[13px]" style={{ color: "var(--g-red, #c5221f)" }}>Past their due date ({fmtNum(r.work.overdueCount ?? 0)})</p>
+                    <ul className="g-text space-y-0.5 text-[13px]">{r.work.overdue!.map((t, i) => <li key={i}><span className="g-text-2">due {fmtDate(t.dueOn)}</span> — {t.title}{t.owner && <span className="g-text-2"> · {t.owner}</span>}</li>)}</ul>
+                  </div>
+                )}
+                {!r.work.unavailable && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}{r.work.dueSoon ? `, ${fmtNum(r.work.dueSoon)} due in the next 7 days` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>}
               </section>
             )}
             {r.alerts.length > 0 && (

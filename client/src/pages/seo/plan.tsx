@@ -15,7 +15,9 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, Tile, useSelectedSite, useSeoSit
 type Kind = "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other";
 type Status = "todo" | "doing" | "done" | "dropped";
 type Counts = { todo: number; doing: number; done: number; dropped: number; doneRecently: number };
-type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed" | "later" | "unavailable"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
+type Task = { recheck?: "none" | "unverifiable" | "not_rechecked" | "failed" | "later" | "unavailable"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null }; dueOn?: string | null; owner?: string | null };
+/** Today in the browser's own calendar ("2026-10-08"): due dates are calendar dates, read where the person is. */
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 type Data = { tasks: Task[]; counts: Counts; closedShown: number; closedMax?: number; max: number };
 const RECHECK: Record<NonNullable<Task["recheck"]>, string> = {
   none: "Not rechecked since it was added — run a new crawl in Site audit to see whether it is fixed.",
@@ -70,6 +72,9 @@ export default function SeoPlanPage() {
   const [title, setTitle] = useState("");
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [note, setNote] = useState("");
+  // The due date and owner being edited, for one task at a time.
+  const [planFor, setPlanFor] = useState<number | null>(null);
+  const [dueDraft, setDueDraft] = useState(""), [ownerDraft, setOwnerDraft] = useState("");
   const refresh = (siteId: number) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${siteId}/tasks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
   const add = useMutation({
     mutationFn: (v: { siteId: number; title: string }) => api("POST", `/api/seo/sites/${v.siteId}/tasks`, { tasks: [{ kind: "other", title: v.title }] }),
@@ -77,8 +82,8 @@ export default function SeoPlanPage() {
     onError: (e) => toast({ title: "Couldn't add that", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const change = useMutation({
-    mutationFn: (v: { siteId: number; id: number; patch: { status?: Status; note?: string | null } }) => api("POST", `/api/seo/tasks/${v.id}`, v.patch),
-    onSuccess: (_d: unknown, v) => { if (v.patch.note !== undefined) setNoteFor(null); refresh(v.siteId); },
+    mutationFn: (v: { siteId: number; id: number; patch: { status?: Status; note?: string | null; dueOn?: string | null; owner?: string | null } }) => api("POST", `/api/seo/tasks/${v.id}`, v.patch),
+    onSuccess: (_d: unknown, v) => { if (v.patch.note !== undefined) setNoteFor(null); if (v.patch.dueOn !== undefined || v.patch.owner !== undefined) setPlanFor(null); refresh(v.siteId); },
     onError: (e) => toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const remove = useMutation({
@@ -95,7 +100,11 @@ export default function SeoPlanPage() {
   useEffect(() => { if (kind !== "all" && q.data && !kinds.includes(kind)) setKind("all"); }, [kinds, kind, q.data]);
   const counts = q.data?.counts;
   const closedTotal = counts ? counts.done + counts.dropped : closed.length;
-  const shown = (showClosed ? closed : open).filter((t) => kind === "all" || t.kind === kind);
+  const today = localToday();
+  // Open tasks: past their due date first (the earliest first), then by due date, then the ones with none (as before).
+  const byDue = (a: Task, b: Task) => (a.dueOn ?? "9999") < (b.dueOn ?? "9999") ? -1 : (a.dueOn ?? "9999") > (b.dueOn ?? "9999") ? 1 : 0;
+  const shown = (showClosed ? closed : [...open].sort(byDue)).filter((t) => kind === "all" || t.kind === kind);
+  const overdue = open.filter((t) => t.dueOn && t.dueOn < today).length;
   const set = (t: Task, s: Status) => site && change.mutate({ siteId: site.id, id: t.id, patch: { status: s } });
 
   return (
@@ -110,6 +119,7 @@ export default function SeoPlanPage() {
             <Tile label="In progress" value={fmtNum(counts?.doing ?? 0)} testId="tile-plan-doing" />
             <Tile label="Done in the last 30 days" value={fmtNum(counts?.doneRecently ?? 0)} testId="tile-plan-done" />
             <Tile label="Done in all" value={fmtNum(counts?.done ?? 0)} testId="tile-plan-total" />
+            {overdue > 0 && <Tile label="Past their due date" value={fmtNum(overdue)} testId="tile-plan-overdue" />}
           </div>
           <form className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate({ siteId: site.id, title: title.trim() }); }} data-testid="form-plan-add">
             <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">A task of your own</span>
@@ -141,6 +151,8 @@ export default function SeoPlanPage() {
                         <span className="g-chip g-chip--sm">{KIND[t.kind]}</span>
                         {t.status !== "todo" && <span className="g-text-2 text-[12px]">{STATUS[t.status]}{t.status === "done" && t.doneAt ? ` ${fmtDate(t.doneAt)}` : ""}</span>}
                         <h2 className={`g-text text-[14px] font-medium ${t.status === "dropped" ? "line-through" : ""}`}>{t.title}</h2>
+                        {t.dueOn && (t.status === "todo" || t.status === "doing") && <span className="g-chip g-chip--sm" style={t.dueOn < today ? { color: "var(--g-red, #c5221f)" } : undefined} data-testid={`task-due-${t.id}`}>{t.dueOn < today ? `Overdue — was due ${fmtDate(t.dueOn)}` : t.dueOn === today ? "Due today" : `Due ${fmtDate(t.dueOn)}`}</span>}
+                        {t.owner && <span className="g-text-2 text-[12px]" data-testid={`task-owner-${t.id}`}>· {t.owner}</span>}
                       </div>
                       <p className="g-text-2 mt-1 text-[12px]">
                         {t.url ? <a href={t.url} className="g-link" target="_blank" rel="noreferrer">{t.url.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="inline h-3 w-3" aria-hidden /></a> : t.target}
@@ -157,6 +169,14 @@ export default function SeoPlanPage() {
                       )}
                       {t.recheck && !t.resolved && <p className="g-text-2 mt-1 text-[12px]" data-testid={`task-recheck-${t.id}`}>{RECHECK[t.recheck]}</p>}
                       {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A crawl made after you added this{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} ran this check again on everything it was found on and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
+                      {planFor === t.id && (
+                        <form className="mt-2 flex flex-wrap items-end gap-2 text-[13px]" onSubmit={(e) => { e.preventDefault(); change.mutate({ siteId: site.id, id: t.id, patch: { dueOn: dueDraft || null, owner: ownerDraft.trim() || null } }); }} data-testid={`form-task-plan-${t.id}`}>
+                          <label className="flex flex-col"><span className="g-text-2 mb-0.5">Due by</span><input type="date" className="g-input" value={dueDraft} onChange={(e) => setDueDraft(e.target.value)} data-testid={`input-task-due-${t.id}`} /></label>
+                          <label className="flex min-w-0 flex-col"><span className="g-text-2 mb-0.5">Who is doing it</span><input className="g-input w-48 max-w-full" value={ownerDraft} maxLength={60} onChange={(e) => setOwnerDraft(e.target.value)} placeholder="e.g. Sam" data-testid={`input-task-owner-${t.id}`} /></label>
+                          <Button size="sm" type="submit" disabled={change.isPending}>Save</Button>
+                          <button type="button" className="g-pill g-pill--sm" onClick={() => setPlanFor(null)}>Cancel</button>
+                        </form>
+                      )}
                       {noteFor === t.id ? (
                         <form className="mt-2 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); change.mutate({ siteId: site.id, id: t.id, patch: { note: note.trim() || null } }); }}>
                           <label className="min-w-0 flex-1"><span className="sr-only">Note for {t.title}</span><textarea className="g-input min-h-[64px] w-full py-2" value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} autoFocus data-testid={`input-task-note-${t.id}`} /></label>
@@ -169,6 +189,7 @@ export default function SeoPlanPage() {
                       {(t.status === "todo" || t.status === "doing") && <button type="button" className="g-pill g-pill--sm" disabled={change.isPending} onClick={() => set(t, "done")} aria-label={`Mark done: ${t.title}`} data-testid={`button-task-done-${t.id}`}><Check /> Done</button>}
                       {(t.status === "todo" || t.status === "doing") && <button type="button" className="g-pill g-pill--sm" disabled={change.isPending} onClick={() => set(t, "dropped")} aria-label={`Drop: ${t.title}`}><X /> Drop</button>}
                       {(t.status === "done" || t.status === "dropped") && <button type="button" className="g-pill g-pill--sm" disabled={change.isPending} onClick={() => set(t, "todo")} aria-label={`Reopen: ${t.title}`} data-testid={`button-task-reopen-${t.id}`}><RotateCcw /> Reopen</button>}
+                      {(t.status === "todo" || t.status === "doing") && planFor !== t.id && <button type="button" className="g-pill g-pill--sm" onClick={() => { setPlanFor(t.id); setDueDraft(t.dueOn ?? ""); setOwnerDraft(t.owner ?? ""); }} aria-label={`Due date and owner for ${t.title}`} data-testid={`button-task-plan-${t.id}`}>{t.dueOn || t.owner ? "Due / who" : "Set due date"}</button>}
                       {noteFor !== t.id && !t.note && <button type="button" className="g-pill g-pill--sm" onClick={() => { setNoteFor(t.id); setNote(""); }} aria-label={`Add a note to ${t.title}`} data-testid={`button-task-note-${t.id}`}>Note</button>}
                       <button type="button" className="g-pill g-pill--sm" disabled={remove.isPending} onClick={() => remove.mutate({ siteId: site.id, id: t.id })} aria-label={`Delete: ${t.title}`}><Trash2 /></button>
                     </div>

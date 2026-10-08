@@ -13,7 +13,7 @@ import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
 type Page = { marksUnavailable?: boolean; name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
-type Watch = { watch: boolean; nextAt: string | null; latest: { id: number; since: string; takenAt: string; page: Page } | null };
+type Watch = { watch: boolean; nextAt: string | null; note?: string | null; checks?: number; chosen?: boolean; latest: { id: number; name?: string; since: string; takenAt: string; page: Page } | null };
 type View = { name: string; places: string[]; page: Page | null; rows: number; watch?: Watch };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
@@ -21,16 +21,18 @@ const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, 
 const flatHas = (text: string, name: string) => flatText(text).includes(flatText(name));
 /** A page as the server compares verdicts (server/seo/audit-pages.ts sameUrlKey): host without www, path without a last slash, the query kept. */
 const pageKey = (u: string) => { try { const x = new URL(u); return `${x.host.toLowerCase().replace(/^www\./, "")}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return u.replace(/#.*$/, "").replace(/\/+$/, ""); } };
+/** Every variant of a site's mentions view (with or without ?check=). */
+const mentionsOf = (siteId: number) => (x: { queryKey: readonly unknown[] }) => typeof x.queryKey[0] === "string" && (x.queryKey[0] === `/api/seo/sites/${siteId}/mentions` || x.queryKey[0].startsWith(`/api/seo/sites/${siteId}/mentions?`));
 const norm = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
 /** A short, stable fingerprint (FNV-1a, 2 x 32 bits) for a task identity that must fit 200 characters. */
 const fingerprint = (t: string) => { let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995; for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; } return a.toString(36) + b.toString(36); };
 const linkWord = (v: boolean | null) => (v === true ? "Links to you" : v === false ? "No link found" : "Not known");
 
-export function MentionsView({ siteId, domain, status }: { siteId: number; domain: string; status: SeoStatus | undefined }) {
+export function MentionsView({ siteId, domain, status, checkId }: { siteId: number; domain: string; status: SeoStatus | undefined; /** A watched check to show (an alert's), instead of the newest. */ checkId?: number | null }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${siteId}/mentions`;
-  const q = useQuery<View>({ queryKey: [key], refetchOnMount: "always" });
+  const q = useQuery<View>({ queryKey: [checkId ? `${key}?check=${checkId}` : key], refetchOnMount: "always" });
   const [name, setName] = useState("");
   const [placesText, setPlacesText] = useState("");
   // Every answer seen on this screen, by name — a purchase stays on screen even when it could not be saved, and going
@@ -54,13 +56,16 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
     mutationFn: (v: { siteId: number; name: string; url: string; verdict: Verdict; was: Verdict }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, url: v.url, verdict: v.verdict }),
     onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: true } })),
     // Saved: the view is read again, and once that fresh answer is here it decides (see the effect below).
-    onSuccess: (_d, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: false } })); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); toast({ title: v.verdict === "mine" ? "Marked: this page is about you" : v.verdict === "not_mine" ? "Marked: another business" : "Mark taken back" }); },
+    onSuccess: (_d, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: false } })); void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }); void qc.invalidateQueries({ queryKey: ["mentions-peek", v.siteId, norm(v.name)] }); toast({ title: v.verdict === "mine" ? "Marked: this page is about you" : v.verdict === "not_mine" ? "Marked: another business" : "Mark taken back" }); },
     onError: (e, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.was, pending: false } })); toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }); },
   });
   // The saved name and places of this site, whenever another site is opened or they load.
   // Fresh server data has every saved verdict: what was shown here for settled ones gives way to it (another tab's
   // change included). Ones still in flight stay until they are answered.
-  useEffect(() => { setMarking((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v.pending))); }, [q.dataUpdatedAt]);
+  // An answer from the server for a name has every verdict saved for it: what was shown here for settled verdicts of
+  // THAT name gives way to it (another tab's change included). Pending ones, and other names', stay.
+  const retire = (name: string) => setMarking((m) => Object.fromEntries(Object.entries(m).filter(([k, v]) => v.pending || !k.startsWith(`${norm(name)}|`))));
+  useEffect(() => { if (q.data?.page) retire(q.data.page.name); if (q.data?.watch?.latest) retire(q.data.watch.latest.page.name); }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -72,7 +77,7 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   const placesChanged = !!q.data && places.join("|") !== q.data.places.join("|");
   const savePlaces = useMutation({
     mutationFn: (v: { siteId: number; places: string[] }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/places`, { places: v.places }),
-    onSuccess: (_d, v) => void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }),
+    onSuccess: (_d, v) => void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }),
     onError: (e) => toast({ title: "Couldn't save the places", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const run = useMutation({
@@ -80,10 +85,10 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
     mutationFn: (v: { siteId: number; name: string; replaces?: string; retryMissing?: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/mentions`, { name: v.name, ...(v.replaces ? { refresh: true, replaces: v.replaces } : {}), ...(v.retryMissing ? { retryMissing: true } : {}) }),
     onSuccess: (d: { page: Page; saved?: boolean }, v) => {
       if (v.siteId === siteId) keep(d.page);
-      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (d.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this again will not be free. Export it now if you need it.", variant: "destructive" });
     },
-    onError: (e, v) => { toast({ title: "Couldn't look for mentions", description: apiErrorMessage(e), variant: "destructive" }); if (v.retryMissing) void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); },
+    onError: (e, v) => { toast({ title: "Couldn't look for mentions", description: apiErrorMessage(e), variant: "destructive" }); if (v.retryMissing) void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }); },
   });
   // The figure set aside — also the most that can be charged. Without it nothing can be bought here.
   const price = status?.holds?.mentions ?? null, retryPrice = status?.holds?.mentionsRetry ?? null;
@@ -92,10 +97,11 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   // Another name typed: its saved answer, if there is one, is looked up free before anything is offered for sale.
   const typed = norm(name), typedOk = /^[\p{L}\p{N}][\p{L}\p{N} &'’.,-]*$/u.test(name.trim()) && name.trim().length >= 3;
   const peek = useQuery<Page | null>({
-    queryKey: ["mentions-peek", siteId, typed], enabled: typedOk && !kept[typed], retry: false, staleTime: 60_000,
+    // Also for a name already on screen: after a verdict it is read again, so a name other than the saved one gets its fresh verdicts too.
+    queryKey: ["mentions-peek", siteId, typed], enabled: typedOk, retry: false, staleTime: 60_000,
     queryFn: async () => { try { return (await api("POST", key, { name: name.trim(), peek: true })).page as Page; } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  useEffect(() => { if (peek.data) keep(peek.data); }, [peek.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (peek.data) { keep(peek.data); retire(peek.data.name); } }, [peek.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const peekFailed = peek.isError && !kept[typed];
   if (q.isLoading) return <p className="g-text-2 py-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading…</p>;
   if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't load mentions</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
@@ -215,18 +221,23 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
 
 type VerdictTools = { of: (name: string, r: Row) => "mine" | "not_mine" | null; pending: (name: string, r: Row) => boolean; set: (name: string, r: Row, v: "mine" | "not_mine" | null) => void };
 /** The monthly watch: on or off, the next date, and every page of the newest watched check, with the same verdicts. */
+const WATCH_NOTE: Record<string, string> = {
+  bad_name: "The watch is waiting: the name it follows can't be searched as written (use letters, numbers, spaces and & ' . , -). Look for mentions with the name written that way, and it follows that.",
+  no_allowance: "The watch is waiting: this month's included SEO data has run out. It tries again daily and is never charged to credit you bought.",
+  not_included: "The watch is waiting: your plan doesn't include the SEO tools right now.",
+};
 function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { siteId: number; name: string; watch: Watch; domain: string; retryPrice: number | null; verdict: VerdictTools }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [all, setAll] = useState(false);
   const set = useMutation({
     mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/watch`, { watch: v.watch }),
-    onSuccess: (_d, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); toast({ title: v.watch ? "Mentions watch is on" : "Mentions watch is off", description: v.watch ? "Once a month, from your included SEO data, new pages that use the name are looked for; likely ones raise an alert." : "Checks already made are kept." }); },
+    onSuccess: (_d, v) => { void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }); toast({ title: v.watch ? "Mentions watch is on" : "Mentions watch is off", description: v.watch ? "Once a month, from your included SEO data, new pages that use the name are looked for; likely ones raise an alert." : "Checks already made are kept." }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const retry = useMutation({
     mutationFn: (v: { siteId: number; checkId: number }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/watch/${v.checkId}/links`, {}),
-    onSuccess: (_d, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onSuccess: (_d, v) => { void qc.invalidateQueries({ predicate: mentionsOf(v.siteId) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't check the links", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const l = watch.latest;
@@ -244,10 +255,15 @@ function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { site
         <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={set.isPending && set.variables?.siteId === siteId ? set.variables.watch : watch.watch} disabled={set.isPending || !name} onChange={(e) => set.mutate({ siteId, watch: e.target.checked })} data-testid="checkbox-mentions-watch" /><span className="g-text">Watch for new mentions every month</span></label>
         <span className="g-text-2">{!name ? "Look for mentions once first, so the watch knows which name to follow." : watch.watch ? `Following "${name}".${watch.nextAt ? ` Next: ${fmtDate(watch.nextAt)}.` : ""}` : "From your included SEO data only; when that has run out it waits, and is never charged to credit you bought."}</span>
       </div>
+      {watch.watch && watch.note && <p className="mt-1 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-watch-note">{WATCH_NOTE[watch.note] ?? "The watch is waiting and will try again."}</p>}
+      {watch.watch && !l && !watch.note && <p className="g-text-2 mt-1 text-[13px]" data-testid="mentions-watch-first">No watched check yet{watch.nextAt ? ` — the first runs on or after ${fmtDate(watch.nextAt)}` : ""}. It looks at pages published in the month before it.</p>}
+      {watch.chosen && <p className="mt-1 text-[13px]" role="status" data-testid="mentions-watch-chosen">Showing the check an alert was raised from{l?.name ? ` (for "${l.name}")` : ""}. <a href={`/seo/mentions?site=${siteId}`} className="g-link">Show the newest</a></p>}
       {l && (
         <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">
           <p className="g-text-2">Pages that use "{l.page.name}", published between {fmtDate(l.since)} and {fmtDate(l.takenAt)}: {fmtNum(rows.length)}{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published than one check reads; the next check carries on from the last one read" : ""}. Read by publication date: a page the source has no date for, or finds later with an earlier date, is not seen here.
             {rows.length > 0 && <button type="button" className="g-link ml-2" onClick={exportCsv} data-testid="button-mentions-watch-export">Export</button>}</p>
+          {l.page.marksUnavailable && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>Your "This is us / Not us" answers couldn't be loaded just now, so they aren't shown here or in the export — they are still saved.</p>}
+          {(l.page as Page & { tieOverflow?: boolean }).tieOverflow && <p className="g-text-2 mt-1 text-[12px]">More pages share one publication time than one check reads; the next check moves past that moment, so some of them may not be read.</p>}
           {!l.page.linksChecked && rows.length > 0 && <p className="mt-1 text-[12px]" role="status">Whether these websites link to you did not load (not charged). <button type="button" className="g-pill g-pill--sm" disabled={retry.isPending || retryPrice == null} onClick={() => retry.mutate({ siteId, checkId: l.id })} data-testid="button-mentions-watch-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></p>}
           {rows.length > 0 && (
             <ul className="mt-1 space-y-1">

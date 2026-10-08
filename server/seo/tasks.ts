@@ -33,11 +33,17 @@ export const taskInput = z.object({
   source: z.string().trim().min(1).max(200).nullable().default(null),
 }).strict();
 export const tasksInput = z.object({ tasks: z.array(taskInput).min(1).max(50) }).strict();
+/** A calendar date the customer picks ("2026-10-31"); checked to be a real date. */
+const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-31").refine((d) => { const x = new Date(`${d}T12:00:00Z`); return !Number.isNaN(x.getTime()) && x.toISOString().slice(0, 10) === d && d >= "2000-01-01" && d <= "2100-12-31"; }, "Not a real date");
 export const taskPatch = z.object({
   status: z.enum(TASK_STATUSES).optional(),
   note: z.string().trim().max(2000).nullable().optional(),
   title: z.string().trim().min(1).max(200).optional(),
-}).strict().refine((p) => p.status !== undefined || p.note !== undefined || p.title !== undefined, "Nothing to change");
+  /** When it should be done by (a calendar date); null takes it away. */
+  dueOn: calendarDate.nullable().optional(),
+  /** Who is doing it — a name, as the customer writes it; null takes it away. */
+  owner: z.string().trim().max(60).transform((o) => o.replace(/\s+/g, " ")).nullable().optional(),
+}).strict().refine((p) => p.status !== undefined || p.note !== undefined || p.title !== undefined || p.dueOn !== undefined || p.owner !== undefined, "Nothing to change");
 
 export const TASK_SCHEMA_DDL = [
   `CREATE TABLE IF NOT EXISTS seo_tasks (
@@ -57,11 +63,15 @@ export const TASK_SCHEMA_DDL = [
    )`,
   `CREATE INDEX IF NOT EXISTS seo_tasks_site ON seo_tasks(site_id, status, created_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_tasks_source ON seo_tasks(site_id, source) WHERE source IS NOT NULL`,
+  // When a task should be done by, and who is doing it (the customer's own words).
+  `ALTER TABLE seo_tasks ADD COLUMN IF NOT EXISTS due_on date`,
+  `ALTER TABLE seo_tasks ADD COLUMN IF NOT EXISTS owner text`,
 ];
 
 export type Task = {
   id: number; kind: TaskKind; title: string; target: string | null; /** `target` when it is a web address safe to link to. */ url: string | null;
   facts: Record<string, string | number | boolean | null>; source: string | null; status: TaskStatus; note: string | null; createdAt: string; doneAt: string | null;
+  /** When it should be done by ("YYYY-MM-DD"), and who is doing it; null when not set. */ dueOn: string | null; owner: string | null;
   /** Audit tasks: a crawl made AFTER the task was added, at least as wide as the one it came from, re-checked this issue and no longer finds it. (The customer still decides when it is done.) */
   resolved?: { on: string | null };
   /** Audit tasks: why nothing can be said yet — no crawl since it was added, the newer crawl covered too little or could not re-check this issue, or the newest crawl failed. */
@@ -76,6 +86,7 @@ export function toTask(r: any): Task {
     facts: r.detail && typeof r.detail === "object" && !Array.isArray(r.detail) ? r.detail : {}, source: r.source ?? null,
     status: (TASK_STATUSES as readonly string[]).includes(r.status) ? r.status : "todo", note: r.note ?? null,
     createdAt: new Date(r.created_at).toISOString(), doneAt: r.done_at ? new Date(r.done_at).toISOString() : null,
+    dueOn: r.due_on ? (r.due_on instanceof Date ? r.due_on.toISOString().slice(0, 10) : String(r.due_on).slice(0, 10)) : null, owner: typeof r.owner === "string" && r.owner ? r.owner : null,
   };
 }
 /** What the crawls say, for judging audit tasks (server/seo/audit.ts auditEvidence). */
@@ -126,8 +137,8 @@ export type TaskCounts = { todo: number; doing: number; done: number; dropped: n
 export async function listTasks(userId: number, siteId: number, closedLimit = 100): Promise<{ tasks: Task[]; counts: TaskCounts; closedShown: number }> {
   const limit = Math.min(MAX_CLOSED_SHOWN, Math.max(1, Math.floor(closedLimit)));
   const [{ rows: open }, { rows: closed }, { rows: [c] }] = await Promise.all([
-    pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${MAX_OPEN_TASKS + 50}`, [siteId, userId]),
-    pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND NOT (${OPEN}) ORDER BY coalesce(done_at, updated_at) DESC, id DESC LIMIT $3`, [siteId, userId, limit]),
+    pool.query(`SELECT *, due_on::text AS due_on FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${MAX_OPEN_TASKS + 50}`, [siteId, userId]),
+    pool.query(`SELECT *, due_on::text AS due_on FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND NOT (${OPEN}) ORDER BY coalesce(done_at, updated_at) DESC, id DESC LIMIT $3`, [siteId, userId, limit]),
     pool.query(
       `SELECT count(*) FILTER (WHERE status='todo')::int AS todo, count(*) FILTER (WHERE status='doing')::int AS doing, count(*) FILTER (WHERE status='done')::int AS done,
               count(*) FILTER (WHERE status='dropped')::int AS dropped, count(*) FILTER (WHERE status='done' AND done_at > now() - interval '30 days')::int AS "doneRecently"
@@ -221,9 +232,11 @@ export async function updateTask(userId: number, taskId: number, patch: z.infer<
          done_at = CASE WHEN $3 IS NULL THEN done_at WHEN $3 = 'done' THEN coalesce(done_at, now()) ELSE NULL END,
          note = CASE WHEN $4 THEN $5 ELSE note END,
          title = coalesce($6, title),
+         due_on = CASE WHEN $7 THEN $8::date ELSE due_on END,
+         owner = CASE WHEN $9 THEN $10 ELSE owner END,
          updated_at = now()
-       WHERE id=$1 AND user_id=$2 RETURNING *`,
-      [taskId, userId, patch.status ?? null, patch.note !== undefined, patch.note || null, patch.title ?? null]);
+       WHERE id=$1 AND user_id=$2 RETURNING *, due_on::text AS due_on`,
+      [taskId, userId, patch.status ?? null, patch.note !== undefined, patch.note || null, patch.title ?? null, patch.dueOn !== undefined, patch.dueOn ?? null, patch.owner !== undefined, patch.owner || null]);
     if (!row) throw new TaskError("That task is no longer there.", 404);
     await client.query("COMMIT");
     return toTask(row);

@@ -544,8 +544,9 @@ export async function cached<T>(userId: number, key: string, maxAgeHours: number
     `SELECT data FROM seo_report_cache WHERE user_id=$1 AND key=$2 AND created_at > now() - make_interval(hours => $3)`, [userId, key, maxAgeHours]);
   return row ? (row.data as T) : null;
 }
-export async function saveCached(userId: number, key: string, kind: string, data: unknown, costUsd: number): Promise<void> {
-  await pool.query(
+/** `db`: a caller's own transaction, so the save can commit together with its other writes. */
+export async function saveCached(userId: number, key: string, kind: string, data: unknown, costUsd: number, db: { query: typeof pool.query } = pool): Promise<void> {
+  await db.query(
     `INSERT INTO seo_report_cache(user_id, key, kind, data, cost_usd) VALUES($1,$2,$3,$4,$5)
      ON CONFLICT (user_id, key) DO UPDATE SET data=EXCLUDED.data, cost_usd=EXCLUDED.cost_usd, kind=EXCLUDED.kind, created_at=now()`,
     [userId, key, kind, JSON.stringify(data), costUsd]);

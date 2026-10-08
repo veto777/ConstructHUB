@@ -100,7 +100,7 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
     return {
       kind: "seo.mention_new", title: a.title, severity: "info",
       body: `Published since ${i?.since ?? "the last check"} and using "${i?.name ?? ""}" (likely you — check each one):\n${pages.slice(0, 5).map((p: any) => `${p.domain}${p.title ? ` — ${String(p.title).slice(0, 80)}` : ""}`).join("\n")}${pages.length > 5 ? "\n…" : ""}`,
-      actionLabel: "See the mentions", actionUrl: i?.siteId ? `/seo/mentions?site=${Number(i.siteId)}` : "/seo/mentions",
+      actionLabel: "See the mentions", actionUrl: i?.siteId ? `/seo/mentions?site=${Number(i.siteId)}${i?.checkId ? `&check=${Number(i.checkId)}` : ""}` : "/seo/mentions",
     };
   }
   if (a.kind === "grid_down" || a.kind === "grid_up")
@@ -149,18 +149,24 @@ export async function deliverAlert(alertId: number): Promise<boolean> {
 /** Emails that failed after their alert's bell entry went out: the email alone, up to four tries, 15 minutes apart. */
 export const EMAIL_TRIES = 4;
 export async function retryAlertEmails(): Promise<number> {
-  // Leased by moving the retry time on: two passes cannot send the same email.
+  // A small batch at a time, each email claimed with this pass's token (another pass skips the claimed ones, and only
+  // this pass can mark them sent); the claim also moves the next try on, so an abandoned one comes back later.
+  const token = randomUUID();
   const { rows } = await pool.query(
-    `UPDATE seo_alerts x SET email_retry_at = now() + interval '15 minutes', email_tries = x.email_tries + 1 FROM seo_sites s
-      WHERE x.email_retry_at <= now() AND x.email_tries < ${EMAIL_TRIES} AND s.id = x.site_id AND s.alerts_enabled IS NOT FALSE
-     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain, x.email_tries`).catch(() => ({ rows: [] as any[] }));
+    `UPDATE seo_alerts x SET email_retry_at = now() + interval '15 minutes', email_tries = x.email_tries + 1, email_claim = $1
+       FROM seo_sites s
+      WHERE s.id = x.site_id AND x.id IN (
+        SELECT a.id FROM seo_alerts a JOIN seo_sites t ON t.id = a.site_id
+         WHERE a.email_retry_at <= now() AND a.email_tries < ${EMAIL_TRIES} AND t.alerts_enabled IS NOT FALSE
+         ORDER BY a.email_retry_at LIMIT 10 FOR UPDATE OF a SKIP LOCKED)
+     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain, x.email_tries`, [token]).catch(() => ({ rows: [] as any[] }));
   let sent = 0;
   for (const a of rows) {
     try {
       const m = alertMessage(a);
       const r = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl }, { only: "email" });
-      if (r.email !== "failed") { await pool.query("UPDATE seo_alerts SET email_retry_at=NULL WHERE id=$1", [a.id]); sent++; }
-      else if (a.email_tries >= EMAIL_TRIES) await pool.query("UPDATE seo_alerts SET email_retry_at=NULL WHERE id=$1", [a.id]);
+      if (r.email !== "failed" || a.email_tries >= EMAIL_TRIES) await pool.query("UPDATE seo_alerts SET email_retry_at=NULL, email_claim=NULL WHERE id=$1 AND email_claim=$2", [a.id, token]);
+      if (r.email !== "failed") sent++;
     } catch (e: any) { console.error(`[seo] alert ${a.id} email retry failed: ${e?.message ?? e}`); }
   }
   return sent;

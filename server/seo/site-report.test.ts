@@ -148,4 +148,23 @@ describe("Search Console numbers in a report", () => {
     expect([w.done.map((x) => x.title), w.doneCount, w.open, w.inProgress]).toEqual([["b", "a"], 2, 2, 1]);
     expect(workSection([], now)).toBeNull();
   });
+  it("work: open tasks past their due date (earliest first, with who owns them) and those due within a week", async () => {
+    const { workSection } = await import("./site-report");
+    const now = new Date("2026-10-08T12:00:00Z");
+    const t = (title: string, status: string, due_on: string | null, owner: string | null = null) => ({ title, status, done_at: null, target: null, note: null, kind: "page", due_on, owner });
+    const w = workSection([t("late b", "todo", "2026-10-05", "Sam"), t("late a", "doing", "2026-09-30"), t("today", "todo", "2026-10-08"), t("next week", "todo", "2026-10-14"), t("later", "todo", "2026-11-30"), t("done late", "done", "2026-09-01"), t("no date", "todo", null)], now)!;
+    expect([w.overdue!.map((x) => [x.title, x.owner]), w.overdueCount, w.dueSoon, w.today]).toEqual([[["late a", null], ["late b", "Sam"]], 2, 2, "2026-10-08"]);
+  });
+  it("notes on one line, cut by whole characters with a mark; PDF text keeps what the font can draw", async () => {
+    const { reportNote, pdfSafe, workSection } = await import("./site-report");
+    expect(reportNote("line one\n\tline two")).toBe("line one line two");
+    const long = "😀".repeat(400);
+    const cut = reportNote(long)!;
+    expect([Array.from(cut).length, cut.endsWith("…"), cut.includes("\ud83d\u2026")]).toEqual([300, true, false]);
+    expect(pdfSafe("Café — “quoted” 😀 日本\u0007")).toBe("Café — “quoted” ? ?? ");
+    // A scheduled report counts the work since the last one went out; a plan with only older work still has a section.
+    const now = new Date("2026-10-08T12:00:00Z");
+    const w = workSection([], now, { since: new Date("2026-10-01T00:00:00Z"), hasPlan: true })!;
+    expect([w.since, w.doneCount, w.done]).toEqual(["2026-10-01T00:00:00.000Z", 0, []]);
+  });
 });

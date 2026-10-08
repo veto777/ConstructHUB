@@ -55,8 +55,8 @@ export function reportEmail(r: SiteReport, opts: { brandName?: string | null; se
  * dedupe window ("send now" passes a fresh one). An empty report (nothing saved
  * for the site yet) is not sent; an address that opted out is skipped.
  */
-export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[] }> {
-  const report = await buildSiteReport(userId, siteId);
+export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; strict?: boolean } = {}): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[] }> {
+  const report = await buildSiteReport(userId, siteId, opts);
   if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [] };
   const out = new Set(await optedOut(userId));
   const [{ rows: [brand] }, { rows: [me] }] = await Promise.all([
@@ -92,12 +92,15 @@ export async function sendDueReports(): Promise<number> {
   const { rows: due } = await pool.query(
     `UPDATE seo_report_schedules SET next_send_at = now() + interval '${LEASE}'
       WHERE site_id IN (SELECT site_id FROM seo_report_schedules WHERE frequency <> 'off' AND next_send_at <= now() AND cardinality(recipients) > 0 ORDER BY next_send_at LIMIT 10 FOR UPDATE SKIP LOCKED)
-     RETURNING site_id, user_id, frequency, recipients`);
+     RETURNING site_id, user_id, frequency, recipients, last_sent_at`);
   let sent = 0;
   for (const s of due) {
     try {
       if (!seoIncluded(await getEntitlements(s.user_id))) { await pool.query("UPDATE seo_report_schedules SET next_send_at = now() + interval '1 day' WHERE site_id=$1", [s.site_id]); continue; }
-      const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, sendPeriod(s.frequency));
+      // The work done since the last report went out (the first one: a week or a month back), so none falls between two
+      // reports and none is told twice; a plan that cannot be read stops the send and it is tried again.
+      const since = s.last_sent_at ? new Date(s.last_sent_at) : new Date(Date.now() - (s.frequency === "weekly" ? 7 : 31) * 864e5);
+      const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, sendPeriod(s.frequency), { workSince: since, strict: true });
       sent += r.sent;
       // Every address was dealt with (sent, already sent this period, or opted out): move on. A failure keeps the lease, so it is tried again.
       if (r.failed === 0) await pool.query("UPDATE seo_report_schedules SET next_send_at=$2, last_sent_at=CASE WHEN $3 THEN now() ELSE last_sent_at END WHERE site_id=$1", [s.site_id, nextSendAt(s.frequency), r.sent > 0]);

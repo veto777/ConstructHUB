@@ -819,15 +819,25 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
    * Buy a mentions answer SAVED FIRST, CHARGED SECOND: the answer is written as the saved check (and, for "Check
    * again", into its receipt) inside the charged call. If it cannot be written, the customer is charged nothing.
    */
-  const buyMentionsSaved = (user: number, key: string, estimateUsd: number, label: string, fetch: () => Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; customerUsd?: number }>, receipt?: { replaces: string }) =>
+  const buyMentionsSaved = (user: number, key: string, estimateUsd: number, label: string, fetch: () => Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; customerUsd?: number }>, receipt?: { replaces: string; token: string }) =>
     withBudget(user, estimateUsd, async () => {
       const o = await fetch();
+      const notSaved = (why: string) => Object.assign(new SeoCustomerError(why, 503), { costUsd: o.costUsd, costUnknown: o.costUnknown });
+      // The saved check and the receipt in ONE transaction, and only by the holder of the claim: a request whose claim
+      // was taken over saves nothing, and is charged nothing.
+      const client = await pool.connect().catch(() => { throw notSaved("The answer could not be saved, so it was not charged. Try again in a moment."); });
       try {
-        await saveCached(user, key, "mentions", o.data, o.costUsd);
-        if (receipt) await pool.query("UPDATE seo_refresh_receipts SET answer=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3", [user, key, receipt.replaces, JSON.stringify(o.data)]);
+        await client.query("BEGIN");
+        if (receipt) {
+          const { rowCount } = await client.query("UPDATE seo_refresh_receipts SET answer=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3 AND token=$5 AND answer IS NULL", [user, key, receipt.replaces, JSON.stringify(o.data), receipt.token]);
+          if (!rowCount) { await client.query("ROLLBACK"); throw notSaved("Another request finished this check first, so this one was not charged. Reload to see it."); }
+        }
+        await saveCached(user, key, "mentions", o.data, o.costUsd, client);
+        await client.query("COMMIT");
       } catch (e: any) {
-        throw Object.assign(new SeoCustomerError("The answer could not be saved, so it was not charged. Try again in a moment.", 503), { costUsd: o.costUsd, costUnknown: o.costUnknown });
-      }
+        await client.query("ROLLBACK").catch(() => {});
+        throw e instanceof SeoCustomerError ? e : notSaved("The answer could not be saved, so it was not charged. Try again in a moment.");
+      } finally { client.release(); }
       return o;
     }, { label });
   route("get", "/api/seo/sites/:id/mentions", async (req, res, user) => {
@@ -835,7 +845,9 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
     const places = await placesOf(site);
     const page = name ? await cached<MentionsPage>(user, mentionsKey(site.domain, name), MENTIONS_CACHE_HOURS) : null;
-    const watch = await mentionWatchView(user, site as any, name || "");
+    // ?check=<id>: a watched check of this site asked for by an alert (anything else: the newest of the followed name).
+    const checkId = typeof req.query.check === "string" && /^[1-9][0-9]{0,9}$/.test(req.query.check) && Number(req.query.check) <= 2147483647 ? Number(req.query.check) : null;
+    const watch = await mentionWatchView(user, site as any, name || "", checkId);
     res.json({
       name, places, page: page ? await mentionsView(site.id, user, page, places) : null, rows: MENTIONS_ROWS,
       watch: { ...watch, latest: watch.latest ? { ...watch.latest, page: await mentionsView(site.id, user, watch.latest.page, places) } : null },
@@ -920,21 +932,25 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // The claim on this replacement, written before anything is bought. Found already: its answer, or "being checked"
       // while it is young; an old claim with no answer (a crash before the save) can be taken over.
       await pool.query("DELETE FROM seo_refresh_receipts WHERE created_at < now() - interval '7 days'").catch(() => {});
-      const { rowCount: claimed } = await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer) VALUES($1,$2,$3,NULL) ON CONFLICT DO NOTHING", [user, key, input.replaces]);
+      // The claim carries its holder's token: taking over an abandoned claim gives it a new token, so the old holder
+      // can neither save under it nor give it back.
+      const token = randomUUID();
+      const { rowCount: claimed } = await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer, token) VALUES($1,$2,$3,NULL,$4) ON CONFLICT DO NOTHING", [user, key, input.replaces, token]);
       if (!claimed) {
         const { rows: [rc] } = await pool.query("SELECT answer, claimed_at > now() - interval '10 minutes' AS young FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3", [user, key, input.replaces]);
         if (rc?.answer) return res.json({ page: await view(rc.answer as MentionsPage), reused: true });
         if (rc?.young) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
-        const { rowCount: taken } = await pool.query("UPDATE seo_refresh_receipts SET claimed_at=now() WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND claimed_at <= now() - interval '10 minutes'", [user, key, input.replaces]);
+        const { rowCount: taken } = await pool.query("UPDATE seo_refresh_receipts SET claimed_at=now(), token=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND claimed_at <= now() - interval '10 minutes'", [user, key, input.replaces, token]);
         if (!taken) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
       }
-      if (!isConfigured()) { await pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL", [user, key, input.replaces]); return notReady(res); }
+      const release = () => pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND token=$4", [user, key, input.replaces, token]).catch(() => {});
+      if (!isConfigured()) { await release(); return notReady(res); }
       try {
-        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}" (again)`, () => fetchMentions(input.name, site.domain), { replaces: input.replaces! });
+        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}" (again)`, () => fetchMentions(input.name, site.domain), { replaces: input.replaces!, token });
         return res.status(201).json({ page: await view(out.data), reused: false, saved: true });
       } catch (e) {
-        // Nothing was saved: the claim is given back, so trying again can buy.
-        await pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL", [user, key, input.replaces]).catch(() => {});
+        // Nothing was saved: this holder's claim is given back, so trying again can buy (a successor's claim is left alone).
+        await release();
         throw e;
       }
     });
@@ -1311,9 +1327,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const input = settingsInput.parse(req.body);
     const { rows: [row] } = await pool.query(
-      `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop)
+      // A mentions watch that follows the business name (no name of its own) is due again when that name changes; and
+      // switching alerts off ends any failed emails still waiting to be tried again (nothing old is sent later).
+      `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop),
+              next_mention_at = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND lower(coalesce(business_name, '')) IS DISTINCT FROM lower(coalesce($3, '')) THEN now() ELSE next_mention_at END
         WHERE id=$1 RETURNING *`,
       [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null]);
+    if (input.alertsEnabled === false) await pool.query("UPDATE seo_alerts SET email_retry_at = NULL WHERE site_id=$1 AND email_retry_at IS NOT NULL", [site.id]);
     res.json(siteView(row));
   });
 
