@@ -61,6 +61,8 @@ export const SEO_SCHEMA_DDL = [
     finished_at timestamptz
   )`,
   `CREATE INDEX IF NOT EXISTS seo_rank_runs_site ON seo_rank_runs(site_id, created_at DESC)`,
+  // One open run per site: two requests at once cannot both buy the same check.
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_rank_runs_one_active ON seo_rank_runs(site_id) WHERE status IN ('queued','running')`,
   `CREATE TABLE IF NOT EXISTS seo_rank_checks (
     id bigserial PRIMARY KEY,
     keyword_id integer NOT NULL REFERENCES seo_keywords(id) ON DELETE CASCADE,

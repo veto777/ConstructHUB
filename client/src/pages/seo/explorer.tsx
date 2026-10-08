@@ -6,6 +6,7 @@
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { holdNote, isNotRunYet } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ExternalLink, Loader2, Plus, RefreshCw, Search } from "lucide-react";
@@ -14,6 +15,10 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey as ReportKey } from "./report-table";
+import { GapView } from "./gap";
+
+type GapKey = "contentGap" | "linkIntersect";
+type ViewKey = ReportKey | GapKey | "overview";
 
 type Footprint = {
   keywords: number; traffic: number; trafficValue: number;
@@ -91,10 +96,10 @@ function AuthorityRing({ value }: { value: number | null }) {
 }
 
 /** The left menu, grouped the way Site Explorer groups its reports. */
-const MENU: { group: string; items: [ReportKey | "overview", string][] }[] = [
+const MENU: { group: string; items: [ViewKey, string][] }[] = [
   { group: "", items: [["overview", "Overview"]] },
-  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["bestByLinks", "Best pages by links"]] },
-  { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"]] },
+  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["linkIntersect", "Link intersect"], ["bestByLinks", "Best pages by links"]] },
+  { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["contentGap", "Content gap"]] },
   { group: "Paid search", items: [["paidKeywords", "Paid keywords"]] },
 ];
 const MENU_LABEL = Object.fromEntries(MENU.flatMap((g) => g.items)) as Record<string, string>;
@@ -113,7 +118,7 @@ export default function SeoExplorerPage() {
   const [domain, setDomain] = useState<string | null>(() => new URLSearchParams(window.location.search).get("domain"));
   const [report, setReport] = useState<Report | null>(null);
   const [table, setTable] = useState<TableKey>("keywords");
-  const [view, setView] = useState<ReportKey | "overview">("overview");
+  const [view, setView] = useState<ViewKey>("overview");
   const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
 
   const recent = useQuery<Recent>({ queryKey: ["/api/seo/explorer/recent"] });
@@ -141,7 +146,7 @@ export default function SeoExplorerPage() {
   });
   const track = useMutation({
     mutationFn: (d: string) => api("POST", "/api/seo/sites", { domain: d, devices: "both", serpDepth: 10 }),
-    onSuccess: (s: { id: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); onSite(s.id); toast({ title: "Added to the rank tracker", description: "Add the keywords you care about under Rank tracker." }); },
+    onSuccess: (s: { id: number }) => { void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); onSite(s.id); toast({ title: "Added to the rank tracker", description: "Add the keywords you care about under Rank tracker." }); },
     onError: (e) => toast({ title: "Couldn't add the site", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
@@ -152,7 +157,9 @@ export default function SeoExplorerPage() {
   const trackedSite = report ? (sites.data ?? []).find((s) => s.domain === report.domain) ?? null : null;
   const tracked = !!trackedSite;
   const busy = analyse.isPending || (saved.isLoading && !!domain && !report);
-  const notFoundYet = !!domain && !report && saved.isError && !analyse.isPending;
+  const savedMissing = saved.isError && isNotRunYet(saved.error);
+  const notFoundYet = !!domain && !report && savedMissing && !analyse.isPending;
+  const savedFailed = !!domain && !report && saved.isError && !savedMissing && !analyse.isPending;
 
   const positions = useMemo(() => {
     if (!report) return [];
@@ -179,7 +186,7 @@ export default function SeoExplorerPage() {
         {site && site.domain !== input.trim() && <button type="button" className="g-pill" onClick={() => { setInput(site.domain); open(site.domain); }} data-testid="button-explorer-my-site">My site: {site.domain}</button>}
       </form>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-explorer-cost">
-        A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
+        A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{holdNote(status.data, "explorerReport")}{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
       </p>
 
       {!report && !busy && (recent.data?.items.length ?? 0) > 0 && (
@@ -202,6 +209,7 @@ export default function SeoExplorerPage() {
         </Panel>
       )}
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
+      {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.</p></Empty>}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
         <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
@@ -237,8 +245,13 @@ export default function SeoExplorerPage() {
           {view !== "overview" ? (
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
-              <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }}
-                onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
+              {view === "contentGap" || view === "linkIntersect" ? (
+                <GapView kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
+                  onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
+              ) : (
+                <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }}
+                  onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
+              )}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}
             </>
           ) : (

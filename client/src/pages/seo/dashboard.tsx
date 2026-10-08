@@ -16,6 +16,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSit
 
 type Card = {
   site: SeoSite;
+  audit: { health: number | null; errors: number; scannedAt: string | null } | null;
   rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null };
   report: {
     fetchedAt: string; authority: number | null; backlinks: number | null; referringDomains: number | null;
@@ -68,7 +69,7 @@ export default function SeoDashboardPage() {
   const { toast } = useToast();
   const dash = useQuery<{ cards: Card[] }>({ queryKey: ["/api/seo/dashboard"] });
   const analyse = useMutation({
-    mutationFn: (domain: string) => api("POST", "/api/seo/explorer", { domain, refresh: true }),
+    mutationFn: (domain: string) => { const s = dash.data?.cards.find((c) => c.site.domain === domain)?.site; return api("POST", "/api/seo/explorer", { domain, refresh: true, locationCode: s?.locationCode, languageCode: s?.languageCode }); },
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] }); },
     onError: (e) => toast({ title: "Couldn't analyse that site", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -80,6 +81,7 @@ export default function SeoDashboardPage() {
   return (
     <SeoShell title="SEO" description="Your sites at a glance: authority, backlinks, search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
+      {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && (
         <Empty testId="seo-dashboard-empty">
           <h3>Add your first site</h3>
@@ -88,7 +90,7 @@ export default function SeoDashboardPage() {
         </Empty>
       )}
       <div className="space-y-4" data-testid="seo-dashboard">
-        {cards.map(({ site: s, rank, report: r }) => {
+        {cards.map(({ site: s, rank, report: r, audit }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
             <section key={s.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
@@ -98,6 +100,7 @@ export default function SeoDashboardPage() {
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
                   <Link href="/seo/rank-tracker" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>
+                  <Link href="/seo/audit" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-audit-${s.id}`}>Site audit{audit?.health != null ? ` · health ${audit.health}` : ""}</Link>
                   <button type="button" className="g-pill g-pill--sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-${s.id}`} title={`A new report costs about ${price} of your SEO data`}>
                     {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"} · {price}
                   </button>

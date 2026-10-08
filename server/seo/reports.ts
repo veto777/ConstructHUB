@@ -220,7 +220,7 @@ export function parseReportRows(table: ReportTable, items: any[], target: string
   }
 }
 
-export type ReportPage = { table: ReportTable; target: string; rows: unknown[]; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+export type ReportPage = { table: ReportTable; target: string; rows: unknown[]; /** Rows the source returned before our own filtering — what paging goes by. */ sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 /** Run one page at the source. */
 export async function fetchReportPage(input: ReportInput & { target: string }): Promise<{ data: ReportPage; costUsd: number }> {
@@ -229,7 +229,7 @@ export async function fetchReportPage(input: ReportInput & { target: string }): 
   return {
     data: {
       table: input.table, target: input.target, rows: parseReportRows(input.table, taskItems(task), input.target),
-      total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
+      sourceRows: taskItems(task).length, total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
       sort: input.sort && SORTS[input.table][input.sort] ? input.sort : defaultSort(input.table), fetchedAt: new Date().toISOString(),
     },
     costUsd: typeof task.cost === "number" ? task.cost : 0,
@@ -250,6 +250,8 @@ export type KeywordOverview = {
   /** Average authority and links of the pages ranking today. */
   topAvg: { authority: number | null; backlinks: number | null; referringDomains: number | null };
   serp: SerpRow[];
+  /** Sections that did not load this time: "results" (the top ten) and/or "authority". */
+  missing?: string[];
 };
 
 export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], input: { keyword: string; locationCode: number; fetchedAt?: string }): KeywordOverview {
@@ -275,24 +277,36 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
 }
 
 /** Overview + today's top results + their authority: three calls. */
-export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number }> {
+export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; costUnknown?: boolean }> {
   let costUsd = 0;
   const call = async (path: string, body: Record<string, unknown>) => {
-    const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
-    costUsd += typeof task.cost === "number" ? task.cost : 0;
-    return task;
+    try {
+      const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+      costUsd += typeof task.cost === "number" ? task.cost : 0;
+      return task;
+    } catch (e: any) {
+      costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+      if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) costUnknown = true;
+      throw e;
+    }
   };
+  let costUnknown = false;
+  const missing: string[] = [];
   const loc = { location_code: input.locationCode, language_code: input.languageCode };
+  // The overview is required; if it fails we still wait for the results call, so the error carries the full cost.
+  let failure: unknown = null;
   const [overview, serp] = await Promise.all([
-    call("/dataforseo_labs/google/keyword_overview/live", { ...loc, keywords: [input.keyword], include_serp_info: true }),
+    call("/dataforseo_labs/google/keyword_overview/live", { ...loc, keywords: [input.keyword], include_serp_info: true }).catch((e) => { failure = e; return null; }),
     call("/serp/google/organic/live/advanced", { ...loc, keyword: input.keyword, depth: 10, device: "desktop" }).catch((e: any) => { console.warn(`[seo] keyword ${input.keyword}: results unavailable — ${e?.message ?? e}`); return null; }),
   ]);
+  if (failure || !overview) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure ?? "overview unavailable")), { costUsd, costUnknown });
+  if (!serp) missing.push("results");
   const serpItems = serp ? taskItems(serp) : [];
   const domains = [...new Set(serpItems.filter((s) => s?.type === "organic" && typeof s.domain === "string").slice(0, 10).map((s) => String(s.domain).replace(/^www\./, "")))];
   const ranks = domains.length
-    ? await call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => [])
+    ? await call("/backlinks/bulk_ranks/live", { targets: domains, rank_scale: "one_thousand" }).then((t) => taskItems(t)).catch(() => { missing.push("authority"); return []; })
     : [];
-  return { data: parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), costUsd };
+  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), missing }, costUsd, costUnknown };
 }
 
 // ── Saved pages ────────────────────────────────────────────────────────────
