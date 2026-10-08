@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-hover",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/crm-hover.b9c34da1.mp4",
+    "bytes": 6721437,
+    "sha256": "b9c34da1b4046b0f8fd8fce511e8fe057392abd340e3590e247f607c1f0e5177"
+  },
+  "captions": {
+    "key": "tutorials/crm-hover.f0abbca9.vtt",
+    "bytes": 1625,
+    "sha256": "f0abbca9b12ba832883276a517ef241f0cf8b598d81e5ca375ddb11e81426c2b"
+  },
+  "poster": {
+    "key": "tutorials/crm-hover.5ba804dc.jpg",
+    "bytes": 90094,
+    "sha256": "5ba804dcd0ef3e9f10400e80275d29732741a560355adc3e268f7edde5d3aa45"
+  },
+  "uploaded": {
+    "at": "2026-10-08T04:44:04.455Z",
+    "video": "d8ed1b136ca0346447b4e0f0750486df",
+    "captions": "d2e603c74ae1fd135bd9c6bf0cc30dc6",
+    "poster": "601d91f0065d93cb99e2152ca9b00b17"
+  }
+}

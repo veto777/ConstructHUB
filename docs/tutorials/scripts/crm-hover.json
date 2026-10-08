@@ -1,0 +1,131 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-hover",
+  "title": "HOVER reports on your clients",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/integrations",
+      "caption": "Integrations",
+      "chapter": "The HOVER card",
+      "narration": "Once HOVER is connected, its measurement reports land in the CRM on their own."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"pill-hover-connected\"]",
+      "caption": "Connected",
+      "narration": "On Integrations, the HOVER card says connected. You sign in to HOVER one time to set that up."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-hover-webhook\"]",
+      "caption": "Webhook verified",
+      "narration": "Webhook verified means HOVER tells the CRM when a job is completed."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-hover-syncreport\"]",
+      "caption": "The last sync",
+      "narration": "The last sync found three jobs, and matched all three to clients by address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-hover-cadence\"]",
+      "caption": "Auto-sync",
+      "chapter": "Sync when you want",
+      "narration": "Auto-sync also checks on a schedule. Every six hours is the default."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-hover-sync\"]",
+      "caption": "Sync now",
+      "narration": "To check right away, choose Sync now.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-hover-syncreport\"]",
+      "caption": "Nothing new",
+      "narration": "Nothing new this time. All three jobs are already up to date."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "The report on the client",
+      "narration": "Now look at a client whose house was measured."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Tunde Oyelaran\") a",
+      "caption": "Tunde Oyelaran",
+      "narration": "Open Tunde Oyelaran, in Albany.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-measurements\"]",
+      "caption": "Measurements",
+      "narration": "Further down the page, Measurements holds the HOVER report. Nobody typed it in."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"measurement-matchedvia-\"]",
+      "caption": "Matched by address",
+      "narration": "It was matched to this client by the address of the house."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"measurement-\"] >> text=/Roof 1,890/",
+      "caption": "Roof, siding, windows, pitch",
+      "narration": "Roof and siding area, windows, stories and pitch are all filled in."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-measurements\"] [data-testid^=\"measurement-\"] >> nth=0",
+      "caption": "3D model and PDF",
+      "narration": "The 3D model and the PDF report open from the two links on the right."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"customer-photo-strip\"]",
+      "caption": "Project Photos",
+      "narration": "And the picture HOVER took of the house is saved under Project Photos."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-integrations\"]",
+      "caption": "Where to find it",
+      "narration": "You will find the HOVER card under Integrations, in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How HOVER measurement reports reach your clients | ConstructHUB CRM",
+    "description": "See what the ConstructHUB CRM does once your HOVER account is connected: completed jobs sync on their own, each report is matched to the client at that address, and the measurements, PDF and 3D model sit on the client's page. Recorded in a demo workspace with stand-in HOVER jobs.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "HOVER",
+      "roof measurements",
+      "siding measurements",
+      "measurement report",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Auto measurements",
+    "accent": "Auto",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}
