@@ -15,6 +15,7 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
 import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
 import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
@@ -93,6 +94,9 @@ export const SEO_PRICES = {
   bulkPer100: retailCents(100 * LABS_ITEM_USD),
   /** One page of Link intersect (the most it costs, for up to three competitors). Content gap is competitorGap per competitor. */
   linkIntersect: retailCents(gapEstimateUsd("links", GAP_MAX_COMPETITORS, 50)),
+  /** Opportunities: the most it can cost (500 keywords), and about what a site with 100 keywords costs. */
+  opportunitiesMax: retailCents(OPP_ESTIMATE_USD),
+  opportunitiesSmall: retailCents(estimateLabsUsd(100)),
   /** Local grid: finding the business on Google Maps, and so much per 100 points scanned. */
   gridLocate: retailCents(GRID_POINT_USD),
   gridPer100: retailCents(100 * GRID_POINT_USD),
@@ -666,6 +670,22 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Opportunities (Site Explorer): what to work on next, from one lookup ────
+  route("post", "/api/seo/opportunities", async (req, res, user) => {
+    const input = oppInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
+    const domain = normalizeDomain(input.domain);
+    if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
+    const key = cacheKey("opportunities", [domain, input.locationCode, input.languageCode]);
+    const saved = input.refresh ? null : await cached<Opportunities>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<Opportunities>(user, key, "opportunities", CACHE_HOURS, OPP_ESTIMATE_USD,
+      () => fetchOpportunities({ domain, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Opportunities — ${domain}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Content gap / Link intersect (Site Explorer) ────────────────────────────
