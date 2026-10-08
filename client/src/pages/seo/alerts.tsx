@@ -12,9 +12,10 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { KeywordWatch } from "./keyword-watch";
+import { marketLabel } from "@shared/seo-markets";
 
 type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up" | "kw_new" | "kw_lost";
-type KwItem = { since: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
+type KwItem = { since: string; takenOn?: string; locationCode?: number; languageCode?: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
 type GridItem = { keyword: string; size: number; spacing: number; top3: number; checked: number; score: number | null; wasTop3: number; wasChecked: number; wasScore: number | null; since: string };
 type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null };
 type LinkItem = { from: number | null; to: number | null; since: string; backlinksFrom: number | null; backlinksTo: number | null; lost?: { domain: string; authority: number | null; from: string | null }[]; lostTotal?: number | null; lostShown?: number };
@@ -77,7 +78,7 @@ export default function SeoAlertsPage() {
       {q.isSuccess && alerts.length === 0 && (
         <Empty testId="alerts-empty">
           <h3>{(q.data?.alerts.length ?? 0) > 0 ? "No alerts of this kind" : "No alerts yet"}</h3>
-          <p>{(q.data?.alerts.length ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check, a monthly backlink snapshot, a repeating local grid or the keyword watch finds a real change from the one before it. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
+          <p>{(q.data?.alerts.length ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check, a monthly backlink snapshot, a repeating local grid or the keyword watch finds a change in the saved data, compared with the one before it, that is big enough to qualify. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
         </Empty>
       )}
       <ul className="space-y-3" data-testid="list-alerts">
@@ -98,12 +99,12 @@ export default function SeoAlertsPage() {
             ) : a.kind === "kw_new" || a.kind === "kw_lost" ? (
               (a.items as unknown as KwItem[]).map((i, n) => (
                 <div key={n}>
-                  <p className="g-text-2 text-[13px]">In our search data, compared with the snapshot of {fmtDate(i.since)}. It is the data's view, not Google's own — track a search in the rank tracker to check Google itself.</p>
+                  <p className="g-text-2 text-[13px]">In our search data{i.locationCode ? ` for ${marketLabel(i.locationCode, i.languageCode ?? "en")}` : ""}: the snapshot of {i.takenOn ? fmtDate(i.takenOn) : "that day"} compared with the one of {fmtDate(i.since)}. It is the data's view, not Google's own — track a search in the rank tracker to check Google itself.</p>
                   <table className="g-table mt-2">
                     <thead><tr><th>Keyword</th><th className="num">{a.kind === "kw_new" ? "Position now" : "Position before"}</th><th className="num">Volume / mo</th></tr></thead>
                     <tbody>{i.keywords.slice(0, 20).map((k) => <tr key={k.keyword}><td>{k.keyword}</td><td className="num">{(a.kind === "kw_new" ? k.position : k.was) ?? "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody>
                   </table>
-                  {i.keywords.length + (i.more ?? 0) > 20 && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(i.keywords.length + (i.more ?? 0) - 20)} more — every one is listed in the keyword watch at the top of this page ("Show all").</p>}
+                  {i.keywords.length + (i.more ?? 0) > 20 && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(i.keywords.length + (i.more ?? 0) - 20)} more. This alert keeps its first {fmtNum(i.keywords.length)}; while these two snapshots are still the site's newest, the keyword watch for {a.domain} lists every one.</p>}
                 </div>
               ))
             ) : a.kind === "grid_down" || a.kind === "grid_up" ? (

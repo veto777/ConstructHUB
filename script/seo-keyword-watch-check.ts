@@ -17,7 +17,8 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   const { rows: [s] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'kwwatch.example') RETURNING *");
   const site = () => pool.query("SELECT * FROM seo_sites WHERE id=$1", [s.id]).then((r) => r.rows[0]);
   const alerts = () => pool.query("SELECT kind, title, items FROM seo_alerts WHERE site_id=$1 ORDER BY kind", [s.id]).then((r) => r.rows);
-  const age = (days: number) => pool.query("UPDATE seo_keyword_snapshots SET taken_on = taken_on - $2::int WHERE site_id=$1", [s.id, days]);
+  // Every snapshot of the site made `days` older. In two moves (far away, then back), so that two rows exactly `days` apart never share a date half-way.
+  const age = async (days: number) => { await pool.query("UPDATE seo_keyword_snapshots SET taken_on = taken_on - 100000 WHERE site_id=$1", [s.id]); await pool.query("UPDATE seo_keyword_snapshots SET taken_on = taken_on + 100000 - $2::int WHERE site_id=$1", [s.id, days]); };
 
   // 1. A snapshot a month ago, then one now: compared, alerts raised once, worded as what the data sees.
   answer = { keywords: [["roof repair", 4], ["siding", 12], ["gutters", 8]] };
@@ -63,6 +64,27 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   ok(busy instanceof KeywordWatchBusy && calls === 1, `a second one while the first is being taken is refused (${busy?.constructor?.name}, calls ${calls})`);
   open(); gate = null; await slow;
   ok((await site()).kw_snapshot_claim === null && (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n === 1, "the claim is given back, and there is one snapshot for the day");
+  // 5b. A claim that ran out and was taken over: the first owner saves nothing, is charged nothing, and cannot give back the new owner's claim.
+  await age(31); calls = 0;
+  gate = new Promise<void>((r) => { open = r; });
+  answer = { keywords: [["fenced", 1]] };
+  const stale = takeKeywordSnapshot(await site(), false).then((x) => x, (e) => e);
+  await new Promise((r) => setTimeout(r, 300));
+  await pool.query("UPDATE seo_sites SET kw_snapshot_claim = now() - interval '11 minutes' WHERE id=$1", [s.id]);
+  const successor = takeKeywordSnapshot(await site(), false).then((x) => x, (e) => e);
+  await new Promise((r) => setTimeout(r, 300));
+  const tokenThen = (await site()).kw_snapshot_claim_token;
+  open(); gate = null;
+  const [r1, r2]: any[] = await Promise.all([stale, successor]);
+  const dayRows = (await pool.query("SELECT count(*)::int n FROM seo_keyword_snapshots WHERE site_id=$1 AND taken_on=current_date", [s.id])).rows[0].n;
+  ok(r1 instanceof Error && r1.notSaved === true && !(r2 instanceof Error) && r2.reused === false && dayRows === 1, `the displaced owner saves nothing and the successor's snapshot is the day's one (${r1?.message?.slice(0, 60)} / ${JSON.stringify(r2).slice(0, 60)})`);
+  ok(typeof tokenThen === "string" && (await site()).kw_snapshot_claim === null && (await site()).kw_snapshot_claim_token === null, "each owner gives back only its own claim; none is left behind");
+  // 5c. The monthly one stands down when its date was moved after it was leased (someone took a snapshot by hand meanwhile).
+  await age(31); calls = 0; await pool.query("UPDATE seo_sites SET kw_watch=true, next_kw_snapshot_at = now() + interval '1 month' WHERE id=$1", [s.id]);
+  const stood = await takeKeywordSnapshot(await site(), true, "2026-01-01 00:00:00+00");
+  ok(stood.reused === true && stood.id === 0 && calls === 0 && (await site()).kw_snapshot_claim === null, "a leased occurrence whose date has moved buys nothing");
+  await pool.query("UPDATE seo_sites SET kw_watch=false, next_kw_snapshot_at = NULL WHERE id=$1", [s.id]);
+  answer = { keywords: [["brand new", 1], ["second", 2]] }; await takeKeywordSnapshot(await site(), false);   // the day has its snapshot again for what follows
   // 6. The schedule: off = nothing; on with a snapshot from today = a month on; due = bought once; switched off before its turn = nothing.
   calls = 0;
   ok((await runDueKeywordSnapshots()) === 0 && calls === 0, "not watched: the scheduler takes nothing");

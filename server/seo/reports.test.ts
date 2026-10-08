@@ -26,7 +26,7 @@ describe("report requests", () => {
 
   it("a site report narrowed to a section or to one page", () => {
     const filters = (o: Record<string, unknown>) => reportRequest(effectiveReport(base(o))).body.filters as unknown[];
-    const HOST = "^(?i:https?://(www\\.)?example\\.com)(:(80|443))?";
+    const HOST = "^(?i:http://(www\\.)?example\\.com(:80)?|https://(www\\.)?example\\.com(:443)?)";
     // The source's pattern language has "(?i:…)"; JavaScript's does not, so the tests below read it as a flag on the whole pattern.
     const RX = (p: unknown) => new RegExp(String(p).replace("(?i:", "(?:"), "i");
     // One condition, on a whole address: the site itself (with or without www), then the path with a real boundary.
@@ -45,11 +45,15 @@ describe("report requests", () => {
     const dotted = RX(filters({ path: "/a.b(c)/[x]" })[2]);
     // Hosts in any letter case, and the scheme's own port, are the same site; another port is not.
     for (const yes of ["HTTPS://WWW.Example.COM/blog/x", "https://example.com:443/blog", "http://example.com:80/blog/"]) expect(section.test(yes), yes).toBe(true);
-    expect(section.test("https://example.com:8443/blog/")).toBe(false);
+    // Another port — including the OTHER scheme's own port — is another origin.
+    for (const no of ["https://example.com:8443/blog/", "https://example.com:80/blog/", "http://example.com:443/blog/"]) expect(section.test(no), no).toBe(false);
     // An upper-case target is the same site.
     expect(reportRequest(effectiveReport({ ...base({ path: "/blog" }), target: "Example.COM" })).body.filters).toEqual(filters({ path: "/blog" }));
     // "/p?" is "/p"; "//other.example/x" is not a path.
     expect(filters({ path: "/p?", exactPage: true })).toEqual(filters({ path: "/p", exactPage: true }));
+    // …but a "?" that is part of the query's value stays: "/p?q=?" is not "/p?q=".
+    expect(filters({ path: "/p?q=?", exactPage: true })).toEqual(["ranked_serp_element.serp_item.url", "regex", `${HOST}/p\\?q=\\?$`]);
+    expect(RX(filters({ path: "/p?q=?", exactPage: true })[2]).test("https://example.com/p?q=?")).toBe(true);
     expect(reportInput.safeParse({ domain: "example.com", table: "keywords", path: "//other.example/blog" }).success).toBe(false);
     for (const yes of ["https://example.com/blog", "https://www.example.com/blog/", "http://example.com/blog/post-1", "https://example.com/blog?page=2"]) expect(section.test(yes), yes).toBe(true);
     for (const no of ["https://example.com/blogging", "https://example.com/blog-post", "https://notexample.com/blog/", "https://shop.example.com/blog/", "https://example.com.evil.test/blog/", "https://evil.test/?u=https://example.com/blog/", "https://example.com/news/blog/"]) expect(section.test(no), no).toBe(false);

@@ -4,7 +4,7 @@
  * turned on; the monthly snapshot uses only the month's included data. Today's snapshot can also be taken now, at
  * the price on the button (one a day — asking again the same day shows the one there is).
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
@@ -14,7 +14,7 @@ import { api, fmtDate, fmtNum, money, useSeoStatus, type SeoSite } from "./shell
 
 type Kw = { keyword: string; position: number | null; volume: number | null; traffic: number | null; path: string | null; was?: number | null };
 type Comparison = { since: string; takenOn: string; locationCode: number; languageCode: string; basis: "whole" | "top" | "unknown" | "none"; added: Kw[]; gone: Kw[]; now: { keywords: number; total: number | null }; before: { keywords: number; total: number | null } };
-type View = { watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
+type View = { watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; nextDayAt?: string; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 
 export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a keyword in the rank tracker. */ onTrack?: (keywords: Kw[]) => void }) {
@@ -24,16 +24,26 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
   const key = `/api/seo/sites/${site.id}/keyword-watch`;
   const q = useQuery<View>({ queryKey: [key], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 30_000 });
   const [tab, setTab] = useState<"added" | "gone">("added");
+  // The day for snapshots changes at midnight UTC: when it does, what can be taken changes, so the panel asks again then.
+  const boundary = q.data?.nextDayAt;
+  useEffect(() => {
+    if (!boundary) return;
+    const ms = new Date(boundary).getTime() - Date.now();
+    if (!(ms > 0) || ms > 36 * 3600_000) return;
+    const t = setTimeout(() => void qc.invalidateQueries({ queryKey: [key] }), ms + 2000);
+    return () => clearTimeout(t);
+  }, [boundary, key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const newDay = boundary ? new Date(boundary).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : null;
   const [shown, setShown] = useState(50);
   const done = () => { void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); };
   const set = useMutation({
     mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/keyword-watch`, { watch: v.watch }),
-    onSuccess: (_d: unknown, v) => { done(); toast({ title: v.watch ? "Keyword watch is on" : "Keyword watch is off", description: v.watch ? "A snapshot is taken once a month from your included SEO data — the next date is shown here. Alerts start with the second snapshot." : "Snapshots already taken are kept." }); },
+    onSuccess: (_d: unknown, v) => { done(); toast({ title: v.watch ? "Keyword watch is on" : "Keyword watch is off", description: v.watch ? "A snapshot is taken once a month from your included SEO data — the next date is shown here. From the second snapshot on, changes that qualify can raise an alert." : "Snapshots already taken are kept." }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const snap = useMutation({
     mutationFn: (v: { siteId: number }) => api("POST", `/api/seo/sites/${v.siteId}/keyword-watch/snapshot`),
-    onSuccess: (d: { keywords: number; reused?: boolean }) => { done(); toast(d.reused ? { title: "Today's snapshot was already taken", description: "Showing that one — nothing was charged. A new one can be taken tomorrow." } : { title: "Snapshot taken", description: `${fmtNum(d.keywords)} keyword${d.keywords === 1 ? "" : "s"} saved.` }); },
+    onSuccess: (d: { keywords: number; reused?: boolean }) => { done(); toast(d.reused ? { title: "Today's snapshot was already taken", description: "Showing that one — nothing was charged. One snapshot is kept per day." } : { title: "Snapshot taken", description: `${fmtNum(d.keywords)} keyword${d.keywords === 1 ? "" : "s"} saved.` }); },
     onError: (e) => { done(); toast({ title: "Couldn't take the snapshot", description: apiErrorMessage(e), variant: "destructive" }); },
   });
   // The figure set aside, which is also the most that can be charged; without it nothing is bought here.
@@ -52,7 +62,7 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="g-text text-[16px] font-medium">Searches newly seen, and no longer seen, for {site.domain}</h2>
-          <p className="g-text-2 mt-1 max-w-3xl text-[13px]">Once a month, a snapshot of the searches our search data has the site ranking for — up to its {fmtNum(d.rows)} highest-traffic ones — is compared with the month before. It goes beyond the keywords you track, but it is the data's view, not Google's own: a search can be "newly seen" because the data started measuring it, and "no longer seen" while the site still ranks. The monthly snapshot uses your included SEO data only{price != null ? ` (up to ${money(price)} each)` : ""}; when that has run out it is skipped, never charged to credit you bought.</p>
+          <p className="g-text-2 mt-1 max-w-3xl text-[13px]">Once a month, a snapshot of the searches our search data has the site ranking for — up to its {fmtNum(d.rows)} highest-traffic ones — is compared with the snapshot before it. It goes beyond the keywords you track, but it is the data's view, not Google's own: a search can be "newly seen" because the data started measuring it, and "no longer seen" while the site still ranks. The monthly snapshot uses your included SEO data only{price != null ? ` (up to ${money(price)} each)` : ""}; when that has run out it is skipped, never charged to credit you bought.</p>
         </div>
         <label className="flex min-h-9 items-center gap-2 text-[13px]"><input type="checkbox" checked={set.isPending && set.variables ? set.variables.watch : d.watch} aria-busy={set.isPending} onChange={(e) => { if (!set.isPending) set.mutate({ siteId: site.id, watch: e.target.checked }); }} data-testid="checkbox-keyword-watch" /><span className="g-text">Watch every month</span></label>
       </div>
@@ -61,7 +71,7 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
           {d.latest ? `Last snapshot ${fmtDate(d.latest.takenOn)} (${place(d.latest)}): ${fmtNum(d.latest.keywords)} keyword${d.latest.keywords === 1 ? "" : "s"}${d.latest.total != null && d.latest.whole === false ? ` of the ${fmtNum(d.latest.total)} the data has for the site` : ""}.` : "No snapshot yet."}
           {d.watch && d.nextAt ? ` Next: ${fmtDate(d.nextAt)}.` : ""}
         </span>
-        {d.latest?.today ? <span className="g-text-2" data-testid="text-keyword-snapshot-today">Today's snapshot has been taken; a new one can be taken tomorrow.</span> : (
+        {d.latest?.today ? <span className="g-text-2" data-testid="text-keyword-snapshot-today">The snapshot for today has been taken (one a day; days change at midnight UTC{newDay ? ` — ${newDay} for you` : ""}).</span> : (
           <button type="button" className="g-pill g-pill--sm" disabled={snap.isPending || !status.data?.configured || !canPay} onClick={() => snap.mutate({ siteId: site.id })} data-testid="button-keyword-snapshot">
             {snap.isPending ? <Loader2 className="animate-spin" /> : null} {snap.isPending ? "Taking it…" : `Take a snapshot now${price != null ? ` — up to ${money(price)}` : ""}`}
           </button>
