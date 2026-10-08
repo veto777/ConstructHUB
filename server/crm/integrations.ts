@@ -23,10 +23,14 @@ import { sendWithFallback } from "../email";
 import { autoSendPaymentReceipt } from "./receipts";
 import { textOrgOwners } from "./sms";
 import { notifyMembers } from "./notify";
+import { providerFixture, type StripeFixture } from "../tutorials/fixtures";
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
-const CONNECT_WEBHOOK_SECRET = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
-const stripe = STRIPE_KEY ? new Stripe(STRIPE_KEY) : null;
+// Tutorial recording slots only (null everywhere else — server/tutorials/fixtures/gate.ts). The
+// signature check below is the same in a slot: the stand-in signs its events with this secret.
+const stripeFx = providerFixture<StripeFixture>("stripe");
+const STRIPE_KEY = stripeFx?.secretKey ?? process.env.STRIPE_SECRET_KEY;
+const CONNECT_WEBHOOK_SECRET = stripeFx?.webhookSecret ?? process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+const stripe = stripeFx ? stripeFx.client : STRIPE_KEY ? new Stripe(STRIPE_KEY) : null;
 
 // ── SSRF guard for outbound webhooks ────────────────────────────────────────
 // A webhook URL is tenant-controlled and we fetch it server-side, so it must

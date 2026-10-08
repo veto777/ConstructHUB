@@ -1,7 +1,7 @@
 /**
  * ONE COMMAND PER VIDEO — the production line (docs/tutorials/PRODUCER-GUIDE.md).
  *
- *   npx tsx scripts/tutorials/produce.ts <helpKey> [--slot N] [--no-upload] [--keep-raw]
+ *   npx tsx scripts/tutorials/produce.ts <helpKey> [--slot N] [--no-upload] [--keep-raw] [--no-fixtures]
  *
  * fresh recording database `constructhub_tut_slot<N>` (a copy of the demo workspace, its dates moved
  * to today) → the app for that slot on port 8180+N (dev server; signed in as the demo owner; no
@@ -10,7 +10,11 @@
  * thumbnail → check → upload to R2 and write the manifest (unless --no-upload) → stop the app by its
  * listening pid → drop the database → delete the raw capture and the per-step clips.
  *
- * Slots 1–4 are four independent producers. What they share is guarded machine-wide:
+ * The slot app runs with the TUTORIAL FIXTURES (docs/tutorials/FIXTURES.md): local stand-ins for Stripe,
+ * HOVER, Google Calendar and texting, and the fixture rows of seed-fixtures.ts, so pages that need a
+ * connected account can be filmed. `--no-fixtures` records the workspace without any of it.
+ *
+ * Slots 1–8 are eight independent producers (ports 8181–8188). What they share is guarded machine-wide:
  *   tts.lock     one request to the voice engine at a time (it answers live customer calls)
  *   encode.lock  one ffmpeg at a time, niced, 4 threads (this box serves production)
  *   slot<N>.lock one producer per slot
@@ -20,8 +24,8 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { ROOT, WORK_DIR, flagNum, loadScript, parseArgs, withLock } from "./lib";
-import { drop, fresh, seedDemo, dbMode } from "./db";
-import { SLOT_PORT, startApp, stopPort, warmApp, type RunningApp } from "./app";
+import { drop, fresh, seedDemo, seedFixtures, dbMode } from "./db";
+import { SLOT_MAX, SLOT_PORT, isSlot, startApp, stopPort, warmApp, type RunningApp } from "./app";
 import { isCrmRoute, helpEntry } from "../../shared/help/registry";
 
 const TSX = path.join(ROOT, "node_modules/.bin/tsx");
@@ -34,11 +38,12 @@ function tool(name: string, args: string[]): Promise<void> {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["no-upload", "keep-raw"]);
+  const args = parseArgs(process.argv.slice(2), ["no-upload", "keep-raw", "no-fixtures"]);
   const helpKey = args._[0];
-  if (!helpKey) throw new Error("Usage: npx tsx scripts/tutorials/produce.ts <helpKey> [--slot 1-4] [--no-upload] [--keep-raw]");
+  if (!helpKey) throw new Error(`Usage: npx tsx scripts/tutorials/produce.ts <helpKey> [--slot 1-${SLOT_MAX}] [--no-upload] [--keep-raw] [--no-fixtures]`);
   const slot = flagNum(args, "slot", 1);
-  if (!Number.isInteger(slot) || slot < 1 || slot > 4) throw new Error("--slot is 1, 2, 3 or 4");
+  if (!isSlot(slot)) throw new Error(`--slot is 1 to ${SLOT_MAX}`);
+  const fixtures = !args.flags["no-fixtures"];
   const scriptFile = path.join(ROOT, "docs/tutorials/scripts", `${helpKey}.json`);
   if (!fs.existsSync(scriptFile)) throw new Error(`${path.relative(ROOT, scriptFile)} does not exist — write the step script first`);
   const { script } = loadScript(scriptFile);
@@ -71,12 +76,16 @@ async function main() {
       // The voice does not need the app: narrate while the database is copied and the app boots.
       const narrated = stage("narrate", () => tool("narrate", [scriptFile, "--out", out]));
       narrated.catch(() => {});
-      await stage("fresh database", async () => { await fresh(database); console.log(`  ${await seedDemo(database)}`); });
-      app = await stage("start the app", () => startApp({ slot, database }));
+      await stage("fresh database", async () => {
+        await fresh(database);
+        console.log(`  ${await seedDemo(database)}`);
+        if (fixtures) console.log(`  ${await seedFixtures(database)}`);
+      });
+      app = await stage("start the app", () => startApp({ slot, database, fixtures }));
       console.log(`  listening on :${app.port} (pid ${app.pid}) · log ${app.log}`);
       await stage("warm the app", async () => { console.log(`  ${await warmApp(app!.port)} client modules compiled`); });
       await narrated;
-      await stage("record", () => tool("record", [scriptFile, "--out", out, "--base", base]));
+      await stage("record", () => tool("record", [scriptFile, "--out", out, "--base", base, "--port", String(port)]));
       await stage("stop the app", async () => { await app!.stop(); app = null; });
       await stage("mux", () => tool("mux", [scriptFile, "--out", out]));
       if (script.thumbnail) await stage("thumbnail", () => tool("thumbnail", [scriptFile, "--out", out]));

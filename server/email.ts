@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { providerFixture, type EmailFixture } from "./tutorials/fixtures";
 import fs from "fs";
 import path from "path";
 import { PLANS, LEGACY_PLAN_MAP } from "@shared/plans";
@@ -221,6 +222,8 @@ function sinkToOutbox(mailOptions: any): { accepted: string[]; rejected: string[
     from: mailOptions.from ?? null, html: mailOptions.html ?? null, text: mailOptions.text ?? null,
     attachments,
   }) + "\n");
+  // Tutorial recording slots only (null everywhere else): the recorder plays the recipient.
+  providerFixture<EmailFixture>("email")?.captured(mailOptions);
   console.log(`[SMTP SINK] Not production — captured to tmp/email-outbox.jsonl instead of sending (to: ${to.join(", ")})`);
   return { accepted: to, rejected: [], response: "sink: written to tmp/email-outbox.jsonl" };
 }

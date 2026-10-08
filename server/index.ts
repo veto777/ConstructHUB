@@ -1,3 +1,5 @@
+// FIRST: a process that asks for tutorial fixtures outside a recording slot refuses to boot (server/tutorials/fixtures/gate.ts).
+import "./tutorials/fixtures/boot-guard";
 import { registerAppPurchaseGuard } from "./app-purchases";
 import { credentialBody } from "./cloudflare/credential-body";
 import express, { type Request, Response, NextFunction } from "express";

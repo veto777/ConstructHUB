@@ -5,8 +5,9 @@
  *   tsx scripts/tutorials/db.ts fresh <name>     drop + copy of constructhub_tut_template
  *   tsx scripts/tutorials/db.ts drop  <name>
  *   tsx scripts/tutorials/db.ts template [--rebuild]   build the template (schema, demo owner, demo seed)
- *   tsx scripts/tutorials/db.ts reseed           apply scripts/tutorials/seed-demo.ts to the EXISTING template —
- *                                                safe while producers are recording (see TEMPLATE_LOCK)
+ *   tsx scripts/tutorials/db.ts reseed [--fixtures]   apply scripts/tutorials/seed-demo.ts (and, with --fixtures,
+ *                                                seed-fixtures.ts) to the EXISTING template — safe while producers
+ *                                                are recording (see TEMPLATE_LOCK)
  *   tsx scripts/tutorials/db.ts list | mode
  *
  * SAFETY (not configurable):
@@ -183,13 +184,28 @@ export async function seedDemo(name: string): Promise<string> {
 }
 
 /**
+ * The tutorial fixture rows (a connected payment account, online payments in every state, the
+ * calendar / texting / HOVER connection settings) — after seedDemo, one transaction, idempotent.
+ * seed-fixtures.ts itself refuses without TUTORIAL_FIXTURES=1 and outside a recording database.
+ */
+export async function seedFixtures(name: string): Promise<string> {
+  return (await run(path.join(ROOT, "node_modules/.bin/tsx"), [path.join(ROOT, "scripts/tutorials/seed-fixtures.ts")], { env: { ...process.env, TUTORIAL_FIXTURES: "1", DATABASE_URL: await databaseUrl(name) }, cwd: ROOT })).stdout.trim();
+}
+
+/**
  * Apply the demo seed to the template that exists: new demo rows reach every copy made from now on,
  * also copies made by a working copy whose own seed-demo.ts is older. One transaction (seed-demo.ts).
  */
-export async function reseedTemplate(): Promise<string> {
+export async function reseedTemplate(opts: { fixtures?: boolean } = {}): Promise<string> {
   if (!(await exists(TEMPLATE))) throw new Error(`${TEMPLATE} does not exist — run: npx tsx scripts/tutorials/db.ts template`);
   return withLock(TEMPLATE_LOCK, async () => {
-    const out = await seedDemo(TEMPLATE);
+    let out = await seedDemo(TEMPLATE);
+    // `--fixtures`: also the fixture rows, each seed its own single transaction of rows only, under
+    // this one exclusive lock. Every copy made afterwards carries them — also the copies of working
+    // copies WITHOUT the fixture code, whose Payments page then lists the five online payments
+    // (their pages still say "not configured"). produce.ts applies them per slot anyway, so the
+    // template only needs them once every producer has this code.
+    if (opts.fixtures) out += `\n${await seedFixtures(TEMPLATE)}`;
     const [database, schema] = await locate(TEMPLATE);
     await query(database, schema, "analyze");
     return out;
@@ -249,6 +265,7 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
   });
   await step("scripts/seed-crm-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/seed-crm-demo.ts")], { env, cwd: ROOT }));
   await step("scripts/tutorials/seed-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/tutorials/seed-demo.ts")], { env, cwd: ROOT }));
+  await step("scripts/tutorials/seed-fixtures.ts", () => seedFixtures(TEMPLATE));
   // A second boot settles whatever the app creates lazily or re-checks after its first run (seed_state,
   // the appraiser and portal passes), so the copies start in seconds instead of redoing it.
   for (const n of ["second", "third"])
@@ -258,13 +275,13 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["rebuild"]);
+  const args = parseArgs(process.argv.slice(2), ["rebuild", "fixtures"]);
   const [cmd, name] = args._;
   if (cmd === "mode") { console.log(await dbMode()); return; }
   if (cmd === "list") { console.log((await list()).join("\n")); return; }
   if (cmd === "template") { await buildTemplate(!!args.flags.rebuild); return; }
-  if (cmd === "reseed") { console.log(await reseedTemplate()); console.log(`${TEMPLATE} reseeded at ${new Date().toISOString()}`); return; }
-  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | reseed | list | mode");
+  if (cmd === "reseed") { console.log(await reseedTemplate({ fixtures: !!args.flags.fixtures })); console.log(`${TEMPLATE} reseeded at ${new Date().toISOString()}`); return; }
+  if ((cmd !== "fresh" && cmd !== "drop") || !name) throw new Error("Usage: tsx scripts/tutorials/db.ts <fresh|drop> constructhub_tut_<name> | template [--rebuild] | reseed [--fixtures] | list | mode");
   assertName(name);
   if (cmd === "drop" && name === TEMPLATE && !args.flags.rebuild) throw new Error("dropping the template takes --rebuild on `template`, not `drop`");
   const t = Date.now();
