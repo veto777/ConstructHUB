@@ -32,10 +32,10 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://a.dash.example%'");
   for (let i = 0; i < 8; i++) {
     const pages = Array.from({ length: 10 }, (_, k) => ({ url: `https://a.dash.example/p${k}`, status: k < i ? 404 : 200, redirects: [] }));
-    await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,'https://a.dash.example/',$3,$4,'completed','{}'::jsonb, now() - $5::int * interval '1 day')`,
+    await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,'https://a.dash.example/',$3,$4,'completed','{"findings":[]}'::jsonb, now() - $5::int * interval '1 day')`,
       [randomUUID(), 1, i === 0 ? 100 : 150, JSON.stringify({ pages }), 8 - i]);
   }
-  await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,2,'https://a.dash.example/',150,'{"pages":[]}','completed','{}'::jsonb, now())`, [randomUUID()]);
+  await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,2,'https://a.dash.example/',150,'{"pages":[]}','completed','{"findings":[]}'::jsonb, now())`, [randomUUID()]);
   const h = (await auditHealthByDomain(1, ["a.dash.example", "www.none.dash.example"])).get("a.dash.example")!;
   ok(h && h.trend.length === HEALTH_TREND, `the trend is the newest ${HEALTH_TREND} crawls: ${h?.trend.length}`);
   ok(h.trend.every((t, k) => k === 0 || t.at! > h.trend[k - 1].at!) && h.trend[h.trend.length - 1].jobId === h.jobId && h.health === h.trend[h.trend.length - 1].health, "oldest first, ending with the newest crawl");

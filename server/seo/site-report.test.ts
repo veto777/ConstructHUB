@@ -183,3 +183,10 @@ describe("Search Console numbers in a report", () => {
     expect(w.done.map((x) => x.title)).toEqual(["in"]);
   });
 });
+
+describe("pdfSafe and the minus sign", () => {
+  it("writes the app's minus sign as a hyphen-minus, never as a question mark", async () => {
+    const { pdfSafe } = await import("./site-report");
+    expect(pdfSafe("3 (−2)")).toBe("3 (-2)");
+  });
+});

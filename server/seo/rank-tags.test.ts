@@ -33,4 +33,8 @@ describe("rank tracker by tag", () => {
     const partial = tagOverview(kws, new Map([[1, 3]]), before).rows.find((r) => r.tag === "roofing")!;
     expect([partial.keywords, partial.checked, partial.ranked]).toEqual([3, 1, 1]);
   });
+  it("the weighting is said separately for the figure and for the change", () => {
+    const mixed = tagOverview([{ id: 1, tags: ["t"], volume: 100 }, { id: 2, tags: ["t"], volume: null }], new Map([[1, 2], [2, 5]]), new Map([[1, 4]])).rows[0];
+    expect([mixed.weighted, mixed.changeWeighted]).toEqual([false, true]);
+  });
 });

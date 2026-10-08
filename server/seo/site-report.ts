@@ -124,7 +124,9 @@ export function workSection(rows: { title: string; status: string; done_at: stri
 
 type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean; tags?: string[] | null };
 /** One tag (a service, a town) in the report: the same comparison as the rankings (the latest check against the earlier one). */
-export type ReportTag = { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number };
+export type ReportTag = { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null;
+  /** Keywords in both checks (the changes rest on these alone), and in the latest only. */ compared: number; newSince: number;
+  /** The index weighted by search volume, or each keyword once — now, and for the change. */ weighted: boolean; changeWeighted: boolean | null };
 export const REPORT_TAGS = 20;
 
 const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
@@ -151,7 +153,7 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
   // By tag: the keywords of the latest check, each tag on its own; the same two checks as everything above.
   const kws = [...now.values()].map((c) => ({ id: c.keywordId, tags: Array.isArray(c.tags) ? c.tags.filter((t) => typeof t === "string" && t) : [], volume: c.volume }));
   const tagged = kws.some((k) => k.tags.length) ? tagOverview(kws, new Map([...now].map(([id, c]) => [id, c.position])), earlier ? new Map([...before].map(([id, c]) => [id, c.position])) : null).rows.filter((t) => t.tag !== null) : [];
-  const byTag: ReportTag[] = tagged.sort((a, b) => b.keywords - a.keywords || String(a.tag).localeCompare(String(b.tag))).map((t) => ({ tag: t.tag as string, keywords: t.checked, top3: t.top3, top10: t.top10, top10Change: t.top10Change, visibility: t.visibility, visibilityChange: t.visibilityChange, compared: t.compared, newSince: t.newSince }));
+  const byTag: ReportTag[] = tagged.sort((a, b) => b.keywords - a.keywords || String(a.tag).localeCompare(String(b.tag))).map((t) => ({ tag: t.tag as string, keywords: t.checked, top3: t.top3, top10: t.top10, top10Change: t.top10Change, visibility: t.visibility, visibilityChange: t.visibilityChange, compared: t.compared, newSince: t.newSince, weighted: t.weighted, changeWeighted: t.changeWeighted }));
   return {
     comparedWith: earlier,
     section: {
@@ -294,7 +296,8 @@ export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.a
 /** Characters the built-in PDF font can draw beyond Latin-1 (its Windows-1252 extras). */
 const WIN_ANSI_EXTRA = new Set(Array.from("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"));
 /** Text the built-in font can draw: control characters and line breaks become spaces; anything else it lacks becomes "?". */
-export const pdfSafe = (t: string) => Array.from(String(t).normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " "))
+// The minus sign the app uses (U+2212) is not in the PDF font: it is written as a hyphen-minus, never as "?".
+export const pdfSafe = (t: string) => Array.from(String(t).normalize("NFC").replace(/\u2212/g, "-").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " "))
   .map((c) => { const n = c.codePointAt(0)!; return (n >= 0x20 && n <= 0x7e) || (n >= 0xa0 && n <= 0xff) || WIN_ANSI_EXTRA.has(c) ? c : "?"; }).join("");
 
 /** The report as a PDF. `brand` is the account's white-label name and logo (Site Scan branding), when set. */
@@ -307,7 +310,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
     doc.on("error", reject);
     const width = doc.page.width - 96, ink = "#1a1a2e", soft = "#666666", rule = "#dddddd";
     const room = (h: number) => { if (doc.y + h > doc.page.height - 60) doc.addPage(); };
-    const heading = (t: string) => { room(60); doc.moveDown(1).fontSize(14).fillColor(ink).font("Helvetica-Bold").text(t).moveDown(0.3); doc.moveTo(48, doc.y).lineTo(48 + width, doc.y).strokeColor(rule).stroke().moveDown(0.5); doc.font("Helvetica").fontSize(10).fillColor(ink); };
+    const heading = (t: string) => { room(60); doc.moveDown(1).fontSize(14).fillColor(ink).font("Helvetica-Bold").text(pdfSafe(t)).moveDown(0.3); doc.moveTo(48, doc.y).lineTo(48 + width, doc.y).strokeColor(rule).stroke().moveDown(0.5); doc.font("Helvetica").fontSize(10).fillColor(ink); };
     const pair = (label0: string, value0: string) => { const label = pdfSafe(label0), value = pdfSafe(value0); room(18); const y = doc.y; doc.fontSize(10).fillColor(soft).text(label, 48, y, { width: width * 0.55 }); doc.fillColor(ink).font("Helvetica-Bold").text(value, 48 + width * 0.55, y, { width: width * 0.45, align: "right" }).font("Helvetica"); doc.x = 48; doc.moveDown(0.35); };
     const line = (t0: string, color = ink) => { const t = pdfSafe(t0); room(16); doc.fontSize(10).fillColor(color).text(t, 48, doc.y, { width }); doc.moveDown(0.2); };
 
@@ -329,18 +332,21 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
       // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
       const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
-      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(c, 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
       if (k.byTag?.length) {
         room(60); doc.moveDown(0.5).font("Helvetica-Bold").fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
         const tcols = [0, width * 0.42, width * 0.58, width * 0.78];
-        const trow = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(c, 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
-        trow(["Tag", "Keywords", "In the top 10", "Visibility index"], true);
-        for (const t of k.byTag) trow([pdfSafe(t.tag), n(t.keywords), `${n(t.top10)}${signed(t.top10Change)}`, t.visibility === null ? "—" : `${t.visibility}${t.visibilityChange ? ` (${t.visibilityChange > 0 ? "+" : "−"}${Math.abs(t.visibilityChange)})` : ""}`]);
+        const trow = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+        // A change that was measured is shown even when it is zero ("±0"); none measured is "no comparison" (—).
+        const chg = (v: number | null) => (v === null ? " (—)" : v === 0 ? " (±0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
+        trow(["Tag", "Keywords (in both / new)", "In the top 10", "Visibility index"], true);
+        for (const t of k.byTag) trow([t.tag, `${n(t.keywords)} (${n(t.compared)} / ${n(t.newSince)})`, `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
+          t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""} ${t.weighted ? "by volume" : "each once"}`]);
         if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
-        line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks; a keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).`, soft);
+        line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (the first number in brackets beside Keywords); (—) means no keyword was in both. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).`, soft);
       }
     }
     if (r.searchConsole) {

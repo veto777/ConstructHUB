@@ -296,8 +296,14 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
   if (missing.length) {
     const { rows } = await pool.query(
       `SELECT id::text AS id, xmin::text AS fp, report, ${PAGES_SQL} AS pages,
-              (jsonb_typeof(report)='object' AND jsonb_typeof(state->'pages')='array'
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string')) AS well_formed
+              -- Everything the score rests on, as a finished crawl writes it (server/sitescan): a report with a list of
+              -- findings (each one an object) and, if any, a list of errors; pages each with an address and a numeric
+              -- status. An empty list is a real empty list; anything else is "could not be read", never a clean crawl.
+              (jsonb_typeof(report)='object' AND jsonb_typeof(report->'findings')='array'
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object')
+               AND (report->'errors' IS NULL OR jsonb_typeof(report->'errors')='array')
+               AND jsonb_typeof(state->'pages')='array'
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'status') IS DISTINCT FROM 'number')) AS well_formed
          FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
     for (const r of rows) {
       // The version read now (it may have changed since the list above; then it is worked out again next time).

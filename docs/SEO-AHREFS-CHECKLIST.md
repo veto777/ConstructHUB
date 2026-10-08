@@ -858,6 +858,17 @@ Verdict: of audit #42's nine, five fixed and four partial; nine new defects, non
  #37-2 shifting positions ...................................... STAYS SAID (the source orders by time alone)
  NOT DONE: a claim taken over while the first owner's request is in flight asks the source twice; alert debt from before the #18 migration; request queues per server process.
 
+## Codex audit #44 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-44.md)
+
+Verdict: five new defects, none HIGH.
+
+ 1 "well formed" still let a broken crawl score 100 ........... FIXED (a findings list of objects, an errors list if any, and pages each with an address and a numeric status - as the crawler writes them; anything else is "could not be read". Real crawls in the screenshots database still read)
+ 2 one weighting label for the figure and its change ........... FIXED (said separately when they differ)
+ 3 the report hid what a tag's change rests on ................. FIXED (in both / new counts and the weighting per tag, on the page and in the PDF; a measured zero is "±0", no comparison is "—")
+ 4 the PDF lost the minus sign .................................. FIXED (written as "-" everywhere in the PDF - the rankings changes too, which were printing "?")
+ 5 no tags hid the whole panel ................................. FIXED (all keywords shown, with how to tag them)
+ NOT DONE: as audit #43.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -934,3 +945,4 @@ Verdict: of audit #42's nine, five fixed and four partial; nine new defects, non
 - 10/8 slice 54 (site health tile; any two crawls) + audit #41 fixes: 397 tests across server/seo and the crawler's suites (database-needing files fail as on main). Real Postgres - eighteen scripts passing (audit compare 14/14 with a chosen older crawl shown, a newer baseline and another account's crawl refused; dashboard 11/11 with the health trend; gsc breakdown 10/10 with a waiting page of an earlier read; report "not known" 6/6 naming the report). Browser (vb11, commit checked): the health tile and lowest-health order; "Showing" an older crawl with its note, no plan buttons, the outgoing view saying it is the newest; a malformed crawl id answered 400; 1440 and 390 px with no overflow and no page errors.
 - 10/8 slice 55 (rank tracker by tag) + audit #42 fixes: 401 tests across server/seo and the crawler's suites (database-needing files fail as on main), white-label rule 90 routes. Real Postgres - nineteen scripts passing (new: rank tags 6/6; dashboard 14/14 with kept crawl health, a gap and the newest crawl always current; gsc breakdown 11/11 with no record of reads; audit compare 15/15 with no crawl at all). Browser (vb11, commit checked): By tag on desktop and mobile with each side's dates; the health tile with "N of M pages" and the crawl list; the three detail views opened; 1440 and 390 px with no overflow and no page errors.
 - 10/8 slice 56 (client reports by tag) + audit #43 fixes: 402 tests across server/seo and the crawler's suites (database-needing files fail as on main). Real Postgres - nineteen scripts passing (rank tags 8/8 with a built report; dashboard 15/15 with a changed page status and a broken newest crawl; gsc breakdown 12/12 with rows that have no record of a read). Browser (vb11, commit checked): By tag on the Reports page and in the downloaded PDF; By tag on the rank tracker with the saved-day wording; the health tile; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #44 fixes: 404 tests across server/seo and the crawler's suites; nineteen real-Postgres scripts passing (fixtures now save a report as the crawler does). Browser (vb11, commit checked): report By tag with in-both / new counts and weighting, PDF downloaded; health tile still reading the real crawls; 1440 and 390 px, no overflow, no page errors.

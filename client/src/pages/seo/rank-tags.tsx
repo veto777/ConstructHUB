@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
 
-type Row = { tag: string | null; keywords: number; checked: number; ranked: number; top3: number; top10: number; averagePosition: number | null; visibility: number | null; compared: number; weighted: boolean; visibilityChange: number | null; top10Change: number | null; positionNow: number | null; positionBefore: number | null; rankedBoth: number; newSince: number };
+type Row = { tag: string | null; keywords: number; checked: number; ranked: number; top3: number; top10: number; averagePosition: number | null; visibility: number | null; compared: number; weighted: boolean; changeWeighted: boolean | null; visibilityChange: number | null; top10Change: number | null; positionNow: number | null; positionBefore: number | null; rankedBoth: number; newSince: number };
 type Span = { from: string; to: string; keywords: number };
 const spanWords = (x: Span) => (x.from === x.to ? fmtDate(x.from) : `${fmtDate(x.from)} to ${fmtDate(x.to)}`);
 type Data = { device: "desktop" | "mobile"; devices: ("desktop" | "mobile")[]; deviceFallback?: boolean; now: Span | null; before: Span | null; all: Row; rows: Row[] };
@@ -27,8 +27,8 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
   const d = q.data;
   if (q.isLoading) return <p className="g-text-2 mb-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading tags…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load the tags: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
-  // No tags: nothing to break the keywords down by.
-  if (!d || d.rows.length === 0) return null;
+  // No keywords at all: nothing to show. Keywords but no tags: all keywords, and how to break them down.
+  if (!d || d.all.keywords === 0) return null;
   const list = [...d.rows, { ...d.all, tag: "" }];
   return (
     <section className="mb-5" data-testid="rank-tags" aria-busy={q.isFetching}>
@@ -43,6 +43,7 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-tags-basis">
         {d.deviceFallback ? "This site does not track that device. " : ""}{d.now ? <>Each keyword's newest saved day on {d.device} ({spanWords(d.now)}){d.before ? ` against its own saved day before (${spanWords(d.before)})` : " — none has a day before it to compare with"} (a later check on the same day replaces the earlier one). Changes count only keywords with both — the figure under each change says how many; a keyword checked once is counted apart as new, never as a gain. A keyword can carry more than one tag, so the tags add up to more than all keywords. Visibility is an index, not a share of real clicks: 100 would mean every keyword first; weighted by search volume where every keyword has one, otherwise each keyword counts once.</> : "No check of these keywords on this device yet."}
       </p>
+      {d.rows.length === 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid="text-tags-none">None of these keywords has a tag yet. Give keywords a tag (a service, a town) when you add them, and each tag gets its own row here.</p>}
       {d.now && (
         <div className="overflow-x-auto">
           <table className="g-table w-full" data-testid="table-rank-tags">
@@ -52,7 +53,7 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
                 <tr key={r.tag ?? "\u0000none"} data-testid={`row-tag-${r.tag === "" ? "all" : r.tag ?? "none"}`} className={r.tag === "" ? "font-medium" : undefined}>
                   <td className="max-w-[16rem] !whitespace-normal [overflow-wrap:anywhere]" data-label="Tag"><Label>Tag</Label>{r.tag === "" ? "All keywords" : r.tag === null ? <span className="g-text-2">No tag</span> : r.tag}</td>
                   <td className="num" data-label="Keywords"><Label>Keywords</Label>{fmtNum(r.keywords)}{r.checked < r.keywords && <span className="g-text-2 block text-[11px]">{fmtNum(r.checked)} checked</span>}</td>
-                  <td className="num" data-label="Visibility index"><Label>Visibility index</Label>{r.visibility === null ? "—" : r.visibility}<Move v={r.visibilityChange} />{r.visibility !== null && <span className="g-text-2 block text-[11px]">{r.weighted ? "by search volume" : "each keyword once"}{r.visibilityChange !== null ? ` · change on ${fmtNum(r.compared)}` : ""}</span>}</td>
+                  <td className="num" data-label="Visibility index"><Label>Visibility index</Label>{r.visibility === null ? "—" : r.visibility}<Move v={r.visibilityChange} />{r.visibility !== null && <span className="g-text-2 block text-[11px]">{r.weighted ? "by search volume" : "each keyword once"}{r.visibilityChange !== null ? ` · change on ${fmtNum(r.compared)}${r.changeWeighted !== r.weighted ? (r.changeWeighted ? ", by volume" : ", each once") : ""}` : ""}</span>}</td>
                   <td className="num" data-label="In the top 10"><Label>In the top 10</Label>{fmtNum(r.top10)}<Move v={r.top10Change} />{r.top3 > 0 && <span className="g-text-2 block text-[11px]">{fmtNum(r.top3)} in the top 3</span>}</td>
                   <td className="num" data-label="Avg. position"><Label>Average position</Label>{r.averagePosition ?? "—"}{r.positionNow !== null && r.positionBefore !== null && <span className="g-text-2 block text-[11px]">{r.rankedBoth} ranked both times: {r.positionBefore} → {r.positionNow}</span>}</td>
                   <td className="num" data-label="New since"><Label>New since</Label>{d.before ? fmtNum(r.newSince) : "—"}</td>

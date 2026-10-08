@@ -18,7 +18,7 @@ export type TagRow = {
   /** Of them, checked in the newest check (the figures below are of these). */ checked: number; ranked: number; top3: number; top10: number;
   averagePosition: number | null; visibility: number | null;
   /** Checked both times: the changes are measured on these alone. */ compared: number;
-  /** Visibility weighted by search volume (every keyword in the row has one), or each keyword counted once. */ weighted: boolean;
+  /** The index weighted by search volume (every keyword in it has one), or each keyword counted once — for the current figure and, separately, for the change (its keywords are only those in both). */ weighted: boolean; changeWeighted: boolean | null;
   visibilityChange: number | null; top10Change: number | null;
   /** Average position now and before, of the keywords ranked both times (lower is better). */ positionNow: number | null; positionBefore: number | null; rankedBoth: number;
   /** Checked now and not in the check before (added since, or not answered then). */ newSince: number;
@@ -42,6 +42,7 @@ export function tagOverview(keywords: TagKeyword[], now: Pos, before: Pos | null
       tag, keywords: ids.length, checked: checked.length, ranked: s?.ranked ?? 0, top3: s?.top3 ?? 0, top10: s ? s.top3 + s.top10 : 0,
       averagePosition: s?.averagePosition ?? null, visibility: s ? s.visibility : null,
       compared: both.length, weighted: checked.length > 0 && checked.every((id) => (vol.get(id) ?? 0) > 0),
+      changeWeighted: both.length ? both.every((id) => (vol.get(id) ?? 0) > 0) : null,
       visibilityChange: sNow && sBefore ? Math.round((sNow.visibility - sBefore.visibility) * 10) / 10 : null,
       top10Change: sNow && sBefore ? (sNow.top3 + sNow.top10) - (sBefore.top3 + sBefore.top10) : null,
       positionNow: avg(now), positionBefore: before ? avg(before) : null, rankedBoth: rankedBoth.length,

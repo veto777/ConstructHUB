@@ -16,7 +16,7 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, us
 type Mover = { keyword: string; location: string | null; device: string; from: number | null; to: number | null };
 type Report = {
   domain: string; generatedAt: string; comparedWith: string | null;
-  rankings: { byTag?: { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number }[]; moreTags?: number; tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
+  rankings: { byTag?: { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number; weighted?: boolean; changeWeighted?: boolean | null }[]; moreTags?: number; tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[] } | null;
   search: { fetchedAt: string } | null;
   searchConsole?: { clicks: number } | null;
@@ -30,6 +30,11 @@ type Data = { report: Report; highlights: [string, string][]; empty: boolean; sc
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 const moverText = (m: Mover) => `${m.keyword}${m.location ? ` · ${m.location}` : ""}: ${m.from === null ? `now ${m.to}` : m.to === null ? `was ${m.from}, now not ranked` : `${m.from} → ${m.to}`}`;
 const parseEmails = (text: string) => [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean))];
+
+/** A tag's change since the earlier check: measured zero is "±0"; none measured (no keyword in both) is "—". */
+const TagChange = ({ v }: { v: number | null }) => (v === null ? <span className="g-text-2 ml-1 text-[12px]" title="No keyword was in both checks">—</span>
+  : v === 0 ? <span className="g-text-2 ml-1 text-[12px]">±0</span>
+  : <span className={`g-move ${v > 0 ? "g-move--up" : "g-move--down"} ml-1`}>{v > 0 ? "+" : "−"}{Math.abs(v)}</span>);
 
 export default function SeoReportsPage() {
   const status = useSeoStatus();
@@ -105,9 +110,9 @@ export default function SeoReportsPage() {
                       <tbody>{r.rankings.byTag!.map((t) => (
                         <tr key={t.tag}>
                           <td className="!whitespace-normal [overflow-wrap:anywhere]" data-label="Tag"><span className="sr-only">Tag: </span>{t.tag}</td>
-                          <td className="num" data-label="Keywords"><span className="sr-only">Keywords: </span>{fmtNum(t.keywords)}</td>
-                          <td className="num" data-label="In the top 10"><span className="sr-only">In the top 10: </span>{fmtNum(t.top10)}{t.top10Change ? <span className={`g-move ${t.top10Change > 0 ? "g-move--up" : "g-move--down"} ml-1`}>{t.top10Change > 0 ? "+" : "−"}{Math.abs(t.top10Change)}</span> : null}</td>
-                          <td className="num" data-label="Visibility index"><span className="sr-only">Visibility index: </span>{t.visibility === null ? "—" : t.visibility}{t.visibilityChange ? <span className={`g-move ${t.visibilityChange > 0 ? "g-move--up" : "g-move--down"} ml-1`}>{t.visibilityChange > 0 ? "+" : "−"}{Math.abs(t.visibilityChange)}</span> : null}</td>
+                          <td className="num" data-label="Keywords"><span className="sr-only">Keywords: </span>{fmtNum(t.keywords)}{r.comparedWith && <span className="g-text-2 block text-[11px]">{fmtNum(t.compared)} in both · {fmtNum(t.newSince)} new</span>}</td>
+                          <td className="num" data-label="In the top 10"><span className="sr-only">In the top 10: </span>{fmtNum(t.top10)}{r.comparedWith && <TagChange v={t.top10Change} />}</td>
+                          <td className="num" data-label="Visibility index"><span className="sr-only">Visibility index: </span>{t.visibility === null ? "—" : t.visibility}{r.comparedWith && <TagChange v={t.visibilityChange} />}{t.visibility !== null && t.weighted !== undefined && <span className="g-text-2 block text-[11px]">{t.weighted ? "by search volume" : "each keyword once"}{t.changeWeighted != null && t.changeWeighted !== t.weighted ? `; change ${t.changeWeighted ? "by volume" : "each once"}` : ""}</span>}</td>
                         </tr>))}</tbody></table>
                     {(r.rankings.moreTags ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]">…and {r.rankings.moreTags} more tags.</p>}
                     <p className="g-text-2 mt-1 text-[12px]">{r.comparedWith ? `Changes count only the keywords in both checks (${fmtDate(r.rankings.checkedOn)} and ${fmtDate(r.comparedWith)}); ` : ""}a keyword can carry several tags. The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).</p>
