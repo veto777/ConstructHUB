@@ -51,6 +51,16 @@ inside the worktree, `ENCODE_SLOTS=4`), keys in `.env.gator` (`npx tsx --env-fil
 - The two compilations are used up: 29 clips framed (A-0138 dropped: occupant risk), re-screen found one weak extra
   (A-0145). More episodes need more footage or more of our own AI fails (credit). Marks stay (removal declined).
 
+### 0c. Reactions are VIEWERS only (owner, 2026-10-08: "You are using these as reactions when they are not.")
+
+- Pack audited: 11 mined clips removed (selfies, sand, drenched, CCTV, dominoes, blower, dusty interiors — scenes from other
+  sketches; `_reactions/rejected-not-reactions.json`, queue `rejected`). 12 remain (`_reactions/pack.json`): shocked 1,
+  annoyed 6, deadpan 5. Owner's model: `reaction-deadpan-55-doorbell-stare` (gator with clipboard at a doorway).
+- Episodes re-cut with only those: `docs/gator/reacts/*-cut2.json` → `reacts-*-cut2.mp4` (26–29 s, 3 cutaways, `"short": true`
+  = 20–45 s); the `-cut` versions are superseded in the queue.
+- Next with credit: `docs/gator/REACTIONS-SHOPPING-LIST.md` — 18 viewer reactions (`rv-*` in concepts-live.ts) all animated
+  from `_reactions/REFERENCE-doorbell-clipboard.png` via the new `stillFile` (free upload); 26 takes ≈ $10.08 (budget $12.60).
+
 ## 1. What is live and what is scheduled
 
 - Posted 2026-10-08 (the three cartoon pilots): 8 posts on Instagram / TikTok / LinkedIn; the ninth

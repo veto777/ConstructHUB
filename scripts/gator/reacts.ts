@@ -199,11 +199,11 @@ export type GatorBeat = { gator: string; sec?: number; lead?: number; peak?: num
 export type Step = { fail: Fail } | GatorBeat;
 export type CutawayEpisode = {
   id: string; format: "cutaway"; music?: string; musicLevel?: number; accent?: string; ownerAcceptedRisk?: RiskRecord;
-  sequence: Step[]; /** Test renders only: lifts the 30–45 s rule (nothing else). Never on a posted episode. */ testOnlyAllowAnyLength?: boolean;
+  sequence: Step[]; /** Test renders only: lifts the 30–45 s rule (nothing else). Never on a posted episode. */ testOnlyAllowAnyLength?: boolean; /** A shorter episode (20–45 s) — the owner prefers fewer cutaways to padding. */ short?: boolean;
 };
 /** One entry of the reaction pack (analysis/gator-shorts/_reactions/pack.json), keyed by the reaction's file name. */
 export type PackEntry = { family?: string; peak?: number; lead?: number; hold?: number; audio?: "keep" | "mute"; verdict?: string };
-export const GATOR_SEC = { min: 1.2, max: 2.5, default: 1.6 }, CUTAWAY_SEC = { min: 30, max: 45 }, MUSIC_LEVEL = 0.12;
+export const GATOR_SEC = { min: 1.2, max: 2.5, default: 1.6 }, CUTAWAY_SEC = { min: 30, max: 45 }, MUSIC_LEVEL = 0.12, CUTAWAY_SHORT_MIN = 20;
 /** The cues an accent may be: our own synthesised sounds only (sound.ts) — short ones. */
 export const ACCENTS = ["whoosh", "thud", "tick", "hit", "pop", "ding"] as const;
 export type CutSegment =
@@ -257,9 +257,11 @@ export function planCutaway(ep: CutawayEpisode, durations: Readonly<Record<strin
   });
   segments.push({ kind: "tag", start: t, sec: TAG_SEC });
   const totalSec = t + TAG_SEC;
-  if (totalSec < CUTAWAY_SEC.min - 1e-6 || totalSec > CUTAWAY_SEC.max + 1e-6) {
+  // "short": the owner allows fewer, shorter episodes rather than padding with non-reactions (2026-10-08): 20–45 s.
+  const minSec = ep.short === true ? CUTAWAY_SHORT_MIN : CUTAWAY_SEC.min;
+  if (totalSec < minSec - 1e-6 || totalSec > CUTAWAY_SEC.max + 1e-6) {
     const sum = (k: string) => segments.filter((s) => s.kind === k).reduce((a, s) => a + s.sec, 0).toFixed(2);
-    const why = `${ep.id}: runs ${totalSec.toFixed(2)} s (fails ${sum("fail")} + gators ${sum("gator")} + end tag ${TAG_SEC}) — a cutaway episode is ${CUTAWAY_SEC.min}–${CUTAWAY_SEC.max} s`;
+    const why = `${ep.id}: runs ${totalSec.toFixed(2)} s (fails ${sum("fail")} + gators ${sum("gator")} + end tag ${TAG_SEC}) — a cutaway episode is ${minSec}–${CUTAWAY_SEC.max} s`;
     if (ep.testOnlyAllowAnyLength !== true) throw new Error(why);
     warnings.push(`${why} (lifted by testOnlyAllowAnyLength — a test render, not for posting)`);
   }

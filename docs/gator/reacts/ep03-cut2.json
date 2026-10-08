@@ -1,0 +1,136 @@
+{
+  "id": "ep03-cut2",
+  "format": "cutaway",
+  "music": "robot-factory",
+  "accent": "whoosh",
+  "ownerAcceptedRisk": {
+    "by": "the owner of ConstructHUB",
+    "date": "2026-10-08",
+    "quote": "Do what I am asking you to do!"
+  },
+  "sequence": [
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 80.8,
+        "out": 82.9,
+        "impact": 82.1,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0120 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-deadpan-55-doorbell-stare.mp4",
+      "sec": 1.83,
+      "lead": 0.2
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 598.63,
+        "out": 602.62,
+        "impact": 602.1,
+        "crop": {
+          "x": 646,
+          "y": 0,
+          "w": 628,
+          "h": 1080
+        },
+        "frame": {
+          "x0": 0.5
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0958 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 85.8,
+        "out": 91.4,
+        "impact": 90.6,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0125 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: @oshaisthissafe)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-annoyed-15-watch.mp4",
+      "sec": 1.89,
+      "lead": 0.25
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 399.73,
+        "out": 404.2,
+        "impact": 403.6,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0639 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 669.77,
+        "out": 675.4,
+        "impact": 674.6,
+        "crop": {
+          "x": 481,
+          "y": 0,
+          "w": 958,
+          "h": 1080
+        },
+        "frame": {
+          "x0": 0.7,
+          "x1": 0.9
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-1109 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-annoyed-10-facepalm.mp4",
+      "sec": 1.54,
+      "lead": 0.5
+    }
+  ],
+  "short": true
+}

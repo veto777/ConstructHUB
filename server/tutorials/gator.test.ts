@@ -1011,6 +1011,11 @@ describe("gator reacts — the cutaway format (fail → gator → fail, no PiP)"
     const t = planCutaway({ ...short, testOnlyAllowAnyLength: true }, d, pack);
     expect(t.warnings[0]).toMatch(/testOnlyAllowAnyLength — a test render, not for posting/);
     expect(() => planCutaway({ ...short, testOnlyAllowAnyLength: "yes" as unknown as boolean }, d, pack)).toThrow(/30–45 s/);
+    // "short": 20–45 s — fewer cutaways rather than padding; still refused under 20 s.
+    expect(() => planCutaway({ ...short, short: true }, d, pack)).toThrow(/a cutaway episode is 20–45 s/);
+    const mid = ep([fail("a.mp4", 8), { gator: "_deliver/g1.mp4", sec: 2 }, fail("b.mp4", 8), { gator: "_deliver/g2.mp4", sec: 2 }]);
+    expect(() => planCutaway(mid, d, pack)).toThrow(/30–45 s/);
+    expect(planCutaway({ ...mid, short: true }, d, pack).totalSec).toBeCloseTo(20.8, 1);
   });
   it("the same rights rules: a third-party fail needs the flag AND the record", () => {
     const tp = { kind: "third-party" as const, record: "clip from a compilation, unlicensed", source: "https://youtu.be/abc", channel: "A Channel" };

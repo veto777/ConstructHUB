@@ -98,6 +98,14 @@ const reaction = (name: string, title: string, action: string, sound: string): C
   shots: [{ id: "s1", look: "live", video: "talk", voice: "none", seconds: 3, use: 3, rawMotion: true, stillFrom: HOST_STILL, scene: "", motion: `${HOST_HOLD} He is watching something off to the side of the camera, just past the lens. ${action} He does not speak any words. ${HOST_END} Sound: ${sound}`, beats: [], cues: [] }],
   sound: "The take's own sound.", caption: title, hashtags: tags, linkedin: null, youtubeTitle: title,
 });
+const VIEWER_STILL = "_reactions/REFERENCE-doorbell-clipboard.png";
+const VIEWER_HOLD = "ONE continuous steady phone take, photorealistic; the camera does not move and the framing does not change. The alligator stands upright exactly where he is in front of the doorway, close to the lens, facing it, holding his clipboard in one claw. He is watching a screen just below the lens.";
+const VIEWER_END = "He is the only character; nobody else appears; nothing happens to him and nothing else in the scene changes. His yellow hard hat, dark opaque sunglasses and orange vest stay on; his eyes are never visible. Never a smile, never a grin, never laughing. No text appears. No music.";
+const viewer = (name: string, title: string, action: string, sound: string, seconds = 3): Concept => ({
+  id: `rv-${name}`, title, format: "job-site pain", cut: "oneshot", look: "live", style: 17, evergreen: true, sample: true, hook: title,
+  shots: [{ id: "s1", look: "live", video: "talk", voice: "none", seconds, use: seconds, rawMotion: true, stillFile: VIEWER_STILL, scene: "", motion: `${VIEWER_HOLD} ${action} He does not speak any words. ${VIEWER_END} Sound: ${sound}`, beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: title, hashtags: tags, linkedin: null, youtubeTitle: title,
+});
 const hostLine = (name: string, line: string, seconds = 3): Concept => ({
   id: `host-${name}`, title: line, format: "job-site pain", cut: "oneshot", look: "live", style: 17, evergreen: true, sample: true, hook: line,
   shots: [{ id: "s1", look: "live", video: "talk", seconds, use: seconds, rawMotion: true, stillFrom: HOST_STILL, scene: "", motion: `${HOST_HOLD} He looks straight into the lens and says, completely deadpan and unhurried: "${line}" ${HOST_END}`, say: { text: line }, beats: [], cues: [] }],
@@ -315,6 +323,29 @@ export const LIVE_CONCEPTS: Concept[] = [
   reaction("deadpan-20-glance", "A glance", "Mouth shut, face flat, he glances briefly off to the side at a loud mess, then looks back into the lens — and does nothing at all; no expression, no movement.", "a loud crash off-camera, then silence."),
   reaction("deadpan-21-clipboard", "Still writing", "He does not react at all: he looks down at his coffee cup, calmly swirls it and takes one unhurried sip, never once looking up, while a loud crash is heard off-camera.", "a loud crash and clatter somewhere off-camera; a calm sip."),
   reaction("deadpan-22-nod", "Called it", "Mouth shut, face flat, he looks at what he is watching and gives one single slow nod, as if he had predicted exactly this, then is still.", "a loud crash off-camera, then a quiet \"mm-hm.\""),
+
+  /* ── THE VIEWER PACK (owner, 2026-10-08): a reaction is ONLY the gator as a viewer — upright, facing the lens, in the one
+     setting of the owner-approved doorbell/clipboard shot (`_reactions/REFERENCE-doorbell-clipboard.png`, the first frame of
+     reaction-deadpan-55-doorbell-stare), nothing happening TO him. Animated straight from that still, so they intercut.
+     Shopping list and costs: docs/gator/REACTIONS-SHOPPING-LIST.md. NOT generated yet (no credit). ───────────────── */
+  viewer("shocked-60-jaw-drop", "Jaw drop", "Within the first half second he sees something go badly wrong: his head jerks BACK, his jaw drops open in alarm (an O of shock — no teeth-baring, no smile) and he freezes like that, staring.", "a sharp intake of breath."),
+  viewer("shocked-61-spit-take", "Spit-take", "He raises a paper coffee cup from below the frame in his free claw and sips — then sees it and sprays the coffee out in a burst, recoiling, and stares, coffee dripping from his snout.", "a sip, then a spluttering spray."),
+  viewer("shocked-62-flinch", "Flinch", "He flinches hard at a sudden crash: his whole body jolts, shoulders up, the clipboard jerks up against his chest, and he stays tensed, staring, mouth open in shock (never a smile).", "a loud bang off-camera and a short gasp \"oh!\" with no other words."),
+  viewer("shocked-63-double-take", "Double take", "He glances at it, looks away calmly, then whips his head back to stare at it again, frozen, snout pushed forward.", "silence, then a short startled grunt."),
+  viewer("shocked-64-hard-hat", "Grabs his hard hat", "He jolts in shock and slaps his free claw down on top of his yellow hard hat with both hands as if to hold his head together, mouth falling open, staring.", "a slap on plastic and a gasp."),
+  viewer("shocked-65-frozen-sip", "Frozen mid-sip", "He lifts a paper coffee cup from below the frame to his mouth — and freezes solid with the cup at his mouth, completely motionless, staring.", "sudden silence."),
+  viewer("shocked-66-lean-in", "Leans in", "He slowly leans far in toward the lens, snout pushed forward, mouth hanging slightly open in total disbelief, and holds it — not smiling.", "silence."),
+  viewer("shocked-67-drops-clipboard", "Drops the clipboard", "Within the first half second he goes rigid with shock and the clipboard slips out of his claw and falls out of frame; he does not look down, still staring, mouth open in shock.", "a clipboard clattering on a porch floor."),
+  viewer("annoyed-70-facepalm", "Facepalm", "Annoyed, he lifts his free claw and plants it flat over his snout and sunglasses; his shoulders drop and his head sinks, and he holds it there.", "a long tired sigh."),
+  viewer("annoyed-71-exhale", "Long exhale", "Annoyed, mouth shut, he tilts his head slowly back to look up at the sky and lets out one long slow breath through his nose, shoulders sinking.", "one long exhale through the nose.", 4),
+  viewer("annoyed-72-arms-crossed", "Arms crossed, tapping", "Annoyed, mouth shut, he folds his arms across his chest with the clipboard held against it and taps one claw on his arm, staring flatly.", "slow claw taps on plastic."),
+  viewer("annoyed-73-pinch", "Pinches his snout", "Annoyed, he pinches the bridge of his snout just under his sunglasses with two claws, head bowed, like a man with a headache, and holds it.", "a quiet groan."),
+  viewer("annoyed-74-claw-up", "Throws a claw up", "Annoyed, mouth shut, he throws his free claw up in the air in exasperation and lets it drop against his side.", "a clap of a claw against the vest."),
+  viewer("annoyed-75-write-up", "Writes him up", "Mouth shut, face flat, he looks down at the clipboard and writes one short line on it with a pen in his free claw, firmly, then looks back up at the lens.", "a pen scratching on paper."),
+  viewer("annoyed-76-clipboard-face", "Can't watch", "Annoyed, he slowly raises the clipboard in front of his face to block the view, and holds it there.", "a quiet groan."),
+  viewer("deadpan-80-flat-stare", "Flat stare", "He does not react at all: completely still, mouth shut, staring flatly into the lens while a loud crash is heard; only the tip of his tail flicks once.", "a loud crash off-camera, then silence."),
+  viewer("deadpan-81-slow-nod", "Called it", "Mouth shut, face flat, he gives one single slow nod, as if he had predicted exactly this, then is still.", "a loud crash off-camera, then silence."),
+  viewer("deadpan-82-sandwich", "Keeps eating", "He raises a sandwich from below the frame in his free claw and keeps chewing a bite slowly, completely unbothered, staring flatly into the lens while a loud crash is heard.", "a loud crash off-camera; slow chewing.", 4),
 
   /* ── "Gator Reacts": the host lines ──────────────────────────────────────── */
   hostLine("open", "Alright. Site walk. Let's see who's getting written up today.", 5),

@@ -808,7 +808,7 @@
       "why": "superseded by reacts-ep06-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep01-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:41.331Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -822,10 +822,10 @@
       "review": [
         "reacts-ep01-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep01-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-ep02-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:42.246Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -839,10 +839,10 @@
       "review": [
         "reacts-ep02-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep02-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-ep03-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:43.054Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -856,10 +856,10 @@
       "review": [
         "reacts-ep03-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep03-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-ep04-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:43.913Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -873,10 +873,10 @@
       "review": [
         "reacts-ep04-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep04-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-ep05-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:44.781Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -890,10 +890,10 @@
       "review": [
         "reacts-ep05-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep05-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-ep06-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:24:45.659Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -907,10 +907,10 @@
       "review": [
         "reacts-ep06-cut.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep06-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
     },
     "reacts-trees-01-cut": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T14:40:12.820Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -924,7 +924,225 @@
       "review": [
         "reacts-trees-01-cut.mp4"
       ],
+      "why": "superseded by reacts-trees-01-cut2: reactions that were scenes from other sketches removed (owner, 2026-10-08)"
+    },
+    "reacts-ep01-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:43.387Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: gravity always wins.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep01-cut2.mp4"
+      ],
       "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep02-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:44.352Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: heavy machinery.",
+        "Clips: Adam the Site Manager (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep02-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep03-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:45.203Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: load handling.",
+        "Clips: Adam the Site Manager (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep03-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep04-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:46.103Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: bad decisions.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep04-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep05-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:46.969Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: site chaos.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep05-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep06-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:47.865Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: the crew.",
+        "Nobody on this crew reads the manual."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep06-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-trees-01-cut2": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:44:48.734Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: he thought he knew where it would fall.",
+        "Clips: mason.olsenrhy (Instagram) (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-trees-01-cut2.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reaction-shocked-50-deck-gives": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-shocked-50-deck-gives.mp4"
+      ]
+    },
+    "reaction-shocked-51-deck-yelp": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-shocked-51-deck-yelp.mp4"
+      ]
+    },
+    "reaction-shocked-52-roof-uh-oh": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-shocked-52-roof-uh-oh.mp4"
+      ]
+    },
+    "reaction-annoyed-53-drenched": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-annoyed-53-drenched.mp4"
+      ]
+    },
+    "reaction-deadpan-54-sand-face": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-54-sand-face.mp4"
+      ]
+    },
+    "reaction-deadpan-34-slow-sip": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-34-slow-sip.mp4"
+      ]
+    },
+    "reaction-deadpan-35-sip-interior": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-35-sip-interior.mp4"
+      ]
+    },
+    "reaction-deadpan-56-cctv-sip-stare": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-56-cctv-sip-stare.mp4"
+      ]
+    },
+    "reaction-deadpan-57-dominoes-stare": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-57-dominoes-stare.mp4"
+      ]
+    },
+    "reaction-deadpan-58-blower-turn": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-58-blower-turn.mp4"
+      ]
+    },
+    "reaction-deadpan-59-ladder-look-up": {
+      "status": "rejected",
+      "at": "2026-10-08T23:00:00Z",
+      "by": "the owner (screenshots + 'You are using these as reactions when they are not.')",
+      "why": "not a reaction — a scene from another sketch (owner, 2026-10-08)",
+      "review": [
+        "reaction-deadpan-59-ladder-look-up.mp4"
+      ]
     }
   }
 }

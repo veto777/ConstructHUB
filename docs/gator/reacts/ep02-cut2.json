@@ -1,0 +1,152 @@
+{
+  "id": "ep02-cut2",
+  "format": "cutaway",
+  "music": "sneaking-around",
+  "accent": "whoosh",
+  "ownerAcceptedRisk": {
+    "by": "the owner of ConstructHUB",
+    "date": "2026-10-08",
+    "quote": "Do what I am asking you to do!"
+  },
+  "sequence": [
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 136.5,
+        "out": 139.8,
+        "impact": 139.0,
+        "crop": {
+          "x": 673,
+          "y": 0,
+          "w": 574,
+          "h": 1080
+        },
+        "frame": {
+          "y": 0.5
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0213 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-deadpan-20-glance.mp4",
+      "sec": 1.3,
+      "lead": 0.5
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 204.43,
+        "out": 206.9,
+        "impact": 206.5,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0324 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 74.2,
+        "out": 79.3,
+        "impact": 78.8,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0114 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: @oshaisthissafe)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-deadpan-55-doorbell-stare.mp4",
+      "sec": 1.83,
+      "lead": 0.2
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 110.9,
+        "out": 116.45,
+        "impact": 115.6,
+        "crop": {
+          "x": 657,
+          "y": 0,
+          "w": 606,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0145 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: @oshaisthissafe)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 570.97,
+        "out": 572.7,
+        "impact": 571.9,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-0930 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "fail": {
+        "file": "_sources/4HmTgOLTQsE.mp4",
+        "in": 634.37,
+        "out": 636.2,
+        "impact": 635.4,
+        "crop": {
+          "x": 656,
+          "y": 0,
+          "w": 608,
+          "h": 1080
+        },
+        "rights": {
+          "kind": "third-party",
+          "record": "clip A-1034 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+          "source": "https://youtu.be/4HmTgOLTQsE",
+          "channel": "Adam the Site Manager"
+        }
+      }
+    },
+    {
+      "gator": "_deliver/reaction-deadpan-17-still.mp4",
+      "sec": 2.2,
+      "lead": 0.25
+    }
+  ],
+  "short": true
+}

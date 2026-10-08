@@ -171,6 +171,7 @@ function videoParams(s: Shot, imageUrl: string, audioUrl?: string): Record<strin
 }
 /** Where a shot's still comes from: its own takes, or another shot's approved still. */
 function stillRef(c: Concept, s: Shot): { concept: string; shot: string; take: number } {
+  if (s.stillFile) return { concept: c.id, shot: s.id, take: 1 };
   if (s.stillFrom) { const [cid, sid] = s.stillFrom.split("/"); return { concept: cid, shot: sid, take: readTakes(cid).stills[sid] ?? 0 }; }
   return { concept: c.id, shot: s.id, take: readTakes(c.id).stills[s.id] ?? 0 };
 }
@@ -242,7 +243,7 @@ async function drivingAudio(s: Shot, io: Io, creds: Creds): Promise<{ url: strin
 async function makeStills(c: Concept, only: string | null, ledger: Ledger, io: Io, creds: Creds) {
   const takes = readTakes(c.id), refs = c.look === "live" ? await liveSheet(ledger, io, creds) : await references(io, creds);
   for (const s of c.shots) {
-    if ((only && only !== s.id) || s.stillFrom || s.videoFrom) continue;
+    if ((only && only !== s.id) || s.stillFrom || s.stillFile || s.videoFrom) continue;
     const take = (takes.stills[s.id] ??= 1); saveTakes(c.id, takes);
     const params: Record<string, unknown> = s.rawStill ? { prompt: stillPrompt(s), resolution: "2k", aspect_ratio: "9:16", quality: "medium" } : stillParams(c, s.id, refs.urls), file = stillFile(c, s.id, take);
     // A finished take is never asked for again — not even when the wording has changed since (that is what a retake is for).
@@ -256,7 +257,10 @@ async function makeVideos(c: Concept, only: string | null, ledger: Ledger, io: I
   const takes = readTakes(c.id);
   for (const s of c.shots) {
     if ((only && only !== s.id) || s.videoFrom) continue;
-    const ref = stillRef(c, s), st = ref.take, still = ledger.entries.find((e) => e.key === `${ref.concept}/${ref.shot}/still/take${st}`);
+    const ref = stillRef(c, s), st = ref.take;
+    // A local reference still: the same picture every time (identity = its sha256); the upload is free.
+    const local = s.stillFile ? { data: fs.readFileSync(path.join(OUT, s.stillFile)) } : null;
+    const still = local ? { status: "completed", outputUrl: await uploadInput(io, creds, local.data, s.stillFile!.endsWith(".png") ? "image/png" : "image/jpeg"), sha256: sha256(local.data) } : ledger.entries.find((e) => e.key === `${ref.concept}/${ref.shot}/still/take${st}`);
     if (!st || still?.status !== "completed" || !still.outputUrl) throw new Error(`${c.id} ${s.id}: no finished still — run --stills, and look at it, first`);
     const first = (takes.videos[s.id] ??= 1); saveTakes(c.id, takes);
     // A talking shot may be asked for more than once: the takes are measured and the one nearest the approved voice is kept.
@@ -682,7 +686,7 @@ export async function produce(c: Concept, budgetCredits: number): Promise<void> 
     await makeStills(c, null, ledger, io, creds);
     // The one fault a machine can see in a still is fixed by the machine, once: a picture that does not fill the frame.
     for (const s of c.shots) {
-      if (s.stillFrom) continue;
+      if (s.stillFrom || s.stillFile) continue;
       const t = readTakes(c.id), fault = await stillFault(stillFile(c, s.id, t.stills[s.id]));
       if (!fault) continue;
       io.log(`  still ${s.id}: ${fault} — one automatic retake`);

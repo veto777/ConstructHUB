@@ -77,6 +77,8 @@ export type Shot = {
   sync?: "peaks" | "max";
   /** Animate a still that was already drawn and approved for another shot: "<conceptId>/<shotId>". */
   stillFrom?: string;
+  /** A local reference still (relative to analysis/gator-shorts) animated as it is — uploaded for free, no paid still. */
+  stillFile?: string;
   /** Use the CLIP that was already made and approved for another shot ("<conceptId>/<shotId>") — the goat is generated once. */
   videoFrom?: string;
   /** A speech bubble over the picture (x, y: the bubble's centre, in 1080×1920 pixels). */
@@ -353,7 +355,7 @@ export function lintConcept(c: Concept): string[] {
     if (s.say && (s.say.text.length > 260 || (s.video !== "talk" && (s.say.lead ?? 0.5) + 1 > s.use))) bad.push(`${s.id}: the spoken line is too long for the shot`);
     if ((s.video === "wan-talk" || s.video === "kling-voice" || (s.video === "talk" && !s.rawMotion && !s.videoFrom)) && !s.say && !s.videoFrom) bad.push(`${s.id}: a talking model needs a line`);
     for (const b of s.beats) { if (b.at < 0 || b.at >= s.use) bad.push(`${s.id}: a beat starts outside the shot`); if (b.accent && !b.text.toLowerCase().includes(b.accent.toLowerCase())) bad.push(`${s.id}: the accent “${b.accent}” is not in “${b.text}”`); }
-    if (!s.stillFrom && !s.videoFrom && !s.scene.trim()) bad.push(`${s.id}: no scene`);
+    if (!s.stillFrom && !s.stillFile && !s.videoFrom && !s.scene.trim()) bad.push(`${s.id}: no scene`);
     if (/\b(roof|ladder|scaffold)/i.test(s.scene) && /\b(stands?|kneels?|sits?|climbs?|walks?) on (a |the )?(pitched |finished |residential )*(roof|ladder|scaffold)/i.test(s.scene) && !/harness|three points of contact|guard ?rail/i.test(s.scene)) bad.push(`${s.id}: he is at height without a harness, a guard rail or three points of contact in the prompt`);
     if (/sunglasses (off|removed)|without (his )?(hard hat|sunglasses)|takes off/i.test(`${s.scene} ${s.motion}`)) bad.push(`${s.id}: the hard hat and sunglasses stay on`);
   }
