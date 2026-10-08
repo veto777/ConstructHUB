@@ -4,14 +4,18 @@
  * only the month's included data.
  *
  * Why "published since": the ordinary check lists the 50 strongest websites that use the name, and comparing two such
- * lists cannot tell a new mention from a website that merely moved into the 50. Pages with a publication date after
- * the last check are new by their own date (a page the source dates wrongly, or has no date for, is not seen here).
+ * lists cannot tell a new mention from a website that merely moved into the 50. So the watch reads PAGES (every page,
+ * not one per website) by their publication date, OLDEST first, in a window that starts where the last one ended
+ * (with a week's overlap; pages already seen are not counted twice). When a window holds more pages than one check
+ * reads, the next check starts from the last page read — nothing is skipped, it is only later. A page the source has
+ * no date for, or adds to its index later with an earlier date than the overlap, is not seen here; the panel says so.
  *
  * An alert is raised for the new pages that are likely the business — confirmed by the customer for that website, or
  * naming one of their places, and not marked as another business — on websites that do not link to the site yet.
  * Saved first, charged second: the check is written inside the charged call, with the next date, only while the
  * occurrence the scheduler leased is still this one.
  */
+import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { request, assertOk, taskItems, normalizeDomain, type DfsTask } from "./dataforseo";
 import { withBudget, SeoBudgetError } from "./budget";
@@ -19,11 +23,15 @@ import { saveAlert, deliverAlert } from "./alerts";
 import { getEntitlements } from "../entitlements";
 import { seoIncluded } from "./plan";
 import { recordFailure } from "../ops/issues";
-import { checkLinks, parseMention, placeIn, defaultPlaces, nameKey, pageKeyOf, MENTIONS_ROWS, MENTIONS_ESTIMATE_USD, type MentionRow, type MentionsPage } from "./mentions";
+import { checkLinks, parseMention, placeIn, defaultPlaces, nameKey, pageKeyOf, nameOk, MENTIONS_ROWS, MENTIONS_ESTIMATE_USD, type MentionRow, type MentionsPage } from "./mentions";
 
 export const mentionWatchDeps = { request, entitled: async (userId: number) => seoIncluded(await getEntitlements(userId)) };
 /** The first watched check looks back this far (later ones: since the one before). */
 export const FIRST_LOOKBACK_DAYS = 31;
+/** Each window starts this far before where the last one ended, for pages the source indexed a little late. */
+export const OVERLAP_DAYS = 7;
+/** Pages read in one watched check (one search; the price is verified for this many). */
+export const WATCH_ROWS = MENTIONS_ROWS;
 
 export const MENTION_WATCH_DDL = [
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_watch boolean NOT NULL DEFAULT false`,
@@ -38,12 +46,19 @@ export const MENTION_WATCH_DDL = [
      since timestamptz NOT NULL,
      run_on date NOT NULL DEFAULT current_date,
      page jsonb NOT NULL,
+     -- The window read: pages published after window_from up to window_to; complete = every page in it was read.
+     window_from timestamptz,
+     window_to timestamptz,
+     complete boolean NOT NULL DEFAULT true,
      cost_usd numeric NOT NULL DEFAULT 0,
      alerts_done boolean NOT NULL DEFAULT false,
      alerts_tried_at timestamptz,
      created_at timestamptz NOT NULL DEFAULT now(),
      UNIQUE (site_id, run_on)
    )`,
+  `ALTER TABLE seo_mention_checks ADD COLUMN IF NOT EXISTS window_from timestamptz`,
+  `ALTER TABLE seo_mention_checks ADD COLUMN IF NOT EXISTS window_to timestamptz`,
+  `ALTER TABLE seo_mention_checks ADD COLUMN IF NOT EXISTS complete boolean NOT NULL DEFAULT true`,
 ];
 /** The alert kind for new mentions. Runs after every other change to the rule (it replaces it with the full list). */
 export const MENTION_WATCH_ALERT_DDL = [
@@ -57,28 +72,46 @@ export const MENTION_WATCH_ALERT_DDL = [
 ];
 
 const stamp = (d: Date) => `${d.toISOString().slice(0, 19).replace("T", " ")} +00:00`;
-/** The search for pages published after `since` (and not in the future), newest first. Pure. */
-export function newMentionsRequest(name: string, domain: string, since: Date, now = new Date()): Record<string, unknown> {
+/** The search for every page published after `from` up to `to`, OLDEST first. Pure. */
+export function newMentionsRequest(name: string, domain: string, from: Date, to: Date): Record<string, unknown> {
   return {
-    keyword: `"${name}"`, search_mode: "one_per_domain", limit: MENTIONS_ROWS,
-    filters: [["main_domain", "<>", domain], "and", ["content_info.date_published", ">", stamp(since)], "and", ["content_info.date_published", "<", stamp(new Date(now.getTime() + 864e5))]],
-    order_by: ["content_info.date_published,desc"],
+    keyword: `"${name}"`, search_mode: "as_is", limit: WATCH_ROWS,
+    filters: [["main_domain", "<>", domain], "and", ["content_info.date_published", ">", stamp(from)], "and", ["content_info.date_published", "<=", stamp(to)]],
+    order_by: ["content_info.date_published,asc"],
   };
 }
 
-/** The new pages and their link check. A failed link check leaves "links to you" unknown and is not charged. */
-export async function fetchNewMentions(name: string, domain: string, since: Date): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
+export type WatchPage = MentionsPage & { complete: boolean; /** Where the next window starts when this one was not read to its end. */ resumeFrom: string | null; skippedSeen: number };
+/**
+ * The pages of a window (deduplicated by page, pages already seen in earlier checks left out) and their link check. A
+ * failed link check leaves "links to you" unknown and is not charged. The source's dates and the window decide what is
+ * new; `complete` = every page of the window was read (else the next window resumes from the last one read).
+ */
+export async function fetchNewMentions(name: string, domain: string, from: Date, to: Date, seenBefore: ReadonlySet<string> = new Set()): Promise<{ data: WatchPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
   const target = normalizeDomain(domain) ?? domain;
-  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, since)]), { treatNoResultsAsEmpty: true });
+  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, from, to)]), { treatNoResultsAsEmpty: true });
   const searchUsd = typeof task.cost === "number" ? task.cost : 0;
-  const seen = new Set<string>(), rows: MentionRow[] = [];
-  for (const i of taskItems(task)) { const r = parseMention(i, target); if (r && !seen.has(r.domain)) { seen.add(r.domain); rows.push({ ...r, linksToYou: null }); } }
+  const items = taskItems(task), seen = new Set<string>(), rows: MentionRow[] = [];
+  let skippedSeen = 0, last: string | null = null;
+  for (const i of items) {
+    const d = typeof i?.content_info?.date_published === "string" ? new Date(i.content_info.date_published) : null;
+    if (d && !Number.isNaN(d.getTime())) last = d.toISOString();
+    const r = parseMention(i, target);
+    if (!r) continue;
+    const k = pageKeyOf(r.url);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    if (seenBefore.has(k)) { skippedSeen++; continue; }
+    rows.push({ ...r, linksToYou: null });
+  }
   const total = typeof (task.result?.[0] as any)?.total_count === "number" ? (task.result?.[0] as any).total_count : null;
-  const page: MentionsPage = { name, domain: target, rows, total, linksChecked: !rows.length, linksCheckedAt: null, fetchedAt: new Date().toISOString() };
+  // Read to the end only when the source says there is no more than came back (unknown total + a full page = not complete).
+  const complete = total !== null ? total <= items.length : items.length < WATCH_ROWS;
+  const page: WatchPage = { name, domain: target, rows, total, linksChecked: !rows.length, linksCheckedAt: null, fetchedAt: new Date().toISOString(), complete, resumeFrom: complete ? null : last, skippedSeen };
   if (!rows.length) return { data: page, costUsd: searchUsd, costUnknown: false, customerUsd: searchUsd };
   const links = await checkLinks(page);
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
-  return { data: links.data, costUsd: r6(searchUsd + links.costUsd), costUnknown: links.costUnknown, customerUsd: r6(searchUsd + (links.data.linksChecked ? links.costUsd : 0)) };
+  return { data: { ...page, ...links.data }, costUsd: r6(searchUsd + links.costUsd), costUnknown: links.costUnknown, customerUsd: r6(searchUsd + (links.data.linksChecked ? links.costUsd : 0)) };
 }
 
 type WatchSite = { id: number; user_id: number; domain: string; name: string; lease: string };
@@ -89,34 +122,54 @@ export async function sitePlaces(site: { id: number; mention_places?: unknown })
   return defaultPlaces(rows.map((r: any) => r.location_name));
 }
 
+/** The name a site's watch follows: the name searched last, else the business name. */
+const WATCH_NAME_SQL = `btrim(coalesce(nullif(btrim(mention_name), ''), business_name, ''))`;
 /**
  * One watched check for one leased occurrence. Bought from the included data only; saved inside the charged call
- * together with the next date — only while the site's date is still the leased one and the watch is on. Anything that
- * stops the save charges nothing.
+ * together with the next date — only while the site's date is still the leased one, the watch is on, and it still
+ * follows the same name. A day that already has its check buys nothing (its next date is put right instead). Anything
+ * that stops the save charges the customer nothing; what the source cost is kept, with its uncertainty.
  */
 export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; pages: number } | null> {
   const key = nameKey(site.name);
-  const { rows: [last] } = await pool.query("SELECT created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 1", [site.id, key]);
-  const since = last ? new Date(last.created_at) : new Date(Date.now() - FIRST_LOOKBACK_DAYS * 864e5);
+  if (!nameOk(site.name)) throw Object.assign(new Error(`mentions watch for ${site.domain}: the name cannot be searched as it is written`), { notSaved: true, badName: true });
+  // One check a day, decided BEFORE anything is bought.
+  const { rows: [today] } = await pool.query("SELECT id, run_on::text AS run_on FROM seo_mention_checks WHERE site_id=$1 AND run_on = current_date", [site.id]);
+  if (today) {
+    await pool.query("UPDATE seo_sites SET next_mention_at = $3::date + interval '1 month' WHERE id=$1 AND next_mention_at::text = $2", [site.id, site.lease, today.run_on]);
+    return null;
+  }
+  // The window: from where the last check of this name ended (less the overlap; or the page it resumes from), to now.
+  const { rows: prev } = await pool.query(
+    "SELECT window_to, complete, page->>'resumeFrom' AS resume, page->'rows' AS rows, created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 3", [site.id, key]);
+  const to = new Date();
+  const last = prev[0];
+  const from = !last ? new Date(to.getTime() - FIRST_LOOKBACK_DAYS * 864e5)
+    : !last.complete && last.resume ? new Date(last.resume)
+    : new Date(new Date(last.window_to ?? last.created_at).getTime() - OVERLAP_DAYS * 864e5);
+  const seenBefore = new Set<string>(prev.flatMap((p: any) => (Array.isArray(p.rows) ? p.rows : []).map((r: any) => (typeof r?.url === "string" ? pageKeyOf(r.url) : ""))).filter(Boolean));
   const out = await withBudget(site.user_id, MENTIONS_ESTIMATE_USD, async () => {
-    const o = await fetchNewMentions(site.name, site.domain, since);
-    const fail = (why: string) => Object.assign(new Error(`mentions watch for ${site.domain} not saved: ${why}`), { costUsd: o.costUsd, costUnknown: false, notSaved: true });
-    const client = await pool.connect();
+    const o = await fetchNewMentions(site.name, site.domain, from, to, seenBefore);
+    const fail = (why: string) => Object.assign(new Error(`mentions watch for ${site.domain} not saved: ${why}`), { costUsd: o.costUsd, costUnknown: o.costUnknown, notSaved: true });
+    let client: PoolClient | null = null;
     try {
-      await client.query("BEGIN");
-      const { rowCount: still } = await client.query("SELECT 1 FROM seo_sites WHERE id=$1 AND mention_watch AND next_mention_at::text = $2 FOR UPDATE", [site.id, site.lease]);
-      if (!still) { await client.query("ROLLBACK"); throw fail("the watch was turned off or its date moved meanwhile"); }
-      const { rows: [row] } = await client.query(
-        `INSERT INTO seo_mention_checks(site_id, user_id, name, name_key, since, page, cost_usd) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (site_id, run_on) DO NOTHING RETURNING id`,
-        [site.id, site.user_id, site.name, key, since.toISOString(), JSON.stringify(o.data), o.costUsd]);
-      if (!row) { await client.query("ROLLBACK"); throw fail("today's check already exists"); }
-      await client.query("UPDATE seo_sites SET next_mention_at = now() + interval '1 month' WHERE id=$1 AND next_mention_at::text = $2", [site.id, site.lease]);
-      await client.query("COMMIT");
+      // Taking a connection is inside the same handling: a failure there still reports what the source cost.
+      client = (await pool.connect()) as PoolClient;
+      const db = client;
+      await db.query("BEGIN");
+      const { rowCount: still } = await db.query(`SELECT 1 FROM seo_sites WHERE id=$1 AND mention_watch AND next_mention_at::text = $2 AND lower(${WATCH_NAME_SQL}) = $3 FOR UPDATE`, [site.id, site.lease, key]);
+      if (!still) { await db.query("ROLLBACK"); throw fail("the watch was turned off, its date moved or its name changed meanwhile"); }
+      const { rows: [row] } = await db.query(
+        `INSERT INTO seo_mention_checks(site_id, user_id, name, name_key, since, page, cost_usd, window_from, window_to, complete) VALUES($1,$2,$3,$4,$5,$6,$7,$5,$8,$9) ON CONFLICT (site_id, run_on) DO NOTHING RETURNING id`,
+        [site.id, site.user_id, site.name, key, from.toISOString(), JSON.stringify(o.data), o.costUsd, to.toISOString(), o.data.complete]);
+      if (!row) { await db.query("ROLLBACK"); throw fail("today's check already exists"); }
+      await db.query("UPDATE seo_sites SET next_mention_at = now() + interval '1 month' WHERE id=$1 AND next_mention_at::text = $2", [site.id, site.lease]);
+      await db.query("COMMIT");
       return { data: { id: row.id as number, pages: o.data.rows.length }, costUsd: o.costUsd, costUnknown: o.costUnknown, customerUsd: o.customerUsd };
     } catch (e: any) {
-      await client.query("ROLLBACK").catch(() => {});
+      if (client) await (client as PoolClient).query("ROLLBACK").catch(() => {});
       throw e?.notSaved ? e : fail(e?.message ?? String(e));
-    } finally { client.release(); }
+    } finally { (client as PoolClient | null)?.release(); }
   }, { allowanceOnly: true, label: `Mentions watch — "${site.name}"` });
   await settleMentionAlerts(site.id).catch((e) => console.error(`[seo] mention alerts for site ${site.id} failed (they will be tried again): ${e?.message ?? e}`));
   return out.data;
@@ -142,8 +195,11 @@ export async function settleMentionAlerts(siteId: number): Promise<number> {
         const pages = alertPages(Array.isArray(page?.rows) ? page.rows : [], await sitePlaces({ id: siteId, mention_places: c.mention_places }), new Map(marks.map((m: any) => [m.page_key, m.verdict])));
         if (pages.length) {
           const item = { checkId: c.id, name: c.name, since: new Date(c.since).toISOString().slice(0, 10), takenOn: new Date(c.created_at).toISOString().slice(0, 10), linksChecked: page.linksChecked,
-            pages: pages.slice(0, 50).map((p) => ({ domain: p.domain, url: p.url, title: p.title, place: p.place, confirmed: p.confirmed, linksToYou: p.linksToYou })), more: Math.max(0, pages.length - 50) };
-          const id = await saveAlert(c.user_id, siteId, "mention_new", `mention:${c.id}`, `${pages.length} new page${pages.length === 1 ? "" : "s"} mention "${c.name}" — ${pages.length === 1 ? "its website does" : "their websites do"} not link to ${c.domain}`, [item]);
+            pages: pages.slice(0, 50).map((p) => ({ domain: p.domain, url: p.url, title: p.title, place: p.place, confirmed: p.confirmed, linksToYou: p.linksToYou })), more: Math.max(0, pages.length - 50), siteId };
+          // "No link found" only where the link check answered; where it did not, the link is said to be not known.
+          const unknown = pages.filter((p) => p.linksToYou === null).length;
+          const title = `${pages.length} new page${pages.length === 1 ? "" : "s"} mention "${c.name}"` + (unknown === pages.length ? ` — whether ${pages.length === 1 ? "its website links" : "their websites link"} to ${c.domain} is not known` : unknown ? ` — no link to ${c.domain} found for ${pages.length - unknown}, not known for ${unknown}` : ` — no link to ${c.domain} found`);
+          const id = await saveAlert(c.user_id, siteId, "mention_new", `mention:${c.id}`, title, [item]);
           if (id) { await deliverAlert(id); raised++; }
         }
       }
@@ -159,8 +215,8 @@ export async function runDueMentionChecks(): Promise<number> {
   for (const o of owed) await settleMentionAlerts(o.site_id).catch(() => {});
   const { rows: due } = await pool.query(
     `UPDATE seo_sites SET next_mention_at = now() + interval '6 hours'
-      WHERE mention_watch AND next_mention_at <= now() AND nullif(btrim(coalesce(mention_name, business_name, '')), '') IS NOT NULL
-      RETURNING id, user_id, domain, btrim(coalesce(nullif(btrim(mention_name), ''), business_name)) AS name, next_mention_at::text AS lease`);
+      WHERE mention_watch AND next_mention_at <= now() AND ${WATCH_NAME_SQL} <> ''
+      RETURNING id, user_id, domain, ${WATCH_NAME_SQL} AS name, next_mention_at::text AS lease`);
   let done = 0;
   for (const site of due) {
     const later = (interval: string) => pool.query(`UPDATE seo_sites SET next_mention_at = now() + interval '${interval}' WHERE id=$1 AND mention_watch AND next_mention_at::text = $2`, [site.id, site.lease]).catch(() => {});
@@ -169,6 +225,7 @@ export async function runDueMentionChecks(): Promise<number> {
       if (await takeWatchedCheck(site)) done++;
     } catch (e: any) {
       if (e instanceof SeoBudgetError) { console.warn(`[seo] mentions watch for ${site.domain} skipped: ${e.message}`); await later("1 day"); }
+      else if (e?.badName) { console.warn(`[seo] ${e.message}`); await later("7 days"); }
       else if (!e?.notSaved) void recordFailure("job", "SEO mentions watch", e);
     }
   }
@@ -187,4 +244,25 @@ export async function mentionWatchView(userId: number, site: { id: number; menti
     watch: !!site.mention_watch, nextAt: site.mention_watch && site.next_mention_at ? new Date(site.next_mention_at as string).toISOString() : null,
     latest: c ? { id: c.id, since: new Date(c.since).toISOString(), takenAt: new Date(c.created_at).toISOString(), page: c.page as MentionsPage } : null,
   };
+}
+
+/**
+ * A second try of a watched check's link lookup, when it did not load. Bought (the customer's own choice) and SAVED
+ * FIRST, CHARGED SECOND: the check is updated inside the charged call, only while its link lookup is still missing.
+ */
+export async function retryWatchedLinks(userId: number, siteId: number, checkId: number, estimateUsd: number): Promise<MentionsPage | null> {
+  const { rows: [c] } = await pool.query("SELECT page FROM seo_mention_checks WHERE id=$1 AND site_id=$2 AND user_id=$3", [checkId, siteId, userId]);
+  if (!c) return null;
+  const page = c.page as MentionsPage;
+  if (page.linksChecked) return page;
+  const out = await withBudget(userId, estimateUsd, async () => {
+    const o = await checkLinks(page);
+    if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown });
+    const merged = { ...page, ...o.data };
+    const { rowCount } = await pool.query("UPDATE seo_mention_checks SET page=$4 WHERE id=$1 AND site_id=$2 AND user_id=$3 AND coalesce(page->>'linksChecked','false') = 'false'", [checkId, siteId, userId, JSON.stringify(merged)])
+      .catch((e) => { throw Object.assign(e instanceof Error ? e : new Error(String(e)), { costUsd: o.costUsd, costUnknown: o.costUnknown }); });
+    if (!rowCount) throw Object.assign(new Error("The check was completed meanwhile."), { costUsd: o.costUsd, costUnknown: o.costUnknown });
+    return { data: merged, costUsd: o.costUsd, costUnknown: o.costUnknown };
+  }, { label: `Mentions watch — link check, second try` });
+  return out.data;
 }

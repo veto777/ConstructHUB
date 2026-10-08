@@ -22,6 +22,7 @@ type Report = {
   searchConsole?: { clicks: number } | null;
   audit: { scannedAt: string | null; health: number | null; topIssues: { title: string; severity: string; count: number }[] } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
+  work?: { days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number } | null;
 };
 type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null };
 type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
@@ -101,6 +102,16 @@ export default function SeoReportsPage() {
               <section className="rounded-lg border p-4" style={card} data-testid="report-audit">
                 <h2 className="g-text mb-2 text-[16px] font-medium">What to fix first <span className="g-text-2 text-[12px] font-normal">· crawled {fmtDate(r.audit.scannedAt)}</span></h2>
                 <ul className="g-text space-y-0.5 text-[13px]">{r.audit.topIssues.map((i) => <li key={i.title}>{i.title} <span className="g-text-2">— {fmtNum(i.count)} affected ({i.severity})</span></li>)}</ul>
+              </section>
+            )}
+            {r.work && (
+              <section className="rounded-lg border p-4" style={card} data-testid="report-work">
+                <h2 className="g-text mb-2 text-[16px] font-medium">Work done <span className="g-text-2 text-[12px] font-normal">· the last {r.work.days} days, from the <Link href="/seo/plan" className="g-link">action plan</Link></span></h2>
+                {r.work.done.length === 0 ? <p className="g-text-2 text-[13px]">No task was marked done in this period.</p> : (
+                  <ul className="g-text space-y-0.5 text-[13px]">{r.work.done.map((t, i) => <li key={i}><span className="g-text-2">{fmtDate(t.doneAt)}</span> — {t.title}{t.note && <span className="g-text-2"> ({t.note})</span>}</li>)}</ul>
+                )}
+                {r.work.doneCount > r.work.done.length && <p className="g-text-2 mt-1 text-[12px]">…and {fmtNum(r.work.doneCount - r.work.done.length)} more.</p>}
+                <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>
               </section>
             )}
             {r.alerts.length > 0 && (

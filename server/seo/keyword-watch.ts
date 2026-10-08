@@ -108,6 +108,7 @@ export type PageChange = {
   /** What to show: the path on the site's own host, the full address on another host; null = the source gave no page. */ path: string | null;
   /** The page's full address when it is known (from the source, or the site's own host and the path); null when not. The newer snapshot's spelling. */ url: string | null;
   /** The older snapshot's spelling of the same page's address, when it differed (http then, https now). */ urlBefore?: string;
+  /** Internal while building: the newer snapshot has set `url`. Never in the result. */ currentSet?: boolean;
   /** The path was kept only to its first 300 characters (older snapshots): two long addresses could be one row here. */ cut: boolean;
   before: PageSide; after: PageSide;
   /** Keywords on this page in only one of the two snapshots (what that means depends on the comparison's basis). */ added: number; gone: number;
@@ -157,7 +158,13 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
       pages.set(k, row);
     }
     if (pg?.cut) row.cut = true;
-    if (current && pg?.origin && row.url !== `${pg.origin}${pg.path}`) { if (row.url) row.urlBefore = row.url; row.url = `${pg.origin}${pg.path}`; }
+    // The older snapshot's spelling is kept as it was first seen; the newer snapshot's FIRST spelling is the one shown and
+    // planned (later current keywords spelled another way do not change it).
+    if (pg?.origin) {
+      const spelled = `${pg.origin}${pg.path}`;
+      if (!current) { if (!row.urlBefore && !row.currentSet) row.urlBefore = spelled; }
+      else if (!row.currentSet) { row.url = spelled; row.currentSet = true; }
+    }
     return row;
   };
   const add = (x: PageSide, k: SnapshotKeyword) => { x.keywords++; if (k.traffic === null) x.unknown++; else x.visits += k.traffic; };
@@ -181,6 +188,8 @@ export function pagesChanged(now: SnapshotKeyword[], before: SnapshotKeyword[], 
     else if (!pg && bpg) row.movedIn++;    // the "page not given" row: it had one before
   }
   const done = (x: PageSide) => ({ ...x, visits: Math.round(x.visits * 10) / 10 });
+  // urlBefore only when the older snapshot spelled the page's address differently from the newer one.
+  for (const p of pages.values()) { if (!p.currentSet || p.urlBefore === p.url) delete p.urlBefore; delete p.currentSet; }
   // Visits are compared only where every keyword on both sides has an estimate; elsewhere the keyword count decides.
   const visitChange = (p: PageChange) => (p.before.unknown === 0 && p.after.unknown === 0 ? Math.abs(p.after.visits - p.before.visits) : -1);
   return [...pages.values()].map((p) => ({ ...p, before: done(p.before), after: done(p.after) }))

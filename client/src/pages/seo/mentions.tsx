@@ -19,6 +19,8 @@ const csvCell = (v: string | number | null) => { const s = v == null ? "" : Stri
 const flatText = (t: string) => ` ${t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
 /** Whether the words of `name` appear together, as whole words, in `text`. */
 const flatHas = (text: string, name: string) => flatText(text).includes(flatText(name));
+/** A page as the server compares verdicts (server/seo/audit-pages.ts sameUrlKey): host without www, path without a last slash, the query kept. */
+const pageKey = (u: string) => { try { const x = new URL(u); return `${x.host.toLowerCase().replace(/^www\./, "")}${x.pathname.replace(/\/+$/, "")}${x.search}`; } catch { return u.replace(/#.*$/, "").replace(/\/+$/, ""); } };
 const norm = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
 /** A short, stable fingerprint (FNV-1a, 2 x 32 bits) for a task identity that must fit 200 characters. */
 const fingerprint = (t: string) => { let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995; for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; } return a.toString(36) + b.toString(36); };
@@ -50,11 +52,15 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   const [marking, setMarking] = useState<Record<string, { verdict: Verdict; pending: boolean }>>({});
   const mark = useMutation({
     mutationFn: (v: { siteId: number; name: string; url: string; verdict: Verdict; was: Verdict }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/marks`, { name: v.name, url: v.url, verdict: v.verdict }),
-    onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.verdict, pending: true } })),
-    onSuccess: (_d, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.verdict, pending: false } })); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); },
-    onError: (e, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${v.url}`]: { verdict: v.was, pending: false } })); toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }); },
+    onMutate: (v) => setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: true } })),
+    // Saved: the view is read again, and once that fresh answer is here it decides (see the effect below).
+    onSuccess: (_d, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.verdict, pending: false } })); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); toast({ title: v.verdict === "mine" ? "Marked: this page is about you" : v.verdict === "not_mine" ? "Marked: another business" : "Mark taken back" }); },
+    onError: (e, v) => { setMarking((m) => ({ ...m, [`${norm(v.name)}|${pageKey(v.url)}`]: { verdict: v.was, pending: false } })); toast({ title: "Couldn't save that", description: apiErrorMessage(e), variant: "destructive" }); },
   });
   // The saved name and places of this site, whenever another site is opened or they load.
+  // Fresh server data has every saved verdict: what was shown here for settled ones gives way to it (another tab's
+  // change included). Ones still in flight stay until they are answered.
+  useEffect(() => { setMarking((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v.pending))); }, [q.dataUpdatedAt]);
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -104,9 +110,14 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   };
   const rows = (page?.rows ?? []).map((r) => ({ ...r, place: placeOf(r) }));
   // The customer's verdict decides when there is one; otherwise the place match is a pointer to check, nothing more.
-  const markKey = (r: Row) => `${norm(page?.name ?? "")}|${r.url}`;
-  const markOf = (r: Row): Verdict => marking[markKey(r)]?.verdict !== undefined ? marking[markKey(r)].verdict : r.mark ?? null;
-  const markPending = (r: Row) => !!marking[markKey(r)]?.pending;
+  const markKeyFor = (name: string, r: Row) => `${norm(name)}|${pageKey(r.url)}`;
+  const markOfFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o && !o.pending ? o.verdict : r.mark ?? null; };
+  const shownMarkFor = (name: string, r: Row): Verdict => { const o = marking[markKeyFor(name, r)]; return o ? o.verdict : r.mark ?? null; };
+  const pendingFor = (name: string, r: Row) => !!marking[markKeyFor(name, r)]?.pending;
+  // Groups use the settled verdict, so a row being marked stays where it is (and keeps focus) until the answer comes;
+  // its buttons show the choice being saved.
+  const markOf = (r: Row): Verdict => markOfFor(page?.name ?? "", r);
+  const markPending = (r: Row) => pendingFor(page?.name ?? "", r);
   const likely = (r: Row & { place: string | null }) => markOf(r) === "mine" || (markOf(r) === null && !!r.place);
   const groups = {
     prospects: rows.filter((r) => likely(r) && r.linksToYou === false), yours: rows.filter(likely), unsure: rows.filter((r) => markOf(r) === null && !r.place),
@@ -137,7 +148,8 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   const tabs: [typeof filter, string, number][] = [["prospects", "Likely you, no link", groups.prospects.length], ["yours", "Likely you", groups.yours.length], ["unsure", "Name only — check it is you", groups.unsure.length], ["linked", "Website links to you", groups.linked.length], ["notMine", "Marked not you", groups.notMine.length], ["all", "All", groups.all.length]];
   return (
     <div data-testid="mentions">
-      {q.data?.watch && <WatchPanel siteId={siteId} name={q.data.name} watch={q.data.watch} />}
+      {q.data?.watch && <WatchPanel siteId={siteId} name={q.data.name} watch={q.data.watch} domain={domain} retryPrice={status?.holds?.mentionsRetry ?? null}
+        verdict={{ of: shownMarkFor, pending: pendingFor, set: (n, r, v) => mark.mutate({ siteId, name: n, url: r.url, verdict: v, was: markOfFor(n, r) }) }} />}
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">Pages on other websites that use your business's exact name, and whether those websites link to you. A website that writes about you without linking is the easiest link to ask for. Other businesses can share your name, so each page is read for your places: a page that names one of them is more likely to be about you — not certain (a directory can list several businesses, and two can share a name in one town), so check before you ask.</p>
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="flex min-w-0 flex-col text-[13px]"><span className="g-text-2 mb-1">Business name, exactly as written</span>
@@ -183,8 +195,8 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
                       <td data-label="Link to you">{linkWord(r.linksToYou)}</td>
                       <td className="whitespace-nowrap text-right">
                         <span className="inline-flex flex-wrap justify-end gap-1" role="group" aria-label={`Is this page on ${r.domain} about you?`} aria-busy={markPending(r)}>
-                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={markOf(r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "mine" ? null : "mine", was: markOf(r) })} data-testid={`button-mention-mine-${r.domain}`}>{markOf(r) === "mine" ? "✓ This is us" : "This is us"}</button>
-                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={markOf(r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "not_mine" ? null : "not_mine", was: markOf(r) })} data-testid={`button-mention-notmine-${r.domain}`}>{markOf(r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
+                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "mine" ? null : "mine", was: markOf(r) })} data-testid={`button-mention-mine-${r.domain}`}>{shownMarkFor(page!.name, r) === "mine" ? "✓ This is us" : "This is us"}</button>
+                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "not_mine" ? null : "not_mine", was: markOf(r) })} data-testid={`button-mention-notmine-${r.domain}`}>{shownMarkFor(page!.name, r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
                           {r.linksToYou !== true && markOf(r) !== "not_mine" && !markPending(r) && <AddToPlan siteId={siteId} label="Plan" testId={`button-plan-mention-${r.domain}`} tasks={[task(r)]} />}
                         </span>
                       </td>
@@ -201,16 +213,31 @@ export function MentionsView({ siteId, domain, status }: { siteId: number; domai
   );
 }
 
-/** The monthly watch: on or off, the next date, and the pages published since the check before it. */
-function WatchPanel({ siteId, name, watch }: { siteId: number; name: string; watch: Watch }) {
+type VerdictTools = { of: (name: string, r: Row) => "mine" | "not_mine" | null; pending: (name: string, r: Row) => boolean; set: (name: string, r: Row, v: "mine" | "not_mine" | null) => void };
+/** The monthly watch: on or off, the next date, and every page of the newest watched check, with the same verdicts. */
+function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { siteId: number; name: string; watch: Watch; domain: string; retryPrice: number | null; verdict: VerdictTools }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [all, setAll] = useState(false);
   const set = useMutation({
     mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/watch`, { watch: v.watch }),
     onSuccess: (_d, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); toast({ title: v.watch ? "Mentions watch is on" : "Mentions watch is off", description: v.watch ? "Once a month, from your included SEO data, new pages that use the name are looked for; likely ones raise an alert." : "Checks already made are kept." }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const retry = useMutation({
+    mutationFn: (v: { siteId: number; checkId: number }) => api("POST", `/api/seo/sites/${v.siteId}/mentions/watch/${v.checkId}/links`, {}),
+    onSuccess: (_d, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/mentions`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onError: (e) => toast({ title: "Couldn't check the links", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const l = watch.latest;
+  const rows = l?.page.rows ?? [];
+  const shown = all ? rows : rows.slice(0, 10);
+  const exportCsv = () => {
+    const lines: (string | number | null)[][] = [["Searched name", "Page", "Website", "Title", "Published", "Names one of your places", "Your verdict on this page", "Link to your site (from any page of that website)", "Window from", "Window to"],
+      ...rows.map((r) => [l!.page.name, r.url, r.domain, r.title, r.published, r.place, verdict.of(l!.page.name, r) ?? "", linkWord(r.linksToYou), l!.since.slice(0, 10), l!.takenAt.slice(0, 10)])];
+    const blob = new Blob([lines.map((x) => x.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${domain}-new-mentions.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
   return (
     <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }} data-testid="mentions-watch">
       <div className="flex flex-wrap items-center gap-3 text-[13px]">
@@ -219,8 +246,27 @@ function WatchPanel({ siteId, name, watch }: { siteId: number; name: string; wat
       </div>
       {l && (
         <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">
-          <p className="g-text-2">Pages published between {fmtDate(l.since)} and {fmtDate(l.takenAt)} that use "{l.page.name}": {fmtNum(l.page.rows.length)}{l.page.rows.length >= 50 ? " (the 50 newest)" : ""}. A page the source has no date for is not seen here.</p>
-          {l.page.rows.length > 0 && <ul className="mt-1 space-y-0.5">{l.page.rows.slice(0, 10).map((r) => <li key={r.url}><a href={r.url} className="g-link" target="_blank" rel="noreferrer">{r.domain}</a><span className="g-text-2"> — {r.title}{r.mark === "mine" ? " · you confirmed this website" : r.mark === "not_mine" ? " · marked not you" : r.place ? ` · names ${r.place}` : " · names none of your places"}{r.linksToYou === true ? " · links to you" : r.linksToYou === null ? " · link not known" : ""}</span></li>)}</ul>}
+          <p className="g-text-2">Pages that use "{l.page.name}", published between {fmtDate(l.since)} and {fmtDate(l.takenAt)}: {fmtNum(rows.length)}{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published than one check reads; the next check carries on from the last one read" : ""}. Read by publication date: a page the source has no date for, or finds later with an earlier date, is not seen here.
+            {rows.length > 0 && <button type="button" className="g-link ml-2" onClick={exportCsv} data-testid="button-mentions-watch-export">Export</button>}</p>
+          {!l.page.linksChecked && rows.length > 0 && <p className="mt-1 text-[12px]" role="status">Whether these websites link to you did not load (not charged). <button type="button" className="g-pill g-pill--sm" disabled={retry.isPending || retryPrice == null} onClick={() => retry.mutate({ siteId, checkId: l.id })} data-testid="button-mentions-watch-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></p>}
+          {rows.length > 0 && (
+            <ul className="mt-1 space-y-1">
+              {shown.map((r) => {
+                const v = verdict.of(l.page.name, r), busy = verdict.pending(l.page.name, r);
+                return (
+                  <li key={r.url} className="flex flex-wrap items-center gap-x-2">
+                    <a href={r.url} className="g-link" target="_blank" rel="noreferrer">{r.domain}</a>
+                    <span className="g-text-2 min-w-0 flex-1">— {r.title}{v === "mine" ? " · you confirmed this page" : v === "not_mine" ? " · marked another business" : r.place ? ` · names ${r.place}` : " · names none of your places"}{r.linksToYou === true ? " · its website links to you" : r.linksToYou === null ? " · link not known" : " · no link found"}</span>
+                    <span className="inline-flex gap-1" role="group" aria-label={`Is this page on ${r.domain} about you?`} aria-busy={busy}>
+                      <button type="button" className="g-pill g-pill--sm" disabled={busy} aria-pressed={v === "mine"} onClick={() => verdict.set(l.page.name, r, v === "mine" ? null : "mine")}>{v === "mine" ? "✓ This is us" : "This is us"}</button>
+                      <button type="button" className="g-pill g-pill--sm" disabled={busy} aria-pressed={v === "not_mine"} onClick={() => verdict.set(l.page.name, r, v === "not_mine" ? null : "not_mine")}>{v === "not_mine" ? "✓ Not us" : "Not us"}</button>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {rows.length > 10 && <button type="button" className="g-link mt-1 text-[13px]" aria-expanded={all} onClick={() => setAll(!all)} data-testid="button-mentions-watch-all">{all ? "Show the first 10" : `Show all ${fmtNum(rows.length)}`}</button>}
         </div>
       )}
     </div>

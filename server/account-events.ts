@@ -48,10 +48,17 @@ export async function channelsFor(userId: number, kind: NotificationKind) {
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
+/**
+ * Send a notification on the channels the user has on for its kind. Returns what happened on each, so a caller that
+ * must not lose an email can try it again (`only: "email"` sends the email alone — no second bell entry). Existing
+ * callers that ignore the result behave exactly as before.
+ */
 export async function notifyUser(userId: number, kind: NotificationKind,
-  msg: { title: string; body?: string; link?: string; severity?: "info" | "warning" | "critical"; actionLabel?: string; actionUrl?: string }) {
+  msg: { title: string; body?: string; link?: string; severity?: "info" | "warning" | "critical"; actionLabel?: string; actionUrl?: string },
+  opts: { only?: "email" } = {}): Promise<{ inApp: boolean; email: "sent" | "failed" | "off" | "no_address" }> {
   const ch = await channelsFor(userId, kind);
-  if (ch.inApp) {
+  let email: "sent" | "failed" | "off" | "no_address" = ch.email ? "no_address" : "off";
+  if (ch.inApp && opts.only !== "email") {
     await pool.query("INSERT INTO user_notifications(user_id,kind,title,body,link,severity) VALUES($1,$2,$3,$4,$5,$6)",
       [userId, kind, msg.title, msg.body ?? null, msg.link ?? null, msg.severity ?? "info"]);
     // The bell's twin on the iPhone app (when the user turned notifications on there): same switch, same link.
@@ -66,9 +73,10 @@ export async function notifyUser(userId: number, kind: NotificationKind,
         to: u.email, subject: `ConstructHUB: ${msg.title}`,
         text: `${msg.title}\n\n${msg.body ?? ""}${msg.actionUrl ? `\n\n${msg.actionLabel || "Review"}: ${base}${msg.actionUrl}` : ""}\n\nManage notifications: ${base}/settings?tab=notifications`,
         html: `<div style="font-family:system-ui,sans-serif;max-width:560px"><h2 style="font-size:18px">${esc(msg.title)}</h2>${msg.body ? `<p>${esc(msg.body).replace(/\n/g, "<br>")}</p>` : ""}${action}<p style="color:#6b7280;font-size:12px">Manage notifications: <a href="${esc(base)}/settings?tab=notifications">${esc(base)}/settings</a></p></div>`,
-      }).catch((e: any) => console.error("[notify] email failed:", e?.message));
+      }).then(() => { email = "sent"; }, (e: any) => { email = "failed"; console.error("[notify] email failed:", e?.message); });
     }
   }
+  return { inApp: ch.inApp && opts.only !== "email", email };
 }
 
 export async function logActivity(req: any | null, userId: number, kind: string, detail: Record<string, unknown> = {}) {

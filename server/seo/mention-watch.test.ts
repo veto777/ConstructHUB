@@ -4,10 +4,10 @@ import { alertMessage } from "./alerts";
 
 const row = (domain: string, title: string, linksToYou: boolean | null = false) => ({ url: `https://${domain}/p`, domain, title, snippet: null, published: "2026-10-01", authority: 30, linksToYou });
 describe("mentions watch", () => {
-  it("asks for pages published since the last check (and not dated in the future), newest first", () => {
+  it("asks for every page published in the window (not one per website), oldest first, up to its end", () => {
     const r = newMentionsRequest("Alpine Exteriors", "alpine.example", new Date("2026-09-08T10:00:00Z"), new Date("2026-10-08T10:00:00Z"));
-    expect(r).toMatchObject({ keyword: '"Alpine Exteriors"', order_by: ["content_info.date_published,desc"],
-      filters: [["main_domain", "<>", "alpine.example"], "and", ["content_info.date_published", ">", "2026-09-08 10:00:00 +00:00"], "and", ["content_info.date_published", "<", "2026-10-09 10:00:00 +00:00"]] });
+    expect(r).toMatchObject({ keyword: '"Alpine Exteriors"', search_mode: "as_is", order_by: ["content_info.date_published,asc"],
+      filters: [["main_domain", "<>", "alpine.example"], "and", ["content_info.date_published", ">", "2026-09-08 10:00:00 +00:00"], "and", ["content_info.date_published", "<=", "2026-10-08 10:00:00 +00:00"]] });
   });
   it("alerts only on pages likely to be the business, not marked otherwise, on websites not known to link", () => {
     const rows = [row("a.com", "Alpine Exteriors in Bellingham"), row("b.com", "Alpine Exteriors Tampa"), row("c.com", "Alpine Exteriors Bellingham", true), row("d.com", "Alpine Exteriors in Bellingham"), row("e.com", "Alpine Exteriors news")];

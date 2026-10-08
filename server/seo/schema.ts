@@ -192,6 +192,10 @@ export const SEO_SCHEMA_DDL = [
      created_at timestamptz NOT NULL DEFAULT now(),
      PRIMARY KEY (user_id, key, replaces)
    )`,
+  // The claim is written before anything is bought (answer still empty): a second request for the same replacement —
+  // from another tab, another server process, or after a crash — finds it instead of buying again.
+  `ALTER TABLE seo_refresh_receipts ALTER COLUMN answer DROP NOT NULL`,
+  `ALTER TABLE seo_refresh_receipts ADD COLUMN IF NOT EXISTS claimed_at timestamptz NOT NULL DEFAULT now()`,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alert_drop integer NOT NULL DEFAULT 3`,
   // What changed between checks (server/seo/alerts.ts). `source` is what raised it (a rank run id, a snapshot date).
   `CREATE TABLE IF NOT EXISTS seo_alerts (
@@ -222,6 +226,9 @@ export const SEO_SCHEMA_DDL = [
   // Alerts: a delivery in progress holds a short lease; notified_at is set only once it went out.
   `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claimed_at timestamptz`,
   `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claim_token text`,
+  // An email that failed after the bell entry went out: tried again on its own (a few times), never with a second bell entry.
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS email_retry_at timestamptz`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS email_tries integer NOT NULL DEFAULT 0`,
   // One list name per account, whatever the capitals.
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_keyword_lists_name ON seo_keyword_lists(user_id, lower(name))`,
   // People who asked not to get an account's reports any more (server/seo/site-report-send.ts).

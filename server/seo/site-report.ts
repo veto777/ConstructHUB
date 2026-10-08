@@ -52,7 +52,25 @@ export type SiteReport = {
   alerts: { title: string; kind: string; createdAt: string }[];
   /** Repeating local grids: the newest scan of each with the comparable one before it. */
   grids?: GridReportLine[];
+  /**
+   * The work done: action-plan tasks MARKED done in the last WORK_DAYS days (the customer's own record that they were
+   * done — not a measurement), newest first, and how many are still open. null when the site has no plan at all.
+   */
+  work?: WorkSection | null;
 };
+export const WORK_DAYS = 30, WORK_LIST = 15;
+export type WorkSection = { days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number };
+/** Pure: the work section from the plan's rows (any order). */
+export function workSection(rows: { title: string; status: string; done_at: string | Date | null; target: string | null; note: string | null; kind: string }[], now = new Date()): WorkSection | null {
+  if (!rows.length) return null;
+  const since = now.getTime() - WORK_DAYS * 864e5;
+  const done = rows.filter((t) => t.status === "done" && t.done_at && new Date(t.done_at).getTime() >= since)
+    .sort((a, b) => new Date(b.done_at!).getTime() - new Date(a.done_at!).getTime());
+  return {
+    days: WORK_DAYS, doneCount: done.length, open: rows.filter((t) => t.status === "todo" || t.status === "doing").length, inProgress: rows.filter((t) => t.status === "doing").length,
+    done: done.slice(0, WORK_LIST).map((t) => ({ title: t.title, doneAt: new Date(t.done_at!).toISOString(), target: t.target ?? null, note: t.note ? String(t.note).slice(0, 300) : null, kind: t.kind })),
+  };
+}
 
 type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean };
 
@@ -111,6 +129,8 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
   const grids = await gridReportLines(userId, site.id).catch(() => []);
+  const { rows: tasks } = await pool.query(
+    `SELECT title, status, done_at, target, note, kind FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND (status IN ('todo','doing') OR (status='done' AND done_at > now() - interval '${WORK_DAYS} days'))`, [site.id, userId]).catch(() => ({ rows: [] as any[] }));
   const ranks = rankingsSection(checks, primary);
   const { rows: [count] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
   if (ranks) ranks.section.tracked = Math.max(ranks.section.checked, Number(count?.n ?? 0));
@@ -135,6 +155,7 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
     alerts,
     grids,
+    work: workSection(tasks),
   };
 }
 
@@ -183,6 +204,7 @@ export function reportHighlights(r: SiteReport): [string, string][] {
     if (r.search.authority !== null) rows.push(["Authority (0–100)", String(r.search.authority)]);
   }
   for (const g of r.grids ?? []) rows.push([`Local grid — "${g.keyword}"`, gridLine(g)]);
+  if (r.work) rows.push([`Work done, last ${r.work.days} days`, `${r.work.doneCount} task${r.work.doneCount === 1 ? "" : "s"} marked done · ${r.work.open} still open`]);
   if (r.audit && r.audit.health !== null) rows.push(["Site health (0–100)", `${r.audit.health}${signed(r.audit.healthChange)} · ${n(r.audit.errors)} errors, ${n(r.audit.warnings)} warnings`]);
   return rows;
 }
@@ -190,7 +212,7 @@ export function reportHighlights(r: SiteReport): [string, string][] {
 /** One repeating grid in words: where it stands and, when there is a comparable scan before it, where it stood. */
 export const gridLine = (g: GridReportLine) =>
   `scanned ${String(g.at).slice(0, 10)}: in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked} on ${String(g.previous.at).slice(0, 10)})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
-export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length;
+export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length && !r.work;
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
@@ -260,6 +282,13 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       heading("Local grid — Google's local results across your area");
       for (const g of r.grids!) pair(`"${g.keyword}" · ${g.size} × ${g.size} points, ${g.spacing} mi apart · ${day(g.at)}`, gridLine(g));
       line("Each point is a Google search made from that spot. The position score counts a point where the business is not in the first 20 as 21; lower is better.", soft);
+    }
+    if (r.work) {
+      heading(`Work done — the last ${r.work.days} days`);
+      if (!r.work.done.length) line("No task in the action plan was marked done in this period.", soft);
+      for (const t of r.work.done) line(`  • ${day(t.doneAt)} — ${t.title}${t.note ? ` (${t.note})` : ""}`);
+      if (r.work.doneCount > r.work.done.length) line(`…and ${r.work.doneCount - r.work.done.length} more.`, soft);
+      line(`${r.work.open} task${r.work.open === 1 ? " is" : "s are"} still open${r.work.inProgress ? `, ${r.work.inProgress} of them in progress` : ""}. "Done" is what was marked in the action plan; whether a site issue is gone shows in the next crawl.`, soft);
     }
     if (r.alerts.length) { heading("Alerts in the last month"); for (const a of r.alerts) line(`${day(a.createdAt)} — ${a.title}`); }
     doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });

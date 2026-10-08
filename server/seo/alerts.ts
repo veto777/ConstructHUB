@@ -100,7 +100,7 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
     return {
       kind: "seo.mention_new", title: a.title, severity: "info",
       body: `Published since ${i?.since ?? "the last check"} and using "${i?.name ?? ""}" (likely you — check each one):\n${pages.slice(0, 5).map((p: any) => `${p.domain}${p.title ? ` — ${String(p.title).slice(0, 80)}` : ""}`).join("\n")}${pages.length > 5 ? "\n…" : ""}`,
-      actionLabel: "See the mentions", actionUrl: `/seo/explorer?domain=${encodeURIComponent(a.domain)}&view=mentions`,
+      actionLabel: "See the mentions", actionUrl: i?.siteId ? `/seo/mentions?site=${Number(i.siteId)}` : "/seo/mentions",
     };
   }
   if (a.kind === "grid_down" || a.kind === "grid_up")
@@ -126,15 +126,18 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
 export async function deliverAlert(alertId: number): Promise<boolean> {
   // Only the sender holding this token may finish or give up the delivery: a slow sender whose lease ran out cannot undo a newer one's.
   const token = randomUUID();
+  // A site whose alerts were switched off after this one was saved: it stays on the Alerts page but is not sent.
+  await pool.query("UPDATE seo_alerts x SET notified_at=now() FROM seo_sites s WHERE x.id=$1 AND x.notified_at IS NULL AND s.id=x.site_id AND s.alerts_enabled = false", [alertId]);
   const { rows: [a] } = await pool.query(
     `UPDATE seo_alerts x SET claimed_at=now(), claim_token=$2 FROM seo_sites s
-      WHERE x.id=$1 AND x.notified_at IS NULL AND (x.claimed_at IS NULL OR x.claimed_at < now() - interval '5 minutes') AND s.id=x.site_id
+      WHERE x.id=$1 AND x.notified_at IS NULL AND (x.claimed_at IS NULL OR x.claimed_at < now() - interval '5 minutes') AND s.id=x.site_id AND s.alerts_enabled IS NOT FALSE
      RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId, token]);
   if (!a) return false;
   try {
     const m = alertMessage(a);
-    await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
-    await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL WHERE id=$1 AND claim_token=$2", [alertId, token]);
+    const sent = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
+    // The bell entry is there; an email that failed is tried again on its own.
+    await pool.query(`UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL, email_retry_at = CASE WHEN $3 THEN now() + interval '15 minutes' ELSE NULL END WHERE id=$1 AND claim_token=$2`, [alertId, token, sent?.email === "failed"]);
     return true;
   } catch (e: any) {
     await pool.query("UPDATE seo_alerts SET claimed_at=NULL, claim_token=NULL WHERE id=$1 AND notified_at IS NULL AND claim_token=$2", [alertId, token]).catch(() => {});
@@ -143,8 +146,29 @@ export async function deliverAlert(alertId: number): Promise<boolean> {
   }
 }
 
+/** Emails that failed after their alert's bell entry went out: the email alone, up to four tries, 15 minutes apart. */
+export const EMAIL_TRIES = 4;
+export async function retryAlertEmails(): Promise<number> {
+  // Leased by moving the retry time on: two passes cannot send the same email.
+  const { rows } = await pool.query(
+    `UPDATE seo_alerts x SET email_retry_at = now() + interval '15 minutes', email_tries = x.email_tries + 1 FROM seo_sites s
+      WHERE x.email_retry_at <= now() AND x.email_tries < ${EMAIL_TRIES} AND s.id = x.site_id AND s.alerts_enabled IS NOT FALSE
+     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain, x.email_tries`).catch(() => ({ rows: [] as any[] }));
+  let sent = 0;
+  for (const a of rows) {
+    try {
+      const m = alertMessage(a);
+      const r = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl }, { only: "email" });
+      if (r.email !== "failed") { await pool.query("UPDATE seo_alerts SET email_retry_at=NULL WHERE id=$1", [a.id]); sent++; }
+      else if (a.email_tries >= EMAIL_TRIES) await pool.query("UPDATE seo_alerts SET email_retry_at=NULL WHERE id=$1", [a.id]);
+    } catch (e: any) { console.error(`[seo] alert ${a.id} email retry failed: ${e?.message ?? e}`); }
+  }
+  return sent;
+}
+
 /** Alerts saved but not sent (a crash, a failed send, a lease that ran out): try again for three days. */
 export async function deliverPendingAlerts(): Promise<number> {
+  await retryAlertEmails().catch((e) => console.error("[seo] alert email retries failed", e?.message ?? e));
   const { rows } = await pool.query(
     `SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '3 days'
         AND (claimed_at IS NULL OR claimed_at < now() - interval '5 minutes') ORDER BY id LIMIT 20`);

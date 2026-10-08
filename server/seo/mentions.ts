@@ -32,6 +32,8 @@ export const mentionsDeps = { request };
 
 /** The name as searched: letters, digits, spaces and the punctuation names use — never a quote or a search operator. */
 const NAME_RE = /^[\p{L}\p{N}][\p{L}\p{N} &'’.,-]*$/u;
+/** Whether a name can be searched as written (letters, digits, spaces and & ' . , -; 3-80 characters). */
+export const nameOk = (name: string) => { const n = name.trim().replace(/\s+/g, " "); return n.length >= 3 && n.length <= 80 && NAME_RE.test(n); };
 export const mentionsInput = z.object({
   name: z.string().trim().min(3, "Enter the business name as people write it.").max(80).transform((s) => s.replace(/\s+/g, " ")).refine((s) => NAME_RE.test(s), "Use the business name only — letters, numbers, spaces and & ' . , -"),
   peek: z.boolean().default(false),

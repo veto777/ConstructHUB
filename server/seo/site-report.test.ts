@@ -140,4 +140,12 @@ describe("Search Console numbers in a report", () => {
     expect(_gscComparable({ ...base, days: 28, previousDays: 6 })).toBe(false);
     expect(_gscComparable({ ...base, previousClicks: null, previousImpressions: null, days: 28, previousDays: 0 })).toBe(false);
   });
+  it("work done: tasks marked done in the last 30 days, newest first, and what is still open; no plan = no section", async () => {
+    const { workSection } = await import("./site-report");
+    const now = new Date("2026-10-08T12:00:00Z");
+    const t = (title: string, status: string, done_at: string | null = null) => ({ title, status, done_at, target: null, note: null, kind: "page" });
+    const w = workSection([t("old", "done", "2026-08-01T00:00:00Z"), t("a", "done", "2026-10-01T00:00:00Z"), t("b", "done", "2026-10-05T00:00:00Z"), t("c", "todo"), t("d", "doing"), t("e", "dropped")], now)!;
+    expect([w.done.map((x) => x.title), w.doneCount, w.open, w.inProgress]).toEqual([["b", "a"], 2, 2, 1]);
+    expect(workSection([], now)).toBeNull();
+  });
 });

@@ -245,6 +245,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "POST /api/seo/sites/:id/mentions": [{ url: "/api/seo/sites/1/mentions", body: { name: "Acme Roofing", refresh: true, replaces: "2026-10-01T00:00:00.000Z" } }, { url: "/api/seo/sites/1/mentions", body: { name: "Acme Roofing", retryMissing: true } }],
   "POST /api/seo/sites/:id/mentions/places": [{ url: "/api/seo/sites/1/mentions/places", body: { places: ["Tampa"] } }],
   "POST /api/seo/sites/:id/mentions/watch": [{ url: "/api/seo/sites/1/mentions/watch", body: { watch: false } }],
+  "POST /api/seo/sites/:id/mentions/watch/:checkId/links": [{ url: "/api/seo/sites/1/mentions/watch/1/links", body: {} }],
   "POST /api/seo/sites/:id/mentions/marks": [{ url: "/api/seo/sites/1/mentions/marks", body: { name: "Acme Roofing", url: "https://news.example/story", verdict: "mine" } }],
   "GET /api/seo/sites/:id/planner": [{ url: "/api/seo/sites/1/planner" }],
   "POST /api/seo/sites/:id/planner": [{ url: "/api/seo/sites/1/planner", body: { services: ["roof repair"], towns: ["tampa"] } }],
@@ -328,7 +329,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(86);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(87);
   });
 
   for (const mode of Object.keys(PROVIDER)) {

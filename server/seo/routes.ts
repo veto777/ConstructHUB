@@ -17,8 +17,8 @@
  */
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
-import { setMentionWatch, mentionWatchView } from "./mention-watch";
-import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
+import { setMentionWatch, mentionWatchView, retryWatchedLinks } from "./mention-watch";
+import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, nameOk as mentionNameOk, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -74,7 +74,7 @@ import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
-import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME } from "./public-errors";
+import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -815,8 +815,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     } catch (e: any) { marksUnavailable = true; console.error(`[seo] mention verdicts for site ${siteId} could not be read: ${e?.message ?? e}`); }
     return { ...page, ...(marksUnavailable ? { marksUnavailable } : {}), rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places), mark: mark.get(pageKeyOf(r.url)) ?? null })) };
   };
-  /** Bought "Check again" answers by the answer they replaced (see seo_refresh_receipts); in memory as well, for when the database write fails. */
-  const receiptsInMemory = new Map<string, MentionsPage>();
+  /**
+   * Buy a mentions answer SAVED FIRST, CHARGED SECOND: the answer is written as the saved check (and, for "Check
+   * again", into its receipt) inside the charged call. If it cannot be written, the customer is charged nothing.
+   */
+  const buyMentionsSaved = (user: number, key: string, estimateUsd: number, label: string, fetch: () => Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; customerUsd?: number }>, receipt?: { replaces: string }) =>
+    withBudget(user, estimateUsd, async () => {
+      const o = await fetch();
+      try {
+        await saveCached(user, key, "mentions", o.data, o.costUsd);
+        if (receipt) await pool.query("UPDATE seo_refresh_receipts SET answer=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3", [user, key, receipt.replaces, JSON.stringify(o.data)]);
+      } catch (e: any) {
+        throw Object.assign(new SeoCustomerError("The answer could not be saved, so it was not charged. Try again in a moment.", 503), { costUsd: o.costUsd, costUnknown: o.costUnknown });
+      }
+      return o;
+    }, { label });
   route("get", "/api/seo/sites/:id/mentions", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
@@ -840,9 +853,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/sites/:id/mentions/watch", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const { watch } = z.object({ watch: z.boolean() }).strict().parse(req.body);
-    if (watch && !((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim()) return res.status(400).json({ message: "Look for mentions of the business name once first, so the watch knows which name to follow." });
+    const followed = (((site as { mention_name?: string | null }).mention_name ?? "").trim() || (site.business_name ?? "").trim());
+    if (watch && !followed) return res.status(400).json({ message: "Look for mentions of the business name once first, so the watch knows which name to follow." });
+    if (watch && !mentionNameOk(followed)) return res.status(400).json({ message: "The name to follow can only have letters, numbers, spaces and & ' . , - — look for mentions with the name written that way first." });
     await setMentionWatch(user, site.id, watch);
     res.json({ watch });
+  });
+  // A watched check whose link lookup did not load: try that lookup again (the price on the button is the hold).
+  route("post", "/api/seo/sites/:id/mentions/watch/:checkId/links", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    if (!isConfigured()) return notReady(res);
+    const page = await retryWatchedLinks(user, site.id, id.parse(req.params.checkId), MENTIONS_RETRY_USD);
+    if (!page) return res.status(404).json({ message: "That check is no longer there." });
+    res.json({ page: await mentionsView(site.id, user, page, await placesOf(site)) });
   });
   // The customer's verdict on one page for one name: "mine", "not_mine", or null to take it back. Spends nothing.
   route("post", "/api/seo/sites/:id/mentions/marks", async (req, res, user) => {
@@ -869,39 +892,51 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     }
     await serial(`mentions:${user}:${key}`, async () => {
       // The name is remembered for the site whatever happens next (it is the customer's own choice, not data bought).
-      await pool.query("UPDATE seo_sites SET mention_name=$3 WHERE id=$1 AND user_id=$2", [site.id, user, input.name]);
+      // A watch that follows the name is due again at once when the name changes (an occurrence leased for the old name
+      // then fails its own check and buys nothing).
+      await pool.query(`UPDATE seo_sites SET mention_name=$3, next_mention_at = CASE WHEN mention_watch AND lower(btrim(coalesce(nullif(btrim(mention_name), ''), business_name, ''))) <> lower($3) THEN now() ELSE next_mention_at END WHERE id=$1 AND user_id=$2`, [site.id, user, input.name]);
       if (input.retryMissing) {
         const now = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
         if (!now) return res.status(409).json({ code: "retry_unavailable", message: "The saved check is no longer there, so there is nothing to complete. Run the check again — the price is on the button." });
         if (now.linksChecked) return res.json({ page: await view(now), reused: true });
         if (!isConfigured()) return notReady(res);
-        const out = await buyOnce<MentionsPage>(user, key, "mentions-retry", MENTIONS_CACHE_HOURS, MENTIONS_RETRY_USD,
-          async () => { const o = await checkLinks(now); if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown }); return o; }, true, `Mentions — ${site.domain} (link check, second try)`);
-        return res.status(201).json({ page: await view(out.data), reused: false, saved: out.saved });
+        const out = await buyMentionsSaved(user, key, MENTIONS_RETRY_USD, `Mentions — ${site.domain} (link check, second try)`,
+          async () => { const o = await checkLinks(now); if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown }); return o; });
+        return res.status(201).json({ page: await view(out.data), reused: false, saved: true });
       }
       // "Check again" must say which answer it replaces. The same replacement asked again (a second click, another tab,
       // a retry after a lost response) gets the answer the first one bought — from its receipt, which is kept even when
       // the answer could not be saved as the report — or a newer saved answer. Read inside the queue: one purchase.
       if (input.refresh && !input.replaces) return res.status(400).json({ message: "Reload the page and press Check again." });
-      const receiptKey = `${user}|${key}|${input.replaces ?? ""}`;
-      if (input.refresh) {
-        const { rows: [rc] } = await pool.query("SELECT answer FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND created_at > now() - interval '7 days'", [user, key, input.replaces]).catch(() => ({ rows: [] as any[] }));
-        const earlier = (rc?.answer as MentionsPage | undefined) ?? receiptsInMemory.get(receiptKey);
-        if (earlier) return res.json({ page: await view(earlier), reused: true });
-      }
       const current = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
-      const stale = !input.refresh ? false : !current || !(new Date(current.fetchedAt) > new Date(input.replaces!));
-      if (current && !stale) return res.json({ page: await view(current), reused: true });
-      if (!isConfigured()) return notReady(res);
-      const out = await buyOnce<MentionsPage>(user, key, "mentions", MENTIONS_CACHE_HOURS, MENTIONS_ESTIMATE_USD, () => fetchMentions(input.name, site.domain), input.refresh, `Mentions — "${input.name}"`);
-      if (input.refresh && !out.reused) {
-        receiptsInMemory.set(receiptKey, out.data);
-        if (receiptsInMemory.size > 200) receiptsInMemory.delete(receiptsInMemory.keys().next().value as string);
-        await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING", [user, key, input.replaces, JSON.stringify(out.data)])
-          .then(() => pool.query("DELETE FROM seo_refresh_receipts WHERE created_at < now() - interval '7 days'"))
-          .catch((e) => console.error(`[seo] refresh receipt not kept (kept in memory): ${e?.message ?? e}`));
+      if (!input.refresh) {
+        if (current) return res.json({ page: await view(current), reused: true });
+        if (!isConfigured()) return notReady(res);
+        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}"`, () => fetchMentions(input.name, site.domain));
+        return res.status(201).json({ page: await view(out.data), reused: false, saved: true });
       }
-      return res.status(out.reused ? 200 : 201).json({ page: await view(out.data), reused: out.reused, saved: out.saved });
+      // A newer saved answer than the one being replaced: that is the answer.
+      if (current && new Date(current.fetchedAt) > new Date(input.replaces!)) return res.json({ page: await view(current), reused: true });
+      // The claim on this replacement, written before anything is bought. Found already: its answer, or "being checked"
+      // while it is young; an old claim with no answer (a crash before the save) can be taken over.
+      await pool.query("DELETE FROM seo_refresh_receipts WHERE created_at < now() - interval '7 days'").catch(() => {});
+      const { rowCount: claimed } = await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer) VALUES($1,$2,$3,NULL) ON CONFLICT DO NOTHING", [user, key, input.replaces]);
+      if (!claimed) {
+        const { rows: [rc] } = await pool.query("SELECT answer, claimed_at > now() - interval '10 minutes' AS young FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3", [user, key, input.replaces]);
+        if (rc?.answer) return res.json({ page: await view(rc.answer as MentionsPage), reused: true });
+        if (rc?.young) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
+        const { rowCount: taken } = await pool.query("UPDATE seo_refresh_receipts SET claimed_at=now() WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND claimed_at <= now() - interval '10 minutes'", [user, key, input.replaces]);
+        if (!taken) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
+      }
+      if (!isConfigured()) { await pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL", [user, key, input.replaces]); return notReady(res); }
+      try {
+        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}" (again)`, () => fetchMentions(input.name, site.domain), { replaces: input.replaces! });
+        return res.status(201).json({ page: await view(out.data), reused: false, saved: true });
+      } catch (e) {
+        // Nothing was saved: the claim is given back, so trying again can buy.
+        await pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL", [user, key, input.replaces]).catch(() => {});
+        throw e;
+      }
     });
   });
 
