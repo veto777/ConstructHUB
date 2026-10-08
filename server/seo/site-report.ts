@@ -65,6 +65,11 @@ export type SiteReport = {
     /** Keywords the site tracks, and how many of them the latest check covered. */
     tracked: number; checked: number; device: string; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null;
     previousTop3: number | null; previousTop10: number | null; previousAverage: number | null;
+    /**
+     * The changes, measured only on keywords in BOTH checks (the same rule as the tags): how many those are, the change
+     * in their top 10 / top 3, and their average position now and before (of those ranked both times). null = no earlier check.
+     */
+    compared?: number | null; top10Change?: number | null; top3Change?: number | null; averageNow?: number | null; averageBefore?: number | null; rankedBoth?: number;
     inMapPack: number; withMapPack: number;
     /** The ten biggest moves each way; the counts are of all of them. */
     improved: Mover[]; declined: Mover[]; improvedCount: number; declinedCount: number;
@@ -160,6 +165,15 @@ export function rankingsSection(checks: Check[], primaryDevice: string, daysBack
       tracked: now.size, checked: now.size, device: primaryDevice, checkedOn: latest,
       improvedCount: moved.filter((m) => m.by > 0).length, declinedCount: moved.filter((m) => m.by < 0).length,
       top3: ranked(now).filter((p) => p <= 3).length, top10: ranked(now).filter((p) => p <= 10).length, averagePosition: avg(ranked(now)),
+      ...(() => {
+        if (!earlier) return { compared: null, top10Change: null, top3Change: null, averageNow: null, averageBefore: null, rankedBoth: 0 };
+        const both = [...now.keys()].filter((id) => before.has(id));
+        const pos = (m: Map<number, Check>, id: number) => m.get(id)!.position;
+        const inTop = (m: Map<number, Check>, n: number) => both.filter((id) => { const p = pos(m, id); return p !== null && p <= n; }).length;
+        const rb = both.filter((id) => pos(now, id) !== null && pos(before, id) !== null);
+        return { compared: both.length, top10Change: both.length ? inTop(now, 10) - inTop(before, 10) : null, top3Change: both.length ? inTop(now, 3) - inTop(before, 3) : null,
+          averageNow: avg(rb.map((id) => pos(now, id) as number)), averageBefore: avg(rb.map((id) => pos(before, id) as number)), rankedBoth: rb.length };
+      })(),
       previousTop3: earlier ? ranked(before).filter((p) => p <= 3).length : null, previousTop10: earlier ? ranked(before).filter((p) => p <= 10).length : null, previousAverage: earlier ? avg(ranked(before)) : null,
       inMapPack: [...now.values()].filter((c) => c.local !== null).length, withMapPack: [...now.values()].filter((c) => c.hasPack).length,
       improved: moved.filter((m) => m.by > 0).sort((a, b) => b.by - a.by).slice(0, 10).map(strip),
@@ -261,10 +275,13 @@ export function reportHighlights(r: SiteReport): [string, string][] {
   const rows: [string, string][] = [];
   if (r.rankings) {
     const k = r.rankings;
-    rows.push(["Keywords in the top 10", `${k.top10} of ${k.checked} checked${k.previousTop10 !== null ? signed(k.top10 - k.previousTop10) : ""}`]);
+    // Changes only on keywords in both checks (said with their number); none in both = no change claimed.
+    const on = k.compared ? ` on the ${k.compared} in both checks` : "";
+    rows.push(["Keywords in the top 10", `${k.top10} of ${k.checked} checked${k.top10Change != null && k.compared ? `${signed(k.top10Change) || " (no change)"}${on}` : ""}`]);
     if (k.tracked > k.checked) rows.push(["Not covered by the latest check", `${k.tracked - k.checked} of ${k.tracked} tracked keywords`]);
-    rows.push(["Keywords in the top 3", `${k.top3}${k.previousTop3 !== null ? signed(k.top3 - k.previousTop3) : ""}`]);
-    if (k.averagePosition !== null) rows.push(["Average position", `${k.averagePosition}${k.previousAverage !== null && k.previousAverage !== k.averagePosition ? ` (was ${k.previousAverage})` : ""}`]);
+    rows.push(["Keywords in the top 3", `${k.top3}${k.top3Change != null && k.compared ? `${signed(k.top3Change) || " (no change)"}${on}` : ""}`]);
+    if (k.averagePosition !== null) rows.push(["Average position", `${k.averagePosition}${k.averageNow != null && k.averageBefore != null && k.rankedBoth ? ` (the ${k.rankedBoth} ranked both times: ${k.averageBefore} then, ${k.averageNow} now)` : ""}`]);
+    if (r.comparedWith && k.compared === 0) rows.push(["Compared with the earlier check", "no keyword was in both checks, so no change is shown"]);
     if (k.withMapPack > 0) rows.push(["In the Google map pack", `${k.inMapPack} of ${k.withMapPack} searches that show a map`]);
   }
   if (r.searchConsole) {
@@ -328,7 +345,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       heading(`Rankings on Google (${k.device}) — checked ${day(k.checkedOn)}`);
       if (k.improved.length) { line(k.improvedCount > k.improved.length ? `Moved up — the ${k.improved.length} biggest of ${k.improvedCount}` : "Moved up", "#188038"); for (const m of k.improved) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
       if (k.declined.length) { line(k.declinedCount > k.declined.length ? `Moved down — the ${k.declined.length} biggest of ${k.declinedCount}` : "Moved down", "#c5221f"); for (const m of k.declined) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
-      if (!k.improved.length && !k.declined.length) line(r.comparedWith ? "No keyword changed position since the earlier check." : "This is the first check, so there is nothing to compare with yet.", soft);
+      if (!k.improved.length && !k.declined.length) line(!r.comparedWith ? "This is the first check, so there is nothing to compare with yet." : k.compared === 0 ? "No keyword was in both checks, so nothing is compared." : "No keyword changed position since the earlier check.", soft);
       room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
       // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
       const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
@@ -338,15 +355,22 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
       if (k.byTag?.length) {
         room(60); doc.moveDown(0.5).font("Helvetica-Bold").fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
-        const tcols = [0, width * 0.42, width * 0.58, width * 0.78];
-        const trow = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
-        // A change that was measured is shown even when it is zero ("±0"); none measured is "no comparison" (—).
-        const chg = (v: number | null) => (v === null ? " (—)" : v === 0 ? " (±0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
-        trow(["Tag", "Keywords (in both / new)", "In the top 10", "Visibility index"], true);
-        for (const t of k.byTag) trow([t.tag, `${n(t.keywords)} (${n(t.compared)} / ${n(t.newSince)})`, `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
-          t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""} ${t.weighted ? "by volume" : "each once"}`]);
+        // Short cells that fit their column (no cell is cut short); the header comes again after a page break; the
+        // weighting of each figure is said in lines under the table.
+        const tcols = [0, width * 0.36, width * 0.5, width * 0.66, width * 0.82];
+        const head = ["Tag", "Keywords", "In both / new", "In the top 10", "Visibility index"];
+        const tline = (cells: string[], bold = false) => { const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, lineBreak: false, ellipsis: i === 0 })); doc.x = 48; doc.y = y + 14; };
+        const trow = (cells: string[]) => { if (doc.y + 16 > doc.page.height - 60) { doc.addPage(); tline(head, true); } tline(cells); };
+        // A change that was measured is shown even when it is zero ("±0" is written "0"); none measured is "(—)" written "(-)".
+        const chg = (v: number | null) => (v === null ? " (-)" : v === 0 ? " (0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
+        room(32); tline(head, true);
+        for (const t of k.byTag) trow([t.tag, n(t.keywords), r.comparedWith ? `${n(t.compared)} / ${n(t.newSince)}` : "-", `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
+          t.visibility === null ? "-" : `${t.visibility}${r.comparedWith ? chg(t.visibilityChange) : ""}`]);
+        const once = k.byTag.filter((t) => t.visibility !== null && !t.weighted).map((t) => t.tag);
+        const mixed = k.byTag.filter((t) => r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted).map((t) => `${t.tag} (change ${t.changeWeighted ? "by search volume" : "each keyword once"})`);
+        line(`Visibility index weighting: by search volume${once.length ? `, except each keyword counted once for ${once.join(", ")} (some keywords have no volume)` : ""}.${mixed.length ? ` The change is weighted differently for ${mixed.join(", ")}.` : ""}`, soft);
         if (k.moreTags) line(`…and ${k.moreTags} more tags.`, soft);
-        line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (the first number in brackets beside Keywords); (—) means no keyword was in both. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).`, soft);
+        line(`${r.comparedWith ? "Changes in brackets count only the keywords in both checks (\"In both\"); (-) means none was in both, (0) a measured no change. A keyword can carry several tags. " : ""}The visibility index is not a share of real clicks: 100 would mean every keyword first.`, soft);
       }
     }
     if (r.searchConsole) {

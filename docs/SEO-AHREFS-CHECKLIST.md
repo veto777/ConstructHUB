@@ -869,6 +869,19 @@ Verdict: five new defects, none HIGH.
  5 no tags hid the whole panel ................................. FIXED (all keywords shown, with how to tag them)
  NOT DONE: as audit #43.
 
+## Codex audit #45 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-45.md)
+
+Verdict: seven new defects, none HIGH. Codex found no genuine current-format crawl the evidence test would reject.
+
+ 1 the stricter test did not reach scores already kept ........ FIXED (formula version 2: every kept crawl health is worked out again)
+ 2 malformed findings / errors still scored clean ............. FIXED (each finding needs a text severity and, if it lists pages, a list of addresses; each error an address)
+ 3 the PDF left out the change's weighting .................... FIXED (said under the table when it differs)
+ 4 the PDF tag table cut its cells ............................ FIXED (short cells in five columns; weighting in lines below; the header repeats after a page break)
+ 5 tracker changes rounded to a signed 0 ...................... FIXED (one decimal, "pts")
+ 6 headline changes compared different keywords ............... FIXED (top 10 / top 3 changes and the average position only on keywords in both checks, with their number; none in both = "no keyword was in both checks", never "no keyword changed")
+ 7 switching device lost focus and the buttons ................ FIXED (heading and device buttons stay; loading and errors show under them)
+ NOT DONE: as audit #43.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -946,3 +959,4 @@ Verdict: five new defects, none HIGH.
 - 10/8 slice 55 (rank tracker by tag) + audit #42 fixes: 401 tests across server/seo and the crawler's suites (database-needing files fail as on main), white-label rule 90 routes. Real Postgres - nineteen scripts passing (new: rank tags 6/6; dashboard 14/14 with kept crawl health, a gap and the newest crawl always current; gsc breakdown 11/11 with no record of reads; audit compare 15/15 with no crawl at all). Browser (vb11, commit checked): By tag on desktop and mobile with each side's dates; the health tile with "N of M pages" and the crawl list; the three detail views opened; 1440 and 390 px with no overflow and no page errors.
 - 10/8 slice 56 (client reports by tag) + audit #43 fixes: 402 tests across server/seo and the crawler's suites (database-needing files fail as on main). Real Postgres - nineteen scripts passing (rank tags 8/8 with a built report; dashboard 15/15 with a changed page status and a broken newest crawl; gsc breakdown 12/12 with rows that have no record of a read). Browser (vb11, commit checked): By tag on the Reports page and in the downloaded PDF; By tag on the rank tracker with the saved-day wording; the health tile; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #44 fixes: 404 tests across server/seo and the crawler's suites; nineteen real-Postgres scripts passing (fixtures now save a report as the crawler does). Browser (vb11, commit checked): report By tag with in-both / new counts and weighting, PDF downloaded; health tile still reading the real crawls; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #45 fixes: 405 tests across server/seo and the crawler's suites; nineteen real-Postgres scripts passing. Browser (vb11, commit checked): rank tracker and report by tag, the report PDF downloaded, the health tile still reading the real crawls under the version-2 test; 1440 and 390 px, no overflow, no page errors.

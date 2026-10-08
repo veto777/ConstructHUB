@@ -33,6 +33,12 @@ describe("rankingsSection", () => {
     expect(first.section).toMatchObject({ previousTop10: null, improved: [], declined: [] });
     expect(rankingsSection([], "desktop")).toBeNull();
   });
+  it("headline changes rest only on keywords in both checks; none in both = no change claimed", () => {
+    expect([out.section.compared, out.section.top10Change, out.section.top3Change, out.section.rankedBoth, out.section.averageBefore, out.section.averageNow]).toEqual([3, -1, 1, 2, 6.5, 6]);
+    const swapped = rankingsSection([...Array.from({ length: 10 }, (_, i) => check(10 + i, `old ${i}`, "2026-09-10", 3)), check(99, "new", "2026-10-08", 2)], "desktop", 30, today)!;
+    expect([swapped.section.compared, swapped.section.top10Change]).toEqual([0, null]);
+    expect(reportHighlights({ ...report(), comparedWith: "2026-09-10", rankings: swapped.section }).find(([l]) => l === "Compared with the earlier check")?.[1]).toMatch(/no keyword was in both/);
+  });
   it("by tag: the same two checks, each tag on its own; none when no keyword has a tag", () => {
     expect(out.section.byTag).toBeUndefined();
     const tagged = checks.map((c) => ({ ...c, tags: c.keywordId === 4 ? ["windows", "tampa"] : c.keywordId === 3 ? ["roofing"] : c.keywordId === 1 ? ["roofing"] : [] }));
@@ -45,7 +51,7 @@ describe("rankingsSection", () => {
 
 const report = (over: Partial<SiteReport> = {}): SiteReport => ({
   domain: "example.com", generatedAt: "2026-10-08T12:00:00Z", comparedWith: "2026-09-10",
-  rankings: { tracked: 4, checked: 4, device: "desktop", improvedCount: 1, declinedCount: 1, checkedOn: "2026-10-08", top3: 1, top10: 3, averagePosition: 6, previousTop3: 0, previousTop10: 2, previousAverage: 7, inMapPack: 1, withMapPack: 2,
+  rankings: { tracked: 4, checked: 4, device: "desktop", improvedCount: 1, declinedCount: 1, checkedOn: "2026-10-08", top3: 1, top10: 3, averagePosition: 6, previousTop3: 0, previousTop10: 2, previousAverage: 7, compared: 3, top10Change: 1, top3Change: 1, rankedBoth: 2, averageBefore: 7, averageNow: 6, inMapPack: 1, withMapPack: 2,
     improved: [{ keyword: "roof repair", location: "Tampa, Florida", device: "desktop", from: 9, to: 3 }], declined: [{ keyword: "gutters", location: null, device: "desktop", from: 8, to: null }],
     keywords: [{ keyword: "roof repair", location: "Tampa, Florida", position: 3, previous: 9, local: 2, volume: 880 }] },
   search: { fetchedAt: "2026-10-07T00:00:00Z", authority: 37, referringDomains: 2660, backlinks: 32000, organicKeywords: 74, organicTraffic: 54, trafficValue: 997, trafficChange: 12, keywordsChange: -3, referringDomainsChange: 0 },
@@ -58,11 +64,11 @@ const report = (over: Partial<SiteReport> = {}): SiteReport => ({
 describe("words", () => {
   it("highlights carry the change since the earlier check", () => {
     const rows = Object.fromEntries(reportHighlights(report()));
-    expect(rows["Keywords in the top 10"]).toBe("3 of 4 checked (+1)");
+    expect(rows["Keywords in the top 10"]).toBe("3 of 4 checked (+1) on the 3 in both checks");
     expect(rows["Not covered by the latest check"]).toBeUndefined();
     const partial = report(); partial.rankings!.tracked = 10;
     expect(Object.fromEntries(reportHighlights(partial))["Not covered by the latest check"]).toBe("6 of 10 tracked keywords");
-    expect(rows["Average position"]).toBe("6 (was 7)");
+    expect(rows["Average position"]).toBe("6 (the 2 ranked both times: 7 then, 6 now)");
     expect(rows["Clicks from Google, last 28 days"]).toBe("412 (+32)");
     expect(rows["Times shown in Google, last 28 days"]).toBe("18,300 (−700)");
     expect(rows["In the Google map pack"]).toBe("1 of 2 searches that show a map");

@@ -267,7 +267,7 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
 /** How many crawls of a site the dashboard's health trend shows. */
 export const HEALTH_TREND = 6;
 /** The version of the health worked out per crawl (seo_crawl_health.v): a new formula works every crawl out again. */
-const HEALTH_V = 1;
+const HEALTH_V = 2; // 2: the strict evidence test (audit #44/#45) — every crawl worked out under 1 is worked out again
 /**
  * One crawl's health. `readable` false = the stored crawl could not be read (its score is not known — never zero).
  * `pages` = the pages the score is out of; `errorPages` = the distinct ones with an error.
@@ -300,8 +300,13 @@ export async function auditHealthByDomain(user: number, domains: string[]): Prom
               -- findings (each one an object) and, if any, a list of errors; pages each with an address and a numeric
               -- status. An empty list is a real empty list; anything else is "could not be read", never a clean crawl.
               (jsonb_typeof(report)='object' AND jsonb_typeof(report->'findings')='array'
-               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object')
-               AND (report->'errors' IS NULL OR jsonb_typeof(report->'errors')='array')
+               -- each finding: an object with a text severity, and its pages (if any) a list of addresses
+               AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'findings') f WHERE jsonb_typeof(f)<>'object'
+                     OR jsonb_typeof(f->'severity') IS DISTINCT FROM 'string'
+                     OR (f ? 'urls' AND (jsonb_typeof(f->'urls')<>'array' OR EXISTS (SELECT 1 FROM jsonb_array_elements(f->'urls') u WHERE jsonb_typeof(u)<>'string'))))
+               -- each error (a page that could not be fetched counts against the score): an object with an address
+               AND (report->'errors' IS NULL OR (jsonb_typeof(report->'errors')='array'
+                     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(report->'errors') e WHERE jsonb_typeof(e)<>'object' OR jsonb_typeof(e->'url') IS DISTINCT FROM 'string')))
                AND jsonb_typeof(state->'pages')='array'
                AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(state->'pages') p WHERE jsonb_typeof(p)<>'object' OR jsonb_typeof(p->'url') IS DISTINCT FROM 'string' OR jsonb_typeof(p->'status') IS DISTINCT FROM 'number')) AS well_formed
          FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
