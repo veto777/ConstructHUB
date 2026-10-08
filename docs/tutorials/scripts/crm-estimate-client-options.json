@@ -1,0 +1,184 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-client-options",
+  "title": "How a client picks options and discounts",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients/922d4e0c-ba4f-5af1-882a-e3446b1f3772",
+      "caption": "The client's page",
+      "chapter": "Set up the estimate",
+      "narration": "Let your client choose between options, right on their estimate."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-discounts-demo-estimate-e-2000\"]",
+      "caption": "Discounts",
+      "narration": "On the estimate, choose Discounts.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-preset-pay_in_full\"]",
+      "caption": "Tick an offer",
+      "narration": "Tick an offer for this client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-discounts\"]",
+      "caption": "Save offers",
+      "narration": "Choose Save offers.",
+      "holdMs": 300
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-options-demo-estimate-e-2000\"]",
+      "caption": "Options",
+      "narration": "Now choose Options.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-name\"]",
+      "value": "Hardwood",
+      "caption": "First option",
+      "narration": "Name the first option."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"option-pb-row-\"]:has-text(\"Engineered hardwood\") button",
+      "caption": "Add its work",
+      "narration": "Add its work from your price book.",
+      "holdMs": 300
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-option-line-qty-\"]",
+      "value": "1480",
+      "caption": "Quantity",
+      "narration": "Type the quantity."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-option\"]",
+      "caption": "Add option",
+      "narration": "Choose Add option.",
+      "holdMs": 400
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-name\"]",
+      "value": "Vinyl plank",
+      "caption": "Second option",
+      "narration": "Then the second option."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"option-pb-row-\"]:has-text(\"LVP, supply\") button",
+      "caption": "Add its work",
+      "narration": "Its work.",
+      "holdMs": 300
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-option-line-qty-\"]",
+      "value": "1480",
+      "caption": "Quantity",
+      "narration": "And its quantity."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-option\"]",
+      "caption": "Add option",
+      "narration": "Add option again.",
+      "holdMs": 400
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com",
+        "estimate": "E-2000"
+      },
+      "caption": "The client's screen",
+      "chapter": "Your client chooses",
+      "narration": "Now your client. At the top of their estimate is Choose your scopes."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"option-2\"] button",
+      "caption": "Tick an option",
+      "narration": "They tick the option they want."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-discount-pay_in_full\"]",
+      "caption": "Tick a discount",
+      "narration": "Under Optional discounts, they tick an offer they qualify for.",
+      "holdMs": 300
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review-selection\"]",
+      "caption": "Review selection",
+      "narration": "Then Review selection.",
+      "holdMs": 400
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"review-totals\"]",
+      "caption": "The totals",
+      "narration": "The option they left out is struck through, and the totals are listed."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-generate-estimate\"]",
+      "caption": "Generate my estimate",
+      "chapter": "Their new estimate",
+      "narration": "Generate my estimate makes a new estimate with only their choices.",
+      "holdMs": 900
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/clients/922d4e0c-ba4f-5af1-882a-e3446b1f3772",
+      "caption": "Back in the CRM",
+      "narration": "Back in the CRM, on the client's page under Clients.",
+      "holdMs": 600
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"E-2003\")",
+      "caption": "The new estimate",
+      "narration": "Here is the new estimate. The discount is confirmed when the client approves."
+    }
+  ],
+  "youtube": {
+    "title": "How a client picks options and discounts | ConstructHUB CRM",
+    "description": "Add two options and a discount offer to an estimate in ConstructHUB CRM, then see the client's side: they tick the option they want, tick a discount they qualify for, review the totals and generate a new estimate with only their choices. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "estimate options",
+      "good better best",
+      "estimate discounts",
+      "client estimate page",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Let clients choose",
+    "accent": "choose",
+    "kicker": "CRM Tutorial",
+    "step": 17
+  }
+}
