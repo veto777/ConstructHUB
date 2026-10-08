@@ -176,6 +176,48 @@ export function requirePermission(res: any, ctx: OrgContext, perm: CrmPermission
   return false;
 }
 
+/** Guard a route on holding at least one of several permissions. Responds 403 and returns false if none is held. */
+export function requireAnyPermission(res: any, ctx: OrgContext, perms: readonly CrmPermission[]): boolean {
+  if (perms.some((p) => ctx.permissions[p])) return true;
+  res.status(403).json({ message: `Requires permission: ${perms.join(" or ")}` });
+  return false;
+}
+
+/**
+ * The one money redactor. A price-blind seat ("See prices" off) never receives
+ * the `price` keys, a cost-blind seat ("See costs and margins" off) never
+ * receives the `cost` keys: the keys are ABSENT from the JSON, not zeroed, so
+ * a page shows "hidden" rather than "$0.00". Every route that returns a row
+ * carrying money to a seat that may lack either permission goes through this
+ * (or through a presenter built on the same two flags) instead of testing the
+ * flags by hand.
+ */
+export function stripMoney<T extends Record<string, any>>(
+  ctx: OrgContext, row: T, keys: { price?: readonly string[]; cost?: readonly string[] },
+): T {
+  const out: Record<string, any> = { ...row };
+  if (!ctx.permissions.seePrices) for (const k of keys.price ?? []) delete out[k];
+  if (!ctx.permissions.seeCosts) for (const k of keys.cost ?? []) delete out[k];
+  return out as T;
+}
+
+/**
+ * Whether `ctx` may hand `role` (with `overrides`) to someone else. Owners and
+ * admins hand out any role below owner, as before. A delegate who only holds
+ * "Manage team and invitations" through a per-person override may not create a
+ * seat more powerful than their own: every permission the new role or override
+ * switches ON must be one the delegate holds. Returns the first permission
+ * they lack, or null when the grant is allowed.
+ */
+export function grantExceedsOwn(ctx: OrgContext, role: string, overrides: unknown): CrmPermission | null {
+  if (ctx.member.role === "owner" || ctx.member.role === "admin") return null;
+  const granted = crmEffectivePermissions(role, overrides);
+  for (const p of Object.keys(granted) as CrmPermission[]) {
+    if (granted[p] && !ctx.permissions[p]) return p;
+  }
+  return null;
+}
+
 /**
  * Guard a route on the OWNER role itself. Hard deletes (test-document cleanup)
  * are owner-only — never a permission flag, so no admin/pm seat override can

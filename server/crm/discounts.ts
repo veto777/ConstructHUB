@@ -145,6 +145,8 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Discount offers are pricing — price-blind seats never read them.
+    if (!requirePermission(res, ctx, "seePrices")) return;
 
     const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);

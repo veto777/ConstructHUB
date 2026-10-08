@@ -63,12 +63,15 @@ export default function CrmProjectPage() {
   const search = useSearch();
   const [, navigate] = useLocation();
   const tabParam = new URLSearchParams(search).get("tab");
-  const tab = (TABS as readonly string[]).includes(tabParam ?? "") ? tabParam! : "costing";
   const setTab = (t: string) => navigate(`/crm/projects/${id}?tab=${t}`, { replace: true });
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const perms = me?.permissions ?? {};
   const seeCosts = perms.seeCosts === true;
+  // Costing is the cost-side ledger: a seat without "See costs and margins" (a field crew, the pm) has
+  // no Costing tab and lands on the punch list — the API refuses the costing read either way.
+  const wanted = (TABS as readonly string[]).includes(tabParam ?? "") ? tabParam! : null;
+  const tab = !me ? (wanted ?? "punch") : seeCosts ? (wanted ?? "costing") : (wanted && wanted !== "costing" ? wanted : "punch");
   const canManageJobs = perms.manageJobs === true;
   const canSendCo = perms.approveChangeOrders === true;
 
@@ -281,7 +284,7 @@ export default function CrmProjectPage() {
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap h-auto bg-muted/60 p-1">
-          <TabsTrigger value="costing"><DollarSign className="h-4 w-4 mr-1" /> Costing</TabsTrigger>
+          {seeCosts && <TabsTrigger value="costing"><DollarSign className="h-4 w-4 mr-1" /> Costing</TabsTrigger>}
           <TabsTrigger value="change-orders"><FileDiff className="h-4 w-4 mr-1" /> Change orders</TabsTrigger>
           <TabsTrigger value="punch"><ClipboardCheck className="h-4 w-4 mr-1" /> Punch list</TabsTrigger>
           <TabsTrigger value="logs"><NotebookPen className="h-4 w-4 mr-1" /> Daily logs</TabsTrigger>
@@ -402,6 +405,8 @@ export default function CrmProjectPage() {
               />
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Writing a change order needs "Approve change orders" (the API refuses the rest). */}
+              {canSendCo && (
               <div className="grid gap-2 sm:grid-cols-4 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="sm:col-span-2">
                   <Label className="text-xs">Title</Label>
@@ -423,6 +428,7 @@ export default function CrmProjectPage() {
                   </Button>
                 </div>
               </div>
+              )}
               {cos?.map((c: any) => (
                 <div key={c.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
                   data-testid={`co-row-${c.id}`}>
@@ -469,6 +475,8 @@ export default function CrmProjectPage() {
           <Card>
             <CardHeader><SectionTitle title="Punch list" /></CardHeader>
             <CardContent className="space-y-3">
+              {/* Adding to the punch list needs "Create and edit jobs". */}
+              {canManageJobs && (
               <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="flex-1 min-w-[200px]"><Label className="text-xs">Item</Label>
                   <Input value={pu.title} maxLength={300} onChange={(e) => setPu({ ...pu, title: e.target.value })}
@@ -482,6 +490,7 @@ export default function CrmProjectPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              )}
               {punch?.map((p: any) => (
                 <div key={p.id} className="rounded-lg border px-4 py-3 flex flex-wrap items-center justify-between gap-2"
                   data-testid={`punch-row-${p.id}`}>
@@ -610,6 +619,8 @@ export default function CrmProjectPage() {
               />
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Adding a selection needs "Create and edit jobs". */}
+              {canManageJobs && (
               <div className="flex flex-wrap gap-2 items-end rounded-lg border bg-muted/30 p-3">
                 <div className="flex-1 min-w-[180px]"><Label className="text-xs">Selection</Label>
                   <Input value={se.name} maxLength={200} onChange={(e) => setSe({ ...se, name: e.target.value })}
@@ -627,6 +638,7 @@ export default function CrmProjectPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              )}
               {sels?.map((s: any) => {
                 const over = s.actualCents != null && s.actualCents > s.allowanceCents;
                 const editing = selEdit?.id === s.id ? selEdit : null;
@@ -636,11 +648,14 @@ export default function CrmProjectPage() {
                       <div className="min-w-0">
                         <div className="font-medium">{s.name}{s.category ? ` · ${s.category}` : ""}</div>
                         {s.chosenOptionName && <div className="text-sm">Chosen: {s.chosenOptionName}</div>}
-                        <div className="text-sm text-muted-foreground tabular-nums">
-                          Allowance {money(s.allowanceCents)}
-                          {s.actualCents != null && ` · actual ${money(s.actualCents)}`}
-                          {over && <span className="text-destructive font-medium"> · over by {money(s.actualCents - s.allowanceCents)}</span>}
-                        </div>
+                        {/* The allowance is money: absent for a price-blind seat (the API leaves it out). */}
+                        {s.allowanceCents != null && (
+                          <div className="text-sm text-muted-foreground tabular-nums">
+                            Allowance {money(s.allowanceCents)}
+                            {s.actualCents != null && ` · actual ${money(s.actualCents)}`}
+                            {over && <span className="text-destructive font-medium"> · over by {money(s.actualCents - s.allowanceCents)}</span>}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {canManageJobs && !editing && (

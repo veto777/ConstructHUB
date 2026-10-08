@@ -37,7 +37,7 @@ import {
 } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
-import { recordActivity } from "./activity";
+import { recordActivity, logActivity } from "./activity";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
@@ -497,6 +497,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, {
       to, emailed, emailError, texted, smsTo, smsError,
       resend: !!est.sentAt, revived: revived || undefined,
+    });
+    // The member's own audit trail (Team → Activity) — the estimate's event
+    // trail above is per document and never showed up under the person.
+    logActivity(ctx, "estimate.sent", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, to, emailed, texted, resend: !!est.sentAt },
     });
 
     // Owner's "bid sent" notice — fires even when the client copy failed to
@@ -1268,6 +1274,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Who opened the bid, from where, and who they forwarded it to is sales
+    // intelligence for the people who write estimates — not for the crew.
+    if (!requirePermission(res, ctx, "manageEstimates")) return;
 
     const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
@@ -1334,6 +1343,10 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const [row] = await db.update(crmEstimates).set({ expiresAt, updatedAt: new Date() })
       .where(eq(crmEstimates.id, est.id)).returning();
     await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, { days: parsed.data.days, expiresAt });
+    logActivity(ctx, "estimate.extended", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, days: parsed.data.days },
+    });
     res.json({ estimate: presentEstimate(row, ctx) });
   });
 
@@ -1698,6 +1711,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // the reply carries the invoice and its totals
 
     const parsed = z.object({
       email: z.string().email().optional(),
@@ -1778,6 +1792,10 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       sentAt: new Date(), sentToEmail: to, updatedAt: new Date(),
     }).where(eq(crmInvoices.id, inv.id)).returning();
     await emitCrmEvent(ctx.org.id, "invoice.sent", { invoiceId: inv.id, to });
+    logActivity(ctx, "invoice.sent", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
+    });
     res.json({ invoice: row, link, emailed, emailError });
   });
 

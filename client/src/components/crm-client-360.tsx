@@ -196,9 +196,11 @@ export function CustomerTimeline({ customerId }: { customerId: string }) {
   // The accountability feed (audit log) folds into the same list. It is
   // manageJobs-gated server-side — a member without it just sees the
   // client-behaviour feed, never an error.
+  const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const { data: audit } = useQuery<any[]>({
     queryKey: [`/api/crm/customers/${customerId}/activity`],
     retry: false,
+    enabled: me?.permissions?.manageJobs === true,
   });
   const merged = [...(entries ?? []), ...(audit ?? [])]
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());

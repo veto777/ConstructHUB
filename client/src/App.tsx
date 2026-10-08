@@ -23,6 +23,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmPaywall } from "@/components/crm-plans";
 import { CrmRibbon } from "@/components/crm-ribbon";
+import { CrmAccessGate } from "@/components/crm-access";
 import { AppTabBar } from "@/components/app-tabbar";
 import { inNativeApp } from "@/lib/app-shell";
 import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
@@ -476,6 +477,8 @@ function CrmPlanGate({ children }: { children: React.ReactNode }) {
 function PortalRouter() {
   return (
     <Suspense fallback={null}>
+    {/* A page the seat's permissions don't cover shows "ask your admin" (shared/crm-access.ts). */}
+    <CrmAccessGate>
     <Switch>
       <Route path="/" component={CrmHomePage} />
       <Route path="/crm" component={CrmHomePage} />
@@ -527,6 +530,7 @@ function PortalRouter() {
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
     </Switch>
+    </CrmAccessGate>
     </Suspense>
   );
 }

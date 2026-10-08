@@ -27,6 +27,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { CRM_ESTIMATES_MENU, crmHasAny } from "@shared/crm-access";
 
 /**
  * The CRM's own sidebar — slimmer and quieter than the marketing app's, but
@@ -37,6 +38,8 @@ const NAV: {
   title: string; url: string; icon: LucideIcon; testid: string;
   /** Permission required to see this item; undefined = everyone. */
   perm?: string;
+  /** …or any one of several. */
+  anyOf?: readonly string[];
   /** Platform admins only (ConstructHUB staff — see /api/crm/me). */
   platformAdmin?: boolean;
   active: (l: string) => boolean;
@@ -60,15 +63,21 @@ const NAV: {
   // JobCam: every member shoots (field crews included) — no permission gate; the API scopes by project visibility.
   { title: "JobCam", url: "/crm/jobcam", icon: Camera, testid: "link-portal-nav-jobcam",
     active: (l: string) => l.startsWith("/crm/jobcam") || /^\/crm\/projects\/[^/]+\/jobcam/.test(l) },
+  // Offered to the seats that write estimates or may see prices; a price-blind crew reaches the
+  // estimate on one of their own jobs from the job page (scope lines, no money).
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "link-portal-nav-estimates",
+    anyOf: CRM_ESTIMATES_MENU,
     active: (l: string) => l.startsWith("/crm/estimates") },
   // Invoices carry money — hidden from members without seePrices, like the API.
   { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "link-portal-nav-invoices",
     perm: "seePrices",
     active: (l: string) => l.startsWith("/crm/invoices") },
+  // The price book and payments are money — hidden without seePrices, like the API (which refuses them).
   { title: "Price book", url: "/crm/pricebook", icon: BookOpen, testid: "link-portal-nav-pricebook",
+    perm: "seePrices",
     active: (l: string) => l.startsWith("/crm/pricebook") },
   { title: "Payments", url: "/crm/payments", icon: CreditCard, testid: "link-portal-nav-payments",
+    perm: "seePrices",
     active: (l: string) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "link-portal-nav-team",
     active: (l: string) => l.startsWith("/crm/team") },
@@ -99,9 +108,11 @@ export function CrmSidebar() {
   });
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   // Unanswered client messages — the badge that makes silence loud.
+  // Only asked for by the seats that have an inbox (the API refuses the rest).
   const { data: inboxSummary } = useQuery<{ unreadTotal: number }>({
     queryKey: ["/api/crm/inbox"],
     refetchInterval: 30_000,
+    enabled: me?.permissions?.manageCustomers === true,
   });
   const msgUnread = inboxSummary?.unreadTotal ?? 0;
 
@@ -170,7 +181,7 @@ export function CrmSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="px-2 gap-1 group-data-[collapsible=icon]:px-0">
               {NAV.filter((item) =>
-                (!item.perm || me?.permissions?.[item.perm] === true) &&
+                crmHasAny(me?.permissions, item.anyOf ?? (item.perm ? [item.perm] : [])) &&
                 (!item.platformAdmin || me?.isPlatformAdmin === true),
               ).map((item) => (
                 <SidebarMenuItem key={item.url}>

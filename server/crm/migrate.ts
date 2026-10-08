@@ -15,7 +15,7 @@ import {
   crmCustomers, crmEstimates, crmEstimateItems, crmInvoices, crmInvoiceItems,
 } from "@shared/schema";
 import { and, eq, isNull, or, sql } from "drizzle-orm";
-import { requireOrg, requirePermission, type OrgContext } from "./tenancy";
+import { requireOrg, requirePermission, requireAnyPermission, type OrgContext } from "./tenancy";
 import { recalcEstimate } from "./entities";
 import { lockDocNumbers, nextDocNumber, type DocNumberPrefix } from "./doc-number";
 import { sendWithFallback } from "../email";
@@ -293,6 +293,8 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
   app.post("/api/crm/migrate/preview", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
+    // The import tool is for the seats that could run the import itself.
+    if (!requireAnyPermission(res, ctx, ["manageCustomers", "manageEstimates", "manageInvoices"])) return;
 
     const entity = String(req.body?.entity || "") as MigrateEntity;
     if (!(MIGRATE_ENTITIES as readonly string[]).includes(entity)) {
@@ -445,7 +447,8 @@ export function registerCrmMigrateRoutes(app: Express, getDevUser: GetUser): voi
    * and tells the contractor a human will reach out.
    */
   app.post("/api/crm/migrate/assisted", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // Asking ConstructHUB to migrate the company's data is a company decision.
+    const ctx = await ctxFor(req, res, "manageSettings");
     if (!ctx) return;
 
     const system = String(req.body?.system || "");

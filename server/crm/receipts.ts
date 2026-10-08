@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { logActivity } from "./activity";
 import { companyBranding, resolveInvoiceDivision, type CompanyBranding } from "./divisions";
 import { sendWithFallback } from "../email";
 
@@ -232,6 +233,7 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [inv] = await db.select().from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
@@ -248,6 +250,7 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [inv] = await db.select().from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
@@ -281,6 +284,10 @@ export function registerCrmReceiptRoutes(app: Express, getDevUser: GetUser): voi
     }
 
     await noteReceiptEmail(inv, to, emailed).catch(() => {});
+    logActivity(ctx, "receipt.sent", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, to, emailed },
+    });
     res.json({ receipt, to, emailed, emailError });
   });
 }

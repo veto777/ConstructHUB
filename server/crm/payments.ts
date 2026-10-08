@@ -170,6 +170,11 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!ctx) return;
 
     const acct = await activeAccount(ctx.org.id);
+    // Every member may learn WHETHER online payment works (the take-payment
+    // dialog and the Payments page need it). Which Stripe account it is — id,
+    // business name, email, the last error — is for the seats that run the
+    // company's money or its integrations.
+    const detail = ctx.permissions.manageIntegrations || ctx.permissions.manageSettings || ctx.permissions.takePayment;
     res.json({
       configured: stripeConnectConfigured(),
       // Tell the operator exactly which env var is missing rather than failing silently.
@@ -178,11 +183,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         ...(!CONNECT_CLIENT_ID ? ["STRIPE_CONNECT_CLIENT_ID"] : []),
       ],
       account: acct ? {
-        id: acct.id, provider: acct.provider, externalAccountId: acct.externalAccountId,
-        livemode: acct.livemode, chargesEnabled: acct.chargesEnabled,
+        provider: acct.provider, livemode: acct.livemode, chargesEnabled: acct.chargesEnabled,
         achEnabled: acct.achEnabled, cardEnabled: acct.cardEnabled,
-        businessName: acct.businessName, accountEmail: acct.accountEmail,
-        country: acct.country, lastCheckedAt: acct.lastCheckedAt, lastError: acct.lastError,
+        ...(detail ? {
+          id: acct.id, externalAccountId: acct.externalAccountId,
+          businessName: acct.businessName, accountEmail: acct.accountEmail,
+          country: acct.country, lastCheckedAt: acct.lastCheckedAt, lastError: acct.lastError,
+        } : {}),
       } : null,
       // Stated up front, in the product, per the spec's honesty requirement.
       disclosure: {
@@ -445,6 +452,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "takePayment")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [inv] = await db.select().from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
@@ -486,6 +494,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "takePayment")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [est] = await db.select().from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
@@ -518,7 +527,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (ok) {
       logActivity(ctx, "payment.link.created", {
         entityType: "estimate", entityId: est.id, customerId: est.customerId,
-        meta: { number: est.number, amountCents: amount },
+        meta: { number: est.number, amountCents: amount, kind: "estimate" },
       });
     }
   });

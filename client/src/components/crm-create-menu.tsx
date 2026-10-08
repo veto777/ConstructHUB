@@ -551,16 +551,22 @@ export function CrmCreateMenu({ trigger, onNavigate }: {
   const [invoiceOpen, setInvoiceOpen] = useState(false);
   const [messageOpen, setMessageOpen] = useState(false);
 
+  // A seat that can create nothing (a field crew by default) gets no Create button at all.
+  const canCreateAnything = perms.manageEstimates === true || perms.manageInvoices === true || perms.manageCustomers === true;
+  if (me && !canCreateAnything) return null;
+
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-52" data-testid="create-menu">
-          {/* Estimate is ungated, like the ribbon's one-tap "New estimate". */}
-          <DropdownMenuItem data-testid="create-item-estimate"
-            onSelect={() => { navigate("/crm/estimates/new"); onNavigate?.(); }}>
-            <FileText className="h-4 w-4 mr-2" /> Estimate
-          </DropdownMenuItem>
+          {/* Each entry needs the permission its API route enforces — nothing here leads to a refusal. */}
+          {perms.manageEstimates === true && (
+            <DropdownMenuItem data-testid="create-item-estimate"
+              onSelect={() => { navigate("/crm/estimates/new"); onNavigate?.(); }}>
+              <FileText className="h-4 w-4 mr-2" /> Estimate
+            </DropdownMenuItem>
+          )}
           {perms.manageInvoices === true && (
             <DropdownMenuItem data-testid="create-item-invoice" onSelect={() => setInvoiceOpen(true)}>
               <ReceiptText className="h-4 w-4 mr-2" /> Invoice
