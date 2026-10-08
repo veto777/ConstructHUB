@@ -172,8 +172,17 @@ export type GenerateResult = { entry: LedgerEntry; paid: boolean };
  *   · the same key with other params        → refused: that is a new take
  *   · failed / nsfw / canceled before       → refused: ask for a new take (it was not charged)
  */
-export async function generate(o: { input: GenerateInput; ledger: Ledger; save: (l: Ledger) => void; creds: Creds; io: Io }): Promise<GenerateResult> {
+export async function generate(o: {
+  input: GenerateInput; ledger: Ledger; save: (l: Ledger) => void; creds: Creds; io: Io;
+  /**
+   * Serialises the paid step across processes (several producers at once): the cap check and the
+   * reservation run inside it, after `refresh` has read in what other runs reserved — so two runs can never
+   * both pass the cap check on the same headroom.
+   */
+  paidLock?: <T>(fn: () => Promise<T>) => Promise<T>; refresh?: (l: Ledger) => void;
+}): Promise<GenerateResult> {
   const { input: g, ledger, save, creds, io } = o;
+  const paidLock = o.paidLock ?? (<T>(fn: () => Promise<T>) => fn());
   const paramsSha256 = sha(canonical({ model: g.model, params: g.identity ?? g.params }));
   let e = ledger.entries.find((x) => x.key === g.key), paid = false;
   if (e && e.paramsSha256 !== paramsSha256) throw new Error(`${g.key} is in the ledger with other parameters — a changed prompt or model is a new take, never a silent second charge`);
@@ -181,12 +190,18 @@ export async function generate(o: { input: GenerateInput; ledger: Ledger; save: 
 
   if (!e) {
     const price = await estimate(io, creds, g.model, g.params);
-    assertWithinBudget(ledger, price.credits, g.key);
-    e = {
-      key: g.key, kind: g.kind, model: g.model, params: g.params, paramsSha256, idempotencyKey: `gator-${sha(`${g.key}\n${paramsSha256}`).slice(0, 40)}`,
-      credits: price.credits, usd: price.usd, status: "reserved", requestId: null, statusUrl: null, createdAt: io.now().toISOString(),
-    };
-    ledger.entries.push(e); save(ledger);
+    e = await paidLock(async () => {
+      o.refresh?.(ledger);
+      const again = ledger.entries.find((x) => x.key === g.key);
+      if (again) throw new Error(`${g.key} was reserved by another run meanwhile — run again to pick it up (nothing is paid twice)`);
+      assertWithinBudget(ledger, price.credits, g.key);
+      const r: LedgerEntry = {
+        key: g.key, kind: g.kind, model: g.model, params: g.params, paramsSha256, idempotencyKey: `gator-${sha(`${g.key}\n${paramsSha256}`).slice(0, 40)}`,
+        credits: price.credits, usd: price.usd, status: "reserved", requestId: null, statusUrl: null, createdAt: io.now().toISOString(),
+      };
+      ledger.entries.push(r); save(ledger);
+      return r;
+    });
     paid = true;
   }
   if (e.status === "reserved") {

@@ -70,6 +70,26 @@ function saveLedger(l: Ledger): void {
   } finally { fs.rmdirSync(lock); }
 }
 
+/**
+ * The paid step's lock: one producer at a time between "is there room under the cap?" and "reserved" in the
+ * ledger, whatever number of runs are going (a directory lock beside the ledger; a holder that died is cleared
+ * after two minutes). `refreshLedger` reads in the entries other runs wrote, so they count towards the cap here.
+ */
+export async function paidLock<T>(fn: () => Promise<T>): Promise<T> {
+  fs.mkdirSync(OUT, { recursive: true });
+  const lock = `${LEDGER}.paid.lock`;
+  for (let i = 0; ; i++) {
+    try { fs.mkdirSync(lock); break; }
+    catch { try { if (Date.now() - fs.statSync(lock).mtimeMs > 120_000) fs.rmdirSync(lock); } catch { /* gone */ } if (i > 6000) throw new Error("the paid-call lock is held by another run"); await sleep(50); }
+  }
+  try { return await fn(); } finally { try { fs.rmdirSync(lock); } catch { /* gone */ } }
+}
+export function refreshLedger(l: Ledger): void {
+  if (!fs.existsSync(LEDGER)) return;
+  const rank = (e: { status: string }) => (e.status === "reserved" ? 0 : e.status === "submitted" ? 1 : 2);
+  for (const e of (JSON.parse(fs.readFileSync(LEDGER, "utf8")) as Ledger).entries) { const i = l.entries.findIndex((x) => x.key === e.key); if (i < 0) l.entries.push(e); else if (rank(e) > rank(l.entries[i])) l.entries[i] = e; }
+}
+
 type Takes = { stills: Record<string, number>; videos: Record<string, number> };
 const takesFile = (id: string) => path.join(OUT, id, "takes.json");
 const readTakes = (id: string): Takes => (fs.existsSync(takesFile(id)) ? JSON.parse(fs.readFileSync(takesFile(id), "utf8")) : { stills: {}, videos: {} });
@@ -107,7 +127,7 @@ async function liveSheet(ledger: Ledger, io: Io, creds: Creds, retake = false): 
   let take = liveTake();
   if (!take || retake) { take++; fs.writeFileSync(path.join(LIVE_DIR, "take.json"), JSON.stringify({ take }) + "\n"); }
   const file = path.join(LIVE_DIR, `sheet-take${take}.png`), params = { prompt: LIVE_SHEET_PROMPT, resolution: "2k", aspect_ratio: "9:16", quality: "medium" };
-  const r = await generate({ input: { key: `_live/sheet/still/take${take}`, kind: "image", model: PILOT.image.model, params, file }, ledger, save: saveLedger, creds, io });
+  const r = await generate({ input: { key: `_live/sheet/still/take${take}`, kind: "image", model: PILOT.image.model, params, file }, ledger, save: saveLedger, creds, io, paidLock, refresh: refreshLedger });
   if (r.paid) io.log(`  live model sheet take ${take}: ${rel(file)}  (${r.entry.credits} credits) — LOOK at it before any live still is drawn from it`);
   return { urls: [r.entry.outputUrl!], shas: [r.entry.sha256!] };
 }
@@ -228,7 +248,7 @@ async function makeStills(c: Concept, only: string | null, ledger: Ledger, io: I
     // A finished take is never asked for again — not even when the wording has changed since (that is what a retake is for).
     if (ledger.entries.find((e) => e.key === stillKey(c, s.id, take))?.status === "completed" && fs.existsSync(file)) { io.log(`  still ${s.id} take ${take}: ${rel(file)}  (already paid for — nothing asked)`); continue; }
     await assertClipBudget(ledger, c, PILOT.image.model, params, io, creds);
-    const r = await generate({ input: { key: stillKey(c, s.id, take), kind: "image", model: PILOT.image.model, params, identity: s.rawStill ? params : { ...params, image_urls: refs.shas }, file }, ledger, save: saveLedger, creds, io });
+    const r = await generate({ input: { key: stillKey(c, s.id, take), kind: "image", model: PILOT.image.model, params, identity: s.rawStill ? params : { ...params, image_urls: refs.shas }, file }, ledger, save: saveLedger, creds, io, paidLock, refresh: refreshLedger });
     io.log(`  still ${s.id} take ${take}: ${rel(file)}${r.paid ? `  (${r.entry.credits} credits)` : "  (already paid for — nothing asked)"}`);
   }
 }
@@ -244,10 +264,13 @@ async function makeVideos(c: Concept, only: string | null, ledger: Ledger, io: I
     const wanted = s.video === "talk" ? [...new Set([...Array.from({ length: Math.max(1, talkTakes) }, (_x, i) => i + 1), first])] : [first];
     for (const take of wanted) {
       const file = videoFile(c, s.id, st, take);
+      const before = ledger.entries.find((e) => e.key === videoKey(c, s.id, st, take));
+      // A take Higgsfield refused or failed (never charged) is skipped, unless it is the one asked for: a retake goes past it.
+      if (take !== first && before && !["reserved", "submitted", "completed"].includes(before.status)) { io.log(`  video ${s.id} take ${take}: ${before.status} earlier (not charged) — skipped`); continue; }
       if (ledger.entries.find((e) => e.key === videoKey(c, s.id, st, take))?.status === "completed" && fs.existsSync(file)) { io.log(`  video ${s.id} take ${take}: ${rel(file)}  (already paid for — nothing asked)`); continue; }
       const audio = s.video === "wan-talk" ? await drivingAudio(s, io, creds) : null;
       await assertClipBudget(ledger, c, videoModel(s), videoParams(s, still.outputUrl, audio?.url), io, creds);
-      const r = await generate({ input: { key: videoKey(c, s.id, st, take), kind: "video", model: videoModel(s), params: videoParams(s, still.outputUrl, audio?.url), identity: { ...videoParams(s, "", audio?.sha), still: still.sha256 }, file }, ledger, save: saveLedger, creds, io });
+      const r = await generate({ input: { key: videoKey(c, s.id, st, take), kind: "video", model: videoModel(s), params: videoParams(s, still.outputUrl, audio?.url), identity: { ...videoParams(s, "", audio?.sha), still: still.sha256 }, file }, ledger, save: saveLedger, creds, io, paidLock, refresh: refreshLedger });
       io.log(`  video ${s.id} take ${take} (${s.video ?? "kling"}, from still take ${st}): ${rel(file)}${r.paid ? `  (${r.entry.credits} credits)` : "  (already paid for — nothing asked)"}`);
     }
     if (s.video !== "talk" || !s.say) continue;

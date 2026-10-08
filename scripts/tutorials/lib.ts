@@ -23,7 +23,8 @@ fs.mkdirSync(WORK_DIR, { recursive: true });
 /** The voice engine answers LIVE customer calls: one TTS request at a time across ALL producers. */
 export const TTS_LOCK = path.join(WORK_DIR, "tts.lock");
 /** One ffmpeg at a time across all producers (this box also serves production). */
-export const ENCODE_LOCK = path.join(WORK_DIR, "encode.lock");
+// ENCODE_SLOTS=N (a box that may run N encodes at once): each process takes one of N slot locks instead.
+export const ENCODE_LOCK = Number(process.env.ENCODE_SLOTS) > 1 ? path.join(WORK_DIR, `encode-${process.pid % Number(process.env.ENCODE_SLOTS)}.lock`) : path.join(WORK_DIR, "encode.lock");
 /** Narration clips by hash of persona + text — a re-record, in any slot or working copy, asks the engine for nothing. */
 export const TTS_CACHE = path.join(WORK_DIR, "tts-cache");
 
