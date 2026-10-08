@@ -1,0 +1,160 @@
+{
+ "id": "ep04-cut",
+ "format": "cutaway",
+ "music": "dodging-lights",
+ "accent": "whoosh",
+ "ownerAcceptedRisk": {
+  "by": "the owner of ConstructHUB",
+  "date": "2026-10-08",
+  "quote": "Do what I am asking you to do!"
+ },
+ "sequence": [
+  {
+   "fail": {
+    "file": "_sources/4HmTgOLTQsE.mp4",
+    "in": 344.63,
+    "out": 348.4,
+    "impact": 346.5,
+    "crop": {
+     "x": 656,
+     "y": 0,
+     "w": 608,
+     "h": 1080
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip A-0544 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+     "source": "https://youtu.be/4HmTgOLTQsE",
+     "channel": "Adam the Site Manager"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-shocked-02-spit-take.mp4",
+   "sec": 1.7,
+   "lead": 0.35
+  },
+  {
+   "fail": {
+    "file": "_sources/4HmTgOLTQsE.mp4",
+    "in": 4.2,
+    "out": 6.1,
+    "impact": 5.3,
+    "crop": {
+     "x": 519,
+     "y": 0,
+     "w": 882,
+     "h": 1080
+    },
+    "frame": {
+     "x0": 0.32,
+     "x1": 0.55
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip A-0004 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: @Unique_Hu_Yaar)",
+     "source": "https://youtu.be/4HmTgOLTQsE",
+     "channel": "Adam the Site Manager"
+    }
+   }
+  },
+  {
+   "fail": {
+    "file": "_sources/4HmTgOLTQsE.mp4",
+    "in": 646.7,
+    "out": 652.56,
+    "impact": 651.2,
+    "crop": {
+     "x": 656,
+     "y": 0,
+     "w": 608,
+     "h": 1080
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip A-1046 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+     "source": "https://youtu.be/4HmTgOLTQsE",
+     "channel": "Adam the Site Manager"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-annoyed-10-facepalm.mp4",
+   "sec": 1.6,
+   "lead": 0.5
+  },
+  {
+   "fail": {
+    "file": "_sources/4HmTgOLTQsE.mp4",
+    "in": 511.47,
+    "out": 513.85,
+    "impact": 512.95,
+    "crop": {
+     "x": 656,
+     "y": 0,
+     "w": 608,
+     "h": 1080
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip A-0831 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+     "source": "https://youtu.be/4HmTgOLTQsE",
+     "channel": "Adam the Site Manager"
+    }
+   }
+  },
+  {
+   "fail": {
+    "file": "_sources/4HmTgOLTQsE.mp4",
+    "in": 93.63,
+    "out": 97.27,
+    "impact": 96.5,
+    "crop": {
+     "x": 609,
+     "y": 0,
+     "w": 702,
+     "h": 1080
+    },
+    "frame": {
+     "x0": 1
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip A-0133 from the compilation https://youtu.be/4HmTgOLTQsE; original creator unknown (visible handle: none)",
+     "source": "https://youtu.be/4HmTgOLTQsE",
+     "channel": "Adam the Site Manager"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-deadpan-34-slow-sip.mp4",
+   "sec": 2.4,
+   "lead": 0.1
+  },
+  {
+   "fail": {
+    "file": "_sources/kF_a7SNAMPc.mp4",
+    "in": 32.9,
+    "out": 37.55,
+    "impact": 37,
+    "crop": {
+     "x": 0,
+     "y": 0,
+     "w": 608,
+     "h": 1080
+    },
+    "rights": {
+     "kind": "third-party",
+     "record": "clip B-32 from the compilation https://youtu.be/kF_a7SNAMPc; original creator unknown (visible handle: Mister Twist)",
+     "source": "https://youtu.be/kF_a7SNAMPc",
+     "channel": "Mister Twist"
+    }
+   }
+  },
+  {
+   "gator": "_deliver/reaction-annoyed-32-turn-stare.mp4",
+   "sec": 1.4,
+   "lead": 0.5
+  }
+ ]
+}

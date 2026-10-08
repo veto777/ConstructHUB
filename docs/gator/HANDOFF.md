@@ -39,6 +39,18 @@ inside the worktree, `ENCODE_SLOTS=4`), keys in `.env.gator` (`npx tsx --env-fil
 - Next with credit: the missing shocked reactions (03–07: the pack has one shocked), selfie remakes (fall backwards
   mid-word, phone in hand), and the nine stills-only concepts (chalk-line-snap, coffee-ran-out, …).
 
+### 0b. Follow-up the same evening: the silent, between-scenes format (owner: "the gator reacts but doesn't talk";
+"The gator should be in between scenes not overlay")
+
+- `reacts.ts` `"format": "cutaway"`: fails full-frame (fill 9:16, `frame` window/pan from `_sources/framing.json`), the
+  gator only BETWEEN fails, full screen, silent, peak at the start of the beat; opens on a fail, ends on the gator, 30–45 s.
+  Episodes `docs/gator/reacts/ep0N-cut.json` → review folder `reacts-ep0N-cut.mp4` (pending, queue ids `reacts-ep0N-cut`);
+  the talking/PiP `reacts-ep0N` are `rejected` (superseded) in the queue.
+- Reaction pack: 23 silent reactions (4 shocked, 7 annoyed, 12 deadpan; registry `analysis/gator-shorts/_reactions/pack.json`,
+  sheet `reactions-sheet-v2.jpg`); 15 were mined from existing shots (selfies, host-line pauses, doorbell, CCTV, dominoes…).
+- The two compilations are used up: 29 clips framed (A-0138 dropped: occupant risk), re-screen found one weak extra
+  (A-0145). More episodes need more footage or more of our own AI fails (credit). Marks stay (removal declined).
+
 ## 1. What is live and what is scheduled
 
 - Posted 2026-10-08 (the three cartoon pilots): 8 posts on Instagram / TikTok / LinkedIn; the ninth

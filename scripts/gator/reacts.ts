@@ -52,16 +52,48 @@
  * its corner for the whole clip, clear of the bottom 250 px the platforms draw over; full-screen host lines with
  * a caption; a 0.8 s logo-only end tag (never the cartoon mascot: this is a live-gator video); a CC0 music bed
  * low under the clips' own sound; −14 LUFS.
+ *
+ * ── FORMAT 2: "cutaway" (the owner, 2026-10-08: "the gator should be in between scenes, not overlay") ──────────
+ *   npx tsx --env-file=.env.gator scripts/gator/reacts.ts docs/gator/reacts/<id>.json [--owner-accepted-risk] [--out f.mp4]
+ * An episode with "format": "cutaway" is cut fail → hard cut → full-screen silent gator beat → next fail. No PiP, no
+ * captions, no host lines. Same rights rules and output files as above (+ per fail its crop window in source pixels).
+ *   {
+ *     "id": "c01", "format": "cutaway", "music": "sneaking-around",
+ *     "musicLevel": 0.12,                                       // optional: the bed's level (of full scale), ducked under gator beats
+ *     "accent": "whoosh",                                       // optional: a quiet synthesised cue (sound.ts synth: whoosh, thud, tick,
+ *                                                               //   hit, pop, ding) at each cut to a gator; default none
+ *     "ownerAcceptedRisk": { … },                               // only for third-party fails (and the run needs the flag)
+ *     "sequence": [
+ *       { "fail": { "file": "fx-raccoon-plank/videos/s1-still1-take1.mp4", "in": 0.6, "out": 3.4, "impact": 2.7,
+ *                   "crop": { "x": 408, "y": 0, "w": 1104, "h": 1080 },   // optional: the clip's own picture (source px)
+ *                   "frame": { "x0": 0.3, "x1": 0.6, "y": 0.5 },          // optional: where the 9:16 window sits in the slack
+ *                                                                          //   (0 left/top … 1 right/bottom); x0 → x1 pans over the clip
+ *                   "rights": { "kind": "own-ai", "record": "…" } } },
+ *       { "gator": "_deliver/reaction-deadpan-20-glance.mp4", "sec": 1.6, "lead": 0.25, "audio": "keep", "peak": 2.0 },
+ *       …
+ *     ]
+ *   }
+ * The rules (planCutaway, tested): starts with a fail (the hook is in the first second, never the gator first), ends with a
+ * gator; never two gators in a row; no reaction file twice; a gator beat lasts 1.2–2.5 s; the whole runs 30–45 s INCLUDING
+ * the 0.8 s logo-only end tag, else it is refused with the numbers ("testOnlyAllowAnyLength": true lifts only that rule,
+ * for test renders — never on a posted episode). A gator beat plays the reaction from (peak − lead) for `sec` s, so its
+ * peak lands right after the cut; when the file runs out first its last frame is held ("frozenSec" in the sidecar).
+ * peak / lead / audio default from analysis/gator-shorts/_reactions/pack.json (else every _reactions/pack-*.json
+ * merged), keyed by the reaction's file name; without an entry the episode must give "peak" (lead 0, audio mute).
+ * A fail plays in…out at real speed with its own sound, cropped to `crop`, then FILLS 9:16 (scaled to cover — no bars,
+ * no blur, no letterbox). NB: by decision there is NO watermark-removal step here either; a crop/frame must not be
+ * chosen to cut a watermark off.
  */
 import fs from "fs";
 import path from "path";
-import { ROOT, parseArgs, run } from "../tutorials/lib";
+import { ROOT, encodeWav, parseArgs, run } from "../tutorials/lib";
 import { renderStill } from "../tutorials/brand";
 import { LOUDNESS, measureLoudness } from "../tutorials/mux";
 import { endTagHtml } from "./brand";
 import { FPS, H, W, assFile, layoutBeat } from "./layout";
 import { OUT } from "./make";
 import { track } from "./music";
+import { synth, toPcm, RATE, type Cue } from "./sound";
 
 export type Rights =
   | { kind: "own-ai"; record: string }
@@ -160,6 +192,92 @@ export function plan(ep: Episode, durations: Readonly<Record<string, number>>, c
   return { segments, totalSec: t + TAG_SEC };
 }
 
+/* ── FORMAT 2: cutaway ─────────────────────────────────────────────────────────────────────────────────────── */
+export type Frame = { x0?: number; x1?: number; y?: number };
+export type Fail = { file: string; in: number; out: number; impact: number; crop?: Crop; frame?: Frame; rights?: Rights };
+export type GatorBeat = { gator: string; sec?: number; lead?: number; peak?: number; audio?: "keep" | "mute" };
+export type Step = { fail: Fail } | GatorBeat;
+export type CutawayEpisode = {
+  id: string; format: "cutaway"; music?: string; musicLevel?: number; accent?: string; ownerAcceptedRisk?: RiskRecord;
+  sequence: Step[]; /** Test renders only: lifts the 30–45 s rule (nothing else). Never on a posted episode. */ testOnlyAllowAnyLength?: boolean;
+};
+/** One entry of the reaction pack (analysis/gator-shorts/_reactions/pack.json), keyed by the reaction's file name. */
+export type PackEntry = { family?: string; peak?: number; lead?: number; hold?: number; audio?: "keep" | "mute"; verdict?: string };
+export const GATOR_SEC = { min: 1.2, max: 2.5, default: 1.6 }, CUTAWAY_SEC = { min: 30, max: 45 }, MUSIC_LEVEL = 0.12;
+/** The cues an accent may be: our own synthesised sounds only (sound.ts) — short ones. */
+export const ACCENTS = ["whoosh", "thud", "tick", "hit", "pop", "ding"] as const;
+export type CutSegment =
+  | { kind: "fail"; fail: Fail; start: number; sec: number; from: number; impactAt: number }
+  | { kind: "gator"; file: string; start: number; sec: number; from: number; peak: number; lead: number; audio: "keep" | "mute"; /** Seconds of the beat that hold the reaction's last frame (it ran out). */ frozenSec: number }
+  | { kind: "tag"; start: number; sec: number };
+const q = (x: number) => Math.round(x * FPS) / FPS;
+const isGator = (s: Step): s is GatorBeat => typeof (s as GatorBeat).gator === "string";
+export const isCutaway = (ep: unknown): ep is CutawayEpisode => (ep as { format?: string })?.format === "cutaway";
+
+/**
+ * The cutaway timeline. `durations`: seconds of every file used (fails and reaction files). `pack`: reaction defaults by file
+ * name. Pure (tested). Throws on any broken rule, with the numbers; `warnings` carries what a test-only option lifted.
+ */
+export function planCutaway(ep: CutawayEpisode, durations: Readonly<Record<string, number>>, pack: Readonly<Record<string, PackEntry>> = {}, consent: Consent = {}): { segments: CutSegment[]; totalSec: number; warnings: string[] } {
+  const seq = ep.sequence ?? [], warnings: string[] = [];
+  if (!seq.length) throw new Error(`${ep.id}: a cutaway episode needs a sequence`);
+  if (isGator(seq[0])) throw new Error(`${ep.id}: the sequence starts with the gator — it must open on a fail (the hook is in the first second)`);
+  if (!isGator(seq[seq.length - 1])) throw new Error(`${ep.id}: the sequence must end with a gator beat (the last punchline before the end tag)`);
+  if (ep.accent !== undefined && !(ACCENTS as readonly string[]).includes(ep.accent)) throw new Error(`${ep.id}: accent “${ep.accent}” — only our own synthesised cues: ${ACCENTS.join(", ")}`);
+  if (ep.musicLevel !== undefined && !(ep.musicLevel >= 0 && ep.musicLevel <= 0.5)) throw new Error(`${ep.id}: musicLevel ${ep.musicLevel} — 0…0.5 of full scale (default ${MUSIC_LEVEL}; the bed stays low)`);
+  const seen = new Set<string>(), segments: CutSegment[] = []; let t = 0;
+  seq.forEach((step, i) => {
+    if (isGator(step)) {
+      if (i > 0 && isGator(seq[i - 1])) throw new Error(`${ep.id}: step ${i + 1} — two gators in a row (${(seq[i - 1] as GatorBeat).gator}, ${step.gator}); a fail goes between them`);
+      if (seen.has(step.gator)) throw new Error(`${ep.id}: the reaction ${step.gator} is used twice — vary them`);
+      seen.add(step.gator);
+      const d = durations[step.gator], p = pack[path.basename(step.gator)] ?? {};
+      if (!(d > 0)) throw new Error(`${ep.id}: no reaction file ${step.gator}`);
+      const peak = step.peak ?? p.peak, lead = step.lead ?? p.lead ?? 0, audio = step.audio ?? p.audio ?? "mute", sec = q(step.sec ?? GATOR_SEC.default);
+      if (peak === undefined) throw new Error(`${ep.id}: ${step.gator} — no "peak" (not in the reaction pack): give it in the episode`);
+      if (!(peak > 0 && peak < d)) throw new Error(`${ep.id}: ${step.gator} — peak ${peak} is not inside the file (${d} s)`);
+      if (!(lead >= 0 && lead <= 0.5)) throw new Error(`${ep.id}: ${step.gator} — lead ${lead} must be 0…0.5 s (the peak comes right after the cut)`);
+      if (audio !== "keep" && audio !== "mute") throw new Error(`${ep.id}: ${step.gator} — audio “${audio}” is keep or mute`);
+      if (!(sec >= GATOR_SEC.min - 1e-6 && sec <= GATOR_SEC.max + 1e-6)) throw new Error(`${ep.id}: ${step.gator} — a gator beat is ${GATOR_SEC.min}–${GATOR_SEC.max} s, not ${step.sec}`);
+      const from = Math.max(0, peak - lead), frozenSec = Math.max(0, q(sec - (d - from)));
+      segments.push({ kind: "gator", file: step.gator, start: t, sec, from, peak, lead: peak - from, audio, frozenSec }); t += sec;
+      return;
+    }
+    const f = (step as { fail?: Fail }).fail;
+    if (!f || typeof f.file !== "string") throw new Error(`${ep.id}: step ${i + 1} is neither { "fail": {…} } nor { "gator": "…" }`);
+    const no = rightsRefusal(f, { flag: consent.flag, record: consent.record ?? ep.ownerAcceptedRisk }); if (no) throw new Error(no);
+    const d = durations[f.file];
+    if (!(d > 0)) throw new Error(`${ep.id}: no fail file ${f.file}`);
+    if (!(f.in >= 0 && f.out <= d + 1e-6 && f.out > f.in)) throw new Error(`${ep.id}: ${f.file} — in/out (${f.in}…${f.out}) must lie inside its ${d} s, in before out`);
+    if (!(f.impact >= f.in && f.impact <= f.out)) throw new Error(`${ep.id}: ${f.file} — the impact (${f.impact}) is not inside in/out (${f.in}…${f.out})`);
+    if (f.crop && !(f.crop.w > 0 && f.crop.h > 0 && f.crop.x >= 0 && f.crop.y >= 0)) throw new Error(`${ep.id}: ${f.file} — a crop needs x, y ≥ 0 and w, h > 0`);
+    for (const [k, v] of Object.entries(f.frame ?? {})) if (!(typeof v === "number" && v >= 0 && v <= 1)) throw new Error(`${ep.id}: ${f.file} — frame.${k} ${v} must be 0…1`);
+    const sec = q(f.out - f.in);
+    segments.push({ kind: "fail", fail: f, start: t, sec, from: f.in, impactAt: f.impact - f.in }); t += sec;
+  });
+  segments.push({ kind: "tag", start: t, sec: TAG_SEC });
+  const totalSec = t + TAG_SEC;
+  if (totalSec < CUTAWAY_SEC.min - 1e-6 || totalSec > CUTAWAY_SEC.max + 1e-6) {
+    const sum = (k: string) => segments.filter((s) => s.kind === k).reduce((a, s) => a + s.sec, 0).toFixed(2);
+    const why = `${ep.id}: runs ${totalSec.toFixed(2)} s (fails ${sum("fail")} + gators ${sum("gator")} + end tag ${TAG_SEC}) — a cutaway episode is ${CUTAWAY_SEC.min}–${CUTAWAY_SEC.max} s`;
+    if (ep.testOnlyAllowAnyLength !== true) throw new Error(why);
+    warnings.push(`${why} (lifted by testOnlyAllowAnyLength — a test render, not for posting)`);
+  }
+  return { segments, totalSec, warnings };
+}
+/**
+ * How a fail fills 9:16: the picture (after its crop) is scaled to cover 1080×1920, and the 9:16 window sits at
+ * frame.x0 (→ x1, panning) of the horizontal slack, or frame.y of the vertical one. Returns the scale and, in SOURCE
+ * pixels, the window at the clip's start and end. Pure (tested).
+ */
+export function fillWindow(pic: { w: number; h: number }, crop?: Crop, frame: Frame = {}) {
+  const k = crop ?? { x: 0, y: 0, w: pic.w, h: pic.h };
+  const scale = Math.max(W / k.w, H / k.h), sw = Math.max(W, Math.ceil(k.w * scale / 2) * 2), sh = Math.max(H, Math.ceil(k.h * scale / 2) * 2);
+  const x0 = frame.x0 ?? 0.5, x1 = frame.x1 ?? x0, y = frame.y ?? 0.5, slackX = sw - W, slackY = sh - H;
+  const win = (fx: number) => ({ x: Math.round(k.x + (slackX * fx) / scale), y: Math.round(k.y + (slackY * y) / scale), w: Math.round(W / scale), h: Math.round(H / scale) });
+  return { crop: k, scale, sw, sh, slackX, slackY, x0, x1, y, start: win(x0), end: win(x1) };
+}
+
 const FF = ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4"];
 const CODEC = ["-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", "19", "-maxrate", "10M", "-bufsize", "20M", "-pix_fmt", "yuv420p", "-r", String(FPS), "-g", String(FPS * 2), "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2"];
 const probe = async (file: string) => { const j = JSON.parse((await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", file])).stdout); const v = j.streams.find((s: any) => s.codec_type === "video"); return { sec: Number(j.format.duration), w: Number(v.width), h: Number(v.height), audio: j.streams.some((s: any) => s.codec_type === "audio") }; };
@@ -187,7 +305,9 @@ async function main() {
   const args = parseArgs(process.argv.slice(2), ["owner-accepted-risk"]);
   const epFile = args._[0];
   if (!epFile) throw new Error("usage: reacts.ts <episode.json> [--out file.mp4] [--owner-accepted-risk]");
-  const ep = JSON.parse(fs.readFileSync(epFile, "utf8")) as Episode;
+  const raw = JSON.parse(fs.readFileSync(epFile, "utf8")) as unknown;
+  if (isCutaway(raw)) return cutaway(raw, args);
+  const ep = raw as Episode;
   const consent: Consent = { flag: args.flags["owner-accepted-risk"] === true, record: ep.ownerAcceptedRisk };
   for (const c of ep.clips) { const no = rightsRefusal(c, consent); if (no) throw new Error(no); }
   const thirdParty = ep.clips.filter((c) => c.rights?.kind === "third-party");
@@ -249,4 +369,90 @@ async function main() {
   }, null, 2) + "\n");
   console.log(`  ${path.relative(ROOT, out)}  ${totalSec.toFixed(2)} s  ${loud.lufs} LUFS, true peak ${loud.truePeakDb} dBTP  — LOOK at ${path.basename(out.replace(/\.mp4$/, "-review.jpg"))}`);
 }
+/** The reaction pack: pack.json if the coordinator has merged it, else every _reactions/pack-*.json merged (later names win). */
+export function loadPack(dir = path.join(OUT, "_reactions")): Record<string, PackEntry> {
+  const read = (f: string) => JSON.parse(fs.readFileSync(path.join(dir, f), "utf8")) as Record<string, PackEntry>;
+  if (fs.existsSync(path.join(dir, "pack.json"))) return read("pack.json");
+  if (!fs.existsSync(dir)) return {};
+  return Object.assign({}, ...fs.readdirSync(dir).filter((f) => /^pack-.+\.json$/.test(f)).sort().map(read));
+}
+
+async function cutaway(ep: CutawayEpisode, args: ReturnType<typeof parseArgs>) {
+  const consent: Consent = { flag: args.flags["owner-accepted-risk"] === true, record: ep.ownerAcceptedRisk };
+  const fails = (ep.sequence ?? []).flatMap((s) => ("fail" in s && s.fail ? [s.fail] : []));
+  for (const f of fails) { const no = rightsRefusal(f, consent); if (no) throw new Error(no); }
+  const thirdParty = fails.filter((f) => f.rights?.kind === "third-party");
+  if (thirdParty.length) console.warn(`  ⚠ THIRD-PARTY FOOTAGE (unlicensed): ${thirdParty.length} clip(s) from ${[...new Set(thirdParty.map((f) => (f.rights as { channel: string }).channel))].join(", ")} — used on the owner's accepted risk (${ep.ownerAcceptedRisk!.by}, ${ep.ownerAcceptedRisk!.date}). Copyright claims, takedowns and account strikes are possible. Watermarks are kept.`);
+  const out = typeof args.flags.out === "string" ? path.resolve(args.flags.out) : path.join(OUT, "_reacts", `reacts-${ep.id}.mp4`);
+  const work = path.join(OUT, "_reacts", `.work-${ep.id}`); fs.mkdirSync(work, { recursive: true });
+  const w = (f: string) => path.join(work, f);
+  const durations: Record<string, number> = {}, info: Record<string, Awaited<ReturnType<typeof probe>>> = {};
+  for (const s of ep.sequence ?? []) {
+    const file = "fail" in s && s.fail ? s.fail.file : (s as GatorBeat).gator;
+    if (typeof file !== "string") continue;
+    info[file] ??= await probe(sourceOf(file)); durations[file] = info[file].sec;
+  }
+  for (const f of fails) { const k = f.crop, ci = info[f.file]; if (k && (k.x + k.w > ci.w || k.y + k.h > ci.h)) throw new Error(`${f.file}: the crop ${k.w}x${k.h}+${k.x}+${k.y} is outside the ${ci.w}x${ci.h} picture`); }
+  const { segments, totalSec, warnings } = planCutaway(ep, durations, loadPack(), consent);
+  for (const x of warnings) console.warn(`  ⚠ ${x}`);
+  const parts: string[] = [], windows: Record<number, ReturnType<typeof fillWindow>> = {};
+  for (const [i, s] of segments.entries()) {
+    const part = w(`cut${String(i).padStart(2, "0")}.mp4`); parts.push(part);
+    if (s.kind === "tag") {
+      // Logo only — endTagHtml(false) has no mascot: the cartoon gator never closes a live-gator video.
+      await renderStill(endTagHtml(false), w("end.png"), W, { size: { width: W, height: H } });
+      await run("ffmpeg", [...FF, "-loop", "1", "-t", String(s.sec), "-i", w("end.png"), "-f", "lavfi", "-t", String(s.sec), "-i", "anullsrc=r=48000:cl=stereo", "-vf", `${FILL},format=yuv420p`, ...CODEC, "-t", String(s.sec), part], { nice: true });
+    } else if (s.kind === "fail") {
+      // Cropped to the clip's own picture, scaled to COVER 9:16 and windowed (panning x0 → x1) — no bars, no blur.
+      // NB: no step here removes, blurs or covers a watermark — by decision.
+      const ci = info[s.fail.file], fw = fillWindow(ci, s.fail.crop, s.fail.frame); windows[i] = fw;
+      const k = fw.crop, pre = s.fail.crop ? `crop=${Math.round(k.w)}:${Math.round(k.h)}:${Math.round(k.x)}:${Math.round(k.y)},` : "";
+      const p = `min(1,t/${s.sec.toFixed(3)})`, x = `${fw.slackX}*(${fw.x0}+(${fw.x1 - fw.x0})*${p})`, y = `${Math.round(fw.slackY * fw.y)}`;
+      const vf = `[0:v]${pre}fps=${FPS},scale=${fw.sw}:${fw.sh},crop=${W}:${H}:x='${x}':y=${y},setsar=1,format=yuv420p[v]`;
+      const af = ci.audio ? `[0:a]${A},apad[a]` : `anullsrc=r=48000:cl=stereo[a]`;
+      await run("ffmpeg", [...FF, "-ss", s.from.toFixed(3), "-t", s.sec.toFixed(3), "-i", sourceOf(s.fail.file), "-filter_complex", `${vf};${af}`, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", s.sec.toFixed(3), part], { nice: true });
+    } else {
+      // The reaction from (peak − lead), full screen; when the file runs out its last frame is held (frozenSec).
+      const ri = info[s.file], hold = s.frozenSec + 0.2;
+      const vf = `[0:v]${FILL},tpad=stop_mode=clone:stop_duration=${hold.toFixed(3)},format=yuv420p[v]`;
+      const af = s.audio === "keep" && ri.audio ? `[0:a]${A},apad[a]` : `anullsrc=r=48000:cl=stereo[a]`;
+      await run("ffmpeg", [...FF, "-ss", s.from.toFixed(3), "-i", sourceOf(s.file), "-filter_complex", `${vf};${af}`, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", s.sec.toFixed(3), part], { nice: true });
+    }
+  }
+  // Music bed low under everything (a little lower under the gator beats), fading out; an optional quiet synthesised
+  // accent at each cut to a gator; then the same compressor / limiter / loudnorm chain as the PiP format → −14 LUFS.
+  const music = await track(ep.music ?? "sneaking-around"), level = ep.musicLevel ?? MUSIC_LEVEL;
+  const gators = segments.filter((s) => s.kind === "gator");
+  const duck = gators.map((s) => `between(t,${s.start.toFixed(2)},${(s.start + s.sec).toFixed(2)})`).join("+") || "0";
+  const inputs = [...parts.flatMap((p) => ["-i", p]), "-i", music];
+  let accent = "", mixIn = "[body][m]", mixN = 2;
+  if (ep.accent) {
+    const cues = gators.map((s) => ({ type: ep.accent, at: s.start, gain: 0.5 }) as Cue);
+    fs.writeFileSync(w("accent.wav"), encodeWav({ sampleRate: RATE, samples: toPcm(synth(cues, totalSec)) }));
+    inputs.push("-i", w("accent.wav"));
+    accent = `;[${parts.length + 1}:a]${A},volume=0.18[x]`; mixIn += "[x]"; mixN = 3;
+  }
+  // Each part's audio is cut to its exact length first: the decoded AAC runs a few ms long, and concat would push every
+  // later cut a frame or two late (measured: +2 frames by the 4th cut).
+  const exact = segments.map((s, i) => `[${i}:a]apad,atrim=end=${s.sec.toFixed(4)},asetpts=PTS-STARTPTS[a${i}]`).join(";");
+  const graph = `${exact};${parts.map((_p, i) => `[${i}:v][a${i}]`).join("")}concat=n=${parts.length}:v=1:a=1[v][body];[${parts.length}:a]${A},atrim=start=2:duration=${totalSec.toFixed(3)},asetpts=PTS-STARTPTS,volume='if(${duck},${(level * 0.7).toFixed(3)},${level.toFixed(3)})':eval=frame,afade=t=out:st=${Math.max(0, totalSec - 1.2).toFixed(2)}:d=1.2[m]${accent};${mixIn}amix=inputs=${mixN}:duration=first:normalize=0,acompressor=threshold=-24dB:ratio=4:attack=3:release=140:makeup=6,alimiter=limit=0.84:level=false,loudnorm=I=${LOUDNESS.I}:TP=-1.5:LRA=${LOUDNESS.LRA},alimiter=limit=0.84:level=false,${A}[a]`;
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  await run("ffmpeg", [...FF, ...inputs, "-filter_complex", graph, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", totalSec.toFixed(3), "-movflags", "+faststart", out], { nice: true });
+  const loud = await measureLoudness(out);
+  await run("ffmpeg", [...FF, "-i", out, "-vf", `fps=2,scale=180:320,tile=${Math.min(12, Math.ceil(totalSec * 2 / 4))}x4`, "-frames:v", "1", "-q:v", "3", out.replace(/\.mp4$/, "-review.jpg")], { nice: true });
+  const r2 = (n: number) => Math.round(n * 1000) / 1000;
+  fs.writeFileSync(out.replace(/\.mp4$/, ".json"), JSON.stringify({
+    id: ep.id, format: "cutaway", seconds: r2(totalSec), lufs: loud.lufs, truePeakDb: loud.truePeakDb, music: ep.music ?? "sneaking-around", musicLevel: level, accent: ep.accent ?? null,
+    ...(warnings.length ? { testOnly: true, warnings } : {}),
+    segments: segments.map((s, i) => s.kind === "fail"
+      ? { fail: s.fail.file, in: s.fail.in, out: s.fail.out, start: r2(s.start), sec: r2(s.sec), impactAt: r2(s.start + s.impactAt), rights: s.fail.rights,
+          fill: { picture: windows[i].crop, scale: r2(windows[i].scale), windowAtStart: windows[i].start, windowAtEnd: windows[i].end } }
+      : s.kind === "gator" ? { gator: s.file, start: r2(s.start), sec: r2(s.sec), from: r2(s.from), peak: s.peak, lead: r2(s.lead), audio: s.audio, frozenSec: r2(s.frozenSec) }
+      : { tag: true, start: r2(s.start), sec: s.sec }),
+    sources: fails.map((f) => ({ clip: f.file, kind: f.rights?.kind, ...(f.rights?.kind === "third-party" ? { source: f.rights.source, channel: f.rights.channel } : f.rights?.kind === "cc-by" ? { source: f.rights.url } : {}) })),
+    credits: creditsOf({ id: ep.id, clips: fails.map((f) => ({ ...f, reaction: "" })) }), ...(thirdParty.length ? { thirdParty: true, ownerAcceptedRisk: ep.ownerAcceptedRisk } : {}),
+  }, null, 2) + "\n");
+  console.log(`  ${path.relative(ROOT, out)}  ${totalSec.toFixed(2)} s  ${loud.lufs} LUFS, true peak ${loud.truePeakDb} dBTP  — LOOK at ${path.basename(out.replace(/\.mp4$/, "-review.jpg"))}`);
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().then(() => process.exit(0), (e) => { console.error(`\n✗ ${e instanceof Error ? e.message : e}`); process.exit(1); });

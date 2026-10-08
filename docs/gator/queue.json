@@ -706,7 +706,7 @@
       "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
     },
     "reacts-ep01": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:47.292Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -720,10 +720,10 @@
       "review": [
         "reacts-ep01.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep01-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep02": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:48.148Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -737,10 +737,10 @@
       "review": [
         "reacts-ep02.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep02-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep03": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:48.983Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -754,10 +754,10 @@
       "review": [
         "reacts-ep03.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep03-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep04": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:49.814Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -771,10 +771,10 @@
       "review": [
         "reacts-ep04.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep04-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep05": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:50.651Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -788,10 +788,10 @@
       "review": [
         "reacts-ep05.mp4"
       ],
-      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+      "why": "superseded by reacts-ep05-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
     },
     "reacts-ep06": {
-      "status": "ready-for-review",
+      "status": "rejected",
       "at": "2026-10-08T13:53:51.490Z",
       "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
       "caption": [
@@ -804,6 +804,108 @@
       },
       "review": [
         "reacts-ep06.mp4"
+      ],
+      "why": "superseded by reacts-ep06-cut: the owner asked for a silent gator, between scenes, not over them (2026-10-08)"
+    },
+    "reacts-ep01-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:41.331Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: gravity always wins.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep01-cut.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep02-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:42.246Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: heavy machinery.",
+        "Clips: Adam the Site Manager (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep02-cut.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep03-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:43.054Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: load handling.",
+        "Clips: Adam the Site Manager (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep03-cut.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep04-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:43.913Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: bad decisions.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep04-cut.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep05-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:44.781Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: site chaos.",
+        "Clips: Adam the Site Manager and Mister Twist (YouTube)."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep05-cut.mp4"
+      ],
+      "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
+    },
+    "reacts-ep06-cut": {
+      "status": "ready-for-review",
+      "at": "2026-10-08T14:24:45.659Z",
+      "by": "made by the coordinator (account c) on 2026-10-08; waiting for the owner's review",
+      "caption": [
+        "Gator Reacts: the crew.",
+        "Nobody on this crew reads the manual."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "reacts-ep06-cut.mp4"
       ],
       "why": "pending: in the owner's review folder since 2026-10-08, waiting for his review"
     }
