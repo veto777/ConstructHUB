@@ -32,6 +32,7 @@ import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
   reportInput, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
+  effectiveReport, fetchAdsSnapshot, adsPage, ADS_MAX, ADS_ESTIMATE_USD, ADS_TYPICAL_USD, type AdsSnapshot,
   CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
   type ReportPage, type KeywordOverview,
 } from "./reports";
@@ -68,6 +69,8 @@ export const SEO_PRICES = {
   explorerReport: retailCents(EXPLORER_TYPICAL_USD),
   /** One page of a Site Explorer or Keywords Explorer table. */
   reportPage: retailCents(REPORT_TYPICAL_USD),
+  /** The Ads report: one lookup brings every ad the library will give; paging it is free. */
+  adsReport: retailCents(ADS_TYPICAL_USD),
   keywordOverview: retailCents(KEYWORD_OVERVIEW_TYPICAL_USD),
   keywordResearch: retailCents(estimateLabsUsd(50)),
   competitorGap: retailCents(estimateLabsUsd(100)),
@@ -100,12 +103,16 @@ export const SEO_PRICES = {
 export const SEO_HOLDS = {
   explorerReport: retailCents(EXPLORER_ESTIMATE_USD),
   reportPage: retailCents(REPORT_ESTIMATE_USD),
+  adsReport: retailCents(ADS_ESTIMATE_USD),
   keywordOverview: retailCents(KEYWORD_OVERVIEW_ESTIMATE_USD),
   aiChatgpt: retailCents(AI_ENGINES.chatgpt.estimateUsd),
   aiGemini: retailCents(AI_ENGINES.gemini.estimateUsd),
   aiPerplexity: retailCents(AI_ENGINES.perplexity.estimateUsd),
   aiMentions: retailCents(AI_MENTIONS_ESTIMATE_USD),
   contentSearch: retailCents(CONTENT_ESTIMATE_USD),
+  /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
+  batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
+  batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD * 1.2 + LABS_ITEM_USD)),
 };
 
 /** Report names as the customer sees them (usage history). */
@@ -535,10 +542,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // Someone may have bought it a moment ago.
       if (!input.refresh) { const again = await latestReport(user, domain, input.locationCode, input.languageCode); if (again?.fresh) return { data: again.report, costUsd: 0 }; }
       const o = await withBudget(user, EXPLORER_ESTIMATE_USD, () => fetchDomainReport({ domain, locationCode: input.locationCode, languageCode: input.languageCode }), { label: `Site Explorer report — ${domain}` });
-      await keep(`explorer report ${domain}`, () => saveReport(user, o.data, o.costUsd));
-      return o;
+      const kept = await keep(`explorer report ${domain}`, () => saveReport(user, o.data, o.costUsd));
+      return { ...o, kept };
     });
-    res.status(waiting ? 200 : 201).json({ report: out.data, fresh: true, reused: waiting, usage: await planUsage(user, ent) });
+    res.status(waiting ? 200 : 201).json({ report: out.data, fresh: true, reused: waiting, saved: (out as { kept?: boolean }).kept !== false, usage: await planUsage(user, ent) });
   });
 
   // ── Reports: one page of a Site Explorer / Keywords Explorer table ──────────
@@ -550,7 +557,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const forKeyword = isKeywordTable(input.table);
     const target = forKeyword ? cleanKeyword(input.keyword ?? "") : normalizeDomain(input.domain ?? "");
     if (!target) return res.status(400).json({ message: forKeyword ? "Enter a keyword." : "Enter a domain like example.com" });
-    const full = { ...input, target };
+    // Sorts and filters this report does not have are dropped before anything is looked up or keyed.
+    const full = effectiveReport({ ...input, target });
+    if (input.table === "ads") {
+      // One lookup brings every ad the library will give; each page is cut from that saved copy.
+      if (input.offset >= ADS_MAX) return res.status(400).json({ message: `Google's ad library gives the ${ADS_MAX} most recent ads.` });
+      const adsKey = cacheKey("report:ads-all", [target, input.locationCode]);
+      const kept = await cached<AdsSnapshot>(user, adsKey, CACHE_HOURS);
+      if (kept) return res.json({ page: adsPage(kept, input.limit, input.offset), reused: true });
+      if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+      if (!isConfigured()) return notReady(res);
+      const got = await buyOnce<AdsSnapshot>(user, adsKey, "report:ads", CACHE_HOURS, ADS_ESTIMATE_USD, () => fetchAdsSnapshot({ target, locationCode: input.locationCode }), false, `${REPORT_NAMES.ads ?? "Ads"} — ${target}`);
+      return res.status(got.reused ? 200 : 201).json({ page: adsPage(got.data, input.limit, input.offset), reused: got.reused, saved: got.saved });
+    }
     const key = reportCacheKey(full);
     const saved = await cached<ReportPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
@@ -957,14 +976,16 @@ export async function searchConsoleSummary(user: number, domain: string) {
   const asset = assets[0];
   if (!asset) return null;
   const { rows } = await pool.query(
-    `SELECT (date>=current_date-28) AS recent, sum(clicks)::float8 clicks, sum(impressions)::float8 impressions,
+    `SELECT (date>=current_date-28) AS recent, sum(clicks)::float8 clicks, sum(impressions)::float8 impressions, count(DISTINCT date)::int AS days,
             CASE WHEN sum(impressions)>0 THEN sum(position*impressions)/sum(impressions) END::float8 AS position
        FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date>=current_date-56 GROUP BY 1`, [asset.id]);
   const pick = (recent: boolean) => rows.find((r) => r.recent === recent);
   const cur = pick(true), prev = pick(false);
   return {
     property: asset.external_id, syncedAt: asset.synced_at,
-    clicks: cur?.clicks ?? 0, impressions: cur?.impressions ?? 0, position: cur?.position != null ? Math.round(cur.position * 10) / 10 : null,
-    previousClicks: prev?.clicks ?? 0, previousImpressions: prev?.impressions ?? 0,
+    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each period is there.
+    clicks: cur ? cur.clicks ?? 0 : null, impressions: cur ? cur.impressions ?? 0 : null, position: cur?.position != null ? Math.round(cur.position * 10) / 10 : null,
+    previousClicks: prev ? prev.clicks ?? 0 : null, previousImpressions: prev ? prev.impressions ?? 0 : null,
+    days: cur?.days ?? 0, previousDays: prev?.days ?? 0,
   };
 }

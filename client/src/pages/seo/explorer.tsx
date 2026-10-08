@@ -137,7 +137,8 @@ export default function SeoExplorerPage() {
 
   const analyse = useMutation({
     mutationFn: (v: { domain: string; refresh: boolean }) => api("POST", "/api/seo/explorer", { ...v, ...mk }),
-    onSuccess: (data: { report: Report; reused: boolean }) => {
+    onSuccess: (data: { report: Report; reused: boolean; saved?: boolean }) => {
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this report again will not be free.", variant: "destructive" });
       setReport(data.report); setDomain(data.report.domain); setInput(data.report.domain);
       window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(data.report.domain)}`);
       void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] });

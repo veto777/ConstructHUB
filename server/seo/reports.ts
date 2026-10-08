@@ -105,6 +105,28 @@ export const SORTS: Record<ReportTable, Record<string, string>> = {
 };
 export const defaultSort = (table: ReportTable) => Object.keys(SORTS[table])[0];
 
+const KW_FILTERS = ["positionMin", "positionMax", "volumeMin", "volumeMax", "difficultyMin", "difficultyMax", "intent", "contains"] as const;
+const IDEA_FILTERS = ["volumeMin", "volumeMax", "difficultyMin", "difficultyMax", "intent", "contains"] as const;
+const LINK_FILTERS = ["follow", "contains", "everyLink"] as const;
+/** The filters each report really uses (see reportRequest). */
+export const FILTERS_FOR: Record<ReportTable, readonly (keyof ReportFilters)[]> = {
+  keywords: KW_FILTERS, paidKeywords: KW_FILTERS, pages: ["contains"], competitors: ["contains"],
+  backlinks: LINK_FILTERS, newBacklinks: LINK_FILTERS, lostBacklinks: LINK_FILTERS, brokenBacklinks: ["follow"],
+  referringDomains: ["contains"], anchors: ["contains"], bestByLinks: ["contains"],
+  referringIps: [], linkCompetitors: [], subdomains: [], ads: [],
+  matchingTerms: IDEA_FILTERS, questions: IDEA_FILTERS, relatedTerms: ["volumeMin", "volumeMax", "difficultyMin", "difficultyMax"],
+};
+/**
+ * The request as it will really be run: a sort the report does not have becomes its default, and a filter it
+ * does not use is dropped. Saved pages are keyed by this, so the same page can never be bought twice under
+ * two spellings.
+ */
+export function effectiveReport<T extends ReportInput>(input: T): T {
+  const allowed = FILTERS_FOR[input.table] as readonly string[];
+  const filters = Object.fromEntries(Object.entries(input.filters).filter(([k, v]) => allowed.includes(k) && v !== undefined && v !== false)) as ReportFilters;
+  return { ...input, filters, sort: input.sort !== undefined && SORTS[input.table][input.sort] !== undefined ? input.sort : defaultSort(input.table) };
+}
+
 const QUESTION_RE = "^(how|what|why|when|where|who|which|can|does|do|is|are|should|will) ";
 
 /** The vendor request for one page of one report. Pure. */
@@ -155,8 +177,8 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
     case "subdomains":
       return { path: "/dataforseo_labs/google/subdomains/live", body: { ...labs, target: input.target, order_by: [sort] } };
     case "ads":
-      // The ad library has no paging of its own: ask for as many as the page reaches, and cut the page out of them.
-      return { path: "/serp/google/ads_search/live/advanced", body: { target: input.target, location_code: input.locationCode, depth: Math.min(120, input.offset + input.limit) } };
+      // The ad library has no paging of its own: everything it will give is asked for once (fetchAdsSnapshot) and paged here.
+      return { path: "/serp/google/ads_search/live/advanced", body: { target: input.target, location_code: input.locationCode, depth: ADS_MAX } };
     case "bestByLinks":
       return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("url")), order_by: [sort] } };
     case "matchingTerms":
@@ -219,12 +241,16 @@ export function parseLinkCompetitor(i: any, target: string): LinkCompetitorRow |
   const domain = safeDomain(i?.target);
   return domain && domain !== target && !domain.endsWith(`.${target}`) ? { domain, shared: num(i.intersections) } : null;
 }
-export type SubdomainRow = { subdomain: string; traffic: number; keywords: number; top3: number; top10: number; trafficValue: number | null };
+export type SubdomainRow = { subdomain: string; traffic: number | null; keywords: number | null; top3: number | null; top10: number | null; trafficValue: number | null };
+/** A host name kept exactly as it is — www.example.com is its own row, not example.com. */
+const hostName = (v: unknown): string | null => (typeof v === "string" && v.length <= 253 && /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(v.toLowerCase()) ? v.toLowerCase() : null);
 export function parseSubdomain(i: any): SubdomainRow | null {
-  const subdomain = safeDomain(i?.subdomain), o = i?.metrics?.organic;
+  const subdomain = hostName(i?.subdomain), o = i?.metrics?.organic;
   if (!subdomain || !o) return null;
-  const top3 = (num(o.pos_1) ?? 0) + (num(o.pos_2_3) ?? 0);
-  return { subdomain, traffic: Math.round(num(o.etv) ?? 0), keywords: num(o.count) ?? 0, top3, top10: top3 + (num(o.pos_4_10) ?? 0), trafficValue: num(o.estimated_paid_traffic_cost) === null ? null : Math.round(o.estimated_paid_traffic_cost) };
+  // A number the source left out stays unknown; it is never shown as zero.
+  const p1 = num(o.pos_1), p23 = num(o.pos_2_3), p410 = num(o.pos_4_10);
+  const top3 = p1 === null || p23 === null ? null : p1 + p23;
+  return { subdomain, traffic: num(o.etv) === null ? null : Math.round(o.etv), keywords: num(o.count), top3, top10: top3 === null || p410 === null ? null : top3 + p410, trafficValue: num(o.estimated_paid_traffic_cost) === null ? null : Math.round(o.estimated_paid_traffic_cost) };
 }
 export type AdRow = { advertiser: string; format: string | null; verified: boolean; firstShown: string | null; lastShown: string | null; url: string | null };
 /** One ad from Google's public ad library. The link goes to Google's own page for that ad. */
@@ -266,24 +292,44 @@ export function parseReportRows(table: ReportTable, items: any[], target: string
   }
 }
 
-export type ReportPage = { table: ReportTable; target: string; rows: unknown[]; /** Rows the source returned before our own filtering — what paging goes by. */ sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+export type ReportPage = { table: ReportTable; target: string; /** Ads: the library gave as many as can be asked for, so there may be more than `total`. */ capped?: boolean; rows: unknown[]; /** Rows the source returned before our own filtering — what paging goes by. */ sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 /** Run one page at the source. */
 export async function fetchReportPage(input: ReportInput & { target: string }): Promise<{ data: ReportPage; costUsd: number }> {
   const { path, body } = reportRequest(input);
   const task: DfsTask = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
-  const all = parseReportRows(input.table, taskItems(task), input.target);
-  // The ad library was asked for everything up to this page; the page is the tail of that.
-  const ads = input.table === "ads";
-  const rows = ads ? all.slice(input.offset, input.offset + input.limit) : all;
+  const rows = parseReportRows(input.table, taskItems(task), input.target);
   return {
     data: {
       table: input.table, target: input.target, rows,
-      sourceRows: ads ? rows.length : taskItems(task).length, total: ads ? (all.length < input.offset + input.limit ? all.length : null) : num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
+      sourceRows: taskItems(task).length, total: num(task.result?.[0]?.total_count), limit: input.limit, offset: input.offset,
       sort: input.sort && SORTS[input.table][input.sort] ? input.sort : defaultSort(input.table), fetchedAt: new Date().toISOString(),
     },
     costUsd: typeof task.cost === "number" ? task.cost : 0,
   };
+}
+
+// ── Ads: one lookup, paged here ─────────────────────────────────────────────
+
+/** The most ads the library gives for one advertiser's site. */
+export const ADS_MAX = 120;
+/** Measured 2026-10-08: $0.006 for the full 120. */
+export const ADS_ESTIMATE_USD = 0.008;
+export const ADS_TYPICAL_USD = 0.006;
+export type AdsSnapshot = { target: string; rows: AdRow[]; /** The library returned the most it will give, so the site may have run more. */ capped: boolean; fetchedAt: string };
+/** Everything the ad library will give for a site, in one call. Saved, then paged without buying anything again. */
+export async function fetchAdsSnapshot(input: { target: string; locationCode: number }): Promise<{ data: AdsSnapshot; costUsd: number }> {
+  const task: DfsTask = assertOk(await request("POST", "/serp/google/ads_search/live/advanced", [{ target: input.target, location_code: input.locationCode, depth: ADS_MAX }]), { treatNoResultsAsEmpty: true });
+  const items = taskItems(task);
+  return { data: adsSnapshot(input.target, items), costUsd: typeof task.cost === "number" ? task.cost : 0 };
+}
+export function adsSnapshot(target: string, items: any[], fetchedAt = new Date().toISOString()): AdsSnapshot {
+  return { target, rows: parseReportRows("ads", items, target) as AdRow[], capped: items.length >= ADS_MAX, fetchedAt };
+}
+/** One page cut from the saved snapshot. */
+export function adsPage(s: AdsSnapshot, limit: number, offset: number): ReportPage {
+  const rows = s.rows.slice(offset, offset + limit);
+  return { table: "ads", target: s.target, rows, sourceRows: rows.length, total: s.rows.length, capped: s.capped, limit, offset, sort: "newest", fetchedAt: s.fetchedAt };
 }
 
 // ── Keyword overview ───────────────────────────────────────────────────────
@@ -415,7 +461,7 @@ export function cacheKey(kind: string, parts: unknown): string {
   return createHash("sha1").update(kind).update("\n").update(JSON.stringify(parts)).digest("hex");
 }
 export const reportCacheKey = (i: ReportInput & { target: string }) =>
-  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, i.sort ?? defaultSort(i.table), i.locationCode, i.languageCode, Object.entries(i.filters).sort(([a], [b]) => a.localeCompare(b))]);
+  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, i.locationCode, i.languageCode, Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b))]);
 
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(

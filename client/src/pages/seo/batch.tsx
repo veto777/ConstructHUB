@@ -48,8 +48,11 @@ export default function SeoBatchPage() {
   });
   const priceFor = (n: number) => (status.data?.prices?.batchBase != null && status.data.prices.batchPer100 != null ? status.data.prices.batchBase + Math.ceil((n / 100) * status.data.prices.batchPer100) : null);
   const price = priceFor(Math.min(asked.length || draft.length, MAX));
-  // A little more than the usual price must be available to start (the most it can cost).
-  const canPay = price == null || !status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= Math.ceil(price * 1.15) + 1;
+  // What must be available to start is the most it can cost — the server's own figure, not a guess.
+  const holds = status.data?.holds;
+  const holdFor = (n: number) => (holds?.batchBase != null && holds.batchPer100 != null ? holds.batchBase + Math.ceil((n / 100) * holds.batchPer100) : priceFor(n));
+  const need = holdFor(Math.min(asked.length || draft.length, MAX));
+  const canPay = need == null || !status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= need;
   const page = saved.data?.page ?? null;
   const rows = useMemo(() => {
     if (!page) return [];

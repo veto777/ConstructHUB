@@ -82,7 +82,8 @@ export default function SeoKeywordsPage() {
   });
   const refresh = useMutation({
     mutationFn: () => api("POST", "/api/seo/keyword", { keyword: overview?.keyword, refresh: true, ...mk }),
-    onSuccess: (data: { overview: Overview }) => { setOverview(data.overview); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    // Only if that keyword is still the one on screen: a refresh that lands after another was opened is not shown over it.
+    onSuccess: (data: { overview: Overview }) => { setOverview((cur) => (cur && cur.keyword === data.overview.keyword ? data.overview : cur)); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({

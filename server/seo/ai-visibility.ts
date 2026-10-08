@@ -48,6 +48,20 @@ export const AI_SCHEMA_DDL = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_tracked_prompt ON seo_ai_tracked(site_id, lower(prompt))`,
+  // Answers that were paid for by the monthly job and are waiting to be filed. A row leaves only in the same
+  // transaction that files its answers, so a saving problem can delay them but never lose or re-buy them.
+  `CREATE TABLE IF NOT EXISTS seo_ai_unsaved (
+     id serial PRIMARY KEY,
+     user_id integer NOT NULL,
+     site_id integer NOT NULL,
+     prompt text NOT NULL,
+     answers jsonb NOT NULL,
+     cost_usd numeric NOT NULL DEFAULT 0,
+     run_id text NOT NULL UNIQUE,
+     tries integer NOT NULL DEFAULT 0,
+     next_at timestamptz NOT NULL DEFAULT now(),
+     created_at timestamptz NOT NULL DEFAULT now()
+   )`,
 ];
 
 /** One spelling of a question everywhere it is stored or compared: single spaces, trimmed. */
@@ -207,10 +221,13 @@ export async function saveAiAnswers(userId: number, siteId: number, prompt: stri
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    for (const a of answers)
+    // Filing a run twice changes nothing: a run already filed is only taken off the waiting list.
+    const { rows: [filed] } = await client.query("SELECT 1 FROM seo_ai_checks WHERE run_id=$1 AND user_id=$2 LIMIT 1", [runId, userId]);
+    if (!filed) for (const a of answers)
       await client.query(
         `INSERT INTO seo_ai_checks(user_id, site_id, prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, cost_usd, run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [userId, siteId, onePrompt(prompt), a.engine, a.model, a.mentioned, a.cited, a.listedAt, JSON.stringify(a.businesses), JSON.stringify(a.sources), JSON.stringify(a.searches), a.answer, costUsd / Math.max(1, answers.length), runId]);
+    await client.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1", [runId]);
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
