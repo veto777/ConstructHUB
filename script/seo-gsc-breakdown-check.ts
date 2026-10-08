@@ -27,10 +27,14 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   const p = (await gscBreakdown(1, site, "page"))!;
   ok(p.days === 28 && p.previousDays === 28 && p.comparable, `two full windows (${p.days}/${p.previousDays})`);
   const a = p.rows.find((r) => r.key.endsWith("/a"))!, old = p.rows.find((r) => r.key.endsWith("/old"))!;
-  ok(a.clicks === 56 && a.prevClicks === 28 && old.clicks === 0 && old.prevClicks === 28, `merged: /a 28 -> 56, /old 28 -> 0 (${JSON.stringify([a.clicks, a.prevClicks, old.clicks, old.prevClicks])})`);
+  ok(a.clicks === 56 && a.prevClicks === 28 && old.clicks === null && old.prevClicks === 28, `merged: /a 28 -> 56, /old 28 -> not returned (${JSON.stringify([a.clicks, a.prevClicks, old.clicks, old.prevClicks])})`);
   const q = (await gscBreakdown(1, site, "query"))!;
   ok(q.rows[0].tracked === true, "a search that is a tracked keyword (any letter case) is marked");
   ok((await gscBreakdown(2, site, "page")) === null, "another account has no property for it");
+  // An older URL-prefix property with no data does not hide the one that has data; it is named as another property.
+  await pool.query("INSERT INTO edge_assets(user_id, connection_id, provider, external_id, name, domain, status) VALUES(1,$1,'gsc','http://gscb.example/','x','gscb.example','ok')", [conn.id]);
+  const chosen = (await gscBreakdown(1, site, "page"))!;
+  ok(chosen.property === "sc-domain:gscb.example" && chosen.others.join() === "http://gscb.example/" && chosen.coverage === "domain", `the property with data is used, the other named (${chosen.property}; ${chosen.others})`);
   await pool.query("DELETE FROM edge_connections WHERE id=$1", [conn.id]); await pool.query("DELETE FROM seo_sites WHERE id=$1", [site.id]);
   console.log(`gsc breakdown checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

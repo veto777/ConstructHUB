@@ -29,6 +29,17 @@ export const REPORT_SCHEDULE_DDL = [
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_period text`,
   // Who holds the lease: only that pass may finish the occurrence or move its next date.
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS lease_token text`,
+  // Each recipient's delivery of each report period: 'pending' while a send is under way (with its sender's token and
+  // when it started), 'sent' once the email went. A pending row older than half an hour is a send that died.
+  `CREATE TABLE IF NOT EXISTS seo_report_deliveries (
+     site_id integer NOT NULL REFERENCES seo_sites(id) ON DELETE CASCADE,
+     period text NOT NULL,
+     recipient text NOT NULL,
+     state text NOT NULL CHECK (state IN ('pending','sent')),
+     token text,
+     updated_at timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (site_id, period, recipient)
+   )`,
 ];
 
 export const MAX_RECIPIENTS = 5;

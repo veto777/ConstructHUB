@@ -44,4 +44,8 @@ describe("outgoing links", () => {
     const external = outgoingLinks(Array.from({ length: 6 }, (_, i) => ({ url: `${H}/p${i}`, status: 200, links: ["https://x.example/"] })), [], "alpine.example");
     expect(external.linksMeasured).toBe(true);
   });
+  it("no page loaded: nothing to say about links (null), never 'measured'", () => {
+    expect(outgoingLinks([{ url: `${H}/`, status: 500, links: [] }], [], "alpine.example").linksMeasured).toBeNull();
+    expect(outgoingLinks([{ url: `${H}/`, status: 200, links: [] }], [], "alpine.example").linksMeasured).toBe(false);
+  });
 });

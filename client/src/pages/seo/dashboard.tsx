@@ -81,6 +81,16 @@ export default function SeoDashboardPage() {
   });
   const [sort, setSort] = useState<SortKey>(() => { try { const v = window.localStorage.getItem("seo.dashboard.sort"); return (SORTS.some(([k]) => k === v) ? v : "added") as SortKey; } catch { return "added"; } });
   const chooseSort = (k: SortKey) => { setSort(k); try { window.localStorage.setItem("seo.dashboard.sort", k); } catch { /* private window */ } };
+  // Groups (a client, a region): the dashboard can show one group or all. Remembered on this computer.
+  const [group, setGroup] = useState<string>(() => { try { return window.localStorage.getItem("seo.dashboard.group") ?? ""; } catch { return ""; } });
+  const chooseGroup = (g: string) => { setGroup(g); try { window.localStorage.setItem("seo.dashboard.group", g); } catch { /* private window */ } };
+  const [editing, setEditing] = useState<number | null>(null);
+  const [groupDraft, setGroupDraft] = useState("");
+  const setSiteGroup = useMutation({
+    mutationFn: (v: { id: number; group: string | null }) => api("POST", `/api/seo/sites/${v.id}/settings`, { group: v.group }),
+    onSuccess: () => { setEditing(null); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); },
+    onError: (e) => toast({ title: "Couldn't change the group", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const star = useMutation({
     mutationFn: (v: { id: number; starred: boolean }) => api("POST", `/api/seo/sites/${v.id}/star`, { starred: v.starred }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); },
@@ -97,6 +107,16 @@ export default function SeoDashboardPage() {
       return sort === "name" ? String(x).localeCompare(String(y)) : Number(y) - Number(x);
     });
   }, [dash.data, sort]);
+  const groups = useMemo(() => [...new Set((dash.data?.cards ?? []).map((c) => c.site.group).filter((g): g is string => !!g))].sort((a, b) => a.localeCompare(b)), [dash.data]);
+  // A remembered group that no site is in any more shows everything rather than nothing.
+  const activeGroup = group === "__none__" || groups.includes(group) ? group : "";
+  const shownCards = activeGroup === "" ? cards : cards.filter((c) => (activeGroup === "__none__" ? !c.site.group : c.site.group === activeGroup));
+  // The group's totals, from the same numbers as its cards (tracked keywords checked, open tasks known).
+  const totals = useMemo(() => {
+    const checked = shownCards.filter((c) => c.rank.checked);
+    return { sites: shownCards.length, keywords: shownCards.reduce((n, c) => n + (c.site.keywordCount ?? 0), 0), top10: checked.reduce((n, c) => n + c.rank.top10, 0), checked: checked.length,
+      openTasks: shownCards.some((c) => c.openTasks == null) ? null : shownCards.reduce((n, c) => n + (c.openTasks ?? 0), 0) };
+  }, [shownCards]);
   const price = status.data?.prices ? money(status.data.prices.explorerReport) : "";
   const affordable = canAfford(status.data, "explorerReport");
   const configured = !!status.data?.configured;
@@ -119,11 +139,27 @@ export default function SeoDashboardPage() {
               {SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
             </select>
           </label>
+          {groups.length > 0 && (
+            <label className="g-text-2 flex items-center gap-2">Group
+              <select className="g-input g-select !w-auto !py-1" value={activeGroup} onChange={(e) => chooseGroup(e.target.value)} data-testid="select-dashboard-group">
+                <option value="">All sites</option>
+                {groups.map((g) => <option key={g} value={g}>{g}</option>)}
+                <option value="__none__">Not in a group</option>
+              </select>
+            </label>
+          )}
           <span className="g-text-2">Starred sites stay on top.</span>
         </div>
       )}
+      {activeGroup !== "" && (
+        <p className="g-text mb-3 text-[13px]" data-testid="text-group-totals">
+          <b className="font-medium">{activeGroup === "__none__" ? "Not in a group" : activeGroup}</b>: {fmtNum(totals.sites)} site{totals.sites === 1 ? "" : "s"} · {fmtNum(totals.keywords)} tracked keywords{totals.checked ? ` · ${fmtNum(totals.top10)} in the top 10 (latest check of ${totals.checked} site${totals.checked === 1 ? "" : "s"})` : ""} · {totals.openTasks == null ? "open tasks not known" : `${fmtNum(totals.openTasks)} open task${totals.openTasks === 1 ? "" : "s"}`}
+        </p>
+      )}
+      <datalist id="seo-groups">{groups.map((g) => <option key={g} value={g} />)}</datalist>
       <div className="space-y-4" data-testid="seo-dashboard">
-        {cards.map(({ site: s, rank, report: r, audit, openTasks }) => {
+        {activeGroup !== "" && shownCards.length === 0 && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>Choose another group above.</p></Empty>}
+        {shownCards.map(({ site: s, rank, report: r, audit, openTasks }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
             <section key={s.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
@@ -133,6 +169,16 @@ export default function SeoDashboardPage() {
                 </button>
                 <h2 className="g-text text-[18px] font-medium"><Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-link">{s.domain}</Link></h2>
                 <span className="g-text-2 text-[12px]">{r ? `analysed ${fmtDate(r.fetchedAt)}` : "not analysed yet"}</span>
+                {editing === s.id ? (
+                  <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }); }} data-testid={`form-group-${s.id}`}>
+                    <label className="sr-only" htmlFor={`group-${s.id}`}>Group for {s.domain}</label>
+                    <input id={`group-${s.id}`} className="g-input !h-8 w-40 !py-1 text-[13px]" list="seo-groups" maxLength={40} value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} placeholder="e.g. Smith Roofing" autoFocus data-testid={`input-group-${s.id}`} />
+                    <button type="submit" className="g-pill g-pill--sm" disabled={setSiteGroup.isPending}>Save</button>
+                    <button type="button" className="g-pill g-pill--sm" onClick={() => setEditing(null)}>Cancel</button>
+                  </form>
+                ) : (
+                  <button type="button" className="g-chip g-chip--sm" onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
+                )}
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
                   <Link href="/seo/rank-tracker" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>

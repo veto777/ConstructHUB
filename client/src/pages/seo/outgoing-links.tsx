@@ -22,7 +22,7 @@ const ANSWER: Record<Answer, string> = {
 const broken = (a: Answer) => a === "gone" || a === "error";
 /** A short, stable fingerprint of a whole address, for a task identity that must fit 200 characters. */
 const fingerprint = (t: string) => { let a = 0x811c9dc5, b = 0x5bd1e995; for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; } return a.toString(36) + b.toString(36); };
-type Data = { jobId: string; scannedAt: string | null; linksMeasured: boolean; pagesRead: number; domains: number; links: number; linkedDomains: Domain[]; more: number; broken: Broken[]; checkedAddresses: number; uncheckedLinks: number };
+type Data = { jobId: string; scannedAt: string | null; linksMeasured: boolean | null; pagesRead: number; domains: number; links: number; linkedDomains: Domain[]; more: number; broken: Broken[]; checkedAddresses: number; uncheckedLinks: number };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const path = (u: string) => { try { const x = new URL(u); return (x.pathname + x.search) || "/"; } catch { return u; } };
 
@@ -52,13 +52,14 @@ export function OutgoingLinksView({ site }: { site: SeoSite }) {
   return (
     <div data-testid="outgoing-links">
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">The other websites your pages link to. Links to suppliers, associations and directories are normal; a link to a page that no longer answers is worth fixing, and a website you did not expect here is worth a look.</p>
-      {!d.linksMeasured && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages that loaded have no links at all in their HTML — which happens when links are added by JavaScript (the crawl does not run it). What is listed is only what the HTML had.</p>}
+      {d.linksMeasured === null && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-no-pages">No page of this crawl loaded, so there are no links to read. Run a new crawl in Site audit.</p>}
+      {d.linksMeasured === false && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages that loaded have no links at all in their HTML — which happens when links are added by JavaScript (the crawl does not run it). What is listed is only what the HTML had.</p>}
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
         <span className="g-text-2" data-testid="text-outgoing-meta">From the crawl of {d.scannedAt ? fmtDate(d.scannedAt) : "an unknown date"}: {fmtNum(d.links)} link{d.links === 1 ? "" : "s"} to {fmtNum(d.domains)} other website{d.domains === 1 ? "" : "s"}, from {fmtNum(d.pagesRead)} page{d.pagesRead === 1 ? "" : "s"} that loaded.</span>
         <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!d.linkedDomains.length} onClick={exportCsv} data-testid="button-outgoing-export"><Download /> Export</button>
       </div>
       <section className="mb-4" data-testid="outgoing-broken">
-        <h3 className="g-text mb-1 text-[14px] font-medium">Checked links that did not answer with a page ({fmtNum(d.broken.length)}{d.broken.some((b) => broken(b.answer)) ? `, ${fmtNum(d.broken.filter((b) => broken(b.answer)).length)} broken` : ""})</h3>
+        <h3 className="g-text mb-1 text-[14px] font-medium">Checked links that did not answer normally ({fmtNum(d.broken.length)}{d.broken.some((b) => broken(b.answer)) ? `, ${fmtNum(d.broken.filter((b) => broken(b.answer)).length)} broken` : ""})</h3>
         <p className="g-text-2 mb-2 text-[12px]">The crawl checks a sample of the addresses it did not crawl itself: {fmtNum(d.checkedAddresses)} of these websites' addresses were checked; links to the others ({fmtNum(d.uncheckedLinks)} page link{d.uncheckedLinks === 1 ? "" : "s"}) were not checked, so nothing is said about them.</p>
         {d.checkedAddresses === 0 ? <p className="g-text-2 text-[13px]" data-testid="outgoing-none-checked">No outgoing addresses were checked in this crawl, so nothing is said about whether they work.</p> : d.broken.length === 0 ? <p className="g-text-2 text-[13px]">Every checked address gave an ordinary answer (the check looks at the answer, not at what the page says).</p> : (
           <ul className="space-y-1 text-[13px]">
@@ -72,7 +73,7 @@ export function OutgoingLinksView({ site }: { site: SeoSite }) {
           </ul>
         )}
       </section>
-      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured ? "The pages read link only to your own site." : "None were found in the HTML."}</p></Empty> : (
+      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no links to other websites." : "None were found in the HTML (its links may be added by JavaScript)."}</p></Empty> : (
         <div className="overflow-x-auto">
           <table className="g-table w-full" data-testid="table-outgoing">
             <thead><tr><th>Website</th><th className="num">Pages linking</th><th className="num">Links</th><th>For example</th><th className="num" title="Of its addresses the crawl checked: how many, and how many were gone or a server error">Checked / broken</th></tr></thead>

@@ -71,10 +71,37 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
     const to = norm(raw);
     if (out.has(to)) { refused.push(to); skipped++; continue; }
     const mail = reportEmail(report, { brandName: brand?.name ?? null, senderName: me?.company_name ?? null, unsubscribe: unsubscribeUrl(userId, to) });
+    // This recipient's delivery for the period: claimed before sending; "sent" only once the email went. Already sent =
+    // done; a send under way elsewhere (pending, young) = not done yet, tried again later; a pending one older than half
+    // an hour = a send that died, taken over.
+    const token = randomUUID(), key = `seo-report:${siteId}:${period}:${to}`;
+    const { rows: [claim] } = await pool.query(
+      `INSERT INTO seo_report_deliveries(site_id, period, recipient, state, token) VALUES($1,$2,$3,'pending',$4)
+       ON CONFLICT (site_id, period, recipient) DO UPDATE SET token=excluded.token, updated_at=now()
+         WHERE seo_report_deliveries.state='pending' AND seo_report_deliveries.updated_at < now() - interval '30 minutes'
+       RETURNING state`, [siteId, period, to, token]);
+    if (!claim) {
+      const { rows: [had] } = await pool.query("SELECT state FROM seo_report_deliveries WHERE site_id=$1 AND period=$2 AND recipient=$3", [siteId, period, to]);
+      if (had?.state === "sent") { skipped++; continue; }
+      failed++; continue;   // being sent right now by another pass: not done, so the occurrence stays open
+    }
     try {
-      const went = await sendTransactionalEmail(userId, "seo.report", `seo-report:${siteId}:${period}:${to}`, { to, ...mail, attachments: [{ filename: `seo-report-${report.domain}.pdf`, content: pdf, contentType: "application/pdf" }] });
-      went ? sent++ : skipped++;
-    } catch (e: any) { failed++; console.error(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")} failed: ${e?.message ?? e}`); }
+      const attach = [{ filename: `seo-report-${report.domain}.pdf`, content: pdf, contentType: "application/pdf" }];
+      let went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
+      if (!went) {
+        // The email log holds a claim for this key that our delivery row does not show as sent: a send that died after
+        // claiming. Its claim is released (only that old one) and the email sent once more.
+        await pool.query("DELETE FROM email_log WHERE dedupe_key=$1 AND sent_at < now() - interval '30 minutes'", [key]);
+        went = await sendTransactionalEmail(userId, "seo.report", key, { to, ...mail, attachments: attach });
+      }
+      if (!went) throw new Error("another send of this email is under way");
+      await pool.query("UPDATE seo_report_deliveries SET state='sent', updated_at=now() WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4", [siteId, period, to, token]);
+      sent++;
+    } catch (e: any) {
+      failed++;
+      await pool.query("DELETE FROM seo_report_deliveries WHERE site_id=$1 AND period=$2 AND recipient=$3 AND token=$4 AND state='pending'", [siteId, period, to, token]).catch(() => {});
+      console.error(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")} failed: ${e?.message ?? e}`);
+    }
   }
   return { sent, skipped, failed, empty: false, optedOut: refused };
 }

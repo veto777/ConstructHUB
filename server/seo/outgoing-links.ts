@@ -34,7 +34,7 @@ export const answerOf = (s: number | null, reason?: string): Answer | null =>
   : s >= 300 ? "redirect_unfollowed" : s === 204 ? "no_content" : null;
 export type BrokenOutgoing = { to: string; status: number | null; answer: Answer; /** Pages that link to it (up to 5) and how many in all. */ from: string[]; fromCount: number };
 export type OutgoingLinks = {
-  linksMeasured: boolean; pagesRead: number; domains: number; links: number;
+  /** false = most loaded pages had no links of any kind in their HTML; null = no page loaded, nothing to say. */ linksMeasured: boolean | null; pagesRead: number; domains: number; links: number;
   linkedDomains: LinkedDomain[]; /** More linked websites than are listed. */ more: number;
   broken: BrokenOutgoing[]; /** External addresses the crawl checked (a sample), and how many links point at addresses it did not. */ checkedAddresses: number; uncheckedLinks: number;
 };
@@ -79,7 +79,7 @@ export function outgoingLinks(pages: readonly OutPage[], checks: readonly LinkCh
   // Whether the HTML had links at all to read: most loaded pages carry no link of any kind (to the site or elsewhere).
   const withLinks = loaded.filter((p) => Array.isArray(p.links) && p.links.some((l) => typeof l === "string" && /^https?:/i.test(l))).length;
   return {
-    linksMeasured: loaded.length < 5 ? loaded.length > 0 : withLinks * 2 >= loaded.length, pagesRead: loaded.length,
+    linksMeasured: loaded.length === 0 ? null : loaded.length < 5 ? withLinks > 0 : withLinks * 2 >= loaded.length, pagesRead: loaded.length,
     domains: list.length, links: total, linkedDomains: list.slice(0, OUTGOING_DOMAINS), more: Math.max(0, list.length - OUTGOING_DOMAINS),
     broken: brokenList, checkedAddresses: externalUrls.filter((u) => checked.has(u)).length,
     uncheckedLinks: externalUrls.filter((u) => !checked.has(u)).reduce((n, u) => n + fromOf.get(u)!.size, 0),

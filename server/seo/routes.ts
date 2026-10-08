@@ -226,6 +226,8 @@ const settingsInput = z.object({
   alertsEnabled: z.boolean().optional(),
   alertDrop: z.number().int().min(1).max(20).optional(),
   rankFrequency: z.enum(["weekly", "twice_weekly", "daily"]).optional(),
+  /** The dashboard group: a short name (spacing tidied); null or "" takes the site out of its group. */
+  group: z.string().trim().max(40).transform((g) => g.replace(/\s+/g, " ")).nullable().optional(),
 }).strict();
 const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
@@ -1338,11 +1340,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // past beyond "now"), a longer one moves it out.
       `UPDATE seo_sites SET business_name=CASE WHEN $2 THEN $3 ELSE business_name END, alerts_enabled=coalesce($4, alerts_enabled), alert_drop=coalesce($5, alert_drop),
               rank_frequency=coalesce($6, rank_frequency),
+              group_name=CASE WHEN $7 THEN nullif($8, '') ELSE group_name END,
               next_rank_check_at = CASE WHEN $6 IS NOT NULL AND $6 <> rank_frequency THEN greatest(now(), coalesce(last_rank_check_at, now()) + make_interval(hours => CASE $6 WHEN 'daily' THEN 24 WHEN 'twice_weekly' THEN 84 ELSE 168 END)) ELSE next_rank_check_at END,
               next_mention_at = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND lower(coalesce(business_name, '')) IS DISTINCT FROM lower(coalesce($3, '')) THEN now() ELSE next_mention_at END,
               mention_watch_note = CASE WHEN $2 AND mention_watch AND nullif(btrim(mention_name), '') IS NULL AND nullif(btrim(coalesce($3, '')), '') IS NULL THEN 'no_name' ELSE mention_watch_note END
         WHERE id=$1 RETURNING *`,
-      [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null, input.rankFrequency ?? null]);
+      [site.id, input.businessName !== undefined, input.businessName || null, input.alertsEnabled ?? null, input.alertDrop ?? null, input.rankFrequency ?? null, input.group !== undefined, input.group ?? null]);
     if (input.alertsEnabled === false) await pool.query("UPDATE seo_alerts SET email_retry_at = NULL WHERE site_id=$1 AND email_retry_at IS NOT NULL", [site.id]);
     res.json(siteView(row));
   });
@@ -1524,7 +1527,7 @@ function runView(r: any, admin: boolean) {
 
 function siteView(s: any) {
   return {
-    id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, rankFrequency: s.rank_frequency ?? "weekly", locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
+    id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, rankFrequency: s.rank_frequency ?? "weekly", group: s.group_name ?? null, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
     keywordCount: s.keyword_count ?? 0, nextRankCheckAt: s.next_rank_check_at, lastRankCheckAt: s.last_rank_check_at,
     nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at, starred: s.starred === true,
   };

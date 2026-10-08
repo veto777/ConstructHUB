@@ -158,6 +158,8 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS alerts_enabled boolean NOT NULL DEFAULT true`,
   // How often rankings are checked automatically (server/seo/jobs.ts RANK_FREQUENCIES).
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS rank_frequency text NOT NULL DEFAULT 'weekly'`,
+  // A group the customer puts the site in on the dashboard (a client, a region); null = none.
+  `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS group_name text`,
   `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'seo_sites_rank_frequency_check') THEN
      ALTER TABLE seo_sites ADD CONSTRAINT seo_sites_rank_frequency_check CHECK (rank_frequency IN ('weekly','twice_weekly','daily')); END IF; END $$`,
   // Unlinked mentions (server/seo/mentions.ts): the name searched last and the places a mention is read for.
