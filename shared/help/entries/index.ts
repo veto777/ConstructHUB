@@ -5,6 +5,7 @@ export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_estimate_approved } from "./crm/crm-estimate-approved";
 export { default as e_crm_estimate_discounts } from "./crm/crm-estimate-discounts";
 export { default as e_crm_estimate_edit } from "./crm/crm-estimate-edit";
+export { default as e_crm_estimate_options } from "./crm/crm-estimate-options";
 export { default as e_crm_invoice_create } from "./crm/crm-invoice-create";
 export { default as e_crm_payment_record } from "./crm/crm-payment-record";
 export { default as e_crm_payment_reverse } from "./crm/crm-payment-reverse";
