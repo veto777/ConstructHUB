@@ -32,7 +32,7 @@
     },
     {
       "action": "type",
-      "selector": "[data-testid=\"input-client-email\"]",
+      "selector": "#c-company >> xpath=following::input[1]",
       "value": "naomi.brooks@example.com",
       "caption": "Email",
       "narration": "Add their email. You'll need it to send them an estimate."
