@@ -1,0 +1,139 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-tracking",
+  "title": "See whether your client opened the estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "A sent estimate",
+      "narration": "After you send an estimate, the CRM shows you whether your client has opened it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Halvorsen",
+      "caption": "Search for the client",
+      "narration": "On Clients, search for the client.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Halvorsen-Quist Properties\")",
+      "caption": "Open the client",
+      "narration": "And open their page.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"estimate-demo-estimate-e-2000\"]",
+      "caption": "The estimate you sent",
+      "narration": "Under Estimates, here is the estimate that was sent."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Not opened yet",
+      "caption": "Not opened yet",
+      "narration": "Under the buttons, it shows when it was sent. And for now: Not opened yet."
+    },
+    {
+      "action": "fixture",
+      "fixture": "email.opened",
+      "input": {
+        "estimate": "E-2000",
+        "minutesAgo": 300,
+        "visits": 3,
+        "seconds": 540
+      },
+      "caption": "The client opens it",
+      "chapter": "After the client opens it",
+      "narration": "Now say your client opens the estimate from their email, and comes back to it twice."
+    },
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "narration": "Open Estimates in the left menu."
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has-text(\"E-2000\") [data-pill-tone]:visible",
+      "caption": "Viewed",
+      "narration": "The estimate's status now reads viewed, not sent."
+    },
+    {
+      "action": "click",
+      "selector": "tr:has-text(\"E-2000\") [data-testid^=\"doc-link-\"]",
+      "caption": "Open the estimate",
+      "narration": "Click its number to open it.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/Opened /",
+      "caption": "Opened",
+      "narration": "The line at the top says when it was first opened, and how many views it has had."
+    },
+    {
+      "action": "click",
+      "selector": "a:has-text(\"Halvorsen-Quist Properties\")",
+      "caption": "The client's page",
+      "chapter": "Every visit",
+      "narration": "For the detail, click the client's name.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"engagement-demo-estimate-e-2000\"] summary",
+      "caption": "Visits and time",
+      "narration": "Under the estimate: the visits, the total time spent, and how long ago the last one was."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"engagement-demo-estimate-e-2000\"] summary",
+      "caption": "Open the list",
+      "narration": "Click that line.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"engagement-visits-demo-estimate-e-2000\"]",
+      "caption": "Each visit",
+      "narration": "Each visit is listed: its time, how long it lasted, and the network address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "You will find this on every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "How to see if a client opened your estimate | ConstructHUB CRM",
+    "description": "ConstructHUB CRM shows when a sent estimate was first opened, how many times your client came back to it and how long they spent. This walkthrough shows where those lines are on the client's page and on Estimates. Recorded in a demo workspace; the client's visits are simulated.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "estimate tracking",
+      "estimate opened",
+      "follow up on estimates",
+      "contractor estimates",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Did they open it?",
+    "accent": "open",
+    "kicker": "CRM Tutorial",
+    "step": 11
+  }
+}

@@ -40,6 +40,8 @@ export { default as v_crm_pricebook_template } from "./crm-pricebook-template.js
 export { default as v_crm_pricebook } from "./crm-pricebook.json";
 export { default as v_crm_project_costing } from "./crm-project-costing.json";
 export { default as v_crm_project_daily_log } from "./crm-project-daily-log.json";
+export { default as v_crm_estimate_tracking } from "./crm-estimate-tracking.json";
+export { default as v_crm_google_calendar } from "./crm-google-calendar.json";
 export { default as v_crm_project_edit } from "./crm-project-edit.json";
 export { default as v_crm_project_new } from "./crm-project-new.json";
 export { default as v_crm_project_permits } from "./crm-project-permits.json";
