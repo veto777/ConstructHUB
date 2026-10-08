@@ -253,6 +253,26 @@ export function isOurListing(item: { domain?: unknown; title?: unknown }, target
   return listingOnDomain(item, targetDomain) || listingNamed(item, businessName);
 }
 
+/**
+ * The results-page features the site itself appears in, as "own:<type>": the featured snippet is its page, the AI
+ * overview cites it, or one of the "people also ask" answers comes from it. (The map pack is handled separately,
+ * because a listing can be the business without showing its website.) Pure.
+ */
+export function ownedFeatures(items: any[], target: string): string[] {
+  const ours = (d: unknown) => { if (typeof d !== "string" || !d) return false; const x = d.toLowerCase().replace(/^www\./, ""); return x === target || x.endsWith(`.${target}`); };
+  const out = new Set<string>();
+  for (const i of items) {
+    if (!i || typeof i.type !== "string") continue;
+    if (i.type === "featured_snippet" && ours(i.domain)) out.add("own:featured_snippet");
+    if (i.type === "ai_overview") {
+      const refs = [...(Array.isArray(i.references) ? i.references : []), ...(Array.isArray(i.items) ? i.items.flatMap((x: any) => (Array.isArray(x?.references) ? x.references : [])) : [])];
+      if (refs.some((r: any) => ours(r?.domain))) out.add("own:ai_overview");
+    }
+    if (i.type === "people_also_ask" && Array.isArray(i.items) && i.items.some((q: any) => Array.isArray(q?.expanded_element) && q.expanded_element.some((e: any) => ours(e?.domain)))) out.add("own:people_also_ask");
+  }
+  return [...out];
+}
+
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
 export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }, items: any[]): RankCheckResult {
   const target = input.targetDomain.toLowerCase().replace(/^www\./, "");
@@ -272,7 +292,7 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
     keyword: input.keyword,
     position: match ? num(match.rank_group) ?? num(match.rank_absolute) : null,
     url: match ? str(match.url) : null,
-    serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean))],
+    serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean)), ...ownedFeatures(items, target)],
     localPosition: ours >= 0 ? pack[ours].position : null,
     localPack: pack,
     serpTop: organic.slice(0, 10).map((i) => ({ position: num(i.rank_group) ?? num(i.rank_absolute) ?? 0, domain: safeDomain(i.domain) ?? "", url: safeHttpUrl(i.url), title: str(i.title)?.slice(0, 120) ?? null })).filter((e) => e.position > 0 && e.position <= 200 && e.domain),

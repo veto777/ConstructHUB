@@ -1042,6 +1042,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json(siteView(row));
   });
 
+  // Star a site: starred sites come first on the dashboard.
+  route("post", "/api/seo/sites/:id/star", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const { starred } = z.object({ starred: z.boolean() }).strict().parse(req.body);
+    await pool.query("UPDATE seo_sites SET starred=$3 WHERE id=$1 AND user_id=$2", [site.id, user, starred]);
+    res.json({ id: site.id, starred });
+  });
+
   // Alerts: what changed between checks. Saved rows only.
   route("get", "/api/seo/alerts", async (req, res, user) => {
     const siteId = req.query.siteId === undefined ? null : (await ownedSite(user, req.query.siteId)).id;
@@ -1116,7 +1124,7 @@ function siteView(s: any) {
   return {
     id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
     keywordCount: s.keyword_count ?? 0, nextRankCheckAt: s.next_rank_check_at, lastRankCheckAt: s.last_rank_check_at,
-    nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at,
+    nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at, starred: s.starred === true,
   };
 }
 

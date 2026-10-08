@@ -1,4 +1,5 @@
 /** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
+import { SerpFeatureChips, hasFeature, ownsFeature } from "./serp-features";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -111,8 +112,23 @@ export default function SeoOverviewPage() {
           {o.rows.length === 0 ? (
             <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href="/seo/keywords" className="g-link">research keywords</Link> and track the ones with volume.</p></Empty>
           ) : (
+            <>
+            {(() => {
+              const firsts = o.rows.map((r) => r.positions[o.devices[0]]).filter((p): p is NonNullable<typeof p> => !!p);
+              if (!firsts.length) return null;
+              // A map pack is known three ways (the feature list, the saved pack, our own place in it): any of them counts.
+              const maps = firsts.filter((p) => hasFeature(p.features, "local_pack") || (p.pack?.length ?? 0) > 0 || p.local != null);
+              const count = (t: string) => firsts.filter((p) => hasFeature(p.features, t)).length, own = (t: string) => firsts.filter((p) => ownsFeature(p.features, t)).length;
+              const parts = [
+                maps.length ? `a map pack on ${maps.length} (you are in ${maps.filter((p) => p.local != null).length})` : null,
+                count("ai_overview") ? `an AI overview on ${count("ai_overview")} (it cites you on ${own("ai_overview")})` : null,
+                count("featured_snippet") ? `a featured snippet on ${count("featured_snippet")} (yours on ${own("featured_snippet")})` : null,
+                count("people_also_ask") ? `"people also ask" on ${count("people_also_ask")}` : null,
+              ].filter(Boolean);
+              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">Of your {firsts.length} checked keyword{firsts.length === 1 ? "" : "s"}, Google shows {parts.join(", ")}.</p> : null;
+            })()}
             <table className="g-table" data-testid="table-positions">
-              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
+              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th title="What else Google shows for this search; a green chip means you are in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
               <tbody>
                 {o.rows.map((r) => {
                   const first = r.positions[o.devices[0]];
@@ -122,6 +138,7 @@ export default function SeoOverviewPage() {
                       <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== "United States" && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
                       {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`In the map pack: ${first.pack!.map((p) => p.title).join(", ")}`}>not in it{first.previousLocal != null && <> <span className="g-move g-move--down">lost</span></>}</span> : <span className="g-text-2" title="Google showed no map for this search">no map</span>}</td>
+                      <td data-label="On the page">{first ? <SerpFeatureChips features={(first.pack?.length ?? 0) > 0 || first.local != null ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} /> : <span className="g-text-2">—</span>}</td>
                       <td className="num" data-label="Volume">{fmtNum(r.searchVolume)}</td>
                       <td data-label="Page" className="max-w-[280px] truncate">{first?.url ? <a href={first.url} className="g-link" target="_blank" rel="noreferrer">{first.url.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span className="g-text-2">—</span>}</td>
                       <td className="num g-text-2" data-label="Checked">{first ? fmtDate(first.checkedOn) : "—"}</td>
@@ -138,6 +155,7 @@ export default function SeoOverviewPage() {
                 })}
               </tbody>
             </table>
+            </>
           )}
           {o.runs.length > 0 && (
             <section className="mt-6">

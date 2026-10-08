@@ -49,6 +49,7 @@ export type SeoStatus = {
 export type SeoSite = {
   id: number; domain: string; businessName?: string | null; alertsEnabled?: boolean; alertDrop?: number; locationCode: number; languageCode: string; devices: "desktop" | "mobile" | "both"; serpDepth: number;
   keywordCount: number; nextRankCheckAt: string | null; lastRankCheckAt: string | null; nextBacklinksAt: string | null; lastBacklinksAt: string | null;
+  starred?: boolean; createdAt?: string;
 };
 
 export const fmtNum = (n: number | null | undefined) => n == null ? "—" : Math.round(n).toLocaleString("en-US");
