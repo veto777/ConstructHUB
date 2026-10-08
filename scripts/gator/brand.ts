@@ -18,7 +18,16 @@ export const logoHtml = () => doc(LOGO_RECT.w, LOGO_RECT.h, `<div class="plate">
   .plate img{height:${LOGO_RECT.h - 24}px}`, true);
 
 /** The end tag: "ConstructHUB — run the whole job." and the address. Short, so the joke stays the last thing remembered. */
-export const endTagHtml = () => doc(W, H, `<div class="rays"></div>
+/**
+ * `mascot: false` — the end tag of a LIVE-gator clip: wordmark, line and address only. The live-action gator
+ * and the cartoon mascot are never mixed in one video (the owner, 2026-10-08); the mascot closes cartoon clips.
+ */
+export const endTagHtml = (mascot = true) => !mascot ? doc(W, H, `<div class="rays"></div>
+  <img class="logo" src="${LOGO}" style="left:${W / 2 - 250}px;top:560px;height:128px;padding:20px 34px">
+  <h1 data-fit="${W - 140},420,190" style="left:70px;top:800px;width:${W - 140}px;text-align:center">Run the<br><span class="o">whole</span> job.</h1>
+  <div class="row" style="top:1270px"><div class="pill">${esc(END_TAG.site)}</div></div>`, `
+  .row{position:absolute;left:0;width:100%;display:flex;justify-content:center}
+  .pill{font-family:Anton;font-size:72px;color:#0b2f7a;background:#fff;border-radius:999px;padding:14px 46px 20px;box-shadow:0 6px 0 rgba(0,0,0,.25)}`) : doc(W, H, `<div class="rays"></div>
   <div class="burst" style="left:${W / 2 - 470}px;top:1010px;width:940px;height:940px;border-radius:50%;box-shadow:0 0 0 16px rgba(255,255,255,.95),0 0 0 30px rgba(11,63,168,.55)"></div>
   <img class="logo" src="${LOGO}" style="left:${W / 2 - 190}px;top:330px;height:96px;padding:16px 26px">
   <h1 data-fit="${W - 140},360,170" style="left:70px;top:520px;width:${W - 140}px;text-align:center">Run the<br><span class="o">whole</span> job.</h1>

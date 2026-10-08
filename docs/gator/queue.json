@@ -5,55 +5,58 @@
     "goat-cousin",
     "cast-stretcher",
     "slap-jobsite",
-    "take-measure",
     "moment-ladders",
-    "selfie-deck",
     "pov-nailgun",
+    "selfie-deck",
     "goat-inch-short",
     "skill-tail",
     "cast-inspector",
     "slap-arena",
-    "take-caulk",
     "pov-one-trip",
     "measure-twice",
     "skill-blower",
+    "selfie-leak",
     "zero-percent-rain",
-    "fall-bucket",
-    "fall-wetfloor",
-    "fail-dominoes",
-    "fail-wheelbarrow",
-    "cctv-ladder",
-    "cctv-shingles",
-    "satis-chalk",
+    "moment-video",
     "satis-caulk",
     "mascot-shed",
-    "moment-video",
-    "selfie-leak",
+    "satis-chalk",
+    "cctv-shingles",
+    "fail-dominoes",
+    "fall-wetfloor",
+    "fail-wheelbarrow",
+    "cctv-ladder",
+    "fall-bucket",
+    "our-goat",
+    "take-measure",
+    "take-caulk",
     "talking-sample-1",
     "talking-sample-2",
     "talking-sample-3",
     "talking-sample-4",
-    "talking-final-1",
-    "our-goat"
+    "talking-final-1"
   ],
   "state": {
     "selfie-roof": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "He's been doing this twenty years.",
         "He never said good years."
       ],
       "post": {
-        "tiktok": "captioned.mp4",
-        "instagram": "captioned.mp4"
-      }
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "style01-a-selfie-roof.mp4"
+      ]
     },
     "goat-cousin": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "“That's your price? My cousin can do it cheaper.”",
         "Every estimator's whole week, in one goat."
@@ -62,12 +65,15 @@
         "tiktok": "clip.mp4",
         "instagram": "clip.mp4",
         "linkedin": "clip.mp4"
-      }
+      },
+      "review": [
+        "style07-a-goat-cousin.mp4"
+      ]
     },
     "cast-stretcher": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "He sent the new guy for a board stretcher.",
         "The new guy came back with one."
@@ -75,13 +81,16 @@
       "post": {
         "tiktok": "captioned.mp4",
         "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+        "linkedin": "captioned.mp4"
+      },
+      "review": [
+        "style12-a-cast-stretcher-captioned.mp4"
+      ]
     },
     "slap-jobsite": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "Lunch break. The big guy said go ahead.",
         "He's fine. He landed in the insulation."
@@ -89,26 +98,15 @@
       "post": {
         "tiktok": "replay-music.mp4",
         "instagram": "replay-music.mp4"
-      }
-    },
-    "take-measure": {
-      "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
-      "caption": [
-        "Measure once. Cut twice.",
-        "That's the trade."
-      ],
-      "post": {
-        "tiktok": "captioned.mp4",
-        "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+      },
+      "review": [
+        "slap15-b-jobsite-replay-music.mp4"
+      ]
     },
     "moment-ladders": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "He had one more thing to say about ladders.",
         "The crew had heard enough. (Tie off.)"
@@ -116,25 +114,15 @@
       "post": {
         "tiktok": "clip.mp4",
         "instagram": "clip.mp4"
-      }
-    },
-    "selfie-deck": {
-      "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
-      "caption": [
-        "Day one on the new deck. He said it was solid.",
-        "Day two starts now."
-      ],
-      "post": {
-        "tiktok": "captioned.mp4",
-        "instagram": "captioned.mp4"
-      }
+      },
+      "review": [
+        "viral13-a-ladders.mp4"
+      ]
     },
     "pov-nailgun": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "New guy's first day.",
         "Nobody has said a word to him since."
@@ -142,13 +130,33 @@
       "post": {
         "tiktok": "captioned.mp4",
         "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+        "linkedin": "captioned.mp4"
+      },
+      "review": [
+        "style08-a-pov-nailgun-captioned.mp4"
+      ]
+    },
+    "selfie-deck": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "Day one on the new deck. He said it was solid.",
+        "Day two starts now."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4"
+      },
+      "review": [
+        "selfie-1-captioned.mp4",
+        "style01-b-selfie-deck.mp4"
+      ]
     },
     "goat-inch-short": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "“Cut it exactly where you said, boss.”",
         "Measure twice. Then check who measured."
@@ -157,12 +165,15 @@
         "tiktok": "clip.mp4",
         "instagram": "clip.mp4",
         "linkedin": "clip.mp4"
-      }
+      },
+      "review": [
+        "style07-b-goat-inch-short.mp4"
+      ]
     },
     "skill-tail": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "No trowel. He says he doesn't need one.",
         "Honestly, nice finish."
@@ -171,12 +182,15 @@
         "tiktok": "pure.mp4",
         "instagram": "pure.mp4",
         "linkedin": "pure.mp4"
-      }
+      },
+      "review": [
+        "style03-b-skill-tail.mp4"
+      ]
     },
     "cast-inspector": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "The inspector looked in the panel.",
         "He does that. Means we passed."
@@ -184,13 +198,16 @@
       "post": {
         "tiktok": "captioned.mp4",
         "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+        "linkedin": "captioned.mp4"
+      },
+      "review": [
+        "style12-b-cast-inspector-captioned.mp4"
+      ]
     },
     "slap-arena": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "They let the little guy have a turn.",
         "Never bet against the hard hat."
@@ -198,26 +215,15 @@
       "post": {
         "tiktok": "replay-music.mp4",
         "instagram": "replay-music.mp4"
-      }
-    },
-    "take-caulk": {
-      "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
-      "caption": [
-        "Do your best.",
-        "Caulk the rest."
-      ],
-      "post": {
-        "tiktok": "captioned.mp4",
-        "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+      },
+      "review": [
+        "slap15-a-arena-replay-music.mp4"
+      ]
     },
     "pov-one-trip": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "He said he'd get it all in one trip.",
         "He did."
@@ -225,13 +231,16 @@
       "post": {
         "tiktok": "captioned.mp4",
         "instagram": "captioned.mp4",
-        "linkedin": "pure.mp4"
-      }
+        "linkedin": "captioned.mp4"
+      },
+      "review": [
+        "style08-b-pov-one-trip-captioned.mp4"
+      ]
     },
     "measure-twice": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "Measure twice. Cut once.",
         "Still short."
@@ -240,12 +249,15 @@
         "tiktok": "clip.mp4",
         "instagram": "clip.mp4",
         "linkedin": "clip.mp4"
-      }
+      },
+      "review": [
+        "style11-a-measure-twice.mp4"
+      ]
     },
     "skill-blower": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "He found a new setting on the leaf blower.",
         "Do not ask him how."
@@ -254,12 +266,31 @@
         "tiktok": "pure.mp4",
         "instagram": "pure.mp4",
         "linkedin": "pure.mp4"
-      }
+      },
+      "review": [
+        "style03-a-skill-blower.mp4"
+      ]
+    },
+    "selfie-leak": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "The homeowner said it was a small leak.",
+        "Small."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4"
+      },
+      "review": [
+        "selfie-3-captioned.mp4"
+      ]
     },
     "zero-percent-rain": {
       "status": "approved",
-      "at": "2026-10-08T12:33:18Z",
-      "by": "the owner, 2026-10-08, after watching them: “These are not bad. Let's start posting them.”",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
       "caption": [
         "Forecast: 0% chance of rain.",
         "The 0%:"
@@ -268,92 +299,224 @@
         "tiktok": "clip.mp4",
         "instagram": "clip.mp4",
         "linkedin": "clip.mp4"
-      }
-    },
-    "fall-bucket": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "fall-wetfloor": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "fail-dominoes": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "fail-wheelbarrow": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "cctv-ladder": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "cctv-shingles": {
-      "status": "held",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the owner, 2026-10-08: “The accident videos were not great since they didn't look like an accident.” Held — the accident style is being remade (accident v2)."
-    },
-    "satis-chalk": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the chalk lines come out as scribbles, not three straight lines"
-    },
-    "satis-caulk": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the camera dives into his arm after the bead"
-    },
-    "mascot-shed": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "off-model: the talking model gave the cartoon mascot see-through glasses and eyes; a white band in the still"
+      },
+      "review": [
+        "style11-b-zero-percent-rain.mp4"
+      ]
     },
     "moment-video": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the possum vanishes under the wall and is never shown fine — a viewer could think he is under it"
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "He watched a video. Not load-bearing, he said.",
+        "Twenty years. Never heard the end of that sentence."
+      ],
+      "post": {
+        "tiktok": "clip.mp4",
+        "instagram": "clip.mp4"
+      },
+      "review": [
+        "viral13-b-video.mp4"
+      ]
     },
-    "selfie-leak": {
+    "satis-caulk": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "One bead. One pass.",
+        "That's the whole video."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      },
+      "review": [
+        "style09-b-satis-caulk.mp4"
+      ]
+    },
+    "mascot-shed": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "He strapped the shed down himself.",
+        "He'll strap it again."
+      ],
+      "post": {
+        "tiktok": "captioned.mp4",
+        "instagram": "captioned.mp4"
+      },
+      "review": [
+        "style02-a-mascot-shed-captioned.mp4"
+      ]
+    },
+    "satis-chalk": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "Snap. Snap. Snap.",
+        "Chalk line day."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      },
+      "review": [
+        "style09-a-satis-chalk.mp4"
+      ]
+    },
+    "cctv-shingles": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "The delivery came off the roof early.",
+        "His own truck."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      },
+      "review": [
+        "style05-b-cctv-shingles.mp4"
+      ]
+    },
+    "fail-dominoes": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "He spent all morning stacking those.",
+        "He has not turned around yet."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4",
+        "linkedin": "pure.mp4"
+      },
+      "review": [
+        "style04-a-fail-dominoes.mp4"
+      ]
+    },
+    "fall-wetfloor": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "The floor had just been coated.",
+        "The cone was right there."
+      ],
+      "post": {
+        "tiktok": "replay-music.mp4",
+        "instagram": "replay-music.mp4"
+      },
+      "review": [
+        "fall14-b-wetfloor-music.mp4"
+      ]
+    },
+    "fail-wheelbarrow": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "He said the wheelbarrow was faster.",
+        "It was. Briefly."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "style04-b-fail-wheelbarrow.mp4"
+      ]
+    },
+    "cctv-ladder": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "The yard camera caught this.",
+        "He kept hold of the shingles."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "style05-a-cctv-ladder.mp4"
+      ]
+    },
+    "fall-bucket": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "Somebody filled the bucket with concrete.",
+        "He found out."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "fall14-a-bucket-pure-oneshot.mp4"
+      ]
+    },
+    "our-goat": {
+      "status": "approved",
+      "at": "2026-10-08T13:13:23Z",
+      "by": "the owner kept it in the review folder (2026-10-08): what remains there is his approved set",
+      "caption": [
+        "The goat has seen the invoice."
+      ],
+      "post": {
+        "tiktok": "pure.mp4",
+        "instagram": "pure.mp4"
+      },
+      "review": [
+        "our-goat.mp4"
+      ]
+    },
+    "take-measure": {
       "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the weakest selfie: the burst is small and the last line is cut short"
+      "at": "2026-10-08T13:13:23Z",
+      "why": "owner deleted 2026-10-08"
+    },
+    "take-caulk": {
+      "status": "rejected",
+      "at": "2026-10-08T13:13:23Z",
+      "why": "owner deleted 2026-10-08"
     },
     "talking-sample-1": {
       "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "voice test, not a clip for posting"
-    },
-    "talking-sample-2": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "voice test, not a clip for posting (the mascot gets eyes when he talks)"
+      "at": "2026-10-08T13:13:23Z",
+      "why": "owner deleted 2026-10-08"
     },
     "talking-sample-3": {
       "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "voice test, not a clip for posting"
+      "at": "2026-10-08T13:13:23Z",
+      "why": "owner deleted 2026-10-08"
     },
     "talking-sample-4": {
       "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "voice test, not a clip for posting"
+      "at": "2026-10-08T13:13:23Z",
+      "why": "owner deleted 2026-10-08"
     },
     "talking-final-1": {
       "status": "rejected",
       "at": "2026-10-08T12:33:18Z",
       "why": "off-model: the cartoon mascot gets eyes when he talks"
     },
-    "our-goat": {
-      "status": "rejected",
-      "at": "2026-10-08T12:33:18Z",
-      "why": "the goat alone is an ingredient of the goat cuts, not a post"
+    "talking-sample-2": {
+      "status": "held",
+      "at": "2026-10-08T13:13:23Z",
+      "why": "the owner kept it as the voice he approved — a five-second voice test, not a post"
     }
   }
 }

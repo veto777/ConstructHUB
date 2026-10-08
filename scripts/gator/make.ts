@@ -495,7 +495,7 @@ async function assemble(c: Concept, io: Io) {
   fs.writeFileSync(w("captions.ass"), assFile(boxes));
   fs.copyFileSync(path.join(ROOT, "scripts/tutorials/assets/Anton-Regular.ttf"), w("Anton-Regular.ttf"));
   await renderStill(logoHtml(), w("logo.png"), LOGO_RECT.w, { size: { width: LOGO_RECT.w, height: LOGO_RECT.h }, transparent: true });
-  await renderStill(endTagHtml(), w("end.png"), W, { size: { width: W, height: H } });
+  await renderStill(endTagHtml(!(c.look === "live" || c.shots.some((x) => x.look === "live"))), w("end.png"), W, { size: { width: W, height: H } });
   const bubbles = c.shots.flatMap((s, i) => (s.bubble ? [{ ...s.bubble, start: tl.shots[i].start + s.bubble.at, file: `bubble-${s.id}.png` }] : []));
   for (const b of bubbles) await renderStill(bubbleHtml(b.text, b.tail), w(b.file), BUBBLE.w, { size: { width: BUBBLE.w, height: BUBBLE.h }, transparent: true });
 

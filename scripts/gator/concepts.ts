@@ -343,7 +343,7 @@ export function lintConcept(c: Concept): string[] {
   else if (c.subtitles && !c.shots[0]?.beats.length) { /* the line is the joke: subtitles only, no hook burned in */ }
   else if (c.shots[0]?.beats[0]?.at !== 0 || c.shots[0].beats[0].text !== c.hook) bad.push("the first beat of the first shot must be the hook, at 0 s");
   const sec = c.shots.reduce((n, s) => n + s.use, 0);
-  if (sec < 4 || sec > 20) bad.push(`${sec.toFixed(1)} s of shots (5–20 s)`);
+  if (sec < (c.style === 17 ? 2 : 4) || sec > 20) bad.push(`${sec.toFixed(1)} s of shots (5–20 s)`);
   if (c.look === "live" && c.shots.some((s) => s.look !== "live")) bad.push("a live concept's shots are live");
   for (const s of c.shots) {
     if ((s.shiftDown ?? 0) < 0 || (s.shiftDown ?? 0) > 300) bad.push(`${s.id}: shiftDown is 0–300`);

@@ -61,6 +61,50 @@ const hotTake = (o: { id: string; title: string; stillFrom: string; line: string
 });
 
 /**
+ * ACCIDENT v2 (the owner, 2026-10-08: "The accident videos were not great since they didn't look like an
+ * accident" — and: "the one where the alligator falls off the roof is funny"). What was wrong with v1: he
+ * walks in already performing, the fall is slow and floaty, the camera is centred on the spot and waiting,
+ * nothing else in the scene reacts. The recipe now:
+ *   · he is BUSY and unaware — carrying, climbing, talking to someone off-frame; no wind-up, no look at the lens;
+ *   · the camera is filming SOMETHING ELSE and the accident happens at the edge or in the background; then it
+ *     whips round late, shakes, and the person filming is heard;
+ *   · weight and speed: real time, a hard stop, debris that keeps moving, a second thing going over a beat later;
+ *   · the scene reacts: a dog, a "…you good?", and his thumbs-up — so it stays comedy.
+ * The limits are unchanged: an animal takes the hit, never a person (the people filming are voices only);
+ * no blood, no injury; he is shown fine.
+ */
+const FOUND = "Found-footage realism: ordinary compressed phone video, slightly soft, the exposure shifts when the camera swings, a little wind noise on the microphone, imperfect framing. Everything happens at real speed with real weight — fast acceleration, a hard stop, dust and debris that keep moving afterwards. No slow motion.";
+const SAFE = "The alligator is not hurt: no blood, no injury is shown, and he is clearly fine at the end. No human being appears in the picture at any time — the person filming is only heard. His hard hat, dark sunglasses and orange vest stay on. No text, captions, logos or watermarks appear in the picture. No music.";
+const accident = (o: { id: string; title: string; caption: string; seconds: number; scene: string; action: string; script?: string; voice?: "none" }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", cut: "oneshot", look: "live", style: 16, evergreen: true, sample: true, hook: o.caption,
+  shots: [{ id: "s1", look: "live", video: "talk", seconds: o.seconds, use: o.seconds, rawMotion: true, ...(o.voice ? { voice: o.voice } : {}), scene: `${o.scene} ${PHONE}`, motion: `${o.action} ${FOUND} ${SAFE}`, ...(o.script ? { say: { text: o.script } } : {}), beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+/** A five-second fail of the animal cast, for the "Gator Reacts" episodes: found footage, sudden, they walk away. */
+const quickFail = (o: { id: string; title: string; caption: string; scene: string; action: string }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", cut: "oneshot", look: "live", style: 17, evergreen: true, sample: true, hook: o.caption,
+  shots: [{ id: "s1", look: "live", video: "talk", voice: "none", seconds: 5, use: 5, rawMotion: true, rawStill: true, scene: `${o.scene} ${PHONE}`, motion: `ONE continuous handheld phone take, photorealistic, filmed by a coworker who is never seen. ${o.action} ${FOUND} The animal is not hurt: no blood, no injury; it gets straight back up, unharmed. No human being appears. No text, captions, logos or watermarks appear in the picture. Loud natural sound, no music.`, beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+/**
+ * THE REACTION PACK and the HOST LINES of "Gator Reacts": the live gator in one framing (the still of the
+ * coffee-and-ladder shot, so they cut together and with the coffee shots that already exist), a few seconds each.
+ */
+const HOST_STILL = "moment-ladders/s2";
+const HOST_HOLD = "ONE continuous steady phone take, photorealistic; the camera does not move and the framing does not change. The alligator stands exactly where he is, holding his paper coffee cup in one claw.";
+const HOST_END = "He is the only character; nobody else appears. His hard hat, dark opaque sunglasses and orange vest stay on; his eyes are never visible. No text appears. No music.";
+const reaction = (name: string, title: string, action: string, sound: string): Concept => ({
+  id: `react-${name}`, title, format: "job-site pain", cut: "oneshot", look: "live", style: 17, evergreen: true, sample: true, hook: title,
+  shots: [{ id: "s1", look: "live", video: "talk", voice: "none", seconds: 3, use: 3, rawMotion: true, stillFrom: HOST_STILL, scene: "", motion: `${HOST_HOLD} He is watching something off to the side of the camera, just past the lens. ${action} He does not speak any words. ${HOST_END} Sound: ${sound}`, beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: title, hashtags: tags, linkedin: null, youtubeTitle: title,
+});
+const hostLine = (name: string, line: string, seconds = 3): Concept => ({
+  id: `host-${name}`, title: line, format: "job-site pain", cut: "oneshot", look: "live", style: 17, evergreen: true, sample: true, hook: line,
+  shots: [{ id: "s1", look: "live", video: "talk", seconds, use: seconds, rawMotion: true, stillFrom: HOST_STILL, scene: "", motion: `${HOST_HOLD} He looks straight into the lens and says, completely deadpan and unhurried: "${line}" ${HOST_END}`, say: { text: line }, beats: [], cues: [] }],
+  sound: "His voice.", caption: line, hashtags: tags, linkedin: null, youtubeTitle: line.slice(0, 60),
+});
+
+/**
  * STYLE 13 — "viral moment + gator button": our own scene on the engine of the stalling-before-the-inevitable
  * meme (a cast member talks with total confidence right up to the drop), small subtitles because the line
  * is the joke, then the gator's dry button and a 0.8 s tag. The cast are animals: nobody real is put in peril.
@@ -197,4 +241,92 @@ export const LIVE_CONCEPTS: Concept[] = [
   oneshot({ id: "cast-inspector", style: 12, title: "The inspector", caption: "The inspector looked in the panel.", seconds: 9, subtitled: true, script: "He does that. Means we passed.",
     scene: "In a garage on a jobsite, a real opossum standing upright like a person, wearing a tiny white hard hat and an orange vest and holding a small clipboard, peers into an open grey electrical panel on the wall, its door swung open; nothing is written on anything. He stands beside the opossum holding a paper coffee cup, watching.",
     action: "ONE continuous handheld phone take, photorealistic. The opossum inspector leans in and looks into the open electrical panel. It freezes, goes stiff, and topples straight over backward onto the floor, lying flat on its back with its legs in the air, playing dead. The alligator looks down at it, takes a slow sip of coffee, turns to the lens and says, completely deadpan: \"He does that. Means we passed.\" Behind him the opossum opens one eye." }),
+
+  /* ── Selfie-vlog falls in the mould of "Twenty years" (the owner: "the one where the alligator falls off the roof is funny") ── */
+  selfie(4, "selfie-scaffold", "I got balance", 10,
+    "He stands on the plank deck of a two-level steel pipe scaffold against the side of a house, with his back to the open, unguarded edge; rooftops and trees behind him. On the ground below the scaffold is a big heap of yellow sand.",
+    "He talks fast and cocky straight into the lens: \"Guy says put up the guardrail. I got balance. I got balance—\" Mid-word he steps back off the open edge of the scaffold and drops: the phone goes with him, the picture whips past pipes, sky and wall, and he lands with a heavy thump in the heap of sand in a burst of sand. A beat. The phone, still in his claw, comes back up on his sandy face against the sky, hard hat crooked, and he says, deadpan: \"I got a guardrail guy now.\"",
+    "Guy says put up the guardrail. I got balance. I got balance. I got a guardrail guy now.", "He said he didn't need the guardrail."),
+  selfie(5, "selfie-ladder", "It's a step", 10,
+    "There is exactly ONE alligator in the picture: the one taking the selfie. He is filming himself from the very top of a tall stepladder, so the camera looks slightly down past his shoulders: the roof gutter of a house is right beside his head, the top cap and rails of the aluminium stepladder are visible under his chest, and the lawn and a thick green hedge along the house wall are far below him. Nobody and nothing else is on the ladder or on the roof.",
+    "He talks fast and cocky straight into the lens: \"They say don't stand on the top step. It's a step. It's right there—\" Mid-word the ladder wobbles hard and kicks out sideways from under him: the phone goes with him, the picture spins past the gutter, the sky and the falling ladder, and he crashes down into the thick hedge with a loud rustle as the ladder clatters onto the lawn. A beat. His head pops up out of the hedge, leaves on his hard hat, and he says into the lens, deadpan: \"Okay. It's a shelf.\"",
+    "They say don't stand on the top step. It's a step. It's right there. Okay. It's a shelf.", "He stood on the top step."),
+  selfie(6, "selfie-attic", "Stay on the joists", 10,
+    "He crouches in a dim house attic, balancing on the bare wooden ceiling joists with pink insulation between them, a work light behind him and the sloping roof rafters overhead.",
+    "He talks fast and cocky straight into the lens while walking backwards along the joists: \"Attic's easy. You just stay on the joists. Stay on the—\" Mid-word his foot misses a joist and he drops straight through the ceiling: the phone goes with him through a burst of drywall and pink insulation, the picture whips past a bright living room, and he lands with a thump on a big soft sofa in a cloud of dust, insulation floating down around him, a ragged hole in the ceiling above. A beat. He looks into the lens, dusty, and says, deadpan: \"Found the living room.\"",
+    "Attic's easy. You just stay on the joists. Stay on the. Found the living room.", "He said the attic was easy."),
+
+  /* ── Accident v2: the camera was filming something else ───────────────────── */
+  accident({ id: "acc-deck-ladder", title: "Check out this deck", caption: "He was filming the new deck.", seconds: 10, voice: "none", script: "Check out this deck, boys. Oh! Oh! You good?",
+    scene: "Phone video of a brand-new wooden backyard deck in daylight, filmed from the lawn at an angle so the fresh boards and the railing fill most of the frame. Far in the background, small and off-centre at the right edge, he is high up an aluminium extension ladder leaning against the house wall, his back to the camera, busy carrying a bundle of roof shingles on one shoulder.",
+    action: "ONE continuous handheld phone take, photorealistic. The person filming, never seen, pans slowly along the new deck boards and says proudly: \"Check out this deck, boys—\" In the background, small and at the edge of the frame, the alligator is climbing the extension ladder with the shingles, paying no attention to the camera. Suddenly the foot of the ladder kicks out on the patio: the ladder scrapes down the wall very fast and he drops with it, hitting the ground hard out of sight behind the deck railing with a loud metallic crash; shingles scatter and dust rises. The filmer gasps \"Oh— OH!\" and the camera whips round late toward the noise, shaking and overshooting. A second later a paint bucket rolls off the patio and clatters over. A dog starts barking somewhere. The filmer calls: \"…You good?\" From behind the deck railing one scaly arm rises with a thumbs-up." }),
+  accident({ id: "acc-scaffold-doorbell", title: "Front door camera", caption: "The doorbell camera got all of it.", seconds: 10, voice: "none",
+    scene: "Doorbell-camera view: a very wide fisheye lens, high beside a front door, looking out over a front porch, the steps and the front yard in daylight. Most of the picture is the empty porch, the steps, the lawn and the street. He is SMALL and far from the camera — no more than a quarter of the height of the frame — at the far left edge of the picture and partly cut off by it, out on the lawn: standing on a wooden scaffold plank laid between two tall wooden trestles, side-on to the camera, reaching up to paint the eave of the porch roof with a brush, a paint bucket beside his feet on the plank. He does not look at the camera.",
+    action: "Static doorbell-camera footage, photorealistic, wide fisheye. At the left edge of the frame the alligator paints the trim, busy, turned away, never looking at the camera. Without any warning the plank under him snaps in the middle with a sharp crack: he drops straight down instantly with the two halves of the plank and the paint bucket, landing hard on the lawn mostly out of frame; white paint splashes up across the porch steps; a brush spins across the porch floor. A beat later one of the trestles tips over slowly and crashes down. A dog barks inside the house. Paint keeps dripping off the step. Then, from the bottom-left corner of the frame, one scaly arm rises with a thumbs-up, and holds." }),
+  accident({ id: "acc-wheelbarrow-drive", title: "The new walkway", caption: "She was filming the new walkway.", seconds: 10, voice: "none", script: "So here's the new walkway. Oh no. Oh no!",
+    scene: "Phone video of a freshly laid stone front walkway and new front steps of a suburban house in daylight, filmed looking down at the stones at an angle. In the upper background, out of the centre, a steep concrete driveway rises beside the lawn; at the top of it, small in the frame, he is pushing a steel wheelbarrow heaped with wet grey concrete, side-on to the camera, busy.",
+    action: "ONE continuous handheld phone take, photorealistic. The person filming, never seen, walks slowly along the new stone walkway looking down at it and says in a pleased woman's voice: \"So here's the new walkway—\" In the background the alligator is wheeling the heavy wheelbarrow of wet concrete across the top of the steep driveway, not looking at the camera. The wheelbarrow gets away from him: it lurches downhill, pulling out of his claws, and races down the driveway by itself, fast, bouncing; he runs after it flat out. It hits the kerb at the bottom with a bang and flips, throwing a wide wave of wet concrete across the grass, and he trips over the handles at full speed and belly-flops into the wet concrete with a heavy slap. The filmer says \"Oh no. Oh NO.\" and the camera swings up late and shakes. The wheel keeps spinning. He lifts his head, covered in grey concrete, hard hat still on, and raises one thumb." }),
+  selfie(7, "acc-ceiling-selfie", "Smooth as glass", 10,
+    "He stands in a half-renovated kitchen under a freshly plastered, freshly painted white ceiling; behind him an aluminium stepladder, a work light and a bucket of joint compound on a dust sheet.",
+    "He talks fast and proud straight into the lens: \"New ceiling. Mudded it myself. Smooth as glass. That ain't goin' nowhere—\" Mid-word, without warning, a big section of the ceiling behind him lets go and crashes down in one heavy slab — drywall, dust and pink insulation exploding across the kitchen, the stepladder knocked flying, the work light swinging. He flinches hard, the phone jerks and shakes, dust rolls over him. Bits keep falling. He does not turn around. A beat. Covered in white dust, he says into the lens, deadpan: \"Smooth as glass.\"",
+    "New ceiling. Mudded it myself. Smooth as glass. That ain't going nowhere. Smooth as glass.", "He mudded the ceiling himself."),
+
+  /* ── Five-second fails of the cast, for "Gator Reacts" ───────────────────── */
+  quickFail({ id: "fx-raccoon-plank", title: "The plank", caption: "The plank was fine yesterday.",
+    scene: "A real raccoon standing upright like a person, in a tiny yellow hard hat and orange hi-vis vest, walks along a long wooden plank laid between two sawhorses over a muddy trench on a jobsite, carrying a long piece of lumber on its shoulder, seen from the side from a few steps away, off-centre in the frame.",
+    action: "The raccoon walks briskly along the plank, busy, not looking at the camera. Halfway across, the plank snaps in the middle with a loud crack and the raccoon drops straight down into the muddy trench with a splat, the lumber clattering after it; mud splashes up. The camera jerks. The raccoon's head pops up over the edge of the trench, muddy, hard hat still on." }),
+  quickFail({ id: "fx-rooster-washer", title: "The pressure washer", caption: "First time on the pressure washer.",
+    scene: "A real rooster standing upright like a person, in a tiny yellow hard hat and orange hi-vis vest, holds the long lance of a pressure washer with both wings on a wet concrete driveway beside a house, a hose trailing behind him to the machine; seen from the side, slightly off-centre.",
+    action: "The rooster squeezes the trigger. The lance kicks back violently and a hard jet of water blasts out; the recoil spins the rooster round and drags him skidding backwards across the wet driveway at speed, spraying water in a wild arc over the garage door and the camera, until he sits down hard in a puddle and lets go. The lance clatters. Water drips off the lens. The rooster shakes himself, unharmed." }),
+  quickFail({ id: "fx-beaver-cut", title: "The wrong side of the cut", caption: "He was standing on the off-cut.",
+    scene: "A real beaver standing upright like a person, in a tiny yellow hard hat and orange hi-vis vest, stands on the overhanging end of a long plank that sticks out past the edge of a low wooden deck frame on a jobsite, holding a handsaw to the plank between himself and the frame; a big pile of sawdust and wood shavings lies on the ground below him. Seen from the side.",
+    action: "The beaver saws quickly through the plank he is standing on, concentrating, not looking at the camera. The cut goes through: the end of the plank he stands on drops instantly and he falls straight down with it into the big pile of sawdust with a thump, sawdust bursting into the air. The saw lands beside him. The camera shakes with a laugh. The beaver sits up in the sawdust, unharmed, and looks at the cut end above him." }),
+  quickFail({ id: "fx-possum-paint", title: "The paint tray", caption: "He left the tray on top of the ladder.",
+    scene: "A real opossum standing upright like a person, in a tiny white hard hat and orange hi-vis vest, stands at the foot of a wooden stepladder in an empty room with drop cloths on the floor; on the very top of the stepladder sits a paint tray full of white paint. The opossum has both paws on the ladder, about to move it. Seen from across the room, off-centre.",
+    action: "The opossum grabs the stepladder and drags it briskly sideways across the room, busy, not looking up or at the camera. The paint tray slides off the top and lands upside down squarely on the opossum's hard hat with a slap, white paint pouring down over its head and shoulders and splattering the drop cloth. The opossum freezes, standing, dripping. The camera jerks with a stifled laugh. The tray slowly slides off and clatters on the floor." }),
+  quickFail({ id: "fx-goat-drywall", title: "Sideways", caption: "It fits if you turn it. He did not turn it.",
+    scene: "A real white-and-tan goat with a small yellow hard hat on its head walks toward an open interior doorway in a house under construction, carrying a full sheet of drywall balanced flat across its back, the sheet far wider than the doorway; seen from behind and to the side, down a hallway.",
+    action: "The goat trots briskly straight at the doorway without slowing. The wide drywall sheet slams into both sides of the door frame with a loud bang and snaps clean in half, the two halves dropping to the floor in a puff of white dust, while the goat walks straight on through the doorway without stopping or looking back. The camera shakes. Dust hangs in the air." }),
+  quickFail({ id: "fx-raccoon-buckets", title: "The stack", caption: "They stacked them one higher.",
+    scene: "Two real raccoons standing upright like people, in tiny yellow hard hats and orange hi-vis vests, on a concrete garage floor on a jobsite: one stands on tiptoe placing one more white five-gallon bucket on top of a very tall, leaning tower of stacked white buckets, the other steadies the bottom. Seen from a few steps away, the tower partly cut off by the top of the frame.",
+    action: "The raccoon on tiptoe lets go of the top bucket. The whole leaning tower sways and comes down fast in a loud hollow avalanche of plastic buckets that buries both raccoons and bounces across the floor toward the camera, one bucket hitting the lens with a thud. The camera jolts back. The buckets settle. Two raccoon heads pop up out of the pile, each wearing a bucket-shaped dent of dust, unharmed." }),
+
+  /* ── "Gator Reacts": the reaction pack (the owner: "the reactions have to be annoyed or shocked" — "or no reaction is also a reaction") ── */
+  // SHOCKED — for the impact. Each peaks within the first second.
+  reaction("shocked-01-jaw-drop", "Jaw drop", "Within the first half second he sees a sudden disaster: his jaw drops wide open in shock and his head jerks sharply back, shoulders jumping; he holds the stunned, open-mouthed pose — shocked, not smiling.", "one sharp gasp."),
+  reaction("shocked-02-spit-take", "Spit-take", "He is taking a sip of coffee when he sees a sudden disaster: at once he sprays the coffee out of his mouth in a wide spit-take, lurching forward, coffee mist hanging in the air, then stares, mouth open in shock.", "a sip, a loud spluttering spray, a cough."),
+  reaction("shocked-03-recoil", "OHH!", "Within the first half second he sees a sudden hard impact: he flinches and recoils with his whole body, jerking back half a step, his free claw flying up in front of his chest, mouth wide open in alarm, and lets out one loud \"OHHH!\" — alarmed, not amused.", "one loud alarmed \"OHHH!\" in a gravelly man's voice."),
+  reaction("shocked-04-double-take", "Double-take", "He glances away, bored — then snaps his head back toward what he is watching in a fast, sharp double-take and freezes, leaning forward, jaw hanging open in disbelief.", "a sharp \"huh?!\" grunt."),
+  reaction("shocked-05-hard-hat", "Grabs his hard hat", "Within the first half second he sees a sudden disaster: he jolts so hard that his yellow hard hat pops up off his head, and he slaps his free claw down on top of it to hold it on, mouth open in shock, staring.", "a startled grunt and a slap on plastic."),
+  reaction("shocked-06-drops-coffee", "Drops his coffee", "Within the first half second he sees a sudden disaster: he freezes, staring, mouth falling open, and the paper coffee cup slips out of his claw and drops to the ground, splashing — he does not look at it at all, still staring.", "a small gasp, then a cup hitting the ground with a splash."),
+  reaction("shocked-07-frozen-sip", "Frozen mid-sip", "He lifts the coffee cup to drink — and freezes solid with the cup stopped at his mouth, completely motionless, staring at what he is watching, stunned.", "sudden silence."),
+  reaction("shocked-08-lean-in", "Leans in", "He slowly leans far in toward the lens and toward what he is watching, head pushed forward, mouth hanging open in total disbelief, and holds it.", "a slow, quiet \"what…\" in a gravelly man's voice."),
+  // ANNOYED — for the aftermath and the verdict.
+  reaction("annoyed-09-head-shake", "Head shake", "Annoyed, jaw clamped shut, he slowly shakes his head from side to side three times, then looks down at the ground.", "a low disapproving grunt."),
+  reaction("annoyed-10-facepalm", "Facepalm", "Annoyed, he lifts his free claw and plants it flat over his snout and sunglasses in a facepalm; his shoulders drop and his head sinks, and he holds it there.", "a long tired sigh."),
+  reaction("annoyed-11-exhale", "Long exhale", "Annoyed, mouth shut, he tilts his head slowly all the way back to look up at the sky and lets out one long, slow breath through his nose, shoulders sinking.", "one long exhale through the nose."),
+  reaction("annoyed-12-tapping", "Waiting", "Annoyed, mouth shut, he plants his free claw on his hip and taps one foot on the ground impatiently, his tail flicking sharply from side to side behind him, staring at what he is watching.", "a foot tapping on gravel."),
+  reaction("annoyed-13-pinch", "Pinches his snout", "Annoyed, he pinches the top of his snout just under his sunglasses with two claws of his free hand, head bowed, like a man with a headache, and holds it.", "a quiet groan."),
+  reaction("annoyed-14-cmon", "C'mon", "Annoyed, he points his free claw sharply at what he is watching, then throws the claw up in the air in exasperation and lets it drop, muttering \"C'mon.\"", "a muttered \"C'mon.\" in a gravelly New Jersey man's voice."),
+  reaction("annoyed-15-watch", "Checks his watch", "Annoyed, mouth shut, he slowly raises his free wrist, looks at it as if checking a watch, lowers it, and shakes his head once.", "a short flat grunt."),
+  reaction("annoyed-16-slow-turn", "The look", "Mouth shut, face completely flat, he turns his head very slowly from what he is watching to stare straight into the lens, and holds the flat stare, motionless, one beat too long.", "silence."),
+  // NO REACTION — for the biggest, loudest fails (the contrast is the joke). 18 and 19 are cut from shots that exist.
+  reaction("deadpan-17-still", "Nothing", "He does not react at all: completely still, mouth shut, staring flatly straight into the lens while a loud crash is heard off-camera; only the tip of his tail flicks once.", "a loud crash and clatter somewhere off-camera, then silence."),
+  reaction("deadpan-20-glance", "A glance", "Mouth shut, face flat, he glances briefly off to the side at a loud mess, then looks back into the lens — and does nothing at all; no expression, no movement.", "a loud crash off-camera, then silence."),
+  reaction("deadpan-21-clipboard", "Still writing", "He does not react at all: he looks down at his coffee cup, calmly swirls it and takes one unhurried sip, never once looking up, while a loud crash is heard off-camera.", "a loud crash and clatter somewhere off-camera; a calm sip."),
+  reaction("deadpan-22-nod", "Called it", "Mouth shut, face flat, he looks at what he is watching and gives one single slow nod, as if he had predicted exactly this, then is still.", "a loud crash off-camera, then a quiet \"mm-hm.\""),
+
+  /* ── "Gator Reacts": the host lines ──────────────────────────────────────── */
+  hostLine("open", "Alright. Site walk. Let's see who's getting written up today.", 5),
+  hostLine("write-up", "That's a write-up."),
+  hostLine("signed-off", "Who signed off on that?"),
+  hostLine("twenty-years", "Twenty years. Never seen it done that wrong.", 4),
+  hostLine("operator", "Ladder's fine. Operator's defective.", 4),
+  hostLine("check", "That's coming out of somebody's check.", 4),
+  hostLine("meeting", "And that's why we have the safety meeting.", 4),
+  hostLine("new-guy", "Send that to the new guy."),
+  hostLine("gravity", "Gravity. Still undefeated."),
+  hostLine("seen-worse", "I've seen worse. Not today. But I've seen worse.", 5),
+  hostLine("lunch", "And it's not even lunch."),
+  hostLine("sign-off", "ConstructHUB. Run the whole job. And tie off.", 5),
 ];

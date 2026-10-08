@@ -102,7 +102,7 @@ async function main() {
   fs.copyFileSync(path.join(ROOT, "scripts/tutorials/assets/Anton-Regular.ttf"), w("Anton-Regular.ttf"));
   graph.push(`[body]${tags.length ? "ass=tags.ass:fontsdir=." : "null"}[cap]`);
   if (endTag) {
-    await renderStill(endTagHtml(), w("end.png"), W, { size: { width: W, height: H } });
+    await renderStill(endTagHtml(false), w("end.png"), W, { size: { width: W, height: H } });
     graph.push(`[1:v]fps=${FPS},scale=${W}:${H},setsar=1,format=yuv420p,trim=end_frame=${Math.round(endTag * FPS)},setpts=PTS-STARTPTS[end]`, `[cap][end]concat=n=2:v=1:a=0,format=yuv420p[v]`);
   } else graph.push(`[cap]format=yuv420p[v]`);
 

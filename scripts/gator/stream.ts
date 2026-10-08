@@ -92,7 +92,7 @@ export function planViral(clips: readonly ViralClip[], targets: readonly ViralTa
       const live = before.find(counts);
       if (live) { skipped.push({ conceptId: clip.conceptId, accountId: t.id, reason: `already ${live.status}${live.postSubmissionId ? ` (${live.postSubmissionId})` : ""}` }); continue; }
       // Refused before: carried to the next free slot — at least 12 hours after the refusal.
-      const lastRefused = before.map((p) => new Date(p.createdAt).getTime()).sort((a, b) => b - a)[0];
+      const lastRefused = before.filter((p) => !/^cancelled by us/.test(p.errorMessage ?? "")).map((p) => new Date(p.createdAt).getTime()).sort((a, b) => b - a)[0];   // a post we took back ourselves was not refused
       const saved = { day, slotI, guard };
       let found = nextSlot(0);
       while (lastRefused !== undefined && "at" in found && !mayRetry(lastRefused, found.at)) found = nextSlot(0);

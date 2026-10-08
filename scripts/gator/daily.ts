@@ -26,7 +26,7 @@ import { CONCEPTS, conceptById, lintConcept, type Concept } from "./concepts";
 import { spent } from "./higgsfield";
 import { OUT, clipSpent, produce, readLedger } from "./make";
 import { viralMain } from "./post";
-import { readQueue, saveQueue, type PostPlatform, type Queue } from "./queue";
+import { readQueue, removedFromReview, saveQueue, type PostPlatform, type Queue } from "./queue";
 
 export { QUEUE, readQueue, type Queue, type QueueState } from "./queue";
 export const REVIEW_DIR = path.join(OUT, "_review");
@@ -152,7 +152,15 @@ async function main() {
   }
   if (args.flags.schedule) {
     // Every approved clip that an account does not have yet, in the queue's order, into the next free gator slots.
-    const ids = q.order.filter((id) => !mayPost(q, id));
+    // The owner's review folder first: what he deleted there is not scheduled.
+    const keyFile = process.env.GATOR_FILELOADED_KEY_FILE, base = process.env.GATOR_FILELOADED_URL ?? "http://127.0.0.1:8150/api/p/gator-videos/files";
+    if (!keyFile || !fs.existsSync(keyFile)) throw new Error("GATOR_FILELOADED_KEY_FILE is not set: the owner's review folder is read before every scheduling run");
+    const res = await fetch(base, { headers: { Authorization: `Bearer ${fs.readFileSync(keyFile, "utf8").trim()}` }, signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`the review folder answered ${res.status} — nothing is scheduled without it`);
+    const listing: string[] = ((await res.json()) as { files: { name: string }[] }).files.map((f) => f.name);
+    const gone = q.order.filter((id) => !mayPost(q, id)).map((id) => removedFromReview(q, id, listing)).filter((x): x is string => !!x);
+    for (const g of gone) console.log(`  – ${g}`);
+    const ids = q.order.filter((id) => !mayPost(q, id) && !removedFromReview(q, id, listing));
     if (!ids.length) { console.log("Nothing approved is waiting."); return; }
     const code = await viralMain([...ids, "--brief", ...(args.flags.go ? ["--go"] : []), ...(typeof args.flags.table === "string" ? ["--table", args.flags.table] : []), ...(typeof args.flags.platform === "string" ? ["--platform", args.flags.platform] : [])]);
     if (code !== 0) throw new Error(`the poster stopped (exit ${code})`);

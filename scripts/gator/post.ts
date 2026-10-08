@@ -175,9 +175,15 @@ async function sendShorts(ids: string[], viral: ViralLedger, save: (l: SocialLed
   return failed ? 2 : 0;
 }
 
+/** The clip of a ledger entry — from its key when the entry was added in this run and not yet marked. A row without a clip id is never written. */
+export function clipIdOf(p: { conceptId?: string; helpKey: string }): string {
+  const id = p.conceptId ?? (p.helpKey.startsWith("gator:") ? p.helpKey.slice("gator:".length) : "");
+  if (!id || id === "undefined") throw new Error(`a viral ledger entry has no clip id (${p.helpKey})`);
+  return id;
+}
 /** The calendar from `now` on, as text: day, Eastern time, account, clip — with the tutorial slot of each day shown as kept free. */
 export function scheduleTable(viral: ViralLedger, now: Date): string {
-  const rows = viral.posts.filter((p) => p.status !== "failed" && new Date(p.scheduledTime ?? p.createdAt).getTime() >= now.getTime() - 12 * 3600000).map((p) => ({ at: new Date(p.scheduledTime ?? p.createdAt), account: `${p.platform} ${p.accountId}`, platform: p.platform as string, id: p.accountId, what: `${p.conceptId} (${p.cut})`, status: p.status as string, url: p.publicUrl ?? "" }));
+  const rows = viral.posts.filter((p) => p.status !== "failed" && new Date(p.scheduledTime ?? p.createdAt).getTime() >= now.getTime() - 12 * 3600000).map((p) => ({ at: new Date(p.scheduledTime ?? p.createdAt), account: `${p.platform} ${p.accountId}`, platform: p.platform as string, id: p.accountId, what: `${clipIdOf(p)} (${p.cut})`, status: p.status as string, url: p.publicUrl ?? "" }));
   const days = [...new Set(rows.map((r) => easternLabel(r.at).slice(0, 10)))].sort(), accounts = [...new Map(rows.map((r) => [r.id, r.platform])).entries()];
   for (const d of days) for (const [id, platform] of accounts) { const c = slotClock(d, "tutorial", platform, id); if (c) rows.push({ at: new Date(NaN), account: `${platform} ${id}`, platform, id, what: "tutorial (integrator)", status: "kept free", url: `${d} ${c}` }); }
   const line = (r: (typeof rows)[number]) => { const when = Number.isFinite(r.at.getTime()) ? easternLabel(r.at).slice(0, 16) : r.url; return `${when}  ${r.account.padEnd(16)} ${r.status.padEnd(10)} ${r.what}${Number.isFinite(r.at.getTime()) && r.url ? `  ${r.url}` : ""}`; };
@@ -187,7 +193,7 @@ export function scheduleTable(viral: ViralLedger, now: Date): string {
 }
 
 export async function viralMain(argv: string[]): Promise<number> {
-  const args = parseArgs(argv, ["go", "brief", "asap", "reconcile", "youtube", "override-rate", "enable-shorts"]);
+  const args = parseArgs(argv, ["go", "brief", "asap", "reconcile", "youtube", "override-rate", "enable-shorts", "cancel-scheduled"]);
   const key = process.env.TUTORIAL_BLOTATO_KEY ?? "";
   const say = (s: string) => console.log(redact(s, key));
   const io: Io = { fetch: async (url, init) => { const r = await fetch(url, { ...init, signal: AbortSignal.timeout(60_000) }); return { status: r.status, text: () => r.text() }; }, sleep, now: () => new Date(), log: say };
@@ -199,6 +205,29 @@ export async function viralMain(argv: string[]): Promise<number> {
   const backoffs = readJson<Backoff[]>(BACKOFF_FILE, []);
   const queue = readQueue();
   try {
+  if (args.flags["cancel-scheduled"]) {
+    // Take our own scheduled gator posts back out of Blotato (the owner changed his mind about a clip or a version).
+    // Only posts of THIS ledger that are still "scheduled", on the allowlisted accounts, named or all; each is matched
+    // to Blotato's schedule by account, time AND text before it is deleted — nothing else is touched.
+    if (!key) throw new Error("TUTORIAL_BLOTATO_KEY is not set (run with --env-file=/home/voiceban/ConstructHUB-live/.env)");
+    const allow = parseAllowlist(process.env.TUTORIAL_BLOTATO_ACCOUNT_IDS), why = typeof args.flags.why === "string" ? args.flags.why : "the schedule was rebuilt";
+    const mine = viral.posts.filter((p) => p.status === "scheduled" && allow.includes(p.accountId) && !DENYLIST[p.accountId] && new Date(p.scheduledTime ?? 0).getTime() > now.getTime() + 5 * 60000 && (!args._.length || args._.includes(p.conceptId)));
+    const h = { "blotato-api-key": key }, items: any[] = [];
+    for (let cursor = "", i = 0; i < 40; i++) { const r = await fetch(`https://backend.blotato.com/v2/schedules?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, { headers: h, signal: AbortSignal.timeout(60_000) }); if (!r.ok) throw new Error(`Blotato answered ${r.status} to the schedule list`); const j: any = await r.json(); items.push(...(j.items ?? [])); cursor = j.cursor ?? j.nextCursor ?? ""; if (!cursor) break; await sleep(1200); }
+    let done = 0, missing = 0;
+    for (const p of mine) {
+      const hit = items.filter((s) => String(s.account?.id ?? s.draft?.accountId) === p.accountId && new Date(s.scheduledAt).getTime() === new Date(p.scheduledTime!).getTime() && sha256(Buffer.from(String(s.draft?.content?.text ?? ""))) === p.textSha256);
+      if (hit.length !== 1) { missing++; say(`!!!! ${p.conceptId} → ${p.platform} ${p.scheduledEastern}: ${hit.length} schedules match in Blotato — not touched; look there`); continue; }
+      if (!args.flags.go) { say(`  would cancel ${p.conceptId} → ${p.platform} ${p.scheduledEastern} (schedule ${hit[0].id})`); continue; }
+      const r = await fetch(`https://backend.blotato.com/v2/schedules/${encodeURIComponent(hit[0].id)}`, { method: "DELETE", headers: h, signal: AbortSignal.timeout(60_000) });
+      if (r.status !== 204 && r.status !== 200) { missing++; say(`!!!! ${p.conceptId} → ${p.platform}: Blotato answered ${r.status} to the delete — still scheduled`); continue; }
+      p.status = "failed"; p.errorMessage = `cancelled by us ${now.toISOString()}: ${why}`; save(viral as unknown as SocialLedger); done++;
+      say(`  × ${p.conceptId} → ${p.platform} ${p.scheduledEastern} cancelled`);
+      await sleep(1500);
+    }
+    say(`${done} cancelled, ${missing} need a look, of ${mine.length}`);
+    return missing ? 2 : 0;
+  }
   if (args.flags.reconcile) {
     if (!key) throw new Error("TUTORIAL_BLOTATO_KEY is not set (run with --env-file=/home/voiceban/ConstructHUB-live/.env)");
     const r = await reconcilePosts({ ledger: viral as unknown as SocialLedger, save, key, io });
@@ -271,6 +300,8 @@ export async function viralMain(argv: string[]): Promise<number> {
     say(`  text (${p.text.length}):`);
     say(args.flags.brief ? `    | ${p.text.split("\n")[0]} …` : p.text.split("\n").map((l) => `    | ${l}`).join("\n"));
   }
+  // The calendar as the ledger has it (a dry run adds nothing to it).
+  if (typeof args.flags.table === "string" && (!args.flags.go || !toSend.length)) { fs.writeFileSync(args.flags.table, scheduleTable(viral, now)); say(`→ ${args.flags.table}`); }
   if (!args.flags.go) { say("\nDry run. To create these posts, name the clips and add --go."); return 0; }
   if (!toSend.length) { say("\nnothing to post"); return 0; }
   // Media first: every clip and cover in R2, each public address answering with its first bytes.

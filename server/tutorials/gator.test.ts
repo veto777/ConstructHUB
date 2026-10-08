@@ -8,17 +8,18 @@ import { LIVE_CONCEPTS } from "../../scripts/gator/concepts-live";
 import { plan as replayPlan } from "../../scripts/gator/replay";
 import { boardMd, byStyle, due, engagementRate, parseManual, percentiles, postedOf, rank, recommend, type Metrics, type Posted } from "../../scripts/gator/scoreboard";
 import { STYLES } from "../../scripts/gator/styles";
+import { peakOf, plan as replan, rightsRefusal, type Episode } from "../../scripts/gator/reacts";
 import { schedule, stylesMd, DOC as STYLES_DOC } from "../../scripts/gator/styles-doc";
 import { BAND, REFERENCE, analyse, compare, pitchCorrection } from "../../scripts/gator/voiceprint";
 import { END_TAG_SEC, H, LOGO_RECT, MAX_SEC, MIN_PX, W, ZONES, assFile, layoutBeat, wrapCaption, type Beat } from "../../scripts/gator/layout";
 import { automaticChecks, defaultPost, mayApprove, mayPost, nextInQueue, type Queue } from "../../scripts/gator/daily";
-import { captionFor, readQueue } from "../../scripts/gator/queue";
+import { captionFor, readQueue, removedFromReview } from "../../scripts/gator/queue";
 import { VOICE, voiceFilter, voiceKey } from "../../scripts/gator/voice";
 import { SLOT_ORDER, accountTimes, addBackoff, backoffFor, mayRetry, nextAllowed, rateRefusal, slotAt, slotClock, tutorialRefusal, tutorialSlotFor, tutorialsOfTheDay, type Backoff } from "../../scripts/tutorials/social-rate";
 import { bandFault, clipSpent, hatRow, lineBeats, peaksOf, plainWords, saysTheLine, subtitleBeats, timeline } from "../../scripts/gator/make";
 import fs from "fs";
 import { DOC, conceptsMd } from "../../scripts/gator/concepts-doc";
-import { mediaKey, planAsap, plannedMediaUrl, viralMain } from "../../scripts/gator/post";
+import { clipIdOf, mediaKey, planAsap, plannedMediaUrl, scheduleTable, viralMain } from "../../scripts/gator/post";
 import { RATE, synth, toPcm } from "../../scripts/gator/sound";
 import { VIRAL_RULES, emptyViralLedger, planViral, weekOf, type ViralClip, type ViralLedgerPost, type ViralTarget } from "../../scripts/gator/stream";
 import { buildPost, emptyLedger as emptySocialLedger, planPosts, type LedgerPost, type SocialLedger, type VideoForPost } from "../../scripts/tutorials/social-post-lib";
@@ -470,6 +471,20 @@ describe("gator shorts — the viral stream in the calendar", () => {
     try { expect(await viralMain(["--youtube", "while-youre-here", "--go"])).toBe(1); } finally { console.error = err; }
     expect(said).toMatch(/gator clips do not go to YouTube/);
   });
+  it("the schedule table names the clip in every row — also for a post added in the same run", () => {
+    const viral = emptyViralLedger();
+    const marked: ViralLedgerPost = { ...tutorialPost("76607", "instagram", "2026-10-13T11:40:00Z", "gator:clip-a"), stream: "viral", conceptId: "clip-a", aiGenerated: true };
+    // What sendPosts pushes before the ledger is saved: the tutorial shape, no conceptId yet.
+    const fresh = tutorialPost("63054", "tiktok", "2026-10-13T12:05:00Z", "gator:clip-b") as ViralLedgerPost;
+    viral.posts.push(marked, fresh);
+    const table = scheduleTable(viral, now);
+    expect(table).toContain("clip-a (vertical.mp4)"); expect(table).toContain("clip-b (vertical.mp4)");
+    expect(table).not.toMatch(/undefined/);
+    expect(table).toMatch(/tutorial \(integrator\)/);
+    expect(clipIdOf({ helpKey: "gator:x" })).toBe("x");
+    expect(() => clipIdOf({ helpKey: "crm-clients" })).toThrow(/no clip id/);
+    expect(() => scheduleTable({ ...viral, posts: [{ ...fresh, helpKey: "gator:undefined" }] }, now)).toThrow(/no clip id/);
+  });
   it("TikTok carries its AI-generated label; the tutorial stream's plan is untouched by the viral one", () => {
     const body = buildPost({ id: "63054", platform: "tiktok", name: "construct.hub" }, "caption", { url: "https://constructhub.us/api/tutorials/media/gator-x.social-vertical.12345678.mp4", coverMs: 600 }, "2026-10-13T16:05:00.000Z");
     expect(body.post.target).toMatchObject({ targetType: "tiktok", isAiGenerated: true, isYourBrand: true, isBrandedContent: false, videoCoverTimestamp: 600 });
@@ -738,6 +753,11 @@ describe("gator shorts — what the machine checks by itself", () => {
       expect(text).not.toMatch(/\b(best|guarantee|free|#1|save)\b/i);
     }
     expect(captionFor("tiktok", ["Hook."])).toBe("Hook.\n#AIContent #contractorlife #construction #jobsite #bluecollar");
+    // The owner's review folder is the review surface: a clip whose file he removed is not scheduled.
+    const rq: Queue = { version: 1, order: ["a", "b"], state: { a: { status: "approved", at: "t", review: ["a-pure.mp4", "a-captioned.mp4"] }, b: { status: "approved", at: "t" } } };
+    expect(removedFromReview(rq, "a", ["a-captioned.mp4", "other.mp4"])).toBeNull();
+    expect(removedFromReview(rq, "a", ["other.mp4"])).toMatch(/no longer in the owner's review folder/);
+    expect(removedFromReview(rq, "b", [])).toBeNull();
     // The committed queue: every approved clip can be posted, and its files exist as named.
     const real = readQueue();
     for (const [id, st] of Object.entries(real.state)) { if (st.status === "approved") expect(mayPost(real, id), id).toBeNull(); else expect(st.why, id).toBeTruthy(); }
@@ -867,5 +887,39 @@ describe("gator shorts — the styles experiment and its scoreboard", () => {
     const posted = postedOf({ posts: [{ conceptId: "a", platform: "tiktok", status: "published", publicUrl: "u", scheduledTime: "2026-10-08T04:17:00Z", createdAt: "x" }, { conceptId: "a", platform: "instagram", status: "failed", createdAt: "x" }], youtube: [{ conceptId: "a", status: "uploaded", videoId: "v1", url: "y", uploadedAt: "2026-10-09T00:00:00Z" }, { conceptId: "b", status: "failed", videoId: null }] }, () => 6);
     expect(posted.map((p) => `${p.conceptId}@${p.platform}`)).toEqual(["a@tiktok", "a@youtube"]);
     expect(posted[0].style).toBe(6);
+  });
+});
+
+describe("gator reacts — only footage we may use", () => {
+  const own = { kind: "own-ai" as const, record: "generated by us: fx-raccoon-plank, Higgsfield" };
+  it("a clip without a rights record is refused, and nothing lifts the refusal of somebody else's unlicensed video", () => {
+    expect(rightsRefusal({ file: "a.mp4" })).toMatch(/no rights record/);
+    expect(rightsRefusal({ file: "a.mp4", rights: own })).toBeNull();
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "owner", record: "filmed by the owner's crew on 2026-09-30; they agreed" } })).toBeNull();
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "third-party", record: "from a YouTube compilation" } })).toMatch(/somebody else's video without a licence is not used/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "own-ai", record: "third-party viral clip, unlicensed — de-watermarked" } })).toMatch(/not used/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "licensed", record: "bought 2026-10-09" } })).toMatch(/licensor and the licence reference/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "licensed", record: "bought 2026-10-09", licensor: "an agency", licence: "INV-1234" } })).toBeNull();
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "cc-by", record: "licence field read 2026-10-09", url: "http://x", attribution: "Title — Author" } })).toMatch(/address and the attribution/);
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "cc-by", record: "licence field read 2026-10-09", url: "https://www.youtube.com/watch?v=x", attribution: "Title — Author, CC BY" } })).toBeNull();
+    expect(rightsRefusal({ file: "a.mp4", rights: { kind: "fair-use", record: "commentary" } })).toMatch(/not a kind of rights/);
+    // The tool has no override and no watermark step — in its code, not only in its manual.
+    const src = fs.readFileSync("scripts/gator/reacts.ts", "utf8").split("*/").slice(1).join("*/");
+    expect(src).not.toMatch(/delogo|inpaint|accepted-risk|--force/);
+  });
+  it("the reaction's peak lands on the impact; host lines open, judge and sign off; no reaction twice", () => {
+    const ep: Episode = { id: "t", open: "host-open", signOff: "host-sign-off", verdict: { after: 2, line: "host-write-up" }, clips: [
+      { file: "a.mp4", impact: 2.5, reaction: "react-shocked-01-jaw-drop", rights: own }, { file: "b.mp4", impact: 1.0, reaction: "react-shocked-08-lean-in", rights: own }, { file: "c.mp4", impact: 4.6, reaction: "react-annoyed-10-facepalm", rights: own }] };
+    const d = { "a.mp4": 5, "b.mp4": 5, "c.mp4": 5, "host-open": 5, "host-write-up": 3, "host-sign-off": 5 };
+    const { segments, totalSec } = replan(ep, d);
+    expect(segments.map((s) => s.kind)).toEqual(["host", "clip", "clip", "host", "clip", "host", "tag"]);
+    for (let i = 1; i < segments.length; i++) expect(segments[i].start).toBeCloseTo(segments[i - 1].start + segments[i - 1].sec, 6);
+    for (const s of segments) if (s.kind === "clip") { expect(s.reactionAt + peakOf(s.clip.reaction)).toBeCloseTo(s.impactAt, 6); expect(s.impactAt).toBeGreaterThanOrEqual(0); expect(s.sec).toBeLessThanOrEqual(3.61); }
+    const b = segments[2]; if (b.kind !== "clip") throw new Error();
+    expect(b.from).toBe(0); expect(b.reactionAt).toBeLessThan(0);              // the impact comes early: the slow reaction is already under way
+    expect(totalSec).toBeCloseTo(5 + 3.6 + 2.6 + 3 + 2.4 + 5 + 0.8, 1);
+    expect(() => replan({ ...ep, clips: [ep.clips[0], { ...ep.clips[1], reaction: ep.clips[0].reaction }] }, d)).toThrow(/used twice/);
+    expect(() => replan({ ...ep, clips: [{ file: "a.mp4", impact: 2, reaction: "r" }] }, d)).toThrow(/no rights record/);
+    expect(() => replan({ ...ep, clips: [{ ...ep.clips[0], impact: 9 }] }, d)).toThrow(/not inside the clip/);
   });
 });
