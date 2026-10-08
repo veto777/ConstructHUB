@@ -90,21 +90,25 @@ const LEASE = "1 hour";
  */
 export async function sendDueReports(): Promise<number> {
   const { rows: due } = await pool.query(
-    `UPDATE seo_report_schedules SET next_send_at = now() + interval '${LEASE}', work_cutoff = coalesce(work_cutoff, now())
+    // The occurrence is fixed the first time it is due — its work from / to, and the period its emails count under —
+    // and kept for every retry, so a retry tells the same work to the recipients it did not reach yet.
+    `UPDATE seo_report_schedules SET next_send_at = now() + interval '${LEASE}', work_cutoff = coalesce(work_cutoff, now()),
+            work_since = coalesce(work_since, last_sent_at, now() - CASE WHEN frequency = 'weekly' THEN interval '7 days' ELSE interval '31 days' END),
+            work_period = coalesce(work_period, CASE WHEN frequency = 'weekly' THEN 'w' || floor(extract(epoch FROM now()) / (7 * 86400))::bigint::text ELSE to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM') END)
       WHERE site_id IN (SELECT site_id FROM seo_report_schedules WHERE frequency <> 'off' AND next_send_at <= now() AND cardinality(recipients) > 0 ORDER BY next_send_at LIMIT 10 FOR UPDATE SKIP LOCKED)
-     RETURNING site_id, user_id, frequency, recipients, last_sent_at, work_cutoff`);
+     RETURNING site_id, user_id, frequency, recipients, work_since, work_cutoff, work_period`);
   let sent = 0;
   for (const s of due) {
     try {
       if (!seoIncluded(await getEntitlements(s.user_id))) { await pool.query("UPDATE seo_report_schedules SET next_send_at = now() + interval '1 day' WHERE site_id=$1", [s.site_id]); continue; }
-      // The work done since the last report went out (the first one: a week or a month back), so none falls between two
-      // reports and none is told twice; a plan that cannot be read stops the send and it is tried again.
-      const since = s.last_sent_at ? new Date(s.last_sent_at) : new Date(Date.now() - (s.frequency === "weekly" ? 7 : 31) * 864e5);
-      const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, sendPeriod(s.frequency), { workSince: since, workUntil: new Date(s.work_cutoff), strict: true });
+      // The work done in this occurrence (from where the last one ended), so none falls between two reports and none is
+      // told twice; a plan that cannot be read stops the send and it is tried again.
+      const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, s.work_period, { workSince: new Date(s.work_since), workUntil: new Date(s.work_cutoff), strict: true });
       sent += r.sent;
       // Every address was dealt with (sent, already sent this period, or opted out): move on. A failure keeps the lease, so it is tried again.
-      // Done: the next report's work starts at THIS report's cutoff, not at the moment the emails went.
-      if (r.failed === 0) await pool.query("UPDATE seo_report_schedules SET next_send_at=$2, last_sent_at=CASE WHEN $3 THEN work_cutoff ELSE last_sent_at END, work_cutoff=NULL WHERE site_id=$1", [s.site_id, nextSendAt(s.frequency), r.sent > 0]);
+      // Done — every recipient sent now, already sent for this occurrence, or opted out: the next report's work starts
+      // at THIS occurrence's end. (An empty report sent nothing: its work is told next time.)
+      if (r.failed === 0) await pool.query("UPDATE seo_report_schedules SET next_send_at=$2, last_sent_at=CASE WHEN $3 THEN work_cutoff ELSE last_sent_at END, work_cutoff=NULL, work_since=NULL, work_period=NULL WHERE site_id=$1", [s.site_id, nextSendAt(s.frequency), !r.empty]);
     } catch (e: any) { console.error(`[seo] scheduled report for site ${s.site_id} failed (it will be retried): ${e?.message ?? e}`); }
   }
   return sent;

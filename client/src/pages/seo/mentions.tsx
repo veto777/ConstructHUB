@@ -41,9 +41,13 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // Kept by freshness: an older answer (an earlier search, or the same search before its link check came back) never
   // replaces a newer one; the newest response's verdicts are taken either way.
   const keep = (p: Page) => setKept((m) => {
-    const k = norm(p.name), had = m[k];
+    const k = norm(p.name), had0 = m[k];
+    // Verdicts that could not be read are not "no verdict": the ones known from an earlier answer are kept.
+    if (p.marksUnavailable && had0) { const known = new Map(had0.rows.map((r) => [r.url, r.mark])); p = { ...p, rows: p.rows.map((r) => ({ ...r, mark: known.get(r.url) ?? r.mark })) }; }
+    const had = had0;
     const t = (x: Page) => [x.fetchedAt, x.linksChecked ? (x.linksCheckedAt ?? x.fetchedAt) : ""].join("|");
     if (!had || t(p) >= t(had)) return { ...m, [k]: p };
+    if (p.marksUnavailable) return m;
     const marks = new Map(p.rows.map((r) => [r.url, r.mark]));
     return { ...m, [k]: { ...had, rows: had.rows.map((r) => (marks.has(r.url) ? { ...r, mark: marks.get(r.url) } : r)) } };
   });
@@ -263,10 +267,10 @@ function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { site
       {watch.chosen && <p className="mt-1 text-[13px]" role="status" data-testid="mentions-watch-chosen">Showing the check an alert was raised from{l?.name ? ` (for "${l.name}")` : ""}. <a href={`/seo/mentions?site=${siteId}`} className="g-link">Show the newest</a></p>}
       {l && (
         <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">
-          <p className="g-text-2">Pages that use "{l.page.name}", published between {fmtDate(l.since)} and {fmtDate(l.takenAt)}: {fmtNum(rows.length)}{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published than one check reads; the next check carries on from the last one read" : ""}. Read by publication date: a page the source has no date for, or finds later with an earlier date, is not seen here.
+          <p className="g-text-2">Pages that use "{l.page.name}", published between {fmtDate(l.since)} and {fmtDate(l.takenAt)}: {fmtNum(rows.length)}{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published in this window than one check reads; the next check reads on through the same window" : ""}. Read by publication date, oldest first: a page the source has no date for is not seen, and pages published at the same moment or added to the window between checks can shift places, so a page can occasionally be missed.
             {rows.length > 0 && <button type="button" className="g-link ml-2" onClick={exportCsv} data-testid="button-mentions-watch-export">Export</button>}</p>
           {l.page.marksUnavailable && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>Your "This is us / Not us" answers couldn't be loaded just now, so they aren't shown here or in the export — they are still saved.</p>}
-          {(l.page as Page & { tieOverflow?: boolean }).tieOverflow && <p className="g-text-2 mt-1 text-[12px]">More pages share one publication time than one check reads; the next check moves past that moment, so some of them may not be read.</p>}
+
           {!l.page.linksChecked && rows.length > 0 && <p className="mt-1 text-[12px]" role="status">Whether these websites link to you did not load (not charged). <button type="button" className="g-pill g-pill--sm" disabled={retry.isPending || retryPrice == null} onClick={() => retry.mutate({ siteId, checkId: l.id })} data-testid="button-mentions-watch-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></p>}
           {rows.length > 0 && (
             <ul className="mt-1 space-y-1">

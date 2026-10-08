@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { AuditPages } from "./audit-pages";
 import { RenderCheck } from "./render";
+import { OutgoingLinksView } from "./outgoing-links";
 import { LinkOpportunitiesView } from "./link-opportunities";
 
 type Severity = "error" | "warning" | "notice";
@@ -94,7 +95,7 @@ export default function SeoAuditPage() {
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [view, setView] = useState<"issues" | "pages" | "links" | "rendering">("issues");
+  const [view, setView] = useState<"issues" | "pages" | "links" | "outgoing" | "rendering">("issues");
   const start = useMutation({
     // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
     mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
@@ -221,10 +222,11 @@ export default function SeoAuditPage() {
           )}
 
           <nav className="g-tabs" aria-label="Audit views">
-            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["links", "Internal links"], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
+            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["links", "Internal links"], ["outgoing", "Outgoing links"], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
           </nav>
           {view === "pages" && <AuditPages site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
           {view === "links" && site && <LinkOpportunitiesView site={site} />}
+          {view === "outgoing" && site && <OutgoingLinksView site={site} />}
           {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">

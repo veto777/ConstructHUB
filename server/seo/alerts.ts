@@ -134,6 +134,9 @@ export async function deliverAlert(alertId: number): Promise<boolean> {
      RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId, token]);
   if (!a) return false;
   try {
+    // Looked at again right before sending: alerts switched off since the claim mean it is kept on the page, not sent.
+    const { rowCount: on } = await pool.query("SELECT 1 FROM seo_alerts x JOIN seo_sites s ON s.id = x.site_id WHERE x.id=$1 AND x.claim_token=$2 AND s.alerts_enabled IS NOT FALSE", [alertId, token]);
+    if (!on) { await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL WHERE id=$1 AND claim_token=$2", [alertId, token]); return false; }
     const m = alertMessage(a);
     const sent = await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
     // The bell entry is there; an email that failed is tried again on its own.

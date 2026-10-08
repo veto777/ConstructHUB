@@ -25,7 +25,7 @@ type Overview = {
 };
 
 const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
-const RUN_TRIGGER: Record<string, string> = { weekly: "weekly check", manual: "run now" };
+const RUN_TRIGGER: Record<string, string> = { weekly: "automatic check", manual: "run now" };
 
 /** What the Search Console tile says under its number: the comparison when both 28-day windows are complete, otherwise how much of EACH is synced. */
 function gscHint(g: { clicks: number | null; previousClicks: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean }): string {
@@ -247,9 +247,9 @@ function TrackingSettings({ site, onSaved, perMonthCents, includedCents }: { sit
           </select>
         </label>
         <p className="g-text-2 mt-1 text-[12px]" data-testid="text-rank-frequency-note">
-          {perMonthCents ? `At your ${fmtNum(site.keywordCount)} tracked keyword${site.keywordCount === 1 ? "" : "s"}, a month of checks ${FREQUENCY[freq].toLowerCase()} uses about ${money(perMonthCents[freq])} of SEO data` : "The cost of a month of checks shows here once keywords are tracked"}{includedCents != null && perMonthCents ? ` — your plan includes ${money(includedCents)} a month` : ""}. Automatic checks only use your included data; when it runs out they wait, and are never charged to credit you bought. A site already checked today is not checked again that day.
+          {perMonthCents ? `At your ${fmtNum(site.keywordCount)} tracked keyword${site.keywordCount === 1 ? "" : "s"}, a month of checks ${FREQUENCY[freq].toLowerCase()} uses about ${money(perMonthCents[freq])} of SEO data` : "The cost of a month of checks shows here once keywords are tracked"}{includedCents != null && perMonthCents ? ` — your plan includes ${money(includedCents)} a month` : ""}. Automatic checks only use your included data; when it runs out they wait, and are never charged to credit you bought. A site already checked on a day (UTC) is not checked again automatically that day; "Run check now" always runs.
         </p>
-        <div className="mt-3"><Button type="submit" disabled={m.isPending} data-testid="button-save-settings">{m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save settings"}</Button></div>
+        <div className="mt-3"><Button type="submit" disabled={m.isPending} aria-busy={m.isPending} data-testid="button-save-settings">{m.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden /> Saving settings…</> : "Save settings"}</Button></div>
       </form>
     </details>
   );

@@ -7,8 +7,11 @@
  * lists cannot tell a new mention from a website that merely moved into the 50. So the watch reads PAGES (every page,
  * not one per website) by their publication date, OLDEST first, in a window that starts where the last one ended
  * (with a week's overlap; pages already seen are not counted twice). When a window holds more pages than one check
- * reads, the next check starts from the last page read — nothing is skipped, it is only later. A page the source has
- * no date for, or adds to its index later with an earlier date than the overlap, is not seen here; the panel says so.
+ * reads, the window's END is kept and the next check reads on from where this one stopped (by position in that same
+ * window) until the source's count for the window is reached; only then does a new window start. The source orders
+ * pages by publication time alone, so pages published at the very same moment, or pages it adds to that window between
+ * two checks, can shift positions: the week's overlap and leaving out pages already seen catch most of that, but this is
+ * not promised to be complete. A page the source has no date for is not seen here. The panel says all of this.
  *
  * An alert is raised for the new pages that are likely the business — confirmed by the customer for that website, or
  * naming one of their places, and not marked as another business — on websites that do not link to the site yet.
@@ -76,39 +79,32 @@ export const MENTION_WATCH_ALERT_DDL = [
 ];
 
 const stamp = (d: Date) => `${d.toISOString().slice(0, 19).replace("T", " ")} +00:00`;
-/**
- * The search for every page published after `from` (or AT it, when carrying on from a page read last time — pages that
- * share its time are read again and left out as seen) up to `to`, OLDEST first. Pure.
- */
-export function newMentionsRequest(name: string, domain: string, from: Date, to: Date, inclusive = false, offset = 0): Record<string, unknown> {
+/** The search for the pages of one window (published after `from`, up to `to`), OLDEST first, from position `offset`. Pure. */
+export function newMentionsRequest(name: string, domain: string, from: Date, to: Date, offset = 0): Record<string, unknown> {
   return {
     keyword: `"${name}"`, search_mode: "as_is", limit: WATCH_ROWS, ...(offset > 0 ? { offset } : {}),
-    filters: [["main_domain", "<>", domain], "and", ["content_info.date_published", inclusive ? ">=" : ">", stamp(from)], "and", ["content_info.date_published", "<=", stamp(to)]],
+    filters: [["main_domain", "<>", domain], "and", ["content_info.date_published", ">", stamp(from)], "and", ["content_info.date_published", "<=", stamp(to)]],
     order_by: ["content_info.date_published,asc"],
   };
 }
 
 export type WatchPage = MentionsPage & {
-  complete: boolean; /** Where the next window starts when this one was not read to its end. */ resumeFrom: string | null; skippedSeen: number;
-  /** Every page read (as compared), listed or not. */ seenKeys: string[];
-  /** A full page of results all published at one moment: the next check reads on into that moment (`resumeOffset` pages in) rather than past it. */ tieOverflow?: boolean;
-  /** With `resumeFrom`: how many pages at exactly that moment have been read already (only when a whole page shared it). */ resumeOffset?: number;
+  /** The window was read to its end (the source's count for it reached). */ complete: boolean;
+  /** When not: the same window (its start and its kept END) and the position the next check reads on from. */ resumeFrom: string | null; resumeTo?: string | null; resumeOffset?: number;
+  skippedSeen: number; /** Every page read (as compared), listed or not. */ seenKeys: string[];
 };
 /**
  * The pages of a window (deduplicated by page, pages already seen in earlier checks left out) and their link check. A
  * failed link check leaves "links to you" unknown and is not charged. The source's dates and the window decide what is
  * new; `complete` = every page of the window was read (else the next window resumes from the last one read).
  */
-export async function fetchNewMentions(name: string, domain: string, from: Date, to: Date, seenBefore: ReadonlySet<string> = new Set(), inclusive = false, offset = 0): Promise<{ data: WatchPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
+export async function fetchNewMentions(name: string, domain: string, from: Date, to: Date, seenBefore: ReadonlySet<string> = new Set(), offset = 0): Promise<{ data: WatchPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
   const target = normalizeDomain(domain) ?? domain;
-  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, from, to, inclusive, offset)]), { treatNoResultsAsEmpty: true });
+  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, from, to, offset)]), { treatNoResultsAsEmpty: true });
   const searchUsd = typeof task.cost === "number" ? task.cost : 0;
   const items = taskItems(task), seen = new Set<string>(), rows: MentionRow[] = [], allKeys = new Set<string>();
-  let skippedSeen = 0, last: string | null = null;
-  const dates = new Set<string>();
+  let skippedSeen = 0;
   for (const i of items) {
-    const d = typeof i?.content_info?.date_published === "string" ? new Date(i.content_info.date_published) : null;
-    if (d && !Number.isNaN(d.getTime())) { last = d.toISOString(); dates.add(last); }
     if (typeof i?.url === "string") allKeys.add(pageKeyOf(i.url));
     const r = parseMention(i, target);
     if (!r) continue;
@@ -119,16 +115,14 @@ export async function fetchNewMentions(name: string, domain: string, from: Date,
     rows.push({ ...r, linksToYou: null });
   }
   const total = typeof (task.result?.[0] as any)?.total_count === "number" ? (task.result?.[0] as any).total_count : null;
-  // Read to the end only when the source says there is no more than came back (unknown total + a full page = not complete).
-  const complete = total !== null ? total <= items.length : items.length < WATCH_ROWS;
-  // A full page of results that all share one publication time cannot be read past by time alone: the next check reads
-  // on INTO that moment, by how many of its pages are read already (this page's count added to any before it when this
-  // page itself continued the same moment). Nothing at that moment is skipped.
-  const tieOverflow = !complete && dates.size === 1 && items.length >= WATCH_ROWS;
-  const sameMoment = inclusive && last !== null && from.toISOString() === last;
-  const resumeFrom = complete ? null : last;
-  const resumeOffset = tieOverflow ? (sameMoment ? offset : 0) + items.length : 0;
-  const page: WatchPage = { name, domain: target, rows, total, linksChecked: !rows.length, linksCheckedAt: null, fetchedAt: new Date().toISOString(), complete, resumeFrom, skippedSeen, seenKeys: [...allKeys], ...(tieOverflow ? { tieOverflow, resumeOffset } : {}) };
+  // The source's total is for the whole window (not what is left): read to the end when this position plus what came
+  // back reaches it — or, with no total, when a page came back short. An empty page also ends it (nothing more to read).
+  const read = offset + items.length;
+  const complete = items.length === 0 || (total !== null ? read >= total : items.length < WATCH_ROWS);
+  const page: WatchPage = {
+    name, domain: target, rows, total, linksChecked: !rows.length, linksCheckedAt: null, fetchedAt: new Date().toISOString(), complete, skippedSeen, seenKeys: [...allKeys],
+    resumeFrom: complete ? null : from.toISOString(), ...(complete ? {} : { resumeTo: to.toISOString(), resumeOffset: read }),
+  };
   if (!rows.length) return { data: page, costUsd: searchUsd, costUnknown: false, customerUsd: searchUsd };
   const links = await checkLinks(page);
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
@@ -165,9 +159,10 @@ export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; p
   }
   // The window: from where the last check of this name ended (less the overlap; or the page it resumes from), to now.
   const { rows: [last] } = await pool.query(
-    "SELECT window_to, complete, page->>'resumeFrom' AS resume, coalesce((page->>'resumeOffset')::int, 0) AS resume_offset, created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 1", [site.id, key]);
-  const to = new Date();
-  const resuming = !!last && !last.complete && !!last.resume;
+    "SELECT window_to, complete, page->>'resumeFrom' AS resume, page->>'resumeTo' AS resume_to, coalesce((page->>'resumeOffset')::int, 0) AS resume_offset, created_at FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 ORDER BY created_at DESC LIMIT 1", [site.id, key]);
+  // Carrying on a window that was not read to its end: the same start and END, from the next position.
+  const resuming = !!last && !last.complete && !!last.resume && !!last.resume_to;
+  const to = resuming ? new Date(last.resume_to) : new Date();
   const from = !last ? new Date(to.getTime() - FIRST_LOOKBACK_DAYS * 864e5)
     : resuming ? new Date(last.resume)
     : new Date(new Date(last.window_to ?? last.created_at).getTime() - OVERLAP_DAYS * 864e5);
@@ -176,7 +171,7 @@ export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; p
     "SELECT seen_keys, page->'rows' AS rows FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 AND coalesce(window_to, created_at) >= $3", [site.id, key, new Date(from.getTime() - 864e5).toISOString()]);
   const seenBefore = new Set<string>(prev.flatMap((p: any) => [...(Array.isArray(p.seen_keys) ? p.seen_keys : []), ...(Array.isArray(p.rows) ? p.rows : []).map((r: any) => (typeof r?.url === "string" ? pageKeyOf(r.url) : ""))]).filter(Boolean));
   const out = await withBudget(site.user_id, MENTIONS_ESTIMATE_USD, async () => {
-    const o = await fetchNewMentions(site.name, site.domain, from, to, seenBefore, resuming, resuming ? Number(last.resume_offset ?? 0) : 0);
+    const o = await fetchNewMentions(site.name, site.domain, from, to, seenBefore, resuming ? Number(last.resume_offset ?? 0) : 0);
     const fail = (why: string) => Object.assign(new Error(`mentions watch for ${site.domain} not saved: ${why}`), { costUsd: o.costUsd, costUnknown: o.costUnknown, notSaved: true });
     let client: PoolClient | null = null;
     try {

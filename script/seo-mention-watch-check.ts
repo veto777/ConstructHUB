@@ -76,8 +76,8 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   mentionWatchDeps.request = (async (_m: string, _p: string, body: any[]) => { calls++; asked = body[0]; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.025, result: [{ total_count: 120, items: [item("a.com", "Alpine Exteriors Bellingham", "/one", "2026-09-20 10:00:00 +00:00"), item("a.com", "Alpine Exteriors Bellingham", "/two", "2026-09-25 10:00:00 +00:00")] }] }] }; }) as any;
   const lease3 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
   await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease3 });
-  const w1 = (await pool.query("SELECT complete, page->>'resumeFrom' AS resume, jsonb_array_length(page->'rows') AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
-  ok(w1.n === 2 && w1.complete === false && String(w1.resume).startsWith("2026-09-25"), `two pages of one website kept; more than one check reads: resumes from the last page read (${JSON.stringify(w1)})`);
+  const w1 = (await pool.query("SELECT complete, page->>'resumeFrom' AS resume, page->>'resumeTo' AS rto, page->>'resumeOffset' AS ro, jsonb_array_length(page->'rows') AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
+  ok(w1.n === 2 && w1.complete === false && w1.ro === "2" && w1.rto, `two pages of one website kept; the window (120 pages) is not read to its end: kept with its end, 2 read (${JSON.stringify(w1)})`);
   // The next window (another day) starts from that page, and the pages already seen are not counted again.
   await pool.query("UPDATE seo_mention_checks SET run_on = run_on - 1, created_at = created_at - interval '1 day' WHERE site_id=$1", [s.id]);
   const lease4 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
@@ -85,7 +85,7 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   mentionsDeps.request = (async () => { throw Object.assign(new Error("down"), { code: "upstream", costUsd: 0 }); }) as any;   // this time the link check fails
   await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease4 });
   const w2 = (await pool.query("SELECT id, complete, page FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
-  ok(String(asked.filters[2][2]).startsWith("2026-09-25") && w2.page.rows.map((r: any) => r.url).join() === "https://b.com/x" && w2.page.skippedSeen === 1, `resumed from the last page read; the page already seen left out (${asked.filters[2][2]})`);
+  ok(asked.offset === 2 && new Date(String(asked.filters[4][2]).replace(" +00:00", "Z").replace(" ", "T")).toISOString().slice(0, 19) === new Date(w1.rto).toISOString().slice(0, 19) && w2.page.rows.map((r: any) => r.url).join() === "https://b.com/x" && w2.page.skippedSeen === 1, `the same window read on from position 2 (to ${asked.filters[4][2]}); the page already seen left out`);
   // The alert says the link is not known (the link check failed), never "does not link".
   const a3 = (await alerts()).filter((x: any) => x.items?.[0]?.checkId === w2.id);
   ok(a3.length === 1 && /not known/.test(a3[0].title) && !/does not link/.test(a3[0].title), `alert wording with an unknown link: ${a3[0]?.title}`);
@@ -101,16 +101,16 @@ const charged = async () => Number((await pool.query("SELECT coalesce(sum(includ
   mentionsDeps.request = (async () => ok20([], 0.025)) as any;
   const lease5 = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
   await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease5 });
-  const t1 = (await pool.query("SELECT page->>'resumeFrom' AS r, page->>'resumeOffset' AS o, cardinality(seen_keys) AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
-  ok(String(t1.r).startsWith("2026-09-30T08:00:00") && t1.o === "50" && Number(t1.n) === 50, `ties: the next check reads on INTO that moment, 50 in (${JSON.stringify(t1)})`);
+  const t1 = (await pool.query("SELECT page->>'resumeOffset' AS o, complete, cardinality(seen_keys) AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
+  ok(t1.o === "50" && t1.complete === false && Number(t1.n) === 50, `fifty of eighty pages at one moment: 50 read, the window kept (${JSON.stringify(t1)})`);
   // The next check (another day) asks for that moment from the 51st page on, and counts on from there.
   await pool.query("UPDATE seo_mention_checks SET run_on = run_on - 1, created_at = created_at - interval '1 day' WHERE site_id=$1", [s.id]);
   let tieAsk: any = null;
-  mentionWatchDeps.request = (async (_m: string, _p: string, body: any[]) => { calls++; tieAsk = body[0]; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.025, result: [{ total_count: 30, items: Array.from({ length: 30 }, (_, i) => item(`u${i}.com`, "Alpine Exteriors news", "/p", "2026-09-30 08:00:00 +00:00")) }] }] }; }) as any;
+  mentionWatchDeps.request = (async (_m: string, _p: string, body: any[]) => { calls++; tieAsk = body[0]; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.025, result: [{ total_count: 80, items: Array.from({ length: 30 }, (_, i) => item(`u${i}.com`, "Alpine Exteriors news", "/p", "2026-09-30 08:00:00 +00:00")) }] }] }; }) as any;
   const lease5b = (await pool.query("UPDATE seo_sites SET next_mention_at = now() - interval '1 minute' WHERE id=$1 RETURNING next_mention_at::text AS l", [s.id])).rows[0].l;
   await takeWatchedCheck({ id: s.id, user_id: 1, domain: "mwatch.example", name: "Alpine Exteriors", lease: lease5b });
   const t2 = (await pool.query("SELECT complete, jsonb_array_length(page->'rows') AS n FROM seo_mention_checks WHERE site_id=$1 ORDER BY id DESC LIMIT 1", [s.id])).rows[0];
-  ok(tieAsk.offset === 50 && tieAsk.filters[2][1] === ">=" && t2.complete === true && t2.n === 30, `the rest of that moment is read: offset ${tieAsk.offset}, ${t2.n} pages, complete ${t2.complete}`);
+  ok(tieAsk.offset === 50 && t2.complete === true && t2.n === 30, `the other 30 are read from position 50 (the total stays 80 - it is the window's), and the window is complete: offset ${tieAsk.offset}, ${t2.n} pages, complete ${t2.complete}`);
   // 13. A business name written with two spaces is the same name: its check is saved (not refused forever).
   await pool.query("DELETE FROM seo_mention_checks WHERE site_id=$1", [s.id]);
   await pool.query("UPDATE seo_sites SET business_name='Alpine  Exteriors', mention_name=NULL WHERE id=$1", [s.id]);

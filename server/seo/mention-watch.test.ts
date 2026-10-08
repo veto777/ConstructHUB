@@ -4,7 +4,8 @@ import { alertMessage } from "./alerts";
 
 const row = (domain: string, title: string, linksToYou: boolean | null = false) => ({ url: `https://${domain}/p`, domain, title, snippet: null, published: "2026-10-01", authority: 30, linksToYou });
 describe("mentions watch", () => {
-  it("asks for every page published in the window (not one per website), oldest first, up to its end", () => {
+  it("asks for every page published in the window (not one per website), oldest first, up to its end, from a position", () => {
+    expect(newMentionsRequest("A Co", "a.example", new Date("2026-09-08T10:00:00Z"), new Date("2026-10-08T10:00:00Z"), 50)).toMatchObject({ offset: 50 });
     const r = newMentionsRequest("Alpine Exteriors", "alpine.example", new Date("2026-09-08T10:00:00Z"), new Date("2026-10-08T10:00:00Z"));
     expect(r).toMatchObject({ keyword: '"Alpine Exteriors"', search_mode: "as_is", order_by: ["content_info.date_published,asc"],
       filters: [["main_domain", "<>", "alpine.example"], "and", ["content_info.date_published", ">", "2026-09-08 10:00:00 +00:00"], "and", ["content_info.date_published", "<=", "2026-10-08 10:00:00 +00:00"]] });

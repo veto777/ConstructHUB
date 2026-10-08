@@ -1,0 +1,86 @@
+/**
+ * Site audit → Outgoing links (server/seo/outgoing-links.ts): the other websites the site links to, from the newest
+ * crawl — and which of the links the crawl checked answered with an error. Free.
+ */
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Download, Loader2 } from "lucide-react";
+import { apiErrorMessage } from "@/lib/queryClient";
+import { Empty, fmtDate, fmtNum, isNotRunYet, type SeoSite } from "./shell";
+import { AddToPlan, type PlanTask } from "./plan-button";
+
+type Domain = { domain: string; pages: number; links: number; examples: { from: string; to: string; anchor: string | null }[]; checked: number; broken: number };
+type Broken = { to: string; status: number | null; answer: "gone" | "error" | "refused" | "no_answer"; from: string[]; fromCount: number };
+const ANSWER: Record<Broken["answer"], string> = { gone: "gone", error: "server error", refused: "refused our check — many sites refuse automated checks; open it yourself", no_answer: "no answer — it may have been slow or down at the time" };
+type Data = { jobId: string; scannedAt: string | null; linksMeasured: boolean; pagesRead: number; domains: number; links: number; linkedDomains: Domain[]; more: number; broken: Broken[]; checkedAddresses: number; uncheckedLinks: number };
+const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
+const path = (u: string) => { try { const x = new URL(u); return (x.pathname + x.search) || "/"; } catch { return u; } };
+
+export function OutgoingLinksView({ site }: { site: SeoSite }) {
+  const q = useQuery<Data | null>({
+    queryKey: [`/api/seo/sites/${site.id}/audit/outgoing`], refetchOnMount: "always", retry: false,
+    queryFn: async ({ queryKey }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include" }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+  });
+  const [shown, setShown] = useState(50);
+  if (q.isLoading) return <p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p>;
+  if (q.isError) return <div className="g-callout" role="alert"><h3>Couldn't read the outgoing links</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>;
+  const d = q.data;
+  if (!d) return <Empty testId="outgoing-no-crawl"><h3>No crawl yet</h3><p>Run a crawl first; this view is read from the pages it saves.</p></Empty>;
+  const task = (b: Broken): PlanTask => ({
+    kind: "page", title: `Fix or remove the link to ${b.to.replace(/^https?:\/\/(www\.)?/, "")} (${b.status === null ? "no answer" : `answered ${b.status}`}) on ${b.fromCount} page${b.fromCount === 1 ? "" : "s"}`.slice(0, 200),
+    target: b.from[0] ?? null, facts: { linkTo: b.to.slice(0, 300), answered: b.status, pages: b.fromCount, crawled: d.scannedAt?.slice(0, 10) ?? null },
+    source: `outgoing:${b.to.slice(0, 180)}`,
+  });
+  const exportCsv = () => {
+    const rows: (string | number | null)[][] = [["Website linked to", "Pages linking", "Links", "Checked addresses", "Answered an error", "Example page", "Example link", "Link text", "Crawled on"],
+      ...d.linkedDomains.map((x) => [x.domain, x.pages, x.links, x.checked, x.broken, x.examples[0]?.from ?? null, x.examples[0]?.to ?? null, x.examples[0]?.anchor ?? null, d.scannedAt?.slice(0, 10) ?? null]),
+      ...(d.more > 0 ? [[`The first ${d.linkedDomains.length} of ${d.domains} websites; the rest are not in this file.`]] : [])];
+    const blob = new Blob([rows.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${site.domain}-outgoing-links.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  return (
+    <div data-testid="outgoing-links">
+      <p className="g-text-2 mb-3 max-w-3xl text-[13px]">The other websites your pages link to. Links to suppliers, associations and directories are normal; a link to a page that no longer answers is worth fixing, and a website you did not expect here is worth a look.</p>
+      {!d.linksMeasured && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages of this site link nowhere in their HTML — usual when links are added by JavaScript, which the crawl does not run. What is listed is only what the HTML had.</p>}
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+        <span className="g-text-2" data-testid="text-outgoing-meta">From the crawl of {d.scannedAt ? fmtDate(d.scannedAt) : "an unknown date"}: {fmtNum(d.links)} link{d.links === 1 ? "" : "s"} to {fmtNum(d.domains)} other website{d.domains === 1 ? "" : "s"}, from {fmtNum(d.pagesRead)} page{d.pagesRead === 1 ? "" : "s"} that loaded.</span>
+        <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!d.linkedDomains.length} onClick={exportCsv} data-testid="button-outgoing-export"><Download /> Export</button>
+      </div>
+      <section className="mb-4" data-testid="outgoing-broken">
+        <h3 className="g-text mb-1 text-[14px] font-medium">Checked links that did not answer with a page ({fmtNum(d.broken.length)}{d.broken.some((b) => b.answer === "gone" || b.answer === "error") ? `, ${fmtNum(d.broken.filter((b) => b.answer === "gone" || b.answer === "error").length)} broken` : ""})</h3>
+        <p className="g-text-2 mb-2 text-[12px]">The crawl checks a sample of the addresses it did not crawl itself: {fmtNum(d.checkedAddresses)} of these websites' addresses were checked; links to the others ({fmtNum(d.uncheckedLinks)} page link{d.uncheckedLinks === 1 ? "" : "s"}) were not checked, so nothing is said about them.</p>
+        {d.broken.length === 0 ? <p className="g-text-2 text-[13px]">Every checked address answered with a page.</p> : (
+          <ul className="space-y-1 text-[13px]">
+            {d.broken.map((b) => (
+              <li key={b.to} className="flex flex-wrap items-center gap-x-2 [overflow-wrap:anywhere]">
+                <a href={b.to} target="_blank" rel="noreferrer" className="g-link">{b.to.replace(/^https?:\/\//, "")}</a>
+                <span className="g-text-2">— {b.status === null ? "" : `${b.status}, `}{ANSWER[b.answer]} · linked from {b.from.map(path).join(", ")}{b.fromCount > b.from.length ? ` and ${b.fromCount - b.from.length} more` : ""}</span>
+                {(b.answer === "gone" || b.answer === "error") && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-outgoing-${b.to}`} tasks={[task(b)]} />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured ? "The pages read link only to your own site." : "None were found in the HTML."}</p></Empty> : (
+        <div className="overflow-x-auto">
+          <table className="g-table w-full" data-testid="table-outgoing">
+            <thead><tr><th>Website</th><th className="num">Pages linking</th><th className="num">Links</th><th>For example</th><th className="num" title="Of its addresses the crawl checked: how many, and how many were gone or a server error">Checked / broken</th></tr></thead>
+            <tbody>
+              {d.linkedDomains.slice(0, shown).map((x) => (
+                <tr key={x.domain}>
+                  <td className="max-w-[14rem] truncate" data-label="Website" title={x.domain}>{x.domain}</td>
+                  <td className="num" data-label="Pages linking">{fmtNum(x.pages)}</td><td className="num" data-label="Links">{fmtNum(x.links)}</td>
+                  <td className="max-w-[24rem] !whitespace-normal text-[12px] [overflow-wrap:anywhere]" data-label="For example">{x.examples[0] ? <><span className="g-text-2">{path(x.examples[0].from)} →</span> <a href={x.examples[0].to} target="_blank" rel="noreferrer" className="g-link">{x.examples[0].to.replace(/^https?:\/\/(www\.)?/, "")}</a>{x.examples[0].anchor && x.examples[0].anchor !== "(no text)" ? <span className="g-text-2"> “{x.examples[0].anchor}”</span> : <span className="g-text-2"> (no link text — an image or icon)</span>}</> : "—"}</td>
+                  <td className="num" data-label="Checked / broken">{x.checked ? `${fmtNum(x.checked)} / ${fmtNum(x.broken)}` : "not checked"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {d.linkedDomains.length > shown && <button type="button" className="g-link mt-2 text-[13px]" onClick={() => setShown(d.linkedDomains.length)} data-testid="button-outgoing-all">Show all {fmtNum(d.linkedDomains.length)}</button>}
+          {d.more > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(d.more)} more websites than are listed.</p>}
+        </div>
+      )}
+      <p className="g-text-2 mt-2 text-[12px]">Read from each page's HTML (links added by JavaScript are not seen), up to 2,000 links a page. Whether a link is marked nofollow or sponsored is not recorded by the crawl. Your own sub-domains count as your site.</p>
+    </div>
+  );
+}

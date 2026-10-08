@@ -18,6 +18,7 @@
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { setMentionWatch, mentionWatchView, retryWatchedLinks } from "./mention-watch";
+import { siteOutgoingLinks } from "./outgoing-links";
 import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, nameOk as mentionNameOk, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
@@ -1417,6 +1418,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("get", "/api/seo/sites/:id/audit/link-opportunities", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const out = await linkOpportunities(user, site);
+    if (!out) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
+    res.json(out);
+  });
+  // Site audit → Outgoing links: the other websites the site links to, from the newest crawl. Saved data only.
+  route("get", "/api/seo/sites/:id/audit/outgoing", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const out = await siteOutgoingLinks(user, site);
     if (!out) return res.status(404).json({ code: "no_crawl", message: "No crawl of this site yet." });
     res.json(out);
   });

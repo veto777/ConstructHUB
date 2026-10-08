@@ -110,6 +110,8 @@ const KNOWN_NOTES: (string | RegExp)[] = [
   "None of the checks were accepted by the search data service. Your credits were not charged.",
   "The check could not be started — try again in a few minutes.",
   "This month's included SEO data is used up, so the automatic weekly check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.",
+  // The same note since checks can run more often than weekly (server/seo/jobs.ts WEEKLY_SKIPPED_MESSAGE); the line above stays for notes saved before.
+  "This month's included SEO data is used up, so the automatic check was skipped. Automatic checks never spend credit you bought — press Run check now to use it.",
   /^\d+ of \d+ checks were not accepted by the search data service$/,
   /^\d+ check\(s\) failed: [^·]{1,230} \((desktop|mobile)\)$/,
   /^\d+ check\(s\) never came back from the queue$/,

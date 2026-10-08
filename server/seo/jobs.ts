@@ -102,7 +102,7 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     let reservation;
     try {
       // The automatic weekly check spends the month's included data only — never credit the customer bought.
-      reservation = await reserveBudget(run.user_id, estimate.usd, { allowanceOnly: run.trigger === "weekly", label: `Rank check — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"} for ${site.domain} (${run.trigger === "weekly" ? "weekly" : "run now"})` });
+      reservation = await reserveBudget(run.user_id, estimate.usd, { allowanceOnly: run.trigger === "weekly", label: `Rank check — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"} for ${site.domain} (${run.trigger === "weekly" ? "automatic" : "run now"})` });
     } catch (e) {
       if (e instanceof SeoBudgetError) { console.warn(`[seo] run ${run.id} refused: ${e.detail}`); await finishRun(run.id, "failed", run.trigger === "weekly" && e.code === "seo_credits" ? WEEKLY_SKIPPED_MESSAGE : e.message); return true; }
       throw e;
@@ -278,13 +278,14 @@ export async function retryOwedRefunds(): Promise<number> {
 
 /**
  * Create the automatic runs for sites that are due (owner's plan still includes the tools, DataForSEO connected), at
- * each site's own frequency. A site already checked today (the customer pressed "Run check now") is not checked again
- * the same day: one check a day is all a daily schedule buys.
+ * each site's own frequency. A site already checked today (UTC) is not checked again automatically that day.
  */
 export async function scheduleWeeklyRuns(): Promise<void> {
+  // Any frequency: an automatic check is not made on a day (UTC) the site was already checked — by hand or not. "Run
+  // check now" itself always runs (it is the customer's own choice, and its price is on the button).
   await pool.query(
     `UPDATE seo_sites SET next_rank_check_at = (current_date + 1)::timestamp AT TIME ZONE 'UTC'
-      WHERE next_rank_check_at <= now() AND last_rank_check_at >= current_date::timestamp AT TIME ZONE 'UTC' AND coalesce(rank_frequency, 'weekly') = 'daily'`).catch(() => {});
+      WHERE next_rank_check_at <= now() AND last_rank_check_at >= current_date::timestamp AT TIME ZONE 'UTC'`).catch(() => {});
   const { rows: due } = await pool.query(
     `UPDATE seo_sites SET next_rank_check_at=now()+${GAP_SQL("coalesce(rank_frequency, 'weekly')")}
      WHERE next_rank_check_at<=now() AND EXISTS (SELECT 1 FROM seo_keywords k WHERE k.site_id=seo_sites.id)

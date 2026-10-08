@@ -24,6 +24,9 @@ export const REPORT_SCHEDULE_DDL = [
   // The end of the work a scheduled report covers, fixed when that report is first due: a retry for some recipients
   // tells the same work, and the next report starts exactly here (no task falls between two reports).
   `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_cutoff timestamptz`,
+  // The rest of the occurrence, fixed with it: where its work starts, and the period its emails are counted under.
+  `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_since timestamptz`,
+  `ALTER TABLE seo_report_schedules ADD COLUMN IF NOT EXISTS work_period text`,
 ];
 
 export const MAX_RECIPIENTS = 5;
