@@ -1,0 +1,185 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-deposit-link",
+  "title": "Collect a deposit on an approved estimate",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/estimates",
+      "caption": "Estimates",
+      "chapter": "Put a deposit on the estimate",
+      "narration": "Collect a deposit online as soon as a client approves an estimate."
+    },
+    {
+      "action": "click",
+      "selector": "tr:has-text(\"E-2000\") [data-testid^=\"doc-link-\"]",
+      "caption": "Open the estimate",
+      "narration": "On Estimates, click the estimate's number.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-edit-estimate\"]",
+      "caption": "Edit",
+      "narration": "Choose Edit.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-deposit\"]",
+      "value": "7000",
+      "caption": "Deposit",
+      "narration": "Under Deposit, type the amount you want up front."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-estimate-edit\"]",
+      "caption": "Save",
+      "narration": "Then save your changes.",
+      "holdMs": 900
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "leasing@halvorsenquist.example.com",
+        "estimate": "E-2000"
+      },
+      "caption": "The client's screen",
+      "chapter": "The client approves",
+      "narration": "Now your client's screen. They open the estimate from the link in their email."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-signature\"]",
+      "value": "Marta Halvorsen",
+      "caption": "Their name",
+      "narration": "To approve, they type their name."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-approve\"]",
+      "caption": "Approve",
+      "narration": "And choose Approve this estimate.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"Pay your deposit\")]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Pay your deposit",
+      "narration": "Right away, their page offers Pay your deposit."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/clients/922d4e0c-ba4f-5af1-882a-e3446b1f3772",
+      "caption": "Back in the CRM",
+      "chapter": "Send the deposit link",
+      "narration": "You can also send the link yourself. In the CRM, open the client.",
+      "holdMs": 1000
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-take-payment\"]",
+      "caption": "Take a payment",
+      "narration": "Choose Take a payment.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-deposit-link-demo-estimate-e-2000\"]",
+      "caption": "Create deposit link",
+      "narration": "Then Create deposit link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-deposit-link\"]",
+      "redact": true,
+      "caption": "The link",
+      "narration": "Copy the link, and text or email it to your client."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "stripe.checkout",
+      "input": {},
+      "caption": "The client opens the link",
+      "chapter": "The client pays",
+      "narration": "Either way, your client lands on the secure checkout page. In this demo, it is a stand-in page."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"checkout-summary\"]",
+      "caption": "Checkout",
+      "narration": "It shows the deposit, and who it is paid to."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkout-method-card\"]",
+      "caption": "Card",
+      "narration": "They choose bank account or card."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-checkout-pay\"]",
+      "caption": "Pay",
+      "narration": "And pay.",
+      "holdMs": 900
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Payment received\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Back on the estimate",
+      "narration": "Their estimate page now says Payment received."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/payments",
+      "caption": "Payments",
+      "chapter": "The deposit arrives",
+      "narration": "Back in the CRM, open Payments.",
+      "holdMs": 1000
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"payment-\"]:has-text(\"Halvorsen-Quist\")",
+      "caption": "Recent payments",
+      "narration": "The deposit is in Recent payments, marked succeeded."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-payments\"]",
+      "caption": "Where to find it",
+      "narration": "You will find Payments in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to collect a deposit on an approved estimate | ConstructHUB CRM",
+    "description": "Put a deposit on an estimate in ConstructHUB CRM, see the Pay your deposit button your client gets when they approve, and create a deposit link to send yourself. The payment then shows on your Payments page. Recorded in a demo workspace with a demonstration checkout page in place of the real hosted checkout.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "collect a deposit",
+      "deposit link",
+      "approved estimate",
+      "get paid online",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Collect the deposit",
+    "accent": "deposit",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}
