@@ -90,6 +90,24 @@ async function main() {
   eq("7b once", await raiseLinkAlerts(site.id), null);
   eq("7c another account sees none of it", (await listAlerts(2, null)).length, 0);
 
+  // named losses: a strong site that stopped linking is an alert even when the count barely moved
+  const { rows: [quiet] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'quiet.example','desktop') RETURNING id");
+  const lostRows = [{ domain: "weak.example", authority: 4, from: "https://weak.example/p", to: "https://quiet.example/", lastSeen: "2026-10-01" }, { domain: "chamber.example", authority: 46, from: "https://chamber.example/members", to: "https://quiet.example/", lastSeen: "2026-10-02" }];
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100,"backlinks":900}',NULL),
+    ($1,1,current_date,'{"referringDomains":99,"backlinks":890}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 2))`, [quiet.id, JSON.stringify(lostRows)]);
+  eq("7d one strong site lost is an alert though the count moved by one", await raiseLinkAlerts(quiet.id), "links_lost");
+  const strongAlert: any = (await listAlerts(1, quiet.id))[0];
+  eq("7e it names the site and puts the strongest first", [strongAlert.title, strongAlert.items[0].lost.map((l: any) => l.domain), strongAlert.items[0].lostTotal], ["quiet.example lost a link from chamber.example", ["chamber.example", "weak.example"], 2]);
+  const { rows: [calm] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'calm.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 1))`, [calm.id, JSON.stringify([lostRows[0]])]);
+  eq("7f a weak site lost with the count barely moved is not an alert", await raiseLinkAlerts(calm.id), null);
+  // losses collected against a different snapshot are not pinned on this comparison
+  const { rows: [stale] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'stale.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-90)::text, 'lost', $2::jsonb, 'lostTotal', 2))`, [stale.id, JSON.stringify(lostRows)]);
+  eq("7g losses collected since some other date are not used for this comparison", await raiseLinkAlerts(stale.id), null);
+
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   await pool.end();
   process.exit(failed ? 1 : 0);
