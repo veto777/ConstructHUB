@@ -1,0 +1,161 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-share-link",
+  "title": "Send a client a photo gallery link",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the job's photos",
+      "narration": "Send a client a link to their job's photos. Start by opening the job."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"P-2001\") a",
+      "caption": "Open the job",
+      "narration": "On Pipeline, click the job's name.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-jobcam\"]",
+      "caption": "JobCam tab",
+      "narration": "Choose the JobCam tab.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-panel-open\"]",
+      "caption": "Open feed",
+      "narration": "Then Open feed.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-share-open\"]",
+      "caption": "Share",
+      "chapter": "Make the link",
+      "narration": "Choose Share. With no photos selected, it shares the job's live timeline.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"jobcam-share-title\"]",
+      "value": "Kane hardwood — progress photos",
+      "caption": "Title",
+      "narration": "Give the link a title your client will recognise."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"jobcam-share-expires\"]/ancestor::div[contains(@class,\"grid\")][1]",
+      "caption": "Password and expiry",
+      "narration": "You can add a password, and choose when the link expires."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-share-create\"]",
+      "caption": "Make the link",
+      "narration": "Choose Make the link.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-share-url\"]",
+      "redact": true,
+      "caption": "The link",
+      "narration": "The link is ready to copy."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"jobcam-share-to\"]",
+      "value": "kane@example.com",
+      "caption": "Send to",
+      "chapter": "Send it to your client",
+      "narration": "Or send it from here. Put in your client's email address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-share-send\"]",
+      "caption": "Send email",
+      "narration": "And choose Send email.",
+      "holdMs": 900
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.link",
+      "input": {
+        "to": "kane@example.com"
+      },
+      "caption": "The client opens the link",
+      "chapter": "What your client sees",
+      "narration": "Now your client. They open the link from that email. There is nothing to sign in to."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-share-project\"]",
+      "caption": "The job and its photos",
+      "narration": "They see your company, the job, and its photos, newest first."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Back in the CRM",
+      "chapter": "Turn a link off",
+      "narration": "Back in the CRM, every link you made is listed under Existing links.",
+      "holdMs": 1000
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"jobcam-share-revoke-\"]",
+      "caption": "Revoke",
+      "narration": "To turn one off, choose Revoke.",
+      "holdMs": 900
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.link",
+      "input": {
+        "to": "kane@example.com"
+      },
+      "caption": "The link is off",
+      "narration": "If your client opens it now, it says the link was turned off."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "caption": "Where to find it",
+      "narration": "You will find Share on every job's JobCam page.",
+      "holdMs": 600
+    }
+  ],
+  "youtube": {
+    "title": "How to send a client a link to their job photos | ConstructHUB CRM",
+    "description": "Make a link to a job's photo timeline in ConstructHUB JobCam, email it to your client, see the page they open, and turn the link off again with Revoke. Recorded in a demo workspace; the photos are colour cards made for the demo.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "JobCam",
+      "share job photos",
+      "photo gallery link",
+      "progress photos",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Send a photo link",
+    "accent": "link",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

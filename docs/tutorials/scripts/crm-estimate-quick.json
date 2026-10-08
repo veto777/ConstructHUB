@@ -1,0 +1,145 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-quick",
+  "title": "A quick estimate from the client's page",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open the client",
+      "narration": "Write a short estimate without leaving the client's page. Start on Clients."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Wrenhaven",
+      "caption": "Search for the client",
+      "narration": "Search for the client.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Wrenhaven Dental Studio\")",
+      "caption": "Open the client",
+      "narration": "And open their page.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-quick-estimate\"]",
+      "caption": "New estimate",
+      "narration": "Under Quick actions, choose New estimate.",
+      "holdMs": 700
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-estimate-title\"]",
+      "value": "Reception flooring",
+      "caption": "Title",
+      "chapter": "Type the lines",
+      "narration": "Give the estimate a title."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"line-item-0\"] input >> nth=0",
+      "value": "Luxury vinyl plank, installed",
+      "caption": "The first line",
+      "narration": "On the first line, type what the work is."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"line-item-0\"] input >> nth=1",
+      "value": "420",
+      "caption": "Quantity",
+      "narration": "Then the quantity."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"line-item-0\"] input >> nth=2",
+      "value": "6.5",
+      "caption": "Unit price",
+      "narration": "And the unit price. The line total works itself out."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-scope-0\"]",
+      "value": "Remove the old carpet, level the subfloor, install plank and new base trim.",
+      "caption": "Scope and details",
+      "narration": "Under Scope and details, say what is included. Your client reads this part."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-item\"]",
+      "caption": "Add line",
+      "narration": "Choose Add line for the next one."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"line-item-1\"] input >> nth=0",
+      "value": "Haul away old flooring",
+      "caption": "The second line",
+      "narration": "Type the second line the same way."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"line-item-1\"] input >> nth=2",
+      "value": "380",
+      "caption": "Its price",
+      "narration": "Quantity one, and its price."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"button-save-estimate\"]/ancestor::div[1]/preceding-sibling::div[1]",
+      "caption": "The total",
+      "chapter": "Save it",
+      "narration": "The total adds up at the bottom as you type."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-estimate\"]",
+      "caption": "Create estimate",
+      "narration": "Choose Create estimate.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"estimate-\"]:has-text(\"Reception flooring\")",
+      "caption": "Saved on the client's page",
+      "narration": "The estimate is saved on the client's page as a draft. Preview it, then send it from here."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "The full builder",
+      "narration": "For a bigger job, the full builder under Estimates adds work from your price book."
+    }
+  ],
+  "youtube": {
+    "title": "How to write a quick estimate on a client's page | ConstructHUB CRM",
+    "description": "Write a short estimate straight from a client's page in ConstructHUB CRM: a title, a few typed lines with quantity, unit price and scope, and Create estimate. It is saved as a draft on the client, ready to preview and send. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "quick estimate",
+      "write an estimate",
+      "estimating software",
+      "contractor estimates",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Quick estimate",
+    "accent": "Quick",
+    "kicker": "CRM Tutorial",
+    "step": 14
+  }
+}

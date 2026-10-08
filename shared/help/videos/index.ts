@@ -22,6 +22,8 @@ export { default as v_crm_estimate_approved } from "./crm-estimate-approved.json
 export { default as v_crm_estimate_discounts } from "./crm-estimate-discounts.json";
 export { default as v_crm_estimate_edit } from "./crm-estimate-edit.json";
 export { default as v_crm_estimate_options } from "./crm-estimate-options.json";
+export { default as v_crm_deposit_link } from "./crm-deposit-link.json";
+export { default as v_crm_estimate_quick } from "./crm-estimate-quick.json";
 export { default as v_crm_estimate_tracking } from "./crm-estimate-tracking.json";
 export { default as v_crm_estimates } from "./crm-estimates.json";
 export { default as v_crm_follow_ups } from "./crm-follow-ups.json";
@@ -45,6 +47,10 @@ export { default as v_crm_pricebook_template } from "./crm-pricebook-template.js
 export { default as v_crm_pricebook } from "./crm-pricebook.json";
 export { default as v_crm_project_costing } from "./crm-project-costing.json";
 export { default as v_crm_project_daily_log } from "./crm-project-daily-log.json";
+export { default as v_crm_invoice_client_view } from "./crm-invoice-client-view.json";
+export { default as v_crm_invoice_receipt } from "./crm-invoice-receipt.json";
+export { default as v_crm_jobcam_share_link } from "./crm-jobcam-share-link.json";
+export { default as v_crm_jobcam_upload } from "./crm-jobcam-upload.json";
 export { default as v_crm_project_edit } from "./crm-project-edit.json";
 export { default as v_crm_project_new } from "./crm-project-new.json";
 export { default as v_crm_project_permits } from "./crm-project-permits.json";
@@ -60,5 +66,6 @@ export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_search } from "./crm-search.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";
 export { default as v_crm_team_roles } from "./crm-team-roles.json";
+export { default as v_crm_sms_setup } from "./crm-sms-setup.json";
 export { default as v_database_directory } from "./database-directory.json";
 export { default as v_jobcam } from "./jobcam.json";

@@ -1,0 +1,160 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-invoice-client-view",
+  "title": "What your client sees on an invoice",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/invoices",
+      "caption": "Invoices",
+      "chapter": "The invoice you sent",
+      "narration": "When you send an invoice, your client gets their own page for it. Here is what they see."
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has-text(\"INV-1999\") [data-pill-tone]:visible",
+      "caption": "A sent invoice",
+      "narration": "Take this invoice. It has been sent, and it is waiting to be paid."
+    },
+    {
+      "action": "session",
+      "session": "client",
+      "fixture": "email.signIn",
+      "input": {
+        "to": "hannah.lindqvist@example.com",
+        "invoice": "INV-1999"
+      },
+      "caption": "The client's screen",
+      "chapter": "The client's page",
+      "narration": "Now your client's screen. They open the invoice from the link in their email."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"doc-wordmark\"]/..",
+      "caption": "Number and amount due",
+      "narration": "At the top right are the invoice number, the due date, and the amount due."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"prepared-for\"]",
+      "caption": "Who it is for",
+      "narration": "Then who the invoice is for."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Invoice total\"]/ancestor::div[2]",
+      "caption": "Lines and total",
+      "narration": "Below that, each line of work, and the invoice total."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[contains(text(),\"Pay this invoice\")]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Pay this invoice",
+      "chapter": "Paying online",
+      "narration": "Under the invoice is Pay this invoice. The money goes straight to your own payment account."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Private document",
+      "caption": "A private page",
+      "narration": "It is a private page. It opens only after they confirm their email address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-pay-invoice\"]",
+      "caption": "Pay",
+      "narration": "Your client chooses the pay button."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"checkout-summary\"]",
+      "caption": "The secure checkout page",
+      "narration": "That opens the secure checkout page. In this demo, it is a stand-in page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkout-method-ach\"]",
+      "caption": "Bank account",
+      "narration": "This client pays from a bank account."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-checkout-pay\"]",
+      "caption": "Pay",
+      "narration": "And pays."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[normalize-space(text())=\"Payment processing\"]/ancestor::div[contains(@class,\"rounded\")][1]",
+      "caption": "Payment processing",
+      "narration": "Back on the invoice, it says Payment processing. A bank payment takes a few days to clear."
+    },
+    {
+      "action": "session",
+      "session": "owner",
+      "url": "/crm/invoices",
+      "caption": "Back to the CRM",
+      "chapter": "Preview it yourself",
+      "narration": "Back in the CRM, you can look at any client's page yourself.",
+      "holdMs": 1000
+    },
+    {
+      "action": "click",
+      "selector": "tr:has-text(\"INV-1999\") [data-testid^=\"doc-link-\"]",
+      "caption": "Open an invoice",
+      "narration": "Click an invoice's number to open its client.",
+      "holdMs": 700
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview-invoice-demo-invoice-inv-1999\"]",
+      "caption": "Preview",
+      "narration": "Under Invoices, choose Preview.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"preview-banner\"]",
+      "caption": "Contractor preview",
+      "narration": "This is the same page your client sees. Paying is switched off in the preview."
+    },
+    {
+      "action": "back",
+      "caption": "Back",
+      "narration": "Go back when you are done."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-invoices\"]",
+      "caption": "Where to find it",
+      "narration": "Invoices is in the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "What your client sees when you send an invoice | ConstructHUB CRM",
+    "description": "See the invoice page your client opens from ConstructHUB CRM: the invoice, the amount due, and Pay this invoice. The walkthrough follows a bank payment and shows how to preview any client's page yourself. Recorded in a demo workspace with a demonstration checkout page in place of the real hosted checkout.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "client invoice",
+      "pay invoice online",
+      "invoice preview",
+      "ACH payments",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your client's invoice",
+    "accent": "invoice",
+    "kicker": "CRM Tutorial",
+    "step": 6
+  }
+}
