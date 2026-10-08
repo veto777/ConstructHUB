@@ -62,7 +62,8 @@ export const AI_SCHEMA_DDL = [
      next_at timestamptz NOT NULL DEFAULT now(),
      created_at timestamptz NOT NULL DEFAULT now()
    )`,
-  // 'asking' = the run was opened and the ask may or may not have been paid for (written BEFORE buying);
+  // 'opened' = the run exists but nothing has been sent to the source yet (safe to ask again);
+  // 'asking' = the ask is about to go, or went: it may or may not have been paid for;
   // 'paid' = the answers are here and waiting to be filed.
   `ALTER TABLE seo_ai_unsaved ALTER COLUMN answers DROP NOT NULL`,
   `ALTER TABLE seo_ai_unsaved ADD COLUMN IF NOT EXISTS state text NOT NULL DEFAULT 'paid'`,
@@ -70,12 +71,15 @@ export const AI_SCHEMA_DDL = [
   // One answer per assistant per run, enforced by the database: filing a run twice cannot double it. Rows that would
   // break the rule (the same run filed twice before the rule existed — identical copies) are reduced to the first
   // one, and only while the rule is not there yet, so creating it can never fail on existing data.
+  // Clean-up and rule are ONE step under a lock (a DO block is a single transaction), so no other writer can add a
+  // duplicate between them.
   `DO $$ BEGIN
      IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_ai_checks_run_engine') THEN
+       LOCK TABLE seo_ai_checks IN SHARE ROW EXCLUSIVE MODE;
        DELETE FROM seo_ai_checks a USING seo_ai_checks b WHERE a.run_id IS NOT NULL AND a.run_id = b.run_id AND a.engine = b.engine AND a.id > b.id;
+       CREATE UNIQUE INDEX seo_ai_checks_run_engine ON seo_ai_checks(run_id, engine) WHERE run_id IS NOT NULL;
      END IF;
    END $$`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_checks_run_engine ON seo_ai_checks(run_id, engine) WHERE run_id IS NOT NULL`,
 ];
 
 /** One spelling of a question everywhere it is stored or compared: single spaces, trimmed. */
