@@ -24,6 +24,7 @@ import { spawnSync } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
+import { JOBCAM_STORE } from "./lib";
 import { DEMO_CLIENT_KEYS, DEMO_PROJECT_NUMBERS, UUID_RE, demoClientId, demoProjectId, demoUuid, demoUuidIds, legacyIdMap, type DemoProjectNumber } from "./demo-ids";
 
 const raw = process.env.DATABASE_URL;
@@ -428,12 +429,12 @@ async function main() {
   const kane = project("P-2001");
   for (const p of photos) {
     const id = `demo-photo-${String(p.n).padStart(2, "0")}`;
-    const dir = path.join(process.cwd(), "tmp", "jobcam", "jobcam", orgId, id);
+    const dir = path.join(JOBCAM_STORE, "jobcam", orgId, id);
     const video = p.asset === CLIP;
     const files = video ? { original: "original.mp4", display: "poster.jpg", thumb: "thumb.jpg" } : { original: "original.jpg", display: "display.jpg", thumb: "thumb.jpg" };
-    // The files live in this working copy (tmp/jobcam is the slot app's local object store), so every
-    // checkout makes its own. `source` says which drawing a folder was made from: a folder without it
-    // holds an old colour card and is made again.
+    // The files live in the ONE object store every recording slot on this machine reads (lib.ts
+    // JOBCAM_STORE → the slot app's JOBCAM_LOCAL_ROOT), so a row any working copy seeds has its picture
+    // in every slot. `source` says which drawing a folder was made from: a folder without it is made again.
     const from = path.join(import.meta.dirname, "assets", video ? "" : "photos", p.asset), source = path.join(dir, "source");
     if (!fs.existsSync(from)) throw new Error(`${p.asset} is not in scripts/tutorials/assets — run gen-assets.ts`);
     if (!fs.existsSync(path.join(dir, files.thumb)) || !fs.existsSync(source) || fs.readFileSync(source, "utf8").trim() !== p.asset) {

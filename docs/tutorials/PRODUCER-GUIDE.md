@@ -118,9 +118,10 @@ them has the older data).**
 - **JobCam is on three jobs, one per state**: Kane (FL, six shots, `demo-photo-01`…`06`), Hadley (TX,
   `demo-photo-07`…`10` and the clip `demo-photo-11`) and Lindqvist (NY, `demo-photo-12`…`15`). The
   pictures are the drawn job-site scenes of `scripts/tutorials/assets/photos` (no more brown "Demo
-  photo N" cards); the Recent feed still opens on the six Kane tiles. Each working copy makes its own
-  files under `tmp/jobcam` the first time its seed runs — a tile that is still a brown card means
-  that copy has not merged this seed.
+  photo N" cards); the Recent feed still opens on the six Kane tiles. The files are in **one object
+  store that every slot on the box reads** (`/tmp/claude-1000/constructhub-tutorials/jobcam-store`,
+  the slot app's `JOBCAM_LOCAL_ROOT`), written by whichever copy seeds or reseeds — a broken or brown
+  tile means that working copy has not merged this line yet (its app still reads its own `tmp/jobcam`).
 - **Divisions** (Settings → Divisions): Aspire Interiors — Florida (Sarasota, headquarters), — New
   York (Albany) and — Texas (Austin), each with an invented "Demo …" street line, a suite and a
   `DEMO-<state>-1001` licence. The New York and Texas jobs run under their division, so their
@@ -292,6 +293,13 @@ points at the secret (`crm-api-keys.json`).
 only at `example.com`; a phone only `555-01xx`; nothing shaped like a key or a token; a password field
 takes a `{{PLACEHOLDER}}`, and every placeholder is `"redact": true`. A key's *name*, a search and a
 demo address are typed as they are — no xpath detours.
+
+**Dialogs.** `press` `Escape` is sent to the topmost open dialog (after a click inside one, focus used
+to be on the page and the key did nothing). A target in the caption strip is brought up by moving its
+dialog; where the dialog is a full-screen wrapper with a panel in it (the JobCam share sheet), the
+panel is what moves. A change order's client page is reached with the `email.changeOrder` fixture; a
+video that needs the setup checklist open starts with `"before": [{ "fixture": "auth.unfinishedSetup" }]`
+(`FIXTURES.md`).
 
 **Under load.** A click or a choice waits (up to 3.5 s) until what it asked the server for is back, so
 steps no longer need a blanket `holdMs: 1200`; keep `holdMs` for what the viewer needs time to read.

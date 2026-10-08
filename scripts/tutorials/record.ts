@@ -404,8 +404,19 @@ export class Player {
       const lifted = await target.evaluate((el, strip) => {
         const over = el.getBoundingClientRect().bottom - (innerHeight - strip - 10);
         if (over <= 0) return 0;
-        let host = el.closest('[role="dialog"],[role="alertdialog"]') as HTMLElement | null;
-        for (let n = el.parentElement; !host && n; n = n.parentElement) if (getComputedStyle(n).position === "fixed") host = n as HTMLElement;
+        // What to move: the dialog (or the bar fixed to the bottom) the target is in. A wrapper that covers
+        // the whole window (an overlay with the panel inside it, as the JobCam share sheet is built) has no
+        // room above it: then the panel itself is moved — the wrapper's child that holds the target.
+        const roomy = (n: HTMLElement) => n.getBoundingClientRect().top - 8 >= 1;
+        const chain: HTMLElement[] = [];
+        for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) chain.push(n);
+        const isHost = (n: HTMLElement) => n.matches('[role="dialog"],[role="alertdialog"]') || getComputedStyle(n).position === "fixed";
+        let host = chain.find((n) => isHost(n) && roomy(n)) ?? null;
+        if (!host) {
+          const wrapper = chain.find(isHost);
+          const panel = wrapper ? chain[chain.indexOf(wrapper) - 1] : null;
+          if (panel && roomy(panel) && panel.getBoundingClientRect().height < innerHeight - 16) host = panel;
+        }
         if (!host) return 0;
         const lift = Math.min(over, Math.max(0, host.getBoundingClientRect().top - 8));
         if (lift < 1) return 0;
@@ -455,7 +466,17 @@ export class Player {
     }
     if (step.action === "wait") return;
     if (step.action === "back") { await this.ring(null); await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page); return; }
-    if (step.action === "press") { await page.keyboard.press(step.value!); return; }
+    if (step.action === "press") {
+      // Escape closes a dialog only when the key reaches it — and after a click inside one, focus can be
+      // on <body>. Put it back on the topmost open dialog first, the way a person's next keystroke lands.
+      if (step.value === "Escape") await page.evaluate(() => {
+        const open = Array.from(document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"]')) as HTMLElement[];
+        const top = open[open.length - 1];
+        if (top && !top.contains(document.activeElement)) { if (!top.hasAttribute("tabindex")) top.setAttribute("tabindex", "-1"); top.focus({ preventScroll: true }); }
+      }).catch(() => {});
+      await page.keyboard.press(step.value!);
+      return;
+    }
     if (step.action === "card") {
       await this.ring(null);
       await page.evaluate((html) => (window as any).__tut.card(html), cardHtml(step.card!));
@@ -886,6 +907,8 @@ async function main() {
     await sleep(100);
   }
   await sleep(1500);
+  // What must be true before the camera starts (the script's `before`): fixture helpers only, off camera.
+  for (const b of script.before ?? []) await fixture(b.fixture, b.input ?? {});
   const syncStartMs = await flash(firstPage);
 
   const steps: StepTiming[] = [];

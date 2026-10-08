@@ -8,6 +8,11 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "redactSelectors": [
+    "[data-testid=\"jobcam-share-url\"]",
+    "[data-testid^=\"jobcam-share-row-\"] code",
+    "[data-testid^=\"jobcam-share-link-\"]"
+  ],
   "steps": [
     {
       "action": "goto",

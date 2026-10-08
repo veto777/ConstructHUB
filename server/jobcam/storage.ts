@@ -30,7 +30,15 @@ import { PART_URL_TTL_S } from "./upload-state";
 export type StorageMode = "r2" | "local";
 
 const BUCKET = process.env.R2_BUCKET_NAME || "constructhub";
-const LOCAL_ROOT = path.join(process.cwd(), "tmp", "jobcam");
+/**
+ * Local mode's folder. A walkthrough recording slot (scripts/tutorials/app.ts) points every slot of
+ * the box at ONE folder with JOBCAM_LOCAL_ROOT, so a demo photo that one working copy's seed made is
+ * there for all of them (per-copy folders showed broken tiles for rows another copy had seeded).
+ * Never honoured in production: there R2 is the store, and local mode is only the dev fallback.
+ */
+const LOCAL_ROOT = process.env.NODE_ENV !== "production" && process.env.JOBCAM_LOCAL_ROOT
+  ? path.resolve(process.env.JOBCAM_LOCAL_ROOT)
+  : path.join(process.cwd(), "tmp", "jobcam");
 
 let s3: S3Client | null = null;
 function client(): S3Client {

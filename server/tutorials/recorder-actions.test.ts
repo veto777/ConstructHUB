@@ -127,7 +127,7 @@ describe("the recorder", () => {
   it("lifts a dialog whose target sits in the caption strip, before the ring is drawn", () => {
     const aim = src.slice(src.indexOf("private async aim("), src.indexOf("async play(step"));
     expect(aim).toContain("host.style.translate = `0 ${-total}px`;");
-    expect(aim).toMatch(/closest\('\[role="dialog"\],\[role="alertdialog"\]'\)/);
+    expect(aim).toMatch(/n\.matches\('\[role="dialog"\],\[role="alertdialog"\]'\)/);
     // aim() runs before ring() in every pointing action.
     expect(src).toMatch(/const point = await this\.aim\(target\);[\s\S]{0,400}await this\.ring\(target\);/);
   });
@@ -330,6 +330,35 @@ describe("under load", () => {
     expect(src.match(/fs\.rmSync\(path\.join\(out, f\)/g)).toHaveLength(1);
     expect(src).toMatch(/args\.flags\["from-raw"\]/);
     expect(src).toMatch(/--from-raw: .* is not there/);
+  });
+});
+
+describe("line gaps of 2026-10-08 (batch E)", () => {
+  it("Escape goes to the open dialog, a full-screen wrapper's panel is what gets lifted, and a script can set its starting state off camera", () => {
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/step\.value === "Escape"\) await page\.evaluate/);
+    expect(src).toMatch(/top\.focus\(\{ preventScroll: true \}\)/);
+    expect(src).toMatch(/const panel = wrapper \? chain\[chain\.indexOf\(wrapper\) - 1\] : null/);
+    expect(src).toMatch(/for \(const b of script\.before \?\? \[\]\) await fixture\(b\.fixture, b\.input \?\? \{\}\)/);
+    const script = (before: unknown) => { try { parseTutorialScript({ helpKey: "x", title: "t", viewport: { width: 1024, height: 576 }, steps: [{ action: "goto", url: "/", caption: "c", narration: "n" }], before }); return true; } catch { return false; } };
+    expect(script([{ fixture: "auth.unfinishedSetup" }])).toBe(true);
+    expect(script([{ fixture: "rm -rf" }])).toBe(false);
+    expect(JSON.parse(read("shared/help/step-script.schema.json")).properties.before).toBeTruthy();
+  });
+
+  it("every slot reads one JobCam object store, the seed writes there, and production never does", () => {
+    expect(read("scripts/tutorials/app.ts")).toMatch(/env\.JOBCAM_LOCAL_ROOT = JOBCAM_STORE/);
+    expect(read("scripts/tutorials/seed-demo.ts")).toMatch(/path\.join\(JOBCAM_STORE, "jobcam", orgId, id\)/);
+    expect(read("scripts/tutorials/seed-demo.ts")).not.toMatch(/process\.cwd\(\), "tmp", "jobcam"/);
+    expect(read("server/jobcam/storage.ts")).toMatch(/process\.env\.NODE_ENV !== "production" && process\.env\.JOBCAM_LOCAL_ROOT/);
+  });
+
+  it("the two new fixture helpers are gated, and a draft change order has no client link", () => {
+    const email = read("server/tutorials/fixtures/providers/email.ts"), auth = read("server/tutorials/fixtures/providers/auth.ts");
+    expect(email).toMatch(/changeOrder: async[\s\S]{0,120}requireTutorialFixtures\(/);
+    expect(email).toMatch(/has not been marked sent/);
+    expect(auth).toMatch(/unfinishedSetup: async[\s\S]{0,120}requireTutorialFixtures\(/);
+    expect(auth).toMatch(/update crm_members set phone = null where org_id = \$1 and role = 'owner'/);
   });
 });
 

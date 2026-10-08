@@ -256,3 +256,9 @@ export function lastFrameSeekSec(nbFrames: number, fps: number): number {
   if (!Number.isInteger(nbFrames) || nbFrames < 1 || !(fps > 0)) throw new Error(`cannot place the last frame of ${nbFrames} frames at ${fps} fps`);
   return Math.max(0, (nbFrames - 1.5) / fps);
 }
+
+/**
+ * The JobCam object store of every recording slot on this machine (the slot app's local mode,
+ * JOBCAM_LOCAL_ROOT): one folder, so the demo photos a seed writes are there for every working copy.
+ */
+export const JOBCAM_STORE = path.join(WORK_DIR, "jobcam-store");

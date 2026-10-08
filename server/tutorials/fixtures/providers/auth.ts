@@ -53,4 +53,20 @@ export const authFixture = defineProviderFixture({
   simulates: "A second signed-in person: a real session for one of the demo company's own team members (crew, sales, project manager).",
   seam: "none in feature code — a local-only route that calls passport's req.login(); the dev bypass yields to a real session",
   routes,
+  actions: {
+    /**
+     * {} — the demo owner's first day: the "Finish setting up" card on Home shows only while a required
+     * step is open, and the demo workspace is complete. This clears the owner's own mobile number and
+     * the checklist's "dismissed" stamp IN THIS SLOT'S COPY, so the card is there to be worked through.
+     * Run it from the script's `before` list (it happens before the camera starts); the video then fills
+     * the number back in. Nothing else of the workspace changes.
+     */
+    unfinishedSetup: async (_input, { orgId }) => {
+      requireTutorialFixtures("an unfinished setup checklist");
+      const { pool } = await import("../../../db");
+      const { rowCount } = await pool.query(`update crm_members set phone = null where org_id = $1 and role = 'owner'`, [orgId]);
+      await pool.query(`update crm_orgs set onboarding_dismissed_at = null where id = $1`, [orgId]);
+      return { owners: rowCount ?? 0, checklist: "open: Your profile" };
+    },
+  },
 });

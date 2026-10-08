@@ -87,6 +87,26 @@ export const emailFixture = defineProviderFixture<EmailFixture>({
       return { url, path: `${u.pathname}${u.search}` };
     },
     /**
+     * { title?: "Add hallway closet", client?: "Joe & Mary Kane" }
+     * The client's page of a change order (/co/<token>) — the newest SENT one, or the one named. "Mark
+     * sent & copy link" emails nothing (the contractor pastes the link into their own message), so there
+     * is no email for `email.link` to open: this hands the recorder the same link the button copies.
+     * A draft is refused: a client can only have a link that was marked sent.
+     */
+    changeOrder: async (input, { orgId }) => {
+      requireTutorialFixtures("a change order's client link");
+      const { pool } = await import("../../../db");
+      const { rows: [co] } = await pool.query(
+        `select co.public_token, co.sent_at from crm_change_orders co left join crm_customers c on c.id = co.customer_id
+          where co.org_id = $1 and ($2::text is null or co.title = $2) and ($3::text is null or c.display_name = $3)
+          order by co.sent_at desc nulls last, co.created_at desc limit 1`,
+        [orgId, input.title ? String(input.title) : null, input.client ? String(input.client) : null]);
+      if (!co) throw new Error("no such change order in the demo workspace");
+      if (!co.sent_at) throw new Error("that change order has not been marked sent — the client has no link yet");
+      const path = `/co/${co.public_token}`;
+      return { path, url: `http://portal.constructhub.us:${process.env.PORT}${path}` };
+    },
+    /**
      * { estimate?: "E-2000", invoice?: "INV-1999", minutesAgo?: 90, visits?: 1, seconds?: 150 }
      * The same rows the public page writes on a real open (server/crm/portal.ts), dated in the past.
      */

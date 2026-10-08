@@ -110,9 +110,14 @@ list five online payments on a page that still says "not configured").
 | `email.signIn` | `to`, and optionally `invoice` or `estimate` (its number) | Asks for the client's sign-in link through the product's own route and hands it over — start a homeowner's session already signed in |
 | `email.opened` | `estimate` or `invoice`, `minutesAgo?`, `visits?`, `seconds?` | Marks a **sent** document opened by the client at an earlier time: the same rows the public page writes on a real open |
 | `email.count` | `to` | How many emails that address has received |
+| `email.changeOrder` | `title?`, `client?` | The client's page of a change order (`/co/<token>`) — the newest one marked sent, or the one named. "Mark sent & copy link" emails nothing, so `email.link` has nothing to open; this hands over the link the button copies. A draft is refused |
+| `auth.unfinishedSetup` | — | The demo owner's first day: clears the owner's own mobile number and the checklist's "dismissed" stamp in this slot's copy, so Home shows "Finish setting up". Run it from the script's `before` list (off camera); the video fills the number back in |
 | `sms.inbound` | `from` (a `+1XXX55501XX` number), `body`, `to?` | A text arrives, posted to the real carrier webhook |
 | `sms.last` | — | The last text the slot "sent" |
 | `google-calendar.events` | — | How many events the stand-in calendar holds |
+
+A script's `"before": [{ "fixture": "auth.unfinishedSetup" }]` runs helpers before the camera starts —
+for the state a video begins in, never to stage what it then shows.
 
 "Advance time" is done by the action that moves the thing forward — `stripe.settle`, `email.opened` —
 not by changing the clock: the slot's clock is real.

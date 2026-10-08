@@ -8,6 +8,9 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "redactSelectors": [
+    "[data-testid=\"input-deposit-link\"]"
+  ],
   "steps": [
     {
       "action": "goto",

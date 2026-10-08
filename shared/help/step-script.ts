@@ -166,6 +166,12 @@ export const tutorialScriptSchema = z.object({
    */
   redactSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
   /**
+   * Fixture helpers run BEFORE the camera starts (recording slots only): the state a video begins in
+   * when the demo workspace cannot be seeded that way for everyone — `auth.unfinishedSetup` for the
+   * setup checklist. Never a way to stage a result: what the video then shows is done on camera.
+   */
+  before: z.array(z.object({ fixture: z.string().regex(/^[a-z][a-z-]*\.[a-z][a-zA-Z]*$/).max(60), input: z.record(z.string(), z.union([z.string().max(500), z.number(), z.boolean()])).optional() })).max(4).optional(),
+  /**
    * Taken out of the picture (their space is kept) on every page of the recording, from page load: a
    * mark that may not appear in a film — the overview films carry no Google logo, and the app's own
    * side menu draws three. Presentation only, like the assistant bubble the recorder already hides;

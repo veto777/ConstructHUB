@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-deposit-link",
+  "durationSec": 90,
+  "video": {
+    "key": "tutorials/crm-deposit-link.806675d3.mp4",
+    "bytes": 7566048,
+    "sha256": "806675d3f963bc35f710540b544dde1928ffd162f841b616b8c0e8fc8ba73f33"
+  },
+  "captions": {
+    "key": "tutorials/crm-deposit-link.4fa32415.vtt",
+    "bytes": 1730,
+    "sha256": "4fa32415e5ff4a81930aa8fc7cdab0e90edbef8c57f5d582ad6d94d0dfc80762"
+  },
+  "poster": {
+    "key": "tutorials/crm-deposit-link.184f53d6.jpg",
+    "bytes": 88721,
+    "sha256": "184f53d67233fbce0ebeaf6c37b03c52ee1639e8507e2f9eb933e133d11570ac"
+  },
+  "uploaded": {
+    "at": "2026-10-08T04:41:01.737Z",
+    "video": "3ab71dd35ca2ff650f03d1d44564d881",
+    "captions": "b3c96fc88b7cf1d9fa4a44d217dfe784",
+    "poster": "83400f3189c48303983285c23b1b8183"
+  }
+}

@@ -596,6 +596,28 @@
         "maxLength": 200
       },
       "description": "Plain CSS selectors made invisible (space kept) on every page from page load — a mark that may not appear in a film."
+    },
+    "before": {
+      "type": "array",
+      "maxItems": 4,
+      "description": "Fixture helpers run before the camera starts (recording slots only).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture"
+        ],
+        "properties": {
+          "fixture": {
+            "type": "string",
+            "pattern": "^[a-z][a-z-]*\\.[a-z][a-zA-Z]*$",
+            "maxLength": 60
+          },
+          "input": {
+            "type": "object"
+          }
+        }
+      }
     }
   }
 }

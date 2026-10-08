@@ -13,5 +13,9 @@ const entry: HelpDraft = {
   ],
   howItWorks: "The person who opens the link sees your company name, the job and the photos, without signing in. A live timeline shows every photo on the job and keeps updating; a gallery shows only the photos you picked. A revoked or expired link shows a notice instead of the photos.",
   needs: ["A ConstructHub CRM plan with JobCam — the CRM is a separate product with its own plans.", "A job with photos.", "The client’s email address or mobile number, to send the link."],
+  // HELD (2026-10-08): the recorded cut shows a newly made share link readable for about a second, and the
+  // dialog's "Prefilled from ." defect. Not posted and not in the app (its manifest waits in
+  // docs/tutorials/held-manifests/) until it is re-recorded with redactSelectors after the product fix.
+  youtube: { hold: true },
 };
 export default entry;

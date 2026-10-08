@@ -19,7 +19,7 @@ import { spawn } from "child_process";
 import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
-import { ROOT, WORK_DIR, run, sleep } from "./lib";
+import { JOBCAM_STORE, ROOT, WORK_DIR, run, sleep } from "./lib";
 import { databaseUrl } from "./db";
 
 export const SLOT_PORT = (slot: number) => 8180 + slot;
@@ -99,6 +99,9 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     AI_INTEGRATIONS_OPENAI_API_KEY: "tutorial-recording-no-key", AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9/v1",
   };
   const fixtures = o.fixtures ?? isSlot(o.slot);
+  // One JobCam object store for every slot (see lib.ts JOBCAM_STORE): demo photos are seeded there once.
+  fs.mkdirSync(JOBCAM_STORE, { recursive: true });
+  env.JOBCAM_LOCAL_ROOT = JOBCAM_STORE;
   if (fixtures) { env.TUTORIAL_FIXTURES = "1"; env.TUTORIAL_SLOT = String(o.slot); }
   const fd = fs.openSync(log, "w");
   // cwd stays the repo root (the app resolves client/ and reference data from it); the email outbox it
