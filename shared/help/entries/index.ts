@@ -2,10 +2,13 @@
 // One line per help entry file.
 export { default as e_crm_api_keys } from "./crm/crm-api-keys";
 export { default as e_crm_billing } from "./crm/crm-billing";
+export { default as e_crm_client_portal } from "./crm/crm-client-portal";
 export { default as e_crm_company_settings } from "./crm/crm-company-settings";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_document_defaults } from "./crm/crm-document-defaults";
 export { default as e_crm_notifications } from "./crm/crm-notifications";
 export { default as e_crm_report_issue } from "./crm/crm-report-issue";
+export { default as e_crm_reports } from "./crm/crm-reports";
+export { default as e_crm_search } from "./crm/crm-search";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
