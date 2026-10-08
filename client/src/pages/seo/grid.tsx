@@ -21,7 +21,8 @@ type Center = { lat: number; lng: number; name: string; cid?: string | null };
 type Scan = { id?: number; keyword: string; size: number; spacing: number; center: Center; points: Point[]; rivals: Rival[]; summary: Summary; fetchedAt: string };
 type ScanRow = { id: number; keyword: string; size: number; spacing: number; status: "done" | "failed"; error: string | null; center: Center | null; avgRank: number | null; points: number; checked: number; found: number; top3: number; at: string };
 type State = { id: number; status: "running" | "done" | "failed"; scan: Scan | null; error: string | null };
-type Data = { pin: Pin | null; scans: ScanRow[]; running: { id: number; keyword: string; size: number; spacing: number; at: string } | null; sizes: number[]; spacings: number[]; depth: number; suggestion: string };
+type Watch = { id: number; keyword: string; size: number; spacing: number; every: "weekly" | "monthly"; nextAt: string };
+type Data = { pin: Pin | null; scans: ScanRow[]; watches?: Watch[]; maxWatches?: number; running: { id: number; keyword: string; size: number; spacing: number; at: string } | null; sizes: number[]; spacings: number[]; depth: number; suggestion: string };
 
 const miles = (n: number) => `${n} mile${n === 1 ? "" : "s"}`;
 /** Colour and words for a position. Every colour carries its number, and the text on it meets normal contrast. */
@@ -114,6 +115,17 @@ export default function SeoLocalGridPage() {
     if (openId !== ended) toast({ title: active.data?.status === "done" ? "The scan has finished" : "The scan didn't finish", description: "It is in the list of scans below." });
   }, [ended]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const watch = useMutation({
+    mutationFn: (v: { siteId: number; body: { keyword: string; size: number; spacing: number; every: "weekly" | "monthly" } }) => api("POST", `/api/seo/sites/${v.siteId}/grid/watch`, v.body),
+    onSuccess: (_d: unknown, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/grid`] }); toast({ title: `This scan will repeat every ${v.body.every === "weekly" ? "week" : "month"}`, description: "It uses your month's included SEO data only, and you are alerted when the area clearly changes." }); },
+    onError: (e) => toast({ title: "Couldn't set that up", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const unwatch = useMutation({
+    mutationFn: (v: { siteId: number; id: number }) => api("DELETE", `/api/seo/sites/${v.siteId}/grid/watch/${v.id}`),
+    onSuccess: (_d: unknown, v) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/grid`] }); },
+    onError: (e) => toast({ title: "Couldn't stop that", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const watches = q.data?.watches ?? [];
   const pin = q.data?.pin ?? null;
   const listings = found && found.siteId === site?.id ? found.listings : null;
   // Comparable only with an earlier scan of the same search, the same square, and the same listing in the same place.
@@ -208,6 +220,18 @@ export default function SeoLocalGridPage() {
                 <Tile label="Found" value={`${shown.summary.found} of ${shown.summary.checked}`} hint={`points where you are in the first ${depth} local results`} testId="tile-grid-found" />
                 <Tile label="Area" value={span ? `${span} × ${span} mi` : "1 point"} hint={shown.summary.checked < shown.summary.points ? `${shown.summary.points - shown.summary.checked} point${shown.summary.points - shown.summary.checked === 1 ? "" : "s"} could not be checked` : `${shown.summary.points} points checked`} testId="tile-grid-area" />
               </div>
+              {(() => {
+                const mine = watches.find((w) => w.keyword === shown.keyword && w.size === shown.size && w.spacing === shown.spacing);
+                const each = prices?.gridPer100 != null ? money(Math.ceil((shown.size * shown.size * prices.gridPer100) / 100)) : null;
+                return (
+                  <p className="g-text-2 mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="grid-repeat">
+                    {mine ? <>This scan repeats every {mine.every === "weekly" ? "week" : "month"} — next on {fmtDate(mine.nextAt)}. <button type="button" className="g-link" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: mine.id })} data-testid="button-grid-unwatch">Stop</button></> : <>
+                      <span>Repeat this scan automatically{each ? ` (about ${each} each time, from your included SEO data only)` : ""}:</span>
+                      {(["monthly", "weekly"] as const).map((every) => <button key={every} type="button" className="g-pill g-pill--sm" disabled={watch.isPending || !sameCenter(shown.center, pin ? { lat: pin.lat, lng: pin.lng, name: pin.name, cid: pin.cid } : null)} onClick={() => watch.mutate({ siteId: site.id, body: { keyword: shown.keyword, size: shown.size, spacing: shown.spacing, every } })} data-testid={`button-grid-watch-${every}`}>Every {every === "weekly" ? "week" : "month"}</button>)}
+                    </>}
+                  </p>
+                );
+              })()}
               {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At {unsure} point{unsure === 1 ? "" : "s"} Google's result carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
               <div className="grid gap-5 lg:grid-cols-[auto,1fr]">
                 <div>
@@ -254,6 +278,15 @@ export default function SeoLocalGridPage() {
             </section>
           )}
 
+          {pin && !changing && watches.length > 0 && (
+            <section className="mb-5" data-testid="grid-watches">
+              <h2 className="g-text mb-2 text-[15px] font-medium">Repeating scans</h2>
+              <ul className="space-y-1 text-[13px]">
+                {watches.map((w) => <li key={w.id} className="flex flex-wrap items-center gap-2"><span className="g-text">"{w.keyword}"</span><span className="g-text-2">{w.size} × {w.size}, {miles(w.spacing)} apart · every {w.every === "weekly" ? "week" : "month"} · next {fmtDate(w.nextAt)}</span><button type="button" className="g-link" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: w.id })} aria-label={`Stop repeating the scan for ${w.keyword}`}>Stop</button></li>)}
+              </ul>
+              <p className="g-text-2 mt-1 text-[12px]">Repeating scans use the month's included SEO data only — never credit you bought — and are skipped when it has run out. You get an alert when the area clearly gets better or worse.</p>
+            </section>
+          )}
           {pin && !changing && (
             <section data-testid="grid-history">
               <h2 className="g-text mb-2 text-[15px] font-medium">Scans so far</h2>

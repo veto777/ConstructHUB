@@ -5,6 +5,7 @@
  * the newest Site Explorer report, the newest crawl, backlink snapshots and
  * alerts. Making or sending a report never spends SEO data.
  */
+import { gridReportLines, type GridReportLine } from "./grid-monitor";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
 import { pool } from "../db";
@@ -49,6 +50,8 @@ export type SiteReport = {
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
   searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; /** The newest day synced; the 28 days end here. */ through?: string | null; syncedAt?: string | null } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
+  /** Repeating local grids: the newest scan of each with the comparable one before it. */
+  grids?: GridReportLine[];
 };
 
 type Check = { keywordId: number; keyword: string; location: string | null; volume: number | null; device: string; checkedOn: string; position: number | null; local: number | null; hasPack: boolean };
@@ -107,6 +110,7 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     reportDeps.searchConsole(userId, site.domain).catch(() => null),
     pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
+  const grids = await gridReportLines(userId, site.id).catch(() => []);
   const ranks = rankingsSection(checks, primary);
   const { rows: [count] } = await pool.query("SELECT count(*)::int n FROM seo_keywords WHERE site_id=$1", [site.id]);
   if (ranks) ranks.section.tracked = Math.max(ranks.section.checked, Number(count?.n ?? 0));
@@ -130,6 +134,7 @@ export async function buildSiteReport(userId: number, siteId: number): Promise<S
     // Nothing synced for the last 28 days is no section at all, rather than a row of zeros.
     searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
     alerts,
+    grids,
   };
 }
 
@@ -174,11 +179,15 @@ export function reportHighlights(r: SiteReport): [string, string][] {
     rows.push(["Websites linking to it", `${n(r.search.referringDomains)}${signed(r.search.referringDomainsChange)}`]);
     if (r.search.authority !== null) rows.push(["Authority (0–100)", String(r.search.authority)]);
   }
+  for (const g of r.grids ?? []) rows.push([`Local grid — "${g.keyword}"`, gridLine(g)]);
   if (r.audit && r.audit.health !== null) rows.push(["Site health (0–100)", `${r.audit.health}${signed(r.audit.healthChange)} · ${n(r.audit.errors)} errors, ${n(r.audit.warnings)} warnings`]);
   return rows;
 }
 
-export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole;
+/** One repeating grid in words: where it stands and, when there is a comparable scan before it, where it stood. */
+export const gridLine = (g: GridReportLine) =>
+  `in the first 3 local results at ${g.top3} of ${g.checked} points${g.previous ? ` (was ${g.previous.top3} of ${g.previous.checked})` : ""} · position score ${g.score ?? "—"}${g.previous && g.previous.score !== null ? ` (was ${g.previous.score})` : ""}`;
+export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.audit && !r.searchConsole && !(r.grids ?? []).length;
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
@@ -243,6 +252,11 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Pages crawled", n(r.audit.crawled));
       pair("Errors / warnings / notices", `${n(r.audit.errors)} / ${n(r.audit.warnings)} / ${n(r.audit.notices)}`);
       if (r.audit.topIssues.length) { doc.moveDown(0.3); line("What to fix first", soft); for (const i of r.audit.topIssues) line(`  • ${i.title} — ${n(i.count)} affected (${i.severity})`); }
+    }
+    if ((r.grids ?? []).length) {
+      heading("Local grid — Google's local results across your area");
+      for (const g of r.grids!) pair(`"${g.keyword}" · ${g.size} × ${g.size} points, ${g.spacing} mi apart · ${day(g.at)}`, gridLine(g));
+      line("Each point is a Google search made from that spot. The position score counts a point where the business is not in the first 20 as 21; lower is better.", soft);
     }
     if (r.alerts.length) { heading("Alerts in the last month"); for (const a of r.alerts) line(`${day(a.createdAt)} — ${a.title}`); }
     doc.moveDown(1.5).fontSize(8).fillColor(soft).text("Positions are Google's organic results for the place each keyword is tracked from. The map pack is the block of local businesses Google shows above them.", 48, doc.y, { width });
