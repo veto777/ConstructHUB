@@ -1,0 +1,106 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-reports",
+  "title": "Import a measurement report",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/reports",
+      "caption": "Measurement reports",
+      "chapter": "Import a report",
+      "narration": "A measurement report can go straight onto a client's record. Here is how to import one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-report-file\"]",
+      "caption": "Upload the PDF",
+      "narration": "Upload the report's PDF here, or paste the report's text in the box beside it."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"textarea-report-text\"]",
+      "value": "Prepared for: Tunde Oyelaran\n58 Wren Hollow Ln\nAlbany, NY 12203\ntunde.oyelaran@example.com\nTotal Roof Area: 2,450 SF\nPitch: 6/12\nWaste: 10%",
+      "caption": "Paste the text",
+      "narration": "We'll paste the text of a report for Tunde Oyelaran, a client in Albany, New York. It has his name, address and email, and the roof measurements."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-parse-report\"]",
+      "caption": "Parse report",
+      "narration": "Choose Parse report."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"preview-contact\"]",
+      "caption": "Client",
+      "chapter": "Review what was read",
+      "narration": "Review the import shows what was read. First the client: name, email and address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"preview-measurements\"]",
+      "caption": "Roof",
+      "narration": "Then the roof: squares, square feet, pitch and waste."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"report-status-\"]",
+      "caption": "Draft",
+      "narration": "Nothing is filed yet. Until you confirm, the report is a draft."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-confirm-report\"]",
+      "caption": "Confirm",
+      "chapter": "Confirm and file it",
+      "narration": "If it's right, choose Confirm."
+    },
+    {
+      "action": "wait",
+      "caption": "Existing client matched",
+      "narration": "The CRM found Tunde by his email, so it says Existing client matched. No duplicate is made.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Matched the existing client",
+      "caption": "Report filed",
+      "narration": "The report is filed on his record, and it shows in his client portal too."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Menu: Settings",
+      "narration": "To get here, open Settings in the menu, then Measurement reports."
+    }
+  ],
+  "youtube": {
+    "title": "How to import a measurement report | ConstructHUB CRM",
+    "description": "A short walkthrough of Measurement reports in the ConstructHUB CRM. You will paste a report's text, review the client and roof measurements that were read from it, and confirm. The report is filed on the matching client.",
+    "tags": [
+      "measurement report",
+      "roof measurements",
+      "roofing report",
+      "roof squares",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Reports onto the client",
+    "accent": "client",
+    "kicker": "CRM Tutorial",
+    "step": 5
+  }
+}

@@ -8,6 +8,7 @@ export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_document_defaults } from "./crm-document-defaults.json";
 export { default as v_crm_notifications } from "./crm-notifications.json";
 export { default as v_crm_report_issue } from "./crm-report-issue.json";
+export { default as v_crm_reports } from "./crm-reports.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";
 export { default as v_crm_team_roles } from "./crm-team-roles.json";
