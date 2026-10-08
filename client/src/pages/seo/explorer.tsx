@@ -112,6 +112,52 @@ const TABLES = ["keywords", "pages", "competitors", "referringDomains", "anchors
 type TableKey = (typeof TABLES)[number];
 const TABLE_LABEL: Record<TableKey, string> = { keywords: "Organic keywords", pages: "Top pages", competitors: "Organic competitors", referringDomains: "Referring domains", anchors: "Anchors" };
 
+/**
+ * Compare two months: any two months of the saved history side by side (organic search from two years of monthly
+ * estimates, links from one year). Free — it only reads the report already on screen.
+ */
+function CompareMonths({ report }: { report: Report }) {
+  const months = useMemo(() => [...new Set([...(report.history ?? []).map((h) => h.month), ...(report.linkHistory ?? []).map((h) => h.month)])].sort(), [report]);
+  const [open, setOpen] = useState(false);
+  const [a, setA] = useState<string | null>(null), [b, setB] = useState<string | null>(null);
+  // A different report: the choice starts again (the newest month against the same month a year earlier, or the oldest there is).
+  useEffect(() => { const last = months[months.length - 1] ?? null; setB(last); setA(months[Math.max(0, months.length - 13)] ?? null); }, [months]);
+  if (months.length < 2) return null;
+  const h = (m: string | null) => (report.history ?? []).find((x) => x.month === m) ?? null, l = (m: string | null) => (report.linkHistory ?? []).find((x) => x.month === m) ?? null;
+  const rows: [string, number | null | undefined, number | null | undefined, boolean][] = [
+    ["Organic traffic / mo", h(a)?.traffic, h(b)?.traffic, false], ["Organic keywords", h(a)?.keywords, h(b)?.keywords, false], ["Keywords in the top 3", h(a)?.top3, h(b)?.top3, false],
+    ["Keywords in the top 10", h(a)?.top10, h(b)?.top10, false], ["Traffic value / mo", h(a)?.trafficValue, h(b)?.trafficValue, true],
+    ["Referring domains", l(a)?.referringDomains, l(b)?.referringDomains, false], ["Backlinks", l(a)?.backlinks, l(b)?.backlinks, false], ["Authority", l(a)?.authority, l(b)?.authority, false],
+  ];
+  const show = (v: number | null | undefined, money: boolean) => (v == null ? "—" : money ? usd(v) : fmtNum(v));
+  return (
+    <section className="mb-4" data-testid="panel-compare">
+      <button type="button" className="g-pill g-pill--sm" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="button-compare">{open ? "Hide the comparison" : "Compare two months"}</button>
+      {open && (
+        <div className="mt-3 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }}>
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
+            <label className="g-text-2 flex items-center gap-2">From <select className="g-input g-select !w-auto !py-1" value={a ?? ""} onChange={(e) => setA(e.target.value)} data-testid="select-compare-from">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
+            <label className="g-text-2 flex items-center gap-2">to <select className="g-input g-select !w-auto !py-1" value={b ?? ""} onChange={(e) => setB(e.target.value)} data-testid="select-compare-to">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
+          </div>
+          <table className="g-table" data-testid="table-compare">
+            <thead><tr><th>Measure</th><th className="num">{a ? monthLabel(a) : "—"}</th><th className="num">{b ? monthLabel(b) : "—"}</th><th className="num">Change</th></tr></thead>
+            <tbody>{rows.map(([label, x, y, money]) => {
+              const d = x != null && y != null ? y - x : null;
+              return (
+                <tr key={label}>
+                  <td>{label}</td><td className="num" data-label="From">{show(x, money)}</td><td className="num" data-label="To">{show(y, money)}</td>
+                  <td className="num" data-label="Change">{d == null ? <span className="g-text-2">—</span> : d === 0 ? <span className="g-text-2">no change</span> : <span className={`g-move ${d > 0 ? "g-move--up" : "g-move--down"}`}>{d > 0 ? "▲" : "▼"} {money ? usd(Math.abs(d)) : fmtNum(Math.abs(d))}{x ? ` (${d > 0 ? "+" : "−"}${Math.abs(Math.round((d / x) * 100))}%)` : ""}</span>}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+          <p className="g-text-2 mt-2 text-[12px]">Search figures are monthly estimates going back two years; link figures go back one year, so a dash means that month is outside what is kept. Nothing is bought to compare.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function SeoExplorerPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
@@ -304,6 +350,7 @@ export default function SeoExplorerPage() {
             </Panel>
           </div>
 
+          <CompareMonths report={report} />
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <Panel title="Performance" hint="estimated, by month" testId="panel-performance" className="lg:col-span-2">
               {report.history && report.history.length > 1 ? (
