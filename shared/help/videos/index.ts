@@ -13,6 +13,7 @@ export { default as v_crm_migrate_assisted } from "./crm-migrate-assisted.json";
 export { default as v_crm_migrate } from "./crm-migrate.json";
 export { default as v_crm_payment_methods } from "./crm-payment-methods.json";
 export { default as v_crm_price_floor } from "./crm-price-floor.json";
+export { default as v_crm_project_budget } from "./crm-project-budget.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_scheduled_exports } from "./crm-scheduled-exports.json";
 export { default as v_database_directory } from "./database-directory.json";
