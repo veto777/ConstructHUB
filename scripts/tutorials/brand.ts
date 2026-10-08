@@ -17,13 +17,13 @@ import { chromium } from "playwright";
 import { ROOT } from "./lib";
 
 const ASSET = (p: string) => pathToFileURL(path.join(ROOT, p)).href;
-const FONT = ASSET("scripts/tutorials/assets/Anton-Regular.ttf");
-const LOGO = ASSET("client/public/chub-logo-trimmed.png");
-const GATOR = ASSET("client/public/mascot/gator-standing-1024.v1.webp");
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+export const FONT = ASSET("scripts/tutorials/assets/Anton-Regular.ttf");
+export const LOGO = ASSET("client/public/chub-logo-trimmed.png");
+export const GATOR = ASSET("client/public/mascot/gator-standing-1024.v1.webp");
+export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** Shared look: the blue field with faint rays, the heavy white type with a dark-blue edge, the white outline round the gator. */
-const BASE_CSS = `
+export const BASE_CSS = `
 @font-face{font-family:Anton;src:url("${FONT}") format("truetype");font-display:block}
 *{margin:0;box-sizing:border-box}
 body{width:1280px;height:720px;overflow:hidden;position:relative;font-family:Anton,Impact,"Arial Black",sans-serif;
@@ -46,20 +46,28 @@ for (const el of document.querySelectorAll("[data-fit]")) {
   while (size > 30 && (el.scrollWidth > maxW || el.offsetHeight > maxH)) { size -= 2; el.style.fontSize = size + "px"; }
 }`;
 
-/** Render one 1280×720-designed page at `width` pixels wide to a PNG or JPEG. */
-export async function renderStill(html: string, out: string, width = 1280): Promise<void> {
+/**
+ * Render one 1280×720-designed page at `width` pixels wide to a PNG or JPEG. The social cuts
+ * (social-brand.ts) design at their own size: `size` is then the page's size in real pixels, and
+ * `transparent` keeps the page's see-through parts see-through (PNG only).
+ */
+export async function renderStill(html: string, out: string, width = 1280, opts: { size?: { width: number; height: number }; transparent?: boolean } = {}): Promise<void> {
   const file = `${out}.html`;
   fs.writeFileSync(file, html);
   const browser = await chromium.launch({ headless: true, args: ["--force-color-profile=srgb", "--allow-file-access-from-files"] });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: width / 1280 });
+    const page = await browser.newPage(opts.size ? { viewport: opts.size, deviceScaleFactor: 1 } : { viewport: { width: 1280, height: 720 }, deviceScaleFactor: width / 1280 });
     await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
     await page.evaluate(() => (document as any).fonts.ready);
     if (!(await page.evaluate(() => (document as any).fonts.check('20px Anton')))) throw new Error("the Anton font did not load");
     await page.evaluate(FIT_JS);
     const bad = await page.evaluate(() => Array.from(document.images).filter((i) => !i.complete || i.naturalWidth === 0).map((i) => i.src));
     if (bad.length) throw new Error(`images did not load: ${bad.join(", ")}`);
-    await page.screenshot(out.endsWith(".jpg") ? { path: out, type: "jpeg", quality: 90 } : { path: out, type: "png" });
+    // On a busy box Chromium now and then answers "Unable to capture screenshot": the page is fine, ask again.
+    for (let attempt = 0; ; attempt++) {
+      try { await page.screenshot(out.endsWith(".jpg") ? { path: out, type: "jpeg", quality: 90 } : { path: out, type: "png", omitBackground: !!opts.transparent }); break; }
+      catch (e) { if (attempt >= 3) throw e; await page.waitForTimeout(700 * (attempt + 1)); }
+    }
   } finally { await browser.close(); fs.rmSync(file, { force: true }); }
 }
 
@@ -96,7 +104,7 @@ export const thumbVariant = (helpKey: string): number => {
 };
 
 /** Two or three lines: the accent word on a line of its own when there are three words or more. */
-function headlineLines(headline: string, accent?: string): string[] {
+export function headlineLines(headline: string, accent?: string): string[] {
   const words = headline.trim().split(/\s+/);
   const acc = accent?.toLowerCase();
   const i = acc ? words.findIndex((w) => w.toLowerCase() === acc) : -1;

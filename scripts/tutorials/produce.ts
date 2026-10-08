@@ -1,7 +1,9 @@
 /**
  * ONE COMMAND PER VIDEO — the production line (docs/tutorials/PRODUCER-GUIDE.md).
  *
- *   npx tsx scripts/tutorials/produce.ts <helpKey> [--slot N] [--no-upload] [--keep-raw] [--no-fixtures]
+ *   npx tsx scripts/tutorials/produce.ts <helpKey> [--slot N] [--no-upload] [--keep-raw] [--no-fixtures] [--social]
+ *
+ * --social also makes the phone cuts (social.ts → analysis/video-out/<helpKey>/social/) once the master has passed its check.
  *
  * fresh recording database `constructhub_tut_slot<N>` (a copy of the demo workspace, its dates moved
  * to today) → the app for that slot on port 8180+N (dev server; signed in as the demo owner; no
@@ -38,9 +40,9 @@ function tool(name: string, args: string[]): Promise<void> {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2), ["no-upload", "keep-raw", "no-fixtures"]);
+  const args = parseArgs(process.argv.slice(2), ["no-upload", "keep-raw", "no-fixtures", "social"]);
   const helpKey = args._[0];
-  if (!helpKey) throw new Error(`Usage: npx tsx scripts/tutorials/produce.ts <helpKey> [--slot 1-${SLOT_MAX}] [--no-upload] [--keep-raw] [--no-fixtures]`);
+  if (!helpKey) throw new Error(`Usage: npx tsx scripts/tutorials/produce.ts <helpKey> [--slot 1-${SLOT_MAX}] [--no-upload] [--keep-raw] [--no-fixtures] [--social]`);
   const slot = flagNum(args, "slot", 1);
   if (!isSlot(slot)) throw new Error(`--slot is 1 to ${SLOT_MAX}`);
   const fixtures = !args.flags["no-fixtures"];
@@ -90,6 +92,8 @@ async function main() {
       await stage("mux", () => tool("mux", [scriptFile, "--out", out]));
       if (script.thumbnail) await stage("thumbnail", () => tool("thumbnail", [scriptFile, "--out", out]));
       await stage("check", () => tool("check", [scriptFile, "--out", out]));
+      // The phone cuts are made from the checked master (and the target boxes record.ts just saved); they are not uploaded here.
+      if (args.flags.social) await stage("social cuts", () => tool("social", [helpKey, "--out", out]));
       if (!args.flags["no-upload"]) await stage("upload", () => tool("upload", [helpKey, "--out", out]));
       if (!args.flags["keep-raw"]) {
         // The capture and the per-step clips are scratch (the disk is nearly full); the voice clips stay in the shared cache.

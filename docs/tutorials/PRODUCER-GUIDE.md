@@ -424,6 +424,144 @@ that matters (YouTube prints the length there). Anton is bundled (`scripts/tutor
 OFL); nothing is fetched at render time. To try another layout: `thumbnail.ts <script> --variant 0-3`.
 The in-app poster stays a plain frame of the video (`poster.jpg`) — the thumbnail is for YouTube.
 
+## Social cuts
+
+The 16:9 master is right for YouTube and wrong for a phone feed. `scripts/tutorials/social.ts` re-frames
+a **finished** master — nothing is re-recorded, the voice engine is never called — into:
+
+| File (in `analysis/video-out/<helpKey>/social/`) | What | For |
+| --- | --- | --- |
+| `vertical.mp4` | 1080×1920, 30 fps, H.264 High + AAC 48 kHz stereo, **59 s at most**, −14 LUFS (true peak ≤ −1 dBTP) | Instagram Reels, YouTube Shorts, Threads, X |
+| `vertical-tiktok.mp4` | the same cut with the designed cover as its first half second (TikTok takes a moment of the video as its cover, not an image) | TikTok |
+| `feed.mp4` | 1080×1350 (4:5), 89 s at most — normally the whole walkthrough | LinkedIn, Facebook, the Instagram feed |
+| `cover-vertical.jpg`, `cover-feed.jpg` | the thumbnail's design restacked for a tall frame; headline, screenshot and gator inside the centre 4:5 | Instagram's cover image; a feed post's first image |
+| `social.json` | what was measured of every file + the post text per platform | `social-upload.ts`, `social-post.ts` |
+| `focus.json` | where the camera looked at each step, and how that was found | reading, when a cut looks wrong |
+
+```bash
+npx tsx scripts/tutorials/social.ts <helpKey>                       # finds the master in the known out-dirs
+npx tsx scripts/tutorials/social.ts <helpKey> --out-dir DIR         # …or in DIR/<helpKey>/ (repeatable); --out FOLDER names it exactly
+npx tsx scripts/tutorials/social.ts <helpKey> --only vertical       # one cut; --text-only rebuilds social.json's posts without encoding
+npx tsx scripts/tutorials/social.ts --all [--out-dir DIR]… [--force]  # BACKFILL: every finished master that has no up-to-date cuts
+npx tsx scripts/tutorials/produce.ts <helpKey> --slot N --no-upload --social   # a new video gets its cuts with the master
+```
+
+About 2½ minutes a cut on this box (every ffmpeg under the encode lock, niced, 4 threads). Then **look at
+them** — a dozen frames of each (`ffmpeg -ss N -i vertical.mp4 -frames:v 1 f.jpg`): UI text readable at
+phone size, the control being talked about in frame, captions inside their strip, only demo names.
+
+**What a cut is.** A branded band with the kicker and the hook headline (the script's `thumbnail.headline`);
+the recording full width underneath — a crop of about 1,000 of the master's 1,920 pixels that **follows the
+highlighted control**, easing from step to step; large word-by-word captions (Anton capitals, white with a
+dark edge, the word being said in the brand orange, two lines at most) in their own strip *under* the
+recording, so they never cover a control; a thin orange progress bar; the gator and the address at the
+bottom; a 2 s end card. The first second and a half is the headline, large, over the recording while the
+camera pushes in — not a still title card. No music.
+
+**Safe areas** (`SAFE_AREA` in `social-lib.ts`, tested): on the vertical cut nothing that must be read is in
+the top 14% (the platform's tabs), the bottom 22% (account name, caption, audio) or the right 16% of the
+caption strip (the like / comment / share column). The 4:5 cut has no overlay, only a margin.
+
+**Fitting 59 s** (`planCut`, tested). The pause after every line is tightened from 450 ms + the step's
+`holdMs` to 220 ms — cuts are only ever made in the silence between two lines, never inside a sentence, and
+a step whose action ran longer than its line (typing, a page loading) keeps the action. If that is not
+enough, picture and speech are sped up together by **8% at most**. If it still does not fit, the cut keeps
+the steps from the start up to the last that fits — stopping at a chapter boundary when one is in the last
+30% — and its end card reads "Full walkthrough on YouTube / constructhub.us/tutorials" instead of "More
+tutorials at …". The feed cut has 89 s and nearly always holds the whole walkthrough.
+
+**How the camera knows where to look.** `record.ts` now saves, for every step, the target's box, the moment
+its ring was taken away and the pointer's path (`timings.json` → `steps[].target`, `ringOffMs`, `cursor`).
+Masters recorded before that have none: `social.ts` then looks at the master four times a second and
+**finds the recorder's ring** — a hollow rectangle of the brand orange (the app's solid orange buttons and
+the selected menu item are told apart by being solid; a rectangle that stays put across three steps, such
+as a focused field's outline, is not the ring). Where no ring is found: a field being typed in is located
+by its own blue focus outline; a `highlight` with no ring is taken to be the selected menu item and gets
+the whole menu; anything else (a page that has just opened, `back`, `wait`) gets a wide shot of the page.
+After a click has landed the camera moves on to where the next step will point, so what the click opened
+is in frame. The first video (Database Directory, 1280×720, blue ring) is handled the same way and
+upscaled more — its text is softer than the others'.
+
+**The post text** (`social-text.ts` → `social.json` → `platforms`). Built from the same true material as the
+YouTube description: the hook headline, the producer's title, the help entry (what it is, what it does, how
+to use it), the area's facts and search phrases, the area's hashtags. Instagram gets 1,200–1,800 characters
+(hook, what it is, the numbered short version, three or four "why" lines, a search-phrase line, "Full
+tutorial: link in bio / constructhub.us/tutorials"); TikTok two lines and five hashtags; LinkedIn 900–1,400
+characters in a plainer voice with `https://constructhub.us/tutorials`; Facebook, X (≤ 270) and Threads
+(≤ 480) shorter ones. Every post is linted before it is written (`lintPost`): the platform's length limit,
+its hashtag count, the description's banned words (vendor names, "best", "guarantee", "included with",
+the CRM's host name), no price the help entry does not state, no address but constructhub.us, nothing that
+reads as a claim about real results. CRM posts say the CRM is a separate product with its own plans and
+that the screen is a demo workspace; the permit-directory post does not call real directory data a demo.
+**Instagram hashtags are five, not 8–12**: Instagram has capped a post at five since December 2025, and
+more are blocked or stripped (`PLATFORM_RULES.instagram.hashtags` is the one place to change it).
+
+## Posting to social
+
+Through **Blotato** (`https://backend.blotato.com/v2`, header `blotato-api-key`). The workspace is
+**shared with the owner's other brands**, so the poster is built to be unable to post anywhere else.
+
+```bash
+cd ~/ConstructHUB-<checkout of main>
+npx tsx scripts/tutorials/social-upload.ts <helpKey>…          # 1. the cuts → R2 (create-only), each checked at its public address
+S="npx tsx --env-file=/home/voiceban/ConstructHUB-live/.env scripts/tutorials/social-post.ts"
+$S [helpKey…]                                                  # 2. DRY RUN (default): accounts, times, files, every caption in full
+$S [helpKey…] --go                                             # 3. create the posts
+$S --reconcile                                                 # 4. a few minutes later, and daily: what became of each post
+git add docs/tutorials/social-schedule.json && git commit      #    the ledger is the record — commit it
+```
+
+- **Media.** Blotato needs nothing uploaded to it — "pass any publicly accessible URL in `mediaUrls`". The
+  cuts go to our own R2 as `tutorials/<helpKey>.social-<vertical|tiktok|feed|cover-vertical|cover-feed>.<hash8>.<ext>`
+  and are served by the media route already in production (`https://constructhub.us/api/tutorials/media/…`,
+  public, immutable, byte ranges) — no deploy needed. `social-upload.ts` never overwrites or deletes, asks
+  every public address for its first bytes (206, right length, right type) and writes `social/hosted.json`;
+  the poster refuses a file that changed since.
+- **Who may be posted to.** `TUTORIAL_BLOTATO_ACCOUNT_IDS` in the production `.env`, comma-separated — the
+  only accounts the tool will touch. Empty → it refuses to run. On top of that, every run: (1) the ids of the
+  other brands' accounts (and of our own YouTube channel, which is posted through YouTube's API) are on a
+  **built-in denylist** (`DENYLIST` in `social-post-lib.ts`) that no flag lifts — a typo in the env cannot
+  reach another brand's audience; (2) Blotato's own account list must contain each id; (3) its username or
+  full name must look like ConstructHUB (contain "construct" or "chub") unless you pass `--i-checked <id>`;
+  (4) one bad id stops the whole run. The tool only **creates** posts and reads; it never edits, reschedules
+  or deletes anything in the workspace (tested).
+- **Adding an account** (after the owner connects it at my.blotato.com → Accounts): run the dry run — it
+  prints nothing about other accounts, so list them once with
+  `curl -s -H "blotato-api-key: $TUTORIAL_BLOTATO_KEY" https://backend.blotato.com/v2/users/me/accounts`
+  (never paste the key anywhere), take the new account's `id`, append it to `TUTORIAL_BLOTATO_ACCOUNT_IDS`
+  in `/home/voiceban/ConstructHUB-live/.env`, and run the dry run again: it must list the account by name.
+  A **Facebook** account also needs its Page: `TUTORIAL_BLOTATO_PAGE_IDS=<accountId>:<pageId>` (page ids:
+  `GET /v2/users/me/accounts/<accountId>/subaccounts`); a **LinkedIn** account posts to the personal
+  profile unless a company page is given the same way. Today: 76607 Instagram `constructhubapp`, 38445
+  LinkedIn "Construct HUB" (a profile — no company page is connected to it), 63054 TikTok `construct.hub`.
+- **When.** By default a post follows its video on YouTube (`youtube-schedule.json`): the same Eastern day,
+  30–90 minutes after YouTube publishes it; LinkedIn only on weekdays 08:30–17:00 Eastern, otherwise
+  09:00–10:59 the next weekday. The minute is a hash of the video and the account — the same every time.
+  Blotato does the timing (`scheduledTime`, an instant beside `post`); nothing of ours runs at post time.
+  `--spread M` ignores YouTube's times: per account the first post goes out now and each next one M minutes
+  (plus up to a third of M) later, accounts starting a few minutes apart.
+- **A gentle start.** New accounts are flagged easily: an account gets **one post a day for its first 14
+  days** (`--warmup-start YYYY-MM-DD` or `TUTORIAL_SOCIAL_START`; default: the day of the first post in the
+  ledger; `--warmup-days N`), then three a day like YouTube. What does not fit a day moves to the next.
+  `--per-day N` sets the share outright. `--platform instagram,tiktok` / `--account 76607` start one network
+  at a time.
+- **TikTok** is sent with every field it requires, set to what is true: public, comments / duets / stitches
+  on, not a paid partnership, `isYourBrand: true` (it promotes our own product) and `isAiGenerated: true`
+  (the narration is a synthetic voice). Its cover is the video's frame at 200 ms — the designed cover, which
+  is the first half second of `vertical-tiktok.mp4`. Instagram gets `cover-vertical.jpg` as `coverImageUrl`,
+  as a Reel shared to the feed. LinkedIn takes no cover: its first frame is the hook.
+- **Never twice.** The ledger, `docs/tutorials/social-schedule.json`, holds one entry per video and account.
+  It is written **before** each request (`sending`) and again after the answer, so an interrupted run cannot
+  repeat a post: an entry whose answer never came stays `sending`, is never sent again by the tool, and
+  `--reconcile` shouts about it — look in Blotato. Only a failure Blotato itself reported can be retried
+  (`--retry-failed`).
+- **Rate.** Blotato allows 30 post creations a minute; the tool makes one every six seconds, waits out a
+  429 for as long as it says, and reads statuses a second apart.
+- Blotato's limits and fields were read from its documentation on 2026-10-08 (`help.blotato.com/api/start`,
+  the API reference and "Media Requirements"); they are quoted in the headers of `social-post-lib.ts` and
+  `social-text.ts`. Not verified by a real post yet: that Instagram honours `coverImageUrl` and that LinkedIn
+  accepts a 4:5 video through Blotato (its page lists 16:9, 9:16 and 1:1; LinkedIn itself takes 4:5).
+
 ## Pitfalls already hit (and what the tools now do about them)
 
 - **The CRM only renders on its own host name.** Browse `http://portal.constructhub.us:<port>`; the

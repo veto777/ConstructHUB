@@ -190,7 +190,18 @@ export type NarrationClip = { index: number; text: string; file: string; duratio
 export type NarrationIndex = { helpKey: string; persona: string; sampleRate: number; clips: NarrationClip[] };
 
 /** timings.json — where each step sits in raw.mkv (all times in ms since the recorder's clock started). */
-export type StepTiming = { index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number };
+export type StepTiming = {
+  index: number; action: string; caption: string; startMs: number; narrationStartMs: number; narrationMs: number; endMs: number;
+  /**
+   * Since the social cuts (social.ts): what the step pointed at — the ringed element's box in CSS px
+   * (× zoom = video pixels) where it came to rest, or null for a step without a target; when its ring
+   * was taken away (a click drops it), on the recorder's clock; and the pointer's path as [ms, x, y].
+   * Absent in recordings made before that: social.ts then finds the ring in the frames.
+   */
+  target?: { x: number; y: number; width: number; height: number } | null;
+  ringOffMs?: number | null;
+  cursor?: [number, number, number][];
+};
 export type Timings = {
   helpKey: string; viewport: { width: number; height: number }; base: string; recordedAt: string;
   /** Device scale factor, and the capture's size in pixels (viewport × zoom). */
