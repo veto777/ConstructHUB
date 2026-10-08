@@ -1,0 +1,160 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-costing",
+  "title": "Post costs to a project",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the job",
+      "narration": "The Costing tab tracks what a job costs you. Here is how to post to it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Ellison\") a",
+      "caption": "Open the project",
+      "narration": "Open the job from the Pipeline. We'll use the Ellison job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-gross-profit\"]",
+      "caption": "No costs yet",
+      "narration": "No costs are posted yet, so there is no profit figure."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"form-cost-entry\"]",
+      "caption": "Entry row",
+      "chapter": "A purchase order",
+      "narration": "On the Costing tab, the entry row adds a line to the job."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-kind\"]",
+      "value": "Committed — PO / subcontract",
+      "caption": "Committed",
+      "narration": "In Entry, choose Committed for a purchase order or a subcontract.",
+      "holdMs": 1200
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-code\"]",
+      "value": "09-300 · Flooring",
+      "caption": "Cost code",
+      "narration": "Pick the cost code. This one is Flooring.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-desc\"]",
+      "value": "Plank order",
+      "caption": "Description",
+      "narration": "Name the vendor or the order.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-amount\"]",
+      "value": "2400",
+      "caption": "Amount",
+      "narration": "Type the amount.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-cost\"]",
+      "caption": "Add",
+      "narration": "Click the plus button.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"cost-line-09-300\"]",
+      "caption": "Committed line",
+      "narration": "The Flooring line now shows the order under Committed."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-cost-kind\"]",
+      "value": "Actual — vendor bill",
+      "caption": "Vendor bill",
+      "chapter": "A vendor bill",
+      "narration": "When a bill arrives, choose Actual, vendor bill.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-desc\"]",
+      "value": "Underlayment and trim",
+      "caption": "Description",
+      "narration": "Say what the bill is for.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-cost-amount\"]",
+      "value": "380",
+      "caption": "Amount",
+      "narration": "Type what it cost.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-cost\"]",
+      "caption": "Add",
+      "narration": "And click the plus button again.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"cost-line-09-300\"]",
+      "caption": "Actual line",
+      "narration": "The bill is under Actual on the same line."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-gross-profit\"]",
+      "caption": "Gross profit",
+      "chapter": "Profit",
+      "narration": "Now the page shows gross profit and the margin."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to post job costs to a project | ConstructHUB CRM",
+    "description": "A short walkthrough of the Costing tab in the ConstructHUB CRM. You will add a purchase order as a commitment, post a vendor bill as an actual cost, and see gross profit and margin appear on the project.",
+    "tags": [
+      "job costing",
+      "construction job costs",
+      "purchase orders",
+      "gross profit",
+      "contractor accounting",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Track every job cost",
+    "accent": "cost",
+    "kicker": "CRM Tutorial",
+    "step": 9
+  }
+}

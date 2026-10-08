@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-new",
+  "title": "Start a project for a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open the client",
+      "narration": "A client can have more than one job. Here is how to start a new project for one."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Brewster",
+      "caption": "Search",
+      "narration": "Find the client. We'll search for Brewster.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"]:has-text(\"Imani Brewster\") a",
+      "caption": "Open the client",
+      "narration": "Open Imani Brewster.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"project-demo-project-p-1998\"]",
+      "caption": "Projects",
+      "chapter": "Create the project",
+      "narration": "The Projects section lists the jobs she already has."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-new-project\"]",
+      "caption": "New project",
+      "narration": "Choose New project.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-project-name\"]",
+      "value": "Brewster — primary bath floor tile",
+      "caption": "Project name",
+      "narration": "Type a name for the job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-project\"]",
+      "caption": "Create project",
+      "narration": "Choose Create project.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"project-\"]:has-text(\"primary bath\")",
+      "caption": "On the client's page",
+      "narration": "The new project is on her page, with its own number. It starts as a lead."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Pipeline",
+      "chapter": "On the pipeline",
+      "narration": "It has a card on the Pipeline too. Open Pipeline in the menu.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"primary bath\")",
+      "caption": "The card",
+      "narration": "Here it is, in the Lead column."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"primary bath\") a",
+      "caption": "Open the project",
+      "narration": "Click its name to open the project page.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "h1:has-text(\"primary bath\")",
+      "caption": "Project page",
+      "narration": "From here you run the job."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find your clients under Clients, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to start a new project for a client | ConstructHUB CRM",
+    "description": "A short walkthrough of starting a project in the ConstructHUB CRM. You will open a client, choose New project, name the job, and find it on the client's page and on the Pipeline board.",
+    "tags": [
+      "new project",
+      "construction project management",
+      "job tracking",
+      "client management",
+      "sales pipeline",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Start a new job",
+    "accent": "job",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

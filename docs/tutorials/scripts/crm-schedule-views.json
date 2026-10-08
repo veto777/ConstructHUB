@@ -18,7 +18,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"event-demo-appt-05\"]",
+      "selector": "[data-testid=\"event-demo-appt-14\"]",
       "caption": "Month view",
       "narration": "It opens on Month. Every visit sits on its day."
     },
@@ -26,24 +26,27 @@
       "action": "click",
       "selector": "[data-testid=\"button-cal-next\"]",
       "caption": "Next month",
-      "narration": "The arrows move one month forward or back."
+      "narration": "The arrows move one month forward or back.",
+      "holdMs": 1200
     },
     {
       "action": "click",
       "selector": "[data-testid=\"button-cal-today\"]",
       "caption": "Today",
-      "narration": "Today brings you back to this month."
+      "narration": "Today brings you back to this month.",
+      "holdMs": 1200
     },
     {
       "action": "click",
       "selector": "[data-testid=\"button-view-week\"]",
       "caption": "Week",
       "chapter": "Week",
-      "narration": "Choose Week to see seven days side by side."
+      "narration": "Choose Week to see seven days side by side.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"event-demo-appt-05\"]",
+      "selector": "[data-testid=\"event-demo-appt-14\"]",
       "caption": "A visit in the week",
       "narration": "Each visit shows its start time and its title."
     },
@@ -51,24 +54,27 @@
       "action": "click",
       "selector": "[data-testid=\"button-cal-next\"]",
       "caption": "Next week",
-      "narration": "Here the arrows move a week at a time."
+      "narration": "Here the arrows move a week at a time.",
+      "holdMs": 2500
     },
     {
       "action": "click",
       "selector": "[data-testid=\"button-cal-today\"]",
       "caption": "Today",
-      "narration": "And Today comes back to this week."
+      "narration": "And Today comes back to this week.",
+      "holdMs": 1200
     },
     {
       "action": "click",
       "selector": "[data-testid=\"button-view-agenda\"]",
       "caption": "Agenda",
       "chapter": "Agenda",
-      "narration": "Choose Agenda for a list of what is coming, day by day."
+      "narration": "Choose Agenda for a list of what is coming, day by day.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"appt-demo-appt-08\"]",
+      "selector": "[data-testid=\"appt-demo-appt-13\"]",
       "caption": "A visit in the list",
       "narration": "Each visit shows its time, its project and the crew."
     },
@@ -76,7 +82,8 @@
       "action": "click",
       "selector": "[data-testid=\"button-days-30\"]",
       "caption": "7d, 14d, 30d",
-      "narration": "These buttons set how far ahead the list looks: 7, 14 or 30 days."
+      "narration": "These buttons set how far ahead the list looks: 7, 14 or 30 days.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",
@@ -90,7 +97,8 @@
       "selector": "[data-testid=\"select-calendar-scope\"]",
       "value": "Marco Delgado",
       "caption": "Marco Delgado",
-      "narration": "Pick a name to see one person's visits. We'll choose Marco Delgado."
+      "narration": "Pick a name to see one person's visits. We'll choose Marco Delgado.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",
@@ -102,7 +110,8 @@
       "action": "click",
       "selector": "[data-testid=\"button-view-month\"]",
       "caption": "Back to Month",
-      "narration": "The same choice applies in Month and Week."
+      "narration": "The same choice applies in Month and Week.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",

@@ -1,0 +1,130 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-share",
+  "title": "Show a photo to your client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "chapter": "What the client sees",
+      "narration": "Your client only sees the job photos you choose. Here is how to show one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-client-visible-demo-photo-05\"]",
+      "caption": "Green eye",
+      "narration": "A green eye marks a shot the client can see."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Team only",
+      "narration": "A shot without the eye is for your team only."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Open the shot",
+      "chapter": "Show a photo",
+      "narration": "Open the shot.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-client-visible\"]",
+      "caption": "Hidden",
+      "narration": "It says Hidden from client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-client-visible\"]",
+      "caption": "Switch on",
+      "narration": "Click the switch.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-client-visible\"]",
+      "caption": "Visible",
+      "narration": "Now it says Visible to client. It shows in their portal."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-close\"]",
+      "caption": "Close",
+      "narration": "Close the shot.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Eye on the tile",
+      "narration": "Its tile now carries the green eye."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-05\"]",
+      "caption": "Open a visible shot",
+      "chapter": "Hide a photo",
+      "narration": "To hide a shot again, open it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-client-visible\"]",
+      "caption": "Switch off",
+      "narration": "And click the same switch.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-close\"]",
+      "caption": "Close",
+      "narration": "Close it.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-05\"]",
+      "caption": "Hidden again",
+      "narration": "The eye is gone. Only your team sees this shot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Menu: JobCam",
+      "narration": "You'll find JobCam in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to show a job photo to your client | ConstructHUB CRM",
+    "description": "A short walkthrough of the Visible to client switch in JobCam, in the ConstructHUB CRM. You will open a job-site shot, show it to the client, and hide another one again.",
+    "tags": [
+      "job site photos",
+      "share photos with clients",
+      "client portal",
+      "construction photo app",
+      "JobCam",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Show clients the work",
+    "accent": "clients",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}

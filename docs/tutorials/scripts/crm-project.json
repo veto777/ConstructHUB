@@ -1,0 +1,135 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project",
+  "title": "Read a project page",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open a project",
+      "narration": "Every job has its own project page. Here is how to read one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Kane\")",
+      "caption": "The card",
+      "narration": "Find the job on the Pipeline board."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Kane\") a",
+      "caption": "Open the project",
+      "narration": "Click its name to open the project.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "h1:has-text(\"Kane\")",
+      "caption": "Name, number, stage",
+      "narration": "At the top are the job's name, its number and its stage."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Revised contract",
+      "caption": "Revised contract",
+      "chapter": "The money",
+      "narration": "Revised contract is the contract with the change orders in it."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Budget",
+      "caption": "Budget",
+      "narration": "Budget is what you plan to spend."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Committed",
+      "caption": "Committed",
+      "narration": "Committed is the purchase orders and subcontracts you have placed."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Actual cost",
+      "caption": "Actual cost",
+      "narration": "Actual cost is the bills and labor posted so far."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-gross-profit\"]",
+      "caption": "Gross profit",
+      "narration": "Gross profit is the revised contract minus the actual cost. The margin is beside it."
+    },
+    {
+      "action": "highlight",
+      "selector": "role=tablist",
+      "caption": "Tabs",
+      "chapter": "The tabs",
+      "narration": "Below, each tab is one part of the job."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Punch list\"]",
+      "caption": "Punch list",
+      "narration": "Punch list is what is left to finish.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Daily logs\"]",
+      "caption": "Daily logs",
+      "narration": "Daily logs record each day's work.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"JobCam\"]",
+      "caption": "JobCam",
+      "narration": "JobCam holds the photos from this job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "a[href=\"/crm/pipeline\"] button:has-text(\"Pipeline\")",
+      "caption": "Back to the board",
+      "narration": "Pipeline, at the top of the page, takes you back to the board.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "You'll find Pipeline in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to read a project page | ConstructHUB CRM",
+    "description": "A short walkthrough of a project page in the ConstructHUB CRM. You will open a job from the Pipeline and read its revised contract, budget, committed and actual cost, gross profit and margin, then look at the tabs under them.",
+    "tags": [
+      "job costing",
+      "construction project management",
+      "gross profit",
+      "project tracking",
+      "contractor job tracking",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Know your job profit",
+    "accent": "profit",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}
