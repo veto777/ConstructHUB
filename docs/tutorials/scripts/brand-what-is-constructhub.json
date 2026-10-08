@@ -8,6 +8,10 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
   "steps": [
     {
       "action": "card",
@@ -22,10 +26,14 @@
       "narration": "Five apps to run one job? Stop."
     },
     {
-      "action": "goto",
-      "url": "/",
-      "caption": "The dashboard",
-      "narration": "Leads in one app. Estimates in another. Photos on a phone. Permits, who knows where."
+      "action": "card",
+      "card": {
+        "kicker": "Photos on a phone · permits, who knows where",
+        "headline": "Leads here. Estimates there.",
+        "accent": "Estimates there."
+      },
+      "caption": "The mess",
+      "narration": "Leads here. Estimates there. Permits, who knows where."
     },
     {
       "action": "card",
@@ -58,37 +66,23 @@
     },
     {
       "action": "goto",
-      "url": "/databases",
+      "url": "/databases?q=Houston",
       "chapter": "Business tools",
       "caption": "Permit office directory",
       "narration": "Can your CRM find the permit office? This can."
-    },
-    {
-      "action": "type",
-      "selector": "[data-testid=\"input-database-search\"]",
-      "value": "Houston",
-      "caption": "Type a city",
-      "narration": "Type a city."
-    },
-    {
-      "action": "wait-for",
-      "text": "Showing 1",
-      "timeoutMs": 20000,
-      "caption": "The list",
-      "narration": "Houston, Texas."
     },
     {
       "action": "highlight",
       "selector": "[data-testid=\"list-databases\"] [data-testid^=\"status-portal-\"]:has-text(\"Verified portal\")",
       "punch": 1.25,
       "caption": "Verified portal",
-      "narration": "A checked link to the office's own portal. No guessed addresses."
+      "narration": "Type a city. Get a checked link to the office's own portal. No guessed addresses."
     },
     {
-      "action": "goto",
-      "url": "/property",
-      "caption": "Property records",
-      "narration": "County property records? Same deal."
+      "action": "highlight",
+      "selector": "[data-testid=\"list-databases\"] a:has-text(\"Property lookup\")",
+      "caption": "Property lookup",
+      "narration": "County property records? One click away."
     },
     {
       "action": "goto",
@@ -115,12 +109,6 @@
       "selector": "text=/Approved by Nora Hadley/",
       "caption": "Signed online",
       "narration": "Your client signs online."
-    },
-    {
-      "action": "goto",
-      "url": "/crm/schedule",
-      "caption": "Schedule",
-      "narration": "Put it on the schedule."
     },
     {
       "action": "goto",
@@ -177,7 +165,7 @@
   "thumbnail": {
     "headline": "Five apps? Stop.",
     "accent": "Stop.",
-    "kicker": "Start here",
+    "kicker": "What is ConstructHUB?",
     "step": 0
   }
 }

@@ -212,6 +212,8 @@ function overlay() {
 
 /** The stylesheet behind a script's `redactSelectors`: unreadable from the first paint, on every page of the recording. */
 export const redactCss = (selectors: readonly string[]): string => `${selectors.join(",")}{filter:blur(9px)!important;user-select:none!important}`;
+/** …and the one behind `hideSelectors`: not drawn, its space kept. */
+export const hideCss = (selectors: readonly string[]): string => `${selectors.join(",")}{visibility:hidden!important}`;
 /** Runs in every document before any of its own scripts: the rule is in place before the app can draw the element. */
 function redactFromLoad(css: string) {
   const add = () => { if (document.getElementById("__tut-redact") || !document.documentElement) return !!document.getElementById("__tut-redact"); const s = document.createElement("style"); s.id = "__tut-redact"; s.textContent = css; document.documentElement.appendChild(s); return true; };
@@ -436,6 +438,19 @@ export class Player {
       await this.ring(null);
       await page.goto(hostFor(step.url!, base), { waitUntil: "domcontentloaded" });
       await settle(page);
+      // "Open the page AT this": with a selector, the page is scrolled there at once — and the recorder
+      // films nothing of the page until it is (see `play` in main), so what is above it is never on camera.
+      if (step.selector) {
+        const at = page.locator(fill(step.selector)).first();
+        await at.waitFor({ state: "attached", timeout: 20_000 });
+        await at.evaluate((el, offset) => {
+          let host: Element | null = el.parentElement;
+          while (host && !(/(auto|scroll)/.test(getComputedStyle(host).overflowY) && host.scrollHeight > host.clientHeight + 4)) host = host.parentElement;
+          const top = el.getBoundingClientRect().top - (host ? host.getBoundingClientRect().top : 0) - offset;
+          (host ?? document.scrollingElement ?? document.documentElement).scrollBy({ top, behavior: "instant" as ScrollBehavior });
+        }, step.offset ?? 84);
+        await sleep(350);
+      }
       return;
     }
     if (step.action === "wait") return;
@@ -711,7 +726,8 @@ async function main() {
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
     await context.addInitScript(overlay);
     // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
-    if (script.redactSelectors?.length) await context.addInitScript(redactFromLoad, redactCss(script.redactSelectors));
+    if (script.redactSelectors?.length || script.hideSelectors?.length)
+      await context.addInitScript(redactFromLoad, (script.redactSelectors?.length ? redactCss(script.redactSelectors) : "") + (script.hideSelectors?.length ? hideCss(script.hideSelectors) : ""));
     await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
     // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
     // sees") opens it in this one instead; the script comes back with a `back` step.
@@ -840,6 +856,8 @@ async function main() {
     }
     // Leaving a page that has only just appeared (Back straight after the click that opened it): let it be seen first.
     if ((step.action === "back" || step.action === "goto") && !dry) await sleep(dwellLeft(session.shownAtMs, now()));
+    // A goto that arrives AT something: nothing is filmed from the moment it leaves until the page is scrolled there.
+    if (step.action === "goto" && step.selector) return hold(() => session.player.play(step, session.base), 60_000);
     return session.player.play(step, session.base);
   }
 

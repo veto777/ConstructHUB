@@ -8,6 +8,10 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
   "steps": [
     {
       "action": "card",
@@ -25,6 +29,7 @@
     {
       "action": "card",
       "card": {
+        "kicker": "List price · billed monthly · October 2026",
         "headline": "5 seats. $94.",
         "accent": "$94",
         "columns": [
@@ -48,6 +53,7 @@
     {
       "action": "card",
       "card": {
+        "kicker": "List price · billed monthly · October 2026",
         "headline": "Same seats. About half.",
         "accent": "About half",
         "columns": [
@@ -92,19 +98,7 @@
       "action": "goto",
       "url": "/crm/estimates/demo-estimate-e-1998",
       "caption": "Estimates",
-      "narration": "Estimates from your price book."
-    },
-    {
-      "action": "highlight",
-      "selector": "text=/Approved by Nora Hadley/",
-      "caption": "Signed online",
-      "narration": "Your client signs online."
-    },
-    {
-      "action": "goto",
-      "url": "/crm/schedule",
-      "caption": "Schedule",
-      "narration": "A schedule for the whole crew."
+      "narration": "Estimates your client signs online."
     },
     {
       "action": "goto",

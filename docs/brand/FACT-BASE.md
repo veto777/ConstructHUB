@@ -230,6 +230,30 @@ firms. JobNimbus, AccuLynx, ServiceTitan — pricing not public (S). Buildertren
 403). BrightLocal from $41/mo, Local Falcon from $24.99/mo, NiceJob from $75/month (all S); Podium and
 Birdeye — pricing not public (S). None of their pages fetched mentions a permit-office directory.
 
+### 3b-2. Re-read on 2026-10-08, 04:08–04:12 UTC — directly, for the comparison films
+
+The three CRM competitors' pricing pages were read again **without a summariser** and their text saved in
+`docs/brand/sources/2026-10-08/` (with the hash of each page as received): Housecall Pro and Leap with
+`curl`; Jobber, whose page refuses `curl`, in a headless browser. Every figure on a card in the
+`brand-vs-…` films is in those files. What changed against the table above:
+
+- **Housecall Pro and Leap: the same figures**, now all (D). Housecall Pro's page also showed
+  introductory offers ("$26 /mo for 1 month"; Max "$99 /mo for 3 months") — the films use list prices
+  and say "intro offers not shown".
+- **Jobber is now (D), and its page prices by team size.** "Just me": Core $49/mo ($29 billed
+  annually), Connect $139 ($99), Grow $199 ($149). "2-5 people": **Connect "Includes 5 users" $199/mo**
+  ($149), Grow $299 ($229), Plus $499 ($399) — Core is not offered for a team. "6-10 people": Connect
+  $299, Grow $399, Plus $599, each "Includes 10 users". The "1-year commitment" middle price in the
+  table above was not on the page as rendered. Add-ons listed: Marketing Suite $99/mo, Receptionist
+  $29/mo, **Sales Pipeline $49/mo**.
+- **A new provable pair:** five people, list price billed monthly — Jobber Connect $199 against CRM
+  Essentials $94 (five seats). For one user the prices stay close ($49 against $39; the same on annual
+  billing). The film says both. This is not "cheaper than Jobber".
+- **A new provable contrast:** Jobber lists its sales pipeline as a $49/mo add-on; a pipeline board is
+  in every ConstructHUB CRM plan. The two are not the same feature set — say "different features".
+- **"Permit" appears on none of the three pricing pages.** That is the wording the films use ("it
+  isn't on their pricing page") — a statement about a page on a day, never about what a product can do.
+
 ### 3c. What the research means (the honest picture)
 
 1. **SEO.** Ahrefs and Semrush are far larger, dedicated SEO suites with their own crawlers and data.

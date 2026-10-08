@@ -8,6 +8,10 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
   "steps": [
     {
       "action": "card",
@@ -50,21 +54,17 @@
     {
       "action": "goto",
       "url": "/crm/schedule",
-      "chapter": "Schedule and photos",
       "caption": "Schedule",
       "narration": "The visit goes on the schedule."
     },
     {
       "action": "goto",
-      "url": "/crm/clients",
-      "caption": "Clients",
-      "narration": "Everything about the job"
-    },
-    {
-      "action": "click",
-      "selector": "[data-testid^=\"client-\"] a:has-text(\"Caleb & Nora Hadley\")",
-      "caption": "Caleb & Nora Hadley",
-      "narration": "sits on the client's page."
+      "url": "/crm/clients/b5ac6e7a-ce39-50b1-a39e-5b326d166d80",
+      "selector": "[data-testid=\"section-customer-jobcam\"]",
+      "offset": 96,
+      "chapter": "Schedule and photos",
+      "caption": "The client's page",
+      "narration": "Everything about the job sits on the client's page."
     },
     {
       "action": "highlight",
@@ -75,7 +75,6 @@
     {
       "action": "click",
       "selector": "[data-testid=\"button-convert-demo-estimate-e-1998\"]",
-      "chapter": "Invoice and payment",
       "caption": "Create invoice",
       "narration": "Work done? One click turns the estimate into an invoice."
     },
@@ -94,6 +93,7 @@
         "invoice": "INV-2003"
       },
       "holdMs": 600,
+      "chapter": "Invoice and payment",
       "caption": "The client's side",
       "narration": "Now your client's side. They open the invoice,"
     },
@@ -169,6 +169,6 @@
     "headline": "Lead to paid",
     "accent": "paid",
     "kicker": "CRM in 90 seconds",
-    "step": 17
+    "step": 16
   }
 }

@@ -88,18 +88,18 @@ pairs are real places. Use these names exactly — narration and selectors (`:ha
 | State | Client (exact display name) | City | What they have |
 | --- | --- | --- | --- |
 | FL | Joe & Mary Kane | Sarasota | P-2001 In Progress · E-2001 approved · INV-2002 sent · JobCam photos · messages |
-| FL | Dana Whitfield | Osprey | P-2002 Lead |
-| FL | Luis Orozco | Bradenton | P-2003 Estimating · E-2002 viewed · the one unanswered message |
+| FL | Dana Whitfield | Osprey | P-2002 Lead · **E-1996 declined** (her only estimate: she is the one client under Clients → Declined) |
+| FL | Luis Orozco | Bradenton | P-2003 Estimating · E-2002 viewed, with **Good / Better / Best options** (Better recommended) · the one unanswered message |
 | FL | The Mercer Group (company) | Sarasota | P-2004 Proposal Sent · pending ACH deposit |
-| FL | Greta Ellison | Venice | P-2005 Scheduled · deposit by check · messages |
+| FL | Greta Ellison | Venice | P-2005 Scheduled · deposit by check · messages · a measurement report (fixtures) |
 | FL | Tom & Priya Bauer | Sarasota | P-2006 Waiting on Trades · failed card payment |
 | FL | Lan Nguyen | Bradenton | P-2007 Punch List · cash payment |
 | FL | Vince Castellano | Venice | P-2008 Paid · INV-2001 paid |
-| NY | Rosa & Stefan Ferrante | Brooklyn | P-1993 Lead · visit in 3 days · message thread (answered) |
-| NY | Tunde Oyelaran | Albany | P-1994 Approved · E-1997 approved (8% tax) · deposit by check · visit tomorrow |
-| NY | Hannah Lindqvist | Buffalo | P-1995 Invoiced · INV-1999 sent (8.75% tax) |
+| NY | Rosa & Stefan Ferrante | Brooklyn | P-1993 Lead · **follow-up due today** (weekly rhythm; Home → Needs attention, and Follow-ups) · visit in 3 days · message thread (answered) |
+| NY | Tunde Oyelaran | Albany | P-1994 Approved · E-1997 approved (8% tax) · deposit by check · visit tomorrow · a measurement report (fixtures) |
+| NY | Hannah Lindqvist | Buffalo | P-1995 Invoiced · INV-1999 sent (8.75% tax) · **four JobCam photos** (two visible to the client, one starred) |
 | NY | Wrenhaven Dental Studio (company) | White Plains | P-1996 Estimating |
-| TX | Caleb & Nora Hadley | Austin | P-1997 Scheduled · E-1998 approved (8.25% tax) · deposit by check · visit in 2 days · message thread (answered) |
+| TX | Caleb & Nora Hadley | Austin | P-1997 Scheduled · E-1998 approved (8.25% tax) · deposit by check · visit in 2 days · message thread (answered) · **four JobCam photos and a 4 s clip** · a measurement report (fixtures) |
 | TX | Imani Brewster | Dallas | P-1998 Estimating · E-1999 draft (8.25% tax) |
 | TX | Rafael Quintanilla | Houston | P-1999 Complete · INV-2000 partial (8.25% tax), half paid by check |
 | TX | Halvorsen-Quist Properties (company) | San Antonio | P-2000 Proposal Sent · E-2000 sent (8.25% tax) · visit in 5 days · one read message |
@@ -111,6 +111,26 @@ Properties, Joe & Mary Kane, Wrenhaven Dental Studio. The New York and Texas doc
 below the Florida ones, so the next document made on camera is still E-2003, INV-2003 or P-2009.
 With sixteen clients a short search can match more than one of them — type enough letters, and
 look at the frame.
+
+**Added on 2026-10-08 (three reseeds of the template, 03:29, 03:50 and 04:05 UTC — a copy made before
+them has the older data).**
+
+- **JobCam is on three jobs, one per state**: Kane (FL, six shots, `demo-photo-01`…`06`), Hadley (TX,
+  `demo-photo-07`…`10` and the clip `demo-photo-11`) and Lindqvist (NY, `demo-photo-12`…`15`). The
+  pictures are the drawn job-site scenes of `scripts/tutorials/assets/photos` (no more brown "Demo
+  photo N" cards); the Recent feed still opens on the six Kane tiles. Each working copy makes its own
+  files under `tmp/jobcam` the first time its seed runs — a tile that is still a brown card means
+  that copy has not merged this seed.
+- **Divisions** (Settings → Divisions): Aspire Interiors — Florida (Sarasota, headquarters), — New
+  York (Albany) and — Texas (Austin), each with an invented "Demo …" street line, a suite and a
+  `DEMO-<state>-1001` licence. The New York and Texas jobs run under their division, so their
+  estimates and invoices carry that division's letterhead. **No sales-tax rate is set on any
+  division or on the company** (see "Sales tax" below).
+- **Quick Bid** works on the three clients with a measurement report (Ellison, Oyelaran, Hadley —
+  the HOVER fixture's jobs, so only with fixtures on): the price book has two items priced per square
+  foot of wall, `PT-EXT-SF` "Exterior repaint, per sq ft of wall" and `PT-WASH-SF` "Exterior wash and
+  prep, per sq ft of wall".
+- **Follow-ups, the Declined tab and Good / Better / Best** each have one row to show: see the table.
 
 **The jobs, by state** — every one has a working project page (`/crm/projects/<id>`), a JobCam page
 and a card on the pipeline. Use the name or the number in narration and in `:has-text("…")`.
@@ -157,7 +177,8 @@ by the database and differ in every template build. The New York and Texas rows 
 
 - **Everything else keeps its readable id**, unchanged: `demo-estimate-e-1997`…`e-2000`,
   `demo-invoice-inv-1999`, `demo-invoice-inv-2000`, `demo-appt-01`…`16`, `demo-msg-01`…`11`,
-  `demo-pay-01`…`07`, `demo-member-priya`, `demo-member-owen`, `demo-tag-1`…`4`, `demo-photo-01`…`06`.
+  `demo-pay-01`…`07`, `demo-member-priya`, `demo-member-owen`, `demo-tag-1`…`4`, `demo-photo-01`…`15`,
+  `demo-estimate-e-1996`.
   No page checks the shape of those (the page walk below opens every one), and scripts already
   select them (`invoice-demo-invoice-inv-2000`, `appointment-demo-appt-04`).
 
@@ -237,7 +258,12 @@ was made (tools, voices, vendors); anything typed that looks like a secret (use 
 
 **Pointing.** `highlight` for "look here", `hover` for links, `click`, `type` (replaces the field;
 date and time fields take `2026-10-09` / `13:30`), `select` (native and custom lists, by visible
-name), `back`, `goto`, `wait` — and `upload`, `drag`, `session`, `fixture`, `wait-for` (next section).
+name), `back`, `goto`, `wait`, `scroll-to` (bring a card of a long page under the header: `selector`,
+`offset` — instead of a `#:~:text=` address, which leaves a purple highlight on the heading) — and
+`upload`, `drag`, `session`, `fixture`, `wait-for` (next section). A `click` whose page asks "are you
+sure?" with the browser's own box takes `"dialog": "accept"` (without it the recorder answers Cancel;
+the box itself is never on camera — say what it asked). A `highlight` or `hover` may `"punch": 1.3` —
+the page pushes in on the target for that step.
 The ring is the brand orange everywhere. Use `{{DATE}}`, `{{DATE+1}}`
 for dates — the demo data moves with the calendar, so never name a weekday or a date in narration.
 
@@ -255,6 +281,24 @@ selectors (`text=Outstanding balance`) only where there is no test id.
 - `thumbnail.headline`: 2–5 punchy words, true to the video; `accent`: the one word on the orange
   pill; `step`: a `highlight`/`type`/`hover` step whose ring marks the key element (a `click` loses
   its ring).
+
+**Secrets that appear by themselves** — a key shown right after "Create", a join link, an embed code
+with the host in it — are blurred **from page load** with the script's own list, before the element
+first paints: `"redactSelectors": ["[data-testid=\"text-new-api-key\"] code"]` (plain CSS selectors).
+A step's `"redact": true` only blurs once that step reaches its target; use both when a later step
+points at the secret (`crm-api-keys.json`).
+
+**What a typed value may be** (the test reads the VALUE, not the selector's name): demo text; an email
+only at `example.com`; a phone only `555-01xx`; nothing shaped like a key or a token; a password field
+takes a `{{PLACEHOLDER}}`, and every placeholder is `"redact": true`. A key's *name*, a search and a
+demo address are typed as they are — no xpath detours.
+
+**Under load.** A click or a choice waits (up to 3.5 s) until what it asked the server for is back, so
+steps no longer need a blanket `holdMs: 1200`; keep `holdMs` for what the viewer needs time to read.
+A page that a click opened whole stays on screen at least 1.6 s before a `back` or a `goto` leaves it.
+A refused screenshot is asked for again. `produce.ts` keeps the capture until mux and check have
+passed and tries each of them once more; if it still fails, fix the cause and finish with
+`npx tsx scripts/tutorials/produce.ts $K --from-raw [--no-upload]` — no second recording.
 
 ## Uploads, drags, a second person, connected accounts
 
@@ -305,6 +349,19 @@ new one. Merge `video-fixtures` into your branch when your current video is done
   and replace each with the uuid from "Demo data" (or a `:has-text` selector) before you re-record.
 - **After any change of yours to the seeds** — `check-demo.ts <slot>` ("Demo data").
 
+## Cards (overview films only)
+
+`{ "action": "card", "card": { … } }` draws a full-screen brand card over the page for that step
+(`scripts/tutorials/card.ts`; nothing of it ships in the app): `kicker`, `headline` + `accent` (the
+words on the orange pill), then either `stat` (`value`, `label` — a whole figure counts up) or exactly
+two `columns` (them, then us with `"us": true`: `title`, `value`, `unit`, up to four `lines`), a
+`footnote`, and `"mascot": true` for the gator. Everything that matters sits in the middle column, so
+the phone cuts show the whole card. **A number on a card is a claim**: a card that shows a price is
+refused without a footnote that says whose list price it is and the year; a film that names a price
+lists where it was read in `youtube.sources` (label, url, date) and the companies it names in
+`youtube.names` — both go into the description (SOURCES, the trademark line). A column's price never
+counts up. Tutorials do not use cards and never say or show a price.
+
 ## Overview films ("Start here")
 
 The films that say what ConstructHUB is are not tutorials: their facts and scripts live in
@@ -312,10 +369,20 @@ The films that say what ConstructHUB is are not tutorials: their facts and scrip
 `shared/help/entries/start-here/` (keys start `brand-`; the group leads `/tutorials`, in the order
 `START_HERE_ORDER` in `shared/help/registry.ts` gives). They are made on the same line. Two things
 differ: a tour may cross both apps — a `goto` opens a `/crm…` path on the CRM host and any other path
-on the main host, whatever the base. Their scripts find the demo clients and jobs by name, never by
-id. The Hadley job (Austin, TX) carries three demo photos for these
-films. Nothing in a brand film names a competitor or states a competitor's price without the owner's
+on the main host, whatever the base. Their scripts find the demo clients and jobs by name; the one id they use is a fixed
+demo uuid from "Ids" above (the tour opens the Hadleys' page AT its JobCam block: a `goto` with a
+`selector` arrives already scrolled there, and nothing above it — the money totals — is ever filmed).
+A film carries no Google logo: its script lists the side menu's three under `hideSelectors`. A film
+that opens on its own hook card gets a 0.8 s title card and a 2.5 s end card instead of 1.8 s and 4 s. Nothing in a brand film names a competitor or states a competitor's price without the owner's
 sign-off recorded in `VIDEO-SCRIPTS.md`.
+
+**They are held.** Every film's help entry carries `youtube: { hold: true }`: `youtube-schedule.ts` and
+`social-post.ts` never plan it and list it as "held for owner approval" until the owner releases it
+(`--release <key>` on the run that posts it). The named comparisons (`brand-vs-…`) are also
+`unlisted: true` — not in the app at all — and their manifests wait in `docs/brand/held-manifests/`;
+"Releasing a held film" in `VIDEO-SCRIPTS.md` is the checklist (re-read every price first). Their
+descriptions come from the `brand` variant of the builder: what ConstructHUB is, the two products,
+links, sources, chapters, what the film says, how to start — no keyword bank, no length target.
 
 ## Publishing to YouTube
 
@@ -348,6 +415,7 @@ npx tsx scripts/tutorials/youtube-schedule.ts --print-description crm-schedule  
 npx tsx scripts/tutorials/youtube-schedule.ts --update-descriptions                 # DRY: new text for what is already up
 $S --update-descriptions --go                   # send it (title, description, tags only)
 npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutorials/youtube-calendar.md
+npx tsx scripts/tutorials/youtube-schedule.ts --lint-all    # REPORT: every script in every worktree — rules, short descriptions
 ```
 
 - **Title, description and tags are built at upload time** by `server/youtube/description.ts` — a
@@ -369,8 +437,14 @@ npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutoria
   rebuilds the text of videos that are **already** posted or scheduled — dry by default (length and
   first 200 characters each; `--save DIR` writes them out to read), `--go` sends them
   (`videos.update`, `part=snippet`: nothing about the video, its schedule or its status changes) and
-  records the text, its length and its sha256 in the ledger. The lint that every script in the repo
-  (and in the sibling worktrees) yields a valid description is `server/youtube/description.test.ts`.
+  records the text, its length and its sha256 in the ledger. `server/youtube/description.test.ts` lints the scripts
+  committed in the checkout it runs in, and nothing else (no sibling worktree, no `analysis/` output —
+  the same result on every machine). The lint over **every** worktree on the box, unfinished scripts in
+  other people's folders included, is a report: `youtube-schedule.ts --lint-all` (exit 2 only when a
+  rule is broken). **A description that cannot reach 4,300 characters from its own material is not an
+  error and is never padded**: it is sent as it is, `--lint-all` and the dry run flag it
+  ("! key: its description is N characters …"), and the cure is more true text in the help entry or
+  the script. (The builder first adds the rest of the related tutorials, up to eight.)
 - **When.** After a batch of videos has been merged to `main` and deployed (so the in-app page the
   description links to shows the video): dry run, read the table, `--go`, `--calendar`, commit the
   ledger and the calendar. `--reconcile` once a day while videos are going out — it exits 2 and
@@ -401,6 +475,13 @@ npx tsx scripts/tutorials/youtube-schedule.ts --calendar    # write docs/tutoria
 - **Quota.** One run uploads at most `--max` videos (default 30; the project allows about 100
   uploads a day and customers' own uploads share that). When YouTube says the day's limit is used up
   the run stops cleanly; run it again after midnight Pacific.
+- **A re-recorded in-app video** (its manifest in `shared/help/videos` no longer names the file that
+  was uploaded) is reported by every dry run: `!!!! key: master changed since upload — run --replace
+  key` while the old cut is still scheduled (it would go public at its time), `! key: …` once the old
+  cut is public. `--replace` refuses any file that is not the merged master. A video that is not in the
+  ledger — held, or simply not scheduled yet — needs nothing: its first upload takes the new master.
+- **Held videos** (`youtube: { hold: true }` on the help entry — the overview films) are listed as
+  `⏸ key: held for owner approval` and never planned; `--release key` plans them for that run.
 - **A new cut of a posted video** is reported ("the mp4 … is NOT the file that was uploaded") and not
   re-uploaded. `--replace <helpKey>` uploads the new file into the same slot (or the next free one if
   the old one is already public) and prints the old video id: **delete that one by hand in YouTube

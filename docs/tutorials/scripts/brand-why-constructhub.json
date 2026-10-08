@@ -8,6 +8,10 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
   "steps": [
     {
       "action": "card",

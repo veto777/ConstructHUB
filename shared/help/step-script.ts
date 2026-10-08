@@ -102,7 +102,10 @@ export const tutorialStepSchema = z.object({
   state: z.enum(["visible", "hidden"]).optional(),
   /** wait-for: how long to wait, in ms (default 15000). */
   timeoutMs: z.number().int().min(100).max(120_000).optional(),
-  /** scroll-to: how far under the top of the window the target comes to rest, in CSS px (default 84: clear of the app's header). */
+  /**
+   * scroll-to: how far under the top of the window the target comes to rest, in CSS px (default 84: clear of the app's header).
+   * Also for a `goto` that has a `selector`: the page opens already scrolled to that element, and nothing above it is ever filmed.
+   */
   offset: z.number().int().min(0).max(400).optional(),
   /** card: what the card says. */
   card: tutorialCardSchema.optional(),
@@ -126,7 +129,7 @@ export const tutorialStepSchema = z.object({
   if (s.action === "card" && !s.card) ctx.addIssue({ code: "custom", message: "card needs card", path: ["card"] });
   if (s.action === "card" && s.selector) ctx.addIssue({ code: "custom", message: "a card has no selector", path: ["selector"] });
   if (s.card !== undefined && s.action !== "card") ctx.addIssue({ code: "custom", message: "card is only for card", path: ["card"] });
-  if (s.offset !== undefined && s.action !== "scroll-to") ctx.addIssue({ code: "custom", message: "offset is only for scroll-to", path: ["offset"] });
+  if (s.offset !== undefined && !(s.action === "scroll-to" || (s.action === "goto" && s.selector))) ctx.addIssue({ code: "custom", message: "offset is only for scroll-to, or a goto that arrives at a selector", path: ["offset"] });
   if (s.dialog !== undefined && s.action !== "click") ctx.addIssue({ code: "custom", message: "dialog is only for click", path: ["dialog"] });
   if (s.punch !== undefined && !["highlight", "hover"].includes(s.action)) ctx.addIssue({ code: "custom", message: "punch is only for highlight / hover", path: ["punch"] });
   // A field that belongs to another action is a typo, not a hint: refuse it.
@@ -162,6 +165,13 @@ export const tutorialScriptSchema = z.object({
    * A step's own `redact: true` still blurs its target when the step reaches it.
    */
   redactSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
+  /**
+   * Taken out of the picture (their space is kept) on every page of the recording, from page load: a
+   * mark that may not appear in a film — the overview films carry no Google logo, and the app's own
+   * side menu draws three. Presentation only, like the assistant bubble the recorder already hides;
+   * never a way to hide what a feature really shows. Plain CSS selectors.
+   */
+  hideSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
   /** What the YouTube upload says (youtube.json is generated from this and the measured timings). */
   youtube: z.object({
     /** Task first: "How to create and send an estimate | ConstructHUB CRM". */

@@ -1,0 +1,25 @@
+{
+  "helpKey": "brand-tour-crm",
+  "durationSec": 86,
+  "video": {
+    "key": "tutorials/brand-tour-crm.838e2c25.mp4",
+    "bytes": 8620645,
+    "sha256": "838e2c257a8654be93e5a5192f2bc140d16f71fd1cb6cd838525e62f21cdd809"
+  },
+  "captions": {
+    "key": "tutorials/brand-tour-crm.2a14b961.vtt",
+    "bytes": 1915,
+    "sha256": "2a14b96133fd5ed3043e34ef46a575eefa3989db8f708d0154d00e464a91dba3"
+  },
+  "poster": {
+    "key": "tutorials/brand-tour-crm.3acf5752.jpg",
+    "bytes": 60011,
+    "sha256": "3acf57522c469da73cb070d0d3cef917ed28865cf3090ae1405bc9acf1f89d10"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:51:45.656Z",
+    "video": "a89d953007445708aad1b75d1c02006c",
+    "captions": "31092f3bc0f1730e7fed3cecc66e4bff",
+    "poster": "a4c1026108715237d1a00d5f561ab033"
+  }
+}

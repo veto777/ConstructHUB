@@ -586,6 +586,16 @@
         "maxLength": 200
       },
       "description": "Plain CSS selectors blurred from page load, on every page of the recording, before the element first paints."
+    },
+    "hideSelectors": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "description": "Plain CSS selectors made invisible (space kept) on every page from page load — a mark that may not appear in a film."
     }
   }
 }

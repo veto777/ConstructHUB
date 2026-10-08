@@ -1,0 +1,25 @@
+{
+  "helpKey": "brand-vs-leap",
+  "durationSec": 55,
+  "video": {
+    "key": "tutorials/brand-vs-leap.c3c4811c.mp4",
+    "bytes": 8394296,
+    "sha256": "c3c4811cc13c84478c7860eca34d38c35b8aa3ee24a18be9690e28dc1c74d73e"
+  },
+  "captions": {
+    "key": "tutorials/brand-vs-leap.d99bf0d5.vtt",
+    "bytes": 1440,
+    "sha256": "d99bf0d519ef0067e9c91076e081559d3ca227fd36d63bab578d237ad5eb7c38"
+  },
+  "poster": {
+    "key": "tutorials/brand-vs-leap.c5a9750f.jpg",
+    "bytes": 80941,
+    "sha256": "c5a9750fc0d503aa8ab7f3003fd5607aae48d85bfb5d8445fd6b0640eddffe26"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:48:08.612Z",
+    "video": "8e37c7e2b6f7a867c28705dd6025a6bb",
+    "captions": "3ae7f00e4b2ca0ea3652c40e103dd140",
+    "poster": "dcaf5480ca1fed5b7fea513a9c154056"
+  }
+}

@@ -8,6 +8,10 @@
   },
   "zoom": 1.875,
   "narrator": "janice",
+  "hideSelectors": [
+    "[data-testid^=\"link-nav-group-google\"] svg:not(.lucide)",
+    "[data-testid=\"link-nav-google-reviews\"] svg:not(.lucide)"
+  ],
   "steps": [
     {
       "action": "card",
@@ -67,7 +71,7 @@
     {
       "action": "card",
       "card": {
-        "kicker": "List price · October 2026",
+        "kicker": "List price · billed monthly · October 2026",
         "headline": "Five people?",
         "accent": "Five",
         "columns": [
@@ -91,6 +95,7 @@
     {
       "action": "card",
       "card": {
+        "kicker": "Their pricing page · October 2026",
         "headline": "The pipeline?",
         "accent": "pipeline",
         "columns": [

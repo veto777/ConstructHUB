@@ -18,6 +18,9 @@ npx tsx scripts/tutorials/produce.ts <helpKey> --slot N --no-upload   # ~4 min; 
 npx tsx scripts/tutorials/upload.ts <helpKey>                          # the inspected files → R2, then the manifest
 ```
 
+`produce.ts <helpKey> --from-raw` finishes a capture that is already in the out folder (mux → thumbnail
+→ check) without recording again: the capture is kept until those have passed.
+
 `produce.ts` runs: fresh recording database `constructhub_tut_slot<N>` → the app for that slot on
 port 8180+N → warm-up → `narrate.ts` → `record.ts` → `mux.ts` → `thumbnail.ts` → `check.ts` →
 (`upload.ts`, unless `--no-upload`) → app stopped by its listening pid → database dropped → raw
@@ -150,7 +153,10 @@ e2e suite lives in `e2e/`).
   `click` · `type` · `select` · `press` · `scroll` · `wait` · `back` · `upload` (demo files from
   `scripts/tutorials/assets/`) · `drag` (pointer drag; the carried card is drawn) · `session` (another
   person's browser: the homeowner, or a team member really signed in) · `fixture` (a fixture helper of
-  the slot app) · `wait-for` (text / selector, with a timeout) — `PRODUCER-GUIDE.md` has the table. `selector` is a Playwright selector
+  the slot app) · `wait-for` (text / selector, with a timeout) · `scroll-to` (bring a card of a long page under the
+  header) · `card` (a full-screen brand card, overview films only) — `PRODUCER-GUIDE.md` has the table.
+  A click may answer the page's own confirm box (`dialog`), a highlight may push in on its target
+  (`punch`), and a script's `redactSelectors` are blurred from page load, before they first paint. `selector` is a Playwright selector
   (`[data-testid="…"]`, `role=button[name="…"]`, `label:has-text("…") input`, `text=…`).
   `narration` is what the voice says, and it is also the captions track (`captions.vtt`);
   `caption` is the step's short label (the recorder's log and `timings.json`; it is not drawn on
@@ -305,7 +311,13 @@ Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse w
 | `youtube` | `title` (≤ 70), `description`, `tags` (≤ 12), `playlist`, `category`. |
 | `thumbnail` | `headline` (2–5 words), `accent`, `kicker`, `step`. |
 | `narrator` | Persona id; `"janice"` by default. |
-| `steps[].action` | `goto` · `highlight` · `hover` · `click` · `type` · `select` · `press` · `scroll` · `wait` · `back` · `upload` · `drag` · `session` · `fixture` · `wait-for`. |
+| `redactSelectors` | Plain CSS selectors blurred on every page of the recording from page load (a key shown right after "Create"). |
+| `steps[].action` | `goto` · `highlight` · `hover` · `click` · `type` · `select` · `press` · `scroll` · `wait` · `back` · `upload` · `drag` · `session` · `fixture` · `wait-for` · `scroll-to` · `card`. |
+| `steps[].offset` | `scroll-to`: px under the top of the window where the target comes to rest (default 84). |
+| `steps[].card` | `card`: `kicker`, `headline`, `accent`, `stat` or two `columns`, `footnote`, `mascot` (`scripts/tutorials/card.ts`). A card that shows a price needs a dated footnote. |
+| `steps[].dialog` | `click`: `accept` / `dismiss` the page's own `window.confirm`. |
+| `steps[].punch` | `highlight` / `hover`: push in on the target (1.1–1.8) for that step. |
+| `youtube.sources`, `youtube.names` | Overview films: where another company's figures were read (label, url, date), and the companies named — printed in the description. |
 | `steps[].files` | `upload`: demo files under `scripts/tutorials/assets/` (`photos/site-02.jpg`). |
 | `steps[].to` | `drag`: the selector to drop on. |
 | `steps[].session` | `session`: `owner`, `client` or `member:<Display Name>`; opens at `url`, or at the address a `fixture` hands over. |

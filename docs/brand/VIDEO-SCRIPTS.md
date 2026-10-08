@@ -1,26 +1,30 @@
 # ConstructHUB — flagship video scripts
 
-_Written 2026-10-08. Every sentence traces to `docs/brand/FACT-BASE.md` (tags like [D2], [1c], [3b]
+_Written 2026-10-08; sections 1, 2, 4 and 5a–5c rewritten the same day in the owner's "more aggressive, and catchy" voice and generated from the recorded step scripts (`docs/tutorials/scripts/brand-*.json`), so the narration printed here is the narration recorded. Every sentence traces to `docs/brand/FACT-BASE.md` (tags like [D2], [1c], [3b]
 point at its sections). House rules: plain contractor language, no hype, no price spoken aloud, no
 "best / #1 / only / all-in-one / guaranteed", the CRM is never "included", the SEO data provider is
 never named, Google is never a "partner", and only the demo workspace is ever on screen for the CRM._
 
 | # | Key | Status |
 | --- | --- | --- |
-| 1 | `brand-what-is-constructhub` | **Step script ready; one full take made 2026-10-08 (78 s) and inspected, NOT uploaded** — it showed one flaw (the ring missed "Verified portal" because the list was still loading) and ran 3 s long; both are fixed in the script, which now needs one more take. `docs/tutorials/scripts/brand-what-is-constructhub.json` |
-| 2 | `brand-tour-crm` | **Step script ready, every step played in dry runs, NOT yet recorded** — recording stopped when the merge of `video-fixtures` conflicted (see the hand-off note in the session report). `docs/tutorials/scripts/brand-tour-crm.json` |
+| 1 | `brand-what-is-constructhub` | **Recorded, 61 s, uploaded, held** — bold rewrite 2026-10-08 |
+| 2 | `brand-tour-crm` | **Recorded, 86 s, uploaded, held** — one Texas job from lead to a client paying online (stand-in checkout) |
 | 3 | `brand-tour-business-tools` | Script only — waits until the Business tools upgrades are finished (owner) |
-| 4 | `brand-why-constructhub` | Script only — safe to record without a lawyer (no names, no prices spoken); not recorded in this pass |
-| 5a | `brand-vs-jobber` | Script + fact table — **NEEDS OWNER SIGN-OFF BEFORE RECORDING OR PUBLISHING** |
-| 5b | `brand-vs-housecall-pro` | Script + fact table — **NEEDS OWNER SIGN-OFF BEFORE RECORDING OR PUBLISHING** |
-| 5c | `brand-vs-leap` | Script + fact table — **NEEDS OWNER SIGN-OFF BEFORE RECORDING OR PUBLISHING** |
+| 4 | `brand-why-constructhub` | **Recorded, 45 s, uploaded, held** |
+| 5a | `brand-vs-jobber` | **Recorded, 50 s, uploaded, held and unlisted** — release after the owner re-checks the prices |
+| 5b | `brand-vs-housecall-pro` | **Recorded, 51 s, uploaded, held and unlisted** — release after the owner re-checks the prices |
+| 5c | `brand-vs-leap` | **Recorded, 55 s, uploaded, held and unlisted** — release after the owner re-checks the prices |
 | 5d | `brand-vs-ahrefs-semrush` | Script + fact table — **NEEDS OWNER SIGN-OFF**, and waits for the SEO upgrades |
 
 ---
 
 ## Owner approval sheet — one screen per competitor
 
-Tick a claim to approve it; strike it to drop it. Nothing below is recorded until this is signed.
+**Superseded for Jobber, Housecall Pro and Leap by the owner's instruction of 2026-10-08** (record them,
+hold them, the owner releases them): the claims those three films actually make, with today's direct
+re-read of each pricing page, are in each film's "Claims used" table in section 5. The sheet below is
+kept as the first research pass; Ahrefs / Semrush still waits. Tick a claim to approve it; strike it to
+drop it.
 Every price is the competitor's own page on **2026-10-08** and must be re-read on the day of
 publishing. (D) = read from the page text directly; (S) = read through a summarising fetch, so a
 person must look at the page before it is used.
@@ -77,102 +81,91 @@ not make a JobCam-vs-CompanyCam video** — on the facts it is their win.
 
 ---
 
-## 1. `brand-what-is-constructhub` — "What is ConstructHUB?" (channel trailer · one more take needed)
+## 1. `brand-what-is-constructhub` — "What is ConstructHUB? Find the permit office. Run the whole job."
 
-Problem → two products → Business tools (permit directory, property records) → the CRM montage → how
-to start. No competitor names, no prices. Platform scenes are real pages with the real directory
-(Houston, TX and its verified portal are as the directory holds them); CRM scenes are the demo
-workspace.
+**Recorded 2026-10-08 on slot 6, 61 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-what-is-constructhub.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
-| 1 | **[The problem]** The dashboard (`goto`) | Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online. |
-| 2 | Two products (`highlight`) | ConstructHUB is two products: Business tools, and a CRM. |
-| 3 | **[Business tools]** Database Directory (`goto`) | Business tools start with a directory of county and city permit offices. |
-| 4 | Search a city (`type`) | Type a city or a county. |
-| 5 | Verified portal (`highlight`) | A checked link opens the office's own permit portal. No guessed addresses. |
-| 6 | Property Records (`goto`) | County property records offices are listed the same way. |
-| 7 | Every feature (`goto`) | The same product looks after your Google listing, your reviews and your website. |
-| 8 | **[The CRM]** The CRM: pipeline (`goto`) | The second product is the CRM. Every job is a card, from lead to paid. |
-| 9 | One job (`highlight`) | Open a job, and its estimate, schedule and invoices are together. |
-| 10 | A signed estimate (`goto`) | Send an estimate from your price book. |
-| 11 | Approved online (`highlight`) | Your client approves it online. |
-| 12 | Schedule (`goto`) | Put the visit |
-| 13 | On the calendar (`highlight`) | on the schedule. |
-| 14 | JobCam (`goto`) | File job-site photos to the job |
-| 15 | JobCam feed (`highlight`) | with JobCam. |
-| 16 | Invoices (`goto`) | Then send the invoice, |
-| 17 | Paid (`highlight`) | and record the payment. |
-| 18 | **[How to start]** How to start (`goto`) | Buy one or both. Each has its own plans, at ConstructHUB dot U S. |
+| 1 | **[The problem]** CARD — Sound familiar?: **Five apps to run one job?** | Five apps to run one job? Stop. |
+| 2 | CARD — Photos on a phone · permits, who knows where: **Leads here. Estimates there.** | Leads here. Estimates there. Permits, who knows where. |
+| 3 | CARD — **Two products. One company.** · Business tools; Permit office directory; County property records; Your Google listing & reviews vs ConstructHUB CRM; Leads & pipeline; Estimates signed online; Schedule · invoices · JobCam · _Two separate products, each with its own plans. JobCam: top CRM plan, or an add-on — constructhub.us/pricing_ | ConstructHUB is two products. Business tools find the work. The CRM runs it. |
+| 4 | **[Business tools]** Permit office directory (`goto` /databases?q=Houston) | Can your CRM find the permit office? This can. |
+| 5 | Verified portal (`highlight`) | Type a city. Get a checked link to the office's own portal. No guessed addresses. |
+| 6 | Property lookup (`highlight`) | County property records? One click away. |
+| 7 | **[The CRM]** The CRM (`goto` /crm/pipeline) | Now run the job. Every job is a card, from lead to paid. |
+| 8 | One job (`highlight`) | One job. One card. |
+| 9 | The estimate (`goto` /crm/estimates/demo-estimate-e-1998) | Send the estimate. |
+| 10 | Signed online (`highlight`) | Your client signs online. |
+| 11 | JobCam (`goto` /crm/jobcam) | Shoot the job with JobCam. |
+| 12 | Invoices (`goto` /crm/invoices) | Send the invoice. Get paid. |
+| 13 | **[How to start]** CARD — Each has its own plans: **Buy one. Or both.** · _constructhub.us/pricing_ | Buy one, or both. Each has its own plans. |
+| 14 | CARD — constructhub.us: **Run the whole job.** · _Business tools and the CRM are separate products, each with its own plans._ | ConstructHUB. Run the whole job. |
 
-**Full narration.** Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online. ConstructHUB is two products: Business tools, and a CRM. Business tools start with a directory of county and city permit offices. Type a city or a county. A checked link opens the office's own permit portal. No guessed addresses. County property records offices are listed the same way. The same product looks after your Google listing, your reviews and your website. The second product is the CRM. Every job is a card, from lead to paid. Open a job, and its estimate, schedule and invoices are together. Send an estimate from your price book. Your client approves it online. Put the visit on the schedule. File job-site photos to the job with JobCam. Then send the invoice, and record the payment. Buy one or both. Each has its own plans, at ConstructHUB dot U S.
+**Final narration.** Five apps to run one job? Stop. Leads here. Estimates there. Permits, who knows where. ConstructHUB is two products. Business tools find the work. The CRM runs it. Can your CRM find the permit office? This can. Type a city. Get a checked link to the office's own portal. No guessed addresses. County property records? One click away. Now run the job. Every job is a card, from lead to paid. One job. One card. Send the estimate. Your client signs online. Shoot the job with JobCam. Send the invoice. Get paid. Buy one, or both. Each has its own plans. ConstructHUB. Run the whole job.
 
-Fact base: "two products" [D5]; permit directory and checked links [D1][D2]; property records [1b];
-Google listing, reviews, website [1b] — said, not shown, because those pages need a connected Google
-account; CRM beats [1c]; "its own plans" [D5].
+**Claims used.**
 
-- **Title options (≤ 70):** "What is ConstructHUB? Business tools and a CRM for contractors" ·
-  "ConstructHUB in one minute: permits, your Google listing and a CRM" · "What ConstructHUB does for
-  contractors"
-- **Thumbnail headline:** WHAT IS CONSTRUCTHUB? (kicker "Start here")
-- **59-second vertical cut:** 0–6 s hook, text on screen "Five apps to run one job?" over the
-  dashboard; 6–12 s "ConstructHUB is two products"; 12–28 s permit directory: type a city, the Verified
-  portal badge, crop to the result card; 28–34 s property records; 34–52 s CRM in four cuts (pipeline
-  card, "Approved by…" banner, calendar, paid invoice), one caption each; 52–59 s "Buy one or both —
-  constructhub.us". Crop each shot to the content column (the sidebar is dropped in 9:16).
-- **Pinned comment:** "ConstructHUB is two products you can buy separately: Business tools (permit
-  office directory, property records, Google listing and review tools) and the CRM (estimates,
-  schedule, invoices, job photos). Plans and what each includes: https://constructhub.us/pricing —
-  the permit directory is free to browse: https://constructhub.us/databases"
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Five apps to run one job? Stop." | A question, not a count of anyone's apps. | — |
+| "ConstructHUB is two products. Business tools find the work. The CRM runs it." | Two products sold separately [D5]; the help entry's own wording for Business tools. | `shared/plans.ts`, `shared/crm-plans.ts:4-7` |
+| "Can your CRM find the permit office? This can." | The directory is in the product [D1]. **Swap:** the owner's line "Your CRM can't find the permit office. Ours can." states something about every viewer's CRM that nobody can prove — it is asked as a question. | /databases, on screen |
+| "Type a city. Get a checked link to the office's own portal. No guessed addresses." | Checked links, labeled when unconfirmed, a web search when there is none [D2]. Houston, TX shows "Verified portal" on screen. | `CLAUDE.md` hard rule; the row as the directory holds it on the day |
+| "County property records? Same deal." | Property Records directory with checked links [1b]. | /property, on screen |
+| "Every job is a card, from lead to paid." · "Send the estimate. Your client signs online." · "Shoot the job with JobCam." · "Send the invoice. Get paid." | The CRM as built [1c]; approval is a typed name, and the page itself calls the approved estimate a signed contract. JobCam: top plan or add-on — on the card's footnote. | demo workspace, on screen |
+| "Buy one, or both. Each has its own plans." | [D5] | `shared/crm-plans.ts:4-7` |
 
-## 2. `brand-tour-crm` — "ConstructHUB CRM in 2 minutes" (script ready · not yet recorded)
+- **Title:** What is ConstructHUB? Find the permit office. Run the whole job. · **Thumbnail / cover headline:** FIVE APPS? STOP. (kicker "What is ConstructHUB?")
+- **Files:** master `tutorials/brand-what-is-constructhub.55b67f5f.mp4` · captions `tutorials/brand-what-is-constructhub.ea3ef8f3.vtt` · poster `tutorials/brand-what-is-constructhub.465c6b56.jpg` · social cuts (vertical 57.6 s, 4:5 feed 57.6 s, TikTok file, two covers): `tutorials/brand-what-is-constructhub.social-cover-feed.4271ff1f.jpg`, `tutorials/brand-what-is-constructhub.social-cover-vertical.743daef1.jpg`, `tutorials/brand-what-is-constructhub.social-feed.218f25a8.mp4`, `tutorials/brand-what-is-constructhub.social-tiktok.28bb16b2.mp4`, `tutorials/brand-what-is-constructhub.social-vertical.5283e3bc.mp4` · production folder `analysis/video-out/brand-what-is-constructhub/` on vb11 (git-ignored)
+- **Honest weaknesses:** 61 s, one second over the 45–60 s a phone cut likes (its vertical cut is 57.6 s at ×1.08 speed and keeps every step). The narrator is the calm tutorial voice — the punch comes from the copy and the cards, not the delivery. The push-in on the directory crops the side menu mid-word. The gator stands still on the cards (no reaction animation). The YouTube thumbnail lays the headline over a crop of a card and reads busy.
 
-One fictional job, the Hadleys' floor in Austin, Texas (demo client "Caleb & Nora Hadley", project
-P-1997, estimate E-1998): lead → estimate → signature → schedule → job photos → invoice → paid. The
-invoice is created and the check recorded on camera; the rest is the seeded job.
+---
+
+## 2. `brand-tour-crm` — "ConstructHUB CRM in 90 seconds: one job from lead to paid"
+
+**Recorded 2026-10-08 on slot 6, 86 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-tour-crm.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
-| 1 | **[A lead comes in]** Pipeline (`goto`) | Here is one job in the ConstructHUB CRM, from the first call to the final payment. |
-| 2 | Leads (`highlight`) | Every job starts as a lead on the pipeline. |
-| 3 | The Hadley job (`highlight`) | This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled. |
-| 4 | Clients (`goto`) | Every client has a page. |
-| 5 | Caleb & Nora Hadley (`click`) | Open the Hadleys, and the whole job is in one place. |
-| 6 | Quick actions (`highlight`) | Quick actions start the next step: a visit, an estimate, a payment. |
-| 7 | **[Estimate and signature]** The estimate (`highlight`) | The estimate went out by email. You can see when they opened it, and when they approved. |
-| 8 | Estimate lines (`goto`) | Each line came from the price book, with its quantity and its price. |
-| 9 | Signed (`highlight`) | Nora approved it online by typing her name. Now it is a signed contract. |
-| 10 | **[Schedule and job photos]** Schedule (`goto`) | Next, the visit goes on the schedule. |
-| 11 | The visit (`click`) | Open it for the time, the client, and who is going. |
-| 12 | Close (`press`) | The crew sees it on their own calendar. |
-| 13 | Back to the client (`goto`) | On site, the crew shoots photos with JobCam. |
-| 14 | Caleb & Nora Hadley (`click`) | Back on the Hadleys' page, |
-| 15 | JobCam (`highlight`) | each shot is filed to this client's job. |
-| 16 | **[Invoice and payment]** Create invoice (`click`) | When the work is done, choose Create invoice on the approved estimate. |
-| 17 | The invoice (`highlight`) | The invoice is made from the estimate, ready to send. |
-| 18 | Record payment (`click`) | When the check arrives, choose Record payment. |
-| 19 | Record it (`click`) | Check the amount, and record it. |
-| 20 | Paid (`highlight`) | The invoice is marked paid, and the client gets a receipt by email. |
-| 21 | Home (`goto`) | Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. |
-| 22 | Where to start (`highlight`) | The CRM is its own product, with its own plans. See them at ConstructHUB dot U S. |
+| 1 | **[A lead comes in]** CARD — ConstructHUB CRM: **Lead to paid.** | One job. Lead to paid. Watch. |
+| 2 | Pipeline (`goto` /crm/pipeline) | Every job starts as a lead. |
+| 3 | The Hadley job (`highlight`) | This one: the Hadleys' new floor, in Austin, Texas. |
+| 4 | **[Estimate, signed]** The estimate (`goto` /crm/estimates/demo-estimate-e-1998) | The estimate comes straight out of your price book. |
+| 5 | Signed online (`highlight`) | Nora approved it online. Typed her name. Signed. |
+| 6 | Schedule (`goto` /crm/schedule) | The visit goes on the schedule. |
+| 7 | **[Schedule and photos]** The client's page (`goto` /crm/clients/b5ac6e7a-ce39-50b1-a39e-5b326d166d80) | Everything about the job sits on the client's page. |
+| 8 | JobCam (`highlight`) | Photos and video from the site, filed with JobCam. |
+| 9 | Create invoice (`click`) | Work done? One click turns the estimate into an invoice. |
+| 10 | Send (`click`) | Send it. |
+| 11 | **[Invoice and payment]** The client's side (`session`) | Now your client's side. They open the invoice, |
+| 12 | Pay (`click`) | and pay online. |
+| 13 | Secure checkout (`highlight`) | A secure checkout. In this demo it's a stand-in. No real payment. |
+| 14 | Card (`click`) | Card, or bank account. |
+| 15 | Pay (`click`) | Paid. |
+| 16 | Back in the CRM (`session` /crm/invoices) | Back in your CRM, |
+| 17 | Marked paid (`highlight`) | the invoice is marked paid. Nothing to chase. |
+| 18 | CARD — ConstructHUB CRM · its own product, its own plans: **Run the whole job.** · _constructhub.us/pricing — filmed in a demo workspace with sample data._ | Lead. Estimate. Signature. Schedule. Photos. Invoice. Paid. ConstructHUB. Run the whole job. |
 
-**Full narration.** Here is one job in the ConstructHUB CRM, from the first call to the final payment. Every job starts as a lead on the pipeline. This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled. Every client has a page. Open the Hadleys, and the whole job is in one place. Quick actions start the next step: a visit, an estimate, a payment. The estimate went out by email. You can see when they opened it, and when they approved. Each line came from the price book, with its quantity and its price. Nora approved it online by typing her name. Now it is a signed contract. Next, the visit goes on the schedule. Open it for the time, the client, and who is going. The crew sees it on their own calendar. On site, the crew shoots photos with JobCam. Back on the Hadleys' page, each shot is filed to this client's job. When the work is done, choose Create invoice on the approved estimate. The invoice is made from the estimate, ready to send. When the check arrives, choose Record payment. Check the amount, and record it. The invoice is marked paid, and the client gets a receipt by email. Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. The CRM is its own product, with its own plans. See them at ConstructHUB dot U S.
+**Final narration.** One job. Lead to paid. Watch. Every job starts as a lead. This one: the Hadleys' new floor, in Austin, Texas. The estimate comes straight out of your price book. Nora approved it online. Typed her name. Signed. The visit goes on the schedule. Everything about the job sits on the client's page. Photos and video from the site, filed with JobCam. Work done? One click turns the estimate into an invoice. Send it. Now your client's side. They open the invoice, and pay online. A secure checkout. In this demo it's a stand-in. No real payment. Card, or bank account. Paid. Back in your CRM, the invoice is marked paid. Nothing to chase. Lead. Estimate. Signature. Schedule. Photos. Invoice. Paid. ConstructHUB. Run the whole job.
 
-Fact base: pipeline, estimates and typed-name approval, schedule, JobCam, invoices and recorded
-payments [1c]; "its own product, with its own plans" [D5]. Not said, on purpose: card payments (Stripe
-is not connected in the demo), tax, any price, HOVER, the phone apps.
+**Claims used.**
 
-- **Title options:** "ConstructHUB CRM in 2 minutes: one job from lead to paid" · "Lead to paid: a
-  contractor CRM tour" · "How one job runs through ConstructHUB CRM"
-- **Thumbnail headline:** LEAD TO PAID (kicker "CRM in 2 minutes")
-- **59-second vertical cut:** seven beats of about seven seconds, a big one-word caption on each —
-  LEAD (pipeline column) · ESTIMATE (the estimate lines) · SIGNED ("Approved by Nora Hadley") ·
-  SCHEDULED (the visit dialog) · PHOTOS (JobCam on the client page) · INVOICE (Create invoice) · PAID
-  (the paid badge) — then "ConstructHUB CRM — constructhub.us".
-- **Pinned comment:** "Everything in this video is a demo workspace with made-up clients. The CRM is
-  its own product with its own plans (JobCam is part of the top plan, or an add-on):
-  https://constructhub.us/pricing#crm — step-by-step tutorials for each screen:
-  https://constructhub.us/tutorials"
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Every job starts as a lead." … "the Hadleys' new floor, in Austin, Texas." | Pipeline board; the demo job P-1997 (sample data, said in the end card's footnote and the description). | demo workspace |
+| "The estimate comes straight out of your price book." · "Nora approved it online. Typed her name. Signed." | Estimate lines are price-book items; approval is a typed full name [1c]. Not said: "legally binding". | E-1998 on screen |
+| "The visit goes on the schedule." · "Photos and video from the site, filed with JobCam." | Schedule; JobCam on the client's page (four photos and a clip on this job). | on screen |
+| "One click turns the estimate into an invoice." · "Send it." | Create invoice on the approved estimate; Send. | done on camera |
+| "They open the invoice, and pay online." · "A secure checkout. In this demo it's a stand-in. No real payment." · "Card, or bank account." · "Paid." | The client's invoice page and its Pay button are the product; the checkout page is the recording's stand-in for the payment provider's page and says so on screen and in the narration (`docs/tutorials/FIXTURES.md`). | done on camera, in the client's own session |
+| "Back in your CRM, the invoice is marked paid. Nothing to chase." | INV-2003 shows paid in Invoices after the payment event is processed by the product's own code. | on screen |
+| Not shown, on purpose | The job's "collected" total: the demo job already carried a deposit by check, so the invoice for the full amount would count it twice. No frame shows a collected total and nothing is said about it. | — |
+
+- **Title:** ConstructHUB CRM in 90 seconds: one job from lead to paid · **Thumbnail / cover headline:** LEAD TO PAID (kicker "CRM in 90 seconds")
+- **Files:** master `tutorials/brand-tour-crm.838e2c25.mp4` · captions `tutorials/brand-tour-crm.2a14b961.vtt` · poster `tutorials/brand-tour-crm.3acf5752.jpg` · social cuts (vertical 54.53 s, 4:5 feed 80 s, TikTok file, two covers): `tutorials/brand-tour-crm.social-cover-feed.5b7a2cb0.jpg`, `tutorials/brand-tour-crm.social-cover-vertical.a25682f8.jpg`, `tutorials/brand-tour-crm.social-feed.c5b8c856.mp4`, `tutorials/brand-tour-crm.social-tiktok.59d1b7c2.mp4`, `tutorials/brand-tour-crm.social-vertical.34066a96.mp4` · production folder `analysis/video-out/brand-tour-crm/` on vb11 (git-ignored)
+- **Honest weaknesses:** 86 s. The checkout is a stand-in page (said in the narration and printed on the page). The job was already "Scheduled" and already carried a deposit: the film shows one job's screens in order, it does not create the lead and the estimate on camera. The pipeline card stays in Scheduled after payment, so the film ends on the paid invoice, not on the board. **The 59 s vertical cut stops after the client opens the invoice** (steps 1–14 of 18) and ends on "Full walkthrough on YouTube" — the payment is only in the 4:5 cut and the master.
+
+---
 
 ## 3. `brand-tour-business-tools` — "ConstructHUB Business tools in 2 minutes" (SCRIPT ONLY — do not record yet)
 
@@ -218,183 +211,175 @@ each has been run on a real account. Never say "Google partner".
   https://constructhub.us/databases · Plans: https://constructhub.us/pricing · The CRM is a separate
   product."
 
-## 4. `brand-why-constructhub` — "Why contractors choose ConstructHUB" (SCRIPT — safe to record; not recorded in this pass)
+## 4. `brand-why-constructhub` — "Why ConstructHUB? Checked permit links, every price on one page"
 
-Category-level only. No competitor names, no prices spoken. The fact base does **not** support "instead
-of three or four separate subscriptions" (ConstructHUB is itself two products plus an add-on, and the
-large field-service products now sell marketing add-ons), so the script says "from one company".
-Honest caveat on the title: we have no customer research on why contractors choose us — "Why
-contractors choose…" is the owner's working title; "What makes ConstructHUB different" is the one the
-evidence supports.
+**Recorded 2026-10-08 on slot 6, 45 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-why-constructhub.json`).**
 
-| # | On screen | Narration | Fact |
-| --- | --- | --- | --- |
-| 1 | Dashboard | Most contractor software does one thing. Photos here, estimates there, your Google listing somewhere else. | category level |
-| 2 | Dashboard → CRM | ConstructHUB covers that ground from one company, in two products. | [D9][D5] |
-| 3 | Database Directory | First difference: permits. A directory of county and city permit offices, in the same product as your marketing tools. | [D1] |
-| 4 | Verified portal badge | Every link is checked. If we could not confirm one, it says so. | [D2] |
-| 5 | "Find permit portal" row | If we do not have one, you get a web search. Not a guess. | [D2] |
-| 6 | Directory, signed out | You can browse it before you sign up. | [D3] |
-| 7 | Plans page, a "Not included" list | Second: straight pricing. Every plan shows its price, and what it does not include. | [D4] |
-| 8 | Plans page, the CRM section | Buy the Business tools, the CRM, or both. You are never made to buy both. | [D5] |
-| 9 | CRM client page: estimate, visit, invoice | Third: the job stays together. The estimate, the visit and the invoice are on one page. | [1c] |
-| 10 | JobCam on the same page | Job photos are filed to that same job. JobCam is part of the top CRM plan, or an add-on. | [D7] |
-| 11 | CRM Payments page | Card and bank payments go to your own Stripe account. ConstructHUB adds no fee on top of Stripe's. | [D8] — record only on a workspace where Stripe is connected; the demo shows "not configured" |
-| 12 | Features page | See what each tool does, and which plan has it, at ConstructHUB dot U S. | [D4] |
+| # | On screen | Narration |
+| --- | --- | --- |
+| 1 | **[Permit offices]** CARD — Why ConstructHUB: **Tired of guessing?** | Software that makes you guess? No thanks. |
+| 2 | Permit office directory (`goto` /databases?q=Houston) | Start with the permit office. Type a city. |
+| 3 | Verified portal (`highlight`) | Every link is checked. |
+| 4 | CARD — **Checked. Or it says so.** · A guessed link; Looks official; Might be dead; Might be the wrong office vs ConstructHUB; Verified — checked link; Unconfirmed — it says so; None on record — a web search | Can't confirm it? It says so. Don't have it? You get a search. Never a guess. |
+| 5 | **[Plain prices]** Plans (`goto` /pricing) | Now the prices. |
+| 6 | Every price (`scroll-to`) | Every price is on one page. |
+| 7 | Not included (`highlight`) | And every plan lists what's not included. |
+| 8 | CARD — **Buy one. Or both.** · Business tools; Permit office directory; County property records; Your Google listing & reviews vs ConstructHUB CRM; Leads & pipeline; Estimates signed online; Schedule · invoices · payments · _Two separate products, each with its own plans — constructhub.us/pricing_ | Two products. Buy one, or both. Nobody makes you buy both. |
+| 9 | **[On the job]** JobCam (`goto` /crm/jobcam) | Job photos live on the job, with the estimate and the invoice. |
+| 10 | CARD — Card & bank payments: **We add no fee.** · _Payments go to your own Stripe account. Stripe's own processing fees apply. JobCam is part of the top CRM plan, an add-on to the others._ | Card and bank payments go straight to your own Stripe account. We add no fee on top. |
+| 11 | CARD — constructhub.us: **Run the whole job.** · _Business tools and the CRM are separate products, each with its own plans._ | ConstructHUB. Run the whole job. |
 
-About 80 seconds. Row 11 is the one line that needs a connected demo Stripe account before it can be
-shown; drop it otherwise.
+**Final narration.** Software that makes you guess? No thanks. Start with the permit office. Type a city. Every link is checked. Can't confirm it? It says so. Don't have it? You get a search. Never a guess. Now the prices. Every price is on one page. And every plan lists what's not included. Two products. Buy one, or both. Nobody makes you buy both. Job photos live on the job, with the estimate and the invoice. Card and bank payments go straight to your own Stripe account. We add no fee on top. ConstructHUB. Run the whole job.
 
-- **Title options:** "What makes ConstructHUB different for contractors" · "Why contractors choose
-  ConstructHUB" · "Permits, straight pricing, one job in one place"
-- **Thumbnail headline:** NO GUESSED LINKS
-- **59-second vertical cut:** "Three things that are different" — 1 PERMITS (directory, verified
-  badge, "not a guess") 0–22 s; 2 STRAIGHT PRICING ("Not included" list) 22–38 s; 3 ONE JOB, ONE PAGE
-  (client page scroll, JobCam) 38–54 s; constructhub.us 54–59 s.
-- **Pinned comment:** "What we mean by 'checked': every permit portal link is tested, unconfirmed ones
-  are labeled, and where we have none you get a web search instead of a made-up address. Browse it
-  free: https://constructhub.us/databases"
+**Claims used.**
+
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Software that makes you guess? No thanks." | A hook; no product is named or described. | — |
+| "Every link is checked." · "Can't confirm it? It says so. Don't have it? You get a search. Never a guess." | [D2] | `scripts/verify-links.ts`, `linkStatus`; /features/permits |
+| "Every price is on one page." · "And every plan lists what's not included." | [D4] — the Plans page and its Not included lists, on screen. | /pricing |
+| "Two products. Buy one, or both. Nobody makes you buy both." | [D5] | `shared/crm-plans.ts:4-7` |
+| "Job photos live on the job, with the estimate and the invoice." | [D7]; the footnote of the next card says JobCam is the top CRM plan or an add-on. | /crm/jobcam |
+| "Card and bank payments go straight to your own Stripe account. We add no fee on top." | [D8]; the card's footnote: "Stripe's own processing fees apply." Shown as a card, not as a connected-account screen. | help entry `crm-payments`; /features/crm |
+
+- **Title:** Why ConstructHUB? Checked permit links, every price on one page · **Thumbnail / cover headline:** NO GUESSED LINKS (kicker "Why ConstructHUB")
+- **Files:** master `tutorials/brand-why-constructhub.9ddea801.mp4` · captions `tutorials/brand-why-constructhub.de5d75ff.vtt` · poster `tutorials/brand-why-constructhub.e7e27d0f.jpg` · social cuts (vertical 41.9 s, 4:5 feed 41.9 s, TikTok file, two covers): `tutorials/brand-why-constructhub.social-cover-feed.8ab1fd2c.jpg`, `tutorials/brand-why-constructhub.social-cover-vertical.71720ac6.jpg`, `tutorials/brand-why-constructhub.social-feed.5132f0e6.mp4`, `tutorials/brand-why-constructhub.social-tiktok.2772d130.mp4`, `tutorials/brand-why-constructhub.social-vertical.c62337c2.mp4` · production folder `analysis/video-out/brand-why-constructhub/` on vb11 (git-ignored)
+- **Honest weaknesses:** 45 s. The ring on the Not included list did not draw in the take (the list is on screen and the pointer is on it). The Plans page shows the demo account's own "Your plan: Agency" banner above the fold of that shot, and our own prices are on screen. The first card's "guessed link" column describes a guess in general, not any product.
 
 ---
 
-## 5. Named comparisons — **NEEDS OWNER SIGN-OFF BEFORE RECORDING OR PUBLISHING**
+## 5. Named comparisons — recorded 2026-10-08 on the owner's instruction, **held until the owner releases them**
 
-Rules for all four: the competitor's **name in plain text only** — no logo, no screenshot or footage of
-their product, no imitation of their colours; only ConstructHUB screens are shown; every competitor
-price is on-screen text with "as of October 2026" and the source in the description; the description
-ends "<Name> is a trademark of its owner. ConstructHUB is not affiliated with <Name>. Prices and
-features from their public pages on <date>; check their site for current details."; each video says
-where the competitor is stronger. Re-read every figure on the day of publishing and every 90 days;
-unlist a video that has gone stale.
+Owner, 2026-10-08, after reading the first scripts: *"Do what is way more aggressive! And catchy"* — and
+the named comparisons are wanted. So these are bold in tone and exact in fact: the competitor's **name
+in plain text only** (no logo, no screenshot or footage of their product, no imitation of their
+colours); only ConstructHUB screens and our own cards are shown; every competitor price is on a card
+with "list price · billed monthly · October 2026", its source and "Different features — check both";
+each film says where the other product has tools we do not; the description carries the sources, the
+date they were read and the trademark line. Attack the price and the hassle, never the company.
 
-### 5a. `brand-vs-jobber` — "ConstructHUB CRM and Jobber: an honest comparison" — NEEDS OWNER SIGN-OFF
+**Lines that were asked for and could not be made true — and what replaced them** (also in each film's
+claims list): "Your CRM can't find the permit office. Ours can." → asked as a question. "Jobber won't
+tell you which office issues the permit." → "who finds the permit office?" plus what their pricing page
+lists. "STOP OVERPAYING" → "HALF THE PRICE?" with the qualifier on screen (overpaying is a judgement
+when the plans differ). "They charge per seat. We give you five." → Leap's two published Team figures
+beside our five seats. "No $750 sales add-on needed" → not said; SalesPro is a separate product we
+have no equivalent of, and the film says so. The gator does not react on the stat cards (it stands on
+the hook and end cards); a price never counts up through other prices.
 
-| Fact | Jobber | ConstructHUB | Source · date |
-| --- | --- | --- | --- |
-| Entry plan, 1 user | Core $49/mo no commitment · $39/mo one-year · $29/mo paid annually | CRM Basic $39/mo · $348/yr | getjobber.com/pricing (S) · `shared/crm-plans.ts:102` · 2026-10-08 |
-| Quotes approved online | yes | yes (typed name; contract PDF) | getjobber.com/features (S) · fact base 1c |
-| Schedule, invoices, online payments, client portal | yes | yes | same |
-| Website builder, online booking | yes (Core) | no | getjobber.com/pricing (S) |
-| Integrations | "100+ app integrations" | Stripe, Google Calendar, a lead form, API, webhooks | (S) · fact base 1c |
-| Marketing add-on / AI receptionist | Marketing Suite "$99/mo"; Receptionist "$29/mo" | Business tools from $29/mo (separate product); Call Assistant add-on from $149/mo | (S) · `shared/plans.ts` |
-| Job photos | "unlimited photos and videos" on Plus | JobCam: top plan or +$39/mo; 5 GB | (S) · `shared/crm-plans.ts:34` |
-| Permit office directory, county property records | not on the pages fetched | yes | [D1] |
-| Native phone apps in the stores | yes | **no** — browser today | fact base 1d |
+**The tagline.** Three were tried — "ConstructHUB. Run the whole job." · "ConstructHUB. Find the work.
+Run the job." · "ConstructHUB. One job. One place." — and the first ends every film: it is the
+shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in-one".
 
-**Narration (about 75 s).** If you are choosing software to run jobs, Jobber is probably on your list.
-It should be. Here is an honest look at both. · Both do the core work: quotes your client approves
-online, a schedule, invoices and online payments. · Jobber is the more mature product. It has more
-integrations, a website builder and online booking, and apps in the app stores. ConstructHUB's CRM runs
-in your phone's browser today. · On price, the entry plans are close. The numbers are on screen, with
-today's date. · So why look at ConstructHUB? Two reasons. · One: permits. ConstructHUB has a directory
-of county and city permit offices and county property records. Jobber's pricing and feature pages do
-not list either. · Two: job photos sit inside the CRM, filed to the same job as the estimate and the
-invoice. That is JobCam, part of the top CRM plan or an add-on. · If you want the most established
-field-service app, look at Jobber. If permits and property records matter to how you find work, look
-at ConstructHUB.
+### Releasing a held film
 
-**Where Jobber is stronger (said in the video):** maturity, integrations, website and booking, native
-apps, entry price on annual billing. **Safe claims:** the rows above marked "yes / no" for our side;
-"Jobber's pricing and feature pages do not list" (not "Jobber does not have").
+1. Re-read every figure on the competitor's own pricing page **that day** (and ours), against the
+   film's claims list and `docs/brand/sources/`. If a figure moved, the film is re-recorded, not released.
+2. `youtube-schedule.ts --release <key>` (dry run first) and `social-post.ts <key> --release <key>` —
+   without `--release` both list it as "held for owner approval".
+3. For a `brand-vs-…` film, to show it in the app as well: delete `unlisted: true` from its help entry,
+   `git mv docs/brand/held-manifests/<key>.json shared/help/videos/`, run `gen-index.ts`, deploy.
+4. Put a reminder to re-check the prices every 90 days; unlist a film that has gone stale.
 
-- **Title options:** "ConstructHUB CRM and Jobber: an honest comparison" · "Jobber or ConstructHUB?
-  What each does for contractors" · "ConstructHUB vs Jobber: where each is stronger"
-- **Thumbnail headline:** AN HONEST COMPARISON (text only; no Jobber logo or colours)
-- **59-second vertical cut:** "Same: quotes, schedule, invoices" 0–12 s · "Jobber is stronger at:
-  integrations, website, apps" 12–26 s · "Only here: permit directory + property records" 26–44 s ·
-  "Photos inside the CRM (JobCam)" 44–54 s · "Prices as of Oct 2026 in the description" 54–59 s.
-- **Pinned comment:** "Sources, read on <date>: getjobber.com/pricing and getjobber.com/features;
-  ConstructHUB: constructhub.us/pricing. Jobber is a trademark of its owner; we are not affiliated.
-  Spot something out of date? Tell us and we will fix or pull the video."
+### 5a. `brand-vs-jobber` — "Jobber vs ConstructHUB CRM: permits, seats and the pipeline (2026)"
 
-### 5b. `brand-vs-housecall-pro` — "ConstructHUB CRM and Housecall Pro: an honest comparison" — NEEDS OWNER SIGN-OFF
+**Recorded 2026-10-08 on slot 3, 50 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-jobber.json`).**
 
-| Fact | Housecall Pro | ConstructHUB CRM | Source · date |
-| --- | --- | --- | --- |
-| 1 user, month to month | Basic "$79 /mo" | Basic $39/mo | housecallpro.com/pricing (D) · `shared/crm-plans.ts:102` · 2026-10-08 |
-| 5 users | Essentials "$189 /mo" | Essentials $94/mo | (D) · `:128` |
-| 8 users | Max "$329 /mo" | Max $164/mo | (D) · `:151` |
-| Annual billing, per month | $59 / $149 / $299 "(Billed annually)" | $29 / $74 / $149 ($348 / $888 / $1,788 a year) | (D) · same lines |
-| Extra user | "$35/mo per additional user" | $17/mo | (S) · `:172` |
-| Trial | 14 days | 14 days | page title (D) · `:178` |
-| Estimates, schedule, invoices, payments, customer portal | yes | yes | housecallpro.com/features (S) · 1c |
-| Routes, route optimisation, employee GPS tracking | yes (Essentials / Max) | **no** | (S) |
-| QuickBooks Online sync, financing | yes | **no** | (S) |
-| Review management | yes (Basic) | in Business tools, a separate product | (S) · 1b |
-| Photos | "photo reports & annotations" (Essentials) | JobCam: Max, or +$39/mo | (S) · `:34` |
-| Permit office directory, county property records | not on the pages fetched | yes (Business tools) | [D1] |
-| Native apps | yes | **no** | 1d |
+| # | On screen | Narration |
+| --- | --- | --- |
+| 1 | **[Permit offices]** CARD — Jobber vs ConstructHUB: **Who finds the permit office?** | Jobber runs the job. But who finds the permit office? |
+| 2 | Permit office directory (`goto` /databases?q=Austin) | We do. Type a city, and get the office that issues the permit. |
+| 3 | Verified portal (`highlight`) | A checked link to its own portal. It isn't on Jobber's pricing page. |
+| 4 | **[Seats]** CARD — **One company. Two products.** · Business tools; Permit office directory; County property records; Your Google listing & reviews vs ConstructHUB CRM; Leads & pipeline; Estimates signed online; Schedule · invoices · payments · _Two separate products, each with its own plans — constructhub.us/pricing_ | Permits, your Google listing, and a CRM. One company. Two products. |
+| 5 | CARD — List price · billed monthly · October 2026: **Five people?** · Jobber $199 (a month · Connect · includes 5 users) vs ConstructHUB CRM $94 (a month · Essentials · 5 seats) · _List prices billed monthly, October 2026: getjobber.com/pricing (team size 2-5) · constructhub.us/pricing. Different features — check both. One user: Jobber Core $49, CRM Basic $39 a month._ | Working solo? The list prices are close. Five people? Theirs lists at one hundred ninety-nine dollars a month. Ours, ninety-four. |
+| 6 | **[The pipeline]** CARD — Their pricing page · October 2026: **The pipeline?** · Jobber $49 (a month · Pipeline add-on) vs ConstructHUB CRM $0 (extra · a pipeline on every CRM plan) · _Jobber's pricing page lists Pipeline under add-ons at $49/mo, October 2026: getjobber.com/pricing · constructhub.us/pricing. Different features — check both._ | Their sales pipeline is an add-on. Ours is on every plan. |
+| 7 | Our pipeline (`goto` /crm/pipeline) | Every job is a card, from lead to paid. |
+| 8 | One job (`highlight`) | Not the same features. Jobber has an app marketplace, and tools we don't have. Check both. |
+| 9 | CARD — ConstructHUB CRM · 14-day free trial: **Run the whole job.** · _constructhub.us/pricing — the CRM is a separate product with its own plans._ | Try the CRM free for fourteen days. ConstructHUB. Run the whole job. |
 
-**Narration (about 80 s).** Housecall Pro is one of the best-known tools for home-service crews. Here
-is an honest look at it next to the ConstructHUB CRM. · Both run the job: estimates, a schedule,
-invoices, online payments, and a portal for your customer. · Housecall Pro goes further on dispatch.
-Routes, route optimisation and G P S tracking are on its plans. It syncs with QuickBooks. ConstructHUB
-does not do those today. · The difference is price. At list price, seat for seat, ConstructHUB CRM is
-about half. The plans are on screen, with today's date. They do not include the same features, so
-read both lists. · And ConstructHUB has a second product: Business tools, with a permit office
-directory and county property records. It is sold separately. · If you run trucks on routes all day,
-look hard at Housecall Pro. If you want estimates, a schedule, invoices and job photos for less, look
-at ConstructHUB.
+**Final narration.** Jobber runs the job. But who finds the permit office? We do. Type a city, and get the office that issues the permit. A checked link to its own portal. It isn't on Jobber's pricing page. Permits, your Google listing, and a CRM. One company. Two products. Working solo? The list prices are close. Five people? Theirs lists at one hundred ninety-nine dollars a month. Ours, ninety-four. Their sales pipeline is an add-on. Ours is on every plan. Every job is a card, from lead to paid. Not the same features. Jobber has an app marketplace, and tools we don't have. Check both. Try the CRM free for fourteen days. ConstructHUB. Run the whole job.
 
-**Where Housecall Pro is stronger:** dispatch and routing, GPS, QuickBooks, financing, apps, maturity.
-**Safe claims:** the three list-price pairs **with** "plans do not include the same features" on
-screen; "about half at list price, seat for seat". **Do not say** "half the price" without "at list
-price" and the feature caveat; do not mention their promotions. The word "best-known" is about them,
-not us; drop it if the owner prefers.
+**Claims used.**
 
-- **Title options:** "ConstructHUB CRM and Housecall Pro: an honest comparison" · "Housecall Pro or
-  ConstructHUB? Price and features, side by side" · "ConstructHUB vs Housecall Pro for contractors"
-- **Thumbnail headline:** SEAT FOR SEAT (text only)
-- **59-second vertical cut:** "Same core: estimates, schedule, invoices" 0–10 s · "They win: routes,
-  GPS, QuickBooks" 10–24 s · the price table as of October 2026, held for 12 s with the caveat line
-  24–40 s · "Plus: permit directory (separate product)" 40–54 s · sources in the description 54–59 s.
-- **Pinned comment:** "Prices are list prices from housecallpro.com/pricing and constructhub.us/pricing
-  on <date>; plans do not include the same features, and either company may be running an offer.
-  Housecall Pro is a trademark of its owner; we are not affiliated."
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Jobber runs the job. But who finds the permit office?" · "A checked link to its own portal. It isn't on Jobber's pricing page." | The saved page text does not contain "permit". **Swap:** the owner's line "Jobber won't tell you which office issues the permit" is a claim about what their product can do; what we can prove is what their pricing page lists. | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC |
+| "Permits, your Google listing, and a CRM. One company. Two products." | [D9][D5]. Not claimed: that Jobber has no Google tools (it sells a Marketing Suite). | fact base 1b, 1c |
+| "Working solo? The list prices are close." | Jobber Core, 1 user: "$49/mo" (or $29 billed annually). CRM Basic $39 a month ($348 a year = $29 a month). On the card's footnote. | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC; `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "Five people? Theirs lists at one hundred ninety-nine dollars a month. Ours, ninety-four." | With the page's Team size set to "2-5 people" the lowest plan offered is Connect, "Includes 5 users", "$199/mo" ($149 billed annually); Core is not offered for a team. **Beyond the brief** ("do not claim cheaper"): this is one dated pair with the solo case stated beside it — the owner may drop the card. | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC; `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "Their sales pipeline is an add-on. Ours is on every plan." (card: $49 a month · Pipeline add-on) | The page's add-ons section lists "Sales Pipeline" at "$49 /mo". A pipeline board is in every ConstructHUB CRM plan [1c]. The two are not the same feature set; the footnote says "Different features — check both". | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC |
+| "Not the same features. Jobber has an app marketplace, and tools we don't have. Check both." | Jobber Core: "Connect 100+ tools through the app marketplace". | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC |
 
-### 5c. `brand-vs-leap` — "ConstructHUB CRM and Leap: an honest comparison" — NEEDS OWNER SIGN-OFF
+- **Title:** Jobber vs ConstructHUB CRM: permits, seats and the pipeline (2026) · **Thumbnail / cover headline:** JOBBER VS CONSTRUCTHUB (kicker "Permits · seats · pipeline")
+- **Files:** master `tutorials/brand-vs-jobber.80d4385e.mp4` · captions `tutorials/brand-vs-jobber.461ace60.vtt` · poster `tutorials/brand-vs-jobber.550d40ff.jpg` · social cuts (vertical 46.9 s, 4:5 feed 46.9 s, TikTok file, two covers): `tutorials/brand-vs-jobber.social-cover-feed.2f6a5fe7.jpg`, `tutorials/brand-vs-jobber.social-cover-vertical.a4b957b7.jpg`, `tutorials/brand-vs-jobber.social-feed.aab6d412.mp4`, `tutorials/brand-vs-jobber.social-tiktok.a0ec0b3d.mp4`, `tutorials/brand-vs-jobber.social-vertical.54efe23f.mp4` · production folder `analysis/video-out/brand-vs-jobber/` on vb11 (git-ignored)
+- **Honest weaknesses:** 50 s. The five-people price card goes beyond the brief ("do not claim cheaper"): it is one dated pair with the solo case said aloud and printed — drop the card if the owner prefers. The $0 on our side of the pipeline card means "no extra charge", not a free plan. The directory shot searches Austin and the first row is Austin, AR.
 
-Leap = Leap to Digital (leaptodigital.com): **Leap CRM** and **Leap SalesPro**, for roofing,
-remodeling, windows and doors, siding, kitchen and bath. Confirmed 2026-10-08.
+### 5b. `brand-vs-housecall-pro` — "Housecall Pro vs ConstructHUB CRM: the price per seat (2026)"
 
-| Fact | Leap | ConstructHUB | Source · date |
-| --- | --- | --- | --- |
-| Single user | CRM Essential "$79 /month", "Single-User Only" | CRM Basic $39/mo, 1 seat | leaptodigital.com/pricing (D) · `shared/crm-plans.ts:102` · 2026-10-08 |
-| A team | CRM Team "Starting at $298 /month", "Includes First User and $99 per/mo per add. user" | CRM Essentials $94/mo with 5 seats; Max $164/mo with 8 | (D) · `:128,151` |
-| In-home sales app | SalesPro Premium "Starting at $750 /month", "Includes 6 Users" | **none** | (D) |
-| Trial | "14 Day Free Trial" | 14 days | (D) · `:178` |
-| Leads, estimates, digital signatures, calendar, invoices, payments, customer portal | yes | yes | leaptodigital.com/leap-crm (S) · 1c |
-| Subcontractor portal, workflow automations | yes | subcontractor role; no workflow automations | (S) · 1c |
-| Supplier, measurement and financing integrations | ABC Supply, SRS, QXO, EagleView, GreenSky, QuickBooks | **no** (HOVER is not working today) | leaptodigital.com (S) · 1c |
-| Job photos | integrates with CompanyCam | JobCam inside the CRM: Max, or +$39/mo | (S) · `:34` |
-| Permit directory, property records, Google listing tools | not mentioned on the pages fetched | yes (Business tools, separate) | [D1] |
-| Android and iOS apps | yes | **no** | (S) · 1d |
+**Recorded 2026-10-08 on slot 3, 51 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-housecall-pro.json`).**
 
-**Narration (about 75 s).** Leap is built for home-improvement companies that sell in the home:
-roofing, siding, windows, remodeling. Here is an honest look at it next to ConstructHUB. · Leap is two
-products. Leap CRM runs the job. SalesPro is for presenting and signing at the kitchen table.
-ConstructHUB has nothing like SalesPro. · Leap also connects to suppliers, measurement services and
-financing. ConstructHUB does not. · The CRMs cover the same core: leads, estimates, a signature, a
-calendar, invoices and payments. · Where ConstructHUB differs is who it is priced for. The list prices
-are on screen, with today's date. A small crew gets five seats on one plan. · And ConstructHUB has a
-second product, Business tools: a permit office directory, county property records, and tools for your
-Google listing. Leap's pages do not list those. · If you run a sales team in the home, look at Leap.
-If you are a small crew that wants the job and the permits in one place, look at ConstructHUB.
+| # | On screen | Narration |
+| --- | --- | --- |
+| 1 | **[The price]** CARD — List price · October 2026: **$189 a month for 5 users?** · _Housecall Pro Essentials: $189 a month billed monthly, 5 users included — housecallpro.com/pricing, read 8 October 2026. Intro offers not shown._ | Still paying one hundred eighty-nine dollars a month for five users? |
+| 2 | CARD — List price · billed monthly · October 2026: **5 seats. $94.** · Housecall Pro $189 (a month · Essentials · 5 users) vs ConstructHUB CRM $94 (a month · Essentials · 5 seats) · _List prices billed monthly, October 2026: housecallpro.com/pricing · constructhub.us/pricing. Different features — check both._ | ConstructHUB CRM Essentials. Five seats. Ninety-four dollars. About half, at list price. |
+| 3 | CARD — List price · billed monthly · October 2026: **Same seats. About half.** · Housecall Pro; 1 user — $79 a month; 5 users — $189 a month; 8 users — $329 a month vs ConstructHUB CRM; 1 seat — $39 a month; 5 seats — $94 a month; 8 seats — $164 a month · _List prices billed monthly, October 2026: housecallpro.com/pricing · constructhub.us/pricing. Different features — check both._ | One seat. Five seats. Eight seats. Same counts. About half the list price, every time. |
+| 4 | **[What you get]** Not the same features (`goto` /crm/pipeline) | Not the same features. They have tools we don't have. Check both lists. |
+| 5 | The pipeline (`highlight`) | Here's what you get. Every job on one board, lead to paid. |
+| 6 | Estimates (`goto` /crm/estimates/demo-estimate-e-1998) | Estimates your client signs online. |
+| 7 | Invoices (`goto` /crm/invoices) | Invoices, and payments online. |
+| 8 | **[Permit offices]** Permit offices (`goto` /databases?q=Houston) | And one thing that isn't on their pricing page. |
+| 9 | Verified portal (`highlight`) | A permit office directory. Checked links. Free to browse. |
+| 10 | CARD — ConstructHUB CRM · 14-day free trial: **Run the whole job.** · _constructhub.us/pricing — the CRM is a separate product with its own plans._ | Try the CRM free for fourteen days. ConstructHUB. Run the whole job. |
 
-**Where Leap is stronger:** SalesPro, supplier / measurement / financing integrations, automations,
-native apps, depth for larger sales organisations. **Safe claims:** the dated price lines with the
-feature caveat; "Leap's pages do not list" permits or Google tools. **Do not** quote or dispute Leap's
-own results claims.
+**Final narration.** Still paying one hundred eighty-nine dollars a month for five users? ConstructHUB CRM Essentials. Five seats. Ninety-four dollars. About half, at list price. One seat. Five seats. Eight seats. Same counts. About half the list price, every time. Not the same features. They have tools we don't have. Check both lists. Here's what you get. Every job on one board, lead to paid. Estimates your client signs online. Invoices, and payments online. And one thing that isn't on their pricing page. A permit office directory. Checked links. Free to browse. Try the CRM free for fourteen days. ConstructHUB. Run the whole job.
 
-- **Title options:** "ConstructHUB CRM and Leap: an honest comparison" · "Leap or ConstructHUB? Which
-  fits a small crew" · "ConstructHUB vs Leap CRM for contractors"
-- **Thumbnail headline:** WHICH FITS YOUR CREW? (text only)
-- **59-second vertical cut:** "Leap = CRM + SalesPro (in-home selling)" 0–14 s · "They win:
-  suppliers, measurements, financing, apps" 14–26 s · "Same core CRM" 26–34 s · price lines as of
-  October 2026 with the caveat 34–46 s · "Plus: permits + Google listing tools" 46–56 s · sources 56–59 s.
-- **Pinned comment:** "Sources, read on <date>: leaptodigital.com/pricing and
-  leaptodigital.com/leap-crm; ConstructHUB: constructhub.us/pricing. Leap is a trademark of its owner;
-  we are not affiliated."
+**Claims used.**
+
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Still paying one hundred eighty-nine dollars a month for five users?" (card: $189 a month for 5 users?) | Housecall Pro Essentials: "$189 /mo" billed monthly, "5 users included". An introductory offer ("$26 /mo for 1 month") was showing and is not used; the card says "Intro offers not shown". | housecallpro.com/pricing, read directly (curl) 2026-10-08 04:08 UTC |
+| "ConstructHUB CRM Essentials. Five seats. Ninety-four dollars. About half, at list price." | $94 / 5 seats; 94 ÷ 189 = 49.7 %. | `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "One seat. Five seats. Eight seats. Same counts. About half the list price, every time." (card: $79 / $189 / $329 against $39 / $94 / $164) | Basic "$79 /mo", "1 user included"; Max "$329 /mo", "8 users included". Ratios 49.4 %, 49.7 %, 49.8 %. | housecallpro.com/pricing, read directly (curl) 2026-10-08 04:08 UTC; `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "Not the same features. They have tools we don't have. Check both lists." | Their pricing page lists, among others, route optimisation and GPS tracking, which ConstructHUB CRM does not have. | housecallpro.com/pricing, read directly (curl) 2026-10-08 04:08 UTC |
+| "And one thing that isn't on their pricing page. A permit office directory. Checked links. Free to browse." | The saved page text does not contain the word "permit" (a statement about that page on that day, not about the product). The Database Directory opens without an account or a plan [D3]. | `docs/brand/sources/2026-10-08/`; /databases |
+| "Try the CRM free for fourteen days." | `CRM_TRIAL_DAYS = 14`. | `shared/crm-plans.ts` |
+
+- **Title:** Housecall Pro vs ConstructHUB CRM: the price per seat (2026) · **Thumbnail / cover headline:** HALF THE PRICE? (kicker "vs Housecall Pro")
+- **Files:** master `tutorials/brand-vs-housecall-pro.69558c21.mp4` · captions `tutorials/brand-vs-housecall-pro.8df4ad7a.vtt` · poster `tutorials/brand-vs-housecall-pro.67148cac.jpg` · social cuts (vertical 47.93 s, 4:5 feed 47.93 s, TikTok file, two covers): `tutorials/brand-vs-housecall-pro.social-cover-feed.f2572ac4.jpg`, `tutorials/brand-vs-housecall-pro.social-cover-vertical.afbe953a.jpg`, `tutorials/brand-vs-housecall-pro.social-feed.cbf0246a.mp4`, `tutorials/brand-vs-housecall-pro.social-tiktok.16175d8e.mp4`, `tutorials/brand-vs-housecall-pro.social-vertical.0c12552e.mp4` · production folder `analysis/video-out/brand-vs-housecall-pro/` on vb11 (git-ignored)
+- **Honest weaknesses:** 51 s. Shows list prices only — Housecall Pro's annual prices ($59 / $149 / $299) narrow the gap to our annual prices and are not on screen; its introductory offer is not shown either (the card says so). "About half" is exact to within one point on all three tiers on monthly billing only.
+
+### 5c. `brand-vs-leap` — "Leap CRM vs ConstructHUB CRM: what a small crew pays (2026)"
+
+**Recorded 2026-10-08 on slot 3, 55 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-leap.json`).**
+
+| # | On screen | Narration |
+| --- | --- | --- |
+| 1 | **[One user]** CARD — List price · October 2026: **$79 a month for one user?** · _Leap CRM Essential: $79 a month, single user only — leaptodigital.com/pricing, read 8 October 2026._ | Seventy-nine dollars a month. For one user? |
+| 2 | CARD — List price · billed monthly · October 2026: **One seat. $39.** · Leap CRM $79 (a month · Essential · single user only) vs ConstructHUB CRM $39 (a month · Basic · 1 seat) · _List prices billed monthly, October 2026: leaptodigital.com/pricing · constructhub.us/pricing. Different features — check both._ | ConstructHUB CRM Basic. One seat. Thirty-nine dollars. About half, at list price. |
+| 3 | **[A team]** CARD — List price · billed monthly · October 2026: **Add a crew.** · Leap CRM Team $298 (a month · first user); + $99 a month each additional user vs ConstructHUB CRM $94 (a month · Essentials); 5 seats in the price · _List prices billed monthly, October 2026: leaptodigital.com/pricing · constructhub.us/pricing. Different features — check both._ | Add a crew. Their Team plan starts at two hundred ninety-eight dollars, then ninety-nine more for each user. Ours: five seats, ninety-four dollars. |
+| 4 | Not the same features (`goto` /crm/pipeline) | Not the same features. Leap has an in-home sales app, and tools we don't have. Check both. |
+| 5 | **[What you get]** The pipeline (`highlight`) | Here's ours. Leads on a pipeline. |
+| 6 | Estimates (`goto` /crm/estimates/demo-estimate-e-1998) | Estimates from your price book, |
+| 7 | Signed online (`highlight`) | signed online. |
+| 8 | Invoices (`goto` /crm/invoices) | Invoices, and payments online. |
+| 9 | Permit offices (`goto` /databases?q=Austin) | Plus a permit office directory. It isn't on their pricing page. Free to browse. |
+| 10 | CARD — ConstructHUB CRM · 14-day free trial: **Run the whole job.** · _constructhub.us/pricing — the CRM is a separate product with its own plans._ | Try the CRM free for fourteen days. ConstructHUB. Run the whole job. |
+
+**Final narration.** Seventy-nine dollars a month. For one user? ConstructHUB CRM Basic. One seat. Thirty-nine dollars. About half, at list price. Add a crew. Their Team plan starts at two hundred ninety-eight dollars, then ninety-nine more for each user. Ours: five seats, ninety-four dollars. Not the same features. Leap has an in-home sales app, and tools we don't have. Check both. Here's ours. Leads on a pipeline. Estimates from your price book, signed online. Invoices, and payments online. Plus a permit office directory. It isn't on their pricing page. Free to browse. Try the CRM free for fourteen days. ConstructHUB. Run the whole job.
+
+**Claims used.**
+
+| Line | What makes it true | Source, date, how it was read |
+| --- | --- | --- |
+| "Seventy-nine dollars a month. For one user?" | Leap CRM Essential: "$79 /month", "Single-User Only", "Limit 1 User Per Account". | leaptodigital.com/pricing, read directly (curl) 2026-10-08 04:08 UTC |
+| "ConstructHUB CRM Basic. One seat. Thirty-nine dollars. About half, at list price." | 39 ÷ 79 = 49.4 %. | `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "Their Team plan starts at two hundred ninety-eight dollars, then ninety-nine more for each user. Ours: five seats, ninety-four dollars." | Team: "$298 /month", "Includes First User and $99 per/mo per add. user". No total for five users is said or shown — only their two published figures. **Swap:** "They charge per seat. We give you five." became this. | leaptodigital.com/pricing, read directly (curl) 2026-10-08 04:08 UTC; `shared/crm-plans.ts` (CRM Basic $39 / 1 seat, Essentials $94 / 5, Max $164 / 8), the price book the live /pricing page is drawn from |
+| "Not the same features. Leap has an in-home sales app, and tools we don't have. Check both." | Leap SalesPro (Premium "$750 /month", "Includes 6 Users") is a product ConstructHUB has no equivalent of. **Swap:** "no $750 sales add-on needed" is not said — SalesPro is not an add-on a CRM user must buy. | leaptodigital.com/pricing, read directly (curl) 2026-10-08 04:08 UTC |
+| "Plus a permit office directory. It isn't on their pricing page. Free to browse." | The saved page text does not contain "permit". | `docs/brand/sources/2026-10-08/` |
+
+- **Title:** Leap CRM vs ConstructHUB CRM: what a small crew pays (2026) · **Thumbnail / cover headline:** SMALL CREW. SMALL PRICE. (kicker "vs Leap CRM")
+- **Files:** master `tutorials/brand-vs-leap.c3c4811c.mp4` · captions `tutorials/brand-vs-leap.d99bf0d5.vtt` · poster `tutorials/brand-vs-leap.c5a9750f.jpg` · social cuts (vertical 52.6 s, 4:5 feed 52.6 s, TikTok file, two covers): `tutorials/brand-vs-leap.social-cover-feed.59eae5b5.jpg`, `tutorials/brand-vs-leap.social-cover-vertical.1bcd9c3e.jpg`, `tutorials/brand-vs-leap.social-feed.964f14fb.mp4`, `tutorials/brand-vs-leap.social-tiktok.6f2ae669.mp4`, `tutorials/brand-vs-leap.social-vertical.91c32a3c.mp4` · production folder `analysis/video-out/brand-vs-leap/` on vb11 (git-ignored)
+- **Honest weaknesses:** 55 s. Leap's Team price is shown as its two published figures; no five-user total is computed on screen. The directory shot searches Austin (first row Austin, AR) and has no ring.
 
 ### 5d. `brand-vs-ahrefs-semrush` — "Do you need Ahrefs or Semrush? SEO for a local contractor" — NEEDS OWNER SIGN-OFF · SCRIPT ONLY (waits for the SEO upgrades)
 

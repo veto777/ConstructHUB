@@ -74,7 +74,10 @@ async function main() {
     if (!clip || clip.text !== s.narration) throw new Error(`Step ${i}: narration.json is stale — run narrate.ts and record.ts again`);
     if (clip.durationMs !== timings.steps[i].narrationMs) throw new Error(`Step ${i}: recorded against a different clip — record again`);
   });
-  const cardMs = Math.round(flagNum(args, "card", 1.8) * 1000), endCardMs = Math.round(flagNum(args, "end", 4) * 1000);
+  // A film that opens on its own hook card (the overview films) gets a short title card and a short end card:
+  // its hook is spoken inside the first two seconds, and it ends on its own tagline.
+  const film = script.steps[0].action === "card";
+  const cardMs = Math.round(flagNum(args, "card", film ? 0.8 : 1.8) * 1000), endCardMs = Math.round(flagNum(args, "end", film ? 2.5 : 4) * 1000);
   if (cardMs > 2000) throw new Error("the intro card is 2 s at most");
   const crf = flagNum(args, "crf", 23);
   const { width, height } = timings.video ?? timings.viewport;

@@ -66,8 +66,9 @@ export const CARD_CSS = (font: string) => `
 .tc .col ul{list-style:none;padding:0;width:100%;display:flex;flex-direction:column;gap:3px}
 .tc .col li{font:600 14.5px/1.25 system-ui,"Segoe UI",sans-serif;padding:4px 8px;border-radius:8px;background:rgba(11,47,122,.07)}
 .tc .col.us li{background:rgba(249,115,22,.13)}
-.tc .f{position:absolute;left:${CARD_SAFE.x}px;width:${CARD_SAFE.width}px;top:${CARD_SAFE.y + CARD_SAFE.height - 4}px;text-align:center;font:500 11.5px/1.3 system-ui,"Segoe UI",sans-serif;color:#e6efff;opacity:.95}
-.tc .g{position:absolute;right:-6px;bottom:-26px;height:330px;filter:drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff) drop-shadow(0 10px 14px rgba(0,0,0,.45));animation:tcGator .5s .35s cubic-bezier(.2,1.6,.4,1) both}
+.tc .f{position:absolute;left:${CARD_SAFE.x}px;width:${CARD_SAFE.width}px;top:${CARD_SAFE.y + CARD_SAFE.height - 14}px;text-align:center;font:600 13px/1.3 system-ui,"Segoe UI",sans-serif;color:#fff;text-shadow:0 1px 2px rgba(8,42,112,.6)}
+.tc.m .f{width:${CARD_SAFE.width - 190}px;text-align:left}
+.tc .g{position:absolute;right:-22px;bottom:-30px;height:310px;filter:drop-shadow(3px 0 0 #fff) drop-shadow(-3px 0 0 #fff) drop-shadow(0 3px 0 #fff) drop-shadow(0 -3px 0 #fff) drop-shadow(0 10px 14px rgba(0,0,0,.45));animation:tcGator .5s .35s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes tcPop{from{transform:scale(.6);opacity:0}}
 @keyframes tcDrop{from{transform:translateY(-30px);opacity:0}}
 @keyframes tcSlideL{from{transform:translateX(-70px);opacity:0}}
@@ -80,7 +81,7 @@ export function cardHtml(card: TutorialCard, a: { font: string; gator: string } 
   const cols = card.columns?.map((c) => `<div class="col${c.us ? " us" : ""}"><div class="t">${esc(c.title)}</div>${c.value ? `<div class="v">${esc(c.value)}</div>` : ""}${c.unit ? `<div class="u">${esc(c.unit)}</div>` : ""}`
     + `${c.lines?.length ? `<ul>${c.lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}</div>`).join("") ?? "";
   const small = !!card.columns || (!!card.stat && card.headline.length > 18) || card.headline.length > 34;
-  return `<div class="tc"><style>${CARD_CSS(a.font)}</style><div class="rays"></div>`
+  return `<div class="tc${card.mascot ? " m" : ""}"><style>${CARD_CSS(a.font)}</style><div class="rays"></div>`
     + `<div class="in">${card.kicker ? `<div class="k">${esc(card.kicker)}</div>` : ""}<h1${small ? ` class="s"` : ""}>${headline(card.headline, card.accent)}</h1>`
     + `${card.stat ? `<div class="stat"><b${/^\$?\d+$/.test(card.stat.value) ? ` data-count="${esc(card.stat.value)}"` : ""}>${esc(card.stat.value)}</b><span>${esc(card.stat.label)}</span></div>` : ""}`
     + `${cols ? `<div class="cols">${cols}</div>` : ""}</div>`

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, redactCss, screenshot } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, hideCss, redactCss, screenshot } from "../../scripts/tutorials/record";
 import { CARD_SAFE, cardHtml } from "../../scripts/tutorials/card";
 import { lastFrameSeekSec } from "../../scripts/tutorials/lib";
 import { tutorialCardSchema } from "@shared/help/step-script";
@@ -227,6 +227,8 @@ describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
     expect(twin.properties.redactSelectors).toBeTruthy();
     ok({ action: "scroll-to", selector: "[data-testid=card-defaults]" }); ok({ action: "scroll-to", selector: "x", offset: 120 });
     bad({ action: "scroll-to" }); bad({ action: "highlight", selector: "x", offset: 10 });
+    ok({ action: "goto", url: "/crm/clients", selector: "[data-testid=section-customer-jobcam]", offset: 90 }); bad({ action: "goto", url: "/crm", offset: 90 });
+    expect(read("scripts/tutorials/record.ts")).toMatch(/step\.action === "goto" && step\.selector\) return hold\(/); // nothing above the target is filmed
     ok({ action: "click", selector: "x", dialog: "accept" }); bad({ action: "highlight", selector: "x", dialog: "accept" });
     ok({ action: "highlight", selector: "x", punch: 1.4 }); bad({ action: "click", selector: "x", punch: 1.4 }); bad({ action: "highlight", selector: "x", punch: 3 });
     ok({ action: "card", card: { headline: "Five apps to run one job?" } });
@@ -274,7 +276,8 @@ describe("cards, scroll-to, confirm boxes and blur-from-load", () => {
     expect(script(['[data-testid="text-new-api-key"] code'])).toBe(true);
     for (const sel of ["text=Secret", "div >> code", 'p:has-text("key")', "a{color:red}", "x</style>"]) expect(script([sel]), sel).toBe(false);
     const src = read("scripts/tutorials/record.ts");
-    expect(src).toMatch(/addInitScript\(redactFromLoad, redactCss\(script\.redactSelectors\)\)/);
+    expect(src).toMatch(/addInitScript\(redactFromLoad, \(script\.redactSelectors\?\.length \? redactCss\(script\.redactSelectors\)/);
+    expect(hideCss(["nav svg.logo"])).toBe("nav svg.logo{visibility:hidden!important}");
     expect(src).toMatch(/step\.dialog === "accept" \? d\.accept\(\) : d\.dismiss\(\)/);
   });
 
