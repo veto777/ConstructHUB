@@ -328,6 +328,20 @@ Verdict: "Audit #14 is partly resolved"; coverage about 57% (50-64). No cross-ac
 12 LOW  alert promised more names than the page keeps       FIXED: it says the page keeps the 25 strongest.
  Also (open since #12): second tries on a grid are rationed to a quarter of the points, so our own cost stays inside the 1.25x reservation. Unit test.
 
+## Codex audit #16 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-16.md)
+Verdict: "Audit #15 is partly resolved" (the grid period-close fix "is convincing"); coverage about 58% (50-65). No cross-account disclosure or executable task link. What was done:
+ 1 HIGH audit tasks could falsely look resolved        FIXED: "no longer found" is said only when a crawl finished after the task was added, crawled at least four fifths as many pages as the crawl it came from, re-checked that very issue and does not list it; otherwise the task says why nothing can be said (not rechecked / smaller crawl / could not re-check / newest crawl failed). Unit test with each case.
+ 2 MED  reopening bypassed the limit; duplicates failed at capacity  FIXED: reopening takes the same lock and count as adding; a finding already in the plan is "already there" even when the plan is full. Real Postgres 5a-5c.
+ 3 MED  strong losses could stay silent                FIXED: every saved loss is judged before any list is cut to ten; an unknown spam score is shown as unknown, not treated as clean or as spam. Unit + real Postgres 7k.
+ 4 MED  existing monthly anchors                       FIXED: rows anchored a period after they were set are re-anchored to when they were set.
+ 5 MED  "Open the plan" could open another site        FIXED: the link names the site and the plan page shows it.
+ 6 MED  long findings exceeded task limits             FIXED: findings are fitted (title, target, facts, source) before they are sent.
+ 7 MED  an invisible filter after switching site       FIXED: filter, tab and note editor reset with the site; a kind that is gone is dropped.
+ 8 MED  history silently cut at 600                    FIXED: counts come from the database; all open tasks plus the newest 100 closed are shown, with "show more". Real Postgres 5d.
+ 9 MED  a backlink snapshot could be charged then lost FIXED: the snapshot is written inside the charged call (saved first, charged second).
+10 LOW  a failed count shown as "none open"            FIXED: shown as unavailable.
+ Also: "Plan" buttons carry the finding in their accessible name; the first-snapshot text uses the site's own price.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -372,3 +386,4 @@ Verdict: "Audit #14 is partly resolved"; coverage about 57% (50-64). No cross-ac
 - 10/8 slice 23 (Action plan): 264 unit tests incl. the white-label route rule (the four new routes added to its list); real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler passing, tasks 9/9.
 - 10/8 audit #15 fixes: 264 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 27/27, AI + lists 15/15, grid + scheduler all passing (incl. a period-close made to fail once: 9 lookups, then 0 on the next pass), tasks 9/9. Browser: "Refresh now - up to $0.31", the reworded lost-backlinks section, report grid lines over shared points.
 - 10/8 slice 25 (service-area planner): 270 unit tests incl. the white-label route rule (two new routes added). Browser: table built for 42 searches, cell names read out ("siding contractor bellingham: 320 searches a month; you rank 11, beyond page one, with your home page"), gaps selected and sent to the plan (8 added).
+- 10/8 audit #16 fixes: 270 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks all passing. Browser: plan opened for the named site with database counts; the audit task says "Not rechecked since it was added"; a live backlink refresh (201, charged 31c) with the snapshot saved inside the charged call.

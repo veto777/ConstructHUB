@@ -120,6 +120,11 @@ async function main() {
     ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 2))`,
     [junk.id, JSON.stringify([{ domain: "spam.example", authority: 55, spam: 90, follow: true }, { domain: "forum.example", authority: 48, spam: 2, follow: false }])]);
   eq("7j a spammy site or a nofollow link lost is not an alert, whatever its authority", await raiseLinkAlerts(junk.id), null);
+  const { rows: [buried] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'buried.example','desktop') RETURNING id");
+  const junkTen = Array.from({ length: 10 }, (_, i) => ({ domain: `noise${i}.example`, authority: 90 - i, spam: 95, follow: true }));
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 11))`, [buried.id, JSON.stringify([...junkTen, { domain: "chamber.example", authority: 46, spam: 3, follow: true }])]);
+  eq("7k a real loss behind ten stronger junk ones is still found and named", [await raiseLinkAlerts(buried.id), ((await listAlerts(1, buried.id))[0] as any)?.items[0].lost.map((l: any) => l.domain)], ["links_lost", ["chamber.example"]]);
 
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   await pool.end();

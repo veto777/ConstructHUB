@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { lostLinksRequest, parseLostLink } from "./dataforseo";
-import { isStrongLoss, namedLosses, STRONG_LINK } from "./alerts";
+import { isStrongLoss, namedLosses, strongLosses, STRONG_LINK } from "./alerts";
 import { estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 
 describe("lost linking sites, named", () => {
@@ -33,5 +33,12 @@ describe("lost linking sites, named", () => {
     expect(isStrongLoss({ ...row, follow: false })).toBe(false);
     expect(isStrongLoss({ ...row, spam: 80 })).toBe(false);
     expect(isStrongLoss({ ...row, authority: 12 })).toBe(false);
+    // An unknown spam score is not evidence of spam (nor of its absence): the link still counts, and the row says the score is unknown.
+    expect(isStrongLoss({ ...row, spam: null })).toBe(true);
+    // Every saved loss is judged before any list is cut: ten stronger nofollow / spam losses do not hide a real one behind them.
+    const noise = Array.from({ length: 10 }, (_, i) => ({ domain: `noise${i}.example`, authority: 90 - i, follow: i % 2 === 0 ? false : true, spam: i % 2 === 0 ? 1 : 95, from: null, to: null, lastSeen: null }));
+    const real = { domain: "chamber.example", authority: 46, follow: true, spam: 3, from: null, to: null, lastSeen: null };
+    expect(namedLosses([...noise, real]).some((l) => l.domain === "chamber.example")).toBe(false);
+    expect(strongLosses([...noise, real]).map((l) => l.domain)).toEqual(["chamber.example"]);
   });
 });

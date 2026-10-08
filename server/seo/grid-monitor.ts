@@ -54,7 +54,9 @@ export const GRID_WATCH_DDL = [
   `ALTER TABLE seo_grid_watches ADD COLUMN IF NOT EXISTS lease_token text`,
   `ALTER TABLE seo_grid_watches ADD COLUMN IF NOT EXISTS run_scan_id integer`,
   `ALTER TABLE seo_grid_watches ADD COLUMN IF NOT EXISTS alert_scan_id integer`,
-  `UPDATE seo_grid_watches SET anchor_at = next_at WHERE anchor_at IS NULL`,
+  // The anchor is the moment the watch was set. Rows from before that rule (anchored to their first due date, a period
+  // after they were set) are put right; the next due date follows from the anchor when the current period closes.
+  `UPDATE seo_grid_watches SET anchor_at = created_at WHERE anchor_at IS NULL OR anchor_at > created_at + interval '1 day'`,
   // Comparisons owed for finished scans: a queue, not a single slot. Gone with the watch that owed them.
   `CREATE TABLE IF NOT EXISTS seo_grid_owed (
      scan_id integer PRIMARY KEY,

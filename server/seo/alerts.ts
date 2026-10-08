@@ -182,8 +182,17 @@ export function namedLosses(lost: unknown): LostRow[] {
     .sort((a, b) => (b.authority ?? -1) - (a.authority ?? -1)).slice(0, 10)
     .map((l) => ({ domain: l.domain, authority: l.authority ?? null, spam: l.spam ?? null, follow: l.follow !== false, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
 }
-/** Is this lost link one that mattered: a followed link from a real site with some authority? Pure. */
-export const isStrongLoss = (l: LostRow) => (l.authority ?? 0) >= STRONG_LINK && l.follow !== false && (l.spam ?? 0) < SPAM_LIMIT;
+/**
+ * Is this lost link one that mattered: a followed link from a site with some authority that is not known to be spam?
+ * (An unknown spam score is not evidence either way; the alert shows it as unknown.) Pure.
+ */
+export const isStrongLoss = (l: LostRow) => (l.authority ?? 0) >= STRONG_LINK && l.follow !== false && (l.spam == null || l.spam < SPAM_LIMIT);
+/** Every strong loss among ALL the saved losses, strongest first — judged before any list is cut to ten. Pure. */
+export function strongLosses(lost: unknown): LostRow[] {
+  return (Array.isArray(lost) ? lost : []).filter((l): l is LostRow => !!l && typeof l.domain === "string").filter(isStrongLoss)
+    .sort((a, b) => (b.authority ?? -1) - (a.authority ?? -1)).slice(0, 10)
+    .map((l) => ({ domain: l.domain, authority: l.authority ?? null, spam: l.spam ?? null, follow: l.follow !== false, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
+}
 /**
  * After a snapshot, two questions asked separately: did the count of linking sites move enough (linkChange)? and was a
  * link from a strong site lost? A month can gain sites overall and still lose one that mattered — then both are said.
@@ -197,8 +206,9 @@ export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
   const [latest, previous] = rows;
   const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
   // Named losses belong to this comparison only when they were collected since the snapshot it is compared with.
-  const lost = latest.changes?.since === previous.taken_on ? namedLosses(latest.changes?.lost) : [];
-  const strong = lost.filter(isStrongLoss);
+  const mine = latest.changes?.since === previous.taken_on;
+  const lost = mine ? namedLosses(latest.changes?.lost) : [];
+  const strong = mine ? strongLosses(latest.changes?.lost) : [];
   const counts = { from: previous.summary?.referringDomains ?? null, to: latest.summary?.referringDomains ?? null, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null };
   let raised: string | null = null;
   const raise = async (kind: "links_lost" | "links_gained", title: string, names: LostRow[]) => {

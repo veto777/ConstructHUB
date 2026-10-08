@@ -3,7 +3,7 @@
  * Findings arrive here from "Add to plan" on the Opportunities, Content gap, Link intersect,
  * Backlinks and Site audit screens; you can also write your own. Free (server/seo/tasks.ts).
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ExternalLink, Loader2, Play, Plus, RotateCcw, Trash2, X } from "lucide-react";
@@ -14,8 +14,15 @@ import { api, Empty, fmtDate, fmtNum, SeoShell, Tile, useSelectedSite, useSeoSit
 
 type Kind = "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other";
 type Status = "todo" | "doing" | "done" | "dropped";
-type Task = { id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
-type Data = { tasks: Task[]; max: number };
+type Counts = { todo: number; doing: number; done: number; dropped: number; doneRecently: number };
+type Task = { recheck?: "none" | "smaller" | "not_rechecked" | "failed"; id: number; kind: Kind; title: string; target: string | null; url: string | null; facts: Record<string, string | number | boolean | null>; source: string | null; status: Status; note: string | null; createdAt: string; doneAt: string | null; resolved?: { on: string | null } };
+type Data = { tasks: Task[]; counts: Counts; closedShown: number; max: number };
+const RECHECK: Record<NonNullable<Task["recheck"]>, string> = {
+  none: "Not rechecked since it was added — run a new crawl in Site audit to see whether it is fixed.",
+  smaller: "A newer crawl did not list this, but it covered far fewer pages than the crawl this came from, so that proves nothing yet.",
+  not_rechecked: "The newest crawl could not re-check this (it crawled other pages, or had no Google profile attached).",
+  failed: "The newest crawl failed, so this has not been rechecked.",
+};
 
 const KIND: Record<Kind, string> = { keyword: "Keyword", page: "New page", link_reclaim: "Win back a link", link_prospect: "Ask for a link", audit: "Site fix", other: "Other" };
 const STATUS: Record<Status, string> = { doing: "In progress", todo: "To do", done: "Done", dropped: "Dropped" };
@@ -37,8 +44,11 @@ export default function SeoPlanPage() {
   const [site, onSite] = useSelectedSite(sites.data);
   const qc = useQueryClient();
   const { toast } = useToast();
+  // "Open the plan" from another screen names the site it added to: that site is the one shown.
+  useEffect(() => { const want = Number(new URLSearchParams(window.location.search).get("site")); if (want && sites.data?.some((s) => s.id === want) && site?.id !== want) onSite(want); }, [sites.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [closedLimit, setClosedLimit] = useState(100);
   const key = `/api/seo/sites/${site?.id}/tasks`;
-  const q = useQuery<Data>({ queryKey: [key], enabled: !!site });
+  const q = useQuery<Data>({ queryKey: [key, closedLimit], queryFn: () => api("GET", `${key}?closed=${closedLimit}`), enabled: !!site });
   const [kind, setKind] = useState<Kind | "all">("all");
   const [showClosed, setShowClosed] = useState(false);
   const [title, setTitle] = useState("");
@@ -64,8 +74,12 @@ export default function SeoPlanPage() {
   const open = all.filter((t) => t.status === "todo" || t.status === "doing");
   const closed = all.filter((t) => t.status === "done" || t.status === "dropped");
   const kinds = useMemo(() => [...new Set(all.map((t) => t.kind))], [all]);
+  // A filter that no longer applies (another site, or the last task of that kind gone) is dropped, never left hiding everything.
+  useEffect(() => { setKind("all"); setShowClosed(false); setNoteFor(null); setClosedLimit(100); }, [site?.id]);
+  useEffect(() => { if (kind !== "all" && q.data && !kinds.includes(kind)) setKind("all"); }, [kinds, kind, q.data]);
+  const counts = q.data?.counts;
+  const closedTotal = counts ? counts.done + counts.dropped : closed.length;
   const shown = (showClosed ? closed : open).filter((t) => kind === "all" || t.kind === kind);
-  const doneThisMonth = all.filter((t) => t.status === "done" && t.doneAt && new Date(t.doneAt).getTime() > Date.now() - 30 * 864e5).length;
   const set = (t: Task, s: Status) => site && change.mutate({ siteId: site.id, id: t.id, patch: { status: s } });
 
   return (
@@ -76,10 +90,10 @@ export default function SeoPlanPage() {
       {site && q.data && (
         <>
           <div className="g-tiles mb-4">
-            <Tile label="To do" value={fmtNum(open.filter((t) => t.status === "todo").length)} testId="tile-plan-todo" />
-            <Tile label="In progress" value={fmtNum(open.filter((t) => t.status === "doing").length)} testId="tile-plan-doing" />
-            <Tile label="Done in the last 30 days" value={fmtNum(doneThisMonth)} testId="tile-plan-done" />
-            <Tile label="Done in all" value={fmtNum(all.filter((t) => t.status === "done").length)} testId="tile-plan-total" />
+            <Tile label="To do" value={fmtNum(counts?.todo ?? 0)} testId="tile-plan-todo" />
+            <Tile label="In progress" value={fmtNum(counts?.doing ?? 0)} testId="tile-plan-doing" />
+            <Tile label="Done in the last 30 days" value={fmtNum(counts?.doneRecently ?? 0)} testId="tile-plan-done" />
+            <Tile label="Done in all" value={fmtNum(counts?.done ?? 0)} testId="tile-plan-total" />
           </div>
           <form className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate({ siteId: site.id, title: title.trim() }); }} data-testid="form-plan-add">
             <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">A task of your own</span>
@@ -89,7 +103,7 @@ export default function SeoPlanPage() {
           </form>
           <nav className="g-tabs" aria-label="Tasks">
             <a href="#open" aria-current={!showClosed ? "page" : undefined} onClick={(e) => { e.preventDefault(); setShowClosed(false); }} data-testid="tab-plan-open">Open <span className="g-text-2 tabular-nums">{fmtNum(open.length)}</span></a>
-            <a href="#closed" aria-current={showClosed ? "page" : undefined} onClick={(e) => { e.preventDefault(); setShowClosed(true); }} data-testid="tab-plan-closed">Done and dropped <span className="g-text-2 tabular-nums">{fmtNum(closed.length)}</span></a>
+            <a href="#closed" aria-current={showClosed ? "page" : undefined} onClick={(e) => { e.preventDefault(); setShowClosed(true); }} data-testid="tab-plan-closed">Done and dropped <span className="g-text-2 tabular-nums">{fmtNum(closedTotal)}</span></a>
           </nav>
           {kinds.length > 1 && (
             <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[13px]" role="group" aria-label="Show only">
@@ -116,7 +130,8 @@ export default function SeoPlanPage() {
                         {t.url ? <a href={t.url} className="g-link" target="_blank" rel="noreferrer">{t.url.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="inline h-3 w-3" aria-hidden /></a> : t.target}
                         {(t.url || t.target) && facts(t) ? " · " : ""}{facts(t)}{(t.url || t.target || facts(t)) ? " · " : ""}added {fmtDate(t.createdAt)}
                       </p>
-                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>The latest crawl{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} no longer finds this. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
+                      {t.recheck && !t.resolved && <p className="g-text-2 mt-1 text-[12px]" data-testid={`task-recheck-${t.id}`}>{RECHECK[t.recheck]}</p>}
+                      {t.resolved && <p className="mt-1 text-[13px]" style={{ color: "var(--g-green, #188038)" }} role="status" data-testid={`task-resolved-${t.id}`}>A crawl made after you added this{t.resolved.on ? ` (${fmtDate(t.resolved.on)})` : ""} re-checked it and no longer finds it{t.recheck === "failed" ? " — though a newer crawl since then failed" : ""}. <button type="button" className="g-link" disabled={change.isPending} onClick={() => set(t, "done")}>Mark it done</button></p>}
                       {noteFor === t.id ? (
                         <form className="mt-2 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); change.mutate({ siteId: site.id, id: t.id, patch: { note: note.trim() || null } }); }}>
                           <label className="min-w-0 flex-1"><span className="sr-only">Note for {t.title}</span><textarea className="g-input min-h-[64px] w-full py-2" value={note} maxLength={2000} onChange={(e) => setNote(e.target.value)} autoFocus data-testid={`input-task-note-${t.id}`} /></label>
@@ -137,6 +152,7 @@ export default function SeoPlanPage() {
               ))}
             </ul>
           )}
+          {showClosed && closedTotal > closed.length && <p className="g-text-2 mt-3 text-[13px]" data-testid="plan-more-closed">Showing the latest {fmtNum(closed.length)} of {fmtNum(closedTotal)}. <button type="button" className="g-link" disabled={q.isFetching} onClick={() => setClosedLimit((n) => Math.min(1000, n * 5))}>Show more</button></p>}
           <p className="g-text-2 mt-3 text-[12px]">The plan is yours to keep: nothing here spends SEO data. The numbers on a task are what they were when you added it — the screen it came from has today's.</p>
         </>
       )}

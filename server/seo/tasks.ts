@@ -59,8 +59,10 @@ export const TASK_SCHEMA_DDL = [
 export type Task = {
   id: number; kind: TaskKind; title: string; target: string | null; /** `target` when it is a web address safe to link to. */ url: string | null;
   facts: Record<string, string | number | boolean | null>; source: string | null; status: TaskStatus; note: string | null; createdAt: string; doneAt: string | null;
-  /** Audit tasks: the newest crawl no longer has this issue (it is not marked done for the customer — they decide). */
+  /** Audit tasks: a crawl made AFTER the task was added, at least as wide as the one it came from, re-checked this issue and no longer finds it. (The customer still decides when it is done.) */
   resolved?: { on: string | null };
+  /** Audit tasks: why nothing can be said yet — no crawl since it was added, the newer crawl covered too little or could not re-check this issue, or the newest crawl failed. */
+  recheck?: "none" | "smaller" | "not_rechecked" | "failed";
 };
 /** A task row as the page gets it. Pure. */
 export function toTask(r: any): Task {
@@ -73,31 +75,69 @@ export function toTask(r: any): Task {
     createdAt: new Date(r.created_at).toISOString(), doneAt: r.done_at ? new Date(r.done_at).toISOString() : null,
   };
 }
+/** What the newest finished crawl says, for judging audit tasks. */
+export type CrawlEvidence = {
+  /** Issues that crawl found. */ issueKeys: ReadonlySet<string>;
+  /** Issues it could not re-check (other pages crawled, or no Google profile attached this time). */ notRechecked: ReadonlySet<string>;
+  scannedAt: string | null; /** Pages it crawled. */ crawled: number;
+  /** A newer crawl than that one failed: the picture is older than the customer may think. */ newerFailed: boolean;
+};
 /**
- * Which open audit tasks the newest crawl no longer finds. `issueKeys` are the issues that crawl DID find; a task
- * whose issue is not among them is resolved as far as the crawl can see. Pure.
+ * What can honestly be said about each open audit task. "No longer found" is claimed only when a crawl finished AFTER
+ * the task was added, crawled at least four fifths as many pages as the crawl the task came from (when that is
+ * recorded), re-checked this very issue, and does not list it. Anything less is "not rechecked", with the reason.
+ * A task is never marked done here — the customer decides. Pure.
  */
-export function markResolved(tasks: Task[], issueKeys: ReadonlySet<string> | null, scannedAt: string | null): Task[] {
-  if (!issueKeys) return tasks;
-  return tasks.map((t) => (t.kind === "audit" && t.source?.startsWith("audit:") && (t.status === "todo" || t.status === "doing") && !issueKeys.has(t.source.slice(6)) ? { ...t, resolved: { on: scannedAt } } : t));
+export function markResolved(tasks: Task[], crawl: CrawlEvidence | null): Task[] {
+  return tasks.map((t) => {
+    if (t.kind !== "audit" || !t.source?.startsWith("audit:") || (t.status !== "todo" && t.status !== "doing")) return t;
+    const key = t.source.slice(6);
+    if (!crawl || !crawl.scannedAt || new Date(crawl.scannedAt).getTime() <= new Date(t.createdAt).getTime()) return { ...t, recheck: crawl?.newerFailed ? "failed" as const : "none" as const };
+    if (crawl.issueKeys.has(key)) return t; // still there: nothing to add
+    if (crawl.notRechecked.has(key)) return { ...t, recheck: "not_rechecked" as const };
+    const was = typeof t.facts.crawled === "number" ? t.facts.crawled : null;
+    if (was !== null && crawl.crawled < was * 0.8) return { ...t, recheck: "smaller" as const };
+    return { ...t, resolved: { on: crawl.scannedAt }, ...(crawl.newerFailed ? { recheck: "failed" as const } : {}) };
+  });
 }
 
-const ORDER = `CASE status WHEN 'doing' THEN 0 WHEN 'todo' THEN 1 WHEN 'done' THEN 2 ELSE 3 END`;
-export async function listTasks(userId: number, siteId: number): Promise<Task[]> {
-  const { rows } = await pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 ORDER BY ${ORDER}, coalesce(done_at, created_at) DESC, id DESC LIMIT 600`, [siteId, userId]);
-  return rows.map(toTask);
+const OPEN = "status IN ('todo','doing')";
+export type TaskCounts = { todo: number; doing: number; done: number; dropped: number; /** Finished in the last 30 days. */ doneRecently: number };
+/**
+ * The plan as the page shows it: every open task (never more than the limit), the newest `closedLimit` done or dropped
+ * ones, and counts of everything — so a long history is neither silently cut nor miscounted.
+ */
+export async function listTasks(userId: number, siteId: number, closedLimit = 100): Promise<{ tasks: Task[]; counts: TaskCounts; closedShown: number }> {
+  const limit = Math.min(1000, Math.max(1, Math.floor(closedLimit)));
+  const [{ rows: open }, { rows: closed }, { rows: [c] }] = await Promise.all([
+    pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND ${OPEN} ORDER BY CASE status WHEN 'doing' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT ${MAX_OPEN_TASKS + 50}`, [siteId, userId]),
+    pool.query(`SELECT * FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND NOT (${OPEN}) ORDER BY coalesce(done_at, updated_at) DESC, id DESC LIMIT $3`, [siteId, userId, limit]),
+    pool.query(
+      `SELECT count(*) FILTER (WHERE status='todo')::int AS todo, count(*) FILTER (WHERE status='doing')::int AS doing, count(*) FILTER (WHERE status='done')::int AS done,
+              count(*) FILTER (WHERE status='dropped')::int AS dropped, count(*) FILTER (WHERE status='done' AND done_at > now() - interval '30 days')::int AS "doneRecently"
+         FROM seo_tasks WHERE site_id=$1 AND user_id=$2`, [siteId, userId]),
+  ]);
+  return { tasks: [...open, ...closed].map(toTask), counts: c, closedShown: closed.length };
 }
-/** Add findings to the plan. One that is already there (same source) is left as it is. The limit holds across requests: the site's row is locked for the count and the inserts. */
+/**
+ * Add findings to the plan. One that is already there (same source) is left as it is and does not count against the
+ * limit. The limit holds across requests: the site's row is locked for the count and the inserts.
+ */
 export async function addTasks(userId: number, siteId: number, tasks: z.infer<typeof taskInput>[]): Promise<{ added: number; already: number }> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
     const { rows: [site] } = await client.query("SELECT id FROM seo_sites WHERE id=$1 AND user_id=$2 FOR UPDATE", [siteId, userId]);
     if (!site) throw new TaskError("Site not found", 404);
-    const { rows: [{ n }] } = await client.query("SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND status IN ('todo','doing')", [siteId]);
+    // What is really new: not already in the plan, and not twice in this request.
+    const sources = [...new Set(tasks.map((t) => t.source).filter((s): s is string => !!s))];
+    const { rows: have } = sources.length ? await client.query("SELECT source FROM seo_tasks WHERE site_id=$1 AND source = ANY($2::text[])", [siteId, sources]) : { rows: [] as any[] };
+    const known = new Set<string>(have.map((r: any) => r.source));
+    const fresh = tasks.filter((t) => { if (!t.source) return true; if (known.has(t.source)) return false; known.add(t.source); return true; });
+    const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);
+    if (n + fresh.length > MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks${fresh.length > 1 ? ` and these would make ${n + fresh.length}` : ""}. Finish or drop some first.`, 403);
     let added = 0;
-    for (const t of tasks) {
-      if (n + added >= MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop some first.`, 403);
+    for (const t of fresh) {
       const { rowCount } = await client.query(
         `INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (site_id, source) WHERE source IS NOT NULL DO NOTHING`,
         [userId, siteId, t.kind, t.title, t.target, JSON.stringify(t.facts), t.source]);
@@ -107,19 +147,35 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
     return { added, already: tasks.length - added };
   } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; } finally { client.release(); }
 }
-/** Change a task's status, note or title. Finishing stamps the day; reopening clears it. */
+/**
+ * Change a task's status, note or title. Finishing stamps the day; reopening clears it — and reopening counts
+ * against the same limit as adding, under the same lock on the site's row, so the plan cannot be overfilled that way.
+ */
 export async function updateTask(userId: number, taskId: number, patch: z.infer<typeof taskPatch>): Promise<Task> {
-  const { rows: [row] } = await pool.query(
-    `UPDATE seo_tasks SET
-       status = coalesce($3, status),
-       done_at = CASE WHEN $3 IS NULL THEN done_at WHEN $3 = 'done' THEN coalesce(done_at, now()) ELSE NULL END,
-       note = CASE WHEN $4 THEN $5 ELSE note END,
-       title = coalesce($6, title),
-       updated_at = now()
-     WHERE id=$1 AND user_id=$2 RETURNING *`,
-    [taskId, userId, patch.status ?? null, patch.note !== undefined, patch.note || null, patch.title ?? null]);
-  if (!row) throw new TaskError("That task is no longer there.", 404);
-  return toTask(row);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows: [cur] } = await client.query("SELECT site_id, status FROM seo_tasks WHERE id=$1 AND user_id=$2", [taskId, userId]);
+    if (!cur) throw new TaskError("That task is no longer there.", 404);
+    const opening = (patch.status === "todo" || patch.status === "doing") && cur.status !== "todo" && cur.status !== "doing";
+    if (opening) {
+      await client.query("SELECT id FROM seo_sites WHERE id=$1 FOR UPDATE", [cur.site_id]);
+      const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [cur.site_id]);
+      if (n >= MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks. Finish or drop one before reopening this.`, 403);
+    }
+    const { rows: [row] } = await client.query(
+      `UPDATE seo_tasks SET
+         status = coalesce($3, status),
+         done_at = CASE WHEN $3 IS NULL THEN done_at WHEN $3 = 'done' THEN coalesce(done_at, now()) ELSE NULL END,
+         note = CASE WHEN $4 THEN $5 ELSE note END,
+         title = coalesce($6, title),
+         updated_at = now()
+       WHERE id=$1 AND user_id=$2 RETURNING *`,
+      [taskId, userId, patch.status ?? null, patch.note !== undefined, patch.note || null, patch.title ?? null]);
+    if (!row) throw new TaskError("That task is no longer there.", 404);
+    await client.query("COMMIT");
+    return toTask(row);
+  } catch (e) { await client.query("ROLLBACK").catch(() => {}); throw e; } finally { client.release(); }
 }
 export async function deleteTask(userId: number, taskId: number): Promise<boolean> {
   const { rowCount } = await pool.query("DELETE FROM seo_tasks WHERE id=$1 AND user_id=$2", [taskId, userId]);

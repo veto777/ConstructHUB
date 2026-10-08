@@ -37,7 +37,7 @@ export default function SeoBacklinksPage() {
       {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add a site above to see its backlinks.</p></Empty>}
       {site && data.isLoading && <p className="g-text-2 text-[14px]" role="status">Loading backlinks…</p>}
       {site && data.isError && <div className="g-callout" role="alert" data-testid="seo-backlinks-error"><h3>Couldn't load the backlinks</h3><p>{apiErrorMessage(data.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void data.refetch()}>Try again</button></div>}
-      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h3>No snapshot for {site.domain} yet</h3><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own, and each one lists the backlinks found gone since the last.{status.data ? ` A refresh costs ${priceOf(status.data, "backlinkRefresh")} of your SEO data.` : ""}</p></Empty>}
+      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h3>No snapshot for {site.domain} yet</h3><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own, and each one lists the backlinks found gone since the last.{refreshCents != null ? ` This first snapshot costs up to ${money(refreshCents)} of your SEO data.` : ""}</p></Empty>}
       {site && d?.snapshot && s && (
         <>
           <p className="g-text-2 mb-3 text-[13px]" data-testid="text-snapshot-meta">Snapshot from {fmtDate(d.snapshot.takenOn)}{p && d.previous ? ` · compared with ${fmtDate(d.previous.takenOn)}` : ""} · next automatic snapshot {fmtDate(d.nextSnapshotAt)}</p>
