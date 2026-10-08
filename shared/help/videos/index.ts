@@ -9,6 +9,7 @@ export { default as v_crm_client_new } from "./crm-client-new.json";
 export { default as v_crm_client_notes } from "./crm-client-notes.json";
 export { default as v_crm_client_portal } from "./crm-client-portal.json";
 export { default as v_crm_client_quick_actions } from "./crm-client-quick-actions.json";
+export { default as v_crm_change_orders } from "./crm-change-orders.json";
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_company_settings } from "./crm-company-settings.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
@@ -17,6 +18,7 @@ export { default as v_crm_document_defaults } from "./crm-document-defaults.json
 export { default as v_crm_estimate_approved } from "./crm-estimate-approved.json";
 export { default as v_crm_estimate_discounts } from "./crm-estimate-discounts.json";
 export { default as v_crm_estimate_edit } from "./crm-estimate-edit.json";
+export { default as v_crm_estimate_options } from "./crm-estimate-options.json";
 export { default as v_crm_estimates } from "./crm-estimates.json";
 export { default as v_crm_follow_ups } from "./crm-follow-ups.json";
 export { default as v_crm_home } from "./crm-home.json";

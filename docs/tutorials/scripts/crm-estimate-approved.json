@@ -62,7 +62,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"project-demo-project-p-1994\"]",
+      "selector": "[data-testid^=\"project-\"]:has-text(\"P-1994\")",
       "caption": "Project: Approved",
       "narration": "Their project has moved to Approved by itself."
     },

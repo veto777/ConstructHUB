@@ -1,0 +1,172 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-estimate-options",
+  "title": "Offer good / better / best options",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "chapter": "Open Options",
+      "narration": "Give a client a choice: good, better and best on one estimate."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-clients\"]",
+      "value": "Halvorsen",
+      "caption": "Search for the client",
+      "narration": "On Clients, search for the client."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Halvorsen-Quist Properties\")",
+      "caption": "Open the client",
+      "holdMs": 1200,
+      "narration": "Open their page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-options-demo-estimate-e-2000\"]",
+      "caption": "Options",
+      "narration": "Under Estimates, choose Options on the estimate."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-name\"]",
+      "value": "Good",
+      "caption": "Option name",
+      "chapter": "Add the options",
+      "narration": "Type the first option's name."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-total\"]",
+      "value": "21900",
+      "caption": "Total",
+      "narration": "Give it a total."
+    },
+    {
+      "action": "type",
+      "selector": "#opt-desc",
+      "value": "12 mil plank, standard underlayment",
+      "caption": "Description",
+      "narration": "And say in a line what the client gets."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-option-show-total\"]",
+      "caption": "Show the total to the client",
+      "narration": "Tick Show the total to the client, so they see the price."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-option\"]",
+      "caption": "Add option",
+      "narration": "Choose Add option."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-name\"]",
+      "value": "Better",
+      "caption": "Second option",
+      "narration": "Add the next one the same way."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-option-total\"]",
+      "value": "24300",
+      "caption": "Total",
+      "narration": "This one costs a little more,"
+    },
+    {
+      "action": "type",
+      "selector": "#opt-desc",
+      "value": "20 mil plank, acoustic underlayment",
+      "caption": "Description",
+      "narration": "for a thicker plank and a quieter floor."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-option-show-total\"]",
+      "caption": "Show total",
+      "narration": "Tick Show the total again."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"check-option-recommended\"]",
+      "caption": "Recommended",
+      "narration": "And tick Recommended on the one you want to stand out."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-option\"]",
+      "caption": "Add option",
+      "narration": "Then Add option again."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"option-\"]:has-text(\"Better\") >> nth=0",
+      "caption": "The list of options",
+      "chapter": "What the client sees",
+      "narration": "Both options are listed, and Better is marked recommended."
+    },
+    {
+      "action": "click",
+      "selector": "role=dialog >> role=button[name=\"Close\"]",
+      "caption": "Close",
+      "narration": "Close the list."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-preview-demo-estimate-e-2000\"]",
+      "caption": "Preview",
+      "narration": "Then choose Preview to see the estimate the way your client does."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"option-2\"]",
+      "caption": "Choose your option",
+      "narration": "Under Choose your option, the client sees both, with the recommended one marked."
+    },
+    {
+      "action": "back",
+      "caption": "Back to the CRM",
+      "narration": "Go back to the CRM."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Menu: Clients",
+      "narration": "You'll find your clients, and their estimates, under Clients in the menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to offer good / better / best options | ConstructHUB CRM",
+    "description": "A short walkthrough of estimate options in the ConstructHUB CRM. You will open Options on a client's estimate, add a Good and a Better option with a total and a description, mark one recommended, and preview what the client sees.",
+    "tags": [
+      "good better best",
+      "estimate options",
+      "contractor estimate",
+      "estimating software",
+      "upsell",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Good better best",
+    "accent": "best",
+    "kicker": "CRM Tutorial",
+    "step": 15
+  }
+}
