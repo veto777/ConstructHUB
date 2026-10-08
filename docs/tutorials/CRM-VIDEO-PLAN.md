@@ -150,6 +150,7 @@ missing. Keys E–G are the rows proposed by the coverage audit (not yet rows of
 | `crm-estimate-tracking` (E3) | Seeded opens | `email.opened` (visits at believable earlier times) or a real open in the client's session |
 | `crm-team-crew-view` (G6) | A second sign-in | `session: "member:Marco Delgado"` (really signed in as that member) |
 | `crm-pipeline-move` (A13) | Drag | `drag` |
+| Any row filmed on a New York or Texas project page (`crm-project*`, C-batch project tabs, JobCam for a job) | Their ids were not uuids: "Project not found" | Fixed in the template 2026-10-08 02:58 UTC — the sixteen jobs are listed in `PRODUCER-GUIDE.md`, "Demo data". Old `demo-project-…` / `demo-client-…` selectors must be replaced |
 
 **Still blocked**
 
@@ -159,5 +160,4 @@ missing. Keys E–G are the rows proposed by the coverage audit (not yet rows of
 | `crm-team-join` (E11) | Needs a signed-out visitor: a slot signs every CRM visitor in as the demo owner. Recorder / slot work |
 | `crm-plans-choose` (E10), `crm-billing` (D16, checkout), `crm-jobcam-storage` (F14, add-on purchase) | The platform's own billing is not fixtured (only the CRM's connected payments are). Stop at the button, as written |
 | `crm-setup-checklist` (E1) | Needs a workspace whose onboarding is unfinished (seed) |
-| Project pages of the New York and Texas jobs (any row filmed on them) | Their ids (`demo-project-p-…`) are not uuids and the project page answers "Project not found" — a seed fix in `seed-demo.ts` |
 | `crm-project-permits` (C10), packages in `crm-estimate-options` (B4), lead source in `crm-lead-new` (A11) | The product has no screen for it (audit, section e) |
