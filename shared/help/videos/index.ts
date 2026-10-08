@@ -7,5 +7,6 @@ export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_create_menu } from "./crm-create-menu.json";
 export { default as v_crm_home } from "./crm-home.json";
 export { default as v_crm_lead_new } from "./crm-lead-new.json";
+export { default as v_crm_pipeline_move } from "./crm-pipeline-move.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_database_directory } from "./database-directory.json";

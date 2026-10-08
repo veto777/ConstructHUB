@@ -5,3 +5,4 @@ export { default as e_crm_client_new } from "./crm/crm-client-new";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_create_menu } from "./crm/crm-create-menu";
 export { default as e_crm_lead_new } from "./crm/crm-lead-new";
+export { default as e_crm_pipeline_move } from "./crm/crm-pipeline-move";
