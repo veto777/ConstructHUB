@@ -52,10 +52,14 @@ export const mediaKey = (conceptId: string, sha: string, what: "clip" | "cover")
 /** A Short on our own channel (YouTube's API, never Blotato). `uploading` = the request left and no answer was recorded: never sent again by itself. */
 export type YoutubeShort = { conceptId: string; title: string; sha256: string; status: "uploading" | "uploaded" | "failed"; videoId: string | null; url: string | null; privacyStatus: string | null; containsSyntheticMedia: true; playlist: string | null; startedAt: string; uploadedAt?: string | null; error?: string | null };
 export const SHORTS_PLAYLIST = "ConstructHUB Gator Shorts";
+/** The three pilots were posted before styles had numbers: they are style 6 (cartoon with a meme caption). */
+const PILOT_STYLE: Record<string, number> = { "while-youre-here": 6, "two-day-job": 6, "shingle-rhythm": 6 };
 export const ledgerKey = (conceptId: string) => `gator:${conceptId}`;
 /** Every entry of this ledger is a gator clip: marked so, whatever wrote it. */
 export const saveViralLedger = (file: string) => (l: SocialLedger) => {
-  const posts = l.posts.map((p) => ({ ...p, stream: "viral" as const, conceptId: p.helpKey.replace(/^gator:/, ""), aiGenerated: true as const }));
+  // …and carries the style of the experiment it belongs to (docs/gator/STYLES.md), for the scoreboard.
+  const styleOf = (id: string): number | null => { try { const f = path.join(OUT, id, "social.json"); return (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")).style : null) ?? PILOT_STYLE[id] ?? null; } catch { return null; } };
+  const posts = l.posts.map((p) => { const conceptId = p.helpKey.replace(/^gator:/, ""); return { ...p, stream: "viral" as const, conceptId, style: (p as { style?: number | null }).style ?? styleOf(conceptId), aiGenerated: true as const }; });
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const youtube = (l as unknown as ViralLedger & { youtube?: YoutubeShort[] }).youtube ?? [];
   const tmp = `${file}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify({ version: 1, stream: "viral", timezone: l.timezone, posts, youtube }, null, 2) + "\n"); fs.renameSync(tmp, file);

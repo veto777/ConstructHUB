@@ -1,0 +1,3 @@
+conceptId,platform,checkpoint,views,likes,comments,shares
+# Typed by a person from each app's insights (Blotato's API has no analytics). checkpoint: 2h | 24h | 72h.
+# The scoreboard prints the rows it is waiting for: npx tsx scripts/gator/scoreboard.ts --no-fetch

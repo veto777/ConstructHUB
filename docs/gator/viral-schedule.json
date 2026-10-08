@@ -23,7 +23,8 @@
       "conceptId": "while-youre-here",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:28.722Z",
-      "publicUrl": "https://www.instagram.com/reel/DeODYfcgAKS/"
+      "publicUrl": "https://www.instagram.com/reel/DeODYfcgAKS/",
+      "style": 6
     },
     {
       "helpKey": "gator:while-youre-here",
@@ -45,7 +46,8 @@
       "conceptId": "while-youre-here",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:30.158Z",
-      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513814313808154624"
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513814313808154624",
+      "style": 6
     },
     {
       "helpKey": "gator:while-youre-here",
@@ -67,7 +69,8 @@
       "conceptId": "while-youre-here",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:31.579Z",
-      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694146198894136607"
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694146198894136607",
+      "style": 6
     },
     {
       "helpKey": "gator:two-day-job",
@@ -89,7 +92,8 @@
       "conceptId": "two-day-job",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:32.933Z",
-      "errorMessage": "Could not publish on Instagram: The Instagram account is restricted."
+      "errorMessage": "Could not publish on Instagram: The Instagram account is restricted.",
+      "style": 6
     },
     {
       "helpKey": "gator:two-day-job",
@@ -111,7 +115,8 @@
       "conceptId": "two-day-job",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:34.361Z",
-      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513815500192321537"
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513815500192321537",
+      "style": 6
     },
     {
       "helpKey": "gator:two-day-job",
@@ -133,7 +138,8 @@
       "conceptId": "two-day-job",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:35.785Z",
-      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694147256429055262"
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694147256429055262",
+      "style": 6
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -155,7 +161,8 @@
       "conceptId": "shingle-rhythm",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:37.209Z",
-      "publicUrl": "https://www.instagram.com/reel/DeOER4YjJe-/"
+      "publicUrl": "https://www.instagram.com/reel/DeOER4YjJe-/",
+      "style": 6
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -177,7 +184,8 @@
       "conceptId": "shingle-rhythm",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:38.575Z",
-      "errorMessage": "Could not publish to LinkedIn: com.linkedin.content.common.ResponseException: UGC action was blocked because a share limit has been reached for unverified members"
+      "errorMessage": "Could not publish to LinkedIn: com.linkedin.content.common.ResponseException: UGC action was blocked because a share limit has been reached for unverified members",
+      "style": 6
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -199,7 +207,8 @@
       "conceptId": "shingle-rhythm",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:26:40.001Z",
-      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694148278446755103"
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694148278446755103",
+      "style": 6
     },
     {
       "helpKey": "gator:two-day-job",
@@ -221,7 +230,8 @@
       "conceptId": "two-day-job",
       "aiGenerated": true,
       "checkedAt": "2026-10-08T04:30:59.385Z",
-      "publicUrl": "https://www.instagram.com/reel/DeOFEOnDafC/"
+      "publicUrl": "https://www.instagram.com/reel/DeOFEOnDafC/",
+      "style": 6
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -242,7 +252,8 @@
       "stream": "viral",
       "conceptId": "shingle-rhythm",
       "aiGenerated": true,
-      "checkedAt": "2026-10-08T04:31:00.998Z"
+      "checkedAt": "2026-10-08T06:56:49.177Z",
+      "style": 6
     }
   ],
   "youtube": [

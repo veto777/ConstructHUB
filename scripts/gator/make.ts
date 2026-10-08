@@ -411,19 +411,26 @@ async function assembleOneShot(c: Concept, io: Io) {
   const cctv = c.overlay === "cctv" ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf:text='CAM 03   10-08-2026  %{pts\\:hms\\:52327}':x=44:y=300:fontsize=34:fontcolor=white@0.92:box=1:boxcolor=black@0.35:boxborderw=10,eq=saturation=0.82:contrast=1.06,noise=alls=7:allf=t` : "";
   const picture = `[0:v]fps=${FPS},trim=end_frame=${frames},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,format=yuv420p${cctv}`;
   // Subtitles: what he was HEARD to say, a few words at a time, when he says them.
-  const subs: Beat[] = t?.words?.length ? subtitleBeats(t.words, 0, sec) : c.meme ? [{ at: 0, until: sec, text: c.meme, accent: c.meme.split(" ").pop(), pos: "top" }] : [];
+  // Subtitles show what was HEARD — unless the recogniser misheard a short line ("Bro" as "Roo"): then the script, over the time he speaks.
+  const subs: Beat[] = t?.words?.length && t.wordsOk === false && t.speech ? [{ at: Math.max(0, t.speech.start - 0.06), until: Math.min(sec, t.speech.end + 0.8), text: s.say!.text, pos: "low", small: true }] : t?.words?.length ? subtitleBeats(t.words, 0, sec) : c.meme ? [{ at: 0, until: sec, text: c.meme, accent: c.meme.split(" ").pop(), pos: "top" }] : [];
   fs.writeFileSync(w("subs.ass"), assFile(subs.map(layoutBeat)));
   fs.copyFileSync(path.join(ROOT, "scripts/tutorials/assets/Anton-Regular.ttf"), w("Anton-Regular.ttf"));
   const outs: Record<string, any> = {};
+  // A take that is nearly silent between two small sounds (a chalk line, a caulk gun) cannot be brought to −14 LUFS
+  // by one gain under the peak limit: for those the level is ridden instead (loudnorm's dynamic mode), then limited.
+  const dynamic = `[0:a]aresample=${RATE},${pre},loudnorm=I=${LOUDNESS.I}:TP=-2:LRA=${LOUDNESS.LRA},lowpass=f=13000,alimiter=limit=0.6:level=false:attack=2:release=40,apad=whole_dur=${sec.toFixed(3)},aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo[a]`;
   for (const [name, video] of [["pure", `${picture}[v]`], ["captioned", `${picture},ass=subs.ass:fontsdir=.[v]`]] as const) {
     const out = path.join(dir, `${name}.mp4`);
-    fs.writeFileSync(w(`${name}.graph`), `${video};\n${audio}`);
-    await run("ffmpeg", [...FF, "-i", src, "-filter_complex_threads", "4", "-filter_complex_script", `${name}.graph`, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", sec.toFixed(3), "-movflags", "+faststart", out], { nice: true, cwd: work });
-    const probe = JSON.parse((await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", out])).stdout), v = probe.streams.find((x: any) => x.codec_type === "video");
-    const data = fs.readFileSync(out), loud = await measureLoudness(out);
-    if (loud.truePeakDb > -0.5) throw new Error(`${c.id} ${name}.mp4: true peak ${loud.truePeakDb} dBTP`);
+    let loud = { lufs: 0, truePeakDb: 0 }, probe: any, v: any, data = Buffer.alloc(0);
+    for (const [mode, chain] of [["level", audio], ["ridden", dynamic]] as const) {
+      fs.writeFileSync(w(`${name}.graph`), `${video};\n${chain}`);
+      await run("ffmpeg", [...FF, "-i", src, "-filter_complex_threads", "4", "-filter_complex_script", `${name}.graph`, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", sec.toFixed(3), "-movflags", "+faststart", out], { nice: true, cwd: work });
+      probe = JSON.parse((await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", out])).stdout); v = probe.streams.find((x: any) => x.codec_type === "video");
+      data = fs.readFileSync(out); loud = await measureLoudness(out);
+      if (Math.abs(loud.lufs - LOUDNESS.I) <= 2.5 && loud.truePeakDb <= -0.5) break;
+      if (mode === "ridden") { if (loud.truePeakDb > -0.1 || loud.lufs > -11 || loud.lufs < -24) throw new Error(`${c.id} ${name}.mp4: ${loud.lufs} LUFS, true peak ${loud.truePeakDb} dBTP`); io.log(`  ${name}: a quiet take — ${loud.lufs} LUFS is as loud as it goes without pumping`); }
+    }
     if (v?.width !== W || v?.height !== H || v?.avg_frame_rate !== `${FPS}/1` || Math.abs(Number(probe.format.duration) - sec) > 0.15) throw new Error(`${c.id} ${name}.mp4: ${v?.width}x${v?.height} ${v?.avg_frame_rate} ${probe.format.duration} s`);
-    if (Math.abs(loud.lufs - LOUDNESS.I) > 2.5) throw new Error(`${c.id} ${name}.mp4: ${loud.lufs} LUFS`);
     outs[name] = { file: `${name}.mp4`, width: W, height: H, fps: FPS, durationSec: Math.round(Number(probe.format.duration) * 100) / 100, bytes: data.length, sha256: sha256(data), lufs: loud.lufs, truePeakDb: loud.truePeakDb };
   }
   const pure = path.join(dir, "pure.mp4");
