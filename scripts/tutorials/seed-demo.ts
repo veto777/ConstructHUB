@@ -15,7 +15,8 @@
  * ADDITIVE ONLY — step scripts find rows by name: never rename, reorder or delete a demo row.
  *
  * HARD RULES: everything here is fictional. Emails end in example.com, phones are 555-01xx, the
- * photos are flat colour cards made by ffmpeg and labelled as demo photos. Never copy a real
+ * photos are the drawn job-site scenes of scripts/tutorials/assets/photos (gen-assets.ts: flat
+ * illustration, nobody's house). Never copy a real
  * customer, address or job into this file — and it refuses any database that is not a recording
  * database on 127.0.0.1:5432.
  */
@@ -341,53 +342,80 @@ async function main() {
     { n: 11, client: "Halvorsen-Quist Properties", from: "client", body: "Both units will be empty at the same time, so the floors can be done in one visit.", at: local(-5, 16, 30), read: true },
   ] as Msg[]) await addMsg(m);
 
-  // ── JobCam: six photos on the Kane job and three on the Hadley job. Flat colour cards — obviously not anybody's house. ─────
+  // ── A follow-up that is due today, on a lead (producers, 2026-10-08: "Due for follow-up" was always empty) ──
+  // Rosa & Stefan Ferrante (Brooklyn NY, P-1993 Lead): a weekly cadence whose last follow-up was a week
+  // ago this morning — so it is due, zero days overdue, on any day the workspace is copied (the date
+  // shift above moves it along). Set once: a cadence that is already there is left alone.
+  await q(`update crm_customers set follow_up_cadence_days = 7, last_follow_up_at = $3 where org_id = $1 and id = $2 and follow_up_cadence_days is null`,
+    [orgId, customer("Rosa & Stefan Ferrante"), local(-7, 0, 5)]);
+
+  // ── A declined estimate (the Declined tab of Clients was empty) ────────────────────────────────
+  // Dana Whitfield (Osprey FL, P-2002 Lead) had no estimate: E-1996 is her only one, sent, opened and
+  // declined two days ago — so she is the one client under "Declined". Numbered and filed below every
+  // other estimate; 7% typed on it like the other Florida documents.
+  {
+    const id = "demo-estimate-e-1996", who = customer("Dana Whitfield");
+    const lines = [mat("TL-SUB312", 60), mat("TL-SET40", 2), labour("Install crew", 18, "tile install")], t = totals(lines, 700);
+    const [dana] = await q(`select email from crm_customers where id = $1`, [who]);
+    const made = await q(`insert into crm_estimates (id, org_id, customer_id, project_id, number, title, status, intro_text, subtotal_cents, discount_cents, tax_rate_bps, tax_cents, total_cents, public_token,
+               sent_at, sent_to_email, first_viewed_at, last_viewed_at, view_count, declined_at, decline_reason, expires_at, created_by_member_id, created_at, updated_at)
+             values ($1,$2,$3,$4,'E-1996','Kitchen floor — tile option','declined',$5,$6,0,700,$7,$8,$9,$10,$11,$12,$13,2,$13,$14,$15,$16,$17,$17) on conflict (id) do nothing returning id`,
+      [id, orgId, who, project("P-2002"), "Thanks for having us out — here's the tile option we talked about.", t.subtotal, t.tax, t.total, randomBytes(24).toString("hex"),
+        ago(6 * 24 * 60), dana?.email ?? null, ago(5 * 24 * 60), ago(2 * 24 * 60), "Going with a lower-cost option for now.", new Date(Date.now() + 24 * DAY), member("Priya Shah"), before(estimatesOldest, 12)]);
+    if (made.length) for (const [n, l] of lines.entries())
+      await q(`insert into crm_estimate_items (id, org_id, estimate_id, sort_order, kind, name, quantity_milli, unit, unit_price_cents, taxable) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true) on conflict (id) do nothing`,
+        [`${id}-line-${n + 1}`, orgId, id, n, l.kind, l.name, Math.round(l.qty * 1000), l.unit, l.cents]);
+  }
+
+  // ── JobCam: six photos on the Kane job and three on the Hadley job ─────────────────────────────
+  // The pictures are the drawn job-site scenes of scripts/tutorials/assets/photos (gen-assets.ts) —
+  // flat illustration, obviously not anybody's house — one per caption. (Until 2026-10-08 they were
+  // flat brown cards reading "Demo photo N"; a folder that still holds one is re-made, see `source`.)
   for (const [i, t] of [["Before", "#64748b"], ["Progress", "#2563eb"], ["After", "#16a34a"], ["Issue", "#dc2626"]].entries())
     await q(`insert into jobcam_tags (id, org_id, name, color, created_by_member_id) values ($1,$2,$3,$4,$5) on conflict (id) do nothing`, [`demo-tag-${i + 1}`, orgId, t[0], t[1], owner]);
-  type Photo = { n: number; caption: string; colour: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean; job?: [project: string, client: string] };
+  type Photo = { n: number; caption: string; asset: string; tags: string[]; by: string; minutesAgo: number; starred?: boolean; client?: boolean; job?: [project: string, client: string] };
   const photos: Photo[] = [
-    { n: 1, caption: "Living room before — old carpet", colour: "0x8d99ae", tags: ["Before"], by: "Marco Delgado", minutesAgo: 3 * 24 * 60 + 300 },
-    { n: 2, caption: "Subfloor checked and levelled", colour: "0xb08968", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 2 * 24 * 60 + 200 },
-    { n: 3, caption: "First rows of hardwood down", colour: "0x9c6644", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 2 * 24 * 60 + 30, client: true },
-    { n: 4, caption: "Scratch on board by the hallway — replacing it", colour: "0x7f5539", tags: ["Issue"], by: "Dee Okafor", minutesAgo: 24 * 60 + 240 },
-    { n: 5, caption: "Hallway finished", colour: "0xa47148", tags: ["After"], by: "Marco Delgado", minutesAgo: 24 * 60 + 60, starred: true, client: true },
-    { n: 6, caption: "Stair treads dry-fitted", colour: "0x6f4e37", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 90 },
+    { n: 1, caption: "Living room before — old carpet", asset: "site-09.jpg", tags: ["Before"], by: "Marco Delgado", minutesAgo: 3 * 24 * 60 + 300 },
+    { n: 2, caption: "Subfloor checked and levelled", asset: "site-01.jpg", tags: ["Progress"], by: "Marco Delgado", minutesAgo: 2 * 24 * 60 + 200 },
+    { n: 3, caption: "First rows of hardwood down", asset: "site-02.jpg", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 2 * 24 * 60 + 30, client: true },
+    { n: 4, caption: "Scratch on board by the hallway — replacing it", asset: "site-07.jpg", tags: ["Issue"], by: "Dee Okafor", minutesAgo: 24 * 60 + 240 },
+    { n: 5, caption: "Hallway finished", asset: "site-03.jpg", tags: ["After"], by: "Marco Delgado", minutesAgo: 24 * 60 + 60, starred: true, client: true },
+    { n: 6, caption: "Stair treads dry-fitted", asset: "site-05.jpg", tags: ["Progress"], by: "Dee Okafor", minutesAgo: 90 },
     // Three on the Hadley job in Austin (the CRM tour follows that job end to end). Older than every Kane
     // shot and untagged, so the Recent feed still opens on the same six tiles and no tag count moves.
-    { n: 7, caption: "Front room before — old laminate", colour: "0x7d8597", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 200, job: ["P-1997", "Caleb & Nora Hadley"] },
-    { n: 8, caption: "Hallway measured for planks", colour: "0x8a7968", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 185, job: ["P-1997", "Caleb & Nora Hadley"] },
-    { n: 9, caption: "Sample planks against the baseboard", colour: "0xa68a64", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 170, client: true, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 7, caption: "Front room before — old laminate", asset: "site-06.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 200, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 8, caption: "Hallway measured for planks", asset: "site-10.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 185, job: ["P-1997", "Caleb & Nora Hadley"] },
+    { n: 9, caption: "Sample planks against the baseboard", asset: "site-11.jpg", tags: [], by: "Priya Shah", minutesAgo: 5 * 24 * 60 + 170, client: true, job: ["P-1997", "Caleb & Nora Hadley"] },
   ];
-  const font = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
   const kane = project("P-2001");
   for (const p of photos) {
     const id = `demo-photo-${String(p.n).padStart(2, "0")}`;
     const dir = path.join(process.cwd(), "tmp", "jobcam", "jobcam", orgId, id);
     const files = { original: "original.jpg", display: "display.jpg", thumb: "thumb.jpg" };
-    if (!fs.existsSync(path.join(dir, files.thumb))) {
+    // The files live in this working copy (tmp/jobcam is the slot app's local object store), so every
+    // checkout makes its own. `source` says which drawing a folder was made from: a folder without it
+    // holds an old colour card and is made again.
+    const from = path.join(import.meta.dirname, "assets", "photos", p.asset), source = path.join(dir, "source");
+    if (!fs.existsSync(from)) throw new Error(`${p.asset} is not in scripts/tutorials/assets/photos — run gen-assets.ts`);
+    if (!fs.existsSync(path.join(dir, files.thumb)) || !fs.existsSync(source) || fs.readFileSync(source, "utf8").trim() !== p.asset) {
       fs.mkdirSync(dir, { recursive: true });
-      const label = path.join(dir, "label.txt");
-      fs.writeFileSync(label, `Demo photo ${p.n}`);
-      const sub = path.join(dir, "sub.txt");
-      fs.writeFileSync(sub, p.caption);
-      const esc = (f: string) => f.replace(/:/g, "\\:");
-      const made = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-f", "lavfi",
-        "-i", `color=c=${p.colour}:s=1600x1200:d=1,noise=alls=12:allf=t,vignette=PI/5`,
-        "-vf", `drawtext=fontfile=${font}:textfile='${esc(label)}':fontsize=110:fontcolor=white@0.92:x=(w-text_w)/2:y=h/2-130,`
-          + `drawtext=fontfile=${font}:textfile='${esc(sub)}':fontsize=46:fontcolor=white@0.85:x=(w-text_w)/2:y=h/2+40`,
-        "-frames:v", "1", "-q:v", "4", "-update", "1", path.join(dir, files.original)], { encoding: "utf8" });
-      if (made.status !== 0) throw new Error(`ffmpeg could not make ${id}: ${made.stderr}`);
+      fs.copyFileSync(from, path.join(dir, `${files.original}.tmp`));
+      fs.renameSync(path.join(dir, `${files.original}.tmp`), path.join(dir, files.original));
       for (const [name, width] of [[files.display, 1280], [files.thumb, 480]] as const) {
-        const r = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-i", path.join(dir, files.original), "-vf", `scale=${width}:-2`, "-q:v", "5", "-update", "1", path.join(dir, name)], { encoding: "utf8" });
+        // Written beside and renamed: an app serving this folder never reads half a file.
+        const r = spawnSync("nice", ["-n", "10", "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-threads", "2", "-i", path.join(dir, files.original), "-vf", `scale=${width}:-2`, "-q:v", "4", "-update", "1", "-f", "image2", path.join(dir, `${name}.tmp`)], { encoding: "utf8" });
         if (r.status !== 0) throw new Error(`ffmpeg could not scale ${id}: ${r.stderr}`);
+        fs.renameSync(path.join(dir, `${name}.tmp`), path.join(dir, name));
       }
-      fs.rmSync(label); fs.rmSync(sub);
+      fs.writeFileSync(source, `${p.asset}\n`);
     }
     const key = (name: string) => `jobcam/${orgId}/${id}/${name}`;
     const at = ago(p.minutesAgo), bytes = fs.statSync(path.join(dir, files.original)).size;
     await q(`insert into jobcam_media (id, org_id, project_id, customer_id, uploader_member_id, kind, status, file_name, mime, bytes, rendition_bytes,
                r2_key_original, r2_key_display, r2_key_thumb, width, height, captured_at, uploaded_at, caption, caption_source, tags, starred, client_visible, created_at, updated_at)
-             values ($1,$2,$3,$4,$5,'photo','ready',$6,'image/jpeg',$7,$8,$9,$10,$11,1600,1200,$12,$12,$13,'user',$14,$15,$16,$12,$12) on conflict (id) do nothing`,
+             values ($1,$2,$3,$4,$5,'photo','ready',$6,'image/jpeg',$7,$8,$9,$10,$11,1600,1200,$12,$12,$13,'user',$14,$15,$16,$12,$12)
+             -- a row that is already there keeps everything a script may have been written against; only the sizes follow the picture
+             on conflict (id) do update set bytes = excluded.bytes, rendition_bytes = excluded.rendition_bytes`,
       [id, orgId, p.job ? project(p.job[0]) : kane, customer(p.job ? p.job[1] : "Joe & Mary Kane"), member(p.by), `demo-photo-${p.n}.jpg`, bytes,
         fs.statSync(path.join(dir, files.display)).size + fs.statSync(path.join(dir, files.thumb)).size,
         key(files.original), key(files.display), key(files.thumb), at, p.caption, p.tags, !!p.starred, !!p.client]);

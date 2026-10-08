@@ -74,7 +74,7 @@ describe("the demo files an upload may use", () => {
   it("are all there, small, and what they say they are", () => {
     const magic = (f: string, n: number) => fs.readFileSync(path.join(ASSETS_DIR, f)).subarray(0, n);
     const photos = fs.readdirSync(path.join(ASSETS_DIR, "photos")).filter((f) => f.endsWith(".jpg")).sort();
-    expect(photos).toEqual(["site-01.jpg", "site-02.jpg", "site-03.jpg", "site-04.jpg", "site-05.jpg", "site-06.jpg", "site-07.jpg", "site-08.jpg"]);
+    expect(photos).toEqual(Array.from({ length: 11 }, (_x, i) => `site-${String(i + 1).padStart(2, "0")}.jpg`));
     for (const p of photos) { expect([...magic(`photos/${p}`, 3)]).toEqual([0xff, 0xd8, 0xff]); expect(fs.statSync(path.join(ASSETS_DIR, "photos", p)).size).toBeLessThan(200_000); }
     expect(magic("logo-aspire-interiors.png", 4).toString("latin1")).toBe("\x89PNG");
     expect(magic("care-guide.pdf", 5).toString("latin1")).toBe("%PDF-");

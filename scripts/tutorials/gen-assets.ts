@@ -5,7 +5,7 @@
  *
  *   npx tsx scripts/tutorials/gen-assets.ts
  *
- *   assets/photos/site-01.jpg … site-08.jpg   1600×1200 drawn job-site scenes (flat illustration)
+ *   assets/photos/site-01.jpg … site-11.jpg   1600×1200 drawn job-site scenes (flat illustration; 09–11 are for the demo JobCam feed)
  *   assets/clip-floor-walkthrough.mp4         4 s, 1280×720, a slow move across one of them
  *   assets/logo-aspire-interiors.png          the demo company's logo (made up for the demo)
  *   assets/care-guide.pdf                     a one-page brochure
@@ -83,6 +83,20 @@ const scenes: Record<string, string> = {
     + `<rect x="330" y="470" width="940" height="460" fill="#e9e2d2"/><polygon points="270,480 800,170 1330,480" fill="#6b5b53"/>`
     + `<rect x="730" y="660" width="150" height="270" fill="#4b6b88"/>` + windowAt(420, 570, 220, 200) + windowAt(960, 570, 220, 200)
     + `<rect x="330" y="900" width="940" height="30" fill="#bdb6a6"/>`,
+  // 9 — a carpeted room, before (the demo workspace's JobCam feed: seed-demo.ts)
+  "site-09": wall(520, "#e2ded6") + windowAt(250, 120, 400, 300) + `<rect y="520" width="${W}" height="${H - 520}" fill="#a8a59c"/>`
+    + Array.from({ length: 34 }, (_x, i) => `<rect y="${530 + i * 20}" width="${W}" height="${6 + (i % 3) * 2}" fill="${i % 2 ? "#b2afa6" : "#9e9b92"}" opacity="0.55"/>`).join("")
+    + `<rect x="1020" y="560" width="420" height="36" rx="18" fill="#8f8c84"/><rect x="1060" y="330" width="250" height="190" fill="#f5f1ea"/><rect x="1060" y="330" width="250" height="190" fill="none" stroke="#d8d2c6" stroke-width="6"/>`,
+  // 10 — a hallway, a tape measure run along the floor
+  "site-10": `<rect width="${W}" height="${H}" fill="#e7e4dc"/><polygon points="0,0 520,180 520,640 0,1200" fill="#d9d5cb"/><polygon points="${W},0 1080,180 1080,640 ${W},1200" fill="#dedad1"/>`
+    + `<rect x="520" y="180" width="560" height="460" fill="#eeebe4"/><rect x="700" y="260" width="200" height="380" fill="#f5f1ea"/><rect x="720" y="280" width="160" height="360" fill="#c9d1d6"/>`
+    + `<polygon points="520,640 1080,640 ${W},1200 0,1200" fill="#8f949b"/>`
+    + Array.from({ length: 6 }, (_x, i) => { const y = 640 + 560 * ((i + 1) / 7) ** 1.6; return `<line x1="${520 - (520 * (y - 640)) / 560}" y1="${y}" x2="${1080 + (520 * (y - 640)) / 560}" y2="${y}" stroke="#00000022" stroke-width="3"/>`; }).join("")
+    + `<polygon points="760,650 790,650 560,1200 470,1200" fill="#f4c430"/>` + Array.from({ length: 9 }, (_x, i) => { const t = (i + 1) / 10, y = 650 + 550 * t, x = 775 - 260 * t; return `<rect x="${x - 14 - 30 * t}" y="${y}" width="${28 + 60 * t}" height="4" fill="#3d3d3d"/>`; }).join("")
+    + `<rect x="430" y="1090" width="170" height="110" rx="18" fill="#2f3b46"/>`,
+  // 11 — three sample planks leaning on the baseboard
+  "site-11": wall(640, "#e9e6df") + floor(640, VINYL, { rows: 5 })
+    + [["#b98554", 420], ["#d8b98c", 700], ["#7a5a3c", 980]].map(([c, x]) => `<polygon points="${x},250 ${Number(x) + 190},250 ${Number(x) + 230},700 ${Number(x) + 40},700" fill="${c}" stroke="#00000030" stroke-width="4"/><line x1="${Number(x) + 95}" y1="250" x2="${Number(x) + 135}" y2="700" stroke="#00000018" stroke-width="3"/>`).join(""),
 };
 
 const svg = (inner: string, w = W, h = H) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${inner}</svg>`;
