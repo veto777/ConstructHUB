@@ -5,6 +5,7 @@ export { default as e_crm_client_edit } from "./crm/crm-client-edit";
 export { default as e_crm_client_export } from "./crm/crm-client-export";
 export { default as e_crm_client_new } from "./crm/crm-client-new";
 export { default as e_crm_client_notes } from "./crm/crm-client-notes";
+export { default as e_crm_client_quick_actions } from "./crm/crm-client-quick-actions";
 export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_create_menu } from "./crm/crm-create-menu";
 export { default as e_crm_follow_ups } from "./crm/crm-follow-ups";

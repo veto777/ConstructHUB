@@ -5,6 +5,7 @@ export { default as v_crm_client_edit } from "./crm-client-edit.json";
 export { default as v_crm_client_export } from "./crm-client-export.json";
 export { default as v_crm_client_new } from "./crm-client-new.json";
 export { default as v_crm_client_notes } from "./crm-client-notes.json";
+export { default as v_crm_client_quick_actions } from "./crm-client-quick-actions.json";
 export { default as v_crm_clients } from "./crm-clients.json";
 export { default as v_crm_create_estimate } from "./crm-create-estimate.json";
 export { default as v_crm_create_menu } from "./crm-create-menu.json";
