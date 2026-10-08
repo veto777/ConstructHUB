@@ -16,5 +16,7 @@ const entry: HelpDraft = {
   ],
   howItWorks: "Permit office links are checked. One that could not be confirmed is labeled, and where no link is on record you get a web search instead of a made-up address. The CRM is a separate product with its own subscription, and JobCam comes with the top CRM plan or as an add-on to the other two.",
   needs: ["A ConstructHUB account. Each tool’s page says which plan has it."],
+  // An overview film: posted to YouTube and social only when the owner releases it (--release), never by the schedule.
+  youtube: { hold: true },
 };
 export default entry;

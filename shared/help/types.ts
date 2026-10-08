@@ -53,6 +53,13 @@ export type HelpEntry = {
   group: HelpGroup;
   /** The feature this entry is a section of; sections are listed inside their feature's card. */
   parent?: string;
+  /**
+   * Publishing. `hold: true` — this video is NEVER scheduled by the tools on their own: not to YouTube
+   * (youtube-schedule.ts) and not to social (social-post.ts). Their dry runs list it as "held for owner
+   * approval"; it goes out only when a person names it with `--release <key>`. Set on the overview
+   * films ("Start here"): what they say about the company is the owner's to approve.
+   */
+  youtube?: { hold?: boolean };
   /** null until the walkthrough is recorded. */
   video: HelpVideo | null;
 };

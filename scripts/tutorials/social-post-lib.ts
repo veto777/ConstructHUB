@@ -196,7 +196,10 @@ export type PlanOptions = {
   warmupStart?: string | null; warmupDays?: number; warmupPerDay?: number;
   retryFailed?: boolean;
   tz?: string;
+  /** Keys held for the owner's approval (the help entry's `youtube.hold`): never planned, whatever the YouTube ledger says. The caller leaves out the ones released for this run. */
+  held?: readonly string[];
 };
+export const HELD_REASON = "held for owner approval";
 export const WARMUP_DAYS = 14, WARMUP_PER_DAY = 1, CADENCE_PER_DAY = 3;
 /** A time closer than this is sent without `scheduledTime` (Blotato wants a future time; "now" is simply now). */
 export const IMMEDIATE_WITHIN_MS = 90_000;
@@ -217,7 +220,9 @@ export function planPosts(videos: readonly VideoForPost[], targets: readonly Tar
     const dayN = Math.round((new Date(`${date}T00:00:00Z`).getTime() - new Date(`${warmStart}T00:00:00Z`).getTime()) / DAY_MS);
     return dayN < (o.warmupDays ?? WARMUP_DAYS) ? (o.warmupPerDay ?? WARMUP_PER_DAY) : CADENCE_PER_DAY;
   };
-  const order = [...videos].sort((a, b) => a.publishAt.localeCompare(b.publishAt) || a.helpKey.localeCompare(b.helpKey));
+  const held = new Set(o.held ?? []);
+  for (const v of videos) if (held.has(v.helpKey)) for (const t of targets) skipped.push({ helpKey: v.helpKey, accountId: t.id, reason: `${HELD_REASON} — not posted. When the owner has approved it: --release ${v.helpKey}` });
+  const order = videos.filter((v) => !held.has(v.helpKey)).sort((a, b) => a.publishAt.localeCompare(b.publishAt) || a.helpKey.localeCompare(b.helpKey));
   targets.forEach((t, ti) => {
     const used = new Map<string, number>();
     for (const p of ledger.posts) if (p.accountId === t.id && counts(p)) { const d = zoneTime(p.scheduledTime ?? p.createdAt, tz).date; used.set(d, (used.get(d) ?? 0) + 1); }

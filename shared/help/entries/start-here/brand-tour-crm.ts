@@ -14,5 +14,7 @@ const entry: HelpDraft = {
   ],
   howItWorks: "Each step updates the same client and project, so the pipeline, the client’s page and the Home numbers stay in step. Online card and bank payments go to your own Stripe account; checks and cash are recorded by hand.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "JobCam for the job photos: part of the top CRM plan, an add-on to the others."],
+  // An overview film: posted to YouTube and social only when the owner releases it (--release), never by the schedule.
+  youtube: { hold: true },
 };
 export default entry;

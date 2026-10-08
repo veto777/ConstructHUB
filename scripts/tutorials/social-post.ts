@@ -14,6 +14,8 @@
  *   --account id,id     only these of the allowed accounts
  *   --i-checked ID      "I looked: this account is ConstructHUB's although its name does not say so" (repeatable)
  *   --retry-failed      plan again what Blotato reported as failed
+ *   --release KEY       the owner approved KEY: post it although its help entry says `youtube: { hold: true }`
+ *                       (the overview films). Without it a held video is listed as "held for owner approval". Repeatable.
  *   --out-dir DIR       where the productions are (repeatable); --ledger FILE
  *
  * Without --spread a post follows its video's YouTube publish time (docs/tutorials/youtube-schedule.json):
@@ -42,6 +44,7 @@ import {
 } from "./social-post-lib";
 import { PLATFORM_RULES, SOCIAL_PLATFORMS, type SocialPlatform } from "./social-text";
 import { easternLabel } from "../../server/youtube/schedule";
+import { heldHelpKeys } from "../../shared/help/registry";
 
 const LEDGER = path.join(ROOT, "docs", "tutorials", "social-schedule.json");
 const YT_LEDGER = path.join(ROOT, "docs", "tutorials", "youtube-schedule.json");
@@ -134,8 +137,12 @@ async function main() {
     const yt = (JSON.parse(fs.readFileSync(YT_LEDGER, "utf8")).videos as { helpKey: string; status: string; publishAt: string }[]).filter((v) => v.status === "published" || v.status === "scheduled");
     const outDirs = (repeated(argv, "out-dir").map((d) => path.resolve(d)).length ? repeated(argv, "out-dir").map((d) => path.resolve(d)) : DEFAULT_OUT_DIRS).filter((d) => fs.existsSync(d));
     const keys = args._.length ? args._ : yt.map((v) => v.helpKey);
+    const released = repeated(argv, "release"), held = heldHelpKeys().filter((k) => !released.includes(k));
+    for (const k of released) if (!heldHelpKeys().includes(k)) throw new Error(`--release ${k}: that key is not held`);
     const videos: VideoForPost[] = [];
     for (const k of keys) {
+      // Said first, and whatever state its files are in: a held video is the owner's to release.
+      if (held.includes(k)) { say(`  ⏸ ${k}: held for owner approval — not posted. When the owner has approved it: --release ${k}`); continue; }
       const posted = yt.find((v) => v.helpKey === k);
       if (!posted) { say(`  – ${k}: not on YouTube yet (not in youtube-schedule.json) — a social post goes out with its video`); continue; }
       const v = loadVideo(k, posted.publishAt, outDirs);
@@ -146,7 +153,7 @@ async function main() {
     const now = new Date();
     const { planned, skipped } = planPosts(videos, targets, ledger, {
       now, spreadMin: num("spread"), perDay: num("per-day"), warmupStart: typeof args.flags["warmup-start"] === "string" ? args.flags["warmup-start"] : (process.env.TUTORIAL_SOCIAL_START || null),
-      warmupDays: num("warmup-days") ?? undefined, retryFailed: !!args.flags["retry-failed"],
+      warmupDays: num("warmup-days") ?? undefined, retryFailed: !!args.flags["retry-failed"], held,
     });
 
     say(`\n${args.flags.go ? "POSTING" : "DRY RUN — nothing is sent"}: ${planned.length} post(s), ${videos.length} video(s) × ${targets.length} account(s)   (now ${easternLabel(now)})`);

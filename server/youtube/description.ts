@@ -84,6 +84,11 @@ export type DescriptionInput = {
   track?: string | null;
   /** Neighbouring videos, nearest first (see `relatedFor`). */
   related?: readonly RelatedVideo[];
+  /**
+   * "brand": an overview film (the "Start here" group) — a channel-trailer description, not a
+   * tutorial's. Default: "brand" when the help entry's group is "Start here", else "tutorial".
+   */
+  variant?: "tutorial" | "brand";
 };
 export type BuiltDescription = {
   helpKey: string; title: string; description: string; tags: string[];
@@ -92,8 +97,14 @@ export type BuiltDescription = {
   area: string; hashtags: string[];
   /** True when the description carries a chapter list YouTube will turn into chapter markers. */
   chapters: boolean;
-  /** The source material could not fill the description to DESCRIPTION_TARGET_MIN without padding. */
+  /**
+   * The source material could not fill the description to DESCRIPTION_TARGET_MIN without padding.
+   * NOT an error: the text is sent as it is, the scheduler's dry run flags it, and the fix is more
+   * true material in the help entry or the script — never filler. Always false for a brand film
+   * (it has no length target).
+   */
   underTarget: boolean;
+  variant: "tutorial" | "brand";
   /** What the builder left out or changed, for the person reading the dry run. */
   notes: string[];
 };
@@ -526,6 +537,7 @@ export function relatedFor(helpKey: string, tracks: readonly { name: string; key
 type Knobs = { why: number; terms: number; related: number; quickRef: boolean; howItWorks: boolean; detail: boolean; labels: boolean; about: boolean; steps: number };
 
 export function buildDescription(input: DescriptionInput): BuiltDescription {
+  if ((input.variant ?? (input.entry?.group === BRAND_GROUP ? "brand" : "tutorial")) === "brand") return buildBrandDescription(input);
   const notes: string[] = [], key = input.helpKey, entry = input.entry ?? null;
   const area = areaFor({ helpKey: key, track: input.track, group: entry?.group }), A = AREAS[area];
   const crm = area !== "permits" && area !== "platform";
@@ -654,6 +666,9 @@ export function buildDescription(input: DescriptionInput): BuiltDescription {
     () => (!k.labels ? (k.labels = true, () => { k.labels = false; }) : null),
     () => (k.terms < 18 ? ((k.terms = 18), () => { k.terms = 15; }) : null),
     () => (k.related < 6 ? ((k.related = 6), () => { k.related = 5; }) : null),
+    // Still short: the rest of the neighbouring tutorials (real titles, each a link once it is public).
+    () => (k.related < 7 && related.length > 6 ? ((k.related = 7), () => { k.related = 6; }) : null),
+    () => (k.related < 8 && related.length > 7 ? ((k.related = 8), () => { k.related = 7; }) : null),
   ];
   for (const grow of grows) {
     if (text.length >= DESCRIPTION_GOAL) break;
@@ -669,8 +684,122 @@ export function buildDescription(input: DescriptionInput): BuiltDescription {
   if (bad.length) throw new Error(`${key}: the description says ${bad.join(", ")}`);
   return {
     helpKey: key, title, description: text, tags: buildTags(input, area), length: text.length, bytes: utf8Bytes(text),
-    sha256: createHash("sha256").update(text).digest("hex"), area, hashtags, chapters: chaptersOk, underTarget, notes: Array.from(new Set(notes)),
+    sha256: createHash("sha256").update(text).digest("hex"), area, hashtags, chapters: chaptersOk, underTarget, variant: "tutorial", notes: Array.from(new Set(notes)),
   };
+}
+
+/* ── The overview films ("Start here") ────────────────────────────────────── */
+
+/** The help group of the films that say what ConstructHUB is (shared/help/types.ts HELP_GROUPS). */
+export const BRAND_GROUP = "Start here";
+/**
+ * What the two products are, for a film's description. Each line restates docs/brand/FACT-BASE.md
+ * section 1 (shared/plans.ts, shared/crm-plans.ts): two products, sold separately, nothing bundled.
+ */
+export const BRAND_PRODUCTS: readonly string[] = [
+  "• Business tools - the permit office directory, permit search and county property records, and tools for your Google Business Profile, your reviews and your website.",
+  "• ConstructHUB CRM - clients, the pipeline, estimates your client approves online, the schedule, invoices and payments, and JobCam for job-site photos.",
+  "They are separate products, each with its own plans. Buy one or both.",
+];
+const BRAND_LINKS = (key: string): string[] => [
+  "Website: https://constructhub.us",
+  "Plans for each product: https://constructhub.us/pricing",
+  "Permit office directory: https://constructhub.us/databases",
+  "Step-by-step tutorials: https://constructhub.us/tutorials",
+  `This film in the app: https://constructhub.us/tutorials#help-${key}`,
+];
+const BRAND_DEMO_NOTE = "The CRM scenes are filmed in a demo workspace: the clients, jobs and amounts in them are sample data.";
+const BRAND_HASHTAGS = ["#contractors", "#ConstructHUB", "#contractorsoftware"];
+const BRAND_TAGS = ["ConstructHUB", "contractor software", "contractor CRM", "software for contractors", "building permit lookup", "permit office lookup", "estimates and invoices", "job site photos"];
+
+/**
+ * A channel-trailer description: what ConstructHUB is, the two products, the links, the chapters,
+ * what the film says (its narration, a paragraph per chapter), how to start. No "how to" framing, no
+ * keyword bank, no "search terms" line and NO LENGTH TARGET — it is as long as its true material.
+ */
+function buildBrandDescription(input: DescriptionInput): BuiltDescription {
+  const notes: string[] = [], key = input.helpKey, entry = input.entry ?? null;
+  const title = fitTitle(input.title);
+  if (title !== plain(input.title)) notes.push(`title shortened to ${title.length} characters (was ${plain(input.title).length})`);
+  const steps = input.steps.map((s) => ({ narration: clean(s.narration, notes, "narration"), chapter: s.chapter ? plain(s.chapter) : undefined })).filter((s) => s.narration);
+  const whatItIs = entry ? clean(entry.whatItIs, notes, "help entry") : "";
+  const summary = clean(input.summary, notes, "summary");
+  // The line above "Show more": what the film is, with the name in it.
+  const opening = [summary || whatItIs, summary && whatItIs && summary !== whatItIs ? whatItIs : ""].filter(Boolean).join(" ") || `${title}.`;
+  const groups: { title: string; lines: string[] }[] = [];
+  steps.forEach((s, i) => { if (i === 0 || s.chapter) groups.push({ title: s.chapter ?? "", lines: [] }); groups[groups.length - 1].lines.push(s.narration); });
+  const chaptersOk = validChapters(input.chapters, input.durationSec);
+  if (input.chapters?.length && !chaptersOk) notes.push("the chapter times are not a list YouTube accepts (first at 0:00, three or more, 10 s apart): left out");
+  const needs = (entry?.needs ?? []).map((n) => clean(n, notes, "help entry")).filter(Boolean);
+
+  const render = (withTranscript: boolean): string => {
+    const out: string[] = [/constructhub/i.test(opening.slice(0, 180)) ? opening : `ConstructHUB - ${opening}`, "", "Try ConstructHUB: https://constructhub.us"];
+    const section = (label: string, lines: string[]) => { if (lines.length) out.push("", label, ...lines); };
+    section("THE TWO PRODUCTS", [...BRAND_PRODUCTS]);
+    section("LINKS", BRAND_LINKS(key));
+    if (chaptersOk) section("CHAPTERS", input.chapters!.map((c) => `${c.at.trim()} ${plain(c.title)}`));
+    if (withTranscript) section("WHAT THE FILM SAYS", groups.flatMap((g) => [...(g.title ? [`▶ ${g.title}`] : []), g.lines.join(" ")]));
+    if (entry) {
+      section("HOW TO START", entry.howToUse.map((h) => clean(h, notes, "help entry")).filter(Boolean).map((h, i) => `${i + 1}. ${endStop(h)}`));
+      section("GOOD TO KNOW", [clean(entry.whatItDoes, notes, "help entry"), clean(entry.howItWorks, notes, "help entry"), ...needs.map((x) => `• ${endStop(x)}`), BRAND_DEMO_NOTE].filter(Boolean));
+    } else section("GOOD TO KNOW", [BRAND_DEMO_NOTE]);
+    out.push("", BRAND_HASHTAGS.join(" "));
+    return out.join("\n");
+  };
+  const over = (t: string) => t.length > DESCRIPTION_TARGET_MAX || utf8Bytes(t) > DESCRIPTION_MAX_BYTES;
+  let text = render(true);
+  if (over(text)) { text = render(false); notes.push(`the narration is left out to stay under ${YT_DESCRIPTION_LIMIT} characters`); }
+  if (over(text)) throw new Error(`${key}: the description cannot be brought under ${DESCRIPTION_TARGET_MAX} characters`);
+  const bad = bannedIn(text);
+  if (bad.length) throw new Error(`${key}: the description says ${bad.join(", ")}`);
+
+  const tags: string[] = [], seen = new Set<string>();
+  for (const raw of [...(input.tags ?? []), ...BRAND_TAGS]) {
+    const tag = plain(raw).replace(/[,"#]/g, "").trim();
+    if (tag.length < 2 || tag.length > 40 || seen.has(tag.toLowerCase()) || bannedIn(tag).length || tagsCost([...tags, tag]) > TAGS_BUDGET) continue;
+    seen.add(tag.toLowerCase()); tags.push(tag);
+  }
+  return {
+    helpKey: key, title, description: text, tags, length: text.length, bytes: utf8Bytes(text), sha256: createHash("sha256").update(text).digest("hex"),
+    area: "brand", hashtags: [...BRAND_HASHTAGS], chapters: chaptersOk, underTarget: false, variant: "brand", notes: Array.from(new Set(notes)),
+  };
+}
+
+/* ── The rules every description keeps ────────────────────────────────────── */
+
+/**
+ * What is wrong with a built description — an empty list when nothing is. The committed test runs
+ * it over this checkout's scripts; `youtube-schedule.ts --lint-all` runs it over every worktree on
+ * the machine (a report, not a test: an unfinished script in someone else's folder is their news).
+ * Length UNDER the target is not in this list: see `underTarget`.
+ */
+export function lintDescription(d: Pick<BuiltDescription, "helpKey" | "title" | "description" | "tags" | "length" | "bytes">): string[] {
+  const bad: string[] = [], text = d.description;
+  const need = (ok: boolean, what: string) => { if (!ok) bad.push(what); };
+  need(d.length === text.length, "length is not the text's length");
+  need(d.length <= DESCRIPTION_TARGET_MAX, `${d.length} characters (over ${DESCRIPTION_TARGET_MAX})`);
+  need(d.bytes === utf8Bytes(text) && d.bytes <= DESCRIPTION_MAX_BYTES, `${d.bytes} bytes (over ${DESCRIPTION_MAX_BYTES})`);
+  need(!/[<>]/.test(text + d.title + d.tags.join("")), "an angle bracket");
+  for (const b of bannedIn(text)) bad.push(`says "${b}"`);
+  for (const b of bannedIn(`${d.title} ${d.tags.join(" , ")}`)) bad.push(`title or tags say "${b}"`);
+  // Chapters: either none, or a list YouTube accepts — and no other time anywhere, which YouTube would read as a chapter.
+  const ch = chaptersIn(text);
+  if (ch.length) {
+    need(ch.length >= 3 && ch[0].sec === 0 && ch.every((c, i) => i === 0 || c.sec - ch[i - 1].sec >= 10), "a chapter list YouTube will not accept");
+    need(text.includes("\nCHAPTERS\n0:00 "), "chapter times outside a CHAPTERS list");
+  } else need(!text.includes("CHAPTERS"), "a CHAPTERS heading without chapters");
+  need((text.match(/\b\d{1,2}:\d{2}\b/g) ?? []).length === ch.length, "a time outside the chapter list (YouTube would read it as a chapter)");
+  const tags = text.match(/(?:^|\s)#[A-Za-z]\w*/g) ?? [];
+  need(tags.length >= 3 && tags.length <= MAX_HASHTAGS, `${tags.length} hashtags (3 to ${MAX_HASHTAGS})`);
+  // The only addresses: the site and YouTube's own watch links.
+  for (const url of text.match(/https?:\/\/[^\s)]+/g) ?? []) need(/^https:\/\/(constructhub\.us(\/|$)|www\.youtube\.com\/watch\?v=)/.test(url), `an outside address: ${url}`);
+  need(/ConstructHUB/.test(text.slice(0, 200)), "the opening does not name ConstructHUB");
+  need(text.includes("Try ConstructHUB: https://constructhub.us"), "no \"Try ConstructHUB\" line");
+  need(d.title.length <= TITLE_MAX, `title of ${d.title.length} characters`);
+  need(tagsCost(d.tags) <= TAGS_BUDGET, "tags over the budget");
+  need(new Set(d.tags.map((t) => t.toLowerCase())).size === d.tags.length, "a tag twice");
+  need(!/\n{3,}/.test(text), "blank lines in a row");
+  return bad;
 }
 
 /** Jaccard similarity of two texts on their 5-word shingles: 1 is the same text, 0 nothing in common. */

@@ -56,6 +56,20 @@ function mockIo(answer: (c: Call, n: number) => { status: number; body: unknown 
   return { io, calls, logs, sleeps };
 }
 
+describe("held for owner approval", () => {
+  it("plans nothing for a held video on any account, says why, and plans the rest as before", () => {
+    const now = new Date("2026-10-08T14:00:00.000Z"), videos = [...FOUR, video("brand-what-is-constructhub", "2026-10-08T12:00:00.000Z")];
+    const { planned, skipped } = planPosts(videos, targets(), emptyLedger(), { now, spreadMin: 30, perDay: 9, held: ["brand-what-is-constructhub", "brand-tour-crm"] });
+    expect(planned.some((p) => p.helpKey.startsWith("brand-"))).toBe(false);
+    expect(planned).toHaveLength(FOUR.length * OURS.length);
+    const held = skipped.filter((s) => s.helpKey === "brand-what-is-constructhub");
+    expect(held.map((s) => s.accountId).sort()).toEqual([...OURS].sort());
+    for (const s of held) expect(s.reason).toMatch(/^held for owner approval — not posted\. .*--release brand-what-is-constructhub/);
+    // Released (the caller leaves it out of `held`): it is planned like any other.
+    expect(planPosts(videos, targets(), emptyLedger(), { now, spreadMin: 30, perDay: 9, held: ["brand-tour-crm"] }).planned.filter((p) => p.helpKey === "brand-what-is-constructhub")).toHaveLength(OURS.length);
+  });
+});
+
 describe("who may be posted to", () => {
   it("refuses an empty allowlist before anything else", () => {
     for (const empty of [undefined, null, "", " ", ",", " , "]) expect(() => parseAllowlist(empty)).toThrow(/TUTORIAL_BLOTATO_ACCOUNT_IDS is empty/);

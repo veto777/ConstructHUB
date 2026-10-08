@@ -337,8 +337,32 @@ export type Plan = {
   alreadyPosted: string[];
   /** Posted keys whose mp4 on disk is no longer the file that was uploaded. Reported, never re-uploaded without --replace. */
   hashChanged: { helpKey: string; videoId: string; uploadedSha256: string; fileSha256: string; dir: string }[];
+  /**
+   * Posted keys whose MERGED MASTER (the manifest in shared/help/videos) is no longer the file that
+   * was uploaded: the in-app video was re-recorded. `pending` = YouTube has not published the old
+   * cut yet, so it will go public at `publishAt` unless `--replace` is run (and the old one deleted
+   * by hand). `fileReady` = the new master is in an out-dir, so `--replace` can run now.
+   */
+  masterChanged: { helpKey: string; videoId: string; status: LedgerEntry["status"]; pending: boolean; publishAt: string | null; uploadedSha256: string; manifestSha256: string; fileReady: boolean }[];
+  /** Eligible videos that wait for the owner's approval (`youtube.hold` on the help entry): never planned unless released. */
+  held: string[];
   problems: string[];
 };
+
+/** `shared/help/videos/<helpKey>.json` → the sha256 of the master it describes (null: no manifest, or unreadable). */
+export const manifestShaIn = (manifestDir: string) => (helpKey: string): string | null => {
+  try { const s = JSON.parse(fs.readFileSync(path.join(manifestDir, `${helpKey}.json`), "utf8"))?.video?.sha256; return typeof s === "string" ? s : null; } catch { return null; }
+};
+/** One line per changed master, for the dry run. The first words are what an operator greps for. */
+export function masterChangedLines(plan: Pick<Plan, "masterChanged">, tz: string = SCHEDULE_TZ): string[] {
+  return plan.masterChanged.map((m) => {
+    const what = `${m.helpKey}: master changed since upload — run --replace ${m.helpKey}`;
+    const when = m.pending
+      ? ` (${m.videoId} is STILL SCHEDULED for ${m.publishAt ? easternLabel(m.publishAt, tz) : "a time YouTube holds"}: the OLD cut goes public then unless it is replaced; --replace keeps that slot and names the old video to delete by hand)`
+      : ` (${m.videoId} is public with the old cut; --replace posts the new one in the next free slot and names the old video to delete by hand)`;
+    return `${m.pending ? "!!!! " : "! "}${what}${when}${m.fileReady ? "" : ` — the new master (${m.manifestSha256.slice(0, 8)}) is not in the out-dirs yet: fetch or produce it first`}`;
+  });
+}
 
 const entryDate = (e: LedgerEntry, tz: string): ZoneTime | null => (e.videoId && e.publishAt ? zoneTime(e.publishAt, tz) : null);
 
@@ -356,12 +380,18 @@ const entryDate = (e: LedgerEntry, tz: string): ZoneTime | null => (e.videoId &&
 export function planSchedule(input: {
   ledger: Ledger; candidates: readonly Candidate[]; tracks: readonly Track[]; now: Date;
   start?: string; perDay?: number; replace?: readonly string[]; tz?: string;
+  /** Keys held for the owner's approval (the registry's `heldHelpKeys()`), and the ones a person released for this run. */
+  held?: readonly string[]; release?: readonly string[];
+  /** The merged master of a key (see `manifestShaIn`): lets the plan tell a re-recorded video from the one that was uploaded. */
+  manifestSha?: (helpKey: string) => string | null;
 }): Plan {
   const tz = input.tz ?? SCHEDULE_TZ, perDay = input.perDay ?? DEFAULT_PER_DAY, now = input.now.getTime();
   if (![1, 2, 3].includes(perDay)) throw new Error("--per-day is 1, 2 or 3");
   const replace = new Set(input.replace ?? []);
   const entries = new Map(input.ledger.videos.map((e) => [e.helpKey, e]));
-  const plan: Plan = { planned: [], alreadyPosted: [], hashChanged: [], problems: [] };
+  const plan: Plan = { planned: [], alreadyPosted: [], hashChanged: [], masterChanged: [], held: [], problems: [] };
+  const release = new Set(input.release ?? []), held = new Set((input.held ?? []).filter((k) => !release.has(k)));
+  for (const k of release) if (!(input.held ?? []).includes(k)) plan.problems.push(`--release ${k}: that key is not held (nothing to release)`);
   const used = new Map<string, string[]>();
   const use = (date: string, time: string) => { used.set(date, [...(used.get(date) ?? []), time]); };
   for (const e of input.ledger.videos) { const z = entryDate(e, tz); if (z) use(z.date, z.time); }
@@ -369,8 +399,16 @@ export function planSchedule(input: {
   const fresh: { c: Candidate; replaces?: string }[] = [];
   for (const c of input.candidates) {
     const e = entries.get(c.helpKey);
+    // Held for the owner: nothing of it is uploaded — not a first upload, not a replacement — until it is released.
+    if (held.has(c.helpKey) && (!e?.videoId || replace.has(c.helpKey))) {
+      plan.held.push(c.helpKey);
+      if (replace.has(c.helpKey)) plan.problems.push(`--replace ${c.helpKey}: held for owner approval — add --release ${c.helpKey}`);
+      continue;
+    }
     if (!e?.videoId) { fresh.push({ c }); continue; }
     if (replace.has(c.helpKey)) {
+      const merged = input.manifestSha?.(c.helpKey) ?? null;
+      if (merged && merged !== c.sha256) { plan.problems.push(`--replace ${c.helpKey}: the mp4 in ${c.dir} (${c.sha256.slice(0, 8)}) is not the merged master (${merged.slice(0, 8)}) — the video in the app and the one on YouTube must be the same file`); plan.alreadyPosted.push(c.helpKey); continue; }
       if (e.sha256 === c.sha256 && e.status !== "failed") { plan.problems.push(`--replace ${c.helpKey}: the file on disk is the one already uploaded (${e.videoId}); nothing to replace`); plan.alreadyPosted.push(c.helpKey); continue; }
       const keepsSlot = e.status === "scheduled" && e.publishAt && Date.parse(e.publishAt) >= now + MIN_SLOT_LEAD_MS;
       if (keepsSlot) {
@@ -383,6 +421,19 @@ export function planSchedule(input: {
     if (e.sha256 && e.sha256 !== c.sha256) plan.hashChanged.push({ helpKey: c.helpKey, videoId: e.videoId, uploadedSha256: e.sha256, fileSha256: c.sha256, dir: c.dir });
   }
   for (const k of replace) if (!input.candidates.some((c) => c.helpKey === k)) plan.problems.push(`--replace ${k}: no eligible video with that key in the out-dirs`);
+  // A re-recorded video: the merged master is not what YouTube holds. (A key that is not in the ledger —
+  // held, or simply not scheduled yet — has nothing to compare: its next upload takes the new master.)
+  if (input.manifestSha) for (const e of input.ledger.videos) {
+    if (!e.videoId || !e.sha256 || replace.has(e.helpKey)) continue;
+    const merged = input.manifestSha(e.helpKey);
+    if (!merged || merged === e.sha256) continue;
+    plan.masterChanged.push({
+      helpKey: e.helpKey, videoId: e.videoId, status: e.status, pending: e.status === "scheduled" && (!e.publishAt || Date.parse(e.publishAt) > now), publishAt: e.publishAt,
+      uploadedSha256: e.sha256, manifestSha256: merged, fileReady: input.candidates.some((c) => c.helpKey === e.helpKey && c.sha256 === merged),
+    });
+  }
+  // …and then the plain "the file on disk differs" line would say the same thing twice.
+  plan.hashChanged = plan.hashChanged.filter((h) => !plan.masterChanged.some((m) => m.helpKey === h.helpKey));
 
   const today = zoneTime(now, tz).date;
   let latest = "";

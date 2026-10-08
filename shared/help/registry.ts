@@ -888,6 +888,8 @@ export const helpFeaturesIn = (group: HelpGroup): HelpEntry[] => HELP_FEATURES.f
 export const helpSummary = (e: HelpEntry): string => /^.*?[.!?](?=\s|$)/.exec(e.whatItIs)?.[0] ?? e.whatItIs;
 /** A section's short name ("Cloudflare → Sites" → "Sites"). */
 export const helpShortTitle = (e: HelpEntry): string => e.title.split(" → ").pop()!;
+/** Keys whose video waits for the owner's approval before it is posted anywhere (`youtube.hold` on the entry). */
+export const heldHelpKeys = (): string[] => HELP_ENTRIES.filter((e) => e.youtube?.hold === true).map((e) => e.key);
 /** CRM routes live on the CRM (portal) host. */
 export const isCrmRoute = (route: string): boolean => route === "/crm" || route.startsWith("/crm/");
 /** Does a help entry match a search? Every word must appear somewhere in its text (or its sections'). */

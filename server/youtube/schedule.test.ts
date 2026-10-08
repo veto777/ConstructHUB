@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { DEFAULT_YOUTUBE_CHANNEL_ID, YT_FORCE_SSL_SCOPE, YT_READONLY_SCOPE, YT_UPLOAD_SCOPE, type Deps, type YoutubeGrant } from "./client";
 import {
   MIN_GAP_MINUTES, ROTATION, SLOT_POOLS, addDays, calendarMarkdown, easternLabel, findCandidates, interleave, planSchedule, readLedger, readOrder,
-  reconcile, retryThumbnails, runUploads, timesForDate, trackOf, updateDescriptions, writeLedger, zoneTime, zonedToUtc, type Describe, type Ledger, type LedgerEntry, type Track,
+  reconcile, retryThumbnails, runUploads, timesForDate, trackOf, updateDescriptions, writeLedger, zoneTime, zonedToUtc, manifestShaIn, masterChangedLines, type Describe, type Ledger, type LedgerEntry, type Track,
 } from "./schedule";
 
 /** Wednesday 2026-10-07, 20:30 Eastern — already Thursday the 8th in UTC, which is what the host clock shows. */
@@ -556,6 +556,134 @@ describe("a changed file and --replace", () => {
     produce("crm-a", { bytes: "a new cut" });
     writeLedger(ledgerFile, ledgerOf(published("crm-a", "old_00001", "2026-10-08T00:08:00Z", { sha256: sha("the first cut") })));
     expect(plan({ replace: ["crm-a"] }).planned).toMatchObject([{ helpKey: "crm-a", date: "2026-10-08", replaces: "old_00001" }]);
+  });
+});
+
+describe("a re-recorded in-app video (the merged master changed)", () => {
+  const merged = (o: Partial<Parameters<typeof planSchedule>[0]> = {}) => plan({ manifestSha: manifestShaIn(manifests), ...o });
+  /** A producer re-records: a new mp4 in a NEW out-dir (the old one is still on disk), and the manifest now names the new file. */
+  const rerecord = (helpKey: string, bytes: string, o: { withFile?: boolean } = {}) => {
+    if (o.withFile !== false) produce(helpKey, { bytes, merged: false, dir: path.join(path.dirname(out), "video-out-2") });
+    fs.writeFileSync(path.join(manifests, `${helpKey}.json`), JSON.stringify({ helpKey, video: { sha256: sha(bytes) } }));
+  };
+  const dirs = () => [out, path.join(path.dirname(out), "video-out-2")];
+  const found = () => findCandidates(dirs(), manifests).eligible;
+
+  it("says so in the dry run for a video that is scheduled and not out yet — and uploads nothing by itself", async () => {
+    produce("crm-a"); produce("crm-b");
+    const yt = fakeYoutube();
+    await runUploads({ ledgerFile, planned: plan().planned, deps: yt.deps });
+    expect(merged().masterChanged).toEqual([]);
+    const before = fs.readFileSync(ledgerFile, "utf8"), slot = readLedger(ledgerFile).videos[0].publishAt!;
+
+    rerecord("crm-a", "crm-a, recorded again");
+    const p = merged({ candidates: found() });
+    expect(p.planned).toEqual([]);
+    expect(p.masterChanged).toEqual([{ helpKey: "crm-a", videoId: "vid_0001", status: "scheduled", pending: true, publishAt: slot, uploadedSha256: sha("video of crm-a"), manifestSha256: sha("crm-a, recorded again"), fileReady: true }]);
+    expect(p.hashChanged).toEqual([]); // said once, not twice
+    const [line] = masterChangedLines(p);
+    expect(line).toMatch(/^!!!! crm-a: master changed since upload — run --replace crm-a \(vid_0001 is STILL SCHEDULED for /);
+    expect(line).toContain(easternLabel(slot));
+    expect(line).not.toMatch(/not in the out-dirs/);
+    expect(yt.uploads()).toHaveLength(2);
+    expect(fs.readFileSync(ledgerFile, "utf8")).toBe(before);
+  });
+
+  it("tells a public video from a pending one, and says when the new master is not on this machine", async () => {
+    produce("crm-a");
+    writeLedger(ledgerFile, ledgerOf(published("crm-a", "pub_00001", "2026-10-07T13:00:00Z", { sha256: sha("video of crm-a") })));
+    rerecord("crm-a", "crm-a, recorded again", { withFile: false });
+    const p = merged();
+    expect(p.masterChanged).toMatchObject([{ helpKey: "crm-a", videoId: "pub_00001", status: "published", pending: false, fileReady: false }]);
+    expect(masterChangedLines(p)[0]).toMatch(/^! crm-a: master changed since upload — run --replace crm-a \(pub_00001 is public with the old cut.*not in the out-dirs yet/);
+    // --replace with only the OLD file on disk must not put the old cut up again, nor any file that is not the merged master.
+    const r = merged({ replace: ["crm-a"] });
+    expect(r.planned).toEqual([]);
+    expect(r.problems.join("\n")).toMatch(/--replace crm-a: the mp4 in .* is not the merged master/);
+  });
+
+  it("says nothing for a video that is not in the ledger: a held or unscheduled video simply takes the new master", () => {
+    produce("crm-a"); produce("brand-film");
+    rerecord("crm-a", "crm-a, recorded again"); rerecord("brand-film", "the film, recorded again");
+    const p = merged({ candidates: found(), held: ["brand-film"] });
+    expect(p.masterChanged).toEqual([]);
+    expect(p.held).toEqual(["brand-film"]);
+    expect(p.planned.map((x) => [x.helpKey, x.candidate.sha256])).toEqual([["crm-a", sha("crm-a, recorded again")]]);
+  });
+
+  it("--replace, end to end: the new master goes into the same slot with captions, thumbnail and playlist; the old id is named; nothing is deleted", async () => {
+    produce("crm-a"); produce("crm-b");
+    const yt = fakeYoutube();
+    await runUploads({ ledgerFile, planned: plan().planned, deps: yt.deps });
+    const [a0, b0] = readLedger(ledgerFile).videos;
+    rerecord("crm-a", "crm-a, recorded again");
+
+    const p = merged({ candidates: found(), replace: ["crm-a"] });
+    expect(p.masterChanged).toEqual([]); // being dealt with by this very run
+    expect(p.problems).toEqual([]);
+    expect(p.planned).toMatchObject([{ helpKey: "crm-a", publishAt: a0.publishAt, replaces: "vid_0001", candidate: { sha256: sha("crm-a, recorded again"), dir: path.join(path.dirname(out), "video-out-2", "crm-a") } }]);
+    const from = yt.calls.length;
+    const res = await runUploads({ ledgerFile, planned: p.planned, deps: yt.deps });
+    expect(res).toMatchObject({ stopped: null, warnings: [], uploaded: [{ helpKey: "crm-a", videoId: "vid_0003", publishAt: a0.publishAt }] });
+    expect(res.deleteByHand).toEqual([{ helpKey: "crm-a", videoId: "vid_0001", url: "https://www.youtube.com/watch?v=vid_0001", stillScheduledFor: a0.publishAt }]);
+
+    // What went over the wire for the replacement: an upload (private, the same publish time), its bytes, captions, thumbnail, playlist — and that is all.
+    const sent = yt.calls.slice(from);
+    expect(JSON.parse(sent.find((c) => c.url.includes("uploadType=resumable"))!.body).status).toMatchObject({ privacyStatus: "private", publishAt: a0.publishAt });
+    expect(sent.some((c) => c.method === "PUT" && c.url.includes("upload_id="))).toBe(true);
+    expect(sent.filter((c) => c.url.includes("/captions?"))).toHaveLength(1);
+    expect(sent.filter((c) => c.url.includes("/thumbnails/set"))).toHaveLength(1);
+    expect(sent.filter((c) => c.method === "POST" && c.url.includes("/playlistItems?"))).toHaveLength(1);
+    // Nothing is ever deleted or changed on the old video: no DELETE anywhere, and no request names vid_0001.
+    expect(yt.calls.some((c) => c.method === "DELETE")).toBe(false);
+    expect(sent.some((c) => c.url.includes("vid_0001") || String(c.body ?? "").includes("vid_0001"))).toBe(false);
+
+    const v = readLedger(ledgerFile).videos;
+    expect(v).toHaveLength(2);
+    expect(v.find((e) => e.helpKey === "crm-a")).toMatchObject({ videoId: "vid_0003", status: "scheduled", publishAt: a0.publishAt, sha256: sha("crm-a, recorded again"), captions: "ok", thumbnail: "ok", playlist: "ok",
+      replaced: [{ videoId: "vid_0001", url: "https://www.youtube.com/watch?v=vid_0001", sha256: sha("video of crm-a") }] });
+    expect(v.find((e) => e.helpKey === "crm-a")!.note).toMatch(/vid_0001.*STILL SCHEDULED.*delete it by hand/);
+    expect(v.find((e) => e.helpKey === "crm-b")).toEqual(b0); // the neighbour is untouched
+
+    // Afterwards the plan is quiet, and running --replace again does nothing.
+    const again = merged({ candidates: found(), replace: ["crm-a"] });
+    expect(again.planned).toEqual([]);
+    expect(again.problems.join()).toMatch(/nothing to replace/);
+    expect(merged({ candidates: found() })).toMatchObject({ planned: [], masterChanged: [], hashChanged: [] });
+    expect(yt.uploads()).toHaveLength(3);
+  });
+});
+
+describe("held for owner approval", () => {
+  it("never plans a held video — first upload or replacement — until it is released, and says which are held", async () => {
+    produce("crm-a"); produce("brand-film");
+    const p = plan({ held: ["brand-film", "brand-not-made-yet"] });
+    expect(p.planned.map((x) => x.helpKey)).toEqual(["crm-a"]);
+    expect(p.held).toEqual(["brand-film"]);
+    const yt = fakeYoutube();
+    await runUploads({ ledgerFile, planned: p.planned, deps: yt.deps });
+    expect(readLedger(ledgerFile).videos.map((e) => e.helpKey)).toEqual(["crm-a"]);
+
+    const released = plan({ held: ["brand-film"], release: ["brand-film"] });
+    expect(released.held).toEqual([]);
+    expect(released.planned.map((x) => x.helpKey)).toEqual(["brand-film"]);
+    expect(plan({ release: ["crm-a"] }).problems.join()).toMatch(/--release crm-a: that key is not held/);
+
+    // Once the owner has released it and it is up, a new cut is held again.
+    await runUploads({ ledgerFile, planned: released.planned, deps: yt.deps });
+    produce("brand-film", { bytes: "a new cut of the film" });
+    const again = plan({ held: ["brand-film"], replace: ["brand-film"] });
+    expect(again.planned).toEqual([]);
+    expect(again.held).toEqual(["brand-film"]);
+    expect(again.problems.join()).toMatch(/--replace brand-film: held for owner approval — add --release brand-film/);
+    expect(plan({ held: ["brand-film"], replace: ["brand-film"], release: ["brand-film"] }).planned).toMatchObject([{ helpKey: "brand-film", replaces: "vid_0002" }]);
+    expect(yt.uploads()).toHaveLength(2);
+  });
+
+  it("the registry holds both overview films, and nothing else", async () => {
+    const { heldHelpKeys, helpEntry } = await import("../../shared/help/registry");
+    expect(heldHelpKeys().sort()).toEqual(["brand-tour-crm", "brand-what-is-constructhub"]);
+    for (const k of heldHelpKeys()) expect(helpEntry(k)!.group).toBe("Start here");
   });
 });
 
