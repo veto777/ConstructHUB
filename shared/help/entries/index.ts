@@ -9,6 +9,7 @@ export { default as e_crm_document_defaults } from "./crm/crm-document-defaults"
 export { default as e_crm_notifications } from "./crm/crm-notifications";
 export { default as e_crm_report_issue } from "./crm/crm-report-issue";
 export { default as e_crm_reports } from "./crm/crm-reports";
+export { default as e_crm_sales_tax } from "./crm/crm-sales-tax";
 export { default as e_crm_search } from "./crm/crm-search";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
