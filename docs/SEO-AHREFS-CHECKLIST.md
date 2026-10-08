@@ -13,24 +13,23 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  A2  Trend sparkline and change over the period on authority, referring domains, organic traffic, organic keywords.
 - [x] DONE  A3  Opening the dashboard spends nothing (saved numbers only); "Analyse / Refresh" shows its price first.
 - [x] PART  A4  Health score per site on the card's Site audit button (from the newest crawl). Not yet a metric tile with a trend.
-- [ ] TODO  A5  Add competitors to a project; folders / starred / sort order.
+- [x] PART  A5  Star a site (starred sites stay on top) and choose the order of the cards (as added, name, search traffic, authority, keywords in the top 10, open tasks; remembered on the device). Competitors are followed per site in the rank tracker. Not built: folders.
 
 ## B. Site Explorer (`/seo/explorer`, explorer.tsx + report-table.tsx; server/seo/explorer.ts, reports.ts)
 - [x] DONE  B1  Overview for any domain: authority ring, backlinks, referring domains, followed vs not, organic keywords / traffic / value, paid keywords / traffic.
-- [x] PART  B2  Performance chart (organic traffic, keywords, top-10 keywords) with selectable series. 6 months only; Ahrefs shows years. (Codex: FAIL as DONE.)
+- [x] DONE  B2  Performance chart (organic traffic, keywords, top-10 keywords) with selectable series, two years of monthly history (was six months; a report now costs about $1.20 instead of $1.12 because the history call costs more). Ahrefs goes back further.
 - [x] DONE  B3  Backlink growth chart: referring domains, backlinks, new and lost links per month, 12 months.
 - [x] PART  B4  Organic positions distribution; keywords by intent covers the top 100 keywords only, and says so. (Codex: FAIL as DONE.)
-- [x] DONE  B5  Left menu of reports, each with filters, sort, paging (25/50/100), CSV export, saved for a day:
-              Backlinks · New backlinks · Lost backlinks · Broken backlinks · Referring domains · Anchors · Best pages by links ·
-              Organic keywords · Top pages · Organic competitors · Paid keywords.
+- [x] DONE  B5  Left menu of reports, each with filters, sort, paging (25/50/100), CSV export, saved for a day: Backlinks, New / Lost / Broken backlinks, Referring domains, Anchors, Best pages by links, Organic keywords, Top pages, Organic competitors, Paid keywords. Organic competitors and Best pages by links got their filters 10-08 (tested live).
 - [x] DONE  B6  Organic keywords filters: position range, volume, difficulty, intent, keyword contains; sort by traffic / volume / position / difficulty / CPC.
 - [x] DONE  B7  Tick keywords in a report and add them to the rank tracker.
-- [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
-- [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). NOT seen in a browser.
-- [ ] TODO  B10 Traffic by country; multi-year history; compare two dates.
-- [ ] TODO  B11 Organic keywords history chart by position bucket (1–3, 4–10, 11–20 …) over time.
-- [ ] TODO  B12 Paid ads copy and paid pages.
-- [ ] TODO  B13 AI responses panel (ChatGPT, Gemini, Perplexity, AI Overviews).
+- [x] PART  B8  Referring IPs (linking sites grouped by server address) and Sites with similar links - DONE, run live for jameshardie.com 10/8. Still TODO: linking authors, outgoing links (linked domains, outgoing anchors), internal links.
+- [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). Seen in a browser 10-08.
+- [x] PART  B10 Compare two months (Site Explorer overview): any two months of the saved history side by side with the change - organic traffic, keywords, top 3 / top 10, traffic value (two years) and referring domains, backlinks, authority (one year). Free. Not built: traffic by country.
+- [x] DONE  B11 Organic keywords by position over time (top 3 / 4-10 / the rest) from the saved two-year history.
+- [x] PART  B12 Ads: the Google ads a site has run (advertiser, kind, first/last shown, link to Google's own ad page) from the public ad library; Subdomains report (traffic, keywords, top 3 / top 10, value). The ad wording itself and paid landing pages are not available from the source - TODO.
+- [x] DONE  B13 AI visibility (`/seo/ai`): ask ChatGPT, Google Gemini and Perplexity a customer's question (web search on) and see for each whether the business is named, where in the list, whether its site is a source, who else is named, which sites were used and what was searched; saved history per question. Plus AI mentions: the questions for which Google AI Overviews / ChatGPT already use a site. Run live and seen in a browser 10-08 (ChatGPT named Alpine Exteriors first; Gemini and Perplexity did not).
+- [x] DONE  B15 Opportunities (Site Explorer menu, server/seo/opportunities.ts): one lookup of the keywords the site ranks on pages one and two for (up to 500, most searched) -> within reach (4-20), losing ground (fell 3+), which page ranks for what, searches only the home page ranks for; add to a list / the rank tracker; CSV. Price shown as a maximum ($0.29) with a small-site figure; charged for what returns (6c live for alpineexteriorswa.com, 13 keywords). Says plainly that the data cannot show two pages competing for one search (checked live: one ranking page per keyword). Not in Ahrefs' version here: featured-snippet and declining-content lists.
 - [ ] TODO  B14 Filter chips for URL / subdomain / exact-path scope ("Subdomains" selector).
 
 ## C. Keywords Explorer (`/seo/keywords`, keywords.tsx)
@@ -39,16 +38,16 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  C3  Who ranks: top organic results with each site's authority, dated, with a Refresh button (was labelled "today" while up to a week old - Codex FAIL, fixed 10-08).
 - [x] DONE  C4  What else is on the results page (map pack, people also ask, AI overview …).
 - [x] DONE  C5  Matching terms, related terms and questions: filters, sort, paging, CSV, and "track on my site".
-- [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. NOT seen in a browser.
-- [ ] TODO  C7  Other countries and languages (US English only today).
-- [ ] TODO  C8  Clicks, traffic potential, parent topic.
+- [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. Seen in a browser 10-08.
+- [x] PART  C7  Country selector on Site Explorer, Keywords Explorer (overview, ideas, many keywords) and Content gap: United States (English / Spanish), Canada (English / French), United Kingdom, Ireland, Australia, New Zealand, South Africa, Mexico - one choice remembered on the device; the server refuses any pair not on the list (shared/seo-markets.ts). Link reports are the same in every country and are not bought twice. Not covered: the other ~85 countries the source has, keyword lists (refresh is US), batch analysis, the dashboard cards (the site's own country).
+- [x] PART  C8  Traffic potential (what the page ranking first earns from search across all its keywords) and parent topic (the keyword that sends that page the most visits; click to open it) on the keyword overview - one more lookup, so the overview is now about $0.20 (was $0.16). Overviews saved earlier say so and offer Refresh. Clicks per search: not available from the source - TODO.
 
 ## D. Rank tracker (`/seo/rank-tracker`, index.tsx)
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
 - [x] DONE  D2  History: project chart (visibility %, average position) and positions-by-band chart per check date; click a keyword for its own history chart and table. Built from saved checks, free. NOT yet seen with real check data (no tracked sites exist on production yet).
-- [x] PART  D3  Tags: set a tag when adding keywords, filter the history by tag. TODO: edit tags in the table (API exists), competitors on the same keywords, share of voice vs competitors.
-- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. NOT seen in a browser. US only.
-- [ ] TODO  D5  SERP features won per keyword (only the map pack is tracked so far); scheduled email report.
+- [x] DONE  D3  Tags (set when adding keywords, filter the history). Competitors: follow up to 5 per site; share of voice against them; the other sites seen most on your keywords (one click to follow); who is in the map pack; the first page of Google saved per keyword at each check. All from the checks already paid for. Seen in a browser 10-08 with seeded result pages; competitor positions beyond the top ten start with the next real check.
+- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. Seen in a browser 10-08. US only.
+- [x] DONE  D5  Scheduled email report: done (G5). Results-page features per tracked keyword ("On the page" column and a one-line summary): map pack, AI overview, featured snippet, people also ask, videos, images, ads... with a green chip where the site itself is in it (the snippet is its page, the AI overview cites it, a question is answered from it). From the checks already paid for; checks saved before 10/8 show what was on the page but not whether the site was in it. Format confirmed against live results pages 10/8 (jameshardie.com cited in the AI overview for two searches).
 
 ## E. Billing of SEO data (shared/seo-credits.ts, server/seo/credits.ts, budget.ts)
 - [x] DONE  E1  Every lookup charged at 4x wholesale, reserved then settled to the real cost. Codex FAIL (double refund possible; cost of parallel calls lost on failure) -> fixed 10-08: a reservation settles exactly once; failed reports carry the full cost; a failed lookup costs the customer nothing.
@@ -61,13 +60,39 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  E8  Durable reservations (table seo_reservations): the reservation row, the customer's credit and our ledger settle in one transaction; a reservation the process never settled is finished by a reconciler after 30 minutes (customer charged nothing). Verified on a real Postgres with script/seo-ledger-check.ts: 24/24.
 
 ## F. Site Audit
-- [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). NOT seen in a browser.
-- [x] PART  F2  HTTP status distribution (2xx / 3xx / 4xx / 5xx / failed) and per-area scores. TODO: crawl depth, indexability report, internal-link report, per-page explorer, pause/resume, custom page limit (fixed at 150).
+- [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). Seen in a browser 10-08.
+- [x] DONE  F2  Site audit -> Pages: every crawled page with status, whether it can be indexed and why not, clicks from the home page, links to it, words, title and description length, size, the issues it is listed under; quick filters, search, sort, export. When a site's links only exist after JavaScript runs (true of alpineexteriorswa.com), link counts and depth are shown as not measurable instead of wrong. TODO: pause/resume, custom page limit (fixed at 150).
+- [x] DONE  F3  Site audit -> Rendering: up to 10 chosen pages fetched twice - as plain HTML and in a browser with JavaScript run - and the two visits compared: words, links to the site's own pages, title, main heading, plus the browser visit's timings. A page is "more once JavaScript runs", "less", "much the same" or "could not be compared" - compared only when both visits were answered 2xx, ended on the same page of the site and were measured. Says in so many words that it does not measure what Google renders or indexes. Background run, saved before charged, one at a time per site; the button shows the exact most it can cost; offered also when the site has no crawl yet. Not a rendered crawl of the whole site.
+- [x] DONE  B14 Site Explorer -> a section or one page: Organic keywords, Paid keywords, Top pages, Backlinks (all, new, lost, broken) and Best by links can be narrowed to the pages under a path ("/blog/") or to one page ("this page only" - with or without its last slash); a pasted address is cut down to its path. A narrowed report is its own saved page and its own purchase, at the usual price; reports the source counts for the whole site (linking sites, anchors, competitors...) do not offer it. NOT DONE: an overview (totals, history) for a section.
+- [x] DONE  D9  Rank tracker -> the page Google shows for each search: tracked keywords for which Google went from one of the site's pages to another and back in the last 120 days (a reason to look, not a diagnosis); apart, those where the page changed once, and those where one page was shown under two addresses. Each line gives the town, the device, the ranked checks it rests on with their dates, and says when the keyword has not ranked since. "Plan" adds a task with the pages, device, place and dates. Saved checks only - free.
+- [x] DONE  H6  AI visibility -> the picture so far: across the site's own questions, counting the newest answer from each assistant - named in n of m, website used in n of m, first-named; by assistant; month by month (with how many questions each month rests on); the other businesses named; the websites the assistants read, with review sites and directories marked and addable to the plan. Saved answers only - free. Says it is a sample of the customer's own questions.
+- [x] DONE  C9  Keyword lists and "Many keywords": "Group by topic" groups the keywords by the words they share, with searches a month per group and select-all per group. Worked out from the keywords themselves - free; said to be a reading aid, not Google's own grouping.
 
 ## G. Other Ahrefs tools
-- [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.
+- [x] PART  G1  Content explorer (`/seo/content`): search the web for pages about a topic; title, site, authority, date, author, excerpt; sort by relevance / strongest sites / newest; filters for date, authority, kind of site, leaving out your own; paging, export, open a site in Site explorer. Run live and seen in a browser 10-08. Not Ahrefs' depth: no traffic or linking-site numbers per page.
+              10/8: page-level numbers added - one button gets, for the 25 pages on screen, the sites linking to each and its search visits, and the list can be ordered by either (two lookups, up to $0.17; a part that fails is missing, not zero). Run live: "fiber cement siding cost" - top by linking sites 735, top by visits a homeadvisor.com guide.
+- [ ] TODO  G3  Web Analytics.
+- [x] DONE  G2  Brand Radar / AI visibility: see B13. A question can be asked again every month (up to 5 per site), from the included data only. Not yet: competitor share across many questions.
 - [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
-- [ ] TODO  G5  Client-ready PDF reports and scheduled reports.  G6  Batch analysis of many domains.
+              10/8: backlink snapshots now NAME the linking sites lost since the last one (25 strongest: authority, spam score, the page that linked, last seen) on the Backlinks page and in the alert; a strong site (authority 30+) lost is an alert by itself. Verified live for alpineexteriorswa.com (25 of 113 lost sites listed; refresh price $0.31). Local grid alerts: H2. Still not built: alerts for new keywords and web mentions.
+- [x] DONE  G5  Reports (`/seo/reports`): the site's report on screen, as a PDF (the account's own name and logo when set), and emailed weekly or monthly to up to 5 addresses, or sent now. Built from saved numbers - free. Seen in a browser; the PDF was rendered and read (and two faults found that way were fixed).
+- [x] DONE  G6  Batch analysis (`/seo/batch`): up to 100 websites at once - authority, linking sites, links, estimated search visits, keywords; sort, export, open any in Site explorer. Run live and seen in a browser 10-08.
+
+## H. Beyond Ahrefs: local tools for contractors
+- [x] DONE  H1  Local grid (`/seo/local-grid`, server/seo/grid.ts): find the business on Google Maps once, then scan a search from a 3x3 / 5x5 / 7x7 square of points 1-10 miles apart. Position at every point (colour and number), average position, points in the top 3, who leads across the area (with reviews), the first three at any point, history with comparison to the last scan of the same shape. Runs in the background; price first (about $0.20 for 25 points). Source: Google local finder searched from the point's coordinates. Verified live 10/8 for alpineexteriorswa.com ("roof repair", 49 points, 83 s, all checked).
+              Found by testing: the first version asked for a map view at each point and showed "not found" two miles from a business that ranks first there - a map view only lists what is inside the picture. Replaced before release.
+              Not built: a real map behind the points.
+- [x] DONE  H2  Repeating grids (server/seo/grid-monitor.ts): any finished scan can repeat every week or month (up to 5 per site), run by the scheduler from included data only; compared with the scan before it (same search, square, listing and place) and alerted when the area clearly changed (new alert kinds "Local grid worse / better", bell + email, own notification setting); the newest scan of each repeating search is in the scheduled report (highlights + PDF). Verified end to end 10/8 on the screenshots database: watch set in the browser, scheduler pass run for real (50 s, 25 of 25 points), next date moved a month on, alert raised and delivered, PDF lines read back.
+              Found by the fresh-database check: the new statements ran before the alerts table existed - moved to the end of the schema list before release.
+
+- [x] DONE  H3  Action plan (`/seo/plan`, server/seo/tasks.ts): a per-site to-do list fed by "Add to plan" on Opportunities, Content gap, Link intersect, lost links and Site audit issues, plus tasks of the customer's own; start / note / done / drop / reopen; a finding added twice is one task; an audit task says when the newest crawl no longer finds the issue; open count on the dashboard card. Free. Verified 10/8: real Postgres 9/9 (script/seo-tasks-check.ts) and in the browser (findings added from three screens, a task started, noted and finished, "Action plan - 4 open" on the dashboard).
+              Not built: assigning a task to a team member, due dates, automatic "done" for keyword tasks when the position improves.
+
+- [x] DONE  H4  Service-area planner (Keywords explorer -> "Service x town", server/seo/planner.ts): services down the side, towns across the top; each cell is the search "service town" with searches a month and the site's position; gaps / weak spots / home-page rankings marked; tick cells -> action plan, list or rank tracker; last inputs remembered per site; CSV. Two lookups per table. Verified live 10/8 for alpineexteriorswa.com: 6 services x 7 towns = 42 searches, 8 gaps (880 searches a month), charged 11c against a quoted 15c; the 8 gaps sent to the plan; table reopened free after a reload.
+              Honest limits stated on the page: counts are nationwide for those words (a town name shared with another state counts both); positions are database estimates, not live checks. Not built: clustering of near-identical searches, a "near me" row, suggesting towns from the service area.
+
+- [x] DONE  H5  Directories (Site Explorer menu, server/seo/directories.ts): 26 review sites, trade directories, maps and social profiles for US home-service contractors; which link to the site and to up to 3 competitors; gaps (a competitor is linked, the site is not) marked and sent to the action plan; CSV. One lookup per site (about $0.11). Verified live 10/8: alpineexteriorswa.com linked from 0 of 26; two local competitors on BBB, Porch, Expertise and Yellow Pages - 4 gaps added to the plan.
+              Stated on the page: a dash is "no link found" (a profile with no website link, or one the link database has not crawled, looks the same), and the list is a chosen 26, not every directory.
 
 ## Codex audit #2 (2026-10-08, read-only, in a container; report: tower1 ~/codex-audits/out/seo-audit-2.md)
 Verdict: "a substantive SEO MVP, roughly 30-40% of the requested Ahrefs surface, not an Ahrefs equivalent."
@@ -134,6 +159,301 @@ Re-check of the earlier items: FIXED N3 N9 N10 N11, older 9 14 16 - the rest PAR
 STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / backlink saves), 11 (partial explorer report needs a full refresh),
 15 (agency delegation), 17 (database checks are manual scripts, not CI); B5 filters on competitors / best-by-links.
 
+## Codex audit #5 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-5.md)
+Verdict: "Substantial progress, but billing recovery and outbound reports still need fixes." Coverage: about 45% (40-50%).
+Audit #4's 15: FIXED 8, PARTLY 6, NOT FIXED 1 (#13 per-process locks). 15 new defects; done the same day:
+ 1 report emails had no way to stop them ..... FIXED: every email says who asked for it and carries a signed stop link; an address that
+   used it is never mailed again by that account; nothing is sent once the account has no SEO tools. NOT done: asking a new address to confirm first.
+ 2 schedule marked sent before sending ....... FIXED (leased for an hour, moved on only when every address was dealt with; retried otherwise)
+ 3 failed late settlement forgotten .......... FIXED (kept on the row, applied by the reconciler; real-database check 12)
+ 4 rank refunds could disappear .............. FIXED (the run carries its reservation before posting; a refund that cannot be made is owed and retried; check 13)
+ 5 failed checks stayed charged .............. FIXED (refunded with the ones that never return; check 14). Share is by number of checks, not per-keyword price.
+ 6 alert claim was not a delivery record ..... FIXED (five-minute lease; sent only when it went out; retried for three days)
+ 7 usage could invent a charge ............... FIXED (the amount is the row's final credit, nothing computed)
+ 8 unknown cost is a flag, not an amount ..... OPEN (rank posting is additive; gap and backlinks still use max(reported, estimate))
+ 9 back-fill could collide ................... FIXED (rows that would collide are left alone)
+10 list limits could be raced ................ FIXED (one request at a time per account; one name per account whatever the capitals)
+11 "Refresh numbers" did not refresh the list  FIXED (all keywords, in batches of 200, written back; tested live)
+12 usage stale / wrong "this month" .......... FIXED. Paging beyond 200 rows: OPEN.
+13 report hid a partial check ................ FIXED (checked vs tracked, all movers counted, device named)
+14 place lookup counted 62,000 rows each time  FIXED (one indexed read, at most hourly; removed places are deleted)
+15 small loading / keyboard faults ........... FIXED
+STILL OPEN: 8, 12 (paging), #13 of audit 4 (locks are per process; production runs one), agency delegation, audit summaries computed on read,
+a partly-loaded explorer report needs a full refresh, database checks are manual scripts.
+
+## Codex audit #6 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-6.md)
+Verdict: "Substantial progress, but billing recovery and outbound delivery remain unreliable." Coverage: about 45% (40-50%), with Brand Radar / AI and
+the audit page explorer both counted as missing at the time (both since built).
+Audit #5's 15: FIXED 5, PARTLY 8, NOT FIXED 1, FIX IS WRONG 1 (alert delivery: the shared notifier swallows email errors). 14 new defects; done the same day:
+ 7 saved result pages unvalidated ......... FIXED (http(s) links only, host-shaped domains, bounded sizes; test)
+ 9 share of voice mixed check dates ....... FIXED (one cohort: the latest check day; says how many of the tracked keywords it covers; called an estimate)
+ 8 competitor positions cut off ........... SAID ON THE PAGE (a check reads only as far as the page the customer's own site is on); not changed, it would raise the cost of every check
+10 competitor limit could be raced ........ FIXED
+11 half-finished place load looked fresh .. FIXED (a load counts only when it finishes)
+13 opening the unsubscribe link opted out . FIXED (the link asks; a button press does it)
+14 two months at midnight on the 1st ...... FIXED (one month per reservation, used for refunds too)
+ 5/6 list refresh ......................... FIXED (replaces the numbers, keeps what was done when a batch fails, never re-adds a removed keyword)
+ 3 owed refund lost on an abandoned reservation  FIXED (stays owed until the reservation is really settled)
+OPEN: 1 and 2 (the shared email / notification helpers record "sent" before sending and swallow errors - outside this module),
+4 (cost of posting tasks the source rejected), 12 (a list-name index would fail on pre-existing names differing only by capitals; there are none),
+audit #5's 8 (unknown cost as an amount) and 12 (usage paging), audit #4's 13 (per-process locks), agency delegation.
+
+## Codex audit #7 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-7.md)
+Verdict: "The fixes are substantial, but billing on partial failures, delivery recovery, and the accuracy of customer-facing conclusions still need work."
+Coverage: about 50% (45-55%). 13 new defects, on AI visibility and the audit page explorer; done the same day:
+ 1 an assistant that failed could still be charged ... FIXED (the customer pays only for the parts delivered: AI, content gap, batch; test)
+ 2 a verdict could be fooled .......................... FIXED in part: a one-word name counts only as a named business, not in running text; the web address
+   must be a whole address; a question that names the business says so on the page. The list of businesses is still read from the answer's bold names.
+ 3 a source inferred from a title ..................... FIXED (a title is read as the site only for Gemini's own redirect address; test)
+ 4 paid answers lost from view if saving failed ....... FIXED (shown at once; a notice when they could not be saved)
+ 5 answers from different asks counted together ....... FIXED (the header counts one ask; an older answer is marked as such)
+ 6 "can be indexed" said too much ..................... FIXED ("nothing blocking Google" / "blocked from Google" / response not recorded)
+ 7 the JavaScript diagnosis was too sure .............. FIXED (five pages or more before it is made; worded as the usual cause, not a proven one)
+ 8 big crawls worked out on every read ................ FIXED (kept per crawl; 1,000 pages and 500 links a page at most)
+ 9 list refresh could re-add a removed keyword ........ FIXED (update-only; keywords the source has nothing for are cleared)
+10 alert lease had no owner ........................... FIXED (token). The shared notifier still swallows email errors.
+11 AI as a general chatbot ............................ PART (40 questions an hour per account)
+13 affordability used the usual price ................. FIXED (uses the amount that must be available)
+OPEN: 12 (back-fill is not a versioned migration), the shared email / notification helpers, cost of posting tasks the source rejects,
+per-process locks, usage paging, agency delegation, no way to delete a saved AI question.
+
+## Codex audit #8 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-8.md)
+Verdict: "Substantial SEO functionality, but billing recovery, automatic AI tracking, and customer-facing conclusions still need fixes. This is not
+yet an Ahrefs equivalent." Coverage: 50-60%, midpoint 55%, with Content Explorer still counted as 0-5% (built the same day). 12 new defects:
+ 1 a tracked AI question could drop out of view ..... FIXED (every tracked question is listed with its own Stop; one spelling of a question everywhere)
+ 5 answers of different asks counted together ....... FIXED (run id; saved all-or-none; the server says whether they were saved)
+ 6 a failed monthly ask was lost for 30 days ........ FIXED (leased for an hour; the month moves on only after the answers are saved)
+ 7 an answer could land under another site ......... FIXED (bound to the site it was asked for)
+ 8 batch analysis invented zeros / no retry ........ FIXED (unknown is shown as unknown; a column that did not load can be retried)
+10 canonical tag called a block .................... FIXED (its own filter, described as a request Google usually follows); links are judged on any same-site link
+11 crawl limits applied after reading everything ... FIXED (1,000 pages and 500 links a page inside the query)
+OPEN: 2 (refund intent not written atomically with the run closing), 3 (cost of rank tasks the source rejects), 4 (the shared notifier),
+9 (unknown cost as an amount, outside rank posting), 12 (the back-fill is not a versioned migration).
+
+## Codex audit #9 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-9.md)
+Verdict: "Substantial SEO functionality, but billing recovery and scheduled delivery still need work. This is not an Ahrefs equivalent."
+Coverage: 55% (50-60%); Content Explorer now counted at 20-35%. 10 new defects; done the same day:
+ 1 monthly AI ask could be bought again if saving failed .. FIXED (the month moves on as soon as it is paid for; saving is retried, never the purchase)
+ 2 a result could be stored under another search ......... FIXED on every paid page (the result is written under the request it answers)
+ 3 content paging could strand you on an unbought page ... FIXED (a way back is always there)
+ 4 Stop could miss an older tracked question ............. FIXED (compared in one spelling)
+ 5 answers from different asks shown together ............ FIXED (exact run only; an older answer in the table carries its date)
+ 6 batch: a missing estimate shown as zero; affordability  FIXED
+ 7 content wording said more than the data ............... FIXED ("matches", authority as one sign)
+ 8 "reopens free" could fail silently .................... FIXED (the page says when a result could not be kept)
+ 9 outgoing links shown when links are unmeasurable ...... FIXED
+10 an invalid site to leave out was ignored .............. FIXED (refused)
+Also: the report now carries real clicks and impressions from Google Search Console when the site's property is connected.
+
+## Codex audit #10 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-10.md)
+Verdict: "The audit #9 fixes are incomplete"; coverage about 58% (52-64). No cross-account defect found. What was done:
+ 1 HIGH monthly AI could lose paid answers / re-buy   FIXED: after a paid ask one transaction moves the month on AND parks the answers (seo_ai_unsaved); filing them removes the parked row in the same transaction and is idempotent per run; a background pass keeps retrying (10 min steps, at most 6 h apart) without buying anything. Real-Postgres check script/seo-ai-waiting-check.ts (7 checks). Still possible: the database refusing every write right after the ask.
+ 2 MED  ads re-bought earlier pages, wrong quote        FIXED: one lookup for all 120, saved, paged free; own price ($0.03, hold $0.04) from the measured $0.006.
+ 3 MED  ads cap shown as a total; offsets past the cap  FIXED: total is what was returned with "most recent ... may have run others" when capped; offset >= 120 refused; a malformed row no longer shifts pages.
+ 4 MED  unused filters/sorts made second billable copies FIXED: effectiveReport drops filters a report does not use and replaces an unknown sort; the cache key is built from that.
+ 5 MED  referring-IP note accused sites of one owner    FIXED: wording now says concentration, not ownership.
+ 6 MED  subdomain www stripped; missing numbers as zero FIXED: host kept as is; missing numbers are null.
+ 7 MED  Search Console zeros when nothing was synced    FIXED: null when a period has no rows; change shown only when both periods have 21+ days; the report says when the period is partly synced.
+ 8 LOW  report states / accessible names                FIXED: separate "couldn't check" state (with Back), report-specific empty text, row-specific names on Explore / See the ad.
+ Re-check items: keyword Refresh no longer replaces another keyword's overview; Content explorer's failed check keeps Back; batch "can afford" uses the server's hold; report tables and Site Explorer say when a result could not be kept.
+ NOT DONE: legacy AI answers without a run id still grouped by time (old rows only); persisting report purchases that fail to save (they are shown and flagged, not recoverable).
+
+## Codex audit #11 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-11.md)
+Verdict: "Audit #10 is only partly resolved"; coverage about 59% (53-65). No cross-account disclosure found. What was done:
+ 1 HIGH paid AI recovery began too late                FIXED: a run row ('asking') is written BEFORE the ask is bought; a known failure closes it; answers are parked on that row together with moving the month on; an 'asking' row left by a crash means the question is NOT bought again that month (logged for a person). Filing can move the month on in its own transaction. One answer per assistant per run is a unique index. Real Postgres: script/seo-ai-waiting-check.ts 6a-6c.
+ 2 MED  refresh showed one country's overview as another  FIXED: every lookup carries the country it was started in and is dropped if that is no longer the one on screen; the picker is disabled during a refresh; the overview records its language.
+ 3 MED  country lost in lists and the tracker           FIXED: a list has one country (set when made; other countries are refused with the reason; refresh uses the list's own); tracking from another country than the site's sends the keywords without the numbers and says so. Real Postgres 7a-7c.
+ 4 MED  location / language not validated everywhere    FIXED: keyword research and site creation accept only a listed pair; list adds too.
+ 5 MED  traffic potential not the exact organic page    FIXED: the exact URL as the target (host and scheme kept), organic only, null when the source has no figure; tile says "estimated ... in <country>". Limitation found live: the source has no record of some pages (e.g. a Home Depot product page), shown as "Not available".
+ 6 MED  failed part charged / wrong message             FIXED: the customer pays only for the calls that returned; each missing part is named. NOT DONE: retrying one part without buying the overview again.
+ 7 MED  hold not an upper bound with search operators   FIXED: operators (site:, intitle: ...) are refused on the keyword overview and the local grid.
+ 8 MED  Search Console change from missing days         FIXED: two equal 28-day windows counted back from the newest synced day; a change is shown only when both are complete (28/28); coverage is stated whenever a window is short; one rule (server `comparable`) for the PDF, the email and the tile.
+ 9 MED  English-only "Questions"                        FIXED: question words by language (en, es, fr). Run live in French.
+10 MED  unused geography in cache keys                  FIXED: link reports and link intersect are keyed as one page whatever country is sent.
+11 MED  failed-save flag ignored on some screens        FIXED: keyword overview, content gap / link intersect and bulk analysis now say so. NOT DONE: durable recovery of a purchase that could not be saved.
+12 LOW  inherited property accepted as a sort           FIXED: own properties only.
+ Also: the duplicate "couldn't check" alert in report tables removed.
+
+## Codex audit #12 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-12.md)
+Verdict: "Audit #11 is only partly resolved"; coverage about 57% (50-64). No cross-account disclosure found. Rule adopted for everything bought in the background: SAVED FIRST, CHARGED SECOND. What was done:
+ 1 HIGH grid retries could be charged / exceed the hold  FIXED: three sums kept apart - what returned (the customer's charge, never more than points x price, always under the hold), what the source billed us, and an allowance for tries whose cost we never learned. Unit test with timeouts and retries.
+ 2 HIGH a grid could be charged and its results lost     FIXED: the results are written inside the charged call; if they cannot be written the lookup counts as failed and the customer pays nothing. A late result cannot overwrite a failed scan.
+ 3 HIGH AI recovery could still re-buy / lose answers    FIXED: clearing an unfinished run and moving the month on are one statement; a timeout or other ambiguous failure no longer clears the run (so it is not bought again); the answers are parked inside the charged call - not parked means not charged.
+ 4 HIGH the new unique index could fail on duplicates    FIXED: duplicates are reduced to the first copy before the index is made, only while it does not exist. (Production had none: checked before deploying.) Real Postgres check.
+ 5 MED  lists still mixed countries into the tracker     FIXED: a list's own country travels with its keywords to the tracker and when a keyword is opened. Legacy lists: production had none.
+ 6 MED  late business search pinned to another site      FIXED: search results and the pin carry the site they were made for.
+ 7 MED  fallback matching unreliable                     PARTLY: the listing's own website is kept and matched; each point records how the business was recognised and the page says when it was not by Google's id; a business counts once per point. An exact identity without Google's id is not possible.
+ 8 MED  history compared different listings / areas      FIXED: compared only with an earlier scan of the same search, square and listing in the same place; both denominators are shown.
+ 9 MED  lifecycle across restart, tabs and processes     FIXED: one running scan per site is a unique index; stale scans are closed, not just shown; failed scans stay in the history with the reason; the running scan is watched independently of the one on screen. NOT DONE: the hold of a scan killed by a restart waits for the 30-minute reconciler (no reservation id on the scan row).
+10 MED  wording overstated                               FIXED: "local finder", not the map pack; "Position score" with its rule always shown.
+11 MED  Search Console "last 28 days" when stale         FIXED: the end date and both windows' coverage are in the email, the PDF and the tile.
+12 LOW  orange cells' contrast                           FIXED: dark text on orange and amber; red darkened.
+13 LOW  points past the date line                        FIXED: longitudes wrap, latitudes are clamped; tested.
+
+## Codex audit #13 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-13.md)
+Verdict: "Audit #12 is only partly resolved"; coverage about 56% (49-63). No HIGH finding; no cross-account disclosure. What was done:
+ 1 MED  "Losing ground" compared two different ranks     FIXED: a fall is place on the whole results page now against then (like with like), shown as "places lost".
+ 2 MED  pages / home page ignored the host               FIXED: a page is its host and path (no www, no trailing slash, no tracking parameters); only the site's own front page is the home page.
+ 3 MED  home-page conclusions went beyond the data       FIXED: wording is "the page returned is the home page"; the list is kept when only one page is returned; empty and non-home cases have their own text; a new page is "worth looking into", not a promise.
+ 4 MED  paid rows discarded                              FIXED: all 500 rows are kept and returned; lists page locally (free) and export everything; each page opens to its own searches.
+ 5 MED  monthly AI skipped a month with nothing bought   FIXED: a run is 'opened' (nothing sent) until the moment before the ask leaves, then 'asking'; an 'opened' run left behind is cleared and the question asked. Real Postgres 6d-6e. Still treated as unknown: a connection that fails before the request leaves (indistinguishable from one that fails after).
+ 6 MED  grid's own cost allowance overridden             FIXED: fetchGrid reports its figure as known; the ledger keeps it. NOT DONE: our own reservation is 1.25x while two tries per point can cost us up to 2x (the customer's hold and charge are unaffected).
+ 7 MED  grid page could stop watching / miss another tab FIXED: the page follows whatever the server says is running, keeps asking until a final answer even after a failed attempt, clears the watch when it ends, and reports a watching problem on its own line.
+ 8 MED  wrong matches / comparisons without an id        FIXED: the pinned id wins anywhere in the list; without an id on either side the name must match too for two scans to be compared (page, alert and report).
+ 9 MED  no price on "Look again"; overview required      FIXED: the maximum is on the button; a domain with no report offers "just the opportunities".
+10 LOW  Search Console coverage                          FIXED: both windows' coverage is stated independently (including zero) in the email, PDF and tile.
+11 LOW  "a point that returns nothing is not charged"    FIXED: "a search that fails is not charged (one that works but finds no businesses is)".
+12 MED  clean-up and index creation not atomic           FIXED: each is one DO block under a table lock.
+
+## Codex audit #14 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-14.md)
+Verdict: "Audit #13 is partly resolved. Repeating grids are useful, but their scheduling and alert lifecycle are not yet reliable"; coverage about 57% (50-64). No cross-account disclosure. What was done:
+ 1 HIGH a finished scheduled scan could be bought again    FIXED: the period's scan is tied to the watch (run_scan_id) before anything is bought - a pass that finds it finished closes the period without buying; a lease with a token decides who may record the outcome; the next date is counted from the watch's anchor (a late run or a 28-day month never moves it). Real Postgres 11-13.
+ 2 MED  alert creation failures were forgotten             FIXED: the comparison owed for a scan (alert_scan_id) is set in the same statement that closes the period and cleared only when made; retried every pass. Real Postgres 14.
+ 3 MED  "clear change" could be missing-data noise          FIXED: only points both scans checked are compared (four fifths of the square must be shared); a collapse is not cancelled by a small contrary signal; a baseline with too little in common is passed over for the one before. Unit tests with the auditor's two examples.
+ 4 MED  stopping / changing a watch                        FIXED: a stopped watch's lease answers false - nothing more is bought or alerted (real Postgres 14b); no alert about a listing the site is no longer pinned to; the report shows only scans of the current listing (15-15c).
+ 5 MED  five-watch limit bypassable across processes       FIXED: count and insert under a lock on the site's row (8c); a scan must have been run once before it can repeat (8).
+ 6 MED  idle grid page never learned of other scans        FIXED: asked again every half minute and on window focus; a watching problem is shown whenever there is one.
+ 7 MED  "You" in the rivals table could contradict the grid FIXED: one function decides which listing is the business at a point, used by both.
+ 8 MED  refresh could strand Opportunities on an empty page FIXED: a new set of rows starts at page one; the page number is clamped; a drilled-into page that is gone is closed.
+ 9 MED  concurrent start-up could fail the index steps     FIXED: the table lock is taken before looking; the look is scoped to this schema and table.
+10 LOW  tracker tile's Search Console coverage             FIXED: both windows' coverage stated together.
+11 LOW  old Opportunities cache could not be refreshed     FIXED: new cache key ("v2"); old copies are simply not found.
+ Also: report grid lines carry their scan dates.
+ NOT DONE: our own reservation for a grid stays 1.25x while retries can cost us up to 2x (the customer is unaffected).
+
+## Codex audit #15 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-15.md)
+Verdict: "Audit #14 is partly resolved"; coverage about 57% (50-64). No cross-account disclosure or unsafe link found. What was done:
+ 1 HIGH a failed period-close could re-buy a finished grid   FIXED: once the scan is saved and charged nothing unties it from its period; a failed close is logged and the next pass closes it without buying. Real Postgres 16-16b (the close statement made to fail once).
+ 2 MED  owed comparisons could be overwritten / starved     FIXED: a queue (seo_grid_owed), one row per scan, each with its own retry time. Real Postgres 14-14b.
+ 3 MED  monthly anchor was the first due date               FIXED: the anchor is the moment the watch was set (17).
+ 4 MED  stopping a watch did not fence a comparison under way FIXED: the watch is held for the length of the comparison and its owed rows go with it (14c).
+ 5 MED  an old listing could alert after re-pinning (no id) FIXED: the name must match too.
+ 6 MED  "lost since the last snapshot" not established      FIXED in words and logic: the section is "Lost backlinks seen since <date>" - links still being found after that date and now gone; the lookup is always made (no shortcut from an unrelated count).
+ 7 MED  a lost link shown as the whole site leaving          FIXED: "sites with a lost link ... the site may still link to you from other pages".
+ 8 MED  net gains hid strong losses                         FIXED: the two questions are asked separately (both alerts can be raised); a strong loss is a followed link from a site that is not spam. Real Postgres 7h-7j.
+ 9 MED  partial failures / stale loss data                  FIXED: a failed loss lookup is recorded and shown as failed (not charged), never left as the old list; the refresh says so. NOT DONE: one snapshot per day is still the unit (a second refresh the same day replaces the first).
+10 MED  first-snapshot price and affordability              FIXED: the page gets this site's own maximum (a first snapshot has one lookup fewer) and shows it on the button.
+11 MED  report compared grid scores over different points   FIXED: the report uses the same shared-points comparison as the alert.
+12 LOW  alert promised more names than the page keeps       FIXED: it says the page keeps the 25 strongest.
+ Also (open since #12): second tries on a grid are rationed to a quarter of the points, so our own cost stays inside the 1.25x reservation. Unit test.
+
+## Codex audit #16 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-16.md)
+Verdict: "Audit #15 is partly resolved" (the grid period-close fix "is convincing"); coverage about 58% (50-65). No cross-account disclosure or executable task link. What was done:
+ 1 HIGH audit tasks could falsely look resolved        FIXED: "no longer found" is said only when a crawl finished after the task was added, crawled at least four fifths as many pages as the crawl it came from, re-checked that very issue and does not list it; otherwise the task says why nothing can be said (not rechecked / smaller crawl / could not re-check / newest crawl failed). Unit test with each case.
+ 2 MED  reopening bypassed the limit; duplicates failed at capacity  FIXED: reopening takes the same lock and count as adding; a finding already in the plan is "already there" even when the plan is full. Real Postgres 5a-5c.
+ 3 MED  strong losses could stay silent                FIXED: every saved loss is judged before any list is cut to ten; an unknown spam score is shown as unknown, not treated as clean or as spam. Unit + real Postgres 7k.
+ 4 MED  existing monthly anchors                       FIXED: rows anchored a period after they were set are re-anchored to when they were set.
+ 5 MED  "Open the plan" could open another site        FIXED: the link names the site and the plan page shows it.
+ 6 MED  long findings exceeded task limits             FIXED: findings are fitted (title, target, facts, source) before they are sent.
+ 7 MED  an invisible filter after switching site       FIXED: filter, tab and note editor reset with the site; a kind that is gone is dropped.
+ 8 MED  history silently cut at 600                    FIXED: counts come from the database; all open tasks plus the newest 100 closed are shown, with "show more". Real Postgres 5d.
+ 9 MED  a backlink snapshot could be charged then lost FIXED: the snapshot is written inside the charged call (saved first, charged second).
+10 LOW  a failed count shown as "none open"            FIXED: shown as unavailable.
+ Also: "Plan" buttons carry the finding in their accessible name; the first-snapshot text uses the site's own price.
+
+## Codex audit #17 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-17.md)
+Verdict: "Audit #16 is partly resolved: six fixes hold, four remain partial"; coverage about 59% (52-66). No cross-account disclosure. What was done:
+ 1 HIGH audit resolution lacked task-specific evidence   FIXED: a task records the crawl it came from; the newest finished crawl is compared with THAT crawl (not the one before last) by the audit page's own rule - "no longer found" only when every page the issue was on was crawled again. No recorded crawl, a crawl that is gone, or an issue the origin crawl does not list under that name = "can't be checked automatically". Absence alone is never evidence. Unit test with each case.
+ 2 MED  concurrent status changes could pass the limit   FIXED: any change of status takes the site's row first, then reads the task's status as it is now. Real Postgres 5e.
+ 3 MED  planner pairings could break the source's rules  FIXED: every "service town" is checked (80 characters, ten words) before anything is set aside; the page names the pairing.
+ 4 MED  missing data shown as advice                     FIXED: a volume that did not load is "didn't load", not "too few searches"; counts that need a part that failed are unknown, not zero; with rankings unknown nothing becomes a "write a page" task; "no ranking found" is said to mean the keyword database has none in its first 100.
+ 5 MED  quote, affordability and reservation differed    FIXED: the page asks the server for the quote, which is the reservation itself; the rankings lookup asks for one row per search, so it cannot cost more than was reserved.
+ 6 MED  cached numbers under another country's label     FIXED: the site's country is part of the table's identity on the page; a table made for another country is not shown as this one's.
+ 7 MED  "Track" did not track from each town             FIXED in words: the button and the footnote say it is tracked for the country as a whole and how to track from a town; the selection is kept.
+ 8 MED  a failed scheduled backlink save lost the month  FIXED: the schedule is leased six hours and moves on a month only after the snapshot is saved; link alerts a snapshot calls for are owed (alerts_done) until raised.
+ 9 MED  fitting a task destroyed identity / destination  FIXED: a long source keeps a fingerprint of the whole; an address too long to keep becomes its site, never a shortened address.
+10 MED  closed history unreachable after 1,000           FIXED to 5,000 with an explicit end state (older ones are still counted). NOT DONE: cursor paging beyond that.
+11 MED  bulk action cleared cells that were not sent     FIXED: every selected finding is sent, fifty at a time.
+12 LOW  remembered inputs / comma in a town              FIXED: remembered on every deliberate look; a loading failure is said; "Bellingham, WA" is one town.
+
+## Codex audit #18 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-18.md)
+Verdict: "Audit #17 is partly resolved"; coverage about 60% (52-67). No cross-account disclosure. What was done:
+ 1 HIGH optional checks could look resolved             FIXED (audit page and action plan alike): a PageSpeed issue counts as re-checked only when that page was measured again for the same device; issues from checks that only sample links or images are never called fixed. Unit tests for each way a speed test can fail to run.
+ 2 MED  a "recheck" could predate the task              FIXED: the crawl must have finished after the task was added.
+ 3 LOW  misleading fallback states                      FIXED: up to 60 origin crawls per look; beyond that a task says "not checked this time"; "still there" is by the issue's name; a failed crawl counts as newer only by the clock; a failure to read the crawls is said on every open audit task.
+ 4 MED  snapshot could be bought again                  FIXED: the snapshot and the schedule are one transaction.
+ 5 MED  backlink alert debt                             FIXED: each unsettled snapshot is judged against the snapshot before it and marked on its own; nothing expires; the longest-waiting site goes first. NOT DONE: snapshots from before today are assumed settled.
+ 6 MED  planner could spend without a quote on screen   FIXED: no price, no purchase; loading and failure are shown with a retry.
+ 7 MED  a half-sent batch looked like total failure     FIXED: what was added before it stopped is said and the lists are refreshed.
+ 8 MED  old checks turned unknown ownership into zero   FIXED: new checks carry a marker; "it cites you" is counted only over checks that looked, older ones are "not known".
+ 9 LOW  compare-months footnote / default               FIXED: the same calendar month a year earlier; the footnote says what a dash can mean.
+10 LOW  cached planner selections not remembered        FIXED: pressing "Build" remembers the inputs even when the table is already saved.
+ Also: the rank tracker's summary names the device; a table made for another country has a rebuild button.
+
+## Codex audit #19 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-19.md)
+
+Verdict: of audit #18's ten, eight hold and two were partial; ten new defects in Directories and page numbers. Coverage estimate 60% (53-67).
+
+ audit #18 leftovers
+ 3 audit tasks without a recorded issue said nothing ... FIXED (they now say the crawls could not be read / cannot be checked automatically)
+ 5 same-day refresh could be settled unseen ........... FIXED (see 7 below). Alert debt from before the migration stays discarded: KNOWN, not rebuilt.
+ new
+ 1 HIGH different pages given the same numbers ........ FIXED (a page is its address without the fragment and nothing else: no lower-casing, no slash folding, on server and page)
+ 2 directory sub-domains could not pass the filter .... FIXED (anchored pattern: the directory or any sub-domain of it; checked against the source - it answered the same 15 rows for a large site, so the old filter was not losing rows there)
+ 3 missing traffic shown as zero ...................... FIXED (zero only when the source says zero for that page; left out or without figures = unknown). Labelled "estimated US search visits".
+ 4 a half-loaded answer could not be completed ........ FIXED ("Try that part again" asks for, and charges, the missing part only; what had loaded is kept; a failed look for a saved copy is said, with a retry)
+ 5 price on screen differed from what was set aside ... FIXED (the server sends the exact figure for n sites / n pages; the page shows and checks that figure and will not buy without it)
+ 6 "listed and you are not" ........................... FIXED (wording is about links found; the badge is "Link to check"; plan tasks are "Check your ... profile and its link to the website")
+ 7 settlement could clear a newer same-day snapshot ... FIXED (a snapshot is settled only if it is still the version that was evaluated)
+ 8 competitors in another order bought again .......... FIXED (one fixed order for the saved copy and the lookup)
+ 9 a link invented from a row without a count ......... FIXED (a row that says no links is not a link; a link without a count is shown as "linked", no number)
+ 10 table grouping / unknown cells for screen readers . FIXED (a body per group with a row-group heading; "not checked" and "no link found" are text, not a hover)
+ also: the "not re-checked" note on the audit page now names speed and sampled checks.
+ NOT DONE: Directories "Check again" buys every column again, also the ones that loaded.
+
+## Codex audit #20 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-20.md)
+
+Verdict: of audit #19's twelve, nine fixed and three partial; twelve new defects, most in the rendering check. Coverage estimate 59% (52-66).
+
+ 1 HIGH rendering verdicts claimed too much ........... FIXED (compared only when both visits were answered 2xx, ended on the same page of the site and reported measurements; "less once rendered" is a finding; "same" needs words and links on both sides; a missing title on an unmeasured visit is "not reported"; wording is what the two visits saw)
+ 2 HIGH retry used stale state, could overwrite ....... FIXED (buying numbers for a list of pages is one at a time per account and list; each reads the saved answer again when it is its turn; a known figure is never replaced by an unknown one). One server process: KNOWN - there is no cross-process lock.
+ 3 HIGH a retry could silently buy both parts ......... FIXED (with nothing saved to complete it answers 409 and buys nothing; the full offer and its price come back)
+ 4 rendering could be pointed at odd addresses ........ FIXED (no sign-in in the address, standard port only, no bare IP or single-label host; a visit that ended on another site or another page is not compared). The fetch is made by the source from its network, not ours; DNS is not resolved by us: KNOWN.
+ 5 rendering price differed from the reservation ...... FIXED (exact figure per number of pages from the server; "up to"; no price, no purchase)
+ 6 retry on unknown cost; hold not a ceiling .......... FIXED (asked again only when the source refused the request or the task states a cost of exactly 0; a cost not stated is allowed for and not repeated; the customer is never charged more than the figure shown)
+ 7 rendering state could go stale or stick ............ FIXED (the newest check is asked for every 5 s while one runs, every 30 s otherwise and on focus; what the server says is newest is what is shown; when it cannot be asked that is said, with "Ask again", and the page is not locked)
+ 8 directory answer cut short made false gaps ......... FIXED (when the source has more rows than came back, directories not among them are "?" for that site and never a gap; the page says which sites)
+ 9 a #fragment lost the numbers on screen ............. FIXED (one shared page key for counting, asking, pricing and matching: shared/seo-page-key.ts)
+ 10 a page the lookup left out could never be retried . FIXED (what is still unknown is worked out per page and per figure; "ask again for just those" at the server's exact figure, with the warning that it may not change)
+ 11 copy presented a browser visit as Google .......... FIXED
+ 12 rendering hidden until a crawl exists ............. FIXED
+ also: the same page given twice is checked once instead of refused; sub-domain pages show their host.
+ NOT DONE: alert debt from before the #18 migration stays discarded; an old rendering worker is not cancelled when its run is closed as stale (it cannot save or charge, but its fetches cost us); Directories "Check again" buys every column.
+
+## Codex audit #21 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-21.md)
+
+Verdict: of audit #20's twelve, nine fixed and three partial; ten new defects, half of them about how firmly the competing-pages panel worded its findings. Coverage estimate 59% (52-66).
+
+ 1 HIGH rendering compared pages without identity ..... FIXED (both visits must say where they ended, it must be the very same address on the site - nothing folded - or the page is "could not be compared"; timings and problems are kept only for a browser visit that ended on the site)
+ 2 a failed poll could lock the rendering form ........ FIXED (after a failed ask the last answer no longer counts as "running"; the server's own one-at-a-time rule covers a second start)
+ 3 competing-page key hid real alternatives ........... FIXED (a page is its exact address minus the fragment and click-tracking parameters; addresses that differ only by http/https, www or a last slash are reported as "one page under two addresses", not merged away and not called competing; the port counts)
+ 4 ranking evidence worded as a diagnosis ............. FIXED ("no change of page seen" with the number of keywords it rests on; "not enough checks yet" when none ranked twice; "Last shown" with its date, and "not ranking in the check of ..." when it has not ranked since; alternation is "worth a look", "the checks alone don't prove it")
+ 5 competing results went stale ....................... FIXED (refreshed with the rank history after checks and keyword edits, and when the window is looked at again)
+ 6 rows and tasks lacked context ...................... FIXED (town and device on every line; sub-domain pages show their host; the task carries full addresses, device, place, checks and dates)
+ 7 partial topic volume shown as the whole ............ FIXED ("n searches a month for the k with a figure"; the list total the same way; "no search volumes yet" when none)
+ 8 selecting >500 keywords broke tracking ............. FIXED (sent 500 at a time; the selection is kept; a failure part-way says how many were added; removals 1,000 at a time)
+ 9 stemmer split ordinary words ....................... FIXED (businesses/boxes/patios; possessives; "glass", "gas", "bus", "analysis" left alone)
+ 10 "No shared topic" when the limit was hit .......... FIXED ("Other keywords", and the note says only the 40 largest topics are grouped)
+ carried: Directories "check again" bought good columns - FIXED ("Check just that site again" buys only the sites that did not load and keeps the rest; 409 and no purchase when nothing is saved). A stale rendering run kept fetching - FIXED (the worker asks before each page whether its run is still open). Group checkbox shows a partly-selected state; group order no longer depends on the reader's language settings.
+ NOT DONE: alert debt from before the #18 migration stays discarded (there is nothing saved to judge it by); serialization is per server process.
+
+## Codex audit #22 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-22.md)
+
+Verdict: of audit #21's ten, six fixed and four partial; eleven new defects. Coverage estimate 60% (52-67).
+
+ 1 HIGH directory refresh and retry could overwrite ... FIXED (a first purchase, a full "check again" and a second try for missing sites all go through one queue per account and saved answer, each reading the saved answer when it is its turn)
+ 2 the 5,000-row cap changed what was counted ......... FIXED (the database returns only the newest answer per question, assistant and month - a question asked 40 times is one row; beyond 20,000 such rows the result says it is cut short). Real-Postgres check: script/seo-ai-summary-check.ts.
+ 3 "other businesses" could include the customer ...... FIXED (the customer's own name, as whole words inside the bold text, or its web address, is never listed; the heading is "Other names in the answers" and the note says a heading or an unrecognised spelling can be among them)
+ 4 own-site source count contradicted the headline .... FIXED (the footnote uses the answer-level count)
+ 5 address variants asserted to be one page ........... FIXED (every exact address is kept and counted; "back and forth" / "changed" are said only between clearly different pages; addresses differing only by http/https, www or a last slash are "possible variants - not checked", never merged)
+ 6 ranked-without-a-page became "not ranking" ......... FIXED ("not found in the check of ..." only when no later check ranked; "ranked again on ..., page not recorded" otherwise)
+ 7 task evidence was cut short ........................ FIXED (one fact per address, up to five, each with its checks; variants and the latest check included). Found by running it: the first version used fact names the task rule refuses (400) - corrected and the saved task read back.
+ 8 a closed rendering run could still start fetches ... FIXED (asked before every request, first page and second tries included; when the run's state cannot be read, nothing more is bought)
+ 9 summary lifecycle .................................. FIXED (loading status; history shown with "no answers from the last 120 days" when there is nothing recent; refreshed on focus and every 5 minutes)
+ 10 bulk tracking cleared the selection ............... FIXED
+ 11 directory advice overstated ....................... FIXED ("among the answers' sources"; "check that your profile is accurate"; what an assistant read, and whether it changes an answer, said to be unknown)
+ NOT DONE: alert debt from before the #18 migration; serialization is per server process (one process runs the site).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -142,8 +462,49 @@ STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / b
 - 2026-10-08 (slice 2): Site audit, rank history, and the Codex fixes. 86 SEO unit tests pass. The audit summary was run
   against the real stored crawl. Still NOT seen in a browser by the builder; the rank-history charts have never had real data.
 - 2026-10-08 (slice 3): Content gap + Link intersect, durable ledger, Codex audit #3 fixes. 100 SEO unit tests pass;
-  script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still NOT seen in a browser.
+  script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still Seen in a browser 10-08.
 - 2026-10-08 (slice 4): place-level tracking, map pack, alerts. 113 SEO unit tests pass; script/seo-local-check.ts 17/17 on a
   throwaway Postgres that still had the old schema and rows (the upgrade runs in place); map pack found on live results.
 - 2026-10-08 (slice 5): keyword lists, bulk analysis, usage page, Codex audit #4 fixes. 130 SEO unit tests pass;
-  script/seo-ledger-check.ts 38/38 and script/seo-local-check.ts 20/20 on a fresh throwaway Postgres. NOT seen in a browser.
+  script/seo-ledger-check.ts 38/38 and script/seo-local-check.ts 20/20 on a fresh throwaway Postgres. Seen in a browser 10-08.
+- 2026-10-08 (browser): every SEO screen was opened in headless Chromium (Playwright) against a recording database on vb11 with
+  real lookups for alpineexteriorswa.com - 31 screens plus 7 at phone width, no page errors, no horizontal overflow on a phone.
+  Looking found what code review had not: a clipped column in Site audit, wrapping intent labels, capitalised domain chips,
+  "city, state" not matching in the place picker, no way to get search volumes in the tracker, arrow glyphs missing in the PDF.
+  All fixed. How to repeat it: scripts/seoshots*.tmp.ts in vb11 ~/ConstructHUB-seoshots (not committed).
+- 2026-10-08 (slice 7): reports. 142 SEO unit tests pass.
+- 2026-10-08 (slice 8): followed competitors / share of voice, filters on the last two reports, two-year history, Codex audit #5 fixes.
+  150 SEO unit tests; script/seo-ledger-check.ts 44/44 and seo-local-check.ts 20/20 on a fresh Postgres; unsubscribe, opt-out skipping and
+  list refresh exercised end to end in the recording environment; the competitor panel was looked at in a browser.
+- 2026-10-08 (slice 9): audit page explorer, AI visibility, Codex audit #6 fixes. 174 SEO unit tests. Both new screens run on real data and looked at
+  in a browser; looking at the page explorer on the real crawl is what showed that link counts cannot be trusted on a JavaScript-built site.
+- 2026-10-08 (slice 10): batch analysis, positions over time, monthly AI questions, Codex audit #7 fixes. 181 SEO unit tests.
+  Batch analysis and the monthly AI question were run for real; every SEO tab was opened in the browser with no page errors.
+- 2026-10-08 (slice 11): Content explorer, Codex audit #8 fixes, section tabs wrap to two lines on a wide screen. 188 SEO unit tests.
+  Content explorer run live; the AI page re-run in the browser after the run-id change.
+- 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
+  a report page) were run in the browser.
+- 10/8 slice 13: referring IPs, similar-link sites, subdomains and ads run in the browser against live data for jameshardie.com (50/50/7/50 rows, 0 page errors). Found by looking: the "Authority" number on two of them was not the site's own - column removed.
+- 10/8 slice 14: keyword overview refreshed live in the browser ("siding contractor": traffic potential and parent topic shown; price line $0.20, hold $0.26); switched to Canada - screen cleared, nothing bought until Look up, then Canadian numbers and results (1,300 searches, klzroofing.com first); Site Explorer followed the same choice and showed no report for Canada until asked. 0 page errors.
+- 10/8 audit #10 fixes: ads report run in the browser - one purchase, pages 2 and 3 opened without another (purchases counted: 1), "Rows 101-120 of 120 most recent", Next disabled; referring-IP note and subdomain rows read back. Real Postgres: ledger 44/44, places+alerts 20/20, waiting AI answers 7/7.
+- 10/8 slice 15 (local grid): in the browser against live data - business found by name and pinned; 5x5 at 5 miles (23 of 25 checked before retries were added; 2 timeouts) and 7x7 at 3 miles in the background (start answered in 61 ms, finished in 83 s, a reload mid-scan picked it up, 49 of 49 checked, charged 40c against a 48c hold). 0 page errors.
+- 10/8 audit #11 fixes in the browser, live: keyword overview bought (201); "site:..." refused with a plain message; Canada (French) lookup and the Questions list returned French questions ("comment poser une toiture..."); "Save to a list" offered only a new list, the United States list shown disabled with its country. Real Postgres: ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13.
+- 10/8 slice 17 (Opportunities): run in the browser for alpineexteriorswa.com - 10 within reach (3,230 searches a month), 3 losing ground (5 -> 11, 5 -> 14, 7 -> 11), 1 page for 13 keywords, 100% on the home page; charged 6c against a 29c hold. 0 page errors.
+- 10/8 audit #12 fixes: real Postgres - ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13, grid lifecycle 10/10 (script/seo-grid-check.ts: the one-running-scan rule created over old duplicates, a second start returns the first, the database refuses a third, stale scans closed, failed scans kept, late results refused). Browser, live: a 25-point scan in the background (42 s, 25 of 25, charged 20c against a 25c hold) while an older scan was opened - the running note and the disabled button stayed, then the new scan appeared in the history.
+- 10/8 slice 19 (repeating grids): real Postgres grid check now 18/18 (watches per account, five per site, alert raised once and worded, report lines, a different listing not compared); ledger 44/44, places+alerts 20/20, AI + lists 13/13. Browser: "Every month" set on a scan -> "repeats every month - next on Nov 8"; alerts page shows "Local grid better ... 25 of 25 points, was 5 of 25"; PDF read back with pdftotext.
+- 10/8 audit #13 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 20/20, AI + lists 15/15, grid 18/18. Browser, live: Opportunities for jameshardie.com (500 of 7,217 keywords, 245 within reach paged 50 at a time, "Export all 245", 54 losing ground with places lost, 67 pages, the home page opened to its 13 searches; charged 29c = the stated maximum) and stand-alone for a domain with no report (skagitroofing.net: 6 keywords, 6c, the four home-page searches listed).
+- 10/8 slice 21 (named lost links): real Postgres places+alerts check now 24/24 (a strong site lost alerts and is named; a weak one does not; losses collected against another snapshot are ignored). Browser, live: "Refresh now" (201, charged 31c) -> "Sites that stopped linking since Sep 7 - the 25 strongest of 113" with the pages that linked.
+- 10/8 audit #14 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler all passing (crash after the scan was saved -> period closed with 0 lookups; a due watch -> one scan, next date 14 days from its anchor though it ran 2 days late; a second pass buys nothing; another worker's lease left alone; an owed comparison made later; a stopped watch owes nothing). Real scheduler pass on the screenshots database: 58 s, 25 of 25 points, next date two months from the anchor, lease cleared, second pass bought nothing.
+- 10/8 slice 23 (Action plan): 264 unit tests incl. the white-label route rule (the four new routes added to its list); real Postgres on a fresh database - ledger 44/44, places+alerts 24/24, AI + lists 15/15, grid + scheduler passing, tasks 9/9.
+- 10/8 audit #15 fixes: 264 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 27/27, AI + lists 15/15, grid + scheduler all passing (incl. a period-close made to fail once: 9 lookups, then 0 on the next pass), tasks 9/9. Browser: "Refresh now - up to $0.31", the reworded lost-backlinks section, report grid lines over shared points.
+- 10/8 slice 25 (service-area planner): 270 unit tests incl. the white-label route rule (two new routes added). Browser: table built for 42 searches, cell names read out ("siding contractor bellingham: 320 searches a month; you rank 11, beyond page one, with your home page"), gaps selected and sent to the plan (8 added).
+- 10/8 audit #16 fixes: 270 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks all passing. Browser: plan opened for the named site with database counts; the audit task says "Not rechecked since it was added"; a live backlink refresh (201, charged 31c) with the snapshot saved inside the charged call.
+- 10/8 slice 27 (three parity items): 273 unit tests incl. the white-label rule (one new route). Browser: the rank tracker's "On the page" chips and summary; a site starred and moved to the top, order by name with the starred site still first; two months compared for jameshardie.com (Sep 2025 against Sep 2026, then from Oct 2024).
+- 10/8 audit #17 fixes: 273 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks passing (incl. two reopenings at once for one place). Browser: planner quote "Up to $0.14" (the reservation), an over-long pairing named and blocked; an audit task added today says "Not rechecked since it was added", one added before crawls were recorded says it can't be checked automatically.
+- 10/8 slice 29 (directories + page numbers): 279 unit tests incl. the white-label route rule (two new routes). Browser, live: directories for three sites (201; meta "linked from 0 of these 26 - 4 where a competitor is and you are not"), gaps to the plan (4 added); Content explorer numbers for 25 pages (201, charged 16c against a stated 17c) and both orderings.
+- 10/8 audit #18 fixes: 280 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 29/29 (an older snapshot judged against its own predecessor), AI + lists 15/15, grid + scheduler passing, tasks passing. Browser: planner quote required before buying and inputs remembered after a reload; a live backlink refresh through the single transaction (snapshot saved, alerts settled, next snapshot a month on).
+- 10/8 slice 31 (rendering check): 285 unit tests incl. the white-label route rule (three new routes, 74). Real Postgres on a fresh database - ledger, places+alerts, AI + lists, grid + scheduler, tasks all passing, rendering runs 12/12 (one running per site, another account cannot read it, a closed run cannot be finished, raw error text never shown). Browser, live: an address on another site refused; 10 pages of alpineexteriorswa.com checked in the background (charged 21c against a 26c hold): the home page reads the same either way (412 / 415 words, 99 / 98 own-site links), the nine "compare" pages depend on JavaScript (1 own-site link in the HTML, 107 once rendered). Found by running it: one fetch in three failed without being billed when three ran at once - such a fetch is now asked for once more.
+- 10/8 audit #19 fixes: 285 unit tests. Browser, live: directories for three sites ("Up to $0.34", charged 29c; "4 that link to a competitor and not to you"); page numbers with "estimated US search visits". The pattern filter and the way the source echoes page addresses and answers zero were checked against the source itself. The settlement rule was run in Postgres (same version settles; a rewritten snapshot does not).
+- 10/8 slice 32 + audit #20 fixes: 292 unit tests incl. the white-label route rule (one new route, 75). Real Postgres on a fresh database - ledger, places+alerts, AI + lists, grid + scheduler, tasks, rendering runs all passing. Browser: competing pages for two keywords (earlier checks added to the screenshots database to have something to show), pages listed with their checks, a task added; "Group by topic" on a 10-keyword list (2 topics, select-all per topic). Rendering, live: an address with a port refused; the same page twice counted once ("Check 4 pages - up to $0.11", charged 9c); a compare page "more once JavaScript runs" (1 own-site link in the HTML, 107 in the browser visit), the home page and the guide "much the same". Found by running it: the site answers 200 for a page that does not exist (the check reports what it saw - worth a crawl issue of its own). A retry with nothing saved answered 409 and bought nothing.
+- 10/8 slice 33 + audit #21 fixes: 295 unit tests incl. the white-label route rule (one new route, 76). Real Postgres on a fresh database - all six check scripts passing. Browser, live: the AI summary from the saved answers (named in 2 of 4, by assistant, ten other businesses, twelve websites with the four directories marked and one added to the plan); the page-shown panel ("10 of your 10 checked keywords ranked in two or more checks", town and device per line); topic groups with "Other keywords"; rendering with the same-address rule (4 pages, 2 "more once JavaScript runs", 2 "much the same" - the two visits' addresses matched on every page).
+- 10/8 slice 34 + audit #22 fixes: 297 unit tests. Real Postgres on a fresh database - seven check scripts passing (new: AI summary 7/7 - 40 repeats of one question count once, another account's rows are not read). Browser, live, jameshardie.com: Organic keywords narrowed to /blog/ (4,176 keywords, every row a /blog/ page; 201, charged 8c), to one page pasted as a whole address (215 keywords, all that page), cleared; Backlinks narrowed to /blog/ (628); no section control on Linking sites; a path with a space or % refused in words. The filters were first tried against the source directly (section and exact page on keywords, backlinks, top pages, best by links). Rendering, directories, AI summary and the page-shown panel re-run after the fixes.

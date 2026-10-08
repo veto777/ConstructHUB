@@ -4,19 +4,12 @@
  * The CREATOR decides which offers to extend (usually by ticking presets);
  * they appear as checkboxes on the gated public estimate page. The client's
  * ticking is a preview only — on approve the SERVER re-computes everything
- * from the line items and the enabled offers it has on file:
+ * from the line items and the enabled offers it has on file.
  *
- *   lineTotal     = round(unitPriceCents * quantityMilli / 1000)   per line
- *   subtotal      = Σ lineTotal over non-discount lines
- *   lineDiscount  = Σ |lineTotal| over kind="discount" lines
- *   taxableBase   = max(0, Σ lineTotal over taxable non-discount lines − lineDiscount)
- *   optBps        = min(10_000, Σ percentBps of selected enabled offers)  ← cap
- *   optDiscount   = round(taxableBase * optBps / 10_000)     ← applied to the TAXABLE base
- *   taxCents      = round((taxableBase − optDiscount) * taxRateBps / 10_000)
- *   totalCents    = max(0, subtotal − lineDiscount − optDiscount + taxCents)
- *
- * All integer cents, rounded once per step (same rule as recalcEstimate in
- * entities.ts). Client-supplied totals are never trusted; the result is
+ * The arithmetic is shared/estimate-totals.ts (documented there) — one
+ * function for this route and for the page's live preview. All integer
+ * cents, rounded once per step (same rule as recalcEstimate in entities.ts).
+ * Client-supplied totals are never trusted; the result is
  * persisted as approvedTotalCents + selectedDiscounts on the estimate.
  */
 import type { Express } from "express";
@@ -73,59 +66,12 @@ export const DISCOUNT_PRESETS = [
 ] as const;
 
 // ── The math (pure — unit-tested in discounts.test.ts) ─────────────────────
-
-export type DiscountableLine = {
-  kind: string;
-  unitPriceCents: number;
-  quantityMilli: number;
-  taxable: boolean;
-};
-
-export type SelectedOffer = { percentBps: number };
-
-export type ApprovalTotals = {
-  subtotalCents: number;
-  lineDiscountCents: number;
-  taxableBaseCents: number;
-  optionalDiscountBps: number;
-  optionalDiscountCents: number;
-  taxCents: number;
-  totalCents: number;
-};
-
-/**
- * Recompute the approved total. `taxRateBps` is the estimate's stored rate;
- * `selected` is the server's own enabled offers the client ticked (already
- * validated to belong to the estimate — never client-supplied percentages).
- */
-export function computeApprovalTotals(
-  items: DiscountableLine[],
-  taxRateBps: number,
-  selected: SelectedOffer[],
-): ApprovalTotals {
-  let subtotal = 0, lineDiscount = 0, taxable = 0;
-  for (const i of items) {
-    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
-    if (i.kind === "discount") { lineDiscount += Math.abs(line); continue; }
-    subtotal += line;
-    if (i.taxable) taxable += line;
-  }
-  const taxableBase = Math.max(0, taxable - lineDiscount);
-  // The combined concession can never exceed the base it applies to.
-  const optBps = Math.min(10_000, selected.reduce((s, o) => s + Math.max(0, o.percentBps), 0));
-  const optDiscount = Math.round((taxableBase * optBps) / 10_000);
-  const tax = Math.round(((taxableBase - optDiscount) * Math.max(0, taxRateBps)) / 10_000);
-  const total = Math.max(0, subtotal - lineDiscount - optDiscount + tax);
-  return {
-    subtotalCents: subtotal,
-    lineDiscountCents: lineDiscount,
-    taxableBaseCents: taxableBase,
-    optionalDiscountBps: optBps,
-    optionalDiscountCents: optDiscount,
-    taxCents: tax,
-    totalCents: total,
-  };
-}
+// Lives in shared/estimate-totals.ts so the client estimate page previews
+// with the very same function the approve route charges with.
+import { computeApprovalTotals } from "@shared/estimate-totals";
+export { computeApprovalTotals };
+export type { DiscountableLine, SelectedOffer, ApprovalTotals } from "@shared/estimate-totals";
+import type { ApprovalTotals } from "@shared/estimate-totals";
 
 // ── Server-side selection resolution ────────────────────────────────────────
 
@@ -199,6 +145,8 @@ export function registerCrmDiscountRoutes(app: Express, getDevUser: GetUser): vo
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Discount offers are pricing — price-blind seats never read them.
+    if (!requirePermission(res, ctx, "seePrices")) return;
 
     const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);

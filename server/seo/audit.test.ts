@@ -115,11 +115,24 @@ describe("what counts as broken, and what counts as fixed", () => {
     expect(auditSummary({ findings: [] }, [page("https://x/a")], before).notRechecked.map((f) => f.key)).toEqual(["thin"]);
     expect(auditSummary({ findings: [] }, [page("https://x/a"), page("https://x/b")], before).fixed.map((f) => f.key)).toEqual(["thin"]);
   });
-  it("a PageSpeed entry is re-checked when its page was crawled again", () => {
+  it("a PageSpeed entry is re-checked only when that page was MEASURED again for the same device", () => {
     const psi = { id: "psi-mobile-https://x/a", category: "performance", severity: "warning", title: "mobile PageSpeed performance: 41", urls: ["https://x/a"], why: "", fix: "" };
     const before = { report: { findings: [psi] }, pages: [page("https://x/a")] };
-    expect(auditSummary({ findings: [] }, [page("https://x/a")], before).fixed.map((f) => f.key)).toEqual(["psi-mobile"]);
+    const now = (psiNow: unknown[]) => auditSummary({ findings: [], psi: psiNow as any }, [page("https://x/a")], before);
+    // Measured again on mobile, and now 90 or better (so no finding): fixed.
+    expect(now([{ url: "https://x/a", strategy: "mobile", score: 93 }]).fixed.map((f) => f.key)).toEqual(["psi-mobile"]);
+    // The page was crawled again, but the speed test did not run, failed, was switched off, or ran for the other device:
+    // the finding is gone from the list without anything having been measured. Not a fix.
+    for (const attempt of [[], [{ url: "https://x/a", strategy: "mobile", reason: "request_error", unavailable: "failed" }], [{ reason: "disabled" }], [{ url: "https://x/a", strategy: "desktop", score: 95 }], [{ url: "https://x/b", strategy: "mobile", score: 95 }]])
+      expect([now(attempt).fixed.map((f) => f.key), now(attempt).notRechecked.map((f) => f.key)]).toEqual([[], ["psi-mobile"]]);
     expect(auditSummary({ findings: [] }, [page("https://x/other")], before).notRechecked.map((f) => f.key)).toEqual(["psi-mobile"]);
+  });
+  it("a check that only samples links or images is never called fixed just because it stopped being listed", () => {
+    const broken = { id: "broken-links", category: "technical", severity: "warning", title: "Broken checked links", urls: ["https://x/gone"], why: "", fix: "" };
+    const images = { id: "oversized-images", category: "performance", severity: "warning", title: "Oversized sampled images", urls: ["https://x/a"], why: "", fix: "" };
+    const before = { report: { findings: [broken, images] }, pages: [page("https://x/a"), page("https://x/gone")] };
+    const s = auditSummary({ findings: [] }, [page("https://x/a"), page("https://x/gone")], before);
+    expect([s.fixed.map((f) => f.key), s.notRechecked.map((f) => f.key).sort()]).toEqual([[], ["broken-links", "oversized-images"]]);
   });
   it("Google-profile checks are 'not re-checked' when this crawl had no profile", () => {
     const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };

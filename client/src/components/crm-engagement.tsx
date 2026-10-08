@@ -36,7 +36,7 @@ interface Props {
 /**
  * Per-estimate client engagement + expiry, self-contained for the estimate
  * rows on the client page. Shows "3 visits · 12m total · last 2h ago" with a
- * per-visit breakdown, the expiry date, and a one-click Extend (+7 days)
+ * per-visit breakdown, the expiry date, and a one-click Extend (+7 days on top of the time left)
  * while the estimate is still unanswered. Contractor-side only — this never
  * renders on the public pages.
  */
@@ -44,15 +44,22 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
   const { toast } = useToast();
   const { data: eng } = useQuery<any>({
     queryKey: [`/api/crm/estimates/${e.id}/engagement`],
-    enabled: !!e.sentAt,
+    // Who opened the bid is for the seats that write estimates (the API refuses the rest).
+    enabled: !!e.sentAt && canManage,
   });
 
   const extend = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", `/api/crm/estimates/${e.id}/extend`, { days: 7 })).json(),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       onChanged();
-      toast({ title: "Expiry extended", description: "The client has 7 more days from today." });
+      // The server adds the days to the time the client still has (or to
+      // today, once expired) — say the date it actually landed on.
+      const until = data?.estimate?.expiresAt ? day(data.estimate.expiresAt) : null;
+      toast({
+        title: "Expiry extended",
+        description: until ? `7 days added — the client now has until ${until}.` : "7 days added.",
+      });
     },
     onError: (err: any) =>
       toast({ title: "Could not extend", description: String(err.message ?? err), variant: "destructive" }),

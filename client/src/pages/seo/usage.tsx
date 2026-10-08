@@ -9,7 +9,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtNum, money, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Row = { id: string; at: string; what: string; status: "charged" | "free" | "running"; cents: number; fromIncluded: number; fromPurchased: number };
-type Usage = { rows: Row[]; purchases: { at: string; cents: number }[]; months: { month: string; cents: number; lookups: number }[] };
+type Usage = { rows: Row[]; purchases: { at: string; cents: number }[]; months: { month: string; cents: number; lookups: number }[]; thisMonth?: string };
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -19,9 +19,10 @@ export default function SeoUsagePage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
   const [site, onSite] = useSelectedSite(sites.data);
-  const q = useQuery<Usage>({ queryKey: ["/api/seo/usage"] });
+  const q = useQuery<Usage>({ queryKey: ["/api/seo/usage"], refetchOnMount: "always" });
   const d = q.data, c = status.data?.credits, unlimited = c?.includedCents === -1;
-  const thisMonth = d?.months[0];
+  // The row of the calendar month we are in — not simply the newest month that has one.
+  const thisMonth = d?.months.find((m) => m.month === (d.thisMonth ?? new Date().toISOString().slice(0, 7)));
   const exportCsv = () => {
     if (!d) return;
     const blob = new Blob([[["When", "What", "Status", "Cost (USD)", "From included data", "From purchased credit"], ...d.rows.map((r) => [new Date(r.at).toISOString(), r.what, r.status === "charged" ? "Charged" : r.status === "free" ? "No charge" : "Running", (r.cents / 100).toFixed(2), (r.fromIncluded / 100).toFixed(2), (r.fromPurchased / 100).toFixed(2)])].map((row) => row.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
@@ -42,7 +43,7 @@ export default function SeoUsagePage() {
           </div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h2 className="g-text text-[16px] font-medium">Lookups</h2>
-            <span className="g-text-2 text-[13px]">the latest {fmtNum(d.rows.length)}</span>
+            <span className="g-text-2 text-[13px]">{d.rows.length >= 200 ? "the latest 200 — older lookups are in the monthly totals below" : `the latest ${fmtNum(d.rows.length)}`}</span>
             <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!d.rows.length} onClick={exportCsv} data-testid="button-usage-export"><Download /> Export</button>
           </div>
           {d.rows.length === 0 ? (

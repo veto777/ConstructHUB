@@ -66,6 +66,7 @@ test.describe("/crm/team", () => {
 
       // Revoke access from the member row — this also kills the pending invite.
       await page.getByTestId(`button-remove-${invitedMemberId}`).click();
+      await page.getByTestId("button-confirm-remove-member").click();
       await expect(page.getByText("Team member deactivated", { exact: true })).toBeVisible();
       await expect(inviteRow).toHaveCount(0);
 
@@ -82,6 +83,7 @@ test.describe("/crm/team", () => {
       const inviteRow2 = page.locator('[data-testid^="invite-"]', { hasText: email2 });
       await expect(inviteRow2).toBeVisible();
       await inviteRow2.getByTestId(/^button-revoke-/).click();
+      await page.getByTestId("button-confirm-revoke-invitation").click();
       await expect(page.getByText("Invitation revoked", { exact: true })).toBeVisible();
       await expect(inviteRow2).toHaveCount(0);
     } else {

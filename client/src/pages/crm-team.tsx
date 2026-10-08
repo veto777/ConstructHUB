@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
   CrmPage, CrmPageHeader, StatusPill, EmptyState, ErrorCard, InitialAvatar, SectionTitle, roleTone,
 } from "@/components/crm-ui";
 import { InfoTip } from "@/components/info-tip";
+import { confirmAction } from "@/components/confirm-dialog";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type PermissionMap = Record<string, boolean>;
@@ -138,23 +140,8 @@ const ROLE_BLURB: Record<string, string> = {
   subcontractor: "Outside crew. Sees only assigned work — never clients or pricing.",
 };
 
-const PERM_LABEL: Record<string, string> = {
-  viewAllJobs: "See all jobs (not just their own)",
-  manageJobs: "Create and edit jobs",
-  manageCustomers: "Manage clients",
-  manageEstimates: "Create and send estimates",
-  manageInvoices: "Create and send invoices",
-  takePayment: "Take payments",
-  seePrices: "See prices",
-  seeCosts: "See costs and margins",
-  approveChangeOrders: "Approve change orders",
-  managePriceBook: "Manage the price book",
-  manageTeam: "Manage team and invitations",
-  manageSettings: "Manage company settings",
-  seeReporting: "See reporting",
-  manageIntegrations: "Manage integrations",
-  exportData: "Export client data (CSV)",
-};
+/** The switch labels — one list for the page, the audit log and the "ask your admin" cards (shared/crm-access.ts). */
+const PERM_LABEL: Record<string, string> = CRM_PERMISSION_LABELS;
 
 /** Owner-only expandable audit feed for one member — everything they did, newest first. */
 function MemberActivity({ memberId }: { memberId: string }) {
@@ -868,9 +855,13 @@ export default function CrmTeamPage() {
                       </Button>
                       <Button size="sm" variant="ghost" title="Revoke invitation"
                         onClick={() => {
-                          if (window.confirm(`Revoke the invitation for ${inv.email}? Their invite link stops working.`)) {
-                            revoke.mutate(inv.id);
-                          }
+                          confirmAction({
+                            id: "revoke-invitation",
+                            title: `Revoke the invitation for ${inv.email}?`,
+                            description: "Their invite link stops working straight away. The link can't be restored — to bring them on later, send a new invitation.",
+                            confirmLabel: "Revoke invitation",
+                            onConfirm: () => revoke.mutate(inv.id),
+                          });
                         }}
                         disabled={revoke.isPending}
                         data-testid={`button-revoke-${inv.id}`}>
@@ -952,10 +943,21 @@ export default function CrmTeamPage() {
                               title={m.status === "invited" ? "Revoke invite and remove" : "Remove from team"}
                               onClick={() => {
                                 const who = m.displayName || m.email;
-                                const question = m.status === "invited"
-                                  ? `Revoke ${who}'s invitation and remove them from the team?`
-                                  : `Remove ${who} from the team? They lose access right away; their job history stays.`;
-                                if (window.confirm(question)) removeMember.mutate(m.id);
+                                confirmAction(m.status === "invited"
+                                  ? {
+                                    id: "remove-member",
+                                    title: `Revoke ${who}'s invitation and remove them from the team?`,
+                                    description: "Their invite link stops working and they come off the team list. To bring them on later, invite them again.",
+                                    confirmLabel: "Revoke and remove",
+                                    onConfirm: () => removeMember.mutate(m.id),
+                                  }
+                                  : {
+                                    id: "remove-member",
+                                    title: `Remove ${who} from the team?`,
+                                    description: "They lose access right away. Their job history stays. To bring them back, invite them again.",
+                                    confirmLabel: "Remove from team",
+                                    onConfirm: () => removeMember.mutate(m.id),
+                                  });
                               }}
                               disabled={removeMember.isPending}
                               data-testid={`button-remove-${m.id}`}>

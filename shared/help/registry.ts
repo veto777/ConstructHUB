@@ -775,7 +775,7 @@ const entries: Draft[] = [
       "Add items from your price book with the scope of work.",
       "Review and send.",
       "Watch the status; a client who re-opens the bid is your cue to call.",
-      "“Extend” adds seven days when a client needs more time.",
+      "“Extend” adds seven days on top of the time left (or seven days from today once it has expired) when a client needs more time.",
     ],
     howItWorks: "The first time a client opens the link they confirm their email with a one-time code. An estimate expires 7 days after it is sent. A signed estimate is locked, and permanent delete is for owners only.",
     needs: [CRM_NEED, "Price book items to pick from."],

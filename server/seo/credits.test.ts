@@ -46,9 +46,9 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
 
   it("the price shown before a lookup is the wholesale estimate at the markup", () => {
     expect(SEO_PRICES.explorerReport).toBe(retailCents(EXPLORER_TYPICAL_USD));
-    expect(SEO_PRICES.explorerReport).toBe(112);
+    expect(SEO_PRICES.explorerReport).toBe(120); // $0.30 of data at 4x (two years of history since 2026-10-08; it was $0.28 / $1.12 with six months)
     expect(SEO_PRICES.reportPage).toBe(10);
-    expect(SEO_PRICES.keywordOverview).toBe(16);
+    expect(SEO_PRICES.keywordOverview).toBe(20); // was 16 before the overview also bought what the first page earns (traffic potential)
     expect(SEO_PRICES.keywordResearch).toBe(8);
     expect(SEO_PRICES.competitorGap).toBe(10);
     expect(SEO_PRICES.rankChecksPer100).toBe(24);

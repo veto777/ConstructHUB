@@ -218,8 +218,12 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       .where(and(eq(crmCustomerNotes.orgId, ctx.org.id), eq(crmCustomerNotes.customerId, req.params.id)))
       .orderBy(desc(crmCustomerNotes.createdAt))
       .limit(200);
+    // The owner's payment-reversal note states the amount; it is not shown to a price-blind seat.
+    const shown = ctx.permissions.seePrices
+      ? rows
+      : rows.filter((r) => !/^A \$[\d,.]+ payment .* was reversed by the account owner\./.test(r.note.body ?? ""));
     res.json(
-      rows.map((r) => ({
+      shown.map((r) => ({
         id: r.note.id,
         body: r.note.body,
         authorMemberId: r.note.authorMemberId,
@@ -433,7 +437,9 @@ export function registerCrmClient360Routes(app: Express, getDevUser: GetUser): v
       });
     }
 
-    for (const p of await access.filter("payments", payments)) {
+    // Payments are money: a price-blind seat gets no payment lines at all
+    // (the same seat is refused GET /api/crm/payments).
+    for (const p of ctx.permissions.seePrices ? await access.filter("payments", payments) : []) {
       const ref = (p.invoiceId ? invById.get(p.invoiceId)?.number : null)
         ?? (p.estimateId ? refOf(estById.get(p.estimateId)) : null);
       entries.push({

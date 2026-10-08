@@ -113,17 +113,17 @@ export type GapPage = {
 
 export const gapDeps = { labsDomainIntersection, request };
 
-export async function fetchGap(input: { kind: "content" | "links"; target: string; competitors: string[]; limit: number; offset: number; locationCode: number; languageCode: string }): Promise<{ data: GapPage; costUsd: number; costUnknown?: boolean }> {
+export async function fetchGap(input: { kind: "content" | "links"; target: string; competitors: string[]; limit: number; offset: number; locationCode: number; languageCode: string }): Promise<{ data: GapPage; costUsd: number; costUnknown?: boolean; customerUsd?: number }> {
   const base = { kind: input.kind, target: input.target, competitors: input.competitors, limit: input.limit, offset: input.offset, fetchedAt: new Date().toISOString() };
   if (input.kind === "content") {
     // Every competitor's call finishes before we decide, so a failure never hides what the others cost.
     const settled = await Promise.allSettled(input.competitors.map((competitor) =>
       gapDeps.labsDomainIntersection({ competitor, ours: input.target, locationCode: input.locationCode, languageCode: input.languageCode, limit: CONTENT_GAP_ROWS })));
-    let costUsd = 0, costUnknown = false;
+    let costUsd = 0, customerUsd = 0, costUnknown = false;
     const lists: { competitor: string; items: GapKeyword[] }[] = [], missing: string[] = [];
     let firstError: unknown = null;
     settled.forEach((s, i) => {
-      if (s.status === "fulfilled") { costUsd += s.value.costUsd; lists.push({ competitor: input.competitors[i], items: s.value.data.items }); }
+      if (s.status === "fulfilled") { costUsd += s.value.costUsd; customerUsd += s.value.costUsd; lists.push({ competitor: input.competitors[i], items: s.value.data.items }); }
       else {
         costUsd += typeof s.reason?.costUsd === "number" ? s.reason.costUsd : 0;
         // No answer at all: it may have run and been charged. Our ledger keeps the estimate.
@@ -133,7 +133,7 @@ export async function fetchGap(input: { kind: "content" | "links"; target: strin
     });
     if (!lists.length) throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError)), { costUsd, costUnknown });
     const all = mergeContentGap(lists);
-    return { data: { ...base, rows: all, total: null, limit: all.length, offset: 0, missing }, costUsd, costUnknown };
+    return { data: { ...base, rows: all, total: null, limit: all.length, offset: 0, missing }, costUsd, customerUsd, costUnknown };
   }
   const targets = Object.fromEntries(input.competitors.map((c, i) => [String(i + 1), c]));
   const task = assertOk(await gapDeps.request("POST", "/backlinks/domain_intersection/live", [{

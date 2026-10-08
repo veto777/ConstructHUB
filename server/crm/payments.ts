@@ -32,6 +32,7 @@ import {
 import { and, eq, isNull, desc, sql, inArray } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
 import { requireDocSession } from "./portal";
+import { amountDueCents } from "@shared/estimate-totals";
 import { logActivity } from "./activity";
 import { getBaseUrl } from "../auth";
 import { financingLinksSchema, financingLinksOf, getPrimaryFinancing } from "./financing";
@@ -173,6 +174,11 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!ctx) return;
 
     const acct = await activeAccount(ctx.org.id);
+    // Every member may learn WHETHER online payment works (the take-payment
+    // dialog and the Payments page need it). Which Stripe account it is — id,
+    // business name, email, the last error — is for the seats that run the
+    // company's money or its integrations.
+    const detail = ctx.permissions.manageIntegrations || ctx.permissions.manageSettings || ctx.permissions.takePayment;
     res.json({
       configured: stripeConnectConfigured(),
       // Tell the operator exactly which env var is missing rather than failing silently.
@@ -181,11 +187,13 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
         ...(!CONNECT_CLIENT_ID ? ["STRIPE_CONNECT_CLIENT_ID"] : []),
       ],
       account: acct ? {
-        id: acct.id, provider: acct.provider, externalAccountId: acct.externalAccountId,
-        livemode: acct.livemode, chargesEnabled: acct.chargesEnabled,
+        provider: acct.provider, livemode: acct.livemode, chargesEnabled: acct.chargesEnabled,
         achEnabled: acct.achEnabled, cardEnabled: acct.cardEnabled,
-        businessName: acct.businessName, accountEmail: acct.accountEmail,
-        country: acct.country, lastCheckedAt: acct.lastCheckedAt, lastError: acct.lastError,
+        ...(detail ? {
+          id: acct.id, externalAccountId: acct.externalAccountId,
+          businessName: acct.businessName, accountEmail: acct.accountEmail,
+          country: acct.country, lastCheckedAt: acct.lastCheckedAt, lastError: acct.lastError,
+        } : {}),
       } : null,
       // Stated up front, in the product, per the spec's honesty requirement.
       disclosure: {
@@ -448,6 +456,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "takePayment")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [inv] = await db.select().from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
@@ -489,15 +498,14 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "takePayment")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice, receipt or payment is an amount
 
     const [est] = await db.select().from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
     if (!est.approvedAt) return res.status(409).json({ message: "Only an approved estimate can be paid." });
     // Charge the SIGNED amount, same as the public deposit flow.
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay on this estimate." });
     const settled = await db.select({ id: crmPayments.id }).from(crmPayments)
       .where(and(eq(crmPayments.estimateId, est.id), eq(crmPayments.status, "succeeded"))).limit(1);
@@ -523,7 +531,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (ok) {
       logActivity(ctx, "payment.link.created", {
         entityType: "estimate", entityId: est.id, customerId: est.customerId,
-        meta: { number: est.number, amountCents: amount },
+        meta: { number: est.number, amountCents: amount, kind: "estimate" },
       });
     }
   });
@@ -677,9 +685,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     if (!est) return res.status(404).json({ message: "This estimate link is no longer valid." });
     if (!(await requireDocSession(req, res, est.customerId))) return;
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, est.orgId)).limit(1);
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     const rails = await onlinePaymentRails(org, amount ?? 0);
     res.json({ financing: getPrimaryFinancing(org), cardAvailable: rails.card, achAvailable: rails.ach });
   });
@@ -801,9 +807,7 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
     // Pay-in-full must charge the SIGNED amount: an approval with selected
     // optional discounts persists the recomputed approvedTotalCents, and the
     // contract PDF + notifications all show it — the charge must match.
-    const amount = est.depositCents && est.depositCents > 0
-      ? est.depositCents
-      : (est.approvedTotalCents ?? est.totalCents);
+    const amount = amountDueCents(est);
     if (!amount || amount < 50) return res.status(400).json({ message: "Nothing to pay." });
 
     // Double-pay guard: the deposit must not be collectable twice.

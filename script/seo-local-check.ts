@@ -90,6 +90,47 @@ async function main() {
   eq("7b once", await raiseLinkAlerts(site.id), null);
   eq("7c another account sees none of it", (await listAlerts(2, null)).length, 0);
 
+  // named losses: a strong site that stopped linking is an alert even when the count barely moved
+  const { rows: [quiet] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'quiet.example','desktop') RETURNING id");
+  const lostRows = [{ domain: "weak.example", authority: 4, from: "https://weak.example/p", to: "https://quiet.example/", lastSeen: "2026-10-01" }, { domain: "chamber.example", authority: 46, from: "https://chamber.example/members", to: "https://quiet.example/", lastSeen: "2026-10-02" }];
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100,"backlinks":900}',NULL),
+    ($1,1,current_date,'{"referringDomains":99,"backlinks":890}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 2))`, [quiet.id, JSON.stringify(lostRows)]);
+  eq("7d one strong site lost is an alert though the count moved by one", await raiseLinkAlerts(quiet.id), "links_lost");
+  const strongAlert: any = (await listAlerts(1, quiet.id))[0];
+  eq("7e it names the site and puts the strongest first", [strongAlert.title, strongAlert.items[0].lost.map((l: any) => l.domain), strongAlert.items[0].lostTotal], ["quiet.example lost a link from chamber.example", ["chamber.example"], 2]);
+  const { rows: [calm] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'calm.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 1))`, [calm.id, JSON.stringify([lostRows[0]])]);
+  eq("7f a weak site lost with the count barely moved is not an alert", await raiseLinkAlerts(calm.id), null);
+  // losses collected against a different snapshot are not pinned on this comparison
+  const { rows: [stale] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'stale.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-90)::text, 'lost', $2::jsonb, 'lostTotal', 2))`, [stale.id, JSON.stringify(lostRows)]);
+  eq("7g losses collected since some other date are not used for this comparison", await raiseLinkAlerts(stale.id), null);
+  // more linking sites overall AND a strong one lost: both are said, not just the gain
+  const { rows: [mixed] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'mixed.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":120}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 2))`, [mixed.id, JSON.stringify(lostRows)]);
+  await raiseLinkAlerts(mixed.id);
+  eq("7h a month that gains sites and loses a strong one raises both alerts", (await listAlerts(1, mixed.id)).map((a: any) => a.kind).sort(), ["links_gained", "links_lost"]);
+  eq("7i ...and raising again adds nothing", [await raiseLinkAlerts(mixed.id), (await listAlerts(1, mixed.id)).length], [null, 2]);
+  // a "strong" site that is spam, or whose link was nofollow, is no loss
+  const { rows: [junk] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'junk.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 2))`,
+    [junk.id, JSON.stringify([{ domain: "spam.example", authority: 55, spam: 90, follow: true }, { domain: "forum.example", authority: 48, spam: 2, follow: false }])]);
+  eq("7j a spammy site or a nofollow link lost is not an alert, whatever its authority", await raiseLinkAlerts(junk.id), null);
+  const { rows: [buried] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'buried.example','desktop') RETURNING id");
+  const junkTen = Array.from({ length: 10 }, (_, i) => ({ domain: `noise${i}.example`, authority: 90 - i, spam: 95, follow: true }));
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary,changes) VALUES ($1,1,current_date-30,'{"referringDomains":100}',NULL),
+    ($1,1,current_date,'{"referringDomains":99}', jsonb_build_object('since', (current_date-30)::text, 'lost', $2::jsonb, 'lostTotal', 11))`, [buried.id, JSON.stringify([...junkTen, { domain: "chamber.example", authority: 46, spam: 3, follow: true }])]);
+  // each unsettled snapshot is judged against the one before it, not just the newest pair
+  const { rows: [three] } = await pool.query("INSERT INTO seo_sites(user_id,domain,devices) VALUES(1,'three.example','desktop') RETURNING id");
+  await pool.query(`INSERT INTO seo_backlink_snapshots(site_id,user_id,taken_on,summary) VALUES ($1,1,current_date-60,'{"referringDomains":100}'),($1,1,current_date-30,'{"referringDomains":80}'),($1,1,current_date,'{"referringDomains":81}')`, [three.id]);
+  eq("7l an older snapshot's own comparison can be judged: 100 -> 80 a month ago is a loss; the newest pair (80 -> 81) is nothing",
+    [await raiseLinkAlerts(three.id, (await pool.query("SELECT (current_date-30)::text d")).rows[0].d), await raiseLinkAlerts(three.id), (await listAlerts(1, three.id)).map((a: any) => a.kind)], ["links_lost", null, ["links_lost"]]);
+  eq("7k a real loss behind ten stronger junk ones is still found and named", [await raiseLinkAlerts(buried.id), ((await listAlerts(1, buried.id))[0] as any)?.items[0].lost.map((l: any) => l.domain)], ["links_lost", ["chamber.example"]]);
+
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   await pool.end();
   process.exit(failed ? 1 : 0);

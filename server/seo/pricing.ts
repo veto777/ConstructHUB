@@ -81,6 +81,11 @@ export function estimateBacklinksUsd(rows: number): number {
   return round6(BACKLINKS_REQUEST_USD + Math.max(0, rows) * BACKLINKS_ROW_USD);
 }
 
+/** How many lost linking sites a snapshot names. */
+export const LOST_LINK_ROWS = 25;
+/** Naming the linking sites lost since the last snapshot: one more lookup. */
+export const estimateLostLinksUsd = () => estimateBacklinksUsd(LOST_LINK_ROWS);
+
 /** The monthly backlink snapshot: summary (1 row) + the top `rows` backlinks. */
 export function estimateBacklinkSnapshotUsd(rows: number): number {
   return round6(estimateBacklinksUsd(1) + estimateBacklinksUsd(rows));

@@ -11,7 +11,17 @@ export type TabOption = {
   match?: readonly string[];
   /** CRM permission needed to see it (crm /api/crm/me permissions). */
   perm?: string;
+  /** …or any ONE of several (the Estimates list: writes estimates, or may see prices). */
+  anyOf?: readonly string[];
 };
+
+/** Whether a seat with `perms` may be offered the tab. `strict` false tolerates a still-loading /api/crm/me. */
+export function tabAllowed(o: TabOption, perms: Partial<Record<string, boolean>> | null | undefined, strict = true): boolean {
+  const need = o.anyOf ?? (o.perm ? [o.perm] : []);
+  if (!need.length) return true;
+  if (!perms) return !strict;
+  return need.some((p) => perms[p] === true);
+}
 
 export const TAB_SLOTS = 4;
 
@@ -42,11 +52,11 @@ export const CRM_TAB_OPTIONS: readonly TabOption[] = [
   { key: "clients", label: "Clients", href: "/crm/clients" },
   { key: "pipeline", label: "Pipeline", href: "/crm/pipeline", match: ["/crm/projects"] },
   { key: "jobcam", label: "JobCam", href: "/crm/jobcam" },
-  { key: "estimates", label: "Estimates", href: "/crm/estimates" },
-  { key: "new-estimate", label: "New estimate", href: "/crm/estimates/new" },
+  { key: "estimates", label: "Estimates", href: "/crm/estimates", anyOf: ["manageEstimates", "seePrices"] },
+  { key: "new-estimate", label: "New estimate", href: "/crm/estimates/new", perm: "manageEstimates" },
   { key: "invoices", label: "Invoices", href: "/crm/invoices", perm: "seePrices" },
-  { key: "pricebook", label: "Price book", href: "/crm/pricebook" },
-  { key: "payments", label: "Payments", href: "/crm/payments" },
+  { key: "pricebook", label: "Price book", href: "/crm/pricebook", perm: "seePrices" },
+  { key: "payments", label: "Payments", href: "/crm/payments", perm: "seePrices" },
   { key: "team", label: "Team", href: "/crm/team" },
   { key: "reports", label: "Reports", href: "/crm/reports" },
 ];

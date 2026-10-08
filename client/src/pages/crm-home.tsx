@@ -109,10 +109,14 @@ export default function CrmHomePage() {
   // Dashboard metrics — read-only rollups over endpoints the app already has.
   const { data: clients } = useQuery<any[]>({ queryKey: ["/api/crm/customers"] });
   const { data: pipeline, isError: pipelineError } = useQuery<any>({ queryKey: ["/api/crm/projects"] });
-  const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"] });
+  // Company-wide rollups and the team feed are for reporting seats; the API refuses the rest, so they are
+  // neither asked for nor shown (a field crew's Home is their own clients, jobs and follow-ups).
+  const canSeeReporting = me?.permissions?.seeReporting === true;
+  const { data: stats } = useQuery<any>({ queryKey: ["/api/crm/stats"], enabled: canSeeReporting });
   const { data: activityData, isError: activityError } = useQuery<{ activity: ActivityItem[] }>({
     queryKey: ["/api/crm/team-activity"],
     refetchInterval: 60_000,
+    enabled: canSeeReporting,
   });
   // Needs-attention rollup: follow-ups due, brand-new leads, leads with no
   // estimate yet — one server-side pass, names only.
@@ -284,7 +288,8 @@ export default function CrmHomePage() {
         </Card>
       )}
 
-      {/* The headline numbers — count on top, dollars underneath. */}
+      {/* The headline numbers — count on top, dollars underneath. Reporting seats only. */}
+      {canSeeReporting && (
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {/* Open estimates counts sent+viewed — land on that filter, like Jobs won does. */}
         <HeadlineCard icon={FileText} label="Open estimates" stat={stats?.openEstimates}
@@ -299,6 +304,7 @@ export default function CrmHomePage() {
         <HeadlineCard icon={ReceiptText} label="Open invoices" stat={stats?.openInvoices}
           showMoney={canSeePrices} href={canSeePrices ? "/crm/invoices?status=sent,partial" : undefined} testid="card-stat-open-invoices" />
       </div>
+      )}
 
       {/* The numbers row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -446,12 +452,14 @@ export default function CrmHomePage() {
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="h-4 w-4 text-muted-foreground" /> Activity
             </CardTitle>
-            <CardDescription>What your team and your clients are doing.</CardDescription>
+            <CardDescription>{canSeeReporting ? "What your team and your clients are doing." : "The projects you are working on."}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="team">
+            <Tabs key={canSeeReporting ? "reporting" : "own"} defaultValue={canSeeReporting ? "team" : "projects"}>
               <TabsList className="mb-2 h-8">
-                <TabsTrigger value="team" className="text-xs" data-testid="tab-team-activity">Team Activity</TabsTrigger>
+                {canSeeReporting && (
+                  <TabsTrigger value="team" className="text-xs" data-testid="tab-team-activity">Team Activity</TabsTrigger>
+                )}
                 <TabsTrigger value="projects" className="text-xs" data-testid="tab-recent-projects">Recent projects</TabsTrigger>
               </TabsList>
               <TabsContent value="team" className="space-y-0.5">
@@ -527,7 +535,9 @@ export default function CrmHomePage() {
                 <Users className="h-4 w-4" strokeWidth={1.8} />
               </div>
               <div className="font-semibold">Clients</div>
-              <p className="text-sm text-muted-foreground mt-1">Create clients, build and send estimates.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {canManageCustomers ? "Create clients, build and send estimates." : "The clients on your jobs."}
+              </p>
             </CardContent>
           </Card>
         </Link>

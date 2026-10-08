@@ -1292,7 +1292,8 @@ export function registerCrmHoverRoutes(app: Express, getDevUser: GetUser): void 
 
   /** Status for the settings card. Never includes the token or hmac secret. */
   app.get("/api/crm/integrations/hover/status", async (req: any, res) => {
-    const ctx = await ctxFor(req, res);
+    // Webhook address, sync errors and the last sync report belong to the integrations card.
+    const ctx = await ctxFor(req, res, "manageIntegrations");
     if (!ctx) return;
     const conn = await readHoverConn(ctx.org.id);
     res.json({

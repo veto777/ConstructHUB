@@ -5,6 +5,7 @@
  * alert never costs SEO data. Each alert is one row in seo_alerts (the Alerts
  * page) and one platform notification (the bell, and email when it is on).
  */
+import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { notifyUser } from "../account-events";
 
@@ -66,7 +67,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export const ITEM_CAP = 200;
 
 /** Insert the alert once (per site, kind and source); its id when it is new, null when it already exists. */
-async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
+export async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
   const { rows: [row] } = await pool.query(
     `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING RETURNING id`,
     [userId, siteId, kind, source, title, JSON.stringify(items.slice(0, ITEM_CAP))]);
@@ -74,7 +75,7 @@ async function saveAlert(userId: number, siteId: number, kind: string, source: s
 }
 
 /** The bell / email text for a saved alert. Pure, for tests. */
-export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
+export function alertMessage(a: { kind: string; title: string; domain: string; items: any[] }): { kind: "seo.rank_drop" | "seo.rank_gain" | "seo.links_change" | "seo.grid_change"; title: string; body: string; severity: "info" | "warning"; actionLabel: string; actionUrl: string } {
   if (a.kind === "rank_drop" || a.kind === "rank_gain") {
     const items = (Array.isArray(a.items) ? a.items : []) as RankChange[];
     return {
@@ -84,38 +85,51 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
     };
   }
   const i = (Array.isArray(a.items) ? a.items[0] : null) ?? {};
+  if (a.kind === "grid_down" || a.kind === "grid_up")
+    return {
+      kind: "seo.grid_change", title: a.title, severity: a.kind === "grid_down" ? "warning" : "info",
+      body: `Local grid for "${i.keyword ?? ""}" (${i.size} × ${i.size} points): in the first three local results at ${i.top3} of ${i.checked} points, was ${i.wasTop3} of ${i.wasChecked}. Position score ${i.score ?? "—"}, was ${i.wasScore ?? "—"} (lower is better).`,
+      actionLabel: "See the grid", actionUrl: "/seo/local-grid",
+    };
   return {
     kind: "seo.links_change", title: a.title, severity: a.kind === "links_lost" ? "warning" : "info",
-    body: `Sites linking to ${a.domain}: ${i.from ?? "?"} on ${i.since ?? "the last snapshot"}, ${i.to ?? "?"} now.`,
+    body: `Sites linking to ${a.domain}: ${i.from ?? "?"} on ${i.since ?? "the last snapshot"}, ${i.to ?? "?"} now.` +
+      (Array.isArray(i.lost) && i.lost.length ? `\nLinks lost from: ${i.lost.slice(0, 5).map((l: any) => `${l.domain}${l.authority != null ? ` (authority ${l.authority})` : ""}`).join(", ")}${i.lost.length > 5 ? ", …" : ""}.` : ""),
     actionLabel: "See the links", actionUrl: "/seo/backlinks",
   };
 }
 
 /**
- * Send one alert to the bell (and email when that is on). The row is claimed
- * first, so it goes out once; if sending fails the claim is released and
- * deliverPendingAlerts tries again.
+ * Send one alert to the bell (and email when that is on). A delivery in
+ * progress holds a five-minute lease (`claimed_at`); `notified_at` is set only
+ * after it went out. A crash mid-delivery therefore leaves the alert due again
+ * when the lease runs out, instead of marking it sent.
  */
 export async function deliverAlert(alertId: number): Promise<boolean> {
+  // Only the sender holding this token may finish or give up the delivery: a slow sender whose lease ran out cannot undo a newer one's.
+  const token = randomUUID();
   const { rows: [a] } = await pool.query(
-    `UPDATE seo_alerts x SET notified_at=now() FROM seo_sites s WHERE x.id=$1 AND x.notified_at IS NULL AND s.id=x.site_id
-     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId]);
+    `UPDATE seo_alerts x SET claimed_at=now(), claim_token=$2 FROM seo_sites s
+      WHERE x.id=$1 AND x.notified_at IS NULL AND (x.claimed_at IS NULL OR x.claimed_at < now() - interval '5 minutes') AND s.id=x.site_id
+     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId, token]);
   if (!a) return false;
   try {
     const m = alertMessage(a);
     await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
+    await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL WHERE id=$1 AND claim_token=$2", [alertId, token]);
     return true;
   } catch (e: any) {
-    await pool.query("UPDATE seo_alerts SET notified_at=NULL WHERE id=$1", [alertId]).catch(() => {});
+    await pool.query("UPDATE seo_alerts SET claimed_at=NULL, claim_token=NULL WHERE id=$1 AND notified_at IS NULL AND claim_token=$2", [alertId, token]).catch(() => {});
     console.error(`[seo] alert ${alertId} was not delivered (it will be retried): ${e?.message ?? e}`);
     return false;
   }
 }
 
-/** Alerts saved but never sent (a crash between the two, or a failed send): try again for a day. */
+/** Alerts saved but not sent (a crash, a failed send, a lease that ran out): try again for three days. */
 export async function deliverPendingAlerts(): Promise<number> {
   const { rows } = await pool.query(
-    "SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '24 hours' ORDER BY id LIMIT 20");
+    `SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '3 days'
+        AND (claimed_at IS NULL OR claimed_at < now() - interval '5 minutes') ORDER BY id LIMIT 20`);
   let sent = 0;
   for (const r of rows) if (await deliverAlert(Number(r.id))) sent++;
   return sent;
@@ -157,20 +171,55 @@ export function linkChange(now: number | null | undefined, before: number | null
 }
 
 /** After a backlink snapshot: compare with the snapshot before it. */
-export async function raiseLinkAlerts(siteId: number): Promise<string | null> {
+/** A lost link from a site at least this strong (0–100) is worth an alert on its own… */
+export const STRONG_LINK = 30;
+/** …unless the site looks like spam (a spam score this high) or the link was nofollow: those are no loss. */
+export const SPAM_LIMIT = 50;
+type LostRow = { domain: string; authority: number | null; spam?: number | null; follow?: boolean; from: string | null; to: string | null; lastSeen: string | null };
+/** The lost backlinks worth naming in an alert: strongest site first, at most ten. Pure. */
+export function namedLosses(lost: unknown): LostRow[] {
+  return (Array.isArray(lost) ? lost : []).filter((l): l is LostRow => !!l && typeof l.domain === "string")
+    .sort((a, b) => (b.authority ?? -1) - (a.authority ?? -1)).slice(0, 10)
+    .map((l) => ({ domain: l.domain, authority: l.authority ?? null, spam: l.spam ?? null, follow: l.follow !== false, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
+}
+/**
+ * Is this lost link one that mattered: a followed link from a site with some authority that is not known to be spam?
+ * (An unknown spam score is not evidence either way; the alert shows it as unknown.) Pure.
+ */
+export const isStrongLoss = (l: LostRow) => (l.authority ?? 0) >= STRONG_LINK && l.follow !== false && (l.spam == null || l.spam < SPAM_LIMIT);
+/** Every strong loss among ALL the saved losses, strongest first — judged before any list is cut to ten. Pure. */
+export function strongLosses(lost: unknown): LostRow[] {
+  return (Array.isArray(lost) ? lost : []).filter((l): l is LostRow => !!l && typeof l.domain === "string").filter(isStrongLoss)
+    .sort((a, b) => (b.authority ?? -1) - (a.authority ?? -1)).slice(0, 10)
+    .map((l) => ({ domain: l.domain, authority: l.authority ?? null, spam: l.spam ?? null, follow: l.follow !== false, from: l.from ?? null, to: l.to ?? null, lastSeen: l.lastSeen ?? null }));
+}
+/**
+ * After a snapshot, two questions asked separately: did the count of linking sites move enough (linkChange)? and was a
+ * link from a strong site lost? A month can gain sites overall and still lose one that mattered — then both are said.
+ * Returns the kind of the first alert raised, or null.
+ */
+export async function raiseLinkAlerts(siteId: number, /** The snapshot to judge (its date); the newest when left out. It is compared with the snapshot before it. */ takenOn?: string): Promise<string | null> {
   const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled FROM seo_sites WHERE id=$1", [siteId]);
   if (!site || site.alerts_enabled === false) return null;
-  const { rows } = await pool.query("SELECT taken_on::text AS taken_on, summary FROM seo_backlink_snapshots WHERE site_id=$1 ORDER BY taken_on DESC LIMIT 2", [siteId]);
-  if (rows.length < 2) return null;
+  const { rows } = await pool.query("SELECT taken_on::text AS taken_on, summary, changes FROM seo_backlink_snapshots WHERE site_id=$1 AND ($2::date IS NULL OR taken_on <= $2::date) ORDER BY taken_on DESC LIMIT 2", [siteId, takenOn ?? null]);
+  if (rows.length < 2 || (takenOn && rows[0].taken_on !== takenOn)) return null;
   const [latest, previous] = rows;
   const change = linkChange(latest.summary?.referringDomains, previous.summary?.referringDomains);
-  if (!change) return null;
-  const title = `${site.domain} ${change.kind === "links_lost" ? "lost" : "gained"} ${plural(change.by, "linking site")}`;
-  const items = [{ from: previous.summary.referringDomains, to: latest.summary.referringDomains, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null }];
-  const id = await saveAlert(site.user_id, siteId, change.kind, latest.taken_on, title, items);
-  if (!id) return null;
-  await deliverAlert(id);
-  return change.kind;
+  // Named losses belong to this comparison only when they were collected since the snapshot it is compared with.
+  const mine = latest.changes?.since === previous.taken_on;
+  const lost = mine ? namedLosses(latest.changes?.lost) : [];
+  const strong = mine ? strongLosses(latest.changes?.lost) : [];
+  const counts = { from: previous.summary?.referringDomains ?? null, to: latest.summary?.referringDomains ?? null, since: previous.taken_on, backlinksFrom: previous.summary?.backlinks ?? null, backlinksTo: latest.summary?.backlinks ?? null };
+  let raised: string | null = null;
+  const raise = async (kind: "links_lost" | "links_gained", title: string, names: LostRow[]) => {
+    const id = await saveAlert(site.user_id, siteId, kind, latest.taken_on, title, [{ ...counts, lost: names, lostShown: names.length, lostTotal: names.length ? latest.changes?.lostTotal ?? null : null }]);
+    if (id) { await deliverAlert(id); raised ??= kind; }
+  };
+  if (change) await raise(change.kind, `${site.domain} ${change.kind === "links_lost" ? "lost" : "gained"} ${plural(change.by, "linking site")}`, change.kind === "links_lost" ? lost : []);
+  // A strong link lost is said even when the count rose, or barely moved. (When the count fell, the alert above already names it.)
+  if (strong.length && change?.kind !== "links_lost")
+    await raise("links_lost", `${site.domain} lost ${strong.length === 1 ? `a link from ${strong[0].domain}` : `links from ${strong.length} strong sites`}`, strong);
+  return raised;
 }
 
 export async function listAlerts(userId: number, siteId: number | null, limit = 100) {

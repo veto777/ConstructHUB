@@ -38,10 +38,10 @@ async function clientCookie(customerId: string): Promise<string> {
   return `crm_client=${raw}`;
 }
 
-let engagementIncrement: any, estimateExpiryOnSend: any, redactIpPrefix: any, ESTIMATE_EXPIRY_DAYS: number;
+let engagementIncrement: any, estimateExpiryOnSend: any, estimateExpiryOnExtend: any, redactIpPrefix: any, ESTIMATE_EXPIRY_DAYS: number;
 
 beforeAll(async () => {
-  ({ engagementIncrement, estimateExpiryOnSend, redactIpPrefix, ESTIMATE_EXPIRY_DAYS } =
+  ({ engagementIncrement, estimateExpiryOnSend, estimateExpiryOnExtend, redactIpPrefix, ESTIMATE_EXPIRY_DAYS } =
     await import("./portal"));
 });
 
@@ -87,6 +87,46 @@ describe("estimate expiry math (pure)", () => {
     expect(ESTIMATE_EXPIRY_DAYS).toBe(7);
     const sent = new Date("2026-03-01T09:00:00Z");
     expect(estimateExpiryOnSend(sent).toISOString()).toBe("2026-03-08T09:00:00.000Z");
+  });
+});
+
+describe("estimate extend math (pure) — extending never shortens", () => {
+  const now = new Date("2026-10-08T15:00:00Z");
+  const DAY = 86_400_000;
+
+  it("weeks left: the days go on top of the current expiry (the reported 11/2 → 10/15 bug)", () => {
+    const current = new Date("2026-11-02T15:00:00Z");
+    const next = estimateExpiryOnExtend(current, now, 7);
+    expect(next.toISOString()).toBe("2026-11-09T15:00:00.000Z");
+    expect(next.getTime()).toBeGreaterThan(current.getTime());
+  });
+
+  it("expiring tomorrow: 7 days after tomorrow, not 7 days from today", () => {
+    const current = new Date(now.getTime() + DAY);
+    expect(estimateExpiryOnExtend(current, now, 7).getTime()).toBe(now.getTime() + 8 * DAY);
+  });
+
+  it("already expired: a fresh window counted from now (not from the stale date)", () => {
+    const current = new Date(now.getTime() - 30 * DAY);
+    const next = estimateExpiryOnExtend(current, now, 7);
+    expect(next.getTime()).toBe(now.getTime() + 7 * DAY);
+    expect(next.getTime()).toBeGreaterThan(now.getTime());
+  });
+
+  it("expiring exactly now, or with no expiry stamped: counted from now", () => {
+    expect(estimateExpiryOnExtend(now, now, 7).getTime()).toBe(now.getTime() + 7 * DAY);
+    expect(estimateExpiryOnExtend(null, now, 7).getTime()).toBe(now.getTime() + 7 * DAY);
+    expect(estimateExpiryOnExtend(undefined, now, 7).getTime()).toBe(now.getTime() + 7 * DAY);
+    expect(estimateExpiryOnExtend(new Date(NaN), now, 7).getTime()).toBe(now.getTime() + 7 * DAY);
+  });
+
+  it("defaults to the standard 7 days and is never earlier than the current expiry", () => {
+    for (const offsetDays of [-400, -1, 0, 1, 6, 7, 8, 25, 400]) {
+      const current = new Date(now.getTime() + offsetDays * DAY);
+      const next = estimateExpiryOnExtend(current, now);
+      expect(next.getTime()).toBeGreaterThanOrEqual(current.getTime() + 7 * DAY);
+      expect(next.getTime()).toBeGreaterThanOrEqual(now.getTime() + 7 * DAY);
+    }
   });
 });
 
@@ -169,6 +209,72 @@ describe("expiry + engagement against the dev server", () => {
       method: "POST", body: JSON.stringify({ days: 7 }),
     }, cookie);
     expect(late.status).toBe(409);
+  });
+
+  // Extend ADDS days to the later of (current expiry, now). The expiry is
+  // placed with SQL (session clock = UTC, like the app's) and read back
+  // through the API, so the assertions compare like with like.
+  async function sentWithExpiry(interval: string) {
+    const est = await makeSentEstimate();
+    const send = await api(`/api/crm/estimates/${est.id}/send`, { method: "POST", body: "{}" }, cookie);
+    expect(send.status).toBe(200);
+    const { rows } = await pool.query(
+      `update crm_estimates set expires_at = (now() at time zone 'utc') + $2::interval
+        where id = $1
+        returning (extract(epoch from (expires_at at time zone 'utc')) * 1000)::float8 as ms`,
+      [est.id, interval],
+    );
+    return { id: est.id as string, before: Math.round(rows[0].ms) };
+  }
+  const extend7 = (id: string) =>
+    api(`/api/crm/estimates/${id}/extend`, { method: "POST", body: JSON.stringify({ days: 7 }) }, cookie);
+  const DAY = 86_400_000;
+
+  it("extend with weeks left adds 7 days on top — it never moves the expiry earlier", async () => {
+    const { id, before } = await sentWithExpiry("25 days");
+    const ext = await extend7(id);
+    expect(ext.status).toBe(200);
+    const after = new Date(ext.body.estimate.expiresAt).getTime();
+    expect(after).toBeGreaterThan(before);
+    expect(Math.abs(after - (before + 7 * DAY))).toBeLessThan(5);
+    expect(after).toBeGreaterThan(Date.now() + 31 * DAY);
+
+    // Twice is 14 days, not "7 from today" again.
+    const again = await extend7(id);
+    expect(Math.abs(new Date(again.body.estimate.expiresAt).getTime() - (before + 14 * DAY))).toBeLessThan(5);
+  });
+
+  it("extend on an estimate expiring tomorrow lands 8 days out", async () => {
+    const { id, before } = await sentWithExpiry("1 day");
+    const ext = await extend7(id);
+    expect(ext.status).toBe(200);
+    const after = new Date(ext.body.estimate.expiresAt).getTime();
+    expect(Math.abs(after - (before + 7 * DAY))).toBeLessThan(5);
+    expect(after).toBeGreaterThan(Date.now() + 7.9 * DAY);
+  });
+
+  it("extend on an expired estimate gives 7 days from now and revives the link", async () => {
+    const { id, before } = await sentWithExpiry("-30 days");
+    expect(before).toBeLessThan(Date.now());
+    const t0 = Date.now();
+    const ext = await extend7(id);
+    expect(ext.status).toBe(200);
+    const after = new Date(ext.body.estimate.expiresAt).getTime();
+    expect(after).toBeGreaterThanOrEqual(t0 + 7 * DAY - 2000);
+    expect(after).toBeLessThanOrEqual(Date.now() + 7 * DAY + 2000);
+  });
+
+  it("re-sending keeps an extended expiry (no shortening), and restarts an expired one", async () => {
+    const long = await sentWithExpiry("25 days");
+    const resend = await api(`/api/crm/estimates/${long.id}/send`, { method: "POST", body: "{}" }, cookie);
+    expect(resend.status).toBe(200);
+    expect(Math.abs(new Date(resend.body.estimate.expiresAt).getTime() - long.before)).toBeLessThan(5);
+
+    const old = await sentWithExpiry("-3 days");
+    const again = await api(`/api/crm/estimates/${old.id}/send`, { method: "POST", body: "{}" }, cookie);
+    expect(again.status).toBe(200);
+    const sentAt = new Date(again.body.estimate.sentAt).getTime();
+    expect(new Date(again.body.estimate.expiresAt).getTime() - sentAt).toBe(7 * DAY);
   });
 
   it("heartbeats accumulate capped, server-side duration; CRM read redacts IPs", async () => {

@@ -1,4 +1,5 @@
 /** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
+import { SerpFeatureChips, hasFeature, ownsFeature } from "./serp-features";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,20 +9,29 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 import { KeywordHistory, RankHistoryPanel } from "./rank-history";
+import { CompetingPages } from "./competing";
 import { LocationPicker, type Place } from "./location-picker";
+import { CompetitorPanel } from "./rank-competitors";
 
-type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[] } | null;
+type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[]; top?: { position: number; domain: string; url?: string | null; title?: string | null }[] } | null;
 type Overview = {
   site: SeoSite; devices: ("desktop" | "mobile")[];
   summary: { tracked: number; checked: number; top3: number; top10: number; averagePosition: number | null; improved: number; declined: number; lastCheckedOn: string | null; inMapPack?: number; withMapPack?: number };
   rows: { id: number; keyword: string; location?: string | null; tags: string[]; searchVolume: number | null; cpc: number | null; difficulty: number | null; positions: Record<string, Position> }[];
   runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; created_at: string; finished_at: string | null }[];
-  searchConsole: { property: string; clicks: number; impressions: number; position: number | null; previousClicks: number; previousImpressions: number } | null;
+  searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean } | null;
   nextCheck: { serps: number; priceCents?: number; nextAt: string | null };
 };
 
 const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
 const RUN_TRIGGER: Record<string, string> = { weekly: "weekly check", manual: "run now" };
+
+/** What the Search Console tile says under its number: the comparison when both 28-day windows are complete, otherwise how much of EACH is synced. */
+function gscHint(g: { clicks: number | null; previousClicks: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean }): string {
+  if (g.comparable) return `${fmtNum(g.previousClicks)} the 28 days before`;
+  const now = g.days ?? 0, before = g.previousDays ?? 0;
+  return `${now} of the last 28 days synced${g.through ? ` (to ${fmtDate(g.through)})` : ""}; ${before} of the 28 before — not compared`;
+}
 
 export default function SeoOverviewPage() {
   const status = useSeoStatus();
@@ -35,7 +45,7 @@ export default function SeoOverviewPage() {
     refetchInterval: (q) => q.state.data?.runs.some((r) => r.status === "queued" || r.status === "running") ? 20_000 : false,
   });
   // The history charts (their keys carry the device/tag) and the dashboard change with every check and keyword edit.
-  const refreshHistory = () => { void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-history`) || /^\/api\/seo\/keywords\/\d+\/history$/.test(q.queryKey[0])) }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
+  const refreshHistory = () => { void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-history`) || q.queryKey[0] === `/api/seo/sites/${site?.id}/rank-competing` || /^\/api\/seo\/keywords\/\d+\/history$/.test(q.queryKey[0])) }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
   const invalidate = () => { refreshHistory(); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/overview`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); };
   const runNow = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/rank-check`),
@@ -81,7 +91,7 @@ export default function SeoOverviewPage() {
             <Tile label="Since last check" value={<><span className="g-move g-move--up text-[20px]">▲{o.summary.improved}</span> <span className="g-move g-move--down text-[20px]">▼{o.summary.declined}</span></>} hint="Keywords up / down" testId="tile-movement" />
             {o.searchConsole ? (
               <>
-                <Tile label="Search Console clicks (28 days)" value={fmtNum(o.searchConsole.clicks)} hint={`${fmtNum(o.searchConsole.previousClicks)} the 28 days before`} testId="tile-gsc-clicks" />
+                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={gscHint(o.searchConsole)} testId="tile-gsc-clicks" />
                 <Tile label="Impressions (28 days)" value={fmtNum(o.searchConsole.impressions)} hint={o.searchConsole.position != null ? `Average position ${o.searchConsole.position}` : o.searchConsole.property} testId="tile-gsc-impressions" />
               </>
             ) : (
@@ -91,6 +101,8 @@ export default function SeoOverviewPage() {
             {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <RankHistoryPanel site={site} />
+          <CompetingPages site={site} />
+          <CompetitorPanel site={site} onExplore={(d) => { window.location.href = `/seo/explorer?domain=${encodeURIComponent(d)}`; }} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (
             <p className="g-text-2 mb-4 flex flex-wrap items-center gap-2 text-[13px]" data-testid="volumes-missing">
@@ -102,8 +114,30 @@ export default function SeoOverviewPage() {
           {o.rows.length === 0 ? (
             <Empty testId="seo-empty-keywords"><h3>No keywords tracked for {site.domain}</h3><p>Paste keywords above, or <Link href="/seo/keywords" className="g-link">research keywords</Link> and track the ones with volume.</p></Empty>
           ) : (
+            <>
+            {(() => {
+              const firsts = o.rows.map((r) => r.positions[o.devices[0]]).filter((p): p is NonNullable<typeof p> => !!p);
+              if (!firsts.length) return null;
+              // A map pack is known three ways (the feature list, the saved pack, our own place in it): any of them counts.
+              const maps = firsts.filter((p) => hasFeature(p.features, "local_pack") || (p.pack?.length ?? 0) > 0 || p.local != null);
+              const count = (t: string) => firsts.filter((p) => hasFeature(p.features, t)).length;
+              // "You are in it" is known only for checks made since it is looked at; older checks are counted apart, not as "no".
+              const looked = (t: string) => firsts.filter((p) => hasFeature(p.features, t) && hasFeature(p.features, "own:checked"));
+              const known = (t: string, verb: string) => {
+                const l = looked(t), older = count(t) - l.length, yes = l.filter((p) => ownsFeature(p.features, t)).length;
+                if (!l.length) return `whether ${verb} is not known for ${older === 1 ? "this older check" : "these older checks"}`;
+                return `${verb} on ${yes}${older ? ` of the ${l.length} checked for it; not known for ${older} older check${older === 1 ? "" : "s"}` : ""}`;
+              };
+              const parts = [
+                maps.length ? `a map pack on ${maps.length} (you are in ${maps.filter((p) => p.local != null).length})` : null,
+                count("ai_overview") ? `an AI overview on ${count("ai_overview")} (${known("ai_overview", "it cites you")})` : null,
+                count("featured_snippet") ? `a featured snippet on ${count("featured_snippet")} (${known("featured_snippet", "it is yours")})` : null,
+                count("people_also_ask") ? `"people also ask" on ${count("people_also_ask")}` : null,
+              ].filter(Boolean);
+              return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">Of your {firsts.length} keyword{firsts.length === 1 ? "" : "s"} checked on {o.devices[0]}, Google shows {parts.join(", ")}.</p> : null;
+            })()}
             <table className="g-table" data-testid="table-positions">
-              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
+              <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses Google shows on the map for this search">Map pack</th><th title="What else Google shows for this search; a green chip means you are in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
               <tbody>
                 {o.rows.map((r) => {
                   const first = r.positions[o.devices[0]];
@@ -113,17 +147,24 @@ export default function SeoOverviewPage() {
                       <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== "United States" && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
                       {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`In the map pack: ${first.pack!.map((p) => p.title).join(", ")}`}>not in it{first.previousLocal != null && <> <span className="g-move g-move--down">lost</span></>}</span> : <span className="g-text-2" title="Google showed no map for this search">no map</span>}</td>
+                      <td data-label="On the page">{first ? <SerpFeatureChips features={(first.pack?.length ?? 0) > 0 || first.local != null ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} /> : <span className="g-text-2">—</span>}</td>
                       <td className="num" data-label="Volume">{fmtNum(r.searchVolume)}</td>
                       <td data-label="Page" className="max-w-[280px] truncate">{first?.url ? <a href={first.url} className="g-link" target="_blank" rel="noreferrer">{first.url.replace(/^https?:\/\/(www\.)?/, "")}</a> : <span className="g-text-2">—</span>}</td>
                       <td className="num g-text-2" data-label="Checked">{first ? fmtDate(first.checkedOn) : "—"}</td>
                       <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-8 !px-2" onClick={() => remove.mutate(r.id)} aria-label={`Remove ${r.keyword}`} data-testid={`button-remove-${r.id}`}><Trash2 /></button></td>
                     </tr>
-                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>Google's map pack for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} /></td></tr>}
+                    {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>Google's map pack for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} />{(first?.top?.length ?? 0) > 0 && (
+                      <div className="mt-3" data-testid={`serp-${r.id}`}>
+                        <h4 className="g-text mb-1 text-[13px] font-medium">Google's first page for this search <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
+                        <ol className="space-y-0.5 text-[13px]">{first!.top!.map((t) => { const mine = t.domain === site.domain || t.domain.endsWith(`.${site.domain}`); return <li key={`${t.position}-${t.domain}`} className={mine ? "g-text font-medium" : "g-text-2"}><span className="inline-block w-6 tabular-nums">{t.position}.</span> {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="g-link">{t.domain}</a> : t.domain}{mine ? " · you" : ""}{t.title ? <span className="g-text-2 font-normal"> — {t.title}</span> : null}</li>; })}</ol>
+                      </div>
+                    )}</td></tr>}
                     </Fragment>
                   );
                 })}
               </tbody>
             </table>
+            </>
           )}
           {o.runs.length > 0 && (
             <section className="mt-6">

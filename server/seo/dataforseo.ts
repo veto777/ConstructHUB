@@ -24,6 +24,7 @@
  *   the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
  */
 import { clampSerpDepth } from "./pricing";
+import { SEO_NOT_READY_MESSAGE } from "./plan";
 
 export const API_BASE = "https://api.dataforseo.com/v3";
 const REQUEST_TIMEOUT_MS = 60_000;
@@ -44,6 +45,27 @@ export function isConfigured(env: NodeJS.ProcessEnv = dataforseoDeps.env()): boo
 
 export type DataForSeoErrorCode = "not_configured" | "auth" | "rate_limited" | "upstream" | "task_failed" | "invalid" | "timeout";
 
+/**
+ * What a CUSTOMER reads for each kind of failure: what happened and what to do, never who the
+ * source is, never its own words. Every one of these is thrown either by a free call or from
+ * inside withBudget (server/seo/budget.ts), which settles a failed lookup at no charge to the
+ * customer — that is why they can say so.
+ */
+export const SEO_SOURCE_PUBLIC_MESSAGES: Record<DataForSeoErrorCode, string> = {
+  not_configured: SEO_NOT_READY_MESSAGE,
+  auth: "SEO data is temporarily unavailable — our team has been told. Your credits were not charged.",
+  rate_limited: "The keyword data service is busy — try again in a minute. Your credits were not charged.",
+  timeout: "The keyword data service took too long to answer — try again in a minute. Your credits were not charged.",
+  upstream: "The keyword data service didn't answer — try again in a few minutes. Your credits were not charged.",
+  invalid: "That request couldn't be run — check the keyword or website and try again. Your credits were not charged.",
+  task_failed: "This report could not be completed — try again in a few minutes. Your credits were not charged.",
+};
+
+/**
+ * `message` is INTERNAL: it names the vendor and may quote its `status_message` verbatim — for the
+ * log, the issue desk and platform admins only. Anything a customer can read uses `publicMessage` /
+ * `publicCode` (through server/seo/public-errors.ts, the one place that turns an error into a response).
+ */
 export class DataForSeoError extends Error {
   constructor(
     readonly code: DataForSeoErrorCode,
@@ -55,6 +77,8 @@ export class DataForSeoError extends Error {
     super(message);
     this.name = "DataForSeoError";
   }
+  get publicCode(): string { return `seo_source_${this.code}`; }
+  get publicMessage(): string { return SEO_SOURCE_PUBLIC_MESSAGES[this.code] ?? SEO_SOURCE_PUBLIC_MESSAGES.upstream; }
 }
 
 export interface DfsTask {
@@ -183,6 +207,22 @@ export interface RankCheckResult {
   localPosition: number | null;
   /** Who Google showed in the map pack, in order. Empty when there was none. */
   localPack: { position: number; title: string; domain: string | null }[];
+  /** The first ten organic results: who the customer is up against on this search. */
+  serpTop: { position: number; domain: string; url: string | null; title: string | null }[];
+  /** Where each followed competitor stood in the crawled results (null = not found in them). */
+  rivals: Record<string, number | null>;
+}
+
+/** A web address from the open web, kept only when it is plainly http(s) and of sane length — it becomes a link on our page. */
+export function safeHttpUrl(v: unknown): string | null {
+  if (typeof v !== "string" || v.length > 500) return null;
+  try { const u = new URL(v); return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null; } catch { return null; }
+}
+/** A host name from the open web: lower case, no www, only host characters, bounded. */
+export function safeDomain(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const d = v.toLowerCase().replace(/^www\./, "");
+  return d.length <= 253 && /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(d) ? d : null;
 }
 
 /** A business name reduced to what identifies it: lower case, no punctuation, no "LLC"/"Inc". */
@@ -213,16 +253,40 @@ export function isOurListing(item: { domain?: unknown; title?: unknown }, target
   return listingOnDomain(item, targetDomain) || listingNamed(item, businessName);
 }
 
+/**
+ * The results-page features the site itself appears in, as "own:<type>": the featured snippet is its page, the AI
+ * overview cites it, or one of the "people also ask" answers comes from it. (The map pack is handled separately,
+ * because a listing can be the business without showing its website.) Pure.
+ */
+export function ownedFeatures(items: any[], target: string): string[] {
+  const ours = (d: unknown) => { if (typeof d !== "string" || !d) return false; const x = d.toLowerCase().replace(/^www\./, ""); return x === target || x.endsWith(`.${target}`); };
+  const out = new Set<string>();
+  for (const i of items) {
+    if (!i || typeof i.type !== "string") continue;
+    if (i.type === "featured_snippet" && ours(i.domain)) out.add("own:featured_snippet");
+    if (i.type === "ai_overview") {
+      const refs = [...(Array.isArray(i.references) ? i.references : []), ...(Array.isArray(i.items) ? i.items.flatMap((x: any) => (Array.isArray(x?.references) ? x.references : [])) : [])];
+      if (refs.some((r: any) => ours(r?.domain))) out.add("own:ai_overview");
+    }
+    if (i.type === "people_also_ask" && Array.isArray(i.items) && i.items.some((q: any) => Array.isArray(q?.expanded_element) && q.expanded_element.some((e: any) => ours(e?.domain)))) out.add("own:people_also_ask");
+  }
+  // Always present on checks made since ownership is looked at: without it, "not ours" cannot be told from "never looked".
+  return [OWNERSHIP_CHECKED, ...out];
+}
+/** Marks a check whose results-page features were examined for the site's own presence. */
+export const OWNERSHIP_CHECKED = "own:checked";
+
 /** The organic result for the tracked domain (with subdomains), like OpenSEO's buildRankCheckResult. */
-export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }, items: any[]): RankCheckResult {
+export function buildRankResult(input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }, items: any[]): RankCheckResult {
   const target = input.targetDomain.toLowerCase().replace(/^www\./, "");
   const match = items.find((item) => {
     if (!item || item.type !== "organic" || typeof item.domain !== "string") return false;
     const d = item.domain.toLowerCase().replace(/^www\./, "");
     return d === target || d.endsWith(`.${target}`);
   });
+  const organic = items.filter((i) => i && i.type === "organic" && typeof i.domain === "string" && i.domain);
   const packItems = items.filter((i) => i && i.type === "local_pack");
-  const pack = packItems.map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: str(i.title) ?? "", domain: str(i.domain) }));
+  const pack = packItems.slice(0, 10).map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: (str(i.title) ?? "").slice(0, 160), domain: safeDomain(i.domain) }));
   // The website decides wherever it appears in the pack; the name is only a fallback for entries that show none.
   const onDomain = packItems.findIndex((i) => listingOnDomain(i, input.targetDomain));
   const ours = onDomain >= 0 ? onDomain : packItems.findIndex((i) => listingNamed(i, input.businessName));
@@ -231,9 +295,15 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
     keyword: input.keyword,
     position: match ? num(match.rank_group) ?? num(match.rank_absolute) : null,
     url: match ? str(match.url) : null,
-    serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean))],
+    serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean)), ...ownedFeatures(items, target)],
     localPosition: ours >= 0 ? pack[ours].position : null,
     localPack: pack,
+    serpTop: organic.slice(0, 10).map((i) => ({ position: num(i.rank_group) ?? num(i.rank_absolute) ?? 0, domain: safeDomain(i.domain) ?? "", url: safeHttpUrl(i.url), title: str(i.title)?.slice(0, 120) ?? null })).filter((e) => e.position > 0 && e.position <= 200 && e.domain),
+    rivals: Object.fromEntries((input.competitors ?? []).map((c) => {
+      const want = c.toLowerCase().replace(/^www\./, "");
+      const hit = organic.find((i) => { const d = String(i.domain).toLowerCase().replace(/^www\./, ""); return d === want || d.endsWith(`.${want}`); });
+      return [want, hit ? num(hit.rank_group) ?? num(hit.rank_absolute) : null];
+    })),
   };
 }
 
@@ -292,12 +362,12 @@ export type RankTaskOutcome =
   | { status: "completed"; result: RankCheckResult };
 
 /** Collect one queued task (free). */
-export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): Promise<RankTaskOutcome> {
+export async function serpTaskGet(input: { taskId: string; keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }): Promise<RankTaskOutcome> {
   const response = await request("GET", `/serp/google/organic/task_get/advanced/${encodeURIComponent(input.taskId)}`);
   return parseTaskGet(response, input);
 }
 
-export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null }): RankTaskOutcome {
+export function parseTaskGet(response: DfsResponse, input: { keywordId: number; keyword: string; targetDomain: string; businessName?: string | null; competitors?: string[] }): RankTaskOutcome {
   const task = response?.tasks?.[0];
   if (!response || response.status_code !== 20000 || !task)
     throw new DataForSeoError("upstream", response?.status_message || "DataForSEO task_get failed", 0, response?.status_code);
@@ -521,8 +591,8 @@ export function parseBacklinkRow(item: any): Backlink | null {
   if (!item || typeof item !== "object") return null;
   return {
     domainFrom: str(item.domain_from),
-    urlFrom: str(item.url_from),
-    urlTo: str(item.url_to),
+    urlFrom: safeHttpUrl(item.url_from),
+    urlTo: safeHttpUrl(item.url_to),
     anchor: str(item.anchor),
     dofollow: item.dofollow === true,
     rank: num(item.rank),
@@ -548,6 +618,29 @@ export async function backlinksSummary(input: { target: string }): Promise<Price
   const response = await request("POST", "/backlinks/summary/live", [backlinksPayload(input.target)]);
   const task = assertOk(response, { treatNoResultsAsEmpty: true });
   return { data: parseBacklinkSummary(task.result?.[0] ?? {}), costUsd: taskCost(task) };
+}
+
+/** One linking site that stopped linking: who, how strong, from which page to which, and when it was last seen. */
+export type LostLink = { domain: string; /** 0–100. */ authority: number | null; /** 0–100; high means the linking site looks like spam, so the link is no loss. */ spam: number | null; from: string | null; to: string | null; anchor: string | null; lastSeen: string | null; follow: boolean };
+export function parseLostLink(item: any): LostLink | null {
+  const domain = safeDomain(item?.domain_from);
+  if (!domain) return null;
+  const rank = num(item.domain_from_rank);
+  return {
+    domain, authority: rank === null ? null : Math.max(0, Math.min(100, Math.round(rank / 10))), spam: num(item.backlink_spam_score) ?? num(item.backlinks_spam_score), from: safeHttpUrl(item.url_from), to: safeHttpUrl(item.url_to),
+    anchor: str(item.anchor)?.slice(0, 200) ?? null, lastSeen: str(item.last_seen)?.slice(0, 10) ?? null, follow: item.dofollow === true,
+  };
+}
+/** The request for it: one row per linking site, strongest first, among links last seen after `since` (YYYY-MM-DD) and now gone. */
+export const lostLinksRequest = (target: string, since: string, limit: number) => ({
+  ...backlinksPayload(target), backlinks_status_type: "lost", mode: "one_per_domain", limit: Math.min(100, Math.max(1, limit)),
+  filters: ["last_seen", ">", since], order_by: ["domain_from_rank,desc"],
+});
+/** The linking sites lost since a date — named, not just counted. */
+export async function lostLinks(input: { target: string; since: string; limit: number }): Promise<Priced<{ items: LostLink[]; total: number | null }>> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.since)) throw new DataForSeoError("invalid", "since must be a date");
+  const task = assertOk(await request("POST", "/backlinks/backlinks/live", [lostLinksRequest(input.target, input.since, input.limit)]), { treatNoResultsAsEmpty: true });
+  return { data: { items: taskItems(task).map(parseLostLink).filter((x): x is LostLink => !!x), total: num(task.result?.[0]?.total_count) }, costUsd: taskCost(task) };
 }
 
 export async function backlinksList(input: { target: string; limit: number }): Promise<Priced<{ items: Backlink[]; totalCount: number | null }>> {

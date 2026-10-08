@@ -17,12 +17,14 @@ import { PublicPageHeader } from "@/components/public-page-chrome";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { ConfirmHost } from "@/components/confirm-dialog";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
 import { CrmPaywall } from "@/components/crm-plans";
 import { CrmRibbon } from "@/components/crm-ribbon";
+import { CrmAccessGate } from "@/components/crm-access";
 import { AppTabBar } from "@/components/app-tabbar";
 import { inNativeApp } from "@/lib/app-shell";
 import { CrmNotificationsBell } from "@/components/crm-notifications-bell";
@@ -97,6 +99,12 @@ const SeoExplorerPage = lazyPage(() => import("@/pages/seo/explorer"));
 const SeoAuditPage = lazyPage(() => import("@/pages/seo/audit"));
 const SeoAlertsPage = lazyPage(() => import("@/pages/seo/alerts"));
 const SeoUsagePage = lazyPage(() => import("@/pages/seo/usage"));
+const SeoReportsPage = lazyPage(() => import("@/pages/seo/reports"));
+const SeoAiPage = lazyPage(() => import("@/pages/seo/ai"));
+const SeoBatchPage = lazyPage(() => import("@/pages/seo/batch"));
+const SeoLocalGridPage = lazyPage(() => import("@/pages/seo/grid"));
+const SeoPlanPage = lazyPage(() => import("@/pages/seo/plan"));
+const SeoContentPage = lazyPage(() => import("@/pages/seo/content"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
@@ -224,6 +232,12 @@ function DashboardRouter() {
       <Route path="/seo/audit" component={SeoAuditPage} />
       <Route path="/seo/alerts" component={SeoAlertsPage} />
       <Route path="/seo/usage" component={SeoUsagePage} />
+      <Route path="/seo/reports" component={SeoReportsPage} />
+      <Route path="/seo/ai" component={SeoAiPage} />
+      <Route path="/seo/batch" component={SeoBatchPage} />
+      <Route path="/seo/local-grid" component={SeoLocalGridPage} />
+      <Route path="/seo/plan" component={SeoPlanPage} />
+      <Route path="/seo/content" component={SeoContentPage} />
       <Route path="/seo/keywords" component={SeoKeywordsPage} />
       <Route path="/seo/backlinks" component={SeoBacklinksPage} />
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
@@ -423,7 +437,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/usage": "SEO data usage", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
@@ -468,6 +482,8 @@ function CrmPlanGate({ children }: { children: React.ReactNode }) {
 function PortalRouter() {
   return (
     <Suspense fallback={null}>
+    {/* A page the seat's permissions don't cover shows "ask your admin" (shared/crm-access.ts). */}
+    <CrmAccessGate>
     <Switch>
       <Route path="/" component={CrmHomePage} />
       <Route path="/crm" component={CrmHomePage} />
@@ -519,6 +535,7 @@ function PortalRouter() {
       {/* Unknown portal route -> home, which always offers the next action. */}
       <Route component={CrmHomePage} />
     </Switch>
+    </CrmAccessGate>
     </Suspense>
   );
 }
@@ -553,7 +570,9 @@ function PortalPublicRouter() {
  */
 function ClientRouter() {
   return (
-    <Suspense fallback={null}>
+    // Never a blank page while the portal's chunk loads (a null fallback is
+    // what a slow first load of "See what the client sees" looked like).
+    <Suspense fallback={<div className="flex justify-center p-20" data-testid="client-portal-loading"><div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
     <Switch>
       <Route path="/" component={ClientPortalPage} />
       <Route path="/crm-terms" component={CrmTermsPage} />
@@ -853,6 +872,8 @@ function App() {
               <AppContent />
             </Suspense>
             <Toaster />
+            {/* The one confirmation dialog — see confirmAction(). */}
+            <ConfirmHost />
           </TooltipProvider>
         </CartProvider>
       </QueryClientProvider>

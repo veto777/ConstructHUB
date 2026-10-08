@@ -5,6 +5,7 @@
  * One report is charged to the account's SEO data credit; a saved report is free to
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
+import { DirectoriesView } from "./directories";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,11 +15,14 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
-import { ReportView, type TableKey as ReportKey } from "./report-table";
+import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
+import { OpportunitiesView } from "./opportunities";
+import { MarketPicker, useMarket } from "./market";
+import { findMarket, marketKey, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
 
-type GapKey = "contentGap" | "linkIntersect";
+type GapKey = "contentGap" | "linkIntersect" | "opportunities" | "directories";
 type ViewKey = ReportKey | GapKey | "overview";
 
 type Footprint = {
@@ -27,7 +31,7 @@ type Footprint = {
   isNew: number; isUp: number; isDown: number; isLost: number;
 };
 type Report = {
-  domain: string; fetchedAt: string;
+  domain: string; locationCode?: number; languageCode?: string; fetchedAt: string;
   organic: Footprint; paid: Footprint;
   links: {
     authority: number | null; backlinks: number | null; referringDomains: number | null; followedDomains: number | null; nofollowDomains: number | null;
@@ -45,14 +49,14 @@ type Report = {
   anchors: { anchor: string; backlinks: number | null; referringDomains: number | null; firstSeen: string | null }[] | null;
   missing: string[];
 };
-type Recent = { items: { domain: string; fetchedAt: string; authority: number | null; referringDomains: number | null; keywords: number | null; traffic: number | null }[]; freeForDays: number };
+type Recent = { items: { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; authority: number | null; referringDomains: number | null; keywords: number | null; traffic: number | null }[]; freeForDays: number };
 
 const BLUE = "#1a73e8", ORANGE = "#e8710a", GREEN = "#188038", GREY = "#9aa0a6";
 const usd = (n: number | null | undefined) => n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`;
 /** 12,345 → 12.3K, as the tiles read at a glance; exact numbers stay in the tables. */
 const compact = (n: number | null | undefined) =>
   n == null ? "—" : Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : Math.abs(n) >= 10_000 ? `${(n / 1000).toFixed(1)}K` : Math.round(n).toLocaleString("en-US");
-const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 const stripUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -98,16 +102,67 @@ function AuthorityRing({ value }: { value: number | null }) {
 
 /** The left menu, grouped the way Site Explorer groups its reports. */
 const MENU: { group: string; items: [ViewKey, string][] }[] = [
-  { group: "", items: [["overview", "Overview"]] },
-  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["linkIntersect", "Link intersect"], ["bestByLinks", "Best pages by links"]] },
-  { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["contentGap", "Content gap"]] },
-  { group: "Paid search", items: [["paidKeywords", "Paid keywords"]] },
+  { group: "", items: [["overview", "Overview"], ["opportunities", "Opportunities"]] },
+  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["referringIps", "Referring IPs"], ["linkCompetitors", "Sites with similar links"], ["linkIntersect", "Link intersect"], ["directories", "Directories"], ["bestByLinks", "Best pages by links"]] },
+  { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["subdomains", "Subdomains"], ["contentGap", "Content gap"]] },
+  { group: "Paid search", items: [["paidKeywords", "Paid keywords"], ["ads", "Ads"]] },
 ];
 const MENU_LABEL = Object.fromEntries(MENU.flatMap((g) => g.items)) as Record<string, string>;
 
 const TABLES = ["keywords", "pages", "competitors", "referringDomains", "anchors"] as const;
 type TableKey = (typeof TABLES)[number];
 const TABLE_LABEL: Record<TableKey, string> = { keywords: "Organic keywords", pages: "Top pages", competitors: "Organic competitors", referringDomains: "Referring domains", anchors: "Anchors" };
+
+/**
+ * Compare two months: any two months of the saved history side by side (organic search from two years of monthly
+ * estimates, links from one year). Free — it only reads the report already on screen.
+ */
+function CompareMonths({ report }: { report: Report }) {
+  const months = useMemo(() => [...new Set([...(report.history ?? []).map((h) => h.month), ...(report.linkHistory ?? []).map((h) => h.month)])].sort(), [report]);
+  const [open, setOpen] = useState(false);
+  const [a, setA] = useState<string | null>(null), [b, setB] = useState<string | null>(null);
+  // A different report: the choice starts again (the newest month against the same month a year earlier, or the oldest there is).
+  useEffect(() => {
+    const last = months[months.length - 1] ?? null; setB(last);
+    // The same calendar month a year earlier when the history has it; otherwise the oldest month there is.
+    const yearAgo = last ? `${Number(last.slice(0, 4)) - 1}${last.slice(4)}` : null;
+    setA(yearAgo && months.includes(yearAgo) ? yearAgo : months[0] ?? null);
+  }, [months]);
+  if (months.length < 2) return null;
+  const h = (m: string | null) => (report.history ?? []).find((x) => x.month === m) ?? null, l = (m: string | null) => (report.linkHistory ?? []).find((x) => x.month === m) ?? null;
+  const rows: [string, number | null | undefined, number | null | undefined, boolean][] = [
+    ["Organic traffic / mo", h(a)?.traffic, h(b)?.traffic, false], ["Organic keywords", h(a)?.keywords, h(b)?.keywords, false], ["Keywords in the top 3", h(a)?.top3, h(b)?.top3, false],
+    ["Keywords in the top 10", h(a)?.top10, h(b)?.top10, false], ["Traffic value / mo", h(a)?.trafficValue, h(b)?.trafficValue, true],
+    ["Referring domains", l(a)?.referringDomains, l(b)?.referringDomains, false], ["Backlinks", l(a)?.backlinks, l(b)?.backlinks, false], ["Authority", l(a)?.authority, l(b)?.authority, false],
+  ];
+  const show = (v: number | null | undefined, money: boolean) => (v == null ? "—" : money ? usd(v) : fmtNum(v));
+  return (
+    <section className="mb-4" data-testid="panel-compare">
+      <button type="button" className="g-pill g-pill--sm" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="button-compare">{open ? "Hide the comparison" : "Compare two months"}</button>
+      {open && (
+        <div className="mt-3 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }}>
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
+            <label className="g-text-2 flex items-center gap-2">From <select className="g-input g-select !w-auto !py-1" value={a ?? ""} onChange={(e) => setA(e.target.value)} data-testid="select-compare-from">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
+            <label className="g-text-2 flex items-center gap-2">to <select className="g-input g-select !w-auto !py-1" value={b ?? ""} onChange={(e) => setB(e.target.value)} data-testid="select-compare-to">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
+          </div>
+          <table className="g-table" data-testid="table-compare">
+            <thead><tr><th>Measure</th><th className="num">{a ? monthLabel(a) : "—"}</th><th className="num">{b ? monthLabel(b) : "—"}</th><th className="num">Change</th></tr></thead>
+            <tbody>{rows.map(([label, x, y, money]) => {
+              const d = x != null && y != null ? y - x : null;
+              return (
+                <tr key={label}>
+                  <td>{label}</td><td className="num" data-label="From">{show(x, money)}</td><td className="num" data-label="To">{show(y, money)}</td>
+                  <td className="num" data-label="Change">{d == null ? <span className="g-text-2">—</span> : d === 0 ? <span className="g-text-2">no change</span> : <span className={`g-move ${d > 0 ? "g-move--up" : "g-move--down"}`}>{d > 0 ? "▲" : "▼"} {money ? usd(Math.abs(d)) : fmtNum(Math.abs(d))}{x ? ` (${d > 0 ? "+" : "−"}${Math.abs(Math.round((d / x) * 100))}%)` : ""}</span>}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+          <p className="g-text-2 mt-2 text-[12px]">Search figures are monthly estimates going back two years; link figures go back one year. A dash means there is no figure for that month — it is outside what is kept, that part of the report did not load, or the source has none. The newest month can still be filling in. Nothing is bought to compare.</p>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function SeoExplorerPage() {
   const status = useSeoStatus();
@@ -121,17 +176,22 @@ export default function SeoExplorerPage() {
   const [table, setTable] = useState<TableKey>("keywords");
   const [view, setView] = useState<ViewKey>("overview");
   const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
+  const [market, setMarket] = useMarket();
+  const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
+  /** Another country is another report: what is on screen is put away first. */
+  const changeMarket = (m: SeoMarket) => { if (marketKey(m) === marketKey(market)) return; setReport(null); setView("overview"); setMarket(m); };
 
   const recent = useQuery<Recent>({ queryKey: ["/api/seo/explorer/recent"] });
   // A saved report opens without spending anything; 404 just means "not looked up yet".
   const saved = useQuery<{ report: Report; fresh: boolean }>({
-    queryKey: [`/api/seo/explorer?domain=${encodeURIComponent(domain ?? "")}`], enabled: !!domain && !report, retry: false,
+    queryKey: [`/api/seo/explorer?domain=${encodeURIComponent(domain ?? "")}&locationCode=${market.locationCode}&languageCode=${market.languageCode}`], enabled: !!domain && !report, retry: false,
   });
   useEffect(() => { if (saved.data?.report && !report) setReport(saved.data.report); }, [saved.data, report]);
 
   const analyse = useMutation({
-    mutationFn: (v: { domain: string; refresh: boolean }) => api("POST", "/api/seo/explorer", v),
-    onSuccess: (data: { report: Report; reused: boolean }) => {
+    mutationFn: (v: { domain: string; refresh: boolean }) => api("POST", "/api/seo/explorer", { ...v, ...mk }),
+    onSuccess: (data: { report: Report; reused: boolean; saved?: boolean }) => {
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this report again will not be free.", variant: "destructive" });
       setReport(data.report); setDomain(data.report.domain); setInput(data.report.domain);
       window.history.replaceState({}, "", `/seo/explorer?domain=${encodeURIComponent(data.report.domain)}`);
       void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] });
@@ -139,10 +199,12 @@ export default function SeoExplorerPage() {
     },
     onError: (e) => toast({ title: "Couldn't analyse that domain", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const tracksHere = (siteId: number) => { const s = (sites.data ?? []).find((x) => x.id === siteId); return !!s && s.locationCode === market.locationCode && s.languageCode === market.languageCode; };
   const trackKeywords = useMutation({
     mutationFn: (v: { siteId: number; rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[] }) =>
-      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
-    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
+      // Numbers from another country are not the tracked site's numbers: the keywords go in without them.
+      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), ...(tracksHere(v.siteId) ? { volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
+    onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker`, description: tracksHere(v.siteId) ? undefined : `These numbers are for ${market.label}, not the country that site is tracked in, so they were not copied.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
@@ -181,6 +243,7 @@ export default function SeoExplorerPage() {
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           <input className="g-input w-full pl-9" placeholder="example.com" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-explorer-domain" autoComplete="off" spellCheck={false} />
         </label>
+        <MarketPicker value={market} onChange={changeMarket} disabled={analyse.isPending} />
         <Button type="submit" disabled={busy || !input.trim() || !configured} data-testid="button-explorer-analyse" title={!configured ? "Being switched on for your account" : undefined}>
           {analyse.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : "Analyse"}
         </Button>
@@ -196,8 +259,8 @@ export default function SeoExplorerPage() {
             <thead><tr><th>Domain</th><th className="num">Authority</th><th className="num">Referring domains</th><th className="num">Organic keywords</th><th className="num">Organic traffic</th><th className="num">Analysed</th></tr></thead>
             <tbody>
               {recent.data!.items.map((r) => (
-                <tr key={r.domain}>
-                  <td><button type="button" className="g-link" onClick={() => open(r.domain)} data-testid={`button-open-${r.domain}`}>{r.domain}</button></td>
+                <tr key={`${r.domain}:${r.locationCode}:${r.languageCode}`}>
+                  <td><button type="button" className="g-link" onClick={() => { const m = findMarket(r.locationCode ?? 2840, r.languageCode ?? "en"); if (m) setMarket(m); open(r.domain); }} data-testid={`button-open-${r.domain}`}>{r.domain}</button>{(r.locationCode ?? 2840) !== 2840 || (r.languageCode ?? "en") !== "en" ? <span className="g-text-2 ml-2 text-[12px]">{marketLabel(r.locationCode, r.languageCode)}</span> : null}</td>
                   <td className="num" data-label="Authority">{r.authority ?? "—"}</td>
                   <td className="num" data-label="Referring domains">{fmtNum(r.referringDomains)}</td>
                   <td className="num" data-label="Organic keywords">{fmtNum(r.keywords)}</td>
@@ -212,6 +275,13 @@ export default function SeoExplorerPage() {
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
       {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.</p></Empty>}
+      {notFoundYet && domain && (
+        <section className="mt-5" data-testid="explorer-opportunities-only">
+          <h2 className="g-text mb-1 text-[17px] font-medium">Or just the opportunities</h2>
+          <p className="g-text-2 mb-3 text-[13px]">This one lookup does not need the full report.</p>
+          <OpportunitiesView key={`solo:${domain}:${marketKey(market)}`} domain={domain} status={status.data} market={market} />
+        </section>
+      )}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
         <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
       )}
@@ -220,7 +290,7 @@ export default function SeoExplorerPage() {
         <div data-testid="explorer-report">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="g-text text-[20px] font-medium">Overview: <a href={`https://${report.domain}`} target="_blank" rel="noreferrer" className="g-link">{report.domain} <ExternalLink className="inline h-3.5 w-3.5" aria-hidden /></a></h2>
-            <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">United States · as of {fmtDate(report.fetchedAt)}</span>
+            <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">{marketLabel(report.locationCode ?? 2840, report.languageCode ?? "en")} · as of {fmtDate(report.fetchedAt)}</span>
             <div className="ml-auto flex flex-wrap gap-2">
               {!tracked && <button type="button" className="g-pill" disabled={track.isPending} onClick={() => track.mutate(report.domain)} data-testid="button-explorer-track"><Plus /> Track rankings</button>}
               <button type="button" className="g-pill" disabled={analyse.isPending || !configured} onClick={() => { setInput(report.domain); analyse.mutate({ domain: report.domain, refresh: true }); }} data-testid="button-explorer-refresh"><RefreshCw className={analyse.isPending ? "animate-spin" : ""} /> Refresh</button>
@@ -246,13 +316,18 @@ export default function SeoExplorerPage() {
           {view !== "overview" ? (
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
-              {view === "contentGap" || view === "linkIntersect" ? (
-                <GapView kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
+              {view === "directories" ? (
+                <DirectoriesView domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)} planSiteId={trackedSite?.id} />
+              ) : view === "opportunities" ? (
+                <OpportunitiesView key={`${report.domain}:${marketKey(market)}`} domain={report.domain} status={status.data} market={market} planSiteId={trackedSite?.id} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
+              ) : view === "contentGap" || view === "linkIntersect" ? (
+                <GapView planSiteId={trackedSite?.id} market={market} kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
-              ) : (
-                <ReportView table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
+              ) : (<>
+                {REPORT_NOTE[view] && <p className="g-text-2 mb-3 text-[13px]" data-testid="text-report-note">{REPORT_NOTE[view]}</p>}
+                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
-              )}
+              </>)}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}
             </>
           ) : (
@@ -283,6 +358,7 @@ export default function SeoExplorerPage() {
             </Panel>
           </div>
 
+          <CompareMonths report={report} />
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <Panel title="Performance" hint="estimated, by month" testId="panel-performance" className="lg:col-span-2">
               {report.history && report.history.length > 1 ? (
@@ -357,6 +433,24 @@ export default function SeoExplorerPage() {
                 </ResponsiveContainer>
               </div>
               <p className="g-text-2 mt-2 text-[12px]">Blue area: referring domains. Purple: total backlinks (right scale). Green and red: links gained and lost each month.</p>
+            </Panel>
+          )}
+          {(report.history?.length ?? 0) > 1 && (
+            <Panel title="Organic keywords by position" hint="by month" testId="panel-position-history" className="mb-4">
+              <div className="h-56">
+                <ResponsiveContainer>
+                  <ComposedChart data={report.history!.map((h) => ({ month: h.month, top3: h.top3, top10: Math.max(0, h.top10 - h.top3), rest: Math.max(0, h.keywords - h.top10) }))} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="var(--g-divider)" vertical={false} />
+                    <XAxis dataKey="month" tickFormatter={(m) => monthLabel(String(m))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={24} />
+                    <YAxis tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} allowDecimals={false} />
+                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
+                    <Area type="monotone" dataKey="top3" name="Positions 1–3" stackId="p" stroke="#188038" fill="#188038" fillOpacity={0.7} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="top10" name="Positions 4–10" stackId="p" stroke="#1a73e8" fill="#1a73e8" fillOpacity={0.6} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="rest" name="Positions 11–100" stackId="p" stroke="#9aa0a6" fill="#9aa0a6" fillOpacity={0.4} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="g-text-2 mt-2 text-[12px]">Green: keywords ranking in the top 3. Blue: positions 4–10. Grey: the rest of the first hundred.</p>
             </Panel>
           )}
           {report.intents && (

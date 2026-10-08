@@ -16,12 +16,12 @@ import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, type SeoStatus } fro
 
 export type TableKey =
   | "keywords" | "paidKeywords" | "pages" | "competitors" | "backlinks" | "newBacklinks" | "lostBacklinks" | "brokenBacklinks"
-  | "referringDomains" | "anchors" | "bestByLinks" | "matchingTerms" | "relatedTerms" | "questions";
+  | "referringDomains" | "anchors" | "bestByLinks" | "referringIps" | "linkCompetitors" | "subdomains" | "ads" | "matchingTerms" | "relatedTerms" | "questions";
 type Filters = {
   positionMin?: number; positionMax?: number; volumeMin?: number; volumeMax?: number; difficultyMin?: number; difficultyMax?: number;
   intent?: string; contains?: string; follow?: "followed" | "nofollow"; everyLink?: boolean;
 };
-type Page = { table: TableKey; target: string; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+type Page = { table: TableKey; target: string; capped?: boolean; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const strip = (u: string | null | undefined) => (u ?? "").replace(/^https?:\/\/(www\.)?/, "");
@@ -73,7 +73,7 @@ const COLS: Record<TableKey, Col[]> = {
     { key: "keywords", label: "Their keywords", num: true, cell: (r) => fmtNum(r.keywords), csv: (r) => r.keywords },
     { key: "traffic", label: "Their traffic", num: true, cell: (r) => fmtNum(r.traffic), csv: (r) => r.traffic },
     { key: "avgPosition", label: "Avg. position", num: true, cell: (r) => r.avgPosition ?? "—", csv: (r) => r.avgPosition },
-    { key: "explore", label: "", num: true, cell: (r, c) => (c.onExplore ? <button type="button" className="g-link" onClick={() => c.onExplore!(r.domain)}>Explore</button> : null), csv: () => null },
+    { key: "explore", label: "", num: true, cell: (r, c) => (c.onExplore ? <button type="button" className="g-link" aria-label={`Explore ${r.domain}`} onClick={() => c.onExplore!(r.domain)}>Explore</button> : null), csv: () => null },
   ],
   backlinks: linkCols.filter((c) => c.key !== "lastSeen"), newBacklinks: linkCols.filter((c) => c.key !== "lastSeen"),
   lostBacklinks: linkCols.filter((c) => c.key !== "spamScore"), brokenBacklinks: linkCols.filter((c) => c.key !== "lastSeen"),
@@ -99,7 +99,47 @@ const COLS: Record<TableKey, Col[]> = {
     { key: "brokenBacklinks", label: "Broken", num: true, cell: (r) => fmtNum(r.brokenBacklinks), csv: (r) => r.brokenBacklinks },
     { key: "firstSeen", label: "First seen", num: true, cell: (r) => fmtDate(r.firstSeen), csv: (r) => r.firstSeen },
   ],
+  referringIps: [
+    { key: "ip", label: "IP address", cell: (r) => r.ip, csv: (r) => r.ip },
+    { key: "referringDomains", label: "Linking sites on it", num: true, cell: (r) => fmtNum(r.referringDomains), csv: (r) => r.referringDomains },
+    { key: "backlinks", label: "Links", num: true, cell: (r) => fmtNum(r.backlinks), csv: (r) => r.backlinks },
+    { key: "firstSeen", label: "First seen", num: true, cell: (r) => fmtDate(r.firstSeen), csv: (r) => r.firstSeen },
+  ],
+  linkCompetitors: [
+    { key: "domain", label: "Site", cell: (r) => <Ext href={`https://${r.domain}`}>{r.domain}</Ext>, csv: (r) => r.domain },
+    { key: "shared", label: "Linking sites in common", num: true, cell: (r) => fmtNum(r.shared), csv: (r) => r.shared },
+    { key: "explore", label: "", num: true, cell: (r, c) => (c.onExplore ? <button type="button" className="g-link" aria-label={`Explore ${r.domain}`} onClick={() => c.onExplore!(r.domain)}>Explore</button> : null), csv: () => null },
+  ],
+  subdomains: [
+    { key: "subdomain", label: "Subdomain", cell: (r) => <Ext href={`https://${r.subdomain}`}>{r.subdomain}</Ext>, csv: (r) => r.subdomain },
+    { key: "traffic", label: "Traffic", num: true, cell: (r) => fmtNum(r.traffic), csv: (r) => r.traffic },
+    { key: "keywords", label: "Keywords", num: true, cell: (r) => fmtNum(r.keywords), csv: (r) => r.keywords },
+    { key: "top3", label: "In top 3", num: true, cell: (r) => fmtNum(r.top3), csv: (r) => r.top3 },
+    { key: "top10", label: "In top 10", num: true, cell: (r) => fmtNum(r.top10), csv: (r) => r.top10 },
+    { key: "trafficValue", label: "Traffic value", num: true, cell: (r) => usd0(r.trafficValue), csv: (r) => r.trafficValue },
+  ],
+  ads: [
+    { key: "advertiser", label: "Advertiser", cell: (r) => <>{r.advertiser}{r.verified && <span className="g-text-2 text-[12px]"> · verified by Google</span>}</>, csv: (r) => r.advertiser },
+    { key: "format", label: "Kind", cell: (r) => (r.format ? cap(r.format) : "—"), csv: (r) => r.format },
+    { key: "firstShown", label: "First shown", num: true, cell: (r) => fmtDate(r.firstShown), csv: (r) => r.firstShown },
+    { key: "lastShown", label: "Last shown", num: true, cell: (r) => fmtDate(r.lastShown), csv: (r) => r.lastShown },
+    { key: "url", label: "Ad", num: true, cell: (r) => (r.url ? <a href={r.url} className="g-link" target="_blank" rel="noreferrer" aria-label={`See the ad from ${r.advertiser}, last shown ${fmtDate(r.lastShown)}`}>See the ad</a> : null), csv: (r) => r.url },
+  ],
   matchingTerms: ideaCols, relatedTerms: ideaCols, questions: ideaCols,
+};
+/** A line under the title of the reports that need a word of explanation. */
+/** What an empty result means for a report with nothing to loosen. */
+const EMPTY_NOTE: Partial<Record<TableKey, string>> = {
+  ads: "Google's ad library has no ads for this site in this country.",
+  subdomains: "No part of this site with its own name ranks in search.",
+  referringIps: "No linking sites were found for this site.",
+  linkCompetitors: "No other sites share enough linking sites with this one.",
+};
+export const REPORT_NOTE: Partial<Record<TableKey, string>> = {
+  referringIps: "The server addresses the linking sites sit on. It shows where links are concentrated, not who owns the sites: one address is often shared by many unrelated sites (shared hosting, or a network such as Cloudflare).",
+  linkCompetitors: "Sites that many of the same websites link to. They draw on the same sources of links as this site — whether or not they sell the same thing.",
+  subdomains: "The parts of this site with their own name (blog.example.com), with the search traffic each brings.",
+  ads: "The Google Ads this site has run, from Google's public ad library. \"See the ad\" opens Google's own page for it.",
 };
 
 const SORT_LABELS: Record<TableKey, [string, string][]> = {
@@ -114,6 +154,10 @@ const SORT_LABELS: Record<TableKey, [string, string][]> = {
   referringDomains: [["authority", "Strongest sites"], ["links", "Most links"], ["newest", "Newest"]],
   anchors: [["links", "Most backlinks"], ["domains", "Most domains"]],
   bestByLinks: [["links", "Most backlinks"], ["domains", "Most domains"]],
+  referringIps: [["domains", "Most linking sites"], ["links", "Most links"]],
+  linkCompetitors: [["shared", "Most shared linking sites"]],
+  subdomains: [["traffic", "Most traffic"], ["keywords", "Most keywords"]],
+  ads: [["newest", "Most recently shown"]],
   matchingTerms: [["volume", "Highest volume"], ["difficulty", "Easiest"], ["cpc", "Highest CPC"]],
   relatedTerms: [["volume", "Highest volume"], ["difficulty", "Easiest"]],
   questions: [["volume", "Highest volume"], ["difficulty", "Easiest"]],
@@ -123,11 +167,22 @@ const HAS: Record<string, TableKey[]> = {
   volume: ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"],
   difficulty: ["keywords", "matchingTerms", "relatedTerms", "questions"],
   intent: ["keywords", "matchingTerms", "questions"],
-  contains: ["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "referringDomains", "anchors", "matchingTerms", "questions"],
+  contains: ["keywords", "paidKeywords", "pages", "competitors", "backlinks", "newBacklinks", "lostBacklinks", "referringDomains", "anchors", "bestByLinks", "matchingTerms", "questions"],
   follow: ["backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks"],
   everyLink: ["backlinks", "newBacklinks", "lostBacklinks"],
 };
-const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains" };
+/** Reports that can be narrowed to one section or one page of the site (server/seo/reports.ts SCOPED_TABLES). */
+const SCOPED: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "backlinks", "newBacklinks", "lostBacklinks", "brokenBacklinks", "bestByLinks"]);
+/** What was typed, as a path on the site: a pasted address is cut down to its path; "blog" becomes "/blog". null = not usable. */
+export function scopePathOf(raw: string, domain: string): string | null {
+  let v = raw.trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) { try { const u = new URL(v); v = u.pathname + u.search; } catch { return null; } }
+  else { const bare = domain.replace(/^www\./, ""); const m = v.replace(/^www\./, ""); if (m.toLowerCase().startsWith(`${bare.toLowerCase()}/`)) v = m.slice(bare.length); }
+  if (!v.startsWith("/")) v = `/${v}`;
+  return /^\/[^\s%\\]*$/.test(v) && v.length <= 300 ? v : null;
+}
+const CONTAINS_LABEL: Partial<Record<TableKey, string>> = { pages: "URL contains", backlinks: "Anchor contains", newBacklinks: "Anchor contains", lostBacklinks: "Anchor contains", referringDomains: "Domain contains", anchors: "Anchor contains", competitors: "Domain contains", bestByLinks: "URL contains" };
 const isKeywordRows = (t: TableKey) => ["keywords", "paidKeywords", "matchingTerms", "relatedTerms", "questions"].includes(t);
 
 function csvOf(cols: Col[], rows: any[]): string {
@@ -136,7 +191,12 @@ function csvOf(cols: Col[], rows: any[]): string {
   return [used.map((c) => esc(c.label)).join(","), ...rows.map((r) => used.map((c) => esc(c.csv(r))).join(","))].join("\n");
 }
 
-export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction }: {
+/** Reports that differ by country; link reports are the same everywhere, so they are not bought again per country. */
+const BY_COUNTRY: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "competitors", "subdomains", "ads", "matchingTerms", "relatedTerms", "questions"]);
+
+export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction, market }: {
+  /** The country to look at (United States when absent). */
+  market?: { locationCode: number; languageCode: string };
   /** Keyword tables: something else to do with the ticked rows (e.g. add them to a list). */
   extraAction?: (rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null }[], clear: () => void) => ReactNode;
   table: TableKey; domain?: string; keyword?: string; status: SeoStatus | undefined;
@@ -151,35 +211,61 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const [sort, setSort] = useState(SORT_LABELS[table][0][0]);
   const [draft, setDraft] = useState<Filters>({});
   const [filters, setFilters] = useState<Filters>({});
+  /** The section or page the report is narrowed to: what is typed, and what was applied. */
+  const [scopeDraft, setScopeDraft] = useState<{ text: string; exact: boolean }>({ text: "", exact: false });
+  const [scope, setScope] = useState<{ path: string; exact: boolean } | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState<25 | 50 | 100>(50);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   // A different report or target starts clean.
-  useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); }, [table, target]);
+  useEffect(() => { setSort(SORT_LABELS[table][0][0]); setDraft({}); setFilters({}); setOffset(0); setPicked(new Set()); setScopeDraft({ text: "", exact: false }); setScope(null); setScopeError(null); }, [table, target]);
+  const scoped = !!domain && SCOPED.has(table);
 
-  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort, filters, limit, offset }), [domain, keyword, table, sort, filters, limit, offset]);
+  // Belt and braces with the remount: a sort the report does not have is never sent.
+  const sortKey = SORT_LABELS[table].some(([k]) => k === sort) ? sort : SORT_LABELS[table][0][0];
+  const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
+  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}), ...(scoped && scope ? { path: scope.path, exactPage: scope.exact } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang, scoped, scope]);
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/report", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/report", body),
-    onSuccess: (data: { page: Page }) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/report", v.body),
+    onSuccess: (data: { page: Page; saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this page again will not be free. Export it now if you need it.", variant: "destructive" });
+    },
     onError: (e) => toast({ title: "Couldn't run the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
   const cols = COLS[table];
   const has = (f: string) => HAS[f]?.includes(table);
-  const price = status?.prices ? money(status.prices.reportPage) : "";
-  const affordable = canAfford(status, "reportPage");
+  // The Ads report is one small lookup for every ad; the others are bought a page at a time.
+  const priceKey = table === "ads" && status?.prices?.adsReport != null ? "adsReport" as const : "reportPage" as const;
+  const price = status?.prices ? money(status.prices[priceKey] ?? status.prices.reportPage) : "";
+  const affordable = canAfford(status, priceKey);
+  const whole = table === "ads";
+  const hasFilters = Object.keys(HAS).some((f) => HAS[f]?.includes(table));
   const numField = (key: keyof Filters, label: string, width = "w-[88px]") => (
     <label className="g-text-2 flex items-center gap-1 text-[12px]">{label}
       <input className={`g-input ${width} !py-1`} inputMode="numeric" value={(draft[key] as number | undefined) ?? ""} data-testid={`filter-${key}`}
         onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ""); setDraft((d) => ({ ...d, [key]: v === "" ? undefined : Number(v) })); }} />
     </label>
   );
-  const apply = () => { setFilters(Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters); setOffset(0); setPicked(new Set()); };
+  const apply = () => {
+    // The section first: a path that cannot be used is said, and nothing else changes until it is put right.
+    if (scoped) {
+      const typed = scopeDraft.text.trim();
+      const path = typed ? scopePathOf(typed, domain!) : null;
+      if (typed && !path) { setScopeError("Enter a path on this site, such as /blog/ — no spaces or % signs."); return; }
+      if (scopeDraft.exact && !path) { setScopeError("Say which page: a path such as /services/roofing."); return; }
+      setScopeError(null);
+      setScope(path && !(path === "/" && !scopeDraft.exact) ? { path, exact: scopeDraft.exact } : null);
+    }
+    setFilters(Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters); setOffset(0); setPicked(new Set());
+  };
   const download = () => {
     if (!page) return;
     const blob = new Blob([csvOf(cols, page.rows)], { type: "text/csv;charset=utf-8" });
@@ -193,8 +279,16 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
 
   return (
     <div data-testid={`report-${table}`}>
-      {saved.isError && <p className="g-text-2 mb-2 text-[13px]" role="alert" data-testid="report-saved-error">Couldn't check for a saved copy of this report: {apiErrorMessage(saved.error)} <button type="button" className="g-link" onClick={() => void saved.refetch()}>Try again</button></p>}
       <form className="mb-3 flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={(e) => { e.preventDefault(); apply(); }} data-testid="report-filters">
+        {scoped && (
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <label className="g-text-2 flex items-center gap-1 text-[12px]">Only pages under
+              <input className="g-input w-[170px] !py-1" value={scopeDraft.text} maxLength={300} placeholder="/blog/" autoComplete="off" spellCheck={false} aria-invalid={!!scopeError} aria-describedby={scopeError ? `scope-error-${table}` : undefined}
+                onChange={(e) => { setScopeDraft((d) => ({ ...d, text: e.target.value })); setScopeError(null); }} data-testid="filter-scope" />
+            </label>
+            <label className="g-text flex items-center gap-1.5 text-[12px]"><input type="checkbox" checked={scopeDraft.exact} onChange={(e) => { setScopeDraft((d) => ({ ...d, exact: e.target.checked })); setScopeError(null); }} data-testid="filter-scope-exact" /> this page only</label>
+          </span>
+        )}
         {has("position") && <>{numField("positionMin", "Position from", "w-[60px]")}{numField("positionMax", "to", "w-[60px]")}</>}
         {has("volume") && numField("volumeMin", "Volume ≥")}
         {has("difficulty") && numField("difficultyMax", "Difficulty ≤", "w-[60px]")}
@@ -228,16 +322,32 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
             <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
           </select>
         </label>
-        {Object.keys(HAS).some((f) => has(f)) && <button type="submit" className="g-pill g-pill--sm" data-testid="button-apply-filters">Apply filters</button>}
+        {(scoped || Object.keys(HAS).some((f) => has(f))) && <button type="submit" className="g-pill g-pill--sm" data-testid="button-apply-filters">Apply filters</button>}
       </form>
+      {scopeError && <p id={`scope-error-${table}`} className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="scope-error">{scopeError}</p>}
+      {scoped && scope && (
+        <p className="g-text mb-2 text-[13px]" role="status" data-testid="text-scope">
+          Narrowed to {scope.exact ? "the page" : "pages under"} <b className="font-medium">{domain}{scope.path}</b>{scope.exact ? " (with or without its last slash)" : ""}{domain && !scope.exact ? " — including the same path on any sub-domain" : ""}. A narrowed report is saved, and paid for, separately from the whole site's.{" "}
+          <button type="button" className="g-link" onClick={() => { setScope(null); setScopeDraft({ text: "", exact: false }); setOffset(0); setPicked(new Set()); }} data-testid="button-scope-clear">Show the whole site</button>
+        </p>
+      )}
 
       {saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
-      {!saved.isLoading && !page && (
+      {saved.isError && !page && (
+        <div className="g-callout" role="alert" data-testid="report-saved-error">
+          <h3>Couldn't check for a saved copy</h3><p>{apiErrorMessage(saved.error)} Nothing has been charged.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="g-pill" onClick={() => void saved.refetch()}>Try again</button>
+            {offset > 0 && <button type="button" className="g-pill" onClick={() => setOffset(Math.max(0, offset - limit))}>Back</button>}
+          </div>
+        </div>
+      )}
+      {saved.isSuccess && !page && (
         <Empty testId="report-not-run">
-          <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : "This report hasn't been run with these settings"}</h3>
-          <p>Each page of a report costs about {price} of your SEO data. A page you've run is kept for a day and opens free.{holdNote(status, "reportPage")}</p>
+          <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : hasFilters ? "This report hasn't been run with these settings" : "This report hasn't been run yet"}</h3>
+          <p>{whole ? `This report costs about ${price} of your SEO data and brings every ad Google's library will give (up to 120); paging through them is free.` : `Each page of a report costs about ${price} of your SEO data.`} {whole ? "It" : "A page you've run"} is kept for a day and opens free.{holdNote(status, priceKey)}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate()} data-testid="button-run-report">
+            <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-run-report">
               {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}
             </Button>
             {offset > 0 && <button type="button" className="g-pill" onClick={() => setOffset(Math.max(0, offset - limit))}>Back</button>}
@@ -249,7 +359,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
         <>
           <div className="g-text-2 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px]">
             <span data-testid="report-meta">
-              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""} · as of {fmtDate(page.fetchedAt)}
+              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""} · as of {fmtDate(page.fetchedAt)}
             </span>
             <span className="flex flex-wrap items-center gap-2">
               {trackable && extraAction && picked.size > 0 && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
@@ -257,7 +367,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
               <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={download} data-testid="button-export-csv"><Download /> Export CSV</button>
             </span>
           </div>
-          {page.rows.length === 0 ? <Empty testId="report-empty">Nothing matches. Try wider filters.</Empty> : (
+          {page.rows.length === 0 ? <Empty testId="report-empty">{Object.keys(filters).length ? "Nothing matches. Try wider filters." : EMPTY_NOTE[table] ?? "Nothing was found for this site."}</Empty> : (
             <div className="overflow-x-auto">
               <table className="g-table" data-testid={`table-${table}`}>
                 <thead><tr>{trackable && <th className="w-8"></th>}{cols.map((c) => <th key={c.key} className={c.num ? "num" : undefined}>{c.label}</th>)}</tr></thead>
@@ -275,7 +385,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <button type="button" className="g-pill g-pill--sm" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-prev-page">← Previous</button>
             <button type="button" className="g-pill g-pill--sm" disabled={(page.sourceRows ?? page.rows.length) < limit || (page.total != null && to >= page.total) || offset + limit > 9900} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
-            <span className="g-text-2">A page you haven't opened yet costs about {price}.</span>
+            <span className="g-text-2">{whole ? "Paging through these is free." : `A page you haven't opened yet costs about ${price}.`}</span>
           </div>
         </>
       )}

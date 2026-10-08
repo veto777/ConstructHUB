@@ -33,17 +33,18 @@ import { getBaseUrl } from "../auth";
 import { portalBaseUrl, clientPortalBaseUrl } from "../site-context";
 import {
   logEvent, presentEstimate, recalcEstimate, nextDocNumber,
-  ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend,
+  ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend,
 } from "./entities";
 import { notifyOrgOwners } from "./owner-notify";
 import { emitCrmEvent } from "./integrations";
-import { recordActivity } from "./activity";
+import { recordActivity, logActivity } from "./activity";
 import { registerCrmSmsRoutes, maybeAlertReengagement, priorEstimateSessionCount, textOrgOwners, sendSms, normalizePhone, smsEstimatesDefault, orgCanTextClients, CLIENT_TEXT_NEEDS_OWN_NUMBER } from "./sms";
 import { placeEmailNudgeCall, voiceNudgeOnEstimate } from "./voice";
 import { notifyMembers } from "./notify";
 import { companyBranding, resolveEstimateDivision, resolveInvoiceDivision, getDivision } from "./divisions";
 import { crmInvoices, crmInvoiceItems, crmPayments, crmEstimateDiscounts } from "@shared/schema";
 import { computeApprovalTotals, recomputeApprovalTotals, resolveSelectedOffers } from "./discounts";
+import { lineBases } from "@shared/estimate-totals";
 import { storeGeneratedPdf } from "./attachments";
 import { onlinePaymentRails } from "./payments";
 import { buildContractPdf, contractAdminRecipients, contractFileName } from "./contract-pdf";
@@ -92,7 +93,7 @@ const VIEW_DEDUPE_MIN = 30;
  * entities.ts (the PATCH route's "marked sent" stamps the same clock) and
  * re-exported here, where the send route and its tests have always found it.
  */
-export { ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend };
+export { ESTIMATE_EXPIRY_DAYS, estimateExpiryOnSend, estimateExpiryOnExtend };
 
 /**
  * A heartbeat says "I was still here N seconds after the last one". Gaps are
@@ -251,13 +252,8 @@ function publicEstimateView(
   // count (they affect the total); only the item ROWS are dropped below.
   // Exposed so the client page can preview optional discounts live with the
   // same math the server applies on approve (server/crm/discounts.ts).
-  let taxable = 0, lineDiscount = 0;
-  for (const i of items) {
-    const line = Math.round((i.unitPriceCents * i.quantityMilli) / 1000);
-    if (i.kind === "discount") { lineDiscount += Math.abs(line); continue; }
-    if (i.taxable) taxable += line;
-  }
-  const taxableBaseCents = Math.max(0, taxable - lineDiscount);
+  const bases = lineBases(items);
+  const taxableBaseCents = Math.max(0, bases.taxableCents - bases.lineDiscountCents);
   return {
     estimate: {
       id: est.id, number: est.number, title: est.title, status: est.status,
@@ -333,8 +329,13 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     const from = ctx.member.displayName || ctx.org.name;
     // Sending starts the expiry clock (default 7 days). Computed once here so
     // the email and the row agree.
+    // A RE-send never shortens: if the contractor already extended this
+    // estimate past the fresh 7-day window, the later date stands.
     const sentAt = new Date();
-    const expiresAt = estimateExpiryOnSend(sentAt);
+    const freshExpiry = estimateExpiryOnSend(sentAt);
+    const expiresAt = est.expiresAt && est.expiresAt.getTime() > freshExpiry.getTime()
+      ? est.expiresAt
+      : freshExpiry;
 
     // Bid discounts: an estimate with no offers of its own inherits the org's
     // default set at send time — Settings decides the standard offers, the
@@ -501,6 +502,12 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     await logEvent(ctx.org.id, est.id, "sent", ctx.member.id, req, {
       to, emailed, emailError, texted, smsTo, smsError,
       resend: !!est.sentAt, revived: revived || undefined,
+    });
+    // The member's own audit trail (Team → Activity) — the estimate's event
+    // trail above is per document and never showed up under the person.
+    logActivity(ctx, "estimate.sent", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, to, emailed, texted, resend: !!est.sentAt },
     });
 
     // Owner's "bid sent" notice — fires even when the client copy failed to
@@ -680,21 +687,25 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
         // scope ALWAYS shows its price — the client is choosing between
         // priced scopes and the running total is the point; showTotal only
         // governs the legacy display tiers (no items) below.
+        // The bases come from the SAME function the regenerated estimate is
+        // totalled with (shared/estimate-totals.ts), over the same item
+        // defaults select-options applies when it copies the scope.
         const scopeItems = Array.isArray(o.items) ? (o.items as any[]) : [];
-        let subtotal = 0, taxable = 0;
-        for (const i of scopeItems) {
-          const line = Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 1000)) / 1000);
-          subtotal += line;
-          if (i.taxable !== false) taxable += line;
-        }
+        const bases = lineBases(scopeItems.map((i) => ({
+          kind: typeof i.kind === "string" ? i.kind : "labor",
+          unitPriceCents: i.unitPriceCents ?? 0,
+          quantityMilli: i.quantityMilli ?? 1000,
+          taxable: i.taxable !== false,
+        })));
         return {
           id: o.id, name: o.name, tier: o.tier, description: o.description,
           recommended: o.recommended,
           totalCents: o.showTotal ? o.totalCents : undefined,
           selectedAt: o.selectedAt,
           selectable: scopeItems.length > 0,
-          subtotalCents: scopeItems.length ? subtotal : undefined,
-          taxableCents: scopeItems.length ? taxable : undefined,
+          subtotalCents: scopeItems.length ? bases.subtotalCents : undefined,
+          lineDiscountCents: scopeItems.length ? bases.lineDiscountCents : undefined,
+          taxableCents: scopeItems.length ? bases.taxableCents : undefined,
         };
       }),
       // A selection-generated estimate pre-ticks the discounts the client
@@ -1268,6 +1279,9 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (!user) return;
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
+    // Who opened the bid, from where, and who they forwarded it to is sales
+    // intelligence for the people who write estimates — not for the crew.
+    if (!requirePermission(res, ctx, "manageEstimates")) return;
 
     const [est] = await db.select({ id: crmEstimates.id }).from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
@@ -1311,7 +1325,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
   });
 
   /** Push the expiry date out — e.g. the client asked for the weekend to
-   *  decide. Only while the estimate is still unanswered. */
+   *  decide. Only while the estimate is still unanswered. Adds `days` to the
+   *  later of (current expiry, now), so it can only ever move the date later. */
   app.post("/api/crm/estimates/:id/extend", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -1330,10 +1345,18 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     if (est.approvedAt) return res.status(409).json({ message: "This estimate has been approved — expiry no longer applies." });
     if (est.declinedAt) return res.status(409).json({ message: "This estimate has been declined." });
 
-    const expiresAt = estimateExpiryOnSend(new Date(), parsed.data.days);
+    // Added on top of the time the client still has (or from now, once
+    // expired) — extending must never move the date earlier.
+    const expiresAt = estimateExpiryOnExtend(est.expiresAt, new Date(), parsed.data.days);
     const [row] = await db.update(crmEstimates).set({ expiresAt, updatedAt: new Date() })
       .where(eq(crmEstimates.id, est.id)).returning();
-    await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, { days: parsed.data.days, expiresAt });
+    await logEvent(ctx.org.id, est.id, "extended", ctx.member.id, req, {
+      days: parsed.data.days, expiresAt, previousExpiresAt: est.expiresAt,
+    });
+    logActivity(ctx, "estimate.extended", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, days: parsed.data.days },
+    });
     res.json({ estimate: presentEstimate(row, ctx) });
   });
 
@@ -1698,6 +1721,7 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
     const ctx = await requireOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageInvoices")) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // the reply carries the invoice and its totals
 
     const parsed = z.object({
       email: z.string().email().optional(),
@@ -1778,6 +1802,10 @@ export function registerCrmInvoicePortalRoutes(app: Express, getDevUser: GetUser
       sentAt: new Date(), sentToEmail: to, updatedAt: new Date(),
     }).where(eq(crmInvoices.id, inv.id)).returning();
     await emitCrmEvent(ctx.org.id, "invoice.sent", { invoiceId: inv.id, to });
+    logActivity(ctx, "invoice.sent", {
+      entityType: "invoice", entityId: inv.id, customerId: inv.customerId,
+      meta: { number: inv.number, to, emailed, resend: !!inv.sentAt },
+    });
     res.json({ invoice: row, link, emailed, emailError });
   });
 

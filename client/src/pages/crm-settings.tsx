@@ -31,6 +31,7 @@ import {
 import { CRM_THEME_COLORS, resolveOrgTheme } from "@shared/theme-colors";
 import { CRM_TEXTING_PLANS as TEXTING_PLANS } from "@shared/plan-copy";
 import { CrmBillingCard } from "@/components/crm-billing-card";
+import { confirmAction } from "@/components/confirm-dialog";
 
 /**
  * Org settings — company profile, document defaults, notification switches,
@@ -2031,9 +2032,13 @@ export default function CrmSettingsPage() {
               </Button>
               <Button size="sm" variant="outline" className="shrink-0" data-testid="button-regenerate-calendar-feed"
                 onClick={() => {
-                  if (window.confirm("Regenerate the feed URL? Every calendar subscribed to the old link stops updating.")) {
-                    rotateFeed.mutate();
-                  }
+                  confirmAction({
+                    id: "regenerate-calendar-feed",
+                    title: "Regenerate the calendar feed link?",
+                    description: "You get a new feed link, and every calendar subscribed to the old one stops updating. This can't be undone — the old link can't be brought back, so each calendar has to be subscribed again with the new link.",
+                    confirmLabel: "Regenerate link",
+                    onConfirm: () => rotateFeed.mutate(),
+                  });
                 }}
                 disabled={rotateFeed.isPending}>
                 {rotateFeed.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}

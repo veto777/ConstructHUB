@@ -5,19 +5,24 @@
  * page never spends SEO data; "Analyse" / "Refresh" on a card buys a new
  * Site Explorer report for that site.
  */
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { holdNote } from "./shell";
 import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 
+type SortKey = "added" | "name" | "traffic" | "authority" | "top10" | "tasks";
+const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"]];
 type Card = {
   site: SeoSite;
   audit: { health: number | null; errors: number; scannedAt: string | null } | null;
+  /** null = the count could not be read just now. */
+  openTasks?: number | null;
   rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null };
   report: {
     fetchedAt: string; authority: number | null; backlinks: number | null; referringDomains: number | null;
@@ -74,7 +79,24 @@ export default function SeoDashboardPage() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] }); },
     onError: (e) => toast({ title: "Couldn't analyse that site", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const cards = dash.data?.cards ?? [];
+  const [sort, setSort] = useState<SortKey>(() => { try { const v = window.localStorage.getItem("seo.dashboard.sort"); return (SORTS.some(([k]) => k === v) ? v : "added") as SortKey; } catch { return "added"; } });
+  const chooseSort = (k: SortKey) => { setSort(k); try { window.localStorage.setItem("seo.dashboard.sort", k); } catch { /* private window */ } };
+  const star = useMutation({
+    mutationFn: (v: { id: number; starred: boolean }) => api("POST", `/api/seo/sites/${v.id}/star`, { starred: v.starred }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); },
+    onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  // Starred sites first, always; then the chosen order. A site with no number for that order goes last.
+  const cards = useMemo(() => {
+    const value = (c: Card): number | string | null => sort === "name" ? c.site.domain : sort === "traffic" ? c.report?.organicTraffic ?? null : sort === "authority" ? c.report?.authority ?? null : sort === "top10" ? (c.rank.checked ? c.rank.top10 : null) : sort === "tasks" ? c.openTasks ?? null : null;
+    return [...(dash.data?.cards ?? [])].sort((a, b) => {
+      if (!!a.site.starred !== !!b.site.starred) return a.site.starred ? -1 : 1;
+      if (sort === "added") return 0;
+      const x = value(a), y = value(b);
+      if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+      return sort === "name" ? String(x).localeCompare(String(y)) : Number(y) - Number(x);
+    });
+  }, [dash.data, sort]);
   const price = status.data?.prices ? money(status.data.prices.explorerReport) : "";
   const affordable = canAfford(status.data, "explorerReport");
   const configured = !!status.data?.configured;
@@ -90,18 +112,32 @@ export default function SeoDashboardPage() {
           <p className="mt-2">Just want to look a domain up? Open <Link href="/seo/explorer" className="g-link">Site explorer</Link> — any site, yours or a competitor's.</p>
         </Empty>
       )}
+      {cards.length > 1 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
+          <label className="g-text-2 flex items-center gap-2">Order
+            <select className="g-input g-select !w-auto !py-1" value={sort} onChange={(e) => chooseSort(e.target.value as SortKey)} data-testid="select-dashboard-sort">
+              {SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+          </label>
+          <span className="g-text-2">Starred sites stay on top.</span>
+        </div>
+      )}
       <div className="space-y-4" data-testid="seo-dashboard">
-        {cards.map(({ site: s, rank, report: r, audit }) => {
+        {cards.map(({ site: s, rank, report: r, audit, openTasks }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
             <section key={s.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
               <div className="mb-3 flex flex-wrap items-center gap-2">
+                <button type="button" className="rounded p-1" aria-pressed={!!s.starred} aria-label={s.starred ? `Remove the star from ${s.domain}` : `Star ${s.domain} to keep it on top`} title={s.starred ? "Starred — stays on top" : "Star to keep on top"} disabled={star.isPending} onClick={() => star.mutate({ id: s.id, starred: !s.starred })} data-testid={`button-star-${s.id}`}>
+                  <Star className="h-4 w-4" style={s.starred ? { fill: "#f9ab00", color: "#f9ab00" } : { color: "var(--g-text-2)" }} aria-hidden />
+                </button>
                 <h2 className="g-text text-[18px] font-medium"><Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-link">{s.domain}</Link></h2>
                 <span className="g-text-2 text-[12px]">{r ? `analysed ${fmtDate(r.fetchedAt)}` : "not analysed yet"}</span>
                 <div className="ml-auto flex flex-wrap gap-2">
                   <Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-pill g-pill--sm" data-testid={`link-explore-${s.id}`}>Site explorer</Link>
                   <Link href="/seo/rank-tracker" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>
                   <Link href="/seo/audit" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-audit-${s.id}`}>Site audit{audit?.health != null ? ` · health ${audit.health}` : ""}</Link>
+                  <Link href="/seo/plan" className="g-pill g-pill--sm" onClick={() => onSite(s.id)} data-testid={`link-plan-${s.id}`}>Action plan{openTasks == null ? " · count unavailable" : openTasks ? ` · ${openTasks} open` : ""}</Link>
                   <button type="button" className="g-pill g-pill--sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-${s.id}`} title={`A new report costs about ${price} of your SEO data.${holdNote(status.data, "explorerReport")}`}>
                     {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"} · {price}
                   </button>

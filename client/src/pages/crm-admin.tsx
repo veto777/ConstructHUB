@@ -25,6 +25,7 @@ import {
 import { GoogleSectionHeader, GoogleStat } from "@/components/google";
 import { DataSourceCard, type SeoStatus } from "@/pages/seo/shell";
 import { InfoTip } from "@/components/info-tip";
+import { confirmAction } from "@/components/confirm-dialog";
 
 /**
  * Platform admin — "watch all our users". Read-only monitoring across every
@@ -683,9 +684,13 @@ export default function CrmAdminPage() {
                         {inv.status === "pending" && (
                           <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
                             onClick={() => {
-                              if (window.confirm(`Revoke the beta invite for ${inv.email}? The emailed link stops working.`)) {
-                                revokeInvite.mutate(inv.id);
-                              }
+                              confirmAction({
+                                id: "revoke-beta-invite",
+                                title: `Revoke the beta invite for ${inv.email}?`,
+                                description: "The link in the email they were sent stops working straight away, and the invite is removed from this list. This can't be undone — to let them in later, send a new invite.",
+                                confirmLabel: "Revoke invite",
+                                onConfirm: () => revokeInvite.mutate(inv.id),
+                              });
                             }}
                             disabled={revokeInvite.isPending}
                             data-testid={`button-revoke-beta-${inv.id}`}>

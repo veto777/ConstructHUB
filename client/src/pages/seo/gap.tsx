@@ -3,6 +3,8 @@
  * competitors; the result is saved for a day (POST /api/seo/gap, peek first),
  * so reopening it costs nothing. The price is shown before anything is bought.
  */
+import { AddToPlan } from "./plan-button";
+import { findMarket } from "@shared/seo-markets";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Plus, X } from "lucide-react";
@@ -30,7 +32,11 @@ function downloadCsv(name: string, rows: (string | number | null)[][]) {
   URL.revokeObjectURL(a.href);
 }
 
-export function GapView({ kind, domain, status, suggestions, onExplore, onTrack }: {
+export function GapView({ kind, domain, status, suggestions, onExplore, onTrack, market, planSiteId }: {
+  /** The customer's own site, when this report is about it: findings can go to its action plan. */
+  planSiteId?: number;
+  /** Content gap only: the country to compare in (United States when absent). Links are the same everywhere. */
+  market?: { locationCode: number; languageCode: string };
   kind: GapKind; domain: string; status: SeoStatus | undefined;
   /** Likely competitors to offer (the report's organic competitors). */
   suggestions: string[];
@@ -49,15 +55,19 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
   // A different report or site starts clean.
   useEffect(() => { setDraft([]); setApplied([]); setInput(""); setOffset(0); setPicked(new Set()); }, [kind, domain]);
 
-  const body = useMemo(() => ({ kind, domain, competitors: applied, ...(kind === "links" ? { limit, offset } : {}) }), [kind, domain, applied, offset]);
+  const loc = market && kind === "content" ? market.locationCode : undefined, lang = market && kind === "content" ? market.languageCode : undefined;
+  const body = useMemo(() => ({ kind, domain, competitors: applied, ...(kind === "links" ? { limit, offset } : {}), ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [kind, domain, applied, offset, loc, lang]);
   const queryKey = ["/api/seo/gap", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: applied.length > 0, retry: false, staleTime: 5 * 60_000,
     queryFn: async () => { try { return await api("POST", "/api/seo/gap", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: (again: boolean) => api("POST", "/api/seo/gap", again ? { ...body, refresh: true } : body),
-    onSuccess: (data: { page: Page }) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    mutationFn: (v: { body: Record<string, unknown>; key: readonly unknown[]; again: boolean }) => api("POST", "/api/seo/gap", v.again ? { ...v.body, refresh: true } : v.body),
+    onSuccess: (data: { page: Page; saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this comparison again will not be free. Export it now if you need it.", variant: "destructive" });
+    },
     onError: (e) => toast({ title: "Couldn't run the comparison", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
@@ -121,7 +131,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
         <Empty testId="gap-not-run">
           <h3>Compare {domain} with {applied.join(", ")}</h3>
           <p>This {offset > 0 ? "page" : "comparison"} hasn't been run yet.{!affordable && " You don't have enough SEO data left — add credit above."}{dirty && " You changed the competitors above — press Compare to use the new list."}</p>
-          <Button className="mt-2" disabled={run.isPending || !status?.configured || !affordable || dirty} onClick={() => run.mutate(false)} data-testid="button-gap-run">
+          <Button className="mt-2" disabled={run.isPending || !status?.configured || !affordable || dirty} onClick={() => run.mutate({ body, key: queryKey, again: false })} data-testid="button-gap-run">
             {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Comparing…</> : `Run comparison${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}
           </Button>
         </Empty>
@@ -134,10 +144,11 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
               {kind === "content" ? `${fmtNum(page.rows.length)} keywords` : `${fmtNum(page.offset + 1)}–${fmtNum(page.offset + page.rows.length)}${page.total != null ? ` of ${fmtNum(page.total)}` : ""} sites`} · as of {fmtDate(page.fetchedAt)}
             </span>
             <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportRows} disabled={!page.rows.length} data-testid="button-gap-export"><Download /> Export</button>
-            {kind === "content" && <AddToList rows={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent }))} onDone={() => setPicked(new Set())} />}
+            {kind === "content" && <AddToList market={market ? findMarket(market.locationCode, market.languageCode) ?? undefined : undefined} rows={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent }))} onDone={() => setPicked(new Set())} />}
+            {kind === "content" && planSiteId != null && picked.size > 0 && <AddToPlan siteId={planSiteId} onDone={() => setPicked(new Set())} tasks={(page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ kind: "page" as const, title: `Write or improve a page for "${r.keyword}"`, target: r.keyword, facts: { volume: r.volume }, source: `gap:${r.keyword}` }))} />}
             {kind === "content" && onTrack && <button type="button" className="g-pill g-pill--sm" disabled={!picked.size} onClick={() => { onTrack((page.rows as ContentRow[]).filter((r) => picked.has(r.keyword)).map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))); setPicked(new Set()); }} data-testid="button-gap-track"><Plus /> Add {picked.size || ""} to rank tracker</button>}
           </div>
-          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate(true)} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}
+          {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-gap-missing">{page.missing.join(", ")} didn't load this time, so {page.missing.length === 1 ? "it is" : "they are"} not in this comparison. <button type="button" className="g-link" disabled={run.isPending || !affordable} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-gap-retry">{run.isPending ? "Trying again…" : `Try again${priceCents != null ? ` — about ${money(priceCents)}` : ""}`}</button></p>}
           {kind === "content" && <p className="g-text-2 mb-2 text-[12px]">Built from each competitor's 100 highest-traffic keywords that {domain} doesn't rank for. Keywords more than one competitor ranks for come first.</p>}
           {page.rows.length === 0 ? (
             <Empty testId="gap-empty"><h3>Nothing found</h3><p>{kind === "content" ? `No keyword these competitors rank for that ${domain} doesn't.` : `No site links to ${page.competitors.length > 1 ? "all of these competitors" : "this competitor"} without also linking to ${domain}. Try fewer competitors.`}</p></Empty>
@@ -164,7 +175,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
             <>
               <div className="overflow-x-auto">
                 <table className="g-table" data-testid="table-gap-links">
-                  <thead><tr><th>Linking site</th><th className="num">Authority</th><th className="num">Spam</th>{page.competitors.map((c) => <th key={c} className="num">Links to {c}</th>)}<th className="num">First seen</th></tr></thead>
+                  <thead><tr><th>Linking site</th><th className="num">Authority</th><th className="num">Spam</th>{page.competitors.map((c) => <th key={c} className="num">Links to {c}</th>)}<th className="num">First seen</th>{planSiteId != null && <th><span className="sr-only">Action plan</span></th>}</tr></thead>
                   <tbody>
                     {(page.rows as LinkRow[]).map((r) => (
                       <tr key={r.domain}>
@@ -173,6 +184,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack 
                         <td className="num" data-label="Spam">{r.spamScore ?? "—"}</td>
                         {page.competitors.map((c) => <td key={c} className="num" data-label={`Links to ${c}`}>{fmtNum(r.links.find((x) => x.competitor === c)?.backlinks ?? 0)}</td>)}
                         <td className="num g-text-2" data-label="First seen">{fmtDate(r.links.map((l) => l.firstSeen).filter(Boolean).sort()[0] ?? null)}</td>
+                        {planSiteId != null && <td className="num"><AddToPlan siteId={planSiteId} label="Plan" testId={`button-plan-${r.domain}`} tasks={[{ kind: "link_prospect", title: `Ask ${r.domain} for a link`, target: r.domain, facts: { authority: r.authority, linksTo: r.links.filter((l) => l.backlinks > 0).map((l) => l.competitor).join(", ") }, source: `prospect:${r.domain}` }]} /></td>}
                       </tr>
                     ))}
                   </tbody>

@@ -8,6 +8,8 @@ import { pool } from "../db";
 import { request, DataForSeoError } from "./dataforseo";
 
 export const LOCATION_SCHEMA_DDL = [
+  // When the whole list was last loaded to the end (a load that stops half way must not count as fresh).
+  `CREATE TABLE IF NOT EXISTS seo_meta (key text PRIMARY KEY, value text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
   `CREATE TABLE IF NOT EXISTS seo_locations (
     code integer PRIMARY KEY,
     name text NOT NULL,
@@ -46,12 +48,18 @@ export function usableLocations(items: any[]): LocationRow[] {
 }
 
 let loading: Promise<number> | null = null;
-/** Make sure the list is there and fresh. One load at a time; returns the number of locations. */
+/** When the list was last found fresh; the database is not asked again for an hour. */
+let freshUntil = 0;
+/** Make sure the list is there and fresh. One load at a time; returns the number of locations (0 = known fresh, not counted). */
 export async function ensureLocations(): Promise<number> {
-  const { rows: [have] } = await pool.query("SELECT count(*)::int n, min(loaded_at) < now() - make_interval(days => $1) AS stale FROM seo_locations", [REFRESH_DAYS]);
-  if (have.n > 0 && !have.stale) return have.n;
+  if (Date.now() < freshUntil) return 0;
+  // The newest row says when the list was last loaded (a load rewrites every row it still has).
+  const { rows: [have] } = await pool.query("SELECT (SELECT updated_at FROM seo_meta WHERE key='locations_loaded') AS newest, EXISTS (SELECT 1 FROM seo_locations) AS any");
+  const stale = !have.newest || Date.now() - new Date(have.newest).getTime() > REFRESH_DAYS * 864e5;
+  if (have.any && !stale) { freshUntil = Date.now() + 3600_000; return 0; }
   loading ??= (async () => {
     try {
+      const started = new Date();
       const response = await request("GET", "/serp/google/locations/us");
       const task = response?.tasks?.[0];
       if (!response || response.status_code !== 20000 || !task || task.status_code !== 20000) throw new DataForSeoError("upstream", "The list of places could not be loaded");
@@ -64,11 +72,15 @@ export async function ensureLocations(): Promise<number> {
            ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, type=EXCLUDED.type, loaded_at=now()`,
           [chunk.map((r) => r.code), chunk.map((r) => r.name), chunk.map((r) => r.type)]);
       }
+      // Places the source no longer lists (a complete load just rewrote all the others), then the mark that says the load finished.
+      await pool.query("DELETE FROM seo_locations WHERE loaded_at < $1", [started]);
+      await pool.query("INSERT INTO seo_meta(key, value) VALUES('locations_loaded', $1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()", [String(rows.length)]);
       console.info(`[seo] loaded ${rows.length} places`);
+      freshUntil = Date.now() + 3600_000;
       return rows.length;
     } catch (e) {
-      // A stale list is still a usable list.
-      if (have.n > 0) { console.warn(`[seo] places refresh failed, keeping the saved list: ${(e as Error)?.message ?? e}`); return have.n; }
+      // A stale list is still a usable list; do not try again for an hour.
+      if (have.any) { freshUntil = Date.now() + 3600_000; console.warn(`[seo] places refresh failed, keeping the saved list: ${(e as Error)?.message ?? e}`); return 0; }
       throw e;
     } finally { loading = null; }
   })();

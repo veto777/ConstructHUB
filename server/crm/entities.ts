@@ -1,4 +1,5 @@
 import { invoiceRefundTotals } from "./refund-summary";
+import type { CrmCustomerDetailResponse } from "@shared/crm-customer-detail";
 import { objectPolicy, canShareWholeClientPortal } from "./object-access";
 import { csvCell } from "./csv";
 /**
@@ -85,6 +86,26 @@ export function likeContains(q: string): string {
 export const ESTIMATE_EXPIRY_DAYS = 7;
 export function estimateExpiryOnSend(sentAt: Date, days: number = ESTIMATE_EXPIRY_DAYS): Date {
   return new Date(sentAt.getTime() + days * 86_400_000);
+}
+
+/**
+ * "Extend" ADDS time; it never takes any away. The new expiry is counted from
+ * whichever is later — the current expiry or now:
+ *   - weeks still left  → the days are added on top of what the client has;
+ *   - already expired   → the client gets a fresh `days` from now (counting
+ *     from the old date could leave the link expired, which is no extension);
+ *   - no expiry stamped → `days` from now.
+ * Counting from now regardless (the old rule) moved an estimate with weeks
+ * left EARLIER, e.g. 11/2 → 10/15.
+ */
+export function estimateExpiryOnExtend(
+  currentExpiresAt: Date | null | undefined,
+  now: Date = new Date(),
+  days: number = ESTIMATE_EXPIRY_DAYS,
+): Date {
+  const current = currentExpiresAt ? currentExpiresAt.getTime() : NaN;
+  const base = Number.isFinite(current) ? Math.max(current, now.getTime()) : now.getTime();
+  return new Date(base + days * 86_400_000);
 }
 
 /**
@@ -641,13 +662,16 @@ export function registerCrmEntityRoutes(app: Express, getDevUser: GetUser): void
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.customerId, c.id)))
       .orderBy(desc(crmEstimates.createdAt));
 
-    res.json({
+    // The shape is a shared type (shared/crm-customer-detail.ts): the record
+    // sits under `customer`, and consumers type their query with it.
+    const body: CrmCustomerDetailResponse = {
       customer: { ...c, portalToken: undefined },
       // Only someone who can manage customers gets the shareable portal link.
       portalPath: canShareWholeClientPortal(ctx) ? `/portal/${c.portalToken}` : undefined,
       projects: (await objectPolicy(ctx).filter("projects", projects)).map((p) => presentProject(p, ctx)),
       estimates: (await objectPolicy(ctx).filter("estimates", estimates)).map((e) => presentEstimate(e, ctx)),
-    });
+    };
+    res.json(body);
   });
 
   /** Field edits from the client page's Edit dialog; the activity log names

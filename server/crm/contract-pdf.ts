@@ -357,7 +357,8 @@ export async function buildContractPdf(
   doc.moveTo(totalsX, doc.y).lineTo(rightEdge, doc.y).lineWidth(0.75).strokeColor(LINE).stroke();
   doc.moveDown(0.3);
   totalRow("Approved total", money(approvedTotal), { bold: true, big: true });
-  if (e.depositCents) totalRow("Deposit due", money(e.depositCents));
+  // Never more than the signed total (shared/estimate-totals.ts amountDueCents).
+  if (e.depositCents) totalRow("Deposit due", money(Math.min(e.depositCents, approvedTotal)));
   doc.x = left; // leave the right-hand totals column before flowing text
 
   // ── Terms: the estimate's own terms first, then the org's standing ones.

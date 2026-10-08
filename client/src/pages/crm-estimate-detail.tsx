@@ -106,6 +106,10 @@ export default function CrmEstimateDetailPage() {
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const canEdit = me?.permissions?.manageEstimates === true && me?.permissions?.seePrices === true;
+  // A price-blind seat (a field crew on their own job) reads the scope — items and quantities — and no
+  // money: the API leaves every amount out, so the price columns and the totals are not drawn at all
+  // (they used to render as "—" and "$0.00").
+  const showMoney = me?.permissions?.seePrices === true;
   const isOwner = me?.member?.role === "owner";
 
   const { data, isLoading, isError, refetch } = useQuery<any>({
@@ -643,8 +647,8 @@ export default function CrmEstimateDetailPage() {
                     <tr>
                       <th className={crmTable.th}>Item</th>
                       <th className={crmTable.thRight}>Qty</th>
-                      <th className={crmTable.thRight}>Price</th>
-                      <th className={crmTable.thRight}>Total</th>
+                      {showMoney && <th className={crmTable.thRight}>Price</th>}
+                      {showMoney && <th className={crmTable.thRight}>Total</th>}
                     </tr>
                   </thead>
                   <tbody className="block sm:table-row-group">
@@ -664,15 +668,19 @@ export default function CrmEstimateDetailPage() {
                               </div>
                             )}
                             <div className="sm:hidden mt-1 text-xs text-muted-foreground tabular-nums">
-                              {qtyLabel} × {money(i.unitPriceCents)}
+                              {showMoney ? `${qtyLabel} × ${money(i.unitPriceCents)}` : qtyLabel}
                             </div>
                           </td>
                           <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{qtyLabel}</td>
-                          <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{money(i.unitPriceCents)}</td>
-                          <td className={cn(crmTableCards.td, "flex items-baseline justify-between sm:text-right tabular-nums font-medium")}>
-                            <span className="sm:hidden text-xs font-normal text-muted-foreground">Line total</span>
-                            {money(Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 0)) / 1000))}
-                          </td>
+                          {showMoney && (
+                            <td className={cn(crmTable.tdRight, "hidden sm:table-cell tabular-nums")}>{money(i.unitPriceCents)}</td>
+                          )}
+                          {showMoney && (
+                            <td className={cn(crmTableCards.td, "flex items-baseline justify-between sm:text-right tabular-nums font-medium")}>
+                              <span className="sm:hidden text-xs font-normal text-muted-foreground">Line total</span>
+                              {money(Math.round(((i.unitPriceCents ?? 0) * (i.quantityMilli ?? 0)) / 1000))}
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -681,6 +689,12 @@ export default function CrmEstimateDetailPage() {
               </div>
             )}
 
+            {!showMoney && (
+              <p className="text-xs text-muted-foreground" data-testid="text-prices-hidden">
+                Prices and totals are hidden for your seat — this is the scope of work. Ask your admin if you need to see pricing.
+              </p>
+            )}
+            {showMoney && (
             <div className="flex justify-end">
               <div className="w-full max-w-xs text-sm space-y-1">
                 <div className="flex justify-between">
@@ -734,6 +748,7 @@ export default function CrmEstimateDetailPage() {
                 ) : null}
               </div>
             </div>
+            )}
 
             {/* Client-selectable discount offers (the ones the owner likes) —
                 self-contained component, same as on the client page. */}

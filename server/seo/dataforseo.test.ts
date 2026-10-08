@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   dataforseoDeps, isConfigured, assertOk, isTaskInProgress, isNoResultsTask, buildRankResult, parseTaskPost, parseTaskGet,
   parseKeywordItem, parseIntersectionItem, parseBacklinkSummary, parseBacklinkRow, parseAdsVolumeItem, normalizeDomain,
-  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
+  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, safeHttpUrl, safeDomain, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
   DataForSeoError, API_BASE,
 } from "./dataforseo";
 
@@ -103,8 +103,12 @@ describe("rank checks (standard queue)", () => {
   it("buildRankResult: the first organic result on the domain or a subdomain, by rank_group; features are the element types", () => {
     const items = fixture("task_get").tasks[0].result[0].items;
     const r = buildRankResult({ keywordId: 11, keyword: "roofing contractor tampa", targetDomain: "constructhub.us" }, items);
-    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic"],
-      localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }] });
+    expect(r).toEqual({ keywordId: 11, keyword: "roofing contractor tampa", position: 2, url: "https://www.constructhub.us/roofing/tampa", serpFeatures: ["local_pack", "people_also_ask", "organic", "own:checked"],
+      localPosition: null, localPack: [{ position: 1, title: "Tampa Roof Pros", domain: "tamparoofpros.example" }],
+      serpTop: [{ position: 1, domain: "bigroofer.example", url: "https://bigroofer.example/tampa", title: "Big Roofer" }, { position: 2, domain: "constructhub.us", url: "https://www.constructhub.us/roofing/tampa", title: "Tampa roofing contractors" }, { position: 3, domain: "blog.constructhub.us", url: "https://blog.constructhub.us/roofing", title: "Blog" }],
+      rivals: {} });
+    // followed competitors: found in the organic results (a subdomain counts), or null
+    expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "constructhub.us", competitors: ["www.BigRoofer.example", "nowhere.example"] }, items).rivals).toEqual({ "bigroofer.example": 1, "nowhere.example": null });
     // a local-pack hit on another domain is not an organic ranking
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "tamparoofpros.example" }, items).position).toBeNull();
     expect(buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "bigroofer.example" }, items)).toMatchObject({ position: 1, url: "https://bigroofer.example/tampa" });
@@ -143,6 +147,18 @@ describe("rank checks (standard queue)", () => {
     // a tagline after a separator is not part of the name
     expect(isOurListing({ title: "Alpine Exteriors | Siding, Roofing & Windows" }, "x.com", "Alpine Exteriors")).toBe(true);
   });
+  it("what is saved from a result page is safe to show: http(s) links only, host-shaped domains, bounded", () => {
+    const r = buildRankResult({ keywordId: 1, keyword: "k", targetDomain: "x.com" }, [
+      { type: "organic", rank_group: 1, domain: "evil.example", url: "javascript:alert(1)", title: "t".repeat(500) },
+      { type: "organic", rank_group: 2, domain: "bad domain<script>", url: "https://ok.example/" },
+      { type: "organic", rank_group: 3, domain: "WWW.Fine.example", url: "https://fine.example/page" },
+      { type: "local_pack", rank_group: 1, title: "n".repeat(400), domain: "x<y" },
+    ]);
+    expect(r.serpTop).toEqual([{ position: 1, domain: "evil.example", url: null, title: "t".repeat(120) }, { position: 3, domain: "fine.example", url: "https://fine.example/page", title: null }]);
+    expect(r.localPack[0]).toEqual({ position: 1, title: "n".repeat(160), domain: null });
+    expect(safeHttpUrl("data:text/html,x")).toBeNull();
+    expect(safeDomain("a.b-c.com")).toBe("a.b-c.com");
+  });
   it("business names compare without punctuation or company suffixes", () => {
     expect(normalizeBusinessName("Alpine Exteriors, LLC")).toBe("alpine exteriors");
     expect(normalizeBusinessName("The A&B Roofing Co.")).toBe("a and b roofing");
@@ -162,7 +178,7 @@ describe("rank checks (standard queue)", () => {
     expect(calls[0]).toMatchObject({ method: "GET", path: "/serp/google/organic/task_get/advanced/10061512-1535-0066-0000-aaaaaaaaaaaa" });
     expect(done).toMatchObject({ status: "completed", result: { position: 2 } });
     expect(parseTaskGet(fixture("task_get_pending"), input)).toEqual({ status: "pending" });
-    expect(parseTaskGet(fixture("task_get_no_results"), input)).toMatchObject({ status: "completed", result: { position: null, url: null, serpFeatures: [] } });
+    expect(parseTaskGet(fixture("task_get_no_results"), input)).toMatchObject({ status: "completed", result: { position: null, url: null, serpFeatures: ["own:checked"] } });
     expect(parseTaskGet({ status_code: 20000, tasks: [{ status_code: 40101, status_message: "Internal SE Server Error." }] }, input)).toEqual({ status: "failed", message: "Internal SE Server Error." });
     expect(() => parseTaskGet({ status_code: 40400, status_message: "Not Found." }, input)).toThrow(DataForSeoError);
   });

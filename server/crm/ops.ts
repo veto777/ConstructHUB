@@ -27,7 +27,7 @@ import {
   CRM_LINE_ITEM_KINDS,
 } from "@shared/schema";
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
-import { requireOrg, requirePermission, requireOwnerRole, type OrgContext } from "./tenancy";
+import { requireOrg, requirePermission, requireOwnerRole, stripMoney, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
 import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { autoSendPaymentReceipt } from "./receipts";
@@ -221,6 +221,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/invoices", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
     const parsed = z.object({
       customerId: z.string().min(1),
       projectId: z.string().nullable().optional(),
@@ -273,6 +274,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/estimates/:id/invoice", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
     const [est] = await db.select().from(crmEstimates)
       .where(and(eq(crmEstimates.orgId, ctx.org.id), eq(crmEstimates.id, req.params.id))).limit(1);
     if (!est) return res.status(404).json({ message: "Estimate not found" });
@@ -360,6 +362,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/invoices/:id/payments", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "takePayment");
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
     const parsed = z.object({
       amountCents: z.number().int().min(1).max(10_000_000_00),
       // cash/check/wire/credit_card are the manual rails; ach/card/other are
@@ -505,9 +508,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       body: `A ${usd(pay.amountCents)} payment (${via}, recorded ${when})` +
         `${invoice?.number ? ` on invoice ${invoice.number}` : ""} was reversed by the account owner. Reason: ${reason}`,
     }).catch(() => {});
-    logActivity(ctx, "invoice.updated", {
+    logActivity(ctx, "payment.reversed", {
       entityType: "payment", entityId: pay.id, customerId: pay.customerId,
-      meta: { number: invoice?.number ?? null, change: `payment of ${usd(pay.amountCents)} reversed`, invoiceId: pay.invoiceId },
+      meta: { number: invoice?.number ?? null, amountCents: pay.amountCents, method: pay.method, reason, invoiceId: pay.invoiceId },
     });
     // Subscribers that were told payment.succeeded (and maybe invoice.paid)
     // hear about the reversal too, with the invoice balance it left behind.
@@ -523,6 +526,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/invoices/:id/void", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageInvoices");
     if (!ctx) return;
+    if (!requirePermission(res, ctx, "seePrices")) return; // an invoice or payment is an amount
     const [inv] = await db.select().from(crmInvoices)
       .where(and(eq(crmInvoices.orgId, ctx.org.id), eq(crmInvoices.id, req.params.id))).limit(1);
     if (!inv) return res.status(404).json({ message: "Invoice not found" });
@@ -881,6 +885,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
   // ══ CHANGE ORDERS ═════════════════════════════════════════════════════════
 
+  /** A change order as a seat may read it: the amount is a price, the cost is a cost; the token never ships. */
+  const presentChangeOrder = (c: typeof crmChangeOrders.$inferSelect, ctx: OrgContext) =>
+    ({ ...stripMoney(ctx, c, { price: ["amountCents"], cost: ["costCents"] }), publicToken: undefined });
+
   app.get("/api/crm/projects/:id/change-orders", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
@@ -890,9 +898,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .where(and(eq(crmChangeOrders.orgId, ctx.org.id), eq(crmChangeOrders.projectId, proj.id)))
       .orderBy(desc(crmChangeOrders.createdAt));
     res.json(rows.map((c) => ({
-      ...c, publicToken: undefined,
-      amountCents: ctx.permissions.seePrices ? c.amountCents : undefined,
-      costCents: ctx.permissions.seeCosts ? c.costCents : undefined,
+      ...presentChangeOrder(c, ctx),
       publicPath: ctx.permissions.manageEstimates ? `/co/${c.publicToken}` : undefined,
     })));
   });
@@ -919,7 +925,11 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       } as any).returning();
       return inserted;
     });
-    res.status(201).json({ ...row, publicPath: `/co/${row.publicToken}` });
+    logActivity(ctx, "changeorder.created", {
+      entityType: "change_order", entityId: row.id, customerId: row.customerId,
+      meta: { number: row.number, title: row.title, amountCents: row.amountCents },
+    });
+    res.status(201).json({ ...presentChangeOrder(row, ctx), publicPath: `/co/${row.publicToken}` });
   });
 
   /** Stamp a change order sent and hand back its public link — open tracking
@@ -935,7 +945,11 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       status: co.status === "draft" ? "sent" : co.status,
       updatedAt: new Date(),
     }).where(eq(crmChangeOrders.id, co.id)).returning();
-    res.json({ changeOrder: { ...row, publicToken: undefined }, link: `${getBaseUrl(req)}/co/${co.publicToken}` });
+    logActivity(ctx, "changeorder.sent", {
+      entityType: "change_order", entityId: co.id, customerId: co.customerId,
+      meta: { number: co.number, title: co.title },
+    });
+    res.json({ changeOrder: presentChangeOrder(row, ctx), link: `${getBaseUrl(req)}/co/${co.publicToken}` });
   });
 
   /** Public: client approves/declines a change order. */
@@ -999,7 +1013,10 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
   const projectChild = (
     path: string, table: any, schema: z.ZodTypeAny, perm: any = "manageJobs", order: any = null,
+    /** Money keys on the row, stripped per seat on every response (stripMoney). */
+    money: { price?: readonly string[]; cost?: readonly string[] } = {},
   ) => {
+    const present = (ctx: OrgContext, row: any) => stripMoney(ctx, row, money);
     app.get(`/api/crm/projects/:id/${path}`, async (req: any, res) => {
       const ctx = await ctxFor(req, res);
       if (!ctx) return;
@@ -1008,7 +1025,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const rows = await db.select().from(table)
         .where(and(eq(table.orgId, ctx.org.id), eq(table.projectId, proj.id)))
         .orderBy(order ?? desc(table.createdAt)).limit(1000);
-      res.json(rows);
+      res.json(rows.map((r: any) => present(ctx, r)));
     });
     app.post(`/api/crm/projects/:id/${path}`, async (req: any, res) => {
       const ctx = await ctxFor(req, res, perm);
@@ -1020,7 +1037,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const inserted: any[] = await db.insert(table).values({
         ...(parsed.data as any), orgId: ctx.org.id, projectId: proj.id,
       }).returning() as any;
-      res.status(201).json(inserted[0]);
+      res.status(201).json(present(ctx, inserted[0]));
     });
     app.patch(`/api/crm/${path}/:childId`, async (req: any, res) => {
       const ctx = await ctxFor(req, res, perm);
@@ -1030,7 +1047,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       const updated: any[] = await db.update(table).set({ ...(parsed.data as any), updatedAt: new Date() })
         .where(and(eq(table.orgId, ctx.org.id), eq(table.id, req.params.childId))).returning() as any;
       if (!updated[0]) return res.status(404).json({ message: "Not found" });
-      res.json(updated[0]);
+      res.json(present(ctx, updated[0]));
     });
   };
 
@@ -1049,7 +1066,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     allowanceCents: z.number().int().min(0).default(0),
     chosenOptionName: z.string().max(200).nullable().optional(),
     actualCents: z.number().int().min(0).nullable().optional(),
-  }), "manageJobs");
+    // The allowance and what the client's choice came to are prices the
+    // homeowner is billed — a price-blind crew sees the selection, not the money.
+  }), "manageJobs", null, { price: ["allowanceCents", "actualCents"] });
 
   const dailyLogSchema = z.object({
     logDate: z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Enter a valid log date.").optional(),
@@ -1256,21 +1275,21 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
 
   // ══ ESTIMATE OPTIONS (good / better / best) ════════════════════════════════
 
+  /** An option tier per seat: totals and line prices are prices, line costs are costs (the pm is cost-blind). */
+  const presentOption = (o: typeof crmEstimateOptions.$inferSelect, ctx: OrgContext) => ({
+    ...stripMoney(ctx, o, { price: ["subtotalCents", "totalCents"] }),
+    items: Array.isArray(o.items)
+      ? (o.items as any[]).map((i) => stripMoney(ctx, i, { price: ["unitPriceCents"], cost: ["unitCostCents"] }))
+      : o.items,
+  });
+
   app.get("/api/crm/estimates/:id/options", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
     const rows = await db.select().from(crmEstimateOptions)
       .where(and(eq(crmEstimateOptions.orgId, ctx.org.id), eq(crmEstimateOptions.estimateId, req.params.id)))
       .orderBy(asc(crmEstimateOptions.tier));
-    res.json(rows.map((o) => ({
-      ...o,
-      subtotalCents: ctx.permissions.seePrices ? o.subtotalCents : undefined,
-      totalCents: ctx.permissions.seePrices ? o.totalCents : undefined,
-      // Costs stay privileged inside option scopes too (the pm is cost-blind).
-      items: Array.isArray(o.items)
-        ? (o.items as any[]).map((i) => ({ ...i, unitCostCents: ctx.permissions.seeCosts ? i.unitCostCents : undefined }))
-        : o.items,
-    })));
+    res.json(rows.map((o) => presentOption(o, ctx)));
   });
 
   /** Options are estimate edits: same lifecycle guards as the line items. */
@@ -1334,7 +1353,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       orgId: ctx.org.id, estimateId: est.id,
       subtotalCents: subtotal, totalCents: total, items,
     } as any).returning();
-    res.status(201).json(row);
+    res.status(201).json(presentOption(row, ctx));
   });
 
   /** Remove a typo'd tier. Same guards as adding one. */

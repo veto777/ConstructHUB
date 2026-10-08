@@ -1,14 +1,16 @@
 /** /seo/backlinks — the monthly backlink snapshot (summary tiles + top backlinks), "Refresh now". */
+import { AddToPlan } from "./plan-button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtDate, fmtNum, Move, priceOf, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, money, canAfford, Empty, fmtDate, fmtNum, Move, priceOf, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 
 type Summary = { rank: number | null; backlinks: number | null; referringDomains: number | null; referringPages: number | null; brokenBacklinks: number | null; newBacklinks: number | null; lostBacklinks: number | null; newReferringDomains: number | null; lostReferringDomains: number | null; spamScore: number | null; totalCount?: number | null };
 type Backlink = { domainFrom: string | null; urlFrom: string | null; urlTo: string | null; anchor: string | null; dofollow: boolean; rank: number | null; domainRank: number | null; spamScore: number | null; firstSeen: string | null; isNew: boolean; isLost: boolean };
-type Data = { configured: boolean; snapshot: { takenOn: string; summary: Summary; backlinks: Backlink[] } | null; previous: { takenOn: string; summary: Summary } | null; nextSnapshotAt: string | null };
+type Lost = { domain: string; authority: number | null; spam?: number | null; from: string | null; to: string | null; anchor: string | null; lastSeen: string | null; follow: boolean };
+type Data = { configured: boolean; snapshot: { takenOn: string; summary: Summary; backlinks: Backlink[]; changes?: { since: string; lost: Lost[]; lostTotal: number | null; failed?: boolean } | null } | null; refreshCents?: number; previous: { takenOn: string; summary: Summary } | null; nextSnapshotAt: string | null };
 
 export default function SeoBacklinksPage() {
   const status = useSeoStatus();
@@ -19,19 +21,23 @@ export default function SeoBacklinksPage() {
   const data = useQuery<Data>({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`], enabled: !!site, refetchOnMount: "always", });
   const refresh = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/backlinks/refresh`),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: "Backlinks updated" }); },
+    onSuccess: (r: { lostFailed?: boolean }) => { void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/backlinks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast(r?.lostFailed ? { title: "Backlinks updated — except the lost links", description: "That part didn't load and was not charged. Refresh to try again." } : { title: "Backlinks updated" }); },
     onError: (e) => toast({ title: "Couldn't refresh", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const configured = !!status.data?.configured;
+  // What a refresh can cost for THIS site (a first snapshot has one lookup fewer), and whether there is enough left for it.
+  const refreshCents = data.data?.refreshCents ?? status.data?.prices?.backlinkRefresh ?? null;
+  const credits = status.data?.credits;
+  const canRefresh = refreshCents == null || !credits || credits.availableCents === -1 || credits.availableCents >= refreshCents;
   const d = data.data, s = d?.snapshot?.summary, p = d?.previous?.summary;
   const diff = (a: number | null | undefined, b: number | null | undefined) => a != null && b != null && a !== b ? <Move now={-a} before={-b} /> : null;
   return (
     <SeoShell title="Backlinks" description="Who links to your site: a fresh snapshot every month, refreshable any time." site={site} onSite={onSite} sites={sites} status={status}
-      actions={site && d && <Button className="w-full sm:w-auto" disabled={!configured || refresh.isPending || !canAfford(status.data, "backlinkRefresh")} onClick={() => refresh.mutate()} data-testid="button-refresh-backlinks" title={!configured ? "Rank tracking is being switched on for your account" : status.data ? `A refresh costs ${priceOf(status.data, "backlinkRefresh")} of your SEO data` : undefined}>{refresh.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh now</Button>}>
+      actions={site && d && <Button className="w-full sm:w-auto" disabled={!configured || refresh.isPending || !canRefresh} onClick={() => refresh.mutate()} data-testid="button-refresh-backlinks" title={!configured ? "Rank tracking is being switched on for your account" : !canRefresh ? "Not enough SEO data left — add credit above" : undefined}>{refresh.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh now{refreshCents != null ? ` — up to ${money(refreshCents)}` : ""}</Button>}>
       {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add a site above to see its backlinks.</p></Empty>}
       {site && data.isLoading && <p className="g-text-2 text-[14px]" role="status">Loading backlinks…</p>}
       {site && data.isError && <div className="g-callout" role="alert" data-testid="seo-backlinks-error"><h3>Couldn't load the backlinks</h3><p>{apiErrorMessage(data.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void data.refetch()}>Try again</button></div>}
-      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h3>No snapshot for {site.domain} yet</h3><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own.{status.data ? ` A refresh costs ${priceOf(status.data, "backlinkRefresh")} of your SEO data.` : ""}</p></Empty>}
+      {site && d && !d.snapshot && <Empty testId="seo-backlinks-empty"><h3>No snapshot for {site.domain} yet</h3><p>"Refresh now" pulls the summary and the top 100 linking pages; after that a new snapshot is taken every month on its own, and each one lists the backlinks found gone since the last.{refreshCents != null ? ` This first snapshot costs up to ${money(refreshCents)} of your SEO data.` : ""}</p></Empty>}
       {site && d?.snapshot && s && (
         <>
           <p className="g-text-2 mb-3 text-[13px]" data-testid="text-snapshot-meta">Snapshot from {fmtDate(d.snapshot.takenOn)}{p && d.previous ? ` · compared with ${fmtDate(d.previous.takenOn)}` : ""} · next automatic snapshot {fmtDate(d.nextSnapshotAt)}</p>
@@ -41,6 +47,32 @@ export default function SeoBacklinksPage() {
             <Tile label="Referring domains" value={<>{fmtNum(s.referringDomains)} {diff(s.referringDomains, p?.referringDomains)}</>} hint={`+${fmtNum(s.newReferringDomains)} new · −${fmtNum(s.lostReferringDomains)} lost`} testId="tile-domains" />
             <Tile label="Spam score" value={s.spamScore ?? "—"} hint={`${fmtNum(s.brokenBacklinks)} broken backlinks`} testId="tile-spam" />
           </div>
+          {d.snapshot.changes && (
+            <section className="mb-5" data-testid="section-lost-links">
+              <h2 className="g-text mb-1 text-[15px] font-medium">Lost backlinks seen since {fmtDate(d.snapshot.changes.since)}</h2>
+              {d.snapshot.changes.failed ? <p className="text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-lost-links-failed">This part didn't load with this snapshot and was not charged. Refresh to try again.</p>
+              : d.snapshot.changes.lost.length === 0 ? <p className="g-text-2 text-[13px]" data-testid="text-no-lost-links">None found — no backlink that was still being seen after {fmtDate(d.snapshot.changes.since)} is now marked lost.</p> : (
+                <>
+                  <p className="g-text-2 mb-2 text-[13px]">{d.snapshot.changes.lostTotal != null && d.snapshot.changes.lostTotal > d.snapshot.changes.lost.length ? `The ${d.snapshot.changes.lost.length} strongest of ${fmtNum(d.snapshot.changes.lostTotal)} sites with a lost link (only these ${d.snapshot.changes.lost.length} are kept).` : `${d.snapshot.changes.lost.length} site${d.snapshot.changes.lost.length === 1 ? "" : "s"} with a lost link.`} Each row is one link that was still being found after {fmtDate(d.snapshot.changes.since)} and is now gone — the page was removed, the link was taken off it, or the page could no longer be read. The site may still link to you from other pages. If the page still exists, a short note to its owner often gets the link back — worth doing for a real site with some authority; a lost link from a site with a high spam score is no loss.</p>
+                  <div className="overflow-x-auto"><table className="g-table" data-testid="table-lost-links">
+                    <thead><tr><th>Site</th><th className="num">Authority</th><th className="num" title="0–100: how much the linking site looks like spam">Spam</th><th>The page that linked</th><th>Linked to</th><th className="num">Last seen</th><th><span className="sr-only">Action plan</span></th></tr></thead>
+                    <tbody>{d.snapshot.changes.lost.map((l, i) => (
+                      <tr key={`${l.domain}-${i}`}>
+                        <td>{l.domain}{!l.follow && <span className="g-text-2 text-[12px]"> · nofollow</span>}</td>
+                        <td className="num" data-label="Authority">{l.authority ?? "—"}</td>
+                        <td className="num" data-label="Spam">{l.spam ?? "—"}</td>
+                        <td data-label="The page that linked" className="max-w-[320px] truncate">{l.from ? <a href={l.from} className="g-link" target="_blank" rel="noreferrer" title={l.from}>{l.from.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</td>
+                        <td data-label="Linked to" className="g-text-2 max-w-[220px] truncate">{l.to?.replace(/^https?:\/\/(www\.)?/, "") ?? "—"}</td>
+                        <td className="num g-text-2" data-label="Last seen">{fmtDate(l.lastSeen)}</td>
+                        <td className="num"><AddToPlan siteId={site.id} label="Plan" testId={`button-plan-${l.domain}`} tasks={[{ kind: "link_reclaim", title: `Win back the link from ${l.domain}`, target: l.from ?? l.domain, facts: { authority: l.authority, lastSeen: l.lastSeen }, source: `lost:${l.domain}` }]} /></td>
+                      </tr>
+                    ))}</tbody>
+                  </table></div>
+                </>
+              )}
+            </section>
+          )}
+          {d.snapshot.backlinks.length > 0 && <h2 className="g-text mb-2 text-[15px] font-medium">Strongest linking pages</h2>}
           {d.snapshot.backlinks.length === 0 ? <Empty>{(s as { listFailed?: boolean }).listFailed ? <>The list of linking pages didn't load for this snapshot — the totals above are still right. Refresh to try again.</> : <>No live backlinks were found for {site.domain}.</>}</Empty> : (
             <table className="g-table" data-testid="table-backlinks">
               <thead><tr><th>Linking page</th><th>Anchor</th><th>Links to</th><th className="num">Domain rank</th><th className="num">Spam</th><th>Follow</th><th className="num">First seen</th></tr></thead>

@@ -34,6 +34,7 @@ import {
 } from "@shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireOrg, requirePermission } from "./tenancy";
+import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
@@ -972,6 +973,10 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
 
     await logEvent(ctx.org.id, est.id, "reminded", ctx.member.id, req, {
       to, emailed, emailError, texted, smsProvider, smsError,
+    });
+    logActivity(ctx, "estimate.reminded", {
+      entityType: "estimate", entityId: est.id, customerId: est.customerId,
+      meta: { number: est.number, to: to ?? (texted ? phone : null), emailed, texted },
     });
 
     res.json({
