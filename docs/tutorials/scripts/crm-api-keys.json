@@ -24,7 +24,7 @@
     },
     {
       "action": "type",
-      "selector": "[data-testid=\"input-api-key-name\"]",
+      "selector": "input[placeholder*=\"reporting script\"]",
       "value": "Reporting script",
       "caption": "Key name",
       "narration": "Give the key a name that says what will use it."

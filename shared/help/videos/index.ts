@@ -45,6 +45,7 @@ export { default as v_crm_report_issue } from "./crm-report-issue.json";
 export { default as v_crm_reports } from "./crm-reports.json";
 export { default as v_crm_schedule_from_client } from "./crm-schedule-from-client.json";
 export { default as v_crm_schedule_views } from "./crm-schedule-views.json";
+export { default as v_crm_sales_tax } from "./crm-sales-tax.json";
 export { default as v_crm_schedule } from "./crm-schedule.json";
 export { default as v_crm_search } from "./crm-search.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";

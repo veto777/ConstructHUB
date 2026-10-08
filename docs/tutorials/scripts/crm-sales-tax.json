@@ -1,0 +1,158 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-sales-tax",
+  "title": "Set your default sales tax",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings#:~:text=Pre%2Dfilled%20on%20every%20new%20document",
+      "caption": "Estimate & invoice defaults",
+      "chapter": "Set your default rate",
+      "narration": "The CRM adds sales tax to a new estimate from the rate you set. Here is where to set it."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Fallback when no city or division rate matches",
+      "caption": "Fallback rate",
+      "narration": "Default sales tax is the rate used when no city or division rate matches the job."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-default-tax\"]",
+      "value": "8.25",
+      "caption": "Default sales tax (%)",
+      "narration": "Type your rate as a percent. As an example, we'll use eight and a quarter."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-defaults\"]",
+      "caption": "Save defaults",
+      "narration": "Choose Save defaults. Check your own rates with your accountant."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-portal-nav-estimates\"]",
+      "caption": "Estimates",
+      "chapter": "Write a new estimate",
+      "narration": "Now let's see it on a new estimate. Open Estimates."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"New estimate\"), a:has-text(\"New estimate\")",
+      "caption": "New estimate",
+      "narration": "Choose New estimate."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder^=\"Search clients\"]",
+      "value": "Imani",
+      "caption": "Find the client",
+      "narration": "Search for the client."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Imani Brewster\")",
+      "caption": "Imani Brewster",
+      "narration": "We'll pick Imani Brewster, in Dallas."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-item-search\"]",
+      "value": "backsplash",
+      "caption": "Price book",
+      "narration": "Find the work in your price book."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-row-\"]:has-text(\"Kitchen backsplash\") [data-testid^=\"button-add-\"]",
+      "caption": "Add",
+      "narration": "Choose Add."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"input-qty-\"]",
+      "value": "30",
+      "caption": "Quantity",
+      "narration": "Set the quantity, then choose Review."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review\"]",
+      "caption": "Review",
+      "narration": "Review shows the estimate before it's saved."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Added automatically",
+      "caption": "Added automatically",
+      "chapter": "See the tax",
+      "narration": "The review step says sales tax is added automatically."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-title\"]",
+      "value": "Kitchen backsplash",
+      "caption": "Title",
+      "narration": "Give the estimate a title."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-draft\"]",
+      "caption": "Save as draft",
+      "narration": "Choose Save as draft."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-final-total\"]",
+      "caption": "Total with tax",
+      "narration": "Once it's saved, the total includes the tax."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-open-estimate\"]",
+      "caption": "Open this estimate",
+      "narration": "Open it to see the detail."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=/^Tax$/ >> xpath=..",
+      "caption": "Tax line",
+      "narration": "Tax has its own line, between the subtotal and the total."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Menu: Settings",
+      "narration": "You'll find the rate in Settings, under Estimate and invoice defaults."
+    }
+  ],
+  "youtube": {
+    "title": "How to set your default sales tax | ConstructHUB CRM",
+    "description": "A short walkthrough of the default sales tax in the ConstructHUB CRM. You will set the rate in Settings, then write a new estimate and see the tax on its own line above the total. The CRM uses the rates you enter, so check them with your accountant.",
+    "tags": [
+      "sales tax",
+      "estimate tax",
+      "contractor sales tax",
+      "tax rate setting",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Set your sales tax",
+    "accent": "tax",
+    "kicker": "CRM Tutorial",
+    "step": 2
+  }
+}
