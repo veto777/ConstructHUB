@@ -52,6 +52,16 @@ async function main() {
   eq("5b reopening a finished task cannot overfill the plan", [reopen?.status, (await pool.query("SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND status IN ('todo','doing')", [s.id])).rows[0].n], [403, MAX_OPEN_TASKS]);
   const some = (await tasksOf(1, s.id)).filter((x) => x.status === "todo").slice(0, 2);
   eq("5c a finished task makes room again — for a new one or a reopened one", [(await updateTask(1, some[0].id, taskPatch.parse({ status: "done" }))).status, (await addTasks(1, s.id, [t({ kind: "other", title: "fits now" })])).added, (await updateTask(1, some[1].id, taskPatch.parse({ status: "dropped" }))).status, (await updateTask(1, closedOne.id, taskPatch.parse({ status: "todo" }))).status], ["done", 1, "dropped", "todo"]);
+  // two status changes at once at the limit: only one may take the last place
+  const full = (await tasksOf(1, s.id));
+  const closedTwo = full.filter((x) => x.status === "done" || x.status === "dropped").slice(0, 2);
+  if (closedTwo.length === 2) {
+    const openNowN = full.filter((x) => x.status === "todo" || x.status === "doing").length;
+    const spare = (await tasksOf(1, s.id)).filter((x) => x.status === "todo").slice(0, Math.max(0, openNowN - (MAX_OPEN_TASKS - 1)));
+    for (const sp of spare) await updateTask(1, sp.id, taskPatch.parse({ status: "done" }));
+    const race = await Promise.allSettled(closedTwo.map((c) => updateTask(1, c.id, taskPatch.parse({ status: "todo" }))));
+    eq("5e two reopenings at once with one place left: one succeeds", [race.filter((r) => r.status === "fulfilled").length, (await pool.query("SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND status IN ('todo','doing')", [s.id])).rows[0].n], [1, MAX_OPEN_TASKS]);
+  }
   // a long history is counted in full and shown newest first, a page at a time
   await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, status, done_at) SELECT 1, $1, 'other', 'old ' || g, 'done', now() - make_interval(days => 40 + g) FROM generate_series(1, 130) g", [s.id]);
   const page = await listTasks(1, s.id, 100), more = await listTasks(1, s.id, 500);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlanner, cleanTerms, fetchPlanner, plannerDeps, plannerEstimateUsd, plannerInput, rankingsRequest, volumesRequest } from "./planner";
+import { buildPlanner, cleanTerms, fetchPlanner, plannerDeps, plannerEstimateUsd, plannerInput, plannerTooLong, rankingsRequest, volumesRequest } from "./planner";
 import { DataForSeoError } from "./dataforseo";
 
 const loc = { locationCode: 2840, languageCode: "en" };
@@ -15,12 +15,21 @@ describe("service-area planner", () => {
     expect(plannerInput.safeParse({ services: ["siding"], towns: [] }).success).toBe(false);
     expect(plannerInput.safeParse({ services: Array.from({ length: 13 }, (_, i) => `service ${i}`), towns: ["bellingham"] }).success).toBe(false);
     expect(cleanTerms([" Siding ", "siding", "ROOF  repair", ""])).toEqual(["siding", "roof repair"]);
+    // A comma belongs to the line it is on: "Bellingham, WA" is one town.
+    expect(cleanTerms(["Bellingham, WA", "bellingham wa"])).toEqual(["bellingham wa"]);
+    expect(plannerInput.safeParse({ services: ["siding"], towns: ["Bellingham, WA"] }).success).toBe(true);
+    // Every pairing must be a search the source accepts: at most 80 characters and ten words.
+    expect(plannerTooLong(["siding"], ["bellingham"])).toBeNull();
+    expect(plannerTooLong(["a".repeat(50)], ["b".repeat(40)])).toBe(`${"a".repeat(50)} ${"b".repeat(40)}`);
+    expect(plannerTooLong(["one two three four five six"], ["seven eight nine ten eleven"])).toBe("one two three four five six seven eight nine ten eleven");
     expect(plannerEstimateUsd(28)).toBeCloseTo(2 * (0.012 + 28 * 0.00012), 6);
   });
   it("asks once for the volumes and once for the site's rankings of exactly these searches", () => {
     const kws = ["siding bellingham", "siding lynden"];
     expect(volumesRequest(kws, loc)).toEqual({ keywords: kws, location_code: 2840, language_code: "en" });
-    expect(rankingsRequest("alpine.example", kws, loc)).toEqual({ target: "alpine.example", location_code: 2840, language_code: "en", item_types: ["organic"], limit: 4, filters: ["keyword_data.keyword", "in", kws] });
+    expect(rankingsRequest("alpine.example", kws, loc)).toEqual({ target: "alpine.example", location_code: 2840, language_code: "en", item_types: ["organic"], limit: 2, filters: ["keyword_data.keyword", "in", kws] });
+    // Never more rows than were reserved for: one per search.
+    expect(rankingsRequest("alpine.example", Array.from({ length: 150 }, (_, i) => `k ${i}`), loc).limit).toBe(150);
   });
   it("builds the table: a number that is not known stays unknown, never zero", () => {
     const p = buildPlanner(input,
@@ -42,7 +51,11 @@ describe("service-area planner", () => {
   it("when the rankings did not load, nothing is called a gap", () => {
     const p = buildPlanner(input, [vol("siding lynden", 40)], null);
     expect(p.missing).toEqual(["rankings"]);
-    expect(p.summary).toMatchObject({ gaps: 0, gapVolume: 0 });
+    // Unknown, not zero: every count that needs the rankings.
+    expect(p.summary).toEqual({ cells: 4, gaps: null, gapVolume: null, weak: null, strong: null, unknown: null });
+    // And when it is the volumes that did not load, what the rankings alone can say is still said.
+    const v = buildPlanner(input, null, [rank("siding bellingham", 6, "/"), rank("roofing bellingham", 2, "/roofing")]);
+    expect([v.missing, v.summary]).toEqual([["volumes"], { cells: 4, gaps: null, gapVolume: null, weak: 1, strong: 1, unknown: null }]);
   });
   it("one lookup failing leaves a usable table and is not the customer's to pay for; both failing fails", async () => {
     const real = plannerDeps.request;

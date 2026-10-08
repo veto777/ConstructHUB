@@ -16,9 +16,12 @@ export const PLANNER_MAX_SERVICES = 12;
 export const PLANNER_MAX_TOWNS = 15;
 /** The most cells one table may have (services x towns). */
 export const PLANNER_MAX_CELLS = 150;
+/** What the source accepts for one search: its length and its number of words. */
+export const PLANNER_MAX_CHARS = 80;
+export const PLANNER_MAX_WORDS = 10;
 export const plannerDeps = { request };
 
-const word = z.string().trim().min(2).max(60).regex(/^[\p{L}\p{N}][\p{L}\p{N} .'&-]*$/u, "Letters, numbers and spaces only");
+const word = z.string().trim().min(2).max(60).regex(/^[\p{L}\p{N}][\p{L}\p{N} .,'&-]*$/u, "Letters, numbers and spaces only");
 export const plannerInput = z.object({
   services: z.array(word).min(1).max(PLANNER_MAX_SERVICES),
   towns: z.array(word).min(1).max(PLANNER_MAX_TOWNS),
@@ -26,8 +29,13 @@ export const plannerInput = z.object({
   refresh: z.boolean().default(false),
 }).strict();
 
-/** Lower case, single spaces, no duplicates. */
-export const cleanTerms = (list: readonly string[]) => [...new Set(list.map((s) => s.toLowerCase().replace(/\s+/g, " ").trim()).filter(Boolean))];
+/** Lower case, single spaces, no duplicates. A comma is a space ("Bellingham, WA" is one town). */
+export const cleanTerms = (list: readonly string[]) => [...new Set(list.map((s) => s.toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean))];
+/** The first pairing the source would refuse (too long, or too many words), or null when every one is fine. */
+export function plannerTooLong(services: readonly string[], towns: readonly string[]): string | null {
+  for (const s of services) for (const t of towns) { const k = plannerKeyword(s, t); if (k.length > PLANNER_MAX_CHARS || k.split(" ").length > PLANNER_MAX_WORDS) return k; }
+  return null;
+}
 /** Two lookups: the volumes of every "service town", and which of them the site ranks for. The most both can cost us. */
 export const plannerEstimateUsd = (cells: number) => Math.round(2 * estimateLabsUsd(cells) * 1e6) / 1e6;
 
@@ -43,10 +51,11 @@ export type PlannerCell = {
 export type Planner = {
   domain: string; locationCode: number; languageCode: string; fetchedAt: string; services: string[]; towns: string[];
   cells: PlannerCell[];
+  /** Counts that depend on a part that did not load are null (unknown), never zero. */
   summary: {
-    cells: number; /** Searched, and the site does not rank in the first 100. */ gaps: number; gapVolume: number;
-    /** Ranking, but beyond the first three. */ weak: number; /** In the first three. */ strong: number;
-    /** Too few searches to measure and no ranking: nothing known. */ unknown: number;
+    cells: number; /** Searched, and the keyword database has no ranking for the site in its first 100. */ gaps: number | null; gapVolume: number | null;
+    /** Ranking, but beyond the first three. */ weak: number | null; /** In the first three. */ strong: number | null;
+    /** Too few searches to measure and no ranking: nothing known. */ unknown: number | null;
   };
   /** A part that did not load this time ("volumes" or "rankings"); its numbers are missing, not zero. */
   missing: string[];
@@ -77,9 +86,9 @@ export function buildPlanner(input: { domain: string; locationCode: number; lang
   return {
     domain: input.domain, locationCode: input.locationCode, languageCode: input.languageCode, fetchedAt: input.fetchedAt ?? new Date().toISOString(), services: input.services, towns: input.towns, cells,
     summary: {
-      cells: cells.length, gaps: rankings ? gaps.length : 0, gapVolume: rankings ? gaps.reduce((a, c) => a + (c.volume ?? 0), 0) : 0,
-      weak: cells.filter((c) => c.position !== null && c.position > 3).length, strong: cells.filter((c) => c.position !== null && c.position <= 3).length,
-      unknown: cells.filter((c) => c.position === null && !(c.volume ?? 0)).length,
+      cells: cells.length, gaps: rankings && volumes ? gaps.length : null, gapVolume: rankings && volumes ? gaps.reduce((a, c) => a + (c.volume ?? 0), 0) : null,
+      weak: rankings ? cells.filter((c) => c.position !== null && c.position > 3).length : null, strong: rankings ? cells.filter((c) => c.position !== null && c.position <= 3).length : null,
+      unknown: rankings && volumes ? cells.filter((c) => c.position === null && !(c.volume ?? 0)).length : null,
     },
     missing: [volumes ? null : "volumes", rankings ? null : "rankings"].filter((x): x is string => !!x),
   };
@@ -87,7 +96,7 @@ export function buildPlanner(input: { domain: string; locationCode: number; lang
 
 export const volumesRequest = (keywords: string[], loc: { locationCode: number; languageCode: string }) => ({ keywords, location_code: loc.locationCode, language_code: loc.languageCode });
 export const rankingsRequest = (domain: string, keywords: string[], loc: { locationCode: number; languageCode: string }) => ({
-  target: domain, location_code: loc.locationCode, language_code: loc.languageCode, item_types: ["organic"], limit: Math.min(1000, keywords.length * 2), filters: ["keyword_data.keyword", "in", keywords],
+  target: domain, location_code: loc.locationCode, language_code: loc.languageCode, item_types: ["organic"], limit: keywords.length, filters: ["keyword_data.keyword", "in", keywords],
 });
 
 /** Both lookups at once. One may fail (its part is then marked missing and not charged); both failing fails the table. */
