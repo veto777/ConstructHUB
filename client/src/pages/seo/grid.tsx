@@ -19,7 +19,8 @@ type Rival = { name: string; ours: boolean; domain: string | null; rating: numbe
 type Summary = { points: number; checked: number; found: number; top3: number; avgRank: number | null };
 type Scan = { id?: number; keyword: string; size: number; spacing: number; center: { lat: number; lng: number; name: string }; points: Point[]; rivals: Rival[]; summary: Summary; fetchedAt: string };
 type ScanRow = { id: number; keyword: string; size: number; spacing: number; avgRank: number | null; points: number; checked: number; found: number; top3: number; at: string };
-type Data = { pin: Pin | null; scans: ScanRow[]; sizes: number[]; spacings: number[]; depth: number; suggestion: string };
+type State = { id: number; status: "running" | "done" | "failed"; scan: Scan | null; error: string | null };
+type Data = { pin: Pin | null; scans: ScanRow[]; running: { id: number; keyword: string; size: number; spacing: number; at: string } | null; sizes: number[]; spacings: number[]; depth: number; suggestion: string };
 
 const miles = (n: number) => `${n} mile${n === 1 ? "" : "s"}`;
 /** Colour and words for a position, so colour is never the only signal. */
@@ -52,10 +53,11 @@ export default function SeoLocalGridPage() {
   const [size, setSize] = useState(5);
   const [spacing, setSpacing] = useState(2);
   const [openId, setOpenId] = useState<number | null>(null);
-  const [fresh, setFresh] = useState<Scan | null>(null);
   const [cell, setCell] = useState<number | null>(null);
   // Another site is another business: nothing from the last one stays on screen.
-  useEffect(() => { setFound(null); setChanging(false); setOpenId(null); setFresh(null); setCell(null); setKeyword(""); setQuery(""); }, [site?.id]);
+  useEffect(() => { setFound(null); setChanging(false); setOpenId(null); setCell(null); setKeyword(""); setQuery(""); }, [site?.id]);
+  // A scan left running (this page was closed, or it was started elsewhere) is picked up again.
+  useEffect(() => { if (q.data?.running && openId == null) setOpenId(q.data.running.id); }, [q.data?.running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (q.data && !query) setQuery(q.data.suggestion); }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const prices = status.data?.prices as (Record<string, number | undefined> | undefined);
@@ -79,16 +81,23 @@ export default function SeoLocalGridPage() {
   });
   const scan = useMutation({
     mutationFn: (v: { siteId: number; body: { keyword: string; size: number; spacing: number } }) => api("POST", `/api/seo/sites/${v.siteId}/grid/scan`, v.body),
-    onSuccess: (d: { scan: Scan; id: number | null; saved: boolean }, v) => {
-      void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/grid`] });
-      if (v.siteId !== site?.id) return; // the site was changed while it ran: it is in that site's history
-      setFresh({ ...d.scan, id: d.id ?? undefined }); setOpenId(d.id); setCell(null);
-      if (!d.saved) toast({ title: "Shown, but it couldn't be kept", description: "This scan will not be in the history.", variant: "destructive" });
+    // The scan runs in the background; this only starts it. The page then asks for it until it is done.
+    onSuccess: (d: { id: number; reused?: boolean }, v) => {
+      if (v.siteId !== site?.id) return; // the site was changed meanwhile: it will be in that site's history
+      setOpenId(d.id); setCell(null);
+      if (d.reused) toast({ title: "A scan is already running for this site", description: "Showing that one. Start another when it finishes." });
     },
     onError: (e) => toast({ title: "Couldn't run the scan", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const saved = useQuery<{ scan: Scan }>({ queryKey: [`${key}/${openId}`], enabled: !!site && openId != null && fresh?.id !== openId });
-  const shown: Scan | null = openId != null && fresh?.id === openId ? fresh : openId != null ? saved.data?.scan ?? null : fresh;
+  const saved = useQuery<State>({
+    queryKey: [`${key}/${openId}`], enabled: !!site && openId != null,
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 3000 : false),
+  });
+  const running = saved.data?.status === "running" || scan.isPending;
+  const shown: Scan | null = saved.data?.status === "done" ? saved.data.scan : null;
+  // When a scan finishes, the history and what is left of the SEO data are both out of date.
+  const doneId = saved.data?.status !== "running" ? saved.data?.id : undefined;
+  useEffect(() => { if (doneId != null) { void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); } }, [doneId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pin = q.data?.pin ?? null;
   const previous = useMemo(() => {
@@ -155,8 +164,8 @@ export default function SeoLocalGridPage() {
                     {q.data.spacings.map((s) => <option key={s} value={s}>{miles(s)}</option>)}
                   </select>
                 </label>
-                <Button type="submit" disabled={scan.isPending || !keyword.trim() || !configured || !can(scanHold)} data-testid="button-grid-scan">
-                  {scan.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking {points} points…</> : `Scan${scanPrice != null ? ` — about ${money(scanPrice)}` : ""}`}
+                <Button type="submit" disabled={running || !keyword.trim() || !configured || !can(scanHold)} data-testid="button-grid-scan">
+                  {running ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Scanning…</> : `Scan${scanPrice != null ? ` — about ${money(scanPrice)}` : ""}`}
                 </Button>
               </form>
               <p className="g-text-2 mt-2 text-[13px]" data-testid="text-grid-cost">
@@ -168,6 +177,8 @@ export default function SeoLocalGridPage() {
           )}
 
           {openId != null && !shown && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
+          {saved.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Searching Google from each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
+          {saved.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{saved.data.error}</p></div>}
           {openId != null && !shown && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
           {shown && (
             <section className="mb-6" data-testid="grid-result">

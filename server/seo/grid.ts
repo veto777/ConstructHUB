@@ -18,6 +18,10 @@ export const GRID_SPACINGS = [1, 2, 3, 5, 10] as const;
 export const GRID_POINT_USD = 0.002;
 /** How far down the local results we look; a business not in these is "not in the top 20". */
 export const GRID_DEPTH = 20;
+/** Lookups in flight at once. One takes 5–30 seconds, so a 7 x 7 scan takes a minute or two. */
+const GRID_PARALLEL = 12;
+/** A scan still "running" after this long was interrupted (a restart); it is shown as failed. */
+export const GRID_STALE_MINUTES = 12;
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 /** The most a scan of `points` points can cost us (held while it runs). */
 export const gridEstimateUsd = (points: number) => round6(points * GRID_POINT_USD * 1.25);
@@ -150,7 +154,7 @@ export async function locateBusiness(query: string): Promise<{ data: MapListing[
   return { data: listings.filter((l) => l.lat !== null && l.lng !== null).slice(0, 8), costUsd };
 }
 
-/** Run every point, a few at a time. A point that fails is marked unknown; if every point fails the scan fails. */
+/** Run every point, several at a time. A point that fails is tried once more, then marked unknown; if every point fails the scan fails. */
 export async function fetchGrid(input: { keyword: string; size: number; spacing: number; pin: GridPin; domain: string }): Promise<{ data: GridScan; costUsd: number; costUnknown: boolean }> {
   const cells = gridPoints(input.pin, input.size, input.spacing);
   const results: (MapListing[] | null)[] = new Array(cells.length).fill(null);
@@ -160,17 +164,21 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
     for (;;) {
       const i = next++;
       if (i >= cells.length) return;
-      try {
-        const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]));
-        costUsd += r.costUsd; results[i] = r.listings;
-      } catch (e: any) {
-        firstError ??= e;
-        costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
-        if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) costUnknown = true;
+      for (let attempt = 1; attempt <= 2 && results[i] === null; attempt++) {
+        try {
+          const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]));
+          costUsd += r.costUsd; results[i] = r.listings;
+        } catch (e: any) {
+          firstError ??= e;
+          costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
+          if (e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0))) costUnknown = true;
+          // Only a lookup that may simply have been slow is worth a second go.
+          if (e?.code !== "timeout" && e?.code !== "upstream" && e?.code !== "rate_limited") break;
+        }
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(6, cells.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(GRID_PARALLEL, cells.length) }, worker));
   if (results.every((r) => r === null))
     throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError ?? "The map lookups failed.")), { costUsd: round6(costUsd), costUnknown });
   return { data: buildScan(input, cells, results), costUsd: round6(costUsd), costUnknown };
@@ -187,7 +195,9 @@ export const GRID_SCHEMA_DDL = [
      keyword text NOT NULL,
      size integer NOT NULL,
      spacing numeric NOT NULL,
-     scan jsonb NOT NULL,
+     scan jsonb,
+     status text NOT NULL DEFAULT 'done',
+     error text,
      avg_rank numeric,
      points integer NOT NULL DEFAULT 0,
      checked integer NOT NULL DEFAULT 0,
@@ -197,6 +207,9 @@ export const GRID_SCHEMA_DDL = [
      created_at timestamptz NOT NULL DEFAULT now()
    )`,
   `CREATE INDEX IF NOT EXISTS seo_grid_scans_site ON seo_grid_scans(site_id, created_at DESC)`,
+  `ALTER TABLE seo_grid_scans ALTER COLUMN scan DROP NOT NULL`,
+  `ALTER TABLE seo_grid_scans ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'done'`,
+  `ALTER TABLE seo_grid_scans ADD COLUMN IF NOT EXISTS error text`,
 ];
 
 export function readPin(v: unknown): GridPin | null {
@@ -206,21 +219,40 @@ export function readPin(v: unknown): GridPin | null {
 export async function savePin(userId: number, siteId: number, pin: GridPin): Promise<void> {
   await pool.query("UPDATE seo_sites SET grid_pin=$3 WHERE id=$1 AND user_id=$2", [siteId, userId, JSON.stringify(pin)]);
 }
-export async function saveScan(userId: number, siteId: number, scan: GridScan, costUsd: number): Promise<number> {
-  const s = scan.summary;
+/** A scan runs in the background (it can take a couple of minutes); this is its row while it does. */
+export async function beginScan(userId: number, siteId: number, input: { keyword: string; size: number; spacing: number }): Promise<number> {
   const { rows: [row] } = await pool.query(
-    `INSERT INTO seo_grid_scans(user_id, site_id, keyword, size, spacing, scan, avg_rank, points, checked, found, top3, cost_usd) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
-    [userId, siteId, scan.keyword, scan.size, scan.spacing, JSON.stringify(scan), s.avgRank, s.points, s.checked, s.found, s.top3, costUsd]);
+    `INSERT INTO seo_grid_scans(user_id, site_id, keyword, size, spacing, status, points) VALUES($1,$2,$3,$4,$5,'running',$6) RETURNING id`,
+    [userId, siteId, input.keyword, input.size, input.spacing, input.size * input.size]);
   return row.id;
+}
+/** The scan a site has running now, if any (one at a time). */
+export async function runningScan(userId: number, siteId: number): Promise<{ id: number; keyword: string; size: number; spacing: number; at: string } | null> {
+  const { rows: [row] } = await pool.query(
+    `SELECT id, keyword, size, spacing::float8 AS spacing, created_at AS at FROM seo_grid_scans
+      WHERE site_id=$1 AND user_id=$2 AND status='running' AND created_at > now() - interval '${GRID_STALE_MINUTES} minutes' ORDER BY id DESC LIMIT 1`, [siteId, userId]);
+  return row ?? null;
+}
+export async function finishScan(id: number, scan: GridScan, costUsd: number): Promise<void> {
+  const s = scan.summary;
+  await pool.query(`UPDATE seo_grid_scans SET status='done', scan=$2, avg_rank=$3, points=$4, checked=$5, found=$6, top3=$7, cost_usd=$8 WHERE id=$1`,
+    [id, JSON.stringify(scan), s.avgRank, s.points, s.checked, s.found, s.top3, costUsd]);
+}
+export async function failScan(id: number, message: string): Promise<void> {
+  await pool.query(`UPDATE seo_grid_scans SET status='failed', error=$2 WHERE id=$1 AND status='running'`, [id, message.slice(0, 300)]);
 }
 export type ScanRow = { id: number; keyword: string; size: number; spacing: number; avgRank: number | null; points: number; checked: number; found: number; top3: number; at: string };
 export async function listScans(userId: number, siteId: number, limit = 40): Promise<ScanRow[]> {
   const { rows } = await pool.query(
     `SELECT id, keyword, size, spacing::float8 AS spacing, avg_rank::float8 AS "avgRank", points, checked, found, top3, created_at AS at
-       FROM seo_grid_scans WHERE site_id=$1 AND user_id=$2 ORDER BY created_at DESC, id DESC LIMIT $3`, [siteId, userId, limit]);
+       FROM seo_grid_scans WHERE site_id=$1 AND user_id=$2 AND status='done' ORDER BY created_at DESC, id DESC LIMIT $3`, [siteId, userId, limit]);
   return rows;
 }
-export async function getScan(userId: number, siteId: number, scanId: number): Promise<(GridScan & { id: number }) | null> {
-  const { rows: [row] } = await pool.query("SELECT id, scan FROM seo_grid_scans WHERE id=$1 AND site_id=$2 AND user_id=$3", [scanId, siteId, userId]);
-  return row ? { ...(row.scan as GridScan), id: row.id } : null;
+export type ScanState = { id: number; status: "running" | "done" | "failed"; scan: (GridScan & { id: number }) | null; error: string | null };
+export async function getScan(userId: number, siteId: number, scanId: number): Promise<ScanState | null> {
+  const { rows: [row] } = await pool.query(
+    `SELECT id, scan, status, error, created_at < now() - interval '${GRID_STALE_MINUTES} minutes' AS stale FROM seo_grid_scans WHERE id=$1 AND site_id=$2 AND user_id=$3`, [scanId, siteId, userId]);
+  if (!row) return null;
+  if (row.status === "running" && row.stale) return { id: row.id, status: "failed", scan: null, error: "The scan was interrupted before it finished. Lookups it had not made were not charged." };
+  return { id: row.id, status: row.status, scan: row.status === "done" && row.scan ? { ...(row.scan as GridScan), id: row.id } : null, error: row.status === "failed" ? row.error ?? "The scan could not be completed." : null };
 }
