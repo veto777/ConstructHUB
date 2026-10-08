@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildScan, gridEstimateUsd, gridPoints, isTarget, parseMapListings, pinInput, rivalsOf, scanInput, summarise, GRID_POINT_USD, type MapListing } from "./grid";
+import { buildScan, gridEstimateUsd, gridPoints, isTarget, parseMapListings, pinInput, pointRequest, rivalsOf, scanInput, summarise, GRID_POINT_USD, type MapListing } from "./grid";
 
 const item = (title: string, extra: Record<string, unknown> = {}) => ({ type: "maps_search", title, ...extra });
 const L = (name: string, rank: number, extra: Partial<MapListing> = {}): MapListing => ({ name, rank, cid: null, domain: null, address: null, lat: null, lng: null, rating: null, reviews: null, ...extra });
@@ -18,7 +18,8 @@ describe("local grid", () => {
     expect(gridPoints({ lat: 0, lng: 0 }, 7, 5)).toHaveLength(49);
   });
   it("only the offered sizes and distances are accepted", () => {
-    expect(scanInput.parse({ keyword: " siding contractor " })).toEqual({ keyword: "siding contractor", size: 5, spacing: 1 });
+    expect(scanInput.parse({ keyword: " siding contractor " })).toEqual({ keyword: "siding contractor", size: 5, spacing: 2 });
+    expect(scanInput.safeParse({ keyword: "x", spacing: 0.5 }).success).toBe(false);
     expect(scanInput.safeParse({ keyword: "x", size: 9 }).success).toBe(false);
     expect(scanInput.safeParse({ keyword: "x", size: 5, spacing: 50 }).success).toBe(false);
     expect(scanInput.safeParse({ keyword: "" }).success).toBe(false);
@@ -34,6 +35,12 @@ describe("local grid", () => {
       { name: "Alpine Exteriors | Siding", rank: 1, cid: "9877668871764835558", domain: "alpineexteriorswa.com", address: "2119 Lincoln St", lat: 48.75, lng: -122.46, rating: 4.9, reviews: 106 },
       { name: "Universal Roofing LLC", rank: 2, cid: null, domain: null, address: null, lat: null, lng: null, rating: null, reviews: null },
     ]);
+  });
+  it("each point is a search made from that spot, not a map picture of it", () => {
+    // A map view (coordinates plus a zoom) lists only what is inside the picture; the searcher's coordinates alone do not.
+    expect(pointRequest("siding contractor", { lat: 48.7583, lng: -122.4626 })).toEqual({ keyword: "siding contractor", location_coordinate: "48.7583,-122.4626", language_code: "en", depth: 20 });
+    const got = parseMapListings([{ type: "local_pack", title: "Paid", is_paid: true }, { type: "local_pack", title: "Alpine", cid: "12", domain: "alpine.example", rating: { value: 4.9, votes_count: 106 } }]);
+    expect(got).toEqual([{ name: "Alpine", rank: 1, cid: "12", domain: "alpine.example", address: null, lat: null, lng: null, rating: 4.9, reviews: 106 }]);
   });
   it("recognises the business by Google's id first, then its website, then its exact name", () => {
     const t = { cid: "111", domain: "alpine.example", name: "Alpine Exteriors" };

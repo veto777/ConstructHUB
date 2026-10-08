@@ -1,7 +1,9 @@
 /**
- * Local grid: where a business shows up in Google Maps for one search, checked from a
- * square of points laid over its service area (3x3, 5x5 or 7x7, a chosen distance apart).
- * Each point is one Google Maps lookup "as if standing there"; the business is recognised by
+ * Local grid: where a business shows up in Google's local results for one search, checked
+ * from a square of points laid over its service area (3x3, 5x5 or 7x7, a chosen distance apart).
+ * Each point is one Google local search made as if standing there (the local finder with the
+ * searcher's coordinates — NOT a map view centred there: a map view only lists what is inside
+ * the picture, so a business two miles off looked "not found"; measured 2026-10-08). The business is recognised by
  * its Google listing id, else its website, else its name. Scans are kept, so one can be
  * compared with the last. Charged to SEO data like every other lookup (server/seo/budget.ts).
  */
@@ -11,12 +13,11 @@ import { request, assertOk, taskItems, safeDomain, normalizeBusinessName, type D
 
 export const GRID_SIZES = [3, 5, 7] as const;
 /** Miles between neighbouring points. */
-export const GRID_SPACINGS = [0.5, 1, 2, 3, 5] as const;
-/** One Google Maps lookup for one point (measured 2026-10-08). */
+export const GRID_SPACINGS = [1, 2, 3, 5, 10] as const;
+/** One local search for one point (measured 2026-10-08). */
 export const GRID_POINT_USD = 0.002;
-/** How far down the map results we look; a business not in these is "not in the top 20". */
+/** How far down the local results we look; a business not in these is "not in the top 20". */
 export const GRID_DEPTH = 20;
-const GRID_ZOOM = 14;
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 /** The most a scan of `points` points can cost us (held while it runs). */
 export const gridEstimateUsd = (points: number) => round6(points * GRID_POINT_USD * 1.25);
@@ -27,7 +28,7 @@ const literal = <T extends readonly number[]>(values: T) => z.number().refine((n
 export const scanInput = z.object({
   keyword: z.string().trim().min(1).max(120),
   size: literal(GRID_SIZES).default(5),
-  spacing: literal(GRID_SPACINGS).default(1),
+  spacing: literal(GRID_SPACINGS).default(2),
 }).strict();
 export const locateInput = z.object({ query: z.string().trim().min(2).max(160) }).strict();
 export const pinInput = z.object({
@@ -55,11 +56,11 @@ const num = (v: unknown): number | null => (typeof v === "number" && Number.isFi
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 export type MapListing = { name: string; rank: number; cid: string | null; domain: string | null; address: string | null; lat: number | null; lng: number | null; rating: number | null; reviews: number | null };
-/** The businesses in one Google Maps result, in order. Ads and anything without a name are left out. */
+/** The businesses in one Google Maps or local-finder result, in order. Ads and anything without a name are left out. */
 export function parseMapListings(items: any[]): MapListing[] {
   const out: MapListing[] = [];
   for (const i of items) {
-    if (i?.type !== "maps_search") continue;
+    if ((i?.type !== "maps_search" && i?.type !== "local_pack") || i.is_paid === true) continue;
     const name = str(i.title);
     if (!name) continue;
     out.push({
@@ -135,14 +136,17 @@ export function buildScan(input: { keyword: string; size: number; spacing: numbe
   };
 }
 
-async function mapLookup(body: Record<string, unknown>): Promise<{ listings: MapListing[]; costUsd: number }> {
-  const task: DfsTask = assertOk(await gridDeps.request("POST", "/serp/google/maps/live/advanced", [body]), { treatNoResultsAsEmpty: true });
+async function mapLookup(path: string, body: Record<string, unknown>): Promise<{ listings: MapListing[]; costUsd: number }> {
+  const task: DfsTask = assertOk(await gridDeps.request("POST", path, [body]), { treatNoResultsAsEmpty: true });
   return { listings: parseMapListings(taskItems(task)), costUsd: typeof task.cost === "number" ? task.cost : 0 };
 }
 
+/** The local search made from one point: the searcher's own coordinates, no map view. */
+export const pointRequest = (keyword: string, cell: { lat: number; lng: number }) => ({ keyword, location_coordinate: `${cell.lat},${cell.lng}`, language_code: "en", depth: GRID_DEPTH });
+
 /** Find the business on Google Maps by name (and town), to choose the pin the grid is centred on. */
 export async function locateBusiness(query: string): Promise<{ data: MapListing[]; costUsd: number }> {
-  const { listings, costUsd } = await mapLookup({ keyword: query, location_code: 2840, language_code: "en", depth: 10 });
+  const { listings, costUsd } = await mapLookup("/serp/google/maps/live/advanced", { keyword: query, location_code: 2840, language_code: "en", depth: 10 });
   return { data: listings.filter((l) => l.lat !== null && l.lng !== null).slice(0, 8), costUsd };
 }
 
@@ -157,7 +161,7 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
       const i = next++;
       if (i >= cells.length) return;
       try {
-        const r = await mapLookup({ keyword: input.keyword, location_coordinate: `${cells[i].lat},${cells[i].lng},${GRID_ZOOM}z`, language_code: "en", depth: GRID_DEPTH });
+        const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]));
         costUsd += r.costUsd; results[i] = r.listings;
       } catch (e: any) {
         firstError ??= e;

@@ -1,6 +1,6 @@
 /**
- * /seo/local-grid — Local grid: where the business shows up in Google Maps for
- * one search, from a square of points over its service area. Pick the business
+ * /seo/local-grid — Local grid: where the business shows up in Google's local
+ * results for one search, searched from a square of points over its service area. Pick the business
  * on the map once, then scan a keyword; each scan is kept so the next can be
  * compared with it. Every lookup shows its price first (server/seo/grid.ts).
  */
@@ -50,7 +50,7 @@ export default function SeoLocalGridPage() {
   const [changing, setChanging] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [size, setSize] = useState(5);
-  const [spacing, setSpacing] = useState(1);
+  const [spacing, setSpacing] = useState(2);
   const [openId, setOpenId] = useState<number | null>(null);
   const [fresh, setFresh] = useState<Scan | null>(null);
   const [cell, setCell] = useState<number | null>(null);
@@ -99,7 +99,7 @@ export default function SeoLocalGridPage() {
   const span = shown ? (shown.size - 1) * shown.spacing : 0;
 
   return (
-    <SeoShell title="Local grid" description="Where your business shows up in Google Maps across your service area — point by point, for the searches your customers make." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — searched from point after point, for the searches your customers make." site={site} onSite={onSite} sites={sites} status={status}>
       {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h3>No sites yet</h3><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}
       {site && q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</p>}
       {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the local grid</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
@@ -160,7 +160,7 @@ export default function SeoLocalGridPage() {
                 </Button>
               </form>
               <p className="g-text-2 mt-2 text-[13px]" data-testid="text-grid-cost">
-                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one Google Maps lookup{scanPrice != null ? `, about ${money(scanPrice)} of your SEO data in all` : ""}.
+                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one Google search made from that spot{scanPrice != null ? `, about ${money(scanPrice)} of your SEO data in all` : ""}.
                 {scanHold != null && scanPrice != null && scanHold > scanPrice ? ` Up to ${money(scanHold)} is set aside while it runs; what isn't used comes straight back.` : ""} A scan is kept in the history below; running it again is a new scan.
                 {!can(scanHold) && <span style={{ color: "var(--g-red)" }}> Not enough SEO data left — add credit above.</span>}
               </p>
@@ -216,8 +216,8 @@ export default function SeoLocalGridPage() {
                         </tr>
                       ))}</tbody>
                     </table></div>
-                  ) : <p className="g-text-2 text-[13px]">Google Maps showed no businesses for this search here.</p>}
-                  <p className="g-text-2 mt-2 text-[12px]">A business's average position is over the points where it shows. Positions are what Google Maps returned for someone searching from that point at the time of the scan; a real customer's results also depend on their own history and exact location.</p>
+                  ) : <p className="g-text-2 text-[13px]">Google showed no local businesses for this search here.</p>}
+                  <p className="g-text-2 mt-2 text-[12px]">A business's average position is over the points where it shows. Positions are Google's local results (the list behind the map pack) for a search made from that point at the time of the scan; a real customer's results also depend on their own history and the device they use.</p>
                 </div>
               </div>
             </section>
@@ -226,7 +226,7 @@ export default function SeoLocalGridPage() {
           {pin && !changing && (
             <section data-testid="grid-history">
               <h2 className="g-text mb-2 text-[15px] font-medium">Scans so far</h2>
-              {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h3>No scans yet</h3><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three businesses Google Maps shows.</p></Empty> : (
+              {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h3>No scans yet</h3><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three businesses Google shows locally — the ones in the map pack.</p></Empty> : (
                 <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-scans">
                   <thead><tr><th>Search</th><th>Grid</th><th className="num">Average position</th><th className="num">In the top 3</th><th className="num">Found</th><th className="num">When</th></tr></thead>
                   <tbody>{q.data.scans.map((s) => (

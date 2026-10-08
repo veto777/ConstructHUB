@@ -606,7 +606,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     await savePin(user, site.id, pin);
     res.json({ pin });
   });
-  // One scan: every point is one Google Maps lookup. Kept in the history; never reused, because positions move.
+  // One scan: every point is one Google local search made from that spot. Kept in the history; never reused, because positions move.
   route("post", "/api/seo/sites/:id/grid/scan", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const input = scanInput.parse(req.body);
