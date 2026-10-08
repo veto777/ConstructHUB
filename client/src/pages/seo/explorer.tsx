@@ -5,6 +5,7 @@
  * One report is charged to the account's SEO data credit; a saved report is free to
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
  */
+import { DirectoriesView } from "./directories";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ import { MarketPicker, useMarket } from "./market";
 import { findMarket, marketKey, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { AddToList } from "./keyword-lists";
 
-type GapKey = "contentGap" | "linkIntersect" | "opportunities";
+type GapKey = "contentGap" | "linkIntersect" | "opportunities" | "directories";
 type ViewKey = ReportKey | GapKey | "overview";
 
 type Footprint = {
@@ -102,7 +103,7 @@ function AuthorityRing({ value }: { value: number | null }) {
 /** The left menu, grouped the way Site Explorer groups its reports. */
 const MENU: { group: string; items: [ViewKey, string][] }[] = [
   { group: "", items: [["overview", "Overview"], ["opportunities", "Opportunities"]] },
-  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["referringIps", "Referring IPs"], ["linkCompetitors", "Sites with similar links"], ["linkIntersect", "Link intersect"], ["bestByLinks", "Best pages by links"]] },
+  { group: "Backlink profile", items: [["backlinks", "Backlinks"], ["newBacklinks", "New backlinks"], ["lostBacklinks", "Lost backlinks"], ["brokenBacklinks", "Broken backlinks"], ["referringDomains", "Referring domains"], ["anchors", "Anchors"], ["referringIps", "Referring IPs"], ["linkCompetitors", "Sites with similar links"], ["linkIntersect", "Link intersect"], ["directories", "Directories"], ["bestByLinks", "Best pages by links"]] },
   { group: "Organic search", items: [["keywords", "Organic keywords"], ["pages", "Top pages"], ["competitors", "Organic competitors"], ["subdomains", "Subdomains"], ["contentGap", "Content gap"]] },
   { group: "Paid search", items: [["paidKeywords", "Paid keywords"], ["ads", "Ads"]] },
 ];
@@ -310,7 +311,9 @@ export default function SeoExplorerPage() {
           {view !== "overview" ? (
             <>
               <h3 className="g-text mb-3 text-[17px] font-medium" data-testid="text-report-title">{MENU_LABEL[view]}</h3>
-              {view === "opportunities" ? (
+              {view === "directories" ? (
+                <DirectoriesView domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)} planSiteId={trackedSite?.id} />
+              ) : view === "opportunities" ? (
                 <OpportunitiesView key={`${report.domain}:${marketKey(market)}`} domain={report.domain} status={status.data} market={market} planSiteId={trackedSite?.id} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : view === "contentGap" || view === "linkIntersect" ? (
                 <GapView planSiteId={trackedSite?.id} market={market} kind={view === "contentGap" ? "content" : "links"} domain={report.domain} status={status.data} suggestions={(report.competitors ?? []).map((c) => c.domain)}

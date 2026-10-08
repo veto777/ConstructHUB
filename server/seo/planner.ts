@@ -121,5 +121,6 @@ export async function fetchPlanner(input: { domain: string; locationCode: number
     call("/dataforseo_labs/google/ranked_keywords/live", rankingsRequest(input.domain, keywords, input)),
   ]);
   if (!volumes && !rankings) throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError ?? "The lookups failed.")), { costUsd, costUnknown });
-  return { data: buildPlanner(input, volumes, rankings), costUsd, customerUsd, costUnknown };
+  const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
+  return { data: buildPlanner(input, volumes, rankings), costUsd: r6(costUsd), customerUsd: r6(customerUsd), costUnknown };
 }

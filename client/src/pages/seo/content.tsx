@@ -30,6 +30,8 @@ export default function SeoContentPage() {
   const [input, setInput] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [query, setQuery] = useState<string | null>(() => new URLSearchParams(window.location.search).get("q"));
   const [f, setF] = useState<Filters>({ sort: "relevance", excludeOwn: true });
+  /** How the pages on screen are ordered once their numbers are in (the search's own order until then). */
+  const [by, setBy] = useState<"search" | "links" | "traffic">("search");
   const [offset, setOffset] = useState(0);
   const limit = 25;
   useEffect(() => { setOffset(0); }, [query, f]);
@@ -55,6 +57,34 @@ export default function SeoContentPage() {
     a.href = URL.createObjectURL(blob); a.download = `content-${page.query.replace(/[^a-z0-9]+/gi, "-")}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const set = (patch: Partial<Filters>) => setF((x) => ({ ...x, ...patch }));
+
+  // Numbers for the pages on screen: free to look for a saved copy, bought only when asked for.
+  type Metric = { url: string; linkingSites: number | null; traffic: number | null; keywords: number | null };
+  const pageUrls = useMemo(() => (saved.data?.page?.rows ?? []).map((r) => r.url), [saved.data]);
+  const metricsBody = useMemo(() => ({ urls: pageUrls }), [pageUrls]);
+  const metricsKey = ["/api/seo/content/metrics", metricsBody];
+  const metrics = useQuery<{ page: { rows: Metric[]; missing: string[] } } | null>({
+    queryKey: metricsKey, enabled: pageUrls.length > 0, retry: false, staleTime: 5 * 60_000,
+    queryFn: async () => { try { return await api("POST", "/api/seo/content/metrics", { ...metricsBody, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+  });
+  const addMetrics = useMutation({
+    mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/content/metrics", v.body),
+    onSuccess: (data: { saved?: boolean }, v) => {
+      qc.setQueryData(v.key, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (data.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening these numbers again will not be free.", variant: "destructive" });
+    },
+    onError: (e) => toast({ title: "Couldn't get those numbers", description: apiErrorMessage(e), variant: "destructive" }),
+  });
+  const metricsPrice = (status.data?.prices as Record<string, number | undefined> | undefined)?.pageMetrics25 ?? null;
+  const canPayMetrics = metricsPrice == null || !status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= metricsPrice;
+  const metricOf = (url: string) => metrics.data?.page?.rows.find((m) => m.url === url || m.url.replace(/\/$/, "") === url.replace(/\/$/, "")) ?? null;
+  // Ordering by a number puts pages without that number last; the search's own order is kept among equals.
+  const ordered = useMemo(() => {
+    const rows = saved.data?.page?.rows ?? [];
+    if (by === "search" || !metrics.data?.page) return rows;
+    const val = (u: string) => { const m = metricOf(u); return m ? (by === "links" ? m.linkingSites : m.traffic) : null; };
+    return rows.map((r, i) => ({ r, i, v: val(r.url) })).sort((a, b) => (a.v == null ? 1 : 0) - (b.v == null ? 1 : 0) || (b.v ?? 0) - (a.v ?? 0) || a.i - b.i).map((x) => x.r);
+  }, [saved.data, metrics.data, by]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
@@ -92,9 +122,28 @@ export default function SeoContentPage() {
             <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!page.rows.length} onClick={exportCsv} data-testid="button-content-export"><Download /> Export</button>
           </div>
           {saved.data?.saved === false && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="content-unsaved">These results could not be kept, so opening this search again will not be free. Export them now if you need them.</p>}
+          {page.rows.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="content-metrics-bar">
+              {!metrics.data?.page ? (
+                <>
+                  <button type="button" className="g-pill g-pill--sm" disabled={addMetrics.isPending || !status.data?.configured || !canPayMetrics || metrics.isLoading} onClick={() => addMetrics.mutate({ body: metricsBody, key: metricsKey })} data-testid="button-content-metrics">
+                    {addMetrics.isPending ? <Loader2 className="animate-spin" /> : null} Add linking sites and search visits for these {page.rows.length} pages{metricsPrice != null ? ` — up to ${money(metricsPrice)}` : ""}
+                  </button>
+                  <span className="g-text-2">{!canPayMetrics ? "Not enough SEO data left — add credit above." : "Shows which of these pages are worth learning from, or asking for a link."}</span>
+                </>
+              ) : (
+                <>
+                  <label className="g-text-2 flex items-center gap-2">Order these pages by
+                    <select className="g-select" value={by} onChange={(e) => setBy(e.target.value as typeof by)} data-testid="select-content-by"><option value="search">The search's own order</option><option value="links">Most linking sites</option><option value="traffic">Most search visits</option></select>
+                  </label>
+                  {metrics.data.page.missing.length > 0 && <span role="status" style={{ color: "var(--g-red)" }} data-testid="content-metrics-missing">{metrics.data.page.missing.includes("links") ? "Linking sites" : "Search visits"} didn't load (not charged).</span>}
+                </>
+              )}
+            </div>
+          )}
           {page.rows.length === 0 ? <Empty testId="content-empty"><h3>No pages found</h3><p>Try fewer words, or loosen the filters.</p></Empty> : (
             <ul className="space-y-2" data-testid="list-content">
-              {page.rows.map((r) => (
+              {ordered.map((r) => (
                 <li key={r.url} className="rounded-lg border p-3" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
                   <a href={r.url} target="_blank" rel="noreferrer nofollow" className="g-link text-[15px] font-medium">{r.title}</a>
                   <div className="g-text-2 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px]">
@@ -102,6 +151,7 @@ export default function SeoContentPage() {
                     <span title="Link strength of the site, 0–100">authority {r.authority ?? "—"}</span>
                     {r.published && <span>published {new Date(`${r.published}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
                     {r.author && <span>by {r.author}</span>}
+                    {metricOf(r.url) && <span className="g-text" data-testid="content-page-metrics"><b className="font-medium tabular-nums">{metricOf(r.url)!.linkingSites == null ? "—" : fmtNum(metricOf(r.url)!.linkingSites)}</b> linking site{metricOf(r.url)!.linkingSites === 1 ? "" : "s"} · <b className="font-medium tabular-nums">{metricOf(r.url)!.traffic == null ? "—" : fmtNum(metricOf(r.url)!.traffic)}</b> search visits / mo</span>}
                   </div>
                   {r.snippet && <p className="g-text mt-1 text-[13px]">{r.snippet}</p>}
                 </li>

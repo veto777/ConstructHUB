@@ -15,6 +15,8 @@
  * Without vendor credentials every endpoint still answers with
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
+import { pageMetricsInput, cleanUrls, fetchPageMetrics, pageMetricsEstimateUsd, type PageMetrics } from "./page-metrics";
+import { directoriesInput, fetchDirectories, directoriesEstimateUsd, type DirectoriesPage } from "./directories";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -101,6 +103,10 @@ export const SEO_PRICES = {
   bulkPer100: retailCents(100 * LABS_ITEM_USD),
   /** One page of Link intersect (the most it costs, for up to three competitors). Content gap is competitorGap per competitor. */
   linkIntersect: retailCents(gapEstimateUsd("links", GAP_MAX_COMPETITORS, 50)),
+  /** Content explorer: linking sites and search visits for one page of 25 results (two lookups). */
+  pageMetrics25: retailCents(pageMetricsEstimateUsd(25)),
+  /** Directories: one lookup per site checked. */
+  directoriesPerSite: retailCents(directoriesEstimateUsd(1)),
   /** Service-area planner: two lookups — a flat part plus so much per 100 searches in the table. */
   plannerBase: retailCents(2 * LABS_TASK_USD),
   plannerPer100: retailCents(2 * 100 * LABS_ITEM_USD),
@@ -680,6 +686,38 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
       () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Content explorer: linking sites and search visits for the pages on screen ──
+  route("post", "/api/seo/content/metrics", async (req, res, user) => {
+    const input = pageMetricsInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
+    const urls = cleanUrls(input.urls);
+    if (!urls.length) return res.status(400).json({ message: "No web pages to look up." });
+    const key = cacheKey("page-metrics", [[...urls].sort(), input.locationCode, input.languageCode]);
+    const saved = await cached<PageMetrics>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<PageMetrics>(user, key, "page-metrics", CACHE_HOURS, pageMetricsEstimateUsd(urls.length),
+      () => fetchPageMetrics({ urls, locationCode: input.locationCode, languageCode: input.languageCode }), false, `Content explorer — links and visits for ${urls.length} page${urls.length === 1 ? "" : "s"}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+  });
+
+  // ── Directories (Site Explorer): which review sites and trade directories link to a site and its competitors ──
+  route("post", "/api/seo/directories", async (req, res, user) => {
+    const input = directoriesInput.parse(req.body);
+    const target = normalizeDomain(input.domain);
+    if (!target) return res.status(400).json({ message: "Enter a domain like example.com" });
+    const competitors = [...new Set(input.competitors.map((c) => normalizeDomain(c)).filter((c): c is string => !!c && c !== target))];
+    const sites = [target, ...competitors];
+    const key = cacheKey("directories", [target, competitors]);
+    const saved = input.refresh ? null : await cached<DirectoriesPage>(user, key, CACHE_HOURS);
+    if (saved) return res.json({ page: saved, reused: true });
+    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (!isConfigured()) return notReady(res);
+    const out = await buyOnce<DirectoriesPage>(user, key, "directories", CACHE_HOURS, directoriesEstimateUsd(sites.length), () => fetchDirectories(sites), input.refresh, `Directories — ${sites.join(", ")}`);
+    res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
   // ── Service-area planner (Keywords explorer): services x towns for one site ──
