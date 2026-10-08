@@ -45,7 +45,7 @@ texting number $29/mo, competitor scan pack $39/mo. **AI Call Assistant** tiers
 SEO data beyond the plan's allowance is prepaid credit in packs of $25 / $50 / $100
 (`shared/seo-credits.ts:19`).
 
-**CRM** — `shared/crm-plans.ts:100-169`; 14-day trial (`CRM_TRIAL_DAYS`, line 178).
+**CRM** — `shared/crm-plans.ts:100-169`; 7-day trial (`CRM_TRIAL_DAYS`, line 178; owner decision 2026-10-08, was 14).
 
 | Plan | Monthly | Annual | Seats | Not in this plan |
 | --- | --- | --- | --- | --- |
