@@ -78,6 +78,64 @@ objects already in R2 are left alone and the manifest is written once all three 
 `index.ts` → `npx tsx scripts/tutorials/gen-index.ts`. `npx tsx scripts/tutorials/db.ts list` shows
 which recording databases exist.
 
+## Demo data
+
+The workspace is "Aspire Interiors" (Sarasota, FL), signed in as "Demo Account". Everything in it is
+invented (`scripts/seed-crm-demo.ts` + `scripts/tutorials/seed-demo.ts`): the people, the companies and
+the street addresses are made up and were not checked against real ones; only the city / state / ZIP
+pairs are real places. Use these names exactly — narration and selectors (`:has-text("…")`).
+
+| State | Client (exact display name) | City | What they have |
+| --- | --- | --- | --- |
+| FL | Joe & Mary Kane | Sarasota | P-2001 In Progress · E-2001 approved · INV-2002 sent · JobCam photos · messages |
+| FL | Dana Whitfield | Osprey | P-2002 Lead |
+| FL | Luis Orozco | Bradenton | P-2003 Estimating · E-2002 viewed · the one unanswered message |
+| FL | The Mercer Group (company) | Sarasota | P-2004 Proposal Sent · pending ACH deposit |
+| FL | Greta Ellison | Venice | P-2005 Scheduled · deposit by check · messages |
+| FL | Tom & Priya Bauer | Sarasota | P-2006 Waiting on Trades · failed card payment |
+| FL | Lan Nguyen | Bradenton | P-2007 Punch List · cash payment |
+| FL | Vince Castellano | Venice | P-2008 Paid · INV-2001 paid |
+| NY | Rosa & Stefan Ferrante | Brooklyn | P-1993 Lead · visit in 3 days · message thread (answered) |
+| NY | Tunde Oyelaran | Albany | P-1994 Approved · E-1997 approved (8% tax) · deposit by check · visit tomorrow |
+| NY | Hannah Lindqvist | Buffalo | P-1995 Invoiced · INV-1999 sent (8.75% tax) |
+| NY | Wrenhaven Dental Studio (company) | White Plains | P-1996 Estimating |
+| TX | Caleb & Nora Hadley | Austin | P-1997 Scheduled · E-1998 approved (8.25% tax) · deposit by check · visit in 2 days · message thread (answered) |
+| TX | Imani Brewster | Dallas | P-1998 Estimating · E-1999 draft (8.25% tax) |
+| TX | Rafael Quintanilla | Houston | P-1999 Complete · INV-2000 partial (8.25% tax), half paid by check |
+| TX | Halvorsen-Quist Properties (company) | San Antonio | P-2000 Proposal Sent · E-2000 sent (8.25% tax) · visit in 5 days · one read message |
+
+The client list shows the newest first and mixes the states: Vince Castellano, Caleb & Nora Hadley,
+Lan Nguyen, Rosa & Stefan Ferrante, Tom & Priya Bauer, Imani Brewster, Greta Ellison, Tunde Oyelaran,
+The Mercer Group, Rafael Quintanilla, Luis Orozco, Hannah Lindqvist, Dana Whitfield, Halvorsen-Quist
+Properties, Joe & Mary Kane, Wrenhaven Dental Studio. The New York and Texas documents carry numbers
+below the Florida ones, so the next document made on camera is still E-2003, INV-2003 or P-2009. Their
+ids start `demo-` (`demo-client-hadley`, `demo-project-p-1997`, `demo-estimate-e-1998`,
+`demo-invoice-inv-2000`, `demo-appt-13`…`16`, `demo-msg-07`…`11`, `demo-pay-05`…`07`) and are fixed.
+With sixteen clients a short search can match more than one of them — type enough letters, and
+look at the frame.
+
+**Sales tax — what is true on screen (operated 2026-10-07, the same for FL, NY and TX).** The app does
+not know a state's tax rate. A new estimate takes its rate from the job's *city* in a division's
+tax table, else the division's default, else the company default (Settings) — and the demo workspace
+has none of the three set. So:
+
+- In the New estimate wizard the review step shows, for every client: "Sales tax — Added
+  automatically from the client's address", and a **Total equal to the Subtotal**. No tax amount is
+  shown there.
+- The estimate it creates has **Tax $0.00** (rate 0%) — for a Florida client, a New York client and a
+  Texas client alike. Do not say that tax "was added" or name a rate for a new estimate; "tax comes
+  from the rate you set in Settings" is the most that is true, and only if you show that setting.
+- The tax on the seeded documents (7% Florida, 8% Albany, 8.75% Buffalo, 8.25% Texas) was typed on
+  each document, like the "Tax %" field of the estimate editor does. You may say an estimate "shows
+  its tax above the total"; do not say the app worked the rate out from the state.
+
+**Changing the demo data.** Add rows to `scripts/tutorials/seed-demo.ts` (fixed `demo-` ids,
+insert-if-absent, dates relative to now) — never rename, reorder or delete one, scripts find rows by
+name. Then `npx tsx scripts/tutorials/db.ts reseed`: it applies the seed to the template in one
+transaction, so producers can keep recording — a copy made at that moment holds the old data or the
+new, never half. (`db.ts template --rebuild` drops the template and needs every producer stopped.)
+A reseed changes counts and totals on Home, Pipeline and the lists: check your frames after one.
+
 ## House style
 
 **Frame.** Every script: `"viewport": { "width": 1024, "height": 576 }, "zoom": 1.875` — a
