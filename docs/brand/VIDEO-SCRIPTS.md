@@ -83,7 +83,7 @@ not make a JobCam-vs-CompanyCam video** — on the facts it is their win.
 
 ## 1. `brand-what-is-constructhub` — "What is ConstructHUB? Find the permit office. Run the whole job."
 
-**Recorded 2026-10-08 on slot 6, 61 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-what-is-constructhub.json`).**
+**Recorded 2026-10-08 on slot 6 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 61 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-what-is-constructhub.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -117,14 +117,14 @@ not make a JobCam-vs-CompanyCam video** — on the facts it is their win.
 | "Buy one, or both. Each has its own plans." | [D5] | `shared/crm-plans.ts:4-7` |
 
 - **Title:** What is ConstructHUB? Find the permit office. Run the whole job. · **Thumbnail / cover headline:** FIVE APPS? STOP. (kicker "What is ConstructHUB?")
-- **Files:** master `tutorials/brand-what-is-constructhub.55b67f5f.mp4` · captions `tutorials/brand-what-is-constructhub.ea3ef8f3.vtt` · poster `tutorials/brand-what-is-constructhub.465c6b56.jpg` · social cuts (vertical 57.6 s, 4:5 feed 57.6 s, TikTok file, two covers): `tutorials/brand-what-is-constructhub.social-cover-feed.4271ff1f.jpg`, `tutorials/brand-what-is-constructhub.social-cover-vertical.743daef1.jpg`, `tutorials/brand-what-is-constructhub.social-feed.218f25a8.mp4`, `tutorials/brand-what-is-constructhub.social-tiktok.28bb16b2.mp4`, `tutorials/brand-what-is-constructhub.social-vertical.5283e3bc.mp4` · production folder `analysis/video-out/brand-what-is-constructhub/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-what-is-constructhub.7e459284.mp4` · captions `tutorials/brand-what-is-constructhub.80624115.vtt` · poster `tutorials/brand-what-is-constructhub.465c6b56.jpg` · social cuts (vertical 57.77 s, 4:5 feed 57.77 s, TikTok file, two covers): `tutorials/brand-what-is-constructhub.social-cover-feed.4271ff1f.jpg`, `tutorials/brand-what-is-constructhub.social-cover-vertical.743daef1.jpg`, `tutorials/brand-what-is-constructhub.social-feed.37b5a1c4.mp4`, `tutorials/brand-what-is-constructhub.social-tiktok.6775e1af.mp4`, `tutorials/brand-what-is-constructhub.social-vertical.860176a4.mp4` · production folder `analysis/video-out/brand-what-is-constructhub/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 61 s, one second over the 45–60 s a phone cut likes (its vertical cut is 57.6 s at ×1.08 speed and keeps every step). The narrator is the calm tutorial voice — the punch comes from the copy and the cards, not the delivery. The push-in on the directory crops the side menu mid-word. The gator stands still on the cards (no reaction animation). The YouTube thumbnail lays the headline over a crop of a card and reads busy.
 
 ---
 
 ## 2. `brand-tour-crm` — "ConstructHUB CRM in 90 seconds: one job from lead to paid"
 
-**Recorded 2026-10-08 on slot 6, 86 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-tour-crm.json`).**
+**Recorded 2026-10-08 on slot 6 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 86 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-tour-crm.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -162,7 +162,7 @@ not make a JobCam-vs-CompanyCam video** — on the facts it is their win.
 | Not shown, on purpose | The job's "collected" total: the demo job already carried a deposit by check, so the invoice for the full amount would count it twice. No frame shows a collected total and nothing is said about it. | — |
 
 - **Title:** ConstructHUB CRM in 90 seconds: one job from lead to paid · **Thumbnail / cover headline:** LEAD TO PAID (kicker "CRM in 90 seconds")
-- **Files:** master `tutorials/brand-tour-crm.838e2c25.mp4` · captions `tutorials/brand-tour-crm.2a14b961.vtt` · poster `tutorials/brand-tour-crm.3acf5752.jpg` · social cuts (vertical 54.53 s, 4:5 feed 80 s, TikTok file, two covers): `tutorials/brand-tour-crm.social-cover-feed.5b7a2cb0.jpg`, `tutorials/brand-tour-crm.social-cover-vertical.a25682f8.jpg`, `tutorials/brand-tour-crm.social-feed.c5b8c856.mp4`, `tutorials/brand-tour-crm.social-tiktok.59d1b7c2.mp4`, `tutorials/brand-tour-crm.social-vertical.34066a96.mp4` · production folder `analysis/video-out/brand-tour-crm/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-tour-crm.bed947c5.mp4` · captions `tutorials/brand-tour-crm.b0fa7c92.vtt` · poster `tutorials/brand-tour-crm.3acf5752.jpg` · social cuts (vertical 54.53 s, 4:5 feed 80.17 s, TikTok file, two covers): `tutorials/brand-tour-crm.social-cover-feed.5b7a2cb0.jpg`, `tutorials/brand-tour-crm.social-cover-vertical.a25682f8.jpg`, `tutorials/brand-tour-crm.social-feed.75ee77bc.mp4`, `tutorials/brand-tour-crm.social-tiktok.f22a7825.mp4`, `tutorials/brand-tour-crm.social-vertical.af2db6bb.mp4` · production folder `analysis/video-out/brand-tour-crm/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 86 s. The checkout is a stand-in page (said in the narration and printed on the page). The job was already "Scheduled" and already carried a deposit: the film shows one job's screens in order, it does not create the lead and the estimate on camera. The pipeline card stays in Scheduled after payment, so the film ends on the paid invoice, not on the board. **The 59 s vertical cut stops after the client opens the invoice** (steps 1–14 of 18) and ends on "Full walkthrough on YouTube" — the payment is only in the 4:5 cut and the master.
 
 ---
@@ -213,7 +213,7 @@ each has been run on a real account. Never say "Google partner".
 
 ## 4. `brand-why-constructhub` — "Why ConstructHUB? Checked permit links, every price on one page"
 
-**Recorded 2026-10-08 on slot 6, 45 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-why-constructhub.json`).**
+**Recorded 2026-10-08 on slot 6 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 45 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social; in the app's "Start here" group once this branch is deployed (manifest `shared/help/videos/brand-why-constructhub.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -243,7 +243,7 @@ each has been run on a real account. Never say "Google partner".
 | "Card and bank payments go straight to your own Stripe account. We add no fee on top." | [D8]; the card's footnote: "Stripe's own processing fees apply." Shown as a card, not as a connected-account screen. | help entry `crm-payments`; /features/crm |
 
 - **Title:** Why ConstructHUB? Checked permit links, every price on one page · **Thumbnail / cover headline:** NO GUESSED LINKS (kicker "Why ConstructHUB")
-- **Files:** master `tutorials/brand-why-constructhub.9ddea801.mp4` · captions `tutorials/brand-why-constructhub.de5d75ff.vtt` · poster `tutorials/brand-why-constructhub.e7e27d0f.jpg` · social cuts (vertical 41.9 s, 4:5 feed 41.9 s, TikTok file, two covers): `tutorials/brand-why-constructhub.social-cover-feed.8ab1fd2c.jpg`, `tutorials/brand-why-constructhub.social-cover-vertical.71720ac6.jpg`, `tutorials/brand-why-constructhub.social-feed.5132f0e6.mp4`, `tutorials/brand-why-constructhub.social-tiktok.2772d130.mp4`, `tutorials/brand-why-constructhub.social-vertical.c62337c2.mp4` · production folder `analysis/video-out/brand-why-constructhub/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-why-constructhub.8f1e4f35.mp4` · captions `tutorials/brand-why-constructhub.e60564f9.vtt` · poster `tutorials/brand-why-constructhub.e7e27d0f.jpg` · social cuts (vertical 42.03 s, 4:5 feed 42.03 s, TikTok file, two covers): `tutorials/brand-why-constructhub.social-cover-feed.8ab1fd2c.jpg`, `tutorials/brand-why-constructhub.social-cover-vertical.71720ac6.jpg`, `tutorials/brand-why-constructhub.social-feed.51faf978.mp4`, `tutorials/brand-why-constructhub.social-tiktok.d3e02f4a.mp4`, `tutorials/brand-why-constructhub.social-vertical.c0e776d2.mp4` · production folder `analysis/video-out/brand-why-constructhub/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 45 s. The ring on the Not included list did not draw in the take (the list is on screen and the pointer is on it). The Plans page shows the demo account's own "Your plan: Agency" banner above the fold of that shot, and our own prices are on screen. The first card's "guessed link" column describes a guess in general, not any product.
 
 ---
@@ -283,7 +283,7 @@ shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in
 
 ### 5a. `brand-vs-jobber` — "Jobber vs ConstructHUB CRM: permits, seats and the pipeline (2026)"
 
-**Recorded 2026-10-08 on slot 3, 50 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-jobber.json`).**
+**Recorded 2026-10-08 on slot 3 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 50 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-jobber.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -311,12 +311,12 @@ shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in
 | "Not the same features. Jobber has an app marketplace, and tools we don't have. Check both." | Jobber Core: "Connect 100+ tools through the app marketplace". | getjobber.com/pricing, read in a headless browser (the page refuses curl) 2026-10-08 04:09–04:12 UTC |
 
 - **Title:** Jobber vs ConstructHUB CRM: permits, seats and the pipeline (2026) · **Thumbnail / cover headline:** JOBBER VS CONSTRUCTHUB (kicker "Permits · seats · pipeline")
-- **Files:** master `tutorials/brand-vs-jobber.80d4385e.mp4` · captions `tutorials/brand-vs-jobber.461ace60.vtt` · poster `tutorials/brand-vs-jobber.550d40ff.jpg` · social cuts (vertical 46.9 s, 4:5 feed 46.9 s, TikTok file, two covers): `tutorials/brand-vs-jobber.social-cover-feed.2f6a5fe7.jpg`, `tutorials/brand-vs-jobber.social-cover-vertical.a4b957b7.jpg`, `tutorials/brand-vs-jobber.social-feed.aab6d412.mp4`, `tutorials/brand-vs-jobber.social-tiktok.a0ec0b3d.mp4`, `tutorials/brand-vs-jobber.social-vertical.54efe23f.mp4` · production folder `analysis/video-out/brand-vs-jobber/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-vs-jobber.1002c839.mp4` · captions `tutorials/brand-vs-jobber.9616502f.vtt` · poster `tutorials/brand-vs-jobber.550d40ff.jpg` · social cuts (vertical 46.93 s, 4:5 feed 46.93 s, TikTok file, two covers): `tutorials/brand-vs-jobber.social-cover-feed.2f6a5fe7.jpg`, `tutorials/brand-vs-jobber.social-cover-vertical.a4b957b7.jpg`, `tutorials/brand-vs-jobber.social-feed.de44b81d.mp4`, `tutorials/brand-vs-jobber.social-tiktok.1f040df4.mp4`, `tutorials/brand-vs-jobber.social-vertical.11f367be.mp4` · production folder `analysis/video-out/brand-vs-jobber/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 50 s. The five-people price card goes beyond the brief ("do not claim cheaper"): it is one dated pair with the solo case said aloud and printed — drop the card if the owner prefers. The $0 on our side of the pipeline card means "no extra charge", not a free plan. The directory shot searches Austin and the first row is Austin, AR.
 
 ### 5b. `brand-vs-housecall-pro` — "Housecall Pro vs ConstructHUB CRM: the price per seat (2026)"
 
-**Recorded 2026-10-08 on slot 3, 51 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-housecall-pro.json`).**
+**Recorded 2026-10-08 on slot 3 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 51 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-housecall-pro.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -345,12 +345,12 @@ shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in
 | "Try the CRM free for fourteen days." | `CRM_TRIAL_DAYS = 14`. | `shared/crm-plans.ts` |
 
 - **Title:** Housecall Pro vs ConstructHUB CRM: the price per seat (2026) · **Thumbnail / cover headline:** HALF THE PRICE? (kicker "vs Housecall Pro")
-- **Files:** master `tutorials/brand-vs-housecall-pro.69558c21.mp4` · captions `tutorials/brand-vs-housecall-pro.8df4ad7a.vtt` · poster `tutorials/brand-vs-housecall-pro.67148cac.jpg` · social cuts (vertical 47.93 s, 4:5 feed 47.93 s, TikTok file, two covers): `tutorials/brand-vs-housecall-pro.social-cover-feed.f2572ac4.jpg`, `tutorials/brand-vs-housecall-pro.social-cover-vertical.afbe953a.jpg`, `tutorials/brand-vs-housecall-pro.social-feed.cbf0246a.mp4`, `tutorials/brand-vs-housecall-pro.social-tiktok.16175d8e.mp4`, `tutorials/brand-vs-housecall-pro.social-vertical.0c12552e.mp4` · production folder `analysis/video-out/brand-vs-housecall-pro/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-vs-housecall-pro.374c563e.mp4` · captions `tutorials/brand-vs-housecall-pro.822d52e7.vtt` · poster `tutorials/brand-vs-housecall-pro.67148cac.jpg` · social cuts (vertical 47.97 s, 4:5 feed 47.97 s, TikTok file, two covers): `tutorials/brand-vs-housecall-pro.social-cover-feed.f2572ac4.jpg`, `tutorials/brand-vs-housecall-pro.social-cover-vertical.afbe953a.jpg`, `tutorials/brand-vs-housecall-pro.social-feed.7b8434b0.mp4`, `tutorials/brand-vs-housecall-pro.social-tiktok.20e5b139.mp4`, `tutorials/brand-vs-housecall-pro.social-vertical.796f5f0f.mp4` · production folder `analysis/video-out/brand-vs-housecall-pro/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 51 s. Shows list prices only — Housecall Pro's annual prices ($59 / $149 / $299) narrow the gap to our annual prices and are not on screen; its introductory offer is not shown either (the card says so). "About half" is exact to within one point on all three tiers on monthly billing only.
 
 ### 5c. `brand-vs-leap` — "Leap CRM vs ConstructHUB CRM: what a small crew pays (2026)"
 
-**Recorded 2026-10-08 on slot 3, 55 s, uploaded to R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-leap.json`).**
+**Recorded 2026-10-08 on slot 3 and remastered the same day on the merged line (the narrator now says con-STRUCT hub; no fallback page between loads), 56 s, in R2 (create-only). HELD for the owner: not scheduled to YouTube or social, and not in the app (`unlisted`; its manifest waits in `docs/brand/held-manifests/brand-vs-leap.json`).**
 
 | # | On screen | Narration |
 | --- | --- | --- |
@@ -378,7 +378,7 @@ shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in
 | "Plus a permit office directory. It isn't on their pricing page. Free to browse." | The saved page text does not contain "permit". | `docs/brand/sources/2026-10-08/` |
 
 - **Title:** Leap CRM vs ConstructHUB CRM: what a small crew pays (2026) · **Thumbnail / cover headline:** SMALL CREW. SMALL PRICE. (kicker "vs Leap CRM")
-- **Files:** master `tutorials/brand-vs-leap.c3c4811c.mp4` · captions `tutorials/brand-vs-leap.d99bf0d5.vtt` · poster `tutorials/brand-vs-leap.c5a9750f.jpg` · social cuts (vertical 52.6 s, 4:5 feed 52.6 s, TikTok file, two covers): `tutorials/brand-vs-leap.social-cover-feed.59eae5b5.jpg`, `tutorials/brand-vs-leap.social-cover-vertical.1bcd9c3e.jpg`, `tutorials/brand-vs-leap.social-feed.964f14fb.mp4`, `tutorials/brand-vs-leap.social-tiktok.6f2ae669.mp4`, `tutorials/brand-vs-leap.social-vertical.91c32a3c.mp4` · production folder `analysis/video-out/brand-vs-leap/` on vb11 (git-ignored)
+- **Files:** master `tutorials/brand-vs-leap.c6364c53.mp4` · captions `tutorials/brand-vs-leap.44eeeefb.vtt` · poster `tutorials/brand-vs-leap.c5a9750f.jpg` · social cuts (vertical 52.63 s, 4:5 feed 52.63 s, TikTok file, two covers): `tutorials/brand-vs-leap.social-cover-feed.59eae5b5.jpg`, `tutorials/brand-vs-leap.social-cover-vertical.1bcd9c3e.jpg`, `tutorials/brand-vs-leap.social-feed.0af9e033.mp4`, `tutorials/brand-vs-leap.social-tiktok.0b06d4ac.mp4`, `tutorials/brand-vs-leap.social-vertical.10742210.mp4` · production folder `analysis/video-out/brand-vs-leap/` on vb11 (git-ignored; the first cut's objects stay in the bucket, unreferenced)
 - **Honest weaknesses:** 55 s. Leap's Team price is shown as its two published figures; no five-user total is computed on screen. The directory shot searches Austin (first row Austin, AR) and has no ring.
 
 ### 5d. `brand-vs-ahrefs-semrush` — "Do you need Ahrefs or Semrush? SEO for a local contractor" — NEEDS OWNER SIGN-OFF · SCRIPT ONLY (waits for the SEO upgrades)
