@@ -865,9 +865,12 @@ const entries: Draft[] = [
  * Entries added after this file was written live ONE PER FILE under ./entries/<group>/<key>.ts and are
  * collected through the generated ./entries/index.ts — so several people can add help entries (one
  * per walkthrough video, say) without ever editing the same file. They follow the entries above, in
- * key order.
+ * key order (the "Start here" films first, in their own order).
  */
-const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => a.key.localeCompare(b.key));
+/** The overview films play in this order, not in key order: what it is, then a tour of each app, then why. */
+const START_HERE_ORDER = ["brand-what-is-constructhub", "brand-tour-crm", "brand-tour-business-tools", "brand-why-constructhub"];
+const lead = (key: string) => { const i = START_HERE_ORDER.indexOf(key); return i === -1 ? START_HERE_ORDER.length : i; };
+const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sort((a, b) => lead(a.key) - lead(b.key) || a.key.localeCompare(b.key));
 
 /** Every entry. `video` is the recorded walkthrough of its manifest file (./videos/<key>.json), else null. */
 export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map((e) => ({ ...e, video: helpVideoFor(e.key) }));

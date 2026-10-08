@@ -7,8 +7,13 @@
  * a real recording is uploaded (docs/tutorials/VIDEO-PIPELINE.md) — never a placeholder link.
  */
 
-/** The Tutorials page groups features the way the sidebars group them. */
+/**
+ * The Tutorials page groups features the way the sidebars group them. "Start here" leads: the short
+ * films about what ConstructHUB is (one about the whole product, one tour per app). Its entries may
+ * live on either host — every other group is the main app's, except "CRM".
+ */
 export const HELP_GROUPS = [
+  "Start here",
   "Permits & Databases",
   "Google Business",
   "Google Ads",

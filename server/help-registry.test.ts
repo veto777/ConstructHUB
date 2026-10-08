@@ -131,7 +131,9 @@ describe("help registry", () => {
     expect(crmUrls).toContain("/crm/jobcam");
     expect(crmUrls.filter((u) => !featureRoutes.has(u)), "CRM pages with no help entry").toEqual([]);
     expect(crm).toContain('marketingUrl("/tutorials');
-    for (const f of HELP_FEATURES) expect(isCrmRoute(f.route), `${f.key} group`).toBe(f.group === "CRM");
+    // "Start here" holds the overview films: one of them tours the CRM, so that group may point at either app.
+    for (const f of HELP_FEATURES.filter((x) => x.group !== "Start here")) expect(isCrmRoute(f.route), `${f.key} group`).toBe(f.group === "CRM");
+    expect(HELP_GROUPS[0]).toBe("Start here");
     // The owner's list, by name.
     for (const k of ["call-assistant", "social-media", "site-scan", "seo", "cloudflare", "search-console", "ip-tracker", "vpn-shield", "competitor-intel", "jobcam", "google-reviews"])
       expect(HELP_FEATURES.some((f) => f.key === k), k).toBe(true);
@@ -215,6 +217,8 @@ describe("help registry", () => {
         expect(groupDir(e!.group), `${e!.key} is filed under the wrong group`).toBe(d);
         // A CRM entry added this way is one walkthrough's worth: its key says so.
         if (d === "crm") expect(e!.key, f).toMatch(/^crm-[a-z0-9-]+$/);
+        // The overview films are brand pieces, not one feature's walkthrough: their keys say so.
+        if (d === "start-here") expect(e!.key, f).toMatch(/^brand-[a-z0-9-]+$/);
       }
     }
     expect(helpEntry("crm-create-estimate")?.route).toBe("/crm/estimates/new");

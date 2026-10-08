@@ -28,6 +28,7 @@ import { spawn } from "child_process";
 import { chromium, type Locator, type Page } from "playwright";
 import type { TutorialStep } from "../../shared/help/step-script";
 import { flagNum, flagStr, loadScript, outDir, parseArgs, sleep, type NarrationIndex, type StepTiming, type Timings } from "./lib";
+import { isCrmRoute } from "../../shared/help/registry";
 
 /** Injected into every document of the recording context. Plain JS: it runs in the page. */
 function overlay() {
@@ -222,7 +223,7 @@ class Player {
     });
     if (step.action === "goto") {
       await this.ring(null);
-      await page.goto(new URL(step.url!, base).toString(), { waitUntil: "domcontentloaded" });
+      await page.goto(hostFor(step.url!, base), { waitUntil: "domcontentloaded" });
       await settle(page);
       return;
     }
@@ -309,6 +310,19 @@ class Player {
   }
 }
 
+/**
+ * A tour may cross the two apps (the overview films do): a /crm path is opened on the CRM's host name,
+ * any other path on the main host — same machine, same port. For a script that stays in one app this
+ * is the base it was given.
+ */
+const CRM_HOST = "portal.constructhub.us";
+export function hostFor(pathname: string, base: string): string {
+  const u = new URL(base);
+  const crm = isCrmRoute(pathname.split(/[?#]/)[0]);
+  if (crm) u.hostname = CRM_HOST; else if (u.hostname === CRM_HOST) u.hostname = "127.0.0.1";
+  return new URL(pathname, u).toString();
+}
+
 /** The page has stopped loading: network quiet, fonts in, one more beat for the first paint. */
 async function settle(page: Page) {
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
@@ -361,7 +375,8 @@ async function main() {
   ] });
   const context = await browser.newContext({ viewport: null, locale: "en-US", timezoneId: "America/New_York" });
   const origin = new URL(base);
-  await context.addCookies([{ name: "ch_consent", value: "denied", domain: origin.hostname, path: "/" }]);
+  // Both hosts: a tour that crosses from one app to the other must not meet the cookie banner on the way.
+  await context.addCookies([...new Set([origin.hostname, "127.0.0.1", CRM_HOST])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
   // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
   await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
   await context.addInitScript(overlay);
