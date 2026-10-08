@@ -114,7 +114,7 @@ export async function reserveBudget(userId: number, estimateUsd: number, opts: B
   // from this month's allowance and then purchased credit (server/seo/credits.ts).
   const reservation: BudgetReservation = { id, userId, month, estimateUsd, credit: null };
   try {
-    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), { allowanceOnly: opts.allowanceOnly, reservationId: id });
+    reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), { allowanceOnly: opts.allowanceOnly, reservationId: id, month });
   } catch (e) {
     if (!(e instanceof SeoCreditShort)) {
       // The error may have arrived after the credit was in fact taken (a lost acknowledgement). The reservation row is
@@ -238,15 +238,16 @@ export async function refundReservation(id: string, cents: number, key: string):
   try {
     await client.query("BEGIN");
     const { rows: [row] } = await client.query("SELECT * FROM seo_reservations WHERE id=$1 FOR UPDATE", [id]);
-    // Not settled yet: the refund cannot be worked out. The caller keeps it as owed and tries again.
-    if (row && !row.settled_at) { await client.query("ROLLBACK"); throw new Error(`reservation ${id} is not settled yet`); }
+    // Not settled yet — or closed as abandoned, when the real charge may still arrive: the refund cannot be worked out.
+    // The caller keeps it as owed and tries again.
+    if (row && (!row.settled_at || row.reconciled)) { await client.query("ROLLBACK"); throw new Error(`reservation ${id} is not settled yet`); }
     if (!row || !row.credit || row.refund_key === key) { await client.query("ROLLBACK"); return 0; }
     // The row's credit is what the lookup took (and has not yet been refunded), split by where it came from.
     const fromIncluded = Number(row.credit.fromIncluded ?? 0), fromWallet = Number(row.credit.fromWallet ?? 0);
     const give = Math.min(Math.floor(cents), fromIncluded + fromWallet);
     if (give <= 0) { await client.query("ROLLBACK"); return 0; }
     const dWallet = Math.min(give, fromWallet), dIncluded = give - dWallet;
-    await client.query("UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents-$3), wallet_cents=greatest(0,wallet_cents-$4), updated_at=now() WHERE user_id=$1 AND month=$2", [row.user_id, row.month, dIncluded, dWallet]);
+    await client.query("UPDATE seo_credit_usage SET included_cents=greatest(0,included_cents-$3), wallet_cents=greatest(0,wallet_cents-$4), updated_at=now() WHERE user_id=$1 AND month=$2", [row.user_id, row.credit.month ?? row.month, dIncluded, dWallet]);
     if (dWallet) await client.query("UPDATE seo_credit_wallets SET balance_cents=balance_cents+$2, updated_at=now() WHERE user_id=$1", [row.user_id, dWallet]);
     await client.query("UPDATE seo_reservations SET refunded_cents=refunded_cents+$2, refund_key=$3, credit=$4 WHERE id=$1", [id, give, key, JSON.stringify({ ...row.credit, fromIncluded: fromIncluded - dIncluded, fromWallet: fromWallet - dWallet })]);
     await client.query("COMMIT");

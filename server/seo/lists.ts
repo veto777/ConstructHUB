@@ -114,7 +114,8 @@ export async function listItems(userId: number, listId: number) {
 }
 
 /** Add keywords to a list (creating it by name when asked). Keywords already there get their numbers refreshed. */
-export async function addToList(userId: number, input: z.infer<typeof listItemsInput>): Promise<{ list: { id: number; name: string }; added: number; total: number }> {
+/** `replace`: a refresh — the numbers handed in are today's and overwrite what is stored, even with "none". */
+export async function addToList(userId: number, input: z.infer<typeof listItemsInput>, replace = false): Promise<{ list: { id: number; name: string }; added: number; total: number }> {
   let list: { id: number; name: string };
   if (input.listId !== undefined) list = await ownedList(userId, input.listId);
   else {
@@ -138,9 +139,12 @@ export async function addToList(userId: number, input: z.infer<typeof listItemsI
     await pool.query(
       `INSERT INTO seo_keyword_list_items(list_id, keyword, volume, cpc, difficulty, intent)
        SELECT $1, * FROM unnest($2::text[], $3::int[], $4::numeric[], $5::int[], $6::text[])
-       ON CONFLICT (list_id, keyword) DO UPDATE SET volume=coalesce(EXCLUDED.volume, seo_keyword_list_items.volume), cpc=coalesce(EXCLUDED.cpc, seo_keyword_list_items.cpc),
-         difficulty=coalesce(EXCLUDED.difficulty, seo_keyword_list_items.difficulty), intent=coalesce(EXCLUDED.intent, seo_keyword_list_items.intent)`,
-      [list.id, keywords, col((i) => i.volume ?? null), col((i) => i.cpc ?? null), col((i) => i.difficulty ?? null), col((i) => i.intent ?? null)]);
+       ON CONFLICT (list_id, keyword) DO UPDATE SET
+         volume=CASE WHEN $7 THEN EXCLUDED.volume ELSE coalesce(EXCLUDED.volume, seo_keyword_list_items.volume) END,
+         cpc=CASE WHEN $7 THEN EXCLUDED.cpc ELSE coalesce(EXCLUDED.cpc, seo_keyword_list_items.cpc) END,
+         difficulty=CASE WHEN $7 THEN EXCLUDED.difficulty ELSE coalesce(EXCLUDED.difficulty, seo_keyword_list_items.difficulty) END,
+         intent=CASE WHEN $7 THEN EXCLUDED.intent ELSE coalesce(EXCLUDED.intent, seo_keyword_list_items.intent) END`,
+      [list.id, keywords, col((i) => i.volume ?? null), col((i) => i.cpc ?? null), col((i) => i.difficulty ?? null), col((i) => i.intent ?? null), replace]);
   }
   return { list, added: adding, total: have + adding };
 }

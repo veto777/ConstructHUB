@@ -189,6 +189,18 @@ export interface RankCheckResult {
   rivals: Record<string, number | null>;
 }
 
+/** A web address from the open web, kept only when it is plainly http(s) and of sane length — it becomes a link on our page. */
+export function safeHttpUrl(v: unknown): string | null {
+  if (typeof v !== "string" || v.length > 500) return null;
+  try { const u = new URL(v); return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null; } catch { return null; }
+}
+/** A host name from the open web: lower case, no www, only host characters, bounded. */
+export function safeDomain(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const d = v.toLowerCase().replace(/^www\./, "");
+  return d.length <= 253 && /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(d) ? d : null;
+}
+
 /** A business name reduced to what identifies it: lower case, no punctuation, no "LLC"/"Inc". */
 export function normalizeBusinessName(name: string | null | undefined): string {
   return String(name ?? "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ")
@@ -227,7 +239,7 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
   });
   const organic = items.filter((i) => i && i.type === "organic" && typeof i.domain === "string" && i.domain);
   const packItems = items.filter((i) => i && i.type === "local_pack");
-  const pack = packItems.map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: str(i.title) ?? "", domain: str(i.domain) }));
+  const pack = packItems.slice(0, 10).map((i, n) => ({ position: num(i.rank_group) ?? n + 1, title: (str(i.title) ?? "").slice(0, 160), domain: safeDomain(i.domain) }));
   // The website decides wherever it appears in the pack; the name is only a fallback for entries that show none.
   const onDomain = packItems.findIndex((i) => listingOnDomain(i, input.targetDomain));
   const ours = onDomain >= 0 ? onDomain : packItems.findIndex((i) => listingNamed(i, input.businessName));
@@ -239,7 +251,7 @@ export function buildRankResult(input: { keywordId: number; keyword: string; tar
     serpFeatures: [...new Set(items.map((i) => (i && typeof i.type === "string" ? i.type : "")).filter(Boolean))],
     localPosition: ours >= 0 ? pack[ours].position : null,
     localPack: pack,
-    serpTop: organic.slice(0, 10).map((i) => ({ position: num(i.rank_group) ?? num(i.rank_absolute) ?? 0, domain: String(i.domain).toLowerCase().replace(/^www\./, ""), url: str(i.url), title: str(i.title)?.slice(0, 120) ?? null })).filter((e) => e.position > 0),
+    serpTop: organic.slice(0, 10).map((i) => ({ position: num(i.rank_group) ?? num(i.rank_absolute) ?? 0, domain: safeDomain(i.domain) ?? "", url: safeHttpUrl(i.url), title: str(i.title)?.slice(0, 120) ?? null })).filter((e) => e.position > 0 && e.position <= 200 && e.domain),
     rivals: Object.fromEntries((input.competitors ?? []).map((c) => {
       const want = c.toLowerCase().replace(/^www\./, "");
       const hit = organic.find((i) => { const d = String(i.domain).toLowerCase().replace(/^www\./, ""); return d === want || d.endsWith(`.${want}`); });

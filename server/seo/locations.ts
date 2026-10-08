@@ -8,6 +8,8 @@ import { pool } from "../db";
 import { request, DataForSeoError } from "./dataforseo";
 
 export const LOCATION_SCHEMA_DDL = [
+  // When the whole list was last loaded to the end (a load that stops half way must not count as fresh).
+  `CREATE TABLE IF NOT EXISTS seo_meta (key text PRIMARY KEY, value text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`,
   `CREATE TABLE IF NOT EXISTS seo_locations (
     code integer PRIMARY KEY,
     name text NOT NULL,
@@ -52,7 +54,7 @@ let freshUntil = 0;
 export async function ensureLocations(): Promise<number> {
   if (Date.now() < freshUntil) return 0;
   // The newest row says when the list was last loaded (a load rewrites every row it still has).
-  const { rows: [have] } = await pool.query("SELECT (SELECT loaded_at FROM seo_locations ORDER BY loaded_at DESC LIMIT 1) AS newest, EXISTS (SELECT 1 FROM seo_locations) AS any");
+  const { rows: [have] } = await pool.query("SELECT (SELECT updated_at FROM seo_meta WHERE key='locations_loaded') AS newest, EXISTS (SELECT 1 FROM seo_locations) AS any");
   const stale = !have.newest || Date.now() - new Date(have.newest).getTime() > REFRESH_DAYS * 864e5;
   if (have.any && !stale) { freshUntil = Date.now() + 3600_000; return 0; }
   loading ??= (async () => {
@@ -70,8 +72,9 @@ export async function ensureLocations(): Promise<number> {
            ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name, type=EXCLUDED.type, loaded_at=now()`,
           [chunk.map((r) => r.code), chunk.map((r) => r.name), chunk.map((r) => r.type)]);
       }
-      // Places the source no longer lists (a complete load just rewrote all the others).
-      await pool.query("DELETE FROM seo_locations WHERE loaded_at < $1", [started]).catch(() => {});
+      // Places the source no longer lists (a complete load just rewrote all the others), then the mark that says the load finished.
+      await pool.query("DELETE FROM seo_locations WHERE loaded_at < $1", [started]);
+      await pool.query("INSERT INTO seo_meta(key, value) VALUES('locations_loaded', $1) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()", [String(rows.length)]);
       console.info(`[seo] loaded ${rows.length} places`);
       freshUntil = Date.now() + 3600_000;
       return rows.length;

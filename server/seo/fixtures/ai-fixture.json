@@ -1,0 +1,290 @@
+{
+ "chat_gpt": {
+  "status_code": 20000,
+  "tasks": [
+   {
+    "status_code": 20000,
+    "cost": 0.027039,
+    "result": [
+     {
+      "model_name": "gpt-4o-mini-2024-07-18",
+      "web_search": true,
+      "fan_out_queries": [
+       "best siding contractors in Bellingham WA"
+      ],
+      "items": [
+       {
+        "type": "message",
+        "sections": [
+         {
+          "type": "text",
+          "text": "Here are some reputable siding contractors in Bellingham, WA:\n\n**[Topside Roofing & Siding](https://www.topsideroofing.com/?utm_source=openai)**  \n**Open now \u00b7 Roofing contractor \u00b7 4.6 (116 reviews)**  \n_161 E Horton Rd, Bellingham, WA 98226_  \nSpecializes in durable, energy-efficient siding solutions tailored for the Pacific Northwest climate. They offer full siding replacements and targeted repairs, ensuring homes are protected and aesthetically pleasing.\n\n**[Alpine Exteriors | Siding, Roofing & Windows](http://alpineexteriorswa.com/?utm_source=openai)**  \n**Open now \u00b7 Siding contractor \u00b7 4.9 (106 reviews)**  \n_2119 Lincoln St, Bellingham, WA 98225_  \nA family-owned business with over 22 years of experience, specializing in siding installation, roofing, window replacement, and deck building. They are a James Hardie Elite Preferred contractor and offer a 25-year workmanship warranty.\n\n**[Siding & Window Vault](https://sidingwindowvault.com/locations/ferndale-office/?utm_source=openai)**  \n**Closed \u00b7 Siding contractor \u00b7 4.9 (94 reviews)**  \n_1855 Main St #103, Ferndale, WA 98248_  \nA family-owned business offering siding and window replacement services. They are a James Hardie Elite Contractor with a 4.9/5 average rating across 175 reviews.\n\nWhen selecting a contractor, consider factors such as experience, warranty offerings, and customer reviews to ensure you choose the best fit for your project. ",
+          "annotations": [
+           {
+            "title": "Topside Roofing & Siding",
+            "url": "https://www.topsideroofing.com/?utm_source=openai"
+           },
+           {
+            "title": "Alpine Exteriors | Siding, Roofing & Windows",
+            "url": "http://alpineexteriorswa.com/?utm_source=openai"
+           },
+           {
+            "title": "Siding & Window Vault",
+            "url": "https://sidingwindowvault.com/locations/ferndale-office/?utm_source=openai"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "perplexity": {
+  "status_code": 20000,
+  "tasks": [
+   {
+    "status_code": 20000,
+    "cost": 0.005912,
+    "result": [
+     {
+      "model_name": "sonar",
+      "web_search": true,
+      "fan_out_queries": null,
+      "items": [
+       {
+        "type": "message",
+        "sections": [
+         {
+          "type": "text",
+          "text": "Several well-regarded siding contractors serving Bellingham include:\n\n- **Siding & Window Vault** \u2014 Based in nearby Ferndale; specializes in siding and window installation and lists a Washington contractor license.[3]\n- **Esary Roofing & Siding** \u2014 A long-established regional company offering both roofing and siding services; it reports more than 47 years in business.[4]\n- **Topside Roofing & Siding** \u2014 Ranked among the highest-scoring roofing-and-siding companies in the Bellingham metro area.[6]\n- **SRS Roofing Company** \u2014 Another highly rated Bellingham-area roofing contractor that also handles siding work.[6]\n- **Whatcom Roofing and Home Repair Inc.** \u2014 Serves the local market with roofing and home-repair services, including siding-related work.[6]\n- **JEMS Construction LLC** \u2014 Offers siding removal, repair, and installation in Bellingham.[2]\n- **Side-Pro Inc.** \u2014 Listed among highly rated local siding professionals.[8]\n- **Atta Boy Window, Gutter, and Pressure Cleaning** \u2014 Listed as a top Bellingham siding contractor, though its services appear broader than siding installation alone.[1]\n\nFor a major siding replacement, compare at least three written bids and verify each contractor\u2019s Washington license, insurance, warranty terms, references, and whether permits are included.",
+          "annotations": [
+           {
+            "title": "10 Best Siding Contractors in Bellingham, WA For 2026",
+            "url": "https://www.cladsiding.com/contractors/washington/bellingham/"
+           },
+           {
+            "title": "The 10 Best Siding Contractors in Bellingham, WA (with ... - Thumbtack",
+            "url": "https://www.thumbtack.com/wa/bellingham/siding-contractors"
+           },
+           {
+            "title": "Siding Contractor in Bellingham, WA | Siding & Window Vault",
+            "url": "https://sidingwindowvault.com/service-areas/bellingham-wa/siding-contractor/"
+           },
+           {
+            "title": "Siding Contractors in Bellingham, WA - Whatcom Local",
+            "url": "https://www.whatcomlocal.com/l/bellingham-wa/siding-contractors"
+           },
+           {
+            "title": "Siding Vault \u2013 Siding and Window Contractors in Bellingham ...",
+            "url": "https://sidingwindowvault.com/"
+           },
+           {
+            "title": "Best Roofers in Bellingham, WA (2026) | Scored & Verified | TRB",
+            "url": "https://theroofingbrief.com/best-roofers-bellingham-wa/"
+           },
+           {
+            "title": "Siding Contractors in Whatcom County",
+            "url": "https://www.whatcomlocal.com/l/wa/siding-contractors"
+           },
+           {
+            "title": "Top 10 Best Siding pros in Bellingham, WA - Angie's List",
+            "url": "https://www.angi.com/companylist/us/wa/bellingham/siding.htm"
+           },
+           {
+            "title": "Siding Contractors near Bellingham, WA | Better Business Bureau",
+            "url": "https://www.bbb.org/us/wa/bellingham/category/siding-contractors"
+           },
+           {
+            "title": "Find Contractors in Bellingham, WA",
+            "url": "https://network.procore.com/us/wa/bellingham"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "gemini": {
+  "status_code": 20000,
+  "tasks": [
+   {
+    "status_code": 20000,
+    "cost": 0.035746,
+    "result": [
+     {
+      "model_name": "gemini-2.5-flash-lite",
+      "web_search": true,
+      "fan_out_queries": [
+       "best siding contractors Bellingham WA",
+       "top rated siding companies Bellingham WA"
+      ],
+      "items": [
+       {
+        "type": "message",
+        "sections": [
+         {
+          "type": "text",
+          "text": "Based on online reviews and contractor directories, here are some of the highly-rated siding contractors in Bellingham, WA:\n\n*   **Pacific Exteriors LLC:** This company has been a leader among Washington contractors since 2008 and is noted as the largest re-siding company in Washington state. They have received multiple awards, including four James Hardie \u201cPresident's Club\u201d awards, a Houzz recommendation, and Better Business Bureau Accreditation.\n*   **Siding & Window Vault:** Based in Ferndale, WA, they serve the Bellingham area and are a James Hardie Elite Contractor, which is the highest standing awarded by James Hardie to independent contractors. They have a 4.9/5 rating from 175 customers.\n*   **Side-Pro Inc.:** This company has been in business since 1995 and has a 4.5-star rating based on 151 reviews. They are known for professional, direct, and honest service, with detailed quotes and experienced contractors.\n*   **Laika Construction:** Located in Bellingham, they are listed by the Building Industry Association of Whatcom County (BIAWC).\n*   **Highline Construction LLC:** Also listed by BIAWC, this company is located in Bellingham.\n*   **Polar Bear Energy Solutions:** This contractor has a 5.0 rating based on 3 customer reviews on Thumbtack and serves the Bellingham area.\n*   **Alpine Siding:** This company has received praise for their craftsmanship and attention to detail on complex jobs.",
+          "annotations": [
+           {
+            "title": "pacificexteriorsllc.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEHhjBQgdsGLJZ73V7MD88aI7bXvSSWXidkZBT77nmHc95m48QVoxr3y9MLgWYJotp_VA2zr7tTc3pWwvpnn1ToUHMaLtpidP8ovvEyeBb04JF7hAy4P9i8Ee6Z6qCitlh-z"
+           },
+           {
+            "title": "sidingwindowvault.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGC1cfrzSqwzysvnjGWHNfZ-OiSkVU9inF8p4L2FWAFsq9zW9tulkoajB8nhXHhJxJF-ekLJ3ASy78e2QEFnMwZLf5fkcmVLZJg07gJl85bPoPfO-7VaGtr1g=="
+           },
+           {
+            "title": "promatcher.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGAFtgkKvx0kkdfc6Fpu_F82Q2uM6bcnvVgCsSoMDhw1ejae0CdojP6Zkh3_zPsv4DtSfe_qQcOPR-zMb4TLlEn9D7h39XW96DqvAVvX1R9GuU_tEG8htu7Q8R0jrDoxSGAc"
+           },
+           {
+            "title": "homeadvisor.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQE9nix6pWY04Dlw7zHCYI4OA5MJGwAjLsPW8sH9cK_-PygslhoevzPzUXF6HiYDNQ5S8ANpFdRc1rqWhDK1DNOfpya6bHpEP4YG_V2f9k7dTHgmcvrRqjssbSLPD1nbMMG7J"
+           },
+           {
+            "title": "angi.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFmvhCbdagjDaN0ksv9WucNGlJG14heI-kn1m3oZNcenMVnPl4GqTtzAo5UqLQcwTo4ciDgL5Fs1Esu9sHm9I1_-KWLCPhei2wTMwnFso2czoQbcF_UH9SosmptMGLi_ciBb"
+           },
+           {
+            "title": "biawc.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEShXgYB7X7l6Kz3sLeiCqylFS6i46eLcZDYfI4v_u181kvpp7GKU-glRDuB7g7vJvuKqV7qpt6xFte2A2gxuBCzwNiLVDHPJjKJJ-mfTM6yVCqnElvq3x_0vxXe-kGFUR3Q"
+           },
+           {
+            "title": "biawc.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEShXgYB7X7l6Kz3sLeiCqylFS6i46eLcZDYfI4v_u181kvpp7GKU-glRDuB7g7vJvuKqV7qpt6xFte2A2gxuBCzwNiLVDHPJjKJJ-mfTM6yVCqnElvq3x_0vxXe-kGFUR3Q"
+           },
+           {
+            "title": "thumbtack.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGhgAkTAubPMpHKWfJp0iqWKyy-EaVsaXzpGNzTreQ1ILjRUEdz5KS_Xg0zjE-51G0PVt6cbu_qagjIxwAGIfoOvasJRJmRqjVle9k5DCckmgE1YyV2TTnslMwWFiUuMm2to"
+           },
+           {
+            "title": "angi.com",
+            "url": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFmvhCbdagjDaN0ksv9WucNGlJG14heI-kn1m3oZNcenMVnPl4GqTtzAo5UqLQcwTo4ciDgL5Fs1Esu9sHm9I1_-KWLCPhei2wTMwnFso2czoQbcF_UH9SosmptMGLi_ciBb"
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "mentions": {
+  "status_code": 20000,
+  "tasks": [
+   {
+    "status_code": 20000,
+    "cost": 0.102,
+    "result": [
+     {
+      "total_count": 3901,
+      "items": [
+       {
+        "platform": "google",
+        "model_name": "google_ai_overview",
+        "location_code": 2840,
+        "language_code": "en",
+        "question": "fiber concrete siding",
+        "answer": "![7 Best Brands of Fiber-Cement Siding for Your Home](https://api.dataforseo.com/llm_m/cdn/i/6794272567118227447:18e8ffd29d8655fcf2ed5cbeee752af1)\nConcrete fiber siding (correctly known as **fiber cement siding** ) is `a tough exterior house material made from a mix of cement, sand, and cellulose fibers`.[](http://en.wikipedia.org/wiki/Fiber_cement_siding) [[1]](http://en.wikipedia.org/wiki/Fiber_",
+        "sources": [
+         {
+          "domain": "www.reddit.com",
+          "title": "Fiber Cement Siding : r/Construction - Reddit",
+          "url": "https://www.reddit.com/r/Construction/comments/wzjll3/fiber_cement_siding/",
+          "position": 1
+         },
+         {
+          "domain": "www.jameshardie.com",
+          "title": "What is Fiber Cement | James Hardie",
+          "url": "https://www.jameshardie.com/blog/siding-types/what-is-fiber-cement-siding/",
+          "position": 2
+         },
+         {
+          "domain": "en.wikipedia.org",
+          "title": "Fiber cement siding - Wikipedia",
+          "url": "http://en.wikipedia.org/wiki/Fiber_cement_siding",
+          "position": 3
+         },
+         {
+          "domain": "www.everlastsiding.com",
+          "title": "Siding Showdown: Composite Siding vs. Fiber Cement",
+          "url": "https://www.everlastsiding.com/articles/siding-showdown-composite-siding-vs-fiber-cement",
+          "position": 4
+         },
+         {
+          "domain": "www.youtube.com",
+          "title": "Is Fiber Cement Siding Too Heavy for Your Home? Let's Set the Record ...",
+          "url": "https://www.youtube.com/watch?v=eJ-f6KGIf_g&t=50",
+          "position": 5
+         }
+        ],
+        "search_results": null,
+        "ai_search_volume": 74000,
+        "first_response_at": "2026-09-02 10:29:57 +00:00",
+        "last_response_at": "2026-09-02 10:29:57 +00:00",
+        "brand_entities": null,
+        "fan_out_queries": null
+       },
+       {
+        "platform": "google",
+        "model_name": "google_ai_overview",
+        "location_code": 2840,
+        "language_code": "en",
+        "question": "cement fibre siding",
+        "answer": "![Rotting Fiber Cement - United Home Experts](https://api.dataforseo.com/llm_m/cdn/i/1264814246300497943:57e50509f2ed868af0f141deeca30cfe)\n![Composite Siding vs Fiber Cement - Sherwood Lumber](https://api.dataforseo.com/llm_m/cdn/i/1264814246300497943:42daf030efbcf288bf7ace67569d7c7b)\n![7 Best Brands of Fiber-Cement Siding for Your Home](https://api.dataforseo.com/llm_m/cdn/i/1264814246300497943:a",
+        "sources": [
+         {
+          "domain": "www.jameshardie.com",
+          "title": "What is Fiber Cement | James Hardie",
+          "url": "https://www.jameshardie.com/blog/siding-types/what-is-fiber-cement-siding/",
+          "position": 1
+         },
+         {
+          "domain": "www.reddit.com",
+          "title": "Fiber Cement Siding : r/Construction - Reddit",
+          "url": "https://www.reddit.com/r/Construction/comments/wzjll3/fiber_cement_siding/",
+          "position": 2
+         },
+         {
+          "domain": "en.wikipedia.org",
+          "title": "Fiber cement siding - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Fiber_cement_siding",
+          "position": 3
+         },
+         {
+          "domain": "www.lowes.com",
+          "title": "Fiber Cement Siding & Accessories - Lowe's",
+          "url": "https://www.lowes.com/pl/siding-stone-veneer/fiber-cement-siding-accessories/3313868589",
+          "position": 4
+         },
+         {
+          "domain": "www.youtube.com",
+          "title": "How to Cut and Install Fiber-Cement Siding | This Old House",
+          "url": "https://www.youtube.com/watch?v=VzCa2Jt1z5E&t=3",
+          "position": 5
+         }
+        ],
+        "search_results": null,
+        "ai_search_volume": 74000,
+        "first_response_at": "2026-05-14 19:19:13 +00:00",
+        "last_response_at": "2026-08-03 09:53:58 +00:00",
+        "brand_entities": null,
+        "fan_out_queries": null
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}
