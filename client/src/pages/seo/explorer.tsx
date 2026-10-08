@@ -223,6 +223,13 @@ export default function SeoExplorerPage() {
       {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status" data-testid="text-explorer-loading"><Loader2 className="h-4 w-4 animate-spin" /> {analyse.isPending ? "Gathering search and backlink data — about ten seconds…" : "Opening the saved report…"}</p>}
       {savedFailed && <div className="g-callout" role="alert" data-testid="explorer-saved-error"><h3>Couldn't check for a saved report</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {notFoundYet && <Empty testId="explorer-empty"><h3>No report for {domain} yet</h3><p>Press <b>Analyse</b> to build one.</p></Empty>}
+      {notFoundYet && domain && (
+        <section className="mt-5" data-testid="explorer-opportunities-only">
+          <h2 className="g-text mb-1 text-[17px] font-medium">Or just the opportunities</h2>
+          <p className="g-text-2 mb-3 text-[13px]">This one lookup does not need the full report.</p>
+          <OpportunitiesView key={`solo:${domain}:${marketKey(market)}`} domain={domain} status={status.data} market={market} />
+        </section>
+      )}
       {!report && !busy && !domain && (recent.data?.items.length ?? 0) === 0 && (
         <Empty testId="explorer-intro"><h3>Look up any website</h3><p>Enter a domain to see how much search traffic it gets, which keywords and pages earn it, who links to it and who it competes with.</p></Empty>
       )}

@@ -46,13 +46,23 @@ const SOURCE_STATUS: Record<DataForSeoError["code"], number> = {
   not_configured: 503, auth: 502, rate_limited: 429, timeout: 504, upstream: 502, invalid: 400, task_failed: 400,
 };
 
+const isOurs = (e: unknown) => e instanceof DataForSeoError || e instanceof SeoBudgetError || e instanceof SeoCustomerError || e instanceof z.ZodError;
+/**
+ * Some lookups wrap the source's error in a plain Error and keep the original as `cause` (fetchGrid does, to
+ * carry what the tries cost). The wrapper's text is the source's own, so it is never shown: the original decides.
+ */
+function knownError(e: unknown): unknown {
+  const cause = (e as { cause?: unknown } | null)?.cause;
+  return !isOurs(e) && (cause instanceof DataForSeoError || cause instanceof SeoBudgetError) ? cause : e;
+}
+
 /**
  * Turn any error from an SEO route into the response for it. `admin` (a
  * platform admin is asking) adds an `admin` block with the internal wording;
  * nobody else ever gets it.
  */
-export function seoErrorResponse(e: unknown, opts: { admin?: boolean } = {}): SeoErrorResponse {
-  const admin = opts.admin === true;
+export function seoErrorResponse(thrown: unknown, opts: { admin?: boolean } = {}): SeoErrorResponse {
+  const admin = opts.admin === true, e = knownError(thrown);
   if (e instanceof z.ZodError) return { status: 400, unexpected: false, body: { message: "Invalid input", issues: e.issues.slice(0, 3) } };
   // Written for the customer by the feature that throws it (ListError, WatchError).
   if (e instanceof SeoCustomerError) return { status: e.status, unexpected: false, body: { message: e.message } };
@@ -80,7 +90,8 @@ export function seoErrorResponse(e: unknown, opts: { admin?: boolean } = {}): Se
  * What to save for the customer when background work fails (a grid scan, a
  * rank run). `fallback` is used for anything that is not one of our own errors.
  */
-export function publicFailure(e: unknown, fallback: string): string {
+export function publicFailure(thrown: unknown, fallback: string): string {
+  const e = knownError(thrown);
   if (e instanceof SeoBudgetError) return e.message;
   if (e instanceof DataForSeoError) return e.publicMessage;
   return fallback;

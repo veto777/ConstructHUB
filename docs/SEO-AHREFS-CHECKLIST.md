@@ -274,6 +274,21 @@ Verdict: "Audit #11 is only partly resolved"; coverage about 57% (50-64). No cro
 12 LOW  orange cells' contrast                           FIXED: dark text on orange and amber; red darkened.
 13 LOW  points past the date line                        FIXED: longitudes wrap, latitudes are clamped; tested.
 
+## Codex audit #13 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-13.md)
+Verdict: "Audit #12 is only partly resolved"; coverage about 56% (49-63). No HIGH finding; no cross-account disclosure. What was done:
+ 1 MED  "Losing ground" compared two different ranks     FIXED: a fall is place on the whole results page now against then (like with like), shown as "places lost".
+ 2 MED  pages / home page ignored the host               FIXED: a page is its host and path (no www, no trailing slash, no tracking parameters); only the site's own front page is the home page.
+ 3 MED  home-page conclusions went beyond the data       FIXED: wording is "the page returned is the home page"; the list is kept when only one page is returned; empty and non-home cases have their own text; a new page is "worth looking into", not a promise.
+ 4 MED  paid rows discarded                              FIXED: all 500 rows are kept and returned; lists page locally (free) and export everything; each page opens to its own searches.
+ 5 MED  monthly AI skipped a month with nothing bought   FIXED: a run is 'opened' (nothing sent) until the moment before the ask leaves, then 'asking'; an 'opened' run left behind is cleared and the question asked. Real Postgres 6d-6e. Still treated as unknown: a connection that fails before the request leaves (indistinguishable from one that fails after).
+ 6 MED  grid's own cost allowance overridden             FIXED: fetchGrid reports its figure as known; the ledger keeps it. NOT DONE: our own reservation is 1.25x while two tries per point can cost us up to 2x (the customer's hold and charge are unaffected).
+ 7 MED  grid page could stop watching / miss another tab FIXED: the page follows whatever the server says is running, keeps asking until a final answer even after a failed attempt, clears the watch when it ends, and reports a watching problem on its own line.
+ 8 MED  wrong matches / comparisons without an id        FIXED: the pinned id wins anywhere in the list; without an id on either side the name must match too for two scans to be compared (page, alert and report).
+ 9 MED  no price on "Look again"; overview required      FIXED: the maximum is on the button; a domain with no report offers "just the opportunities".
+10 LOW  Search Console coverage                          FIXED: both windows' coverage is stated independently (including zero) in the email, PDF and tile.
+11 LOW  "a point that returns nothing is not charged"    FIXED: "a search that fails is not charged (one that works but finds no businesses is)".
+12 MED  clean-up and index creation not atomic           FIXED: each is one DO block under a table lock.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -312,3 +327,4 @@ Verdict: "Audit #11 is only partly resolved"; coverage about 57% (50-64). No cro
 - 10/8 slice 17 (Opportunities): run in the browser for alpineexteriorswa.com - 10 within reach (3,230 searches a month), 3 losing ground (5 -> 11, 5 -> 14, 7 -> 11), 1 page for 13 keywords, 100% on the home page; charged 6c against a 29c hold. 0 page errors.
 - 10/8 audit #12 fixes: real Postgres - ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13, grid lifecycle 10/10 (script/seo-grid-check.ts: the one-running-scan rule created over old duplicates, a second start returns the first, the database refuses a third, stale scans closed, failed scans kept, late results refused). Browser, live: a 25-point scan in the background (42 s, 25 of 25, charged 20c against a 25c hold) while an older scan was opened - the running note and the disabled button stayed, then the new scan appeared in the history.
 - 10/8 slice 19 (repeating grids): real Postgres grid check now 18/18 (watches per account, five per site, alert raised once and worded, report lines, a different listing not compared); ledger 44/44, places+alerts 20/20, AI + lists 13/13. Browser: "Every month" set on a scan -> "repeats every month - next on Nov 8"; alerts page shows "Local grid better ... 25 of 25 points, was 5 of 25"; PDF read back with pdftotext.
+- 10/8 audit #13 fixes: real Postgres on a fresh database - ledger 44/44, places+alerts 20/20, AI + lists 15/15, grid 18/18. Browser, live: Opportunities for jameshardie.com (500 of 7,217 keywords, 245 within reach paged 50 at a time, "Export all 245", 54 losing ground with places lost, 67 pages, the home page opened to its 13 searches; charged 29c = the stated maximum) and stand-alone for a domain with no report (skagitroofing.net: 6 keywords, 6c, the four home-page searches listed).

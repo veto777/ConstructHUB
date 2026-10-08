@@ -147,8 +147,11 @@ export const gscComparable = (g: NonNullable<SiteReport["searchConsole"]>) => g.
 export const GSC_MIN_DAYS = 28;
 const gscChange = (g: NonNullable<SiteReport["searchConsole"]>, now: number | null, before: number | null) => (gscComparable(g) && now !== null && before !== null ? signed(now - before) : "");
 /** The period in words, with its end date and anything missing from either window — the same text wherever these numbers are shown. */
-export const gscPeriod = (g: NonNullable<SiteReport["searchConsole"]>) =>
-  `${g.through ? `28 days to ${g.through}` : "last 28 days"}${(g.days ?? 28) < GSC_MIN_DAYS ? ` (${g.days} of 28 days synced)` : g.previousClicks !== null && (g.previousDays ?? 28) < GSC_MIN_DAYS ? ` (not compared: only ${g.previousDays} of the 28 days before are synced)` : ""}`;
+export const gscPeriod = (g: NonNullable<SiteReport["searchConsole"]>) => {
+  const days = g.days ?? 28, before = g.previousDays ?? 28;
+  const notes = [days < GSC_MIN_DAYS ? `${days} of 28 days synced` : null, before < GSC_MIN_DAYS ? `not compared: ${before} of the 28 days before are synced` : null].filter(Boolean);
+  return `${g.through ? `28 days to ${g.through}` : "last 28 days"}${notes.length ? ` (${notes.join("; ")})` : ""}`;
+};
 const gscPartial = (g: NonNullable<SiteReport["searchConsole"]>) => ((g.days ?? 28) < GSC_MIN_DAYS ? `Only ${g.days} of these 28 days have been synced from Search Console, so the counts are incomplete and are not compared with the period before.` : null);
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—");
 const signed = (v: number | null | undefined) => (v == null || v === 0 ? "" : ` (${v > 0 ? "+" : "−"}${n(Math.abs(v))})`);

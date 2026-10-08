@@ -116,8 +116,10 @@ export async function raiseGridAlert(siteId: number, scanId: number): Promise<"g
     `SELECT id, top3, checked, points, avg_rank::float8 AS "avgRank", created_at FROM seo_grid_scans
       WHERE site_id=$1 AND status='done' AND id<>$2 AND created_at < $3 AND keyword=$4 AND size=$5 AND spacing=$6
         AND abs((scan->'center'->>'lat')::float8 - $7) < 0.0001 AND abs((scan->'center'->>'lng')::float8 - $8) < 0.0001 AND (scan->'center'->>'cid') IS NOT DISTINCT FROM $9
+        AND ($9::text IS NOT NULL OR (scan->'center'->>'name') = $10)
       ORDER BY created_at DESC LIMIT 1`,
-    [siteId, scanId, now.created_at, now.keyword, now.size, now.spacing, now.center.lat, now.center.lng, now.center.cid ?? null]);
+    // Without Google's id on either side, the same name in the same place is the least that makes two scans the same listing.
+    [siteId, scanId, now.created_at, now.keyword, now.size, now.spacing, now.center.lat, now.center.lng, now.center.cid ?? null, now.center.name ?? ""]);
   if (!before) return null;
   const kind = gridChange(now, before);
   if (!kind) return null;
@@ -177,6 +179,7 @@ export async function gridReportLines(userId: number, siteId: number): Promise<G
               WHERE p.site_id=s.site_id AND p.status='done' AND p.created_at < s.created_at AND p.keyword=s.keyword AND p.size=s.size AND p.spacing=s.spacing
                 AND abs((p.scan->'center'->>'lat')::float8 - (s.scan->'center'->>'lat')::float8) < 0.0001 AND abs((p.scan->'center'->>'lng')::float8 - (s.scan->'center'->>'lng')::float8) < 0.0001
                 AND (p.scan->'center'->>'cid') IS NOT DISTINCT FROM (s.scan->'center'->>'cid')
+                AND ((s.scan->'center'->>'cid') IS NOT NULL OR (p.scan->'center'->>'name') = (s.scan->'center'->>'name'))
               ORDER BY p.created_at DESC LIMIT 1) AS previous
        FROM seo_grid_watches w
        JOIN LATERAL (SELECT * FROM seo_grid_scans x WHERE x.site_id=w.site_id AND x.status='done' AND x.keyword=w.keyword AND x.size=w.size AND x.spacing=w.spacing AND x.created_at > now() - interval '45 days' ORDER BY x.created_at DESC LIMIT 1) s ON true

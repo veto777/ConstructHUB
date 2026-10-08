@@ -626,7 +626,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` })
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
-        // The note is the customer's (server/seo/public-errors.ts): never the error's own text.
+        // The note is the customer's (server/seo/public-errors.ts): never the error's own text. publicFailure looks through
+        // fetchGrid's wrapper (`cause`) to the source's error, so a busy source still reads as one.
         const message = e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : publicFailure(e, "The scan could not be completed. Try again in a few minutes.");
         await failScan(scanId, message).catch(() => {});
       });

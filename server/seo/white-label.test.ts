@@ -20,6 +20,9 @@ import type { AddressInfo } from "node:net";
 import express from "express";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+/** Printed with every failure of this guard. */
+const HOW = "White-label rule broken — read server/seo/README-white-label.md (the boundary is server/seo/public-errors.ts).";
+
 // ── A stand-in database: just enough rows for every route to get to its work ──
 const SITE = {
   id: 1, user_id: 1, domain: "example.com", location_code: 2840, language_code: "en", devices: "desktop", serp_depth: 10, business_name: "Acme Roofing",
@@ -288,9 +291,9 @@ beforeEach(() => { provider = "success"; ledger.refuse = null; db.runs.length = 
 describe("every SEO route, as a customer", () => {
   it("has a request in this suite", () => {
     const routes = [...new Set(registered())];
-    expect(routes.length).toBe(62);
-    expect(routes.filter((r) => !SPECS[r])).toEqual([]);
-    expect(Object.keys(SPECS).filter((r) => !routes.includes(r))).toEqual([]);
+    expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
+    expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(62);
   });
 
   for (const mode of Object.keys(PROVIDER)) {
@@ -314,7 +317,7 @@ describe("every SEO route, as a customer", () => {
         const r = await hit("GET", url);
         for (const l of r.leaks) problems.push(`stored then returned by ${url}: ${l}`);
       }
-      expect(problems).toEqual([]);
+      expect(problems, HOW).toEqual([]);
       expect(statuses["GET /api/seo/admin/usage"]).toEqual([403]);
       if (mode === "success") return;
       // With the provider down, the routes that call it answer with the neutral error — not a 200, not a 500.
@@ -343,7 +346,7 @@ describe("every SEO route, as a customer", () => {
       }
       await settle(() => db.runs.every((r) => r.status !== "queued") && db.scans.every((s) => s.status !== "running"));
       for (const url of ["/api/seo/sites/1/runs", "/api/seo/sites/1/grid", ...db.scans.map((s) => `/api/seo/sites/1/grid/${s.id}`)]) for (const l of (await hit("GET", url)).leaks) problems.push(`stored then returned by ${url}: ${l}`);
-      expect(problems).toEqual([]);
+      expect(problems, HOW).toEqual([]);
       expect(refused).toBeGreaterThan(10);
     });
   }
@@ -379,6 +382,7 @@ describe("notes saved by earlier versions are made safe when read", () => {
       expect(r.status).toBe(200);
       expect(r.leaks).toEqual([]);
       const notes: string[] = (url.endsWith("runs") ? r.body : r.body.runs).map((x: any) => x.error);
+      expect(notes.join(" | "), HOW).not.toMatch(VENDOR_NAME_RE);
       expect(notes.slice(0, 6)).toEqual(Array(6).fill(SEO_NOTE_FALLBACK));
       expect(notes[6]).toBe(legacy[6]);
       expect(notes[7]).toBe(`${SEO_NOTE_FALLBACK} · 1 check(s) never came back from the queue — their cost was refunded`);
@@ -486,6 +490,13 @@ describe("the boundary itself", () => {
     expect(new WatchError("x").name).toBe("WatchError");
     expect(seoErrorResponse(Object.assign(new Error("DataForSEO said no"), { status: 403 })).status).toBe(500);
   });
+  it("a wrapper that carries the source's error as `cause` reads as that error, never as its own text", () => {
+    const source = new DataForSeoError("rate_limited", "DataForSEO HTTP 429 on /serp/google/maps/live/advanced", 0, 429);
+    const wrapped = Object.assign(new Error(source.message), { costUsd: 0.01, costUnknown: false, cause: source });
+    expect(publicFailure(wrapped, "fallback")).toBe(source.publicMessage);
+    expect(seoErrorResponse(wrapped)).toMatchObject({ status: 429, body: { code: "seo_source_rate_limited", message: source.publicMessage } });
+    expect(publicFailure(Object.assign(new Error("DataForSEO HTTP 429"), { cause: new Error("socket hang up") }), "fallback")).toBe("fallback");
+  });
 });
 
 describe("the vendor is not named in anything shipped to the browser", () => {
@@ -504,6 +515,6 @@ describe("the vendor is not named in anything shipped to the browser", () => {
     const files = [...walk(path.join(root, "client")), ...walk(path.join(root, "shared"))];
     expect(files.length).toBeGreaterThan(100);
     const named = files.filter((f) => VENDOR_NAME_RE.test(fs.readFileSync(f, "utf8"))).map((f) => path.relative(root, f)).sort();
-    expect(named).toEqual(ALLOWED);
+    expect(named, `${HOW} These files name the vendor`).toEqual(ALLOWED);
   });
 });
