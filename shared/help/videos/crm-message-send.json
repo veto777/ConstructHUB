@@ -1,25 +1,25 @@
 {
   "helpKey": "crm-message-send",
-  "durationSec": 68,
+  "durationSec": 67,
   "video": {
-    "key": "tutorials/crm-message-send.126d963d.mp4",
-    "bytes": 5513028,
-    "sha256": "126d963de22cbd5dc1ee6a4d057adefb8acd38e0f7f1101efabade44bbe43e81"
+    "key": "tutorials/crm-message-send.086b9626.mp4",
+    "bytes": 5552066,
+    "sha256": "086b96267ef93129834fb5ba09f9d6b1841586840016208a7442cd30915f019a"
   },
   "captions": {
-    "key": "tutorials/crm-message-send.a0dcd5a1.vtt",
+    "key": "tutorials/crm-message-send.ed8ebe36.vtt",
     "bytes": 1135,
-    "sha256": "a0dcd5a1eea79c2759c94c101b2a7ab36357030882af208d3e0ddc5084978c68"
+    "sha256": "ed8ebe36dc80883e295b64b709fed90e354e4dc12a9fedb972543ff2dd9c4274"
   },
   "poster": {
-    "key": "tutorials/crm-message-send.f8ae1657.jpg",
-    "bytes": 91406,
-    "sha256": "f8ae1657f542c4f1bb4be93196d71e653162d788e4aa74f403f869b84d2e5114"
+    "key": "tutorials/crm-message-send.ddfa31bb.jpg",
+    "bytes": 91329,
+    "sha256": "ddfa31bbc48d14fcfc4d19bda1344bea6ed6f583b9f6b3f4c9680a8d94724dce"
   },
   "uploaded": {
-    "at": "2026-10-08T02:06:24.257Z",
-    "video": "dc04c9f18bc4dbc1694da03ce2502de9",
-    "captions": "d2395141a05d896f0253db3844b02b51",
-    "poster": "e07de6403a72353e1e1b1092ac3bd7a5"
+    "at": "2026-10-08T03:39:15.749Z",
+    "video": "4f0b60ee90f57011a4f21b664c9dc272",
+    "captions": "6d12189ec01a3f1e5f725267d134e73e",
+    "poster": "138c1e1b770ed96f0cba1aefc122bd5f"
   }
 }
