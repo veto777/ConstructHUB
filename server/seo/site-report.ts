@@ -178,13 +178,14 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
     if (r.rankings) {
       const k = r.rankings;
       heading(`Rankings on Google — checked ${day(k.checkedOn)}`);
-      if (k.improved.length) { line("Moved up", "#188038"); for (const m of k.improved) line(`  ▲ ${moverLine(m)}`); doc.moveDown(0.3); }
-      if (k.declined.length) { line("Moved down", "#c5221f"); for (const m of k.declined) line(`  ▼ ${moverLine(m)}`); doc.moveDown(0.3); }
+      if (k.improved.length) { line("Moved up", "#188038"); for (const m of k.improved) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
+      if (k.declined.length) { line("Moved down", "#c5221f"); for (const m of k.declined) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
       if (!k.improved.length && !k.declined.length) line(r.comparedWith ? "No keyword changed position since the earlier check." : "This is the first check, so there is nothing to compare with yet.", soft);
       room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
-      const cols = [0, width * 0.52, width * 0.66, width * 0.8, width * 0.92];
+      // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
+      const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
       const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(c, 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
-      row(["Keyword", "Position", "Was", "Map pack", "Searches"], true);
+      row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.tracked > k.keywords.length) line(`…and ${k.tracked - k.keywords.length} more tracked keywords.`, soft);
     }

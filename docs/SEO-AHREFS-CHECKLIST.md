@@ -26,7 +26,7 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  B6  Organic keywords filters: position range, volume, difficulty, intent, keyword contains; sort by traffic / volume / position / difficulty / CPC.
 - [x] DONE  B7  Tick keywords in a report and add them to the rank tracker.
 - [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
-- [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). NOT seen in a browser.
+- [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). Seen in a browser 10-08.
 - [ ] TODO  B10 Traffic by country; multi-year history; compare two dates.
 - [ ] TODO  B11 Organic keywords history chart by position bucket (1–3, 4–10, 11–20 …) over time.
 - [ ] TODO  B12 Paid ads copy and paid pages.
@@ -39,7 +39,7 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  C3  Who ranks: top organic results with each site's authority, dated, with a Refresh button (was labelled "today" while up to a week old - Codex FAIL, fixed 10-08).
 - [x] DONE  C4  What else is on the results page (map pack, people also ask, AI overview …).
 - [x] DONE  C5  Matching terms, related terms and questions: filters, sort, paging, CSV, and "track on my site".
-- [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. NOT seen in a browser.
+- [x] DONE  C6  Many keywords at once (paste up to 200: volume, difficulty, CPC, intent; export; track) and keyword lists (named, saved, add from any keyword report / bulk / content gap, remove, export, track, refresh numbers). Lists are free; the bulk lookup shows its price first. Seen in a browser 10-08.
 - [ ] TODO  C7  Other countries and languages (US English only today).
 - [ ] TODO  C8  Clicks, traffic potential, parent topic.
 
@@ -47,8 +47,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  D1  Weekly positions per keyword on desktop and mobile with movement since the last check, including "new" (entered the results) and "lost" (dropped out) - Codex FAIL fixed 10-08.
 - [x] DONE  D2  History: project chart (visibility %, average position) and positions-by-band chart per check date; click a keyword for its own history chart and table. Built from saved checks, free. NOT yet seen with real check data (no tracked sites exist on production yet).
 - [x] PART  D3  Tags: set a tag when adding keywords, filter the history by tag. TODO: edit tags in the table (API exists), competitors on the same keywords, share of voice vs competitors.
-- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. NOT seen in a browser. US only.
-- [ ] TODO  D5  SERP features won per keyword (only the map pack is tracked so far); scheduled email report.
+- [x] DONE  D4  Place-level tracking: a keyword can be tracked from any US city, ZIP code, county, state or metro area (the same keyword in several places), and the Google map pack is tracked per keyword - the business's place in it (matched by website or by business name) and who else is in it. Live check 10-08: "siding contractor" from Bellingham WA found Alpine Exteriors at #1 in the map pack. Seen in a browser 10-08. US only.
+- [x] PART  D5  Scheduled email report: done (G5). SERP features won per keyword: only the map pack is tracked.
 
 ## E. Billing of SEO data (shared/seo-credits.ts, server/seo/credits.ts, budget.ts)
 - [x] DONE  E1  Every lookup charged at 4x wholesale, reserved then settled to the real cost. Codex FAIL (double refund possible; cost of parallel calls lost on failure) -> fixed 10-08: a reservation settles exactly once; failed reports carry the full cost; a failed lookup costs the customer nothing.
@@ -61,13 +61,14 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  E8  Durable reservations (table seo_reservations): the reservation row, the customer's credit and our ledger settle in one transaction; a reservation the process never settled is finished by a reconciler after 30 minutes (customer charged nothing). Verified on a real Postgres with script/seo-ledger-check.ts: 24/24.
 
 ## F. Site Audit
-- [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). NOT seen in a browser.
+- [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). Seen in a browser 10-08.
 - [x] PART  F2  HTTP status distribution (2xx / 3xx / 4xx / 5xx / failed) and per-area scores. TODO: crawl depth, indexability report, internal-link report, per-page explorer, pause/resume, custom page limit (fixed at 150).
 
 ## G. Other Ahrefs tools
 - [ ] TODO  G1  Content Explorer.  G2  Brand Radar / AI visibility.  G3  Web Analytics.
 - [x] PART  G4  Alerts (`/seo/alerts`, the bell, email): rankings fell / rose, dropped out of / came into the results, left / entered the map pack, linking sites lost / gained; per-site threshold and on/off. Audit regressions use the existing Site Scan notification. TODO: new-keyword and individual lost-link alerts.
-- [ ] TODO  G5  Client-ready PDF reports and scheduled reports.  G6  Batch analysis of many domains.
+- [x] DONE  G5  Reports (`/seo/reports`): the site's report on screen, as a PDF (the account's own name and logo when set), and emailed weekly or monthly to up to 5 addresses, or sent now. Built from saved numbers - free. Seen in a browser; the PDF was rendered and read (and two faults found that way were fixed).
+- [ ] TODO  G6  Batch analysis of many domains.
 
 ## Codex audit #2 (2026-10-08, read-only, in a container; report: tower1 ~/codex-audits/out/seo-audit-2.md)
 Verdict: "a substantive SEO MVP, roughly 30-40% of the requested Ahrefs surface, not an Ahrefs equivalent."
@@ -142,8 +143,14 @@ STILL OPEN: 13 above; N7 (audit summaries computed on read); older 3 (volume / b
 - 2026-10-08 (slice 2): Site audit, rank history, and the Codex fixes. 86 SEO unit tests pass. The audit summary was run
   against the real stored crawl. Still NOT seen in a browser by the builder; the rank-history charts have never had real data.
 - 2026-10-08 (slice 3): Content gap + Link intersect, durable ledger, Codex audit #3 fixes. 100 SEO unit tests pass;
-  script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still NOT seen in a browser.
+  script/seo-ledger-check.ts 24/24 on a throwaway Postgres; gap and link intersect run live. Still Seen in a browser 10-08.
 - 2026-10-08 (slice 4): place-level tracking, map pack, alerts. 113 SEO unit tests pass; script/seo-local-check.ts 17/17 on a
   throwaway Postgres that still had the old schema and rows (the upgrade runs in place); map pack found on live results.
 - 2026-10-08 (slice 5): keyword lists, bulk analysis, usage page, Codex audit #4 fixes. 130 SEO unit tests pass;
-  script/seo-ledger-check.ts 38/38 and script/seo-local-check.ts 20/20 on a fresh throwaway Postgres. NOT seen in a browser.
+  script/seo-ledger-check.ts 38/38 and script/seo-local-check.ts 20/20 on a fresh throwaway Postgres. Seen in a browser 10-08.
+- 2026-10-08 (browser): every SEO screen was opened in headless Chromium (Playwright) against a recording database on vb11 with
+  real lookups for alpineexteriorswa.com - 31 screens plus 7 at phone width, no page errors, no horizontal overflow on a phone.
+  Looking found what code review had not: a clipped column in Site audit, wrapping intent labels, capitalised domain chips,
+  "city, state" not matching in the place picker, no way to get search volumes in the tracker, arrow glyphs missing in the PDF.
+  All fixed. How to repeat it: scripts/seoshots*.tmp.ts in vb11 ~/ConstructHUB-seoshots (not committed).
+- 2026-10-08 (slice 7): reports. 142 SEO unit tests pass.
