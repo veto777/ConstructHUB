@@ -4,6 +4,7 @@ import { REPORT_SCHEDULE_DDL } from "./site-report";
 import { VOICE_SCHEMA_DDL } from "./voice";
 import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { GRID_SCHEMA_DDL } from "./grid";
+import { RENDER_SCHEMA_DDL } from "./render-check";
 import { GRID_WATCH_DDL } from "./grid-monitor";
 import { TASK_SCHEMA_DDL } from "./tasks";
 import { pool } from "../db";
@@ -121,6 +122,8 @@ export const SEO_SCHEMA_DDL = [
   // AI visibility: saved answers from the assistants (server/seo/ai-visibility.ts).
   ...AI_SCHEMA_DDL,
   ...GRID_SCHEMA_DDL,
+  // Rendering checks: pages fetched plain and in a browser (server/seo/render-check.ts).
+  ...RENDER_SCHEMA_DDL,
   // Followed competitors and the saved result pages (server/seo/voice.ts).
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).

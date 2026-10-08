@@ -29,7 +29,7 @@ const SITE = {
   alerts_enabled: true, alert_drop: 3, keyword_count: 1, created_at: "2026-10-01T00:00:00Z", next_rank_check_at: null, last_rank_check_at: null, next_backlinks_at: null, last_backlinks_at: null,
   grid_pin: { name: "Acme Roofing", address: null, lat: 27.95, lng: -82.46, cid: null },
 };
-const db = vi.hoisted(() => ({ runs: [] as any[], scans: [] as any[], log: [] as string[] }));
+const db = vi.hoisted(() => ({ runs: [] as any[], scans: [] as any[], renders: [] as any[], log: [] as string[] }));
 
 function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCount: number } {
   const sql = String(typeof sqlText === "string" ? sqlText : (sqlText as any)?.text ?? "").replace(/\s+/g, " ").trim();
@@ -58,6 +58,15 @@ function fakeQuery(sqlText: unknown, params: any[] = []): { rows: any[]; rowCoun
     if (/^SELECT id, scan, status, error/.test(sql)) return many(db.scans.filter((x) => x.id === params[0]));
     // The history lists failed scans with their note.
     if (/status IN \('done','failed'\)/.test(sql)) return many(db.scans.filter((x) => x.status !== "running").map((x) => ({ id: x.id, keyword: x.keyword ?? "roofer", size: 3, spacing: 2, status: x.status, error: x.error, center: null, avgRank: null, points: 9, checked: 0, found: 0, top3: 0, at: "2026-10-01T00:00:00Z" })));
+    return many([]);
+  }
+  // Rendering checks: started, failed in the background with the error's own text, read back by the page.
+  if (/seo_render_runs/.test(sql)) {
+    if (/^INSERT INTO seo_render_runs/.test(sql)) { const id = db.renders.length + 1; db.renders.push({ id, status: "running", urls: JSON.parse(params[2]), result: null, error: null, created_at: "2026-10-01T00:00:00Z" }); return many([{ id }]); }
+    if (/SET status='failed', error=\$2 WHERE id=\$1/.test(sql)) { const s = db.renders.find((x) => x.id === params[0] && x.status === "running"); if (s) { s.status = "failed"; s.error = params[1]; } return many([]); }
+    if (/SET status='done', result=\$2/.test(sql)) { const s = db.renders.find((x) => x.id === params[0] && x.status === "running"); if (s) { s.status = "done"; s.result = JSON.parse(params[1]); } return { rows: [], rowCount: s ? 1 : 0 }; }
+    if (/^SELECT \* FROM seo_render_runs WHERE id=\$1/.test(sql)) return many(db.renders.filter((x) => x.id === params[0]));
+    if (/^SELECT \* FROM seo_render_runs WHERE site_id=\$1/.test(sql)) return many(db.renders.slice(-1));
     return many([]);
   }
   if (/FROM seo_grid_watches/.test(sql) && /^SELECT count/.test(sql)) return many([{ n: 0 }]);
@@ -210,6 +219,9 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
     ...DOMAIN_TABLES.map((table) => ({ url: "/api/seo/report", body: { table, domain: "example.com" } })),
     ...KEYWORD_TABLES.map((table) => ({ url: "/api/seo/report", body: { table, keyword: "roof repair" } })),
   ],
+  "GET /api/seo/sites/:id/render": [{ url: "/api/seo/sites/1/render" }],
+  "POST /api/seo/sites/:id/render": [{ url: "/api/seo/sites/1/render", body: { urls: ["https://acmeroofing.com/"] } }],
+  "GET /api/seo/sites/:id/render/:runId": [{ url: "/api/seo/sites/1/render/1" }],
   "GET /api/seo/sites/:id/grid": [{ url: "/api/seo/sites/1/grid" }],
   "POST /api/seo/sites/:id/grid/locate": [{ url: "/api/seo/sites/1/grid/locate", body: { query: "Acme Roofing Tampa" } }],
   "POST /api/seo/sites/:id/grid/pin": [{ url: "/api/seo/sites/1/grid/pin", body: { name: "Acme Roofing", lat: 27.95, lng: -82.46 } }],
@@ -295,14 +307,14 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterAll(async () => { dataforseoDeps.fetch = originalFetch; dataforseoDeps.env = originalEnv; vi.restoreAllMocks(); await new Promise((r) => server.close(r)); });
-beforeEach(() => { provider = "success"; ledger.refuse = null; db.runs.length = 0; db.scans.length = 0; issues.recorded.length = 0; });
+beforeEach(() => { provider = "success"; ledger.refuse = null; db.runs.length = 0; db.scans.length = 0; db.renders.length = 0; issues.recorded.length = 0; });
 
 describe("every SEO route, as a customer", () => {
   it("has a request in this suite", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(71);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(74);
   });
 
   for (const mode of Object.keys(PROVIDER)) {
@@ -431,7 +443,7 @@ describe("the admin view is for platform admins only", () => {
     expect(customer.status).toBe(200);
     expect(customer.leaks).toEqual([]);
     expect(customer.body.admin).toBeUndefined();
-    expect(Object.keys(customer.body).sort()).toEqual(["alertsUnread", "configured", "credits", "holds", "packs", "prices", "resetsAt", "usage"]);
+    expect(Object.keys(customer.body).sort()).toEqual(["alertsUnread", "configured", "credits", "holds", "packs", "prices", "quotes", "resetsAt", "usage"]);
     // Customer prices are whole cents at the customer's rate — never the wholesale figure they are worked out from.
     for (const cents of [...Object.values(customer.body.prices), ...Object.values(customer.body.holds)] as number[]) expect(Number.isInteger(cents) && cents >= 1).toBe(true);
     expect(admin.body.admin).toMatchObject({ vendor: "DataForSEO", configured: true, capUsd: 100, spentUsd: 12.345678 });

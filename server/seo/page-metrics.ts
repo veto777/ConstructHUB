@@ -14,6 +14,8 @@ export const pageMetricsInput = z.object({
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
   peek: z.boolean().default(false),
+  /** Ask again for the part of a saved answer that did not load (and only that part). */
+  retry: z.boolean().default(false),
 }).strict();
 /** Web addresses only, without fragments, no duplicates, in the order given. */
 export function cleanUrls(list: readonly string[]): string[] {
@@ -26,14 +28,21 @@ export function cleanUrls(list: readonly string[]): string[] {
   }
   return out.slice(0, PAGE_METRICS_MAX);
 }
-/** The most both lookups can cost us for `n` pages. */
-export const pageMetricsEstimateUsd = (n: number) => Math.round((BACKLINKS_REQUEST_USD + n * BACKLINKS_ROW_USD * 1.2 + estimateLabsUsd(n)) * 1e6) / 1e6;
+export type MetricPart = "links" | "traffic";
+/** The most the lookups can cost us for `n` pages (both, or only the parts named). */
+export const pageMetricsEstimateUsd = (n: number, parts: readonly string[] = ["links", "traffic"]) =>
+  Math.round(((parts.includes("links") ? BACKLINKS_REQUEST_USD + n * BACKLINKS_ROW_USD * 1.2 : 0) + (parts.includes("traffic") ? estimateLabsUsd(n) : 0)) * 1e6) / 1e6;
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 export type PageMetric = { url: string; /** Sites linking to this page; null = that lookup did not load. */ linkingSites: number | null; /** Estimated search visits a month to this page. */ traffic: number | null; /** Keywords it ranks for. */ keywords: number | null };
 export type PageMetrics = { rows: PageMetric[]; /** "links" and/or "traffic": a part that did not load (its numbers are missing, not zero). */ missing: string[]; fetchedAt: string };
 
-const keyOf = (u: unknown) => { try { const x = new URL(String(u)); x.hash = ""; return x.toString().replace(/\/$/, "").toLowerCase(); } catch { return String(u ?? "").replace(/\/$/, "").toLowerCase(); } };
+/**
+ * One page, one key: the address as it is, without its fragment. Nothing else is folded together — /Roof and /roof,
+ * /guide and /guide/, ?id=A and ?id=a can all be different pages, and the source echoes each address as it was asked.
+ */
+export const pageKey = (u: unknown) => { try { const x = new URL(String(u)); x.hash = ""; return x.toString(); } catch { return String(u ?? ""); } };
+const keyOf = pageKey;
 /** Pure: the answer for each page asked about, from what the two lookups returned (null = that lookup failed). */
 export function buildPageMetrics(urls: string[], links: any[] | null, traffic: any[] | null, fetchedAt = new Date().toISOString()): PageMetrics {
   const l = new Map((links ?? []).map((i) => [keyOf(i?.target), i] as const)), t = new Map((traffic ?? []).map((i) => [keyOf(i?.target), i] as const));
@@ -44,15 +53,28 @@ export function buildPageMetrics(urls: string[], links: any[] | null, traffic: a
         url,
         // The source answers for every page it was asked about; a page it left out is unknown, not zero.
         linkingSites: links ? (li ? num(li.referring_main_domains) ?? num(li.referring_domains) : null) : null,
-        traffic: traffic ? (ti && num(ti.etv) !== null ? Math.round(ti.etv) : ti ? null : 0) : null,
-        keywords: traffic ? (ti ? num(ti.count) : 0) : null,
+        // The same for visits: zero only when the source says zero for this very page (it does, for a page it has
+        // no searches for — checked 2026-10-08). A page it left out, or answered without figures, is unknown.
+        traffic: ti && num(ti.etv) !== null ? Math.round(ti.etv) : null,
+        keywords: ti ? num(ti.count) : null,
       };
     }),
     missing: [links ? null : "links", traffic ? null : "traffic"].filter((x): x is string => !!x), fetchedAt,
   };
 }
 
-export async function fetchPageMetrics(input: { urls: string[]; locationCode: number; languageCode: string }): Promise<{ data: PageMetrics; costUsd: number; customerUsd: number; costUnknown: boolean }> {
+/** A saved answer with the part that had not loaded filled in from a second try. What had loaded is kept as it was. Pure. */
+export function mergePageMetrics(saved: PageMetrics, fresh: PageMetrics): PageMetrics {
+  const f = new Map(fresh.rows.map((r) => [r.url, r] as const));
+  const got = (part: MetricPart) => !fresh.missing.includes(part);
+  return {
+    rows: saved.rows.map((r) => { const n = f.get(r.url); return !n ? r : { url: r.url, linkingSites: got("links") ? n.linkingSites : r.linkingSites, traffic: got("traffic") ? n.traffic : r.traffic, keywords: got("traffic") ? n.keywords : r.keywords }; }),
+    missing: saved.missing.filter((m) => fresh.missing.includes(m)), fetchedAt: saved.fetchedAt,
+  };
+}
+
+/** Both lookups, or only the parts named in `only` (the others are then reported missing, for mergePageMetrics to fill from the saved answer). */
+export async function fetchPageMetrics(input: { urls: string[]; locationCode: number; languageCode: string }, only?: readonly string[]): Promise<{ data: PageMetrics; costUsd: number; customerUsd: number; costUnknown: boolean }> {
   let costUsd = 0, customerUsd = 0, costUnknown = false, firstError: unknown = null;
   const call = async (path: string, body: Record<string, unknown>): Promise<any[] | null> => {
     try {
@@ -67,9 +89,10 @@ export async function fetchPageMetrics(input: { urls: string[]; locationCode: nu
       return null;
     }
   };
+  const want = (part: MetricPart) => !only || only.includes(part);
   const [links, traffic] = await Promise.all([
-    call("/backlinks/bulk_referring_domains/live", { targets: input.urls }),
-    call("/dataforseo_labs/google/bulk_traffic_estimation/live", { targets: input.urls, location_code: input.locationCode, language_code: input.languageCode, item_types: ["organic"] }),
+    want("links") ? call("/backlinks/bulk_referring_domains/live", { targets: input.urls }) : null,
+    want("traffic") ? call("/dataforseo_labs/google/bulk_traffic_estimation/live", { targets: input.urls, location_code: input.locationCode, language_code: input.languageCode, item_types: ["organic"] }) : null,
   ]);
   if (!links && !traffic) throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError ?? "The lookups failed.")), { costUsd, costUnknown });
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;

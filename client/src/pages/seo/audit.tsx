@@ -16,6 +16,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { AuditPages } from "./audit-pages";
+import { RenderCheck } from "./render";
 
 type Severity = "error" | "warning" | "notice";
 type Issue = { key: string; title: string; category: string; severity: Severity; count: number; previous: number | null; change: number | null; isNew: boolean; why: string; fix: string; items: string[] };
@@ -92,7 +93,7 @@ export default function SeoAuditPage() {
   const [category, setCategory] = useState("all");
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const [view, setView] = useState<"issues" | "pages">("issues");
+  const [view, setView] = useState<"issues" | "pages" | "rendering">("issues");
   const start = useMutation({
     // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
     mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
@@ -217,9 +218,10 @@ export default function SeoAuditPage() {
           )}
 
           <nav className="g-tabs" aria-label="Audit views">
-            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
+            {([["issues", `Issues (${a.issues.length})`], ["pages", `Pages (${a.crawled})`], ["rendering", "Rendering"]] as const).map(([v, label]) => <a key={v} href={`#${v}`} aria-current={view === v ? "page" : undefined} onClick={(e) => { e.preventDefault(); setView(v); }} data-testid={`tab-audit-view-${v}`}>{label}</a>)}
           </nav>
           {view === "pages" && <AuditPages site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <nav className="g-tabs !mb-0" aria-label="Issue severity">
@@ -280,7 +282,7 @@ export default function SeoAuditPage() {
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">
               <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
-              <p className="g-text-2 mb-2 text-[13px]">The crawl before found these, and this crawl didn't look at the same pages (or had no Google profile to compare with) — so they are not counted as fixed.</p>
+              <p className="g-text-2 mb-2 text-[13px]">The crawl before found these, and this crawl could not check them the same way — it didn't look at the same pages, didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>

@@ -61,7 +61,8 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 
 ## F. Site Audit
 - [x] DONE  F1  Site audit tab (`/seo/audit`): run a crawl, health score ring (share of crawled pages with no errors), errors / warnings / notices, issue list with change since the previous crawl, new and fixed issues, affected pages per issue, CSV export, health trend. Reads Site Scan's crawler. Checked against the real stored crawl of alpineexteriorswa.com (150 pages, 13 issues). Seen in a browser 10-08.
-- [x] DONE  F2  Site audit -> Pages: every crawled page with status, whether it can be indexed and why not, clicks from the home page, links to it, words, title and description length, size, the issues it is listed under; quick filters, search, sort, export. When a site's links only exist after JavaScript runs (true of alpineexteriorswa.com), link counts and depth are shown as not measurable instead of wrong. TODO: pause/resume, custom page limit (fixed at 150), JavaScript rendering.
+- [x] DONE  F2  Site audit -> Pages: every crawled page with status, whether it can be indexed and why not, clicks from the home page, links to it, words, title and description length, size, the issues it is listed under; quick filters, search, sort, export. When a site's links only exist after JavaScript runs (true of alpineexteriorswa.com), link counts and depth are shown as not measurable instead of wrong. TODO: pause/resume, custom page limit (fixed at 150).
+- [x] DONE  F3  Site audit -> Rendering: up to 10 chosen pages fetched twice - as plain HTML and in a real browser with JavaScript run - and compared: words, links to the site's own pages, title, main heading, plus when the main content was painted and the page finished loading. Each page is called "depends on JavaScript" (with the numbers that say so), "same either way" or "could not be compared". Runs in the background (about half a minute), saved before it is charged, one at a time per site; the price is on the button. Not a rendered crawl of the whole site: the crawler itself still reads HTML only.
 
 ## G. Other Ahrefs tools
 - [x] PART  G1  Content explorer (`/seo/content`): search the web for pages about a topic; title, site, authority, date, author, excerpt; sort by relevance / strongest sites / newest; filters for date, authority, kind of site, leaving out your own; paging, export, open a site in Site explorer. Run live and seen in a browser 10-08. Not Ahrefs' depth: no traffic or linking-site numbers per page.
@@ -375,6 +376,27 @@ Verdict: "Audit #17 is partly resolved"; coverage about 60% (52-67). No cross-ac
 10 LOW  cached planner selections not remembered        FIXED: pressing "Build" remembers the inputs even when the table is already saved.
  Also: the rank tracker's summary names the device; a table made for another country has a rebuild button.
 
+## Codex audit #19 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-19.md)
+
+Verdict: of audit #18's ten, eight hold and two were partial; ten new defects in Directories and page numbers. Coverage estimate 60% (53-67).
+
+ audit #18 leftovers
+ 3 audit tasks without a recorded issue said nothing ... FIXED (they now say the crawls could not be read / cannot be checked automatically)
+ 5 same-day refresh could be settled unseen ........... FIXED (see 7 below). Alert debt from before the migration stays discarded: KNOWN, not rebuilt.
+ new
+ 1 HIGH different pages given the same numbers ........ FIXED (a page is its address without the fragment and nothing else: no lower-casing, no slash folding, on server and page)
+ 2 directory sub-domains could not pass the filter .... FIXED (anchored pattern: the directory or any sub-domain of it; checked against the source - it answered the same 15 rows for a large site, so the old filter was not losing rows there)
+ 3 missing traffic shown as zero ...................... FIXED (zero only when the source says zero for that page; left out or without figures = unknown). Labelled "estimated US search visits".
+ 4 a half-loaded answer could not be completed ........ FIXED ("Try that part again" asks for, and charges, the missing part only; what had loaded is kept; a failed look for a saved copy is said, with a retry)
+ 5 price on screen differed from what was set aside ... FIXED (the server sends the exact figure for n sites / n pages; the page shows and checks that figure and will not buy without it)
+ 6 "listed and you are not" ........................... FIXED (wording is about links found; the badge is "Link to check"; plan tasks are "Check your ... profile and its link to the website")
+ 7 settlement could clear a newer same-day snapshot ... FIXED (a snapshot is settled only if it is still the version that was evaluated)
+ 8 competitors in another order bought again .......... FIXED (one fixed order for the saved copy and the lookup)
+ 9 a link invented from a row without a count ......... FIXED (a row that says no links is not a link; a link without a count is shown as "linked", no number)
+ 10 table grouping / unknown cells for screen readers . FIXED (a body per group with a row-group heading; "not checked" and "no link found" are text, not a hover)
+ also: the "not re-checked" note on the audit page now names speed and sampled checks.
+ NOT DONE: Directories "Check again" buys every column again, also the ones that loaded.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -424,3 +446,5 @@ Verdict: "Audit #17 is partly resolved"; coverage about 60% (52-67). No cross-ac
 - 10/8 audit #17 fixes: 273 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 28/28, AI + lists 15/15, grid + scheduler passing, tasks passing (incl. two reopenings at once for one place). Browser: planner quote "Up to $0.14" (the reservation), an over-long pairing named and blocked; an audit task added today says "Not rechecked since it was added", one added before crawls were recorded says it can't be checked automatically.
 - 10/8 slice 29 (directories + page numbers): 279 unit tests incl. the white-label route rule (two new routes). Browser, live: directories for three sites (201; meta "linked from 0 of these 26 - 4 where a competitor is and you are not"), gaps to the plan (4 added); Content explorer numbers for 25 pages (201, charged 16c against a stated 17c) and both orderings.
 - 10/8 audit #18 fixes: 280 unit tests; real Postgres on a fresh database - ledger 44/44, places+alerts 29/29 (an older snapshot judged against its own predecessor), AI + lists 15/15, grid + scheduler passing, tasks passing. Browser: planner quote required before buying and inputs remembered after a reload; a live backlink refresh through the single transaction (snapshot saved, alerts settled, next snapshot a month on).
+- 10/8 slice 31 (rendering check): 285 unit tests incl. the white-label route rule (three new routes, 74). Real Postgres on a fresh database - ledger, places+alerts, AI + lists, grid + scheduler, tasks all passing, rendering runs 12/12 (one running per site, another account cannot read it, a closed run cannot be finished, raw error text never shown). Browser, live: an address on another site refused; 10 pages of alpineexteriorswa.com checked in the background (charged 21c against a 26c hold): the home page reads the same either way (412 / 415 words, 99 / 98 own-site links), the nine "compare" pages depend on JavaScript (1 own-site link in the HTML, 107 once rendered). Found by running it: one fetch in three failed without being billed when three ran at once - such a fetch is now asked for once more.
+- 10/8 audit #19 fixes: 285 unit tests. Browser, live: directories for three sites ("Up to $0.34", charged 29c; "4 that link to a competitor and not to you"); page numbers with "estimated US search visits". The pattern filter and the way the source echoes page addresses and answers zero were checked against the source itself. The settlement rule was run in Postgres (same version settles; a rewritten snapshot does not).

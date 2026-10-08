@@ -24,7 +24,9 @@ export const DIRECTORIES: readonly { domain: string; name: string; kind: Directo
 ];
 export const DIRECTORIES_MAX_SITES = 4;
 /** One lookup for one site: at most one row per directory on the list. */
-export const directoriesEstimateUsd = (sites: number) => Math.round(sites * (BACKLINKS_REQUEST_USD + DIRECTORIES.length * BACKLINKS_ROW_USD * 1.2) * 1e6) / 1e6;
+const DIRECTORY_ROWS = 100;
+/** One lookup for one site: a row per linking directory or sub-domain of one, at most DIRECTORY_ROWS. */
+export const directoriesEstimateUsd = (sites: number) => Math.round(sites * (BACKLINKS_REQUEST_USD + DIRECTORY_ROWS * BACKLINKS_ROW_USD * 1.2) * 1e6) / 1e6;
 export const directoriesDeps = { request };
 
 export const directoriesInput = z.object({
@@ -36,28 +38,43 @@ export const directoriesInput = z.object({
 
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 export const directoryRequest = (target: string) => ({
-  target, include_subdomains: true, backlinks_status_type: "live", limit: 100, rank_scale: "one_thousand",
-  filters: ["domain", "in", DIRECTORIES.map((d) => d.domain)], order_by: ["rank,desc"],
+  target, include_subdomains: true, backlinks_status_type: "live", limit: DIRECTORY_ROWS, rank_scale: "one_thousand",
+  // Each directory or a sub-domain of it (m.yelp.com), anchored at both ends. Checked against the source 2026-10-08.
+  filters: ["domain", "regex", `(^|\\.)(${DIRECTORIES.map((d) => d.domain.replace(/\./g, "\\.")).join("|")})$`], order_by: ["rank,desc"],
 });
 
-export type DirectoryRow = { domain: string; name: string; kind: DirectoryKind; /** Links found from this directory to each site, in the order of `sites`; null = that site's lookup did not load. */ links: (number | null)[] };
+export type DirectoryRow = {
+  domain: string; name: string; kind: DirectoryKind;
+  /** Links found from this directory to each site, in the order of `sites`; null = that site's lookup did not load. */
+  links: (number | null)[];
+  /** Per site: true = a link was found but the source gave no count for it (the number in `links` is then a floor of 1, not a count). Left out when every count is real. */
+  uncounted?: boolean[];
+};
 export type DirectoriesPage = { sites: string[]; rows: DirectoryRow[]; /** Sites whose lookup did not load (their column is unknown, not empty). */ missing: string[]; fetchedAt: string };
 
 /** Pure: the table from each site's lookup (null = it failed). A directory's sub-domains count as the directory. */
 export function buildDirectories(sites: string[], results: (any[] | null)[], fetchedAt = new Date().toISOString()): DirectoriesPage {
   const perSite = results.map((items) => {
     if (!items) return null;
-    const found = new Map<string, number>();
+    const found = new Map<string, { n: number; uncounted: boolean }>();
     for (const i of items) {
       const d = safeDomain(i?.domain);
       const dir = d ? DIRECTORIES.find((x) => d === x.domain || d.endsWith(`.${x.domain}`)) : null;
-      if (dir) found.set(dir.domain, (found.get(dir.domain) ?? 0) + Math.max(1, num(i.backlinks) ?? 1));
+      if (!dir) continue;
+      const count = num(i.backlinks);
+      // A row that says it has no links is not evidence of one. A row without a count is a link of unknown number.
+      if (count !== null && count <= 0) continue;
+      const was = found.get(dir.domain) ?? { n: 0, uncounted: false };
+      found.set(dir.domain, { n: was.n + (count ?? 1), uncounted: was.uncounted || count === null });
     }
     return found;
   });
   return {
     sites, fetchedAt, missing: sites.filter((_, n) => !perSite[n]),
-    rows: DIRECTORIES.map((dir) => ({ ...dir, links: perSite.map((f) => (f ? f.get(dir.domain) ?? 0 : null)) })),
+    rows: DIRECTORIES.map((dir) => {
+      const uncounted = perSite.map((f) => f?.get(dir.domain)?.uncounted === true);
+      return { ...dir, links: perSite.map((f) => (f ? f.get(dir.domain)?.n ?? 0 : null)), ...(uncounted.some(Boolean) ? { uncounted } : {}) };
+    }),
   };
 }
 

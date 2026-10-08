@@ -1,0 +1,26 @@
+import { pool } from "../server/db";
+import { ensureSeoSchema } from "../server/seo/schema";
+import { beginRender, finishRender, failRender, latestRender, getRender } from "../server/seo/render-check";
+let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else n++; };
+(async () => {
+  await ensureSeoSchema(); await ensureSeoSchema();
+  const { rows: [s] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'render.example') RETURNING id");
+  const a = await beginRender(1, s.id, ["https://render.example/"]); ok(!a.existing, "first opens");
+  const [b, c] = await Promise.all([beginRender(1, s.id, ["https://render.example/x"]), beginRender(1, s.id, ["https://render.example/y"])]);
+  ok(b.existing && c.existing && b.id === a.id && c.id === a.id, "one running per site");
+  ok((await latestRender(1, s.id))?.status === "running", "latest running");
+  ok((await getRender(2, s.id, a.id)) === null, "another account cannot read it");
+  const result = { rows: [], summary: { pages: 0, needsJs: 0, same: 0, unknown: 0 }, fetchedAt: new Date().toISOString() };
+  ok(await finishRender(a.id, result, 0.01), "saved"); ok(!(await finishRender(a.id, result, 0.01)), "not saved twice");
+  ok((await getRender(1, s.id, a.id))?.status === "done", "done");
+  const d = await beginRender(1, s.id, ["https://render.example/"]); ok(!d.existing && d.id !== a.id, "next opens");
+  await failRender(d.id, "DataForSEO: user-4471 secret text"); const f = await getRender(1, s.id, d.id);
+  ok(f?.status === "failed" && f.error === "The check could not be completed." && f.result === null, "raw error text is never shown: " + f?.error);
+  const e = await beginRender(1, s.id, ["https://render.example/"]);
+  await pool.query("UPDATE seo_render_runs SET created_at = now() - interval '20 minutes' WHERE id=$1", [e.id]);
+  const l = await latestRender(1, s.id); ok(l?.status === "failed" && /interrupted/.test(l.error ?? ""), "stale run closed: " + l?.error);
+  ok(!(await finishRender(e.id, result, 0.01)), "a closed run cannot be finished (so it is not charged)");
+  await pool.query("DELETE FROM seo_sites WHERE id=$1", [s.id]);
+  ok((await pool.query("SELECT 1 FROM seo_render_runs WHERE site_id=$1", [s.id])).rowCount === 0, "runs go with the site");
+  console.log("render checks passed:", n); await pool.end();
+})().catch((e) => { console.error("FAILED", e); process.exit(1); });

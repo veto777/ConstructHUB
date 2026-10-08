@@ -365,11 +365,13 @@ async function runDueBacklinkSnapshots(): Promise<void> {
  * oldest first — and mark exactly that snapshot as dealt with. A snapshot saved meanwhile is not touched.
  */
 async function settleLinkAlerts(siteId: number): Promise<void> {
-  const { rows } = await pool.query("UPDATE seo_backlink_snapshots SET alerts_tried_at = now() WHERE site_id=$1 AND alerts_done = false RETURNING id, taken_on::text AS taken_on", [siteId]).catch(() => ({ rows: [] as any[] }));
+  // The time of this try doubles as the snapshot's version: a refresh on the same day rewrites the row and clears it,
+  // so the settlement below cannot mark a rewritten snapshot as dealt with on the strength of the one it replaced.
+  const { rows } = await pool.query("UPDATE seo_backlink_snapshots SET alerts_tried_at = clock_timestamp() WHERE site_id=$1 AND alerts_done = false RETURNING id, taken_on::text AS taken_on, alerts_tried_at::text AS tried", [siteId]).catch(() => ({ rows: [] as any[] }));
   for (const snap of rows.sort((a: any, b: any) => String(a.taken_on).localeCompare(String(b.taken_on)))) {
     try {
       await raiseLinkAlerts(siteId, snap.taken_on);
-      await pool.query("UPDATE seo_backlink_snapshots SET alerts_done = true WHERE id=$1", [snap.id]);
+      await pool.query("UPDATE seo_backlink_snapshots SET alerts_done = true WHERE id=$1 AND alerts_tried_at = $2::timestamptz", [snap.id, snap.tried]);
     } catch (e: any) { console.error(`[seo] link alerts for site ${siteId} (snapshot of ${snap.taken_on}) failed (they will be tried again): ${e?.message ?? e}`); }
   }
 }

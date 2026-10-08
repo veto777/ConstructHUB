@@ -121,6 +121,9 @@ const KNOWN_NOTES: (string | RegExp)[] = [
   "The scan ran but its results could not be saved.", "The scan could not be completed. Try again in a few minutes.", "The scan could not be completed.",
   "The scan was interrupted before it finished. Lookups it had not made were not charged.",
   "The scan ran but its results could not be saved. You were not charged.",
+  // server/seo/render-check.ts and its routes
+  "The check was interrupted before it finished. You were not charged.", "The check ran but its results could not be saved. You were not charged.",
+  "The check could not be completed. Try again in a few minutes.", "The check could not be completed.",
   // server/seo/grid-monitor.ts (repeating scans)
   "This month's included SEO data had run out, so the repeating scan was skipped.", "The repeating scan could not be completed; it will be tried again.",
   // What vendor errors read as before the wording above.

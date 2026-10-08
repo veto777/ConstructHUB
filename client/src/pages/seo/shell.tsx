@@ -38,6 +38,8 @@ export type SeoStatus = {
   alertsUnread?: number;
   /** The most a lookup can cost: what must be available for it to start. */
   holds?: Partial<Record<keyof SeoPrices, number>>;
+  /** Exact quotes in cents for lookups sized by the customer: entry n-1 is for n sites or pages. */
+  quotes?: Record<string, number[] | undefined>;
   packs: number[];
   resetsAt: string;
   /** Platform admins only: the real state of the data source. */

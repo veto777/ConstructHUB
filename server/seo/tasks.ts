@@ -94,10 +94,12 @@ export type CrawlEvidence = {
  * done here; the customer decides. Pure.
  */
 /** When the crawls could not be read at all: every open audit task says so, instead of saying nothing. Pure. */
-export const markUnavailable = (tasks: Task[]): Task[] => tasks.map((t) => (t.kind === "audit" && t.source?.startsWith("audit:") && (t.status === "todo" || t.status === "doing") ? { ...t, recheck: "unavailable" as const } : t));
+export const markUnavailable = (tasks: Task[]): Task[] => tasks.map((t) => (t.kind === "audit" && (t.status === "todo" || t.status === "doing") ? { ...t, recheck: "unavailable" as const } : t));
 export function markResolved(tasks: Task[], crawl: CrawlEvidence | null): Task[] {
   return tasks.map((t) => {
-    if (t.kind !== "audit" || !t.source?.startsWith("audit:") || (t.status !== "todo" && t.status !== "doing")) return t;
+    if (t.kind !== "audit" || (t.status !== "todo" && t.status !== "doing")) return t;
+    // An audit task that does not say which issue it came from (added by hand) cannot be checked against a crawl: say so.
+    if (!t.source?.startsWith("audit:")) return { ...t, recheck: "unverifiable" as const };
     const key = t.source.slice(6), from = typeof t.facts.crawlId === "string" ? t.facts.crawlId : null;
     const failed = crawl?.newerFailed ? { recheck: "failed" as const } : {};
     if (!from) return { ...t, recheck: "unverifiable" as const };

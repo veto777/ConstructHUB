@@ -1,7 +1,8 @@
 /**
  * Site Explorer -> Directories: which review sites, trade directories, maps and social profiles link to
- * this site — and to up to three competitors — side by side. A directory you are missing from and a
- * competitor is on is a gap you can close yourself. See server/seo/directories.ts.
+ * this site — and to up to three competitors — side by side. A directory that links to a competitor and
+ * not to you is a link worth checking for: it says nothing about whether you have a profile there.
+ * See server/seo/directories.ts.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,7 @@ import { api, Empty, fmtDate, isNotRunYet, money, type SeoStatus } from "./shell
 import { AddToPlan, type PlanTask } from "./plan-button";
 
 type Kind = "reviews" | "trade" | "maps" | "social" | "business";
-type Row = { domain: string; name: string; kind: Kind; links: (number | null)[] };
+type Row = { domain: string; name: string; kind: Kind; links: (number | null)[]; uncounted?: boolean[] };
 type Data = { sites: string[]; rows: Row[]; missing: string[]; fetchedAt: string };
 const KIND: Record<Kind, string> = { reviews: "Review sites", trade: "Trade directories", maps: "Maps and neighbourhoods", business: "Business directories", social: "Social profiles" };
 const ORDER: Kind[] = ["reviews", "trade", "maps", "business", "social"];
@@ -44,10 +45,12 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
     },
     onError: (e) => toast({ title: "Couldn't check the directories", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const per = (status?.prices as Record<string, number | undefined> | undefined)?.directoriesPerSite ?? null;
+  // The server's own figure for exactly this many sites — what is set aside, and the most that can be charged.
+  const quote = (sites: number) => status?.quotes?.directories?.[sites - 1] ?? null;
   const sitesAsked = 1 + (applied ?? draft).length;
-  const price = per != null ? per * sitesAsked : null;
-  const canPay = price == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= price;
+  const price = quote(sitesAsked);
+  // Without a price on screen nothing can be bought here.
+  const canPay = price != null && (!status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= price);
   const d = saved.data?.page ?? null;
   const dirty = !!applied && (applied.length !== draft.length || applied.some((c, i) => c !== draft[i]));
   const us = d ? d.sites.indexOf(domain) : -1;
@@ -56,17 +59,17 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
   const isGap = (r: Row) => usKnown && r.links[us] === 0 && r.links.some((n, i) => i !== us && (n ?? 0) > 0);
   const gaps = d ? d.rows.filter(isGap) : [];
   const onIt = d && usKnown ? d.rows.filter((r) => (r.links[us] ?? 0) > 0).length : null;
-  const planTask = (r: Row): PlanTask => ({ kind: "link_prospect", title: `Get listed on ${r.name} with a link to the site`, target: r.domain, facts: { linksTo: d!.sites.filter((s, i) => i !== us && (r.links[i] ?? 0) > 0).join(", ") }, source: `dir:${r.domain}` });
+  const planTask = (r: Row): PlanTask => ({ kind: "link_prospect", title: `Check your ${r.name} profile and its link to the website`, target: r.domain, facts: { linksTo: d!.sites.filter((s, i) => i !== us && (r.links[i] ?? 0) > 0).join(", ") }, source: `dir:${r.domain}` });
   const exportCsv = () => {
     if (!d) return;
-    const rows: (string | number | null)[][] = [["Directory", "Kind", ...d.sites], ...d.rows.map((r) => [r.name, KIND[r.kind], ...r.links])];
+    const rows: (string | number | null)[][] = [["Directory", "Kind", ...d.sites.map((s) => `Links found to ${s}`)], ...d.rows.map((r) => [r.name, KIND[r.kind], ...r.links.map((n, i) => (n == null ? "not checked" : r.uncounted?.[i] ? "found (number unknown)" : n))])];
     const blob = new Blob([rows.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${domain}-directories.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
 
   return (
     <div data-testid="directories">
-      <p className="g-text-2 mb-3 text-[13px]">The review sites, trade directories, maps and social profiles that matter to a local contractor — which of them link to {domain}, and to your competitors. Compare with up to {MAX_RIVALS} competitors to see where they are listed and you are not.</p>
+      <p className="g-text-2 mb-3 text-[13px]">The review sites, trade directories, maps and social profiles that matter to a local contractor — which of them link to {domain}, and to your competitors. Compare with up to {MAX_RIVALS} competitors to see which directories link to them and not to you. A missing link is something to check, not proof that you have no profile there.</p>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]">
         {draft.map((c) => <span key={c} className="g-chip">{c} <button type="button" onClick={() => setDraft(draft.filter((x) => x !== c))} aria-label={`Remove ${c}`}><X className="inline h-3 w-3" /></button></span>)}
         {draft.length < MAX_RIVALS && (
@@ -80,7 +83,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
       {(!applied || dirty) && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button onClick={() => setApplied([...draft])} data-testid="button-directories-prepare">{applied ? "Use these sites" : `Check ${draft.length ? `${1 + draft.length} sites` : "this site"}`}</Button>
-          <span className="g-text-2 text-[13px]">{per != null ? `About ${money(per)} of your SEO data for each site${draft.length ? ` — ${money(per * (1 + draft.length))} for these ${1 + draft.length}` : ""}; kept for a day and free to reopen.` : ""}</span>
+          <span className="g-text-2 text-[13px]">{quote(1 + draft.length) != null ? `Up to ${money(quote(1 + draft.length)!)} of your SEO data for ${draft.length ? `these ${1 + draft.length} sites` : "this site"}; kept for a day and free to reopen.` : status ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : "Getting the price…"}</span>
         </div>
       )}
       {applied && !dirty && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
@@ -88,9 +91,9 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
       {applied && !dirty && saved.isSuccess && !d && (
         <Empty testId="directories-not-run">
           <h3>{sitesAsked} site{sitesAsked === 1 ? "" : "s"} ready to check</h3>
-          <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
+          <p>{price == null ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
           <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: false })} data-testid="button-directories-run">
-            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Check the directories{price != null ? ` — about ${money(price)}` : ""}</>}
+            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Check the directories{price != null ? ` — up to ${money(price)}` : ""}</>}
           </Button>
         </Empty>
       )}
@@ -98,34 +101,34 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId }: { d
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
             <span className="g-text-2" data-testid="text-directories-meta">
-              {onIt != null ? `${domain} is linked from ${onIt} of these ${d.rows.length}` : `${domain}'s own check didn't load`}{d.sites.length > 1 && usKnown ? ` · ${gaps.length} where a competitor is and you are not` : ""} · as of {fmtDate(d.fetchedAt)} ·{" "}
-              <button type="button" className="g-link" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: true })}>{run.isPending ? "Checking…" : `Check again${price != null ? ` — about ${money(price)}` : ""}`}</button>
+              {onIt != null ? `${domain} is linked from ${onIt} of these ${d.rows.length}` : `${domain}'s own check didn't load`}{d.sites.length > 1 && usKnown ? ` · ${gaps.length} that link to a competitor and not to you` : ""} · as of {fmtDate(d.fetchedAt)} ·{" "}
+              <button type="button" className="g-link" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: true })}>{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
             </span>
             <span className="ml-auto flex flex-wrap items-center gap-2">
-              {planSiteId != null && gaps.length > 0 && <AddToPlan siteId={planSiteId} label={`Add the ${gaps.length} gap${gaps.length === 1 ? "" : "s"} to the plan`} testId="button-directories-plan" tasks={gaps.map(planTask)} />}
+              {planSiteId != null && gaps.length > 0 && <AddToPlan siteId={planSiteId} label={`Add the ${gaps.length} to check to the plan`} testId="button-directories-plan" tasks={gaps.map(planTask)} />}
               <button type="button" className="g-pill g-pill--sm" onClick={exportCsv} data-testid="button-directories-export"><Download /> Export</button>
             </span>
           </div>
           {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-directories-missing">The check for {d.missing.join(", ")} didn't load and was not charged — {d.missing.length === 1 ? "its column shows" : "their columns show"} "?" rather than a guess. Check again to fill it in.</p>}
           <div className="overflow-x-auto">
             <table className="g-table" data-testid="table-directories">
-              <caption className="sr-only">For each directory, how many links it has to each site. A dash means none were found.</caption>
+              <caption className="sr-only">For each directory, how many links it has to each site. A dash means no link was found, which is not the same as having no profile there.</caption>
               <thead><tr><th scope="col">Directory</th>{d.sites.map((s) => <th key={s} scope="col" className="num">{s === domain ? <b className="font-medium">{s}</b> : s}</th>)}{planSiteId != null && <th><span className="sr-only">Action plan</span></th>}</tr></thead>
-              <tbody>
-                {ORDER.flatMap((kind) => {
+                {ORDER.map((kind) => {
                   const rows = d.rows.filter((r) => r.kind === kind);
-                  return rows.length ? [
-                    <tr key={kind}><th scope="colgroup" colSpan={1 + d.sites.length + (planSiteId != null ? 1 : 0)} className="g-text-2 text-left text-[12px] font-medium uppercase tracking-wide">{KIND[kind]}</th></tr>,
-                    ...rows.map((r) => (
+                  return rows.length ? (
+                    <tbody key={kind}>
+                    <tr><th scope="rowgroup" colSpan={1 + d.sites.length + (planSiteId != null ? 1 : 0)} className="g-text-2 text-left text-[12px] font-medium uppercase tracking-wide">{KIND[kind]}</th></tr>
+                    {rows.map((r) => (
                       <tr key={r.domain} style={isGap(r) ? { background: "rgba(197,34,31,.06)" } : undefined}>
-                        <th scope="row" className="text-left font-normal"><a href={`https://${r.domain}`} className="g-link" target="_blank" rel="noreferrer">{r.name}</a>{isGap(r) && <span className="ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium" style={{ background: "#c5221f", color: "#fff" }}>Gap</span>}</th>
-                        {r.links.map((n, i) => <td key={i} className="num" data-label={d.sites[i]}>{n == null ? <span className="g-text-2" title="This site's check didn't load">?</span> : n > 0 ? <span style={{ color: "#188038" }} className="font-medium">✓ <span className="g-text-2 font-normal">{n} link{n === 1 ? "" : "s"}</span></span> : <span className="g-text-2">—</span>}</td>)}
+                        <th scope="row" className="text-left font-normal"><a href={`https://${r.domain}`} className="g-link" target="_blank" rel="noreferrer">{r.name}</a>{isGap(r) && <span className="ml-2 rounded px-1.5 py-0.5 text-[11px] font-medium" style={{ background: "#c5221f", color: "#fff" }}>Link to check</span>}</th>
+                        {r.links.map((n, i) => <td key={i} className="num" data-label={d.sites[i]}>{n == null ? <span className="g-text-2"><span aria-hidden>?</span><span className="sr-only">Not checked: this site's lookup didn't load</span></span> : n > 0 ? <span style={{ color: "#188038" }} className="font-medium"><span aria-hidden>✓ </span><span className="g-text-2 font-normal">{r.uncounted?.[i] ? "linked" : `${n} link${n === 1 ? "" : "s"}`}</span></span> : <span className="g-text-2"><span aria-hidden>—</span><span className="sr-only">No link found</span></span>}</td>)}
                         {planSiteId != null && <td className="num">{usKnown && r.links[us] === 0 ? <AddToPlan siteId={planSiteId} label="Plan" testId={`button-plan-${r.domain}`} tasks={[planTask(r)]} /> : null}</td>}
                       </tr>
-                    )),
-                  ] : [];
+                    ))}
+                    </tbody>
+                  ) : null;
                 })}
-              </tbody>
             </table>
           </div>
           <p className="g-text-2 mt-2 text-[12px]">A directory counts here only when a page on it <b>links to the website</b> and the link database has seen that page. A profile with no website link, a brand-new listing, or a page the database has not crawled shows as a dash — so a dash means "no link found", not "not listed". The list is {d.rows.length} directories chosen for US home-service contractors, not every directory there is.</p>
