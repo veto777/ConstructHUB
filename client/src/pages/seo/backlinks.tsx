@@ -1,4 +1,5 @@
 /** /seo/backlinks — the monthly backlink snapshot (summary tiles + top backlinks), "Refresh now". */
+import { AddToPlan } from "./plan-button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,7 @@ export default function SeoBacklinksPage() {
                 <>
                   <p className="g-text-2 mb-2 text-[13px]">{d.snapshot.changes.lostTotal != null && d.snapshot.changes.lostTotal > d.snapshot.changes.lost.length ? `The ${d.snapshot.changes.lost.length} strongest of ${fmtNum(d.snapshot.changes.lostTotal)}.` : `${d.snapshot.changes.lost.length} site${d.snapshot.changes.lost.length === 1 ? "" : "s"}.`} A link is "lost" when the page was removed, the link was taken off it, or the page could no longer be read. If the page still exists, a short note to its owner often gets the link back — worth doing for a real site with some authority; a lost link from a site with a high spam score is no loss.</p>
                   <div className="overflow-x-auto"><table className="g-table" data-testid="table-lost-links">
-                    <thead><tr><th>Site</th><th className="num">Authority</th><th className="num" title="0–100: how much the linking site looks like spam">Spam</th><th>The page that linked</th><th>Linked to</th><th className="num">Last seen</th></tr></thead>
+                    <thead><tr><th>Site</th><th className="num">Authority</th><th className="num" title="0–100: how much the linking site looks like spam">Spam</th><th>The page that linked</th><th>Linked to</th><th className="num">Last seen</th><th><span className="sr-only">Action plan</span></th></tr></thead>
                     <tbody>{d.snapshot.changes.lost.map((l, i) => (
                       <tr key={`${l.domain}-${i}`}>
                         <td>{l.domain}{!l.follow && <span className="g-text-2 text-[12px]"> · nofollow</span>}</td>
@@ -58,6 +59,7 @@ export default function SeoBacklinksPage() {
                         <td data-label="The page that linked" className="max-w-[320px] truncate">{l.from ? <a href={l.from} className="g-link" target="_blank" rel="noreferrer" title={l.from}>{l.from.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</td>
                         <td data-label="Linked to" className="g-text-2 max-w-[220px] truncate">{l.to?.replace(/^https?:\/\/(www\.)?/, "") ?? "—"}</td>
                         <td className="num g-text-2" data-label="Last seen">{fmtDate(l.lastSeen)}</td>
+                        <td className="num"><AddToPlan siteId={site.id} label="Plan" testId={`button-plan-${l.domain}`} tasks={[{ kind: "link_reclaim", title: `Win back the link from ${l.domain}`, target: l.from ?? l.domain, facts: { authority: l.authority, lastSeen: l.lastSeen }, source: `lost:${l.domain}` }]} /></td>
                       </tr>
                     ))}</tbody>
                   </table></div>

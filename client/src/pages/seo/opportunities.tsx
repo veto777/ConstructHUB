@@ -4,6 +4,7 @@
  * the same rows: within reach, losing ground, which page was returned for what,
  * and searches the home page was returned for. See server/seo/opportunities.ts.
  */
+import { AddToPlan } from "./plan-button";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
@@ -46,7 +47,7 @@ const NOTE: Record<Tab, ReactNode> = {
   home: <>Searches for which the page returned is the home page, outside the first three. The data keeps one page per search, so this does not prove no other page ranks — but when a service or a town leads to the home page, a page of its own for it is worth looking into.</>,
 };
 
-export function OpportunitiesView({ domain, status, market, onTrack }: { domain: string; status: SeoStatus | undefined; market: SeoMarket; onTrack?: (rows: TrackRow[]) => void }) {
+export function OpportunitiesView({ domain, status, market, onTrack, planSiteId }: { domain: string; status: SeoStatus | undefined; market: SeoMarket; onTrack?: (rows: TrackRow[]) => void; /** The customer's own site, when this is it: findings can go to its action plan. */ planSiteId?: number }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("within");
@@ -142,6 +143,7 @@ export function OpportunitiesView({ domain, status, market, onTrack }: { domain:
           )}
           <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
             {(tab !== "pages" || openPage) && chosen.length > 0 && <AddToList market={market} rows={chosen.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))} onDone={() => setPicked(new Set())} />}
+            {(tab !== "pages" || openPage) && planSiteId != null && chosen.length > 0 && <AddToPlan siteId={planSiteId} onDone={() => setPicked(new Set())} tasks={chosen.map((r) => ({ kind: "keyword" as const, title: r.position <= 3 ? `Keep "${r.keyword}" in the first three` : `Move "${r.keyword}" up from position ${r.position}`, target: r.url, facts: { position: r.position, volume: r.volume }, source: `kw:${r.keyword}` }))} />}
             {(tab !== "pages" || openPage) && onTrack && chosen.length > 0 && <Button size="sm" onClick={() => { onTrack(chosen.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty }))); setPicked(new Set()); }} data-testid="button-opp-track">Add to rank tracker ({chosen.length})</Button>}
             <button type="button" className="g-pill g-pill--sm" disabled={!total} onClick={exportCsv} data-testid="button-opp-export"><Download /> Export all {total ? fmtNum(total) : ""}</button>
           </div>

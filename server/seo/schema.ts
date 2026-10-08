@@ -5,6 +5,7 @@ import { VOICE_SCHEMA_DDL } from "./voice";
 import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { GRID_SCHEMA_DDL } from "./grid";
 import { GRID_WATCH_DDL } from "./grid-monitor";
+import { TASK_SCHEMA_DDL } from "./tasks";
 import { pool } from "../db";
 import { EXPLORER_SCHEMA_DDL } from "./explorer";
 import { CREDIT_SCHEMA_DDL } from "./credits";
@@ -186,6 +187,7 @@ export const SEO_SCHEMA_DDL = [
   // A rank run remembers what paid for it and how many checks were accepted, to refund the ones that never come back.
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,
+  ...TASK_SCHEMA_DDL,
   // Last: it changes a rule on seo_alerts, which must exist by now.
   ...GRID_WATCH_DDL,
 ];
