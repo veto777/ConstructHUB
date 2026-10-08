@@ -51,6 +51,8 @@ export default function SeoReportsPage() {
   });
   const send = useMutation({
     mutationFn: () => api("POST", `${key}/send`, { recipients: list }),
+    // Whatever happened, the schedule's note about deliveries in doubt is read again.
+    onSettled: () => void qc.invalidateQueries({ queryKey: [key] }),
     onSuccess: (x: { sent: number; failed?: number; empty: boolean; optedOut?: string[]; uncertain?: string[] }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" }
       : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : "", x.uncertain?.length ? `A send to ${x.uncertain.join(", ")} broke off and may have arrived, so it was not sent again automatically.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't send the report", description: apiErrorMessage(e), variant: "destructive" }),

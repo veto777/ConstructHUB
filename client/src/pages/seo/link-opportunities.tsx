@@ -19,10 +19,10 @@ const bare = (h: string) => h.toLowerCase().replace(/^www\./, "");
 const nameOf = (u: string, domain: string) => { try { const x = new URL(u); const path = (x.pathname + x.search) || "/"; return bare(x.hostname) === bare(domain) ? path : `${x.hostname}${path}`; } catch { return u; } };
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 
-export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
+export function LinkOpportunitiesView({ site, crawlId }: { site: SeoSite; /** The newest finished crawl (part of the question). */ crawlId?: string | null }) {
   const q = useQuery<Data | null>({
-    queryKey: [`/api/seo/sites/${site.id}/audit/link-opportunities`], refetchOnMount: "always", retry: false,
-    queryFn: async ({ queryKey }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include" }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryKey: [`/api/seo/sites/${site.id}/audit/link-opportunities`, crawlId ?? null], refetchOnMount: "always", retry: false,
+    queryFn: async ({ queryKey, signal }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const [shown, setShown] = useState(50);
   const d = q.data;

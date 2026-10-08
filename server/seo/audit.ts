@@ -93,14 +93,18 @@ export function groupFindings(findings: Finding[] | undefined): Map<string, Grou
 export const failedFetches = (report: AuditReport) => (Array.isArray(report?.errors) ? report.errors : []).filter((e) => e && typeof e.url === "string" && (!e.message || /^Request failed/i.test(e.message)));
 const excludedCount = (report: AuditReport) => (Array.isArray(report?.errors) ? report.errors.length : 0) - failedFetches(report).length;
 
-export function healthScore(report: AuditReport, pages: AuditPage[]): number | null {
+/** The pages the health score is out of, and the distinct ones with an error (an error answer, a failed fetch, or any error-level issue). */
+export function healthCounts(report: AuditReport, pages: AuditPage[]): { pages: number; errorPages: number } {
   const failed = new Set(failedFetches(report).map((e) => e.url));
   const all = new Set<string>([...pages.map((p) => p.url), ...failed]);
-  if (!all.size) return null;
   const bad = new Set<string>(failed);
   for (const p of pages) if (p.status >= 400) bad.add(p.url);
   for (const f of Array.isArray(report.findings) ? report.findings : []) if (f?.severity === "critical") for (const u of Array.isArray(f.urls) ? f.urls : []) if (all.has(u)) bad.add(u);
-  return Math.round(((all.size - bad.size) / all.size) * 100);
+  return { pages: all.size, errorPages: bad.size };
+}
+export function healthScore(report: AuditReport, pages: AuditPage[]): number | null {
+  const c = healthCounts(report, pages);
+  return c.pages ? Math.round(((c.pages - c.errorPages) / c.pages) * 100) : null;
 }
 
 export function auditSummary(report: AuditReport, pages: AuditPage[], previous?: { report: AuditReport; pages: AuditPage[] } | null): AuditSummary {
@@ -225,8 +229,10 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
   // The crawl shown: the one chosen, else the newest.
   let cur = done[0] ?? null, atMissing = false;
   if (opts.at && cur && opts.at !== cur.id) { const c = await load(opts.at); if (c) cur = c; else atMissing = true; }
+  // No finished crawl at all: a crawl asked for is not available, and that is said too.
+  if (!cur && opts.at) atMissing = true;
   // The crawl it is compared with: the one chosen (older than the one shown), else the one just before it.
-  let prev: any = null, chosen = false, vsMissing = false;
+  let prev: any = null, chosen = false, vsMissing = !cur && !!opts.vs;
   if (cur) {
     if (opts.vs) { const v = opts.vs === cur.id ? null : await load(opts.vs, cur.completed_at); if (v) { prev = v; chosen = true; } else vsMissing = true; }
     if (!prev) {
@@ -260,29 +266,53 @@ export async function siteAudit(user: number, domain: string, opts: { at?: strin
 /** Health score per domain for the dashboard cards: newest completed crawl of each. */
 /** How many crawls of a site the dashboard's health trend shows. */
 export const HEALTH_TREND = 6;
-export type HealthPoint = { at: string; health: number; crawled: number; pageCap: number | null };
-export type SiteHealth = { health: number | null; errors: number; scannedAt: string | null; crawled: number;
-  /** The newest crawls with a score, oldest first (up to HEALTH_TREND). Each says how many pages it crawled and its page limit, as health is a share of the pages crawled. */ trend: HealthPoint[] };
+/** The version of the health worked out per crawl (seo_crawl_health.v): a new formula works every crawl out again. */
+const HEALTH_V = 1;
+/**
+ * One crawl's health. `readable` false = the stored crawl could not be read (its score is not known — never zero).
+ * `pages` = the pages the score is out of; `errorPages` = the distinct ones with an error.
+ */
+export type HealthPoint = { jobId: string; at: string | null; readable: boolean; health: number | null; pages: number | null; errorPages: number | null; pageCap: number | null };
+/** A site's health: its newest finished crawl (whatever it says) and the newest crawls, oldest first, gaps included. */
+export type SiteHealth = HealthPoint & { trend: HealthPoint[] };
+
 export async function auditHealthByDomain(user: number, domains: string[]): Promise<Map<string, SiteHealth>> {
   const out = new Map<string, SiteHealth>();
   if (!domains.length) return out;
-  const { rows } = await pool.query(
-    `SELECT host, completed_at, report, page_cap, pages FROM (
-       SELECT host, completed_at, report, page_cap, ${PAGES_SQL} AS pages FROM (
-         SELECT ${HOST_SQL} AS host, completed_at, report, page_cap, state, row_number() OVER (PARTITION BY ${HOST_SQL} ORDER BY completed_at DESC) AS n FROM sitescan_jobs
-          WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j WHERE n <= ${HEALTH_TREND}) k
-      ORDER BY host, completed_at DESC`, [user, domains.map(bare)]);
-  for (const r of rows) {
-    // One unreadable crawl must not take the whole dashboard down.
-    try {
-      const s = auditSummary(r.report, r.pages);
-      const had = out.get(r.host);
-      const at = r.completed_at ? new Date(r.completed_at).toISOString() : null;
-      const point = s.health !== null && at ? [{ at, health: s.health, crawled: s.crawled, pageCap: r.page_cap == null ? null : Number(r.page_cap) }] : [];
-      // Newest first in the rows: the first one read is the site's current picture; older ones only add to the trend.
-      if (!had) out.set(r.host, { health: s.health, errors: s.totals.error.affected, scannedAt: at, crawled: s.crawled, trend: point });
-      else had.trend.unshift(...point);
-    } catch (e: any) { console.warn(`[seo] audit of ${r.host} could not be read: ${e?.message ?? e}`); }
+  // The newest crawls of each site, without their pages: identity, date, page limit and a fingerprint of what was saved.
+  const { rows: jobs } = await pool.query(
+    `SELECT id::text AS id, host, completed_at, page_cap, fp FROM (
+       SELECT id, ${HOST_SQL} AS host, completed_at, page_cap, md5(report::text || ':' || ${CRAWLED_SQL}::text) AS fp,
+              row_number() OVER (PARTITION BY ${HOST_SQL} ORDER BY completed_at DESC, id) AS n
+         FROM sitescan_jobs WHERE user_id=$1 AND ${DONE_SQL} AND ${HOST_SQL} = ANY($2)) j
+      WHERE n <= ${HEALTH_TREND} ORDER BY host, completed_at DESC, id`, [user, domains.map(bare)]);
+  if (!jobs.length) return out;
+  // Worked out once per crawl: read the saved figures; work out (and save) only the crawls that have none, or changed.
+  const { rows: saved } = await pool.query("SELECT job_id, fingerprint, readable, health, error_pages, crawled FROM seo_crawl_health WHERE job_id = ANY($1) AND v=$2", [jobs.map((j: any) => j.id), HEALTH_V]);
+  const known = new Map(saved.map((r: any) => [r.job_id, r]));
+  const missing = jobs.filter((j: any) => known.get(j.id)?.fingerprint !== j.fp);
+  if (missing.length) {
+    const { rows } = await pool.query(`SELECT id::text AS id, report, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text = ANY($1) AND user_id=$2`, [missing.map((j: any) => j.id), user]);
+    for (const r of rows) {
+      const fp = missing.find((j: any) => j.id === r.id)!.fp;
+      let row: any;
+      // One unreadable crawl must not take the whole dashboard down: it is "not readable", and said.
+      try { const c = healthCounts(r.report, r.pages); row = { job_id: r.id, fingerprint: fp, readable: true, health: healthScore(r.report, r.pages), error_pages: c.errorPages, crawled: c.pages }; }
+      catch (e: any) { console.warn(`[seo] crawl ${r.id} could not be read for its health: ${e?.message ?? e}`); row = { job_id: r.id, fingerprint: fp, readable: false, health: null, error_pages: null, crawled: null }; }
+      known.set(r.id, row);
+      await pool.query(
+        `INSERT INTO seo_crawl_health(job_id, fingerprint, v, readable, health, error_pages, crawled) VALUES($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (job_id) DO UPDATE SET fingerprint=excluded.fingerprint, v=excluded.v, readable=excluded.readable, health=excluded.health, error_pages=excluded.error_pages, crawled=excluded.crawled, computed_at=now()`,
+        [row.job_id, fp, HEALTH_V, row.readable, row.health, row.error_pages, row.crawled]).catch((e: any) => console.warn(`[seo] crawl health not saved: ${e?.message ?? e}`));
+    }
+  }
+  for (const j of jobs) {
+    const k = known.get(j.id);
+    const point: HealthPoint = { jobId: j.id, at: j.completed_at ? new Date(j.completed_at).toISOString() : null, readable: !!k?.readable, health: k?.health ?? null,
+      pages: k?.crawled ?? null, errorPages: k?.error_pages ?? null, pageCap: j.page_cap == null ? null : Number(j.page_cap) };
+    // Newest first in the rows: the first is the site's current crawl, whatever it says.
+    const had = out.get(j.host);
+    if (!had) out.set(j.host, { ...point, trend: [point] }); else had.trend.unshift(point);
   }
   return out;
 }

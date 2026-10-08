@@ -71,9 +71,9 @@ export async function gscBreakdown(user: number, site: { id: number; domain: str
   // queue again (one waiting copy of a job at a time) — so ANY read still queued or running means incomplete, whatever
   // finished after it. A failed read counts until a full read of the same days (its first page) is queued after it
   // and finished — and that read's own later pages are then judged the same way. A check that cannot be made is
-  // "not known", never "complete".
-  const jobsTable = await pool.query("SELECT to_regclass('edge_jobs') IS NOT NULL AS ok").then((r) => !!r.rows[0]?.ok, () => null);
-  const inc = jobsTable === false ? { v: false } : jobsTable === null ? null : await pool.query(
+  // "not known", never "complete" — so is a database with no record of reads at all.
+  const jobsTable = await pool.query("SELECT to_regclass('edge_jobs') IS NOT NULL AS ok").then((r) => !!r.rows[0]?.ok, () => false);
+  const inc = !jobsTable ? null : await pool.query(
     `SELECT EXISTS (SELECT 1 FROM edge_jobs j WHERE j.asset_id=$1 AND j.kind='analytics' AND j.payload->>'dimension'=$2
         AND j.payload->>'end' > $4::text AND j.payload->>'start' <= $3::text
         AND (j.state IN ('queued','running')

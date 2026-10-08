@@ -259,6 +259,13 @@ export const SEO_SCHEMA_DDL = [
   // After the grid's: the alert kinds for the keyword watch (it replaces the same rule with the full list).
   ...KEYWORD_WATCH_ALERT_DDL,
   ...MENTION_WATCH_DDL,
+  // Each finished crawl's health, worked out once (the dashboard reads these, not the whole crawl). `fingerprint` is of
+  // the crawl's report and page count: a crawl changed afterwards is worked out again; `v` is the formula's version.
+  `CREATE TABLE IF NOT EXISTS seo_crawl_health (
+     job_id text PRIMARY KEY, fingerprint text NOT NULL, v integer NOT NULL,
+     readable boolean NOT NULL, health integer, error_pages integer, crawled integer,
+     computed_at timestamptz NOT NULL DEFAULT now()
+   )`,
   // Last of all: the mentions watch's alert kind (the full list again, so it holds whatever ran before it).
   ...MENTION_WATCH_ALERT_DDL,
 ];

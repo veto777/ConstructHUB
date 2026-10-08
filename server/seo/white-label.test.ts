@@ -286,6 +286,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "GET /api/seo/sites/:id/audit/outgoing": [{ url: "/api/seo/sites/1/audit/outgoing" }],
   "GET /api/seo/sites/:id/search-console/:dimension": [{ url: "/api/seo/sites/1/search-console/page" }, { url: "/api/seo/sites/1/search-console/query" }],
   "GET /api/seo/sites/:id/rank-history": [{ url: "/api/seo/sites/1/rank-history" }],
+  "GET /api/seo/sites/:id/rank-tags": [{ url: "/api/seo/sites/1/rank-tags" }],
   "GET /api/seo/sites/:id/rank-competing": [{ url: "/api/seo/sites/1/rank-competing" }],
   "GET /api/seo/sites/:id/serp-groups": [{ url: "/api/seo/sites/1/serp-groups" }],
   "GET /api/seo/sites/:id/ai/summary": [{ url: "/api/seo/sites/1/ai/summary" }],
@@ -331,7 +332,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(89);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(90);
   });
 
   for (const mode of Object.keys(PROVIDER)) {

@@ -10,6 +10,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
 import { KeywordHistory, RankHistoryPanel } from "./rank-history";
+import { RankTagsPanel } from "./rank-tags";
 import { CompetingPages } from "./competing";
 import { SerpGroupsPanel } from "./serp-groups";
 import { LocationPicker, type Place } from "./location-picker";
@@ -47,7 +48,7 @@ export default function SeoOverviewPage() {
     refetchInterval: (q) => q.state.data?.runs.some((r) => r.status === "queued" || r.status === "running") ? 20_000 : false,
   });
   // The history charts (their keys carry the device/tag) and the dashboard change with every check and keyword edit.
-  const refreshHistory = () => { void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-history`) || q.queryKey[0] === `/api/seo/sites/${site?.id}/rank-competing` || q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/serp-groups`) || /^\/api\/seo\/keywords\/\d+\/history$/.test(q.queryKey[0])) }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
+  const refreshHistory = () => { void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-history`) || q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/rank-tags`) || q.queryKey[0] === `/api/seo/sites/${site?.id}/rank-competing` || q.queryKey[0].startsWith(`/api/seo/sites/${site?.id}/serp-groups`) || /^\/api\/seo\/keywords\/\d+\/history$/.test(q.queryKey[0])) }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); };
   const invalidate = () => { refreshHistory(); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${site?.id}/overview`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/sites"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); };
   const runNow = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site!.id}/rank-check`),
@@ -103,6 +104,7 @@ export default function SeoOverviewPage() {
             {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
           </div>
           <RankHistoryPanel site={site} />
+          <RankTagsPanel site={site} />
           <CompetingPages site={site} />
           <SerpGroupsPanel site={site} />
           {o?.searchConsole && <GscBreakdownView site={site} />}

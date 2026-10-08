@@ -36,8 +36,9 @@ const COLS: { key: SortKey; label: string; num?: boolean; title?: string }[] = [
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 const lengthNote = (n: number, lo: number, hi: number) => (n === 0 ? "missing" : n < lo ? "short" : n > hi ? "long" : "");
 
-export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: Record<string, string> }) {
-  const q = useQuery<Data>({ queryKey: [`/api/seo/sites/${site.id}/audit/pages`], refetchOnMount: "always" });
+export function AuditPages({ site, issueTitles, crawlId }: { site: SeoSite; issueTitles: Record<string, string>; /** The newest finished crawl: a new one is a new question, never an answer still on its way for the old one. */ crawlId?: string | null }) {
+  const q = useQuery<Data>({ queryKey: [`/api/seo/sites/${site.id}/audit/pages`, crawlId ?? null], refetchOnMount: "always",
+    queryFn: async ({ queryKey, signal }) => { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); } });
   const [filter, setFilter] = useState("all");
   const [text, setText] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "path", dir: 1 });

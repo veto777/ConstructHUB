@@ -56,6 +56,7 @@ import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from ".
 import { auditPages } from "./audit-pages";
 import { linkOpportunities } from "./link-opportunities";
 import { rankHistory, keywordHistory } from "./rank-history";
+import { rankTags } from "./rank-tags";
 import { competingPages } from "./competing-pages";
 import { serpGroups } from "./serp-groups";
 import { dashboardRanks, groupNameSql } from "./dashboard";
@@ -1453,6 +1454,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const device = (q.device && devices.includes(q.device) ? q.device : devices[0]) as "desktop" | "mobile";
     const { rows: tags } = await pool.query("SELECT DISTINCT unnest(tags) AS tag FROM seo_keywords WHERE site_id=$1 ORDER BY 1", [site.id]);
     res.json({ device, devices, tag: q.tag ?? null, tags: tags.map((t: any) => t.tag), days: await rankHistory(site.id, device, q.tag ?? null) });
+  });
+
+  // Rank tracker by tag: each tag's keywords on the newest check against the one before, one device. Saved checks only.
+  route("get", "/api/seo/sites/:id/rank-tags", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const device = req.query.device === "desktop" || req.query.device === "mobile" ? req.query.device : null;
+    res.json(await rankTags(site, device));
   });
 
   // ── Keyword watch: a monthly snapshot of what the site ranks for, compared with the one before ──

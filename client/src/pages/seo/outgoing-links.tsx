@@ -28,10 +28,10 @@ const path = (u: string) => { try { const x = new URL(u); return (x.pathname + x
 
 /** A cell's label for screen readers (the phone layout hides the table header). */
 const Label = ({ children }: { children: string }) => <span className="sr-only">{children}: </span>;
-export function OutgoingLinksView({ site }: { site: SeoSite }) {
+export function OutgoingLinksView({ site, crawlId }: { site: SeoSite; /** The newest finished crawl (part of the question). */ crawlId?: string | null }) {
   const q = useQuery<Data | null>({
-    queryKey: [`/api/seo/sites/${site.id}/audit/outgoing`], refetchOnMount: "always", retry: false,
-    queryFn: async ({ queryKey }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include" }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryKey: [`/api/seo/sites/${site.id}/audit/outgoing`, crawlId ?? null], refetchOnMount: "always", retry: false,
+    queryFn: async ({ queryKey, signal }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const [shown, setShown] = useState(50);
   if (q.isLoading) return <p className="g-text-2 py-6 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Reading the crawl…</p>;

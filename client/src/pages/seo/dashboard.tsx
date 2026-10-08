@@ -20,8 +20,8 @@ type SortKey = "added" | "name" | "traffic" | "authority" | "top10" | "tasks" | 
 const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"], ["health", "Lowest site health first"]];
 type Card = {
   site: SeoSite;
-  /** From the site's own crawls (Site audit); trend = the newest crawls with a score, oldest first. */
-  audit: { health: number | null; errors: number; scannedAt: string | null; crawled?: number; trend?: { at: string; health: number; crawled: number; pageCap: number | null }[] } | null;
+  /** From the site's own crawls (Site audit): the newest finished crawl, and the newest few oldest first (gaps included). */
+  audit: (HealthPoint & { trend: HealthPoint[] }) | null;
   /** null = the count could not be read just now. */
   openTasks?: number | null;
   /** Each keyword's newest check on ONE device (`device`), between `firstOn` and `checkedOn`. */
@@ -69,23 +69,39 @@ function Metric({ label, value, delta, spark, hint, testId }: { label: string; v
   );
 }
 
+/** One crawl's health; readable false = the crawl could not be read (score not known). pages = what the score is out of. */
+type HealthPoint = { jobId: string; at: string | null; readable: boolean; health: number | null; pages: number | null; errorPages: number | null; pageCap: number | null };
+const healthWords = (p: HealthPoint) => (!p.readable ? "could not be read" : p.health === null ? "no page scored" : `health ${p.health}, ${fmtNum(p.errorPages ?? 0)} of ${fmtNum(p.pages ?? 0)} pages with errors`);
+
 /**
- * Site health from the site's own crawls: the newest score, its move since the crawl before, and the trend of the last
- * few crawls. Health is the share of crawled pages with no errors, so crawls of different sizes are said.
+ * Site health from the site's own crawls: the newest crawl's score, its move since the crawl just before it (only when
+ * both have a score), and the last few crawls. Health is a share of the pages crawled, so a move can come from crawling
+ * different pages — the sizes are said whenever they differ.
  */
 function HealthTile({ audit, siteId }: { audit: Card["audit"]; siteId: number }) {
   const trend = audit?.trend ?? [];
-  const last = trend[trend.length - 1], before = trend[trend.length - 2];
-  const move = audit?.health != null && last && before && last.at === audit.scannedAt ? last.health - before.health : null;
-  const caps = new Set(trend.map((t) => t.pageCap)), sizes = trend.map((t) => t.crawled);
-  const uneven = caps.size > 1 || (sizes.length > 1 && Math.min(...sizes) * 2 < Math.max(...sizes));
+  const prev = trend.length > 1 ? trend[trend.length - 2] : null;
+  const move = audit?.health != null && prev?.health != null ? audit.health - prev.health : null;
+  // Different page limits, or more than a tenth more or fewer pages scored (every crawl's size is in the list below).
+  const sizesDiffer = !!audit && !!prev && prev.readable && audit.readable && (prev.pageCap !== audit.pageCap || Math.abs((prev.pages ?? 0) - (audit.pages ?? 0)) > 0.1 * Math.max(prev.pages ?? 0, audit.pages ?? 0));
   const hint = !audit ? "No crawl yet — run one in Site audit"
-    : audit.health == null ? `Crawled ${fmtDate(audit.scannedAt)} — no page could be scored`
-    : `${fmtNum(audit.errors)} page${audit.errors === 1 ? "" : "s"} with errors · crawled ${fmtDate(audit.scannedAt)}${trend.length > 1 ? ` · last ${trend.length} crawls` : ""}${uneven ? " (of different sizes)" : ""}`;
+    : !audit.readable ? `The newest crawl (${fmtDate(audit.at)}) could not be read, so its score is not known`
+    : audit.health === null ? `Crawled ${fmtDate(audit.at)} — no page could be scored`
+    : `${fmtNum(audit.errorPages ?? 0)} of ${fmtNum(audit.pages ?? 0)} pages with errors · crawled ${fmtDate(audit.at)}`
+      + (prev && move === null ? " · the crawl before has no score" : "")
+      + (sizesDiffer ? ` · the crawl before scored ${fmtNum(prev!.pages ?? 0)} pages${prev!.pageCap !== audit.pageCap ? ` (limit ${fmtNum(prev!.pageCap ?? 0)}, now ${fmtNum(audit.pageCap ?? 0)})` : ""} — a move can come from crawling different pages, not only from fixes` : "");
   return (
-    <Metric label="Site health" value={audit?.health == null ? "—" : String(audit.health)} testId={`metric-health-${siteId}`}
-      delta={move ? <span className={`g-move ${move > 0 ? "g-move--up" : "g-move--down"} ml-1`} aria-label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`}>{move > 0 ? "+" : "−"}{Math.abs(move)}</span> : null}
-      spark={<Spark data={trend.map((t) => t.health)} color="#1e8e3e" />} hint={hint} />
+    <div className="min-w-0">
+      <Metric label="Site health" value={audit?.health == null ? "—" : String(audit.health)} testId={`metric-health-${siteId}`}
+        delta={move ? <span className={`g-move ${move > 0 ? "g-move--up" : "g-move--down"} ml-1`} aria-label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`}>{move > 0 ? "+" : "−"}{Math.abs(move)}</span> : null}
+        spark={<Spark data={trend.filter((t) => t.health !== null).length === trend.length ? trend.map((t) => t.health as number) : undefined} color="#1e8e3e" />} hint={hint} />
+      {trend.length > 1 && (
+        <details className="mt-1 text-[12px]" data-testid={`health-history-${siteId}`}>
+          <summary className="g-link cursor-pointer">Last {trend.length} crawls</summary>
+          <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((t) => <li key={t.jobId}>{fmtDate(t.at)}: {healthWords(t)}</li>)}</ul>
+        </details>
+      )}
+    </div>
   );
 }
 

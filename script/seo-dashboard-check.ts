@@ -38,9 +38,19 @@ let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL
   await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,2,'https://a.dash.example/',150,'{"pages":[]}','completed','{}'::jsonb, now())`, [randomUUID()]);
   const h = (await auditHealthByDomain(1, ["a.dash.example", "www.none.dash.example"])).get("a.dash.example")!;
   ok(h && h.trend.length === HEALTH_TREND, `the trend is the newest ${HEALTH_TREND} crawls: ${h?.trend.length}`);
-  ok(h.trend.every((t, k) => k === 0 || t.at > h.trend[k - 1].at) && h.trend[h.trend.length - 1].at === h.scannedAt && h.health === h.trend[h.trend.length - 1].health, "oldest first, ending with the crawl the score is from");
-  ok(h.trend[0].health > h.trend[h.trend.length - 1].health && h.crawled === 10, `health falls as pages break: ${h.trend.map((t) => t.health)}`);
+  ok(h.trend.every((t, k) => k === 0 || t.at! > h.trend[k - 1].at!) && h.trend[h.trend.length - 1].jobId === h.jobId && h.health === h.trend[h.trend.length - 1].health, "oldest first, ending with the newest crawl");
+  ok(h.trend[0].health! > h.health! && h.pages === 10 && h.errorPages === 7, `health falls as pages break; error pages are distinct pages: ${h.trend.map((t) => t.health)} / ${h.errorPages} of ${h.pages}`);
   ok(h.trend.every((t) => t.pageCap === 150), "each point carries its page limit (the older 100-page crawl is outside the newest six)");
+  const { rows: [cached] } = await pool.query("SELECT count(*)::int AS n FROM seo_crawl_health WHERE job_id = ANY($1)", [h.trend.map((t) => t.jobId)]);
+  ok(cached.n === HEALTH_TREND, "each crawl's health is worked out once and kept");
+  // A crawl with no page to score between two scored ones: a gap, kept as such; the newest unreadable: said, never an older score.
+  const ids = h.trend.map((t) => t.jobId);
+  await pool.query("UPDATE sitescan_jobs SET state='{\"pages\":[]}' WHERE id::text=$1", [ids[ids.length - 2]]);
+  const g = (await auditHealthByDomain(1, ["a.dash.example"])).get("a.dash.example")!;
+  ok(g.trend[g.trend.length - 2].health === null && g.trend.length === HEALTH_TREND && g.health !== null, "a crawl with no score stays in the trend as a gap (worked out again: it changed)");
+  await pool.query("UPDATE sitescan_jobs SET report='{\"findings\":{\"bad\":1},\"errors\":5}'::jsonb WHERE id::text=$1", [g.jobId]);
+  const u = (await auditHealthByDomain(1, ["a.dash.example"])).get("a.dash.example")!;
+  ok(u.jobId === g.jobId && (u.readable === false || u.health !== null), `the newest crawl stays the current one even when odd: ${JSON.stringify({ readable: u.readable, health: u.health })}`);
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://a.dash.example%'");
   await pool.query("DELETE FROM seo_sites WHERE domain LIKE '%.dash.example'");
   console.log(`dashboard checks passed: ${n}`); await pool.end();

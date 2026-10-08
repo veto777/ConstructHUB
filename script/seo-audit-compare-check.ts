@@ -41,6 +41,8 @@ const H = "https://compare.example";
   ok(newer.vsMissing === true && newer.audit?.comparedWith?.jobId === oldest, "a crawl newer than the one shown is not a baseline (said)");
   const foreign = await siteAudit(1, "compare.example", { at: other });
   ok(foreign.atMissing === true && foreign.audit?.jobId === newest, "another account's crawl cannot be shown (said; the newest is shown)");
+  const none = await siteAudit(1, "nocrawl.example", { at: randomUUID(), vs: randomUUID() });
+  ok(none.audit === null && none.atMissing === true && none.vsMissing === true, "with no crawl at all, crawls asked for are still said to be unavailable");
   ok(def.crawls.map((c) => c.jobId).join() === [newest, middle, oldest].join() && def.crawls[2].pageCap === 100, "the pickers list this account's crawls of this site, newest first, with their page limits");
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://compare.example%' OR url LIKE 'https://elsewhere.example%'");
   console.log(`audit compare checks passed: ${n}`); await pool.end();

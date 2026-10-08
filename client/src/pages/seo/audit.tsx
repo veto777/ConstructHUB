@@ -163,6 +163,9 @@ export default function SeoAuditPage() {
       )}
       {/* The rendering check does not need a crawl: without one it is offered here, on its own. */}
       {site && d && !a && <div className="mt-6" data-testid="audit-rendering-alone"><RenderCheck site={site} /></div>}
+      {/* Said whatever else is on the page, even with one crawl or none left. */}
+      {site && d?.atMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-at-missing">That crawl is no longer available, so {a ? "the newest crawl is shown" : "there is no crawl to show"}.</p>}
+      {site && d?.vsMissing && <p className="mb-2 text-[13px]" role="alert" data-testid="audit-vs-missing">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown){a ? ", so the crawl before it is used" : ""}.</p>}
       {site && a && (
         <>
           <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">
@@ -258,8 +261,6 @@ export default function SeoAuditPage() {
                 {q.isFetching && <Loader2 className="h-4 w-4 animate-spin" aria-label="Loading" />}
               </div>
               {crawls.length >= 100 && <p className="g-text-2 mt-1 text-[12px]">The newest 100 crawls are listed.</p>}
-              {d?.atMissing && <p className="mt-2 text-[13px]" role="alert">That crawl is no longer available, so the newest crawl is shown.</p>}
-              {d?.vsMissing && <p className="mt-2 text-[13px]" role="alert">That crawl can't be compared with (it is no longer available, or it is not older than the crawl shown), so the crawl before it is used.</p>}
               {a.latest === false && <p className="mt-2 text-[13px]" role="note" data-testid="audit-older-note">You are looking at the crawl of {fmtDate(shownDate)}, not the newest. Its issues, health and counts are shown; Pages, Internal links and Outgoing links read the newest crawl. <button type="button" className="g-link" onClick={() => choose({ at: null, vs: null })}>Show the newest crawl</button></p>}
               {!cmp && <p className="g-text-2 mt-2 text-[13px]">No earlier crawl to compare this one with.</p>}
               {cmp && (
@@ -289,9 +290,9 @@ export default function SeoAuditPage() {
           </nav>
           {a.latest === false && (view === "pages" || view === "links" || view === "outgoing") && <p className="g-text-2 mb-2 text-[12px]" role="note">This view is the newest crawl ({fmtDate(crawls[0]?.at ?? null)}), not the crawl of {fmtDate(shownDate)} shown above.</p>}
           {/* These read the newest crawl; keyed by it, so a crawl that finishes while one is open is read again at once. */}
-          {view === "pages" && <AuditPages key={d?.latestId ?? ""} site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
-          {view === "links" && site && <LinkOpportunitiesView key={d?.latestId ?? ""} site={site} />}
-          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestId ?? ""} site={site} />}
+          {view === "pages" && <AuditPages key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} issueTitles={Object.fromEntries(a.issues.map((i) => [i.key, i.title]))} />}
+          {view === "links" && site && <LinkOpportunitiesView key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} />}
+          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestId ?? ""} crawlId={d?.latestId} site={site} />}
           {view === "rendering" && site && <RenderCheck site={site} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
