@@ -392,6 +392,32 @@ async function main() {
         [`${id}-line-${n + 1}`, orgId, id, n, l.kind, l.name, Math.round(l.qty * 1000), l.unit, l.cents]);
   }
 
+  // ── Two more open estimates producers asked for (batch F, 2026-10-08) ──────────────────────────
+  //  · E-1995, Wrenhaven Dental Studio (White Plains NY, P-1996 Estimating): sent, opened twice by the
+  //    client and not answered — the "viewed" state on a New York job (8.375% typed on it).
+  //  · E-1994, The Mercer Group (Sarasota FL, P-2004 Proposal Sent): sent five weeks ago and past its
+  //    expiry date — the app shows it as expired (entities.ts works that out from expires_at).
+  // Numbered and filed below every other estimate, like E-1996.
+  for (const e of [
+    { number: "E-1995", client: "Wrenhaven Dental Studio", projectNo: "P-1996", title: "Reception flooring — LVP", status: "viewed", bps: 838,
+      lines: [mat("LVP-20M", 640), mat("UND-ACU", 640), labour("Install crew", 64, "click-lock install")], sentDays: 4, viewedDays: [3, 1], expiresInDays: 26, filed: 14 },
+    { number: "E-1994", client: "The Mercer Group", projectNo: "P-2004", title: "Lobby refresh — flooring", status: "sent", bps: 700,
+      lines: [mat("LVP-20M", 900), mat("UND-ACU", 900), mat("BB-525", 240), labour("Install crew", 96, "click-lock install")], sentDays: 35, viewedDays: [] as number[], expiresInDays: -5, filed: 16 },
+  ]) {
+    const id = `demo-estimate-${e.number.toLowerCase()}`, who = customer(e.client), t = totals(e.lines, e.bps);
+    const [c] = await q(`select email from crm_customers where id = $1`, [who]);
+    const made = await q(`insert into crm_estimates (id, org_id, customer_id, project_id, number, title, status, intro_text, subtotal_cents, discount_cents, tax_rate_bps, tax_cents, total_cents, public_token,
+               sent_at, sent_to_email, first_viewed_at, last_viewed_at, view_count, expires_at, created_by_member_id, created_at, updated_at)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,0,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$21) on conflict (id) do nothing returning id`,
+      [id, orgId, who, project(e.projectNo), e.number, e.title, e.status, "Thanks for having us out — here's the scope we walked through together.", t.subtotal, e.bps, t.tax, t.total,
+        randomBytes(24).toString("hex"), ago(e.sentDays * 24 * 60), c?.email ?? null,
+        e.viewedDays.length ? ago(e.viewedDays[0] * 24 * 60) : null, e.viewedDays.length ? ago(e.viewedDays[e.viewedDays.length - 1] * 24 * 60) : null, e.viewedDays.length,
+        new Date(Date.now() + e.expiresInDays * DAY), member("Priya Shah"), before(estimatesOldest, e.filed)]);
+    if (made.length) for (const [n, l] of e.lines.entries())
+      await q(`insert into crm_estimate_items (id, org_id, estimate_id, sort_order, kind, name, quantity_milli, unit, unit_price_cents, taxable) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,true) on conflict (id) do nothing`,
+        [`${id}-line-${n + 1}`, orgId, id, n, l.kind, l.name, Math.round(l.qty * 1000), l.unit, l.cents]);
+  }
+
   // ── JobCam: six photos on the Kane job and three on the Hadley job ─────────────────────────────
   // The pictures are the drawn job-site scenes of scripts/tutorials/assets/photos (gen-assets.ts) —
   // flat illustration, obviously not anybody's house — one per caption. (Until 2026-10-08 they were

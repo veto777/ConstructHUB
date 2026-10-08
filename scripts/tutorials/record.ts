@@ -111,7 +111,9 @@ function overlay() {
     try { sessionStorage.setItem("__tut_xy", JSON.stringify(pos)); } catch { /* storage off */ }
     const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
     // Only for a link that leaves the site: where it goes is the point of hovering it.
-    if (a && /^https?:/.test(a.href) && a.origin !== location.origin) { url.textContent = a.href; url.classList.add("on"); } else url.classList.remove("on");
+    // …and only in a script that asks for it (`showLinkAddress`): a map link's long address in the corner of a
+    // frame is noise in any other video.
+    if (w.__tutLinkAddress && a && /^https?:/.test(a.href) && a.origin !== location.origin) { url.textContent = a.href; url.classList.add("on"); } else url.classList.remove("on");
   }, true);
   // A native drag sends no mousemove: the pointer is followed from the drag events, and the thing
   // being carried is drawn (a headless browser has no drag image of its own).
@@ -226,6 +228,27 @@ export async function screenshot(page: Pick<Page, "screenshot" | "waitForTimeout
     try { await page.screenshot({ path: file }); return; }
     catch (e) { if (attempt >= attempts) throw e; await page.waitForTimeout(400 * attempt); }
   }
+}
+
+/** What a step costs besides its line: the pointer's travel and the page's answer (a low estimate, on purpose). */
+export const STEP_OVERHEAD_MS = 900;
+/**
+ * Where the script's chapters would fall, from the lengths of its lines alone: each chapter mark with
+ * the time since the mark before it, and whether YouTube would keep it (10 s or more; the first always).
+ * An estimate from below — the recording can only be longer — so a chapter this passes is safe.
+ */
+export function chapterPlan(steps: readonly { chapter?: string }[], clipMs: readonly number[], padMs: number): { index: number; title: string; gapMs: number; ok: boolean }[] {
+  const out: { index: number; title: string; gapMs: number; ok: boolean }[] = [];
+  let at = 0, lastKept = 0;
+  steps.forEach((s, i) => {
+    if (i === 0 || s.chapter) {
+      const gapMs = at - lastKept, ok = out.length === 0 || gapMs >= 10_000;
+      out.push({ index: i, title: s.chapter ?? "(start)", gapMs, ok });
+      if (ok) lastKept = at;
+    }
+    at += (clipMs[i] ?? 0) + padMs + STEP_OVERHEAD_MS;
+  });
+  return out;
 }
 
 /** Width and height of a JPEG, from its SOF marker. */
@@ -697,6 +720,19 @@ async function main() {
     });
   }
 
+  // CHAPTERS, BEFORE ANYTHING IS FILMED. YouTube drops a chapter that starts under 10 s after the one before
+  // it, and a video with fewer than three has none — check.ts used to say so after the whole run. A step
+  // lasts at least its line plus the pause, and about a second more for the pointer and the page.
+  {
+    const marks = chapterPlan(script.steps, clipMs, pad);
+    const kept = marks.filter((m) => m.ok).length;
+    for (const m of marks.filter((x) => !x.ok)) console.warn(`  ! chapter “${m.title}” (step ${m.index}) would start about ${(m.gapMs / 1000).toFixed(1)} s after the one before — YouTube needs 10 s: move it to a later step`);
+    if (marks.length >= 3 && kept < 3) {
+      const msg = `only ${kept} of this script's ${marks.length} chapters would be 10 s apart — YouTube needs three. Move the chapter marks before recording.`;
+      if (dry) console.warn(`  ! ${msg}`); else throw new Error(msg);
+    }
+  }
+
   const shotsDir = path.join(dir, "steps");
   if (args.flags.shots) { fs.rmSync(shotsDir, { recursive: true, force: true }); fs.mkdirSync(shotsDir, { recursive: true }); }
 
@@ -745,6 +781,7 @@ async function main() {
     await context.addCookies([...new Set([origin.hostname, "127.0.0.1", CRM_HOST, CLIENT_HOST])].map((domain) => ({ name: "ch_consent", value: "denied", domain, path: "/" })));
     // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
+    await context.addInitScript((on) => { (window as any).__tutLinkAddress = on; }, !!script.showLinkAddress);
     await context.addInitScript(overlay);
     // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
     if (script.redactSelectors?.length || script.hideSelectors?.length)

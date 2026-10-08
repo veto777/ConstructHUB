@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor, hideCss, redactCss, screenshot } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, chapterPlan, hostFor, hideCss, redactCss, screenshot } from "../../scripts/tutorials/record";
 import { CARD_SAFE, cardHtml } from "../../scripts/tutorials/card";
 import { lastFrameSeekSec } from "../../scripts/tutorials/lib";
 import { tutorialCardSchema } from "@shared/help/step-script";
@@ -359,6 +359,33 @@ describe("line gaps of 2026-10-08 (batch E)", () => {
     expect(email).toMatch(/has not been marked sent/);
     expect(auth).toMatch(/unfinishedSetup: async[\s\S]{0,120}requireTutorialFixtures\(/);
     expect(auth).toMatch(/update crm_members set phone = null where org_id = \$1 and role = 'owner'/);
+  });
+});
+
+describe("line gaps of 2026-10-08 (batches F and G)", () => {
+  it("chapter spacing is checked from the script's own lines before anything is recorded", () => {
+    const steps = [{ chapter: "A" }, {}, { chapter: "B" }, {}, {}, { chapter: "C" }, {}, { chapter: "D" }];
+    // 3 s lines, 450 ms pause, 900 ms of pointer and page: 4.35 s a step.
+    const plan = chapterPlan(steps, steps.map(() => 3000), 450);
+    expect(plan.map((p) => [p.title, p.ok])).toEqual([["A", true], ["B", false], ["C", true], ["D", false]]);
+    expect(plan[1].gapMs).toBe(2 * 4350);                 // B: 8.7 s after A — dropped
+    expect(plan[2].gapMs).toBe(5 * 4350);                 // C is measured from A, the last one kept
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/Move the chapter marks before recording/);
+    expect(src.indexOf("chapterPlan(script.steps, clipMs, pad)")).toBeLessThan(src.indexOf("chromium.launch("));
+  });
+
+  it("an outside link's address is drawn only where a script asks for it", () => {
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/w\.__tutLinkAddress && a && /);
+    expect(src).toMatch(/__tutLinkAddress = on; \}, !!script\.showLinkAddress\)/);
+    expect(JSON.parse(read("docs/tutorials/scripts/database-directory.json")).showLinkAddress).toBe(true);
+  });
+
+  it("produce.ts does not start on a nearly full disk; the stand-in payment account is shown as a connected one", () => {
+    expect(read("scripts/tutorials/produce.ts")).toMatch(/freeGb < MIN_FREE_GB\) throw new Error/);
+    expect(read("server/crm/payments.ts")).toMatch(/stripeFx \? \{ livemode: stripeFx\.accountOnScreen\.livemode/);
+    expect(read("server/tutorials/fixtures/providers/hover.ts")).toMatch(/newCapture: async[\s\S]{0,80}requireTutorialFixtures\(/);
   });
 });
 

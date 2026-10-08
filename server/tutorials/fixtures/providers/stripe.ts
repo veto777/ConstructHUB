@@ -25,6 +25,13 @@ export type StripeFixture = {
   connectClientId: string;
   webhookSecret: string;
   client: Stripe;
+  /**
+   * How the stand-in account is SHOWN on the Payments page of a slot: as any connected account looks —
+   * no "test mode" pill, and a plain demo account id in place of the marked one. Only what the page
+   * prints changes: the row in the database keeps `acct_tutfx…` (FIXTURE_MARK), which is what every
+   * safety check reads.
+   */
+  accountOnScreen: { livemode: true; externalAccountId: string };
 };
 
 /** The demo workspace's stand-in connected account (seeded by scripts/tutorials/seed-fixtures.ts). */
@@ -130,6 +137,7 @@ function adapter(): StripeFixture {
     connectClientId: `ca_${FIXTURE_MARK.stripeObject}_recordingslot`,
     // Random per process: only this process can sign an event its own webhook will accept.
     webhookSecret: `whsec_${rid(24)}`,
+    accountOnScreen: { livemode: true, externalAccountId: "acct_demo_AspireInteriors" },
     client: new Stripe(secretKey, { httpClient: Stripe.createFetchHttpClient(stripeApi as any), maxNetworkRetries: 0, telemetry: false }),
   };
   return built;

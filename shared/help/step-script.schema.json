@@ -618,6 +618,10 @@
           }
         }
       }
+    },
+    "showLinkAddress": {
+      "type": "boolean",
+      "description": "Show an outside link's address bottom-left while the pointer is on it (off by default)."
     }
   }
 }

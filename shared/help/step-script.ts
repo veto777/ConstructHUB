@@ -166,6 +166,12 @@ export const tutorialScriptSchema = z.object({
    */
   redactSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
   /**
+   * Show where a link that leaves the site goes, bottom-left, while the pointer is on it — the way a
+   * desktop browser's status bar does. Off unless a script asks (the Database Directory video does:
+   * the portal's real address is its point); everywhere else it was a stray URL in the corner.
+   */
+  showLinkAddress: z.boolean().optional(),
+  /**
    * Fixture helpers run BEFORE the camera starts (recording slots only): the state a video begins in
    * when the demo workspace cannot be seeded that way for everyone — `auth.unfinishedSetup` for the
    * setup checklist. Never a way to stage a result: what the video then shows is done on camera.

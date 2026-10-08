@@ -35,6 +35,8 @@ import { drop, fresh, seedDemo, seedFixtures, dbMode } from "./db";
 import { SLOT_MAX, SLOT_PORT, isSlot, startApp, stopPort, warmApp, type RunningApp } from "./app";
 import { isCrmRoute, helpEntry } from "../../shared/help/registry";
 
+/** Free space below which no production starts (the volume is shared with the production site). */
+export const MIN_FREE_GB = 8;
 const TSX = path.join(ROOT, "node_modules/.bin/tsx");
 function tool(name: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -60,6 +62,12 @@ async function main() {
   const database = `constructhub_tut_slot${slot}`, port = SLOT_PORT(slot);
   // The CRM renders only on its own host name; record.ts points that name at this machine for its browser.
   const base = isCrmRoute(entry.route) ? `http://portal.constructhub.us:${port}` : `http://127.0.0.1:${port}`;
+  // This box serves production and its disk has run out once (2026-10-08): a recording needs about a
+  // gigabyte of scratch, so nothing starts with less than 8 GB free.
+  {
+    const st = fs.statfsSync(out), freeGb = (st.bavail * st.bsize) / 1e9;
+    if (freeGb < MIN_FREE_GB) throw new Error(`only ${freeGb.toFixed(1)} GB free on this volume — produce.ts needs ${MIN_FREE_GB} GB. Delete finished productions' raw.mkv / narration / steps (never masters, captions, thumbnails or cuts) and try again.`);
+  }
   const started = Date.now();
   const marks: [string, number][] = [];
   const stage = async <T>(name: string, fn: () => Promise<T>): Promise<T> => {

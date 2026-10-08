@@ -132,6 +132,10 @@ them has the older data).**
   foot of wall, `PT-EXT-SF` "Exterior repaint, per sq ft of wall" and `PT-WASH-SF` "Exterior wash and
   prep, per sq ft of wall".
 - **Follow-ups, the Declined tab and Good / Better / Best** each have one row to show: see the table.
+- **An estimate the client opened and has not answered**: E-1995, Wrenhaven Dental Studio (White
+  Plains NY) — viewed twice. **An expired estimate**: E-1994, The Mercer Group (Sarasota FL) — sent
+  five weeks ago, past its expiry date. Both number below the others (the next one made on camera is
+  still E-2003), so Home's "Open estimates" and the Undecided tab count two more than before.
 
 **The jobs, by state** — every one has a working project page (`/crm/projects/<id>`), a JobCam page
 and a card on the pipeline. Use the name or the number in narration and in `:has-text("…")`.

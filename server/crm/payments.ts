@@ -194,6 +194,8 @@ export function registerCrmPaymentRoutes(app: Express, getDevUser: GetUser): voi
           businessName: acct.businessName, accountEmail: acct.accountEmail,
           country: acct.country, lastCheckedAt: acct.lastCheckedAt, lastError: acct.lastError,
         } : {}),
+        // A walkthrough recording slot's stand-in account is shown as a connected account looks (null everywhere else).
+        ...(stripeFx ? { livemode: stripeFx.accountOnScreen.livemode, ...(detail ? { externalAccountId: stripeFx.accountOnScreen.externalAccountId } : {}) } : {}),
       } : null,
       // Stated up front, in the product, per the spec's honesty requirement.
       disclosure: {

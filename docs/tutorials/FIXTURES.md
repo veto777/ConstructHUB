@@ -62,6 +62,11 @@ client does not know a fixture exists.
 | `auth` | A second signed-in person: one of the demo company's own team members | none in feature code — a local route that calls passport's `req.login()` (the dev bypass yields to a real session) | `/__tutorial/auth/as?member=<Display Name>` |
 | `search-console` | **Skeleton, not wired** — a verified property `gatorbuilders-demo.example` with 28 days of performance by date, query and page | `SearchConsoleClient(token, http)` / `gscToken(c, http)` already take the fetch to use | Tested data and handler; see "Adding a provider" |
 
+**On the Payments page** the stand-in account is shown as any connected account looks: no "test mode"
+pill, and `acct_demo_AspireInteriors` in place of the marked id (the fixture's `accountOnScreen`, applied
+where the page's own API answers). The row keeps `acct_tutfx…`: the marks are for the safety checks, not
+for the camera.
+
 ### The stand-in checkout page
 
 Stripe's hosted checkout cannot be shown, so a checkout link opens a plain page titled "Secure checkout":
@@ -112,6 +117,7 @@ list five online payments on a page that still says "not configured").
 | `email.count` | `to` | How many emails that address has received |
 | `email.changeOrder` | `title?`, `client?` | The client's page of a change order (`/co/<token>`) — the newest one marked sent, or the one named. "Mark sent & copy link" emails nothing, so `email.link` has nothing to open; this hands over the link the button copies. A draft is refused |
 | `auth.unfinishedSetup` | — | The demo owner's first day: clears the owner's own mobile number and the checklist's "dismissed" stamp in this slot's copy, so Home shows "Finish setting up". Run it from the script's `before` list (off camera); the video fills the number back in |
+| `hover.newCapture` | — | A fourth capture (Imani Brewster, Dallas TX) is finished in the stand-in account. Nothing is imported until "Sync now" is clicked on camera — which then has one job to bring in and match (after the boot sync, a second sync honestly reports nothing new) |
 | `sms.inbound` | `from` (a `+1XXX55501XX` number), `body`, `to?` | A text arrives, posted to the real carrier webhook |
 | `sms.last` | — | The last text the slot "sent" |
 | `google-calendar.events` | — | How many events the stand-in calendar holds |

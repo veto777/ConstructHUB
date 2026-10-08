@@ -13,7 +13,7 @@ import fs from "fs";
 import path from "path";
 import type { Router } from "express";
 import { FIXTURE_MARK } from "../gate";
-import { defineProviderFixture, FIXTURE_ROUTE_PREFIX } from "../registry";
+import { defineProviderFixture, requireTutorialFixtures, FIXTURE_ROUTE_PREFIX } from "../registry";
 import { fixturePdf } from "../pdf";
 
 export type HoverFixture = { clientId: string; clientSecret: string; oauthBase: string; apiBase: string };
@@ -44,6 +44,19 @@ export const FIXTURE_HOVER_JOBS: Job[] = [
     m: { roof: 2130, siding: 1560, windows: 11, stories: 1, pitch: "4/12", waste: 10 } },
 ];
 
+/**
+ * A fourth capture that is NOT there at boot: the `hover.newCapture` helper adds it to the stand-in
+ * account, so the next "Sync now" on camera has something to bring in (after the boot sync the three
+ * above are already matched, and a second sync honestly reports nothing new).
+ */
+const LATE_JOB: Job = { id: `${FIXTURE_MARK.hoverJob}1004`, name: "Brewster — exterior measure", daysAgo: 0, photos: [8],
+  contact: { name: "Imani Brewster", email: "imani.brewster@example.com", phone: "(214) 555-0172" },
+  address: { location_line_1: "905 Larkmoor Ave", city: "Dallas", region: "TX", postal_code: "75206" },
+  m: { roof: 1740, siding: 1320, windows: 9, stories: 1, pitch: "6/12", waste: 10 } };
+let lateJobAdded = false;
+/** What the stand-in account holds right now. */
+const jobsNow = (): Job[] => (lateJobAdded ? [...FIXTURE_HOVER_JOBS, LATE_JOB] : FIXTURE_HOVER_JOBS);
+
 const api = () => `${self()}/api`;
 const jobDetail = (j: Job) => ({
   id: j.id, name: j.name, state: "complete", contact: j.contact, address: j.address,
@@ -63,8 +76,8 @@ function routes(r: Router) {
   r.use("/api", authed);
   r.get("/api/v2/jobs", (req, res) => res.json(Number(req.query.page || 1) > 1
     ? { results: [], pagination: { total_pages: 1 } }
-    : { results: FIXTURE_HOVER_JOBS.map((j) => ({ id: j.id, name: j.name, state: "complete" })), pagination: { total_pages: 1 } }));
-  const find = (id: string) => FIXTURE_HOVER_JOBS.find((j) => j.id === id);
+    : { results: jobsNow().map((j) => ({ id: j.id, name: j.name, state: "complete" })), pagination: { total_pages: 1 } }));
+  const find = (id: string) => jobsNow().find((j) => j.id === id);
   r.get("/api/v3/jobs/:id", (req, res) => { const j = find(req.params.id); return j ? res.json(jobDetail(j)) : res.status(404).json({ error: "not found" }); });
   r.get("/api/v3/jobs/:id/measurements.json", (req, res) => { const j = find(req.params.id); return j ? res.json(fullJson(j)) : res.status(404).json({ error: "not found" }); });
   r.get("/api/v3/jobs/:id/measurements.pdf", (req, res) => {
@@ -93,6 +106,14 @@ export const hoverFixture = defineProviderFixture<HoverFixture>({
   seam: "server/crm/hover.ts — hoverBases(), hoverConfigured() and the client id / secret (the stand-in API is served at /__tutorial/hover)",
   adapter: () => ({ clientId: "tutfx-hover-client", clientSecret: "tutfx-hover-secret", oauthBase: self(), apiBase: api() }),
   routes,
+  actions: {
+    /** {} — a new capture is finished in the stand-in account (Imani Brewster, Dallas TX). Nothing is imported: the product's own "Sync now" does that, on camera. */
+    newCapture: async () => {
+      requireTutorialFixtures("a new HOVER capture");
+      lateJobAdded = true;
+      return { job: LATE_JOB.name, client: LATE_JOB.contact.name, jobs: jobsNow().length };
+    },
+  },
   onBoot: async ({ orgId }) => {
     const { pool } = await import("../../../db");
     const hover = await import("../../../crm/hover");
