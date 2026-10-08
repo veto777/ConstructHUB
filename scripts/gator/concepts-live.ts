@@ -28,6 +28,52 @@ const selfie = (n: number, id: string, title: string, seconds: number, scene: st
   return { id, title, format: "job-site pain", cut: "oneshot", look: "live", style: 1, evergreen: true, sample: true, hook: caption, shots: [shot], sound: "His own voice and the disaster, as the model renders them; nothing added.", caption, hashtags: tags, linkedin: null, youtubeTitle: title };
 };
 
+const PHONE = "It looks like a frame from an ordinary phone video: flat natural daylight, slightly imperfect framing, everything in focus, no cinematic lighting, no filter. Vertical 9:16, filling the frame edge to edge. No text, letters, numbers, logos, brand names or watermarks anywhere.";
+const FINE = "Nobody is hurt: it is clean, harmless slapstick. No blood, no injury. No text, captions, logos or watermarks appear in the picture. Loud natural sound only — no music.";
+
+/** One continuous found-footage take of the live gator (or the cast): nothing burned in. */
+const oneshot = (o: { id: string; style: number; title: string; caption: string; seconds: number; scene: string; action: string; script?: string; cast?: boolean; voice?: "none"; overlay?: "cctv"; meme?: string; subtitled?: boolean }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", cut: "oneshot", look: "live", style: o.style, evergreen: true, sample: true, hook: o.caption, ...(o.overlay ? { overlay: o.overlay } : {}), ...(o.meme ? { meme: o.meme } : {}),
+  shots: [{ id: "s1", look: "live", video: "talk", seconds: o.seconds, use: o.seconds, rawMotion: true, ...(o.cast ? { rawStill: true, voice: "none" as const } : {}), ...(o.voice ? { voice: o.voice } : {}), scene: o.cast ? `${o.scene} ${PHONE}` : o.scene, motion: `${o.action} ${FINE}`, ...(o.script ? { say: { text: o.script } } : {}), beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+
+/** STYLE 7 — a cliché, then a hard cut to OUR goat (generated once: "our-goat"). Subtitled; 0.8 s tag. */
+const cutaway = (o: { id: string; style: number; title: string; caption: string; seconds: number; scene: string; action: string; script: string }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", look: "live", style: o.style, subtitles: true, endTagSec: 0.8, logo: false, evergreen: true, sample: true, hook: o.caption,
+  shots: [
+    { id: "s1", look: "live", video: "talk", voice: "none", seconds: o.seconds, use: o.seconds, rawMotion: true, scene: o.scene, motion: `${o.action} ${FINE}`, say: { text: o.script }, beats: [], cues: [] },
+    { id: "s2", look: "live", video: "talk", videoFrom: "our-goat/s1", scene: "", motion: "", from: 0.35, use: 2.6, ownGain: 0.95, beats: [], cues: [] },
+  ],
+  sound: "The line; then the goat.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+/** STYLE 2 — the selfie vlog with the cartoon mascot (drawn from the mascot's own artwork). */
+const mascotSelfie = (o: { id: string; title: string; caption: string; seconds: number; scene: string; action: string; script: string }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", cut: "oneshot", style: 2, evergreen: true, sample: true, hook: o.caption,
+  shots: [{ id: "s1", video: "talk", seconds: o.seconds, use: o.seconds, rawMotion: true, scene: o.scene, motion: `ONE continuous selfie take filmed by the cartoon alligator himself, no cuts — 2D cartoon animation in the same bold cel-shaded style as the image throughout. ${o.action} His sunglasses are opaque and dark with an orange tint at all times: his eyes are never visible. His hard hat stays on. Nobody is hurt. No text appears. Loud sound: his voice and what happens behind him — no music.`, say: { text: o.script }, beats: [], cues: [] }],
+  sound: "The take's own sound.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+/** STYLE 10 — the hot take: the gator, a coffee, one line (on a still that was already drawn). */
+const hotTake = (o: { id: string; title: string; stillFrom: string; line: string; prompt: string }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", cut: "oneshot", look: "live", style: 10, evergreen: true, sample: true, hook: o.line,
+  shots: [{ id: "s1", look: "live", video: "talk", seconds: 5, use: 5, rawMotion: true, stillFrom: o.stillFrom, scene: "", motion: `ONE continuous handheld phone take, photorealistic. The alligator holds his coffee, looks straight into the lens and says, completely deadpan and unhurried: "${o.prompt}" Then he takes a slow sip. He is the only character. No text appears. Natural sound only — no music.`, say: { text: o.line }, beats: [], cues: [] }],
+  sound: "His voice.", caption: o.line, hashtags: tags, linkedin: o.line, youtubeTitle: o.title,
+});
+
+/**
+ * STYLE 13 — "viral moment + gator button": our own scene on the engine of the stalling-before-the-inevitable
+ * meme (a cast member talks with total confidence right up to the drop), small subtitles because the line
+ * is the joke, then the gator's dry button and a 0.8 s tag. The cast are animals: nobody real is put in peril.
+ */
+const moment = (o: { id: string; title: string; caption: string; seconds: number; castStill: string; castAction: string; castScript: string; buttonScene: string; buttonAction: string; buttonLine: string; buttonSeconds?: number }): Concept => ({
+  id: o.id, title: o.title, format: "job-site pain", look: "live", style: 13, subtitles: true, endTagSec: 0.8, logo: false, evergreen: true, sample: true, hook: o.caption,
+  shots: [
+    { id: "s1", look: "live", video: "talk", voice: "none", seconds: o.seconds, use: o.seconds, rawMotion: true, rawStill: true, scene: `${o.castStill} ${PHONE}`, motion: `${o.castAction} ${FINE}`, say: { text: o.castScript }, beats: [], cues: [] },
+    { id: "s2", look: "live", video: "talk", seconds: o.buttonSeconds ?? 5, use: o.buttonSeconds ?? 5, rawMotion: true, scene: o.buttonScene, motion: `${o.buttonAction} He is the only character in the shot. No text appears. Natural sound only — no music.`, say: { text: o.buttonLine }, beats: [], cues: [] },
+  ],
+  sound: "The takes' own sound; a hit on the cut to the gator.", caption: o.caption, hashtags: tags, linkedin: null, youtubeTitle: o.title,
+});
+
 export const LIVE_CONCEPTS: Concept[] = [
   selfie(1, "selfie-deck", "Day one, new deck", 10,
     "He stands on a brand-new wooden backyard deck raised about a metre off the ground; behind him the deck boards, a railing and the back wall of a suburban house with a sliding glass door.",
@@ -44,4 +90,111 @@ export const LIVE_CONCEPTS: Concept[] = [
     "He talks fast and dry straight into the lens: \"Homeowner says it's a small leak—\" Mid-word the tiled wall behind him bursts open and a huge jet of water blasts across the room, hitting him in the back and soaking everything; the camera shakes and is splashed; he does not flinch, water pouring off his hard hat, and after a beat he says, completely deadpan: \"Small.\"",
     "Homeowner says it's a small leak. Small.",
     "The homeowner said it was a small leak."),
+
+  /* ── Style 13: viral moment + gator button ───────────────────────────────── */
+  moment({ id: "moment-ladders", title: "Lemme tell you somethin' about ladders", caption: "He had one more thing to say about ladders.", seconds: 10,
+    castStill: "A photograph: on the flat roof edge of a two-storey building, a real rooster standing upright like a person, wearing a tiny yellow hard hat and a full-body safety harness whose rope runs taut up to a steel anchor frame behind him, both wings raised mid-gesture, beak open, talking to two real raccoons who stand upright on either side of him in matching orange hi-vis vests and yellow hard hats; one raccoon rests a paw on a large red lever on a winch stand. Rooftops and trees behind. Filmed by a coworker's phone from a few steps away. No people.",
+    castAction: "ONE continuous handheld phone take, no cuts, photorealistic. The rooster in the harness stalls, talking fast and nervous, wings flapping: \"Wait, wait, wait — lemme tell you somethin'. Lemme tell you somethin' about ladders—\" The two raccoons look at each other, nod, and one pulls the red lever: the rooster drops smoothly backward off the roof edge on his rope and out of frame, safely held by the harness, yelling as he goes: \"—safety fiiirst!\" The raccoons lean over the edge to look, and one raises a thumbs-up. The rooster has the fast, nervous voice of a young man. Sound: his voice, the winch whirring, wind.",
+    castScript: "Wait, wait, wait, let me tell you something. Let me tell you something about ladders. Safety first!",
+    buttonScene: "He stands on the ground at the foot of a two-storey building beside an extension ladder, holding a paper coffee cup, looking up toward the roof; seen from a few steps away in three-quarter view.",
+    buttonAction: "ONE continuous handheld phone take, photorealistic. The alligator watches something above, takes a slow sip of coffee, then turns his head to the lens and says, completely deadpan: \"Lemme tell YOU somethin'. Tie off.\"",
+    buttonLine: "Let me tell you something. Tie off." }),
+  moment({ id: "moment-video", title: "I watched a video", caption: "He watched a video. It's not load-bearing, he said.", seconds: 10,
+    castStill: "A photograph: inside a half-renovated living room with one wall stripped to its bare timber studs, a real opossum standing upright like a person, wearing a bathrobe, grips one wall stud with both front paws and looks back over his shoulder with total confidence; beside him a real beaver standing upright in a yellow hard hat and an orange hi-vis vest holds up both front paws as if to say stop. Dust sheets on the floor, a work light. Filmed on a phone from the doorway. No people.",
+    castAction: "ONE continuous handheld phone take, no cuts, photorealistic. The opossum in the bathrobe talks with total confidence while tugging at the stud: \"Lemme tell you somethin'. I watched a video. This one? Not load-bearing—\" He yanks the stud out: the whole stud wall folds over and falls flat with a huge crash and a cloud of dust, landing all around the two animals, who are left standing untouched in the gap where the doorway opening was, blinking. A beat of silence. The beaver slowly lowers his paws and sighs. The opossum has the smug voice of a middle-aged man. Sound: his voice, timber cracking, a crash, dust settling.",
+    castScript: "Let me tell you something. I watched a video. This one? Not load-bearing.",
+    buttonScene: "He stands in the doorway of a half-renovated room full of settling dust, holding a paper coffee cup; seen from a few steps away in three-quarter view.",
+    buttonAction: "ONE continuous handheld phone take, photorealistic. Dust drifts past. The alligator takes a slow sip of coffee, looks at the lens and says, completely deadpan: \"Twenty years. Never heard the end of that sentence.\"",
+    buttonLine: "Twenty years. Never heard the end of that sentence." }),
+
+  /* ── Style 14: the fall (the instant-replay edit is made from this one shot — replay.ts) ── */
+  oneshot({ id: "fall-bucket", style: 14, title: "He kicked the bucket", caption: "Somebody filled the bucket with concrete.", seconds: 10,
+    scene: `Low, ground-level, static phone shot on a gravel jobsite path: close in the foreground stands a white 5-gallon plastic bucket filled to the brim with set grey concrete. Far in the background, small in the frame, he walks toward the camera along the path between stacks of lumber.`,
+    action: `ONE static, low, ground-level phone shot, no cuts, photorealistic. For the first three seconds nothing moves but the alligator walking closer from the background, relaxed and confident. He reaches the bucket, winds up and kicks it hard like a football: the bucket does not move at all. His kicking leg stops dead, his other foot flies up, and he flips onto his back and lands flat in the gravel with a heavy thud and a puff of dust. He lies there a beat, then raises one arm in a thumbs-up. Sound: footsteps on gravel, a dull clunk, a thud.` }),
+  oneshot({ id: "fall-wetfloor", style: 14, title: "Fresh coat", caption: "The floor had just been coated.", seconds: 10, cast: true,
+    scene: `A photograph: static wide shot inside an empty room of a house under renovation — a freshly coated, glossy wet wooden floor shining like glass, a plain yellow plastic cone standing in the doorway in the foreground. In the far doorway at the back stands a real rooster, upright like a person, wearing a tiny yellow hard hat and an orange hi-vis vest, chest puffed out. No people.`,
+    action: `ONE static wide phone shot, no cuts, photorealistic. The rooster in the hard hat struts confidently straight past the yellow cone onto the glossy wet floor. On his second step both feet shoot out from under him; he lands flat on his back with a slap and slides the whole length of the room on the wet floor, spinning slowly, and bumps gently to a stop against the far wall. A beat. He raises one wing in a thumbs-up. Sound: confident footsteps, a squeak, a slap, a long slide.` }),
+
+  /* ── Style 15: tiny gator, giant opponent ────────────────────────────────── */
+  oneshot({ id: "slap-arena", style: 15, title: "One slap", caption: "They let the little guy have a turn.", seconds: 10, cast: true,
+    scene: `A photograph taken on a phone from ringside at an indoor slap-contest under bright arena lights: a pair of hands in grey work gloves gently holds up a small juvenile alligator, about the size of a cat, wearing a tiny yellow hard hat and a tiny orange hi-vis vest, its mouth closed; it faces an enormous, bald, bearded man — an invented person, not anyone real — who stands on the other side of a small table with his chin out and his hands behind his back, in plain black shorts with nothing written on them. A blurred crowd in the dark behind. The table, floor and banners are plain and blank.`,
+    action: `ONE continuous handheld ringside phone take, no cuts, photorealistic. The gloved hands hold the little alligator steady. With its mouth shut the whole time, it winds one short front leg back and slaps the huge man across the cheek with a small open paw — a puff of white chalk dust. A beat: the huge man blinks, sways, and topples over backward like a felled tree, landing flat on the mat. The crowd erupts. The little alligator slowly turns its head and looks into the lens, deadpan. In the background the man sits up, dazed and smiling, and raises a thumbs-up. The alligator never bites, lunges or opens its jaws. Sound: crowd murmur, a small slap, a heavy thud, a roar.` }),
+  oneshot({ id: "slap-jobsite", style: 15, title: "Union break's over", caption: "Lunch break. The big guy said go ahead.", seconds: 10, cast: true,
+    scene: `A photograph taken on a coworker's phone during lunch break on a house-framing jobsite: a pair of hands in grey work gloves gently holds up a small juvenile alligator, about the size of a cat, wearing a tiny yellow hard hat and a tiny orange hi-vis vest, mouth closed; it faces an enormous, cartoonishly broad construction worker — an invented person, not anyone real — in a plain hard hat and plain t-shirt, grinning with his chin stuck out and his hands on his knees. Behind him a big soft pile of pink insulation batts and a stack of empty buckets. Flat daylight. No logos or writing on anything.`,
+    action: `ONE continuous handheld phone take, no cuts, photorealistic. The gloved hands hold the little alligator up to the huge grinning worker. With its mouth shut the whole time, the little alligator winds one short front leg back and slaps him across the cheek with a small open paw — a puff of drywall dust. A beat: the big man's grin freezes, he sways, and he topples backward like a felled tree into the big soft pile of pink insulation, which swallows him with a soft whump. Offscreen coworkers burst out laughing. The man's arm comes up out of the insulation with a thumbs-up, and he is laughing too. The little alligator turns its head and looks into the lens, deadpan. The alligator never bites, lunges or opens its jaws. Sound: site ambience, a small slap, a soft whump, laughter.` }),
+
+  /* ── The goat: OUR goat, generated once, cut to wherever a cliché deserves it (style 7) ── */
+  oneshot({ id: "our-goat", style: 7, title: "The goat", caption: "The goat has seen the invoice.", seconds: 4, cast: true,
+    scene: "A photograph: close-up of a real white-and-tan goat with a short beard standing in a muddy jobsite yard, wearing a small yellow hard hat held on by a chin strap, looking straight into the lens with its mouth closed. Behind it a wheelbarrow and a stack of cinder blocks.",
+    action: "ONE continuous handheld phone take, photorealistic. The goat stares into the lens for half a second, then stretches its neck, opens its mouth wide and SCREAMS — one long, loud, hoarse yell that sounds almost like a person shouting — eyes wide, for two full seconds; then it stops abruptly and stares into the lens again, completely calm. Sound: the scream, loud and close." }),
+  cutaway({ id: "goat-cousin", style: 7, title: "My cousin can do it cheaper", caption: "“My cousin can do it cheaper.”", seconds: 6,
+    scene: "Doorbell-camera view — wide fisheye lens, high angle from beside a front door — of a suburban front porch in daylight: he stands on the doormat holding a clipboard, facing the door.",
+    action: "Static doorbell-camera footage, photorealistic. The alligator stands at the door holding a clipboard. From the doorway, off-screen, a cheerful middle-aged woman's voice says: \"That's your price? My cousin can do it cheaper.\" The alligator does not move for a full second. Then, very slowly, he turns his head and looks straight into the doorbell camera, completely deadpan, and holds the look.",
+    script: "That's your price? My cousin can do it cheaper." }),
+  cutaway({ id: "goat-inch-short", style: 7, title: "Exactly where you said, boss", caption: "He cut it exactly where he was told.", seconds: 7,
+    scene: "Inside a framed doorway opening on a jobsite: a real rooster standing upright like a person, in a tiny yellow hard hat and orange vest, proudly holds a cut wooden board up across the opening — the board is clearly a hand's width too short and does not reach the other side. He stands beside the rooster, looking at the gap.",
+    action: "ONE continuous handheld phone take, photorealistic. The rooster holds the too-short board up proudly and says in a young man's eager voice: \"Cut it exactly where you said, boss!\" The alligator looks at the gap between the board and the frame, then at the rooster, then very slowly turns his head and looks straight into the lens, deadpan, and holds the look.",
+    script: "Cut it exactly where you said, boss!" }),
+
+  /* ── Style 2: the selfie vlog with the cartoon mascot ────────────────────── */
+  mascotSelfie({ id: "mascot-shed", title: "Strapped it myself", caption: "He strapped the shed down himself.", seconds: 9,
+    scene: "Selfie from the phone's point of view: one of his arms reaches out to the edge of the frame holding the phone, his head, his one hard hat and his shoulders fill the lower half of the frame, he looks into the lens mid-sentence; he wears exactly one hard hat and there is no second hat anywhere. Behind him, on a quiet street, drawn right down to the bottom edge of the picture, a small wooden garden shed sits on a flatbed trailer hitched to a generic unmarked orange pickup truck, held by one thin strap.",
+    action: "He talks fast and cocky straight into the lens: \"This shed? Strapped it myself. It ain't goin' nowhere—\" Behind him the strap snaps and the shed slides off the back of the trailer and lands on the road with a huge crash and a cloud of dust. He does not turn around. A beat. He says, deadpan: \"I'll strap it again.\"",
+    script: "This shed? Strapped it myself. It ain't going nowhere. I'll strap it again." }),
+  mascotSelfie({ id: "mascot-pour", title: "Nobody touches it", caption: "Fresh pour. Nobody touches it.", seconds: 9,
+    scene: "Selfie from the phone's point of view: one of his arms reaches out to the edge of the frame holding the phone, his head, hard hat and shoulders fill the lower half of the frame, he looks into the lens mid-sentence. Behind him a freshly poured, perfectly smooth concrete driveway slab in wooden forms, and at the top of the sloping drive an empty wheelbarrow.",
+    action: "He talks fast and proud straight into the lens: \"Fresh pour. Perfect finish. Nobody touches it—\" Behind him the empty wheelbarrow starts rolling by itself, trundles right across the wet concrete leaving a deep wheel track from one side to the other, and tips over at the far edge with a clatter. He does not turn around. A beat. He says, deadpan: \"Fuhgeddaboudit.\"",
+    script: "Fresh pour. Perfect finish. Nobody touches it. Forget about it." }),
+
+  /* ── Style 3: the impossible skill ───────────────────────────────────────── */
+  oneshot({ id: "skill-blower", style: 3, title: "Leaf blower", caption: "He found a new setting on the leaf blower.", seconds: 8,
+    scene: "In a suburban back garden covered in autumn leaves he stands holding a large petrol leaf blower with both hands, its nozzle pointed straight down at the ground; seen from a few steps away, as if filmed by a neighbour over the fence.",
+    action: "ONE continuous handheld phone take, photorealistic. He squeezes the trigger: the blower roars and he rises slowly off the ground, hovering about half a metre up, legs dangling, tail swaying, perfectly calm, drifting a little from side to side while leaves swirl beneath him. After a few seconds he eases off and settles gently back on the grass, and gives one small nod. Sound: a loud leaf blower rising and falling." }),
+  oneshot({ id: "skill-tail", style: 3, title: "Tail finish", caption: "No trowel. He says he doesn't need one.", seconds: 8,
+    scene: "He kneels on kneeboards at the edge of a freshly poured grey concrete slab on a house site, his long tail lying flat on the wet concrete behind him; seen from a few steps away by a coworker's phone.",
+    action: "ONE continuous handheld phone take, photorealistic. He sweeps his tail across the wet concrete in one long, slow, smooth arc; behind the tail the rough surface turns into a flawless, glassy, mirror-smooth finish reflecting the sky. He sweeps once more the other way, perfect again, then looks over his shoulder at the lens. Sound: a soft wet scraping, site ambience." }),
+
+  /* ── Style 4: the fail he walks away from ────────────────────────────────── */
+  oneshot({ id: "fail-wheelbarrow", style: 4, title: "Wheelbarrow", caption: "He said the wheelbarrow was faster.", seconds: 8,
+    scene: "On a house site he stands upright inside a steel wheelbarrow, in a surfer's stance with his arms out, at the top of a long wooden plank ramp that runs down from a mound of earth; at the bottom of the ramp is a big soft pile of yellow sand. Seen from the side by a coworker's phone.",
+    action: "ONE continuous handheld phone take, photorealistic. The wheelbarrow rolls down the plank ramp, picking up speed, and he surfs it with his arms out, confident. At the bottom the wheel digs into the sand, the wheelbarrow stops dead and tips, and he is thrown forward head-first into the big soft sand pile with a soft thump, his legs and tail sticking out. A beat. One arm comes up out of the sand with a thumbs-up. Sound: a rattling wheel, a thump, a coworker laughing off-screen." }),
+  oneshot({ id: "fail-dominoes", style: 4, title: "Dominoes", caption: "He spent all morning stacking those.", seconds: 8,
+    scene: "On a concrete slab a long, perfectly neat row of grey cinder blocks stands on end, one behind another like dominoes, stretching away into the distance. He stands beside the nearest block with his back to the row, facing the lens proudly, chest out.",
+    action: "ONE continuous handheld phone take, photorealistic. He stands proudly in front of his row of blocks. He shifts his weight: his tail swings and taps the first block. The whole row topples like dominoes, one after another, clattering away into the distance behind him. He hears it. He does not turn around. He slowly closes his mouth and looks into the lens, deadpan, while the last blocks fall. Sound: a long run of clacking concrete." }),
+
+  /* ── Style 5: CCTV ───────────────────────────────────────────────────────── */
+  oneshot({ id: "cctv-ladder", style: 5, title: "CAM 03", caption: "The yard camera caught this.", seconds: 8, overlay: "cctv",
+    scene: "High-angle security-camera view, wide lens, looking down from the corner of a building at the side wall of a house in daylight: an aluminium extension ladder leans against the wall, and he stands on it about two metres up, carrying a bundle of roof shingles on one shoulder.",
+    action: "Static security-camera footage, photorealistic, slightly washed-out colour. He climbs one more rung, calm. The foot of the ladder slides out: the ladder skids down the wall, and he rides it all the way down like a surfboard, knees bent, still holding the bundle of shingles, and lands on his feet on the ground as the ladder clatters flat beside him. He stands still for a moment, then slowly looks up, straight into the security camera. Sound: a scrape, a clatter, quiet." }),
+  oneshot({ id: "cctv-shingles", style: 5, title: "CAM 03 — the delivery", caption: "The delivery came off the roof early.", seconds: 8, overlay: "cctv",
+    scene: "High-angle security-camera view, wide lens, of a driveway in daylight: a generic unmarked orange pickup truck is parked directly below the edge of a low roof, where a pallet stacked with bundles of roof shingles sits right at the edge. He stands beside the truck holding a paper coffee cup.",
+    action: "Static security-camera footage, photorealistic, slightly washed-out colour. The stack of shingle bundles at the roof edge slowly tips and slides off, and lands with a huge crash in the bed of his own pickup truck, which sags hard on its springs. He does not flinch. He takes one slow sip of coffee. Then he slowly looks up, straight into the security camera. Sound: a creak, a huge crash, quiet." }),
+
+  /* ── Style 8: the coworker's phone ───────────────────────────────────────── */
+  oneshot({ id: "pov-nailgun", style: 8, title: "New guy's first day", caption: "New guy's first day.", meme: "New guy's first day", seconds: 8, voice: "none", script: "Bro. Bro!",
+    scene: "Phone footage from a few steps away on a house site, as if filmed by a coworker who is not in the picture: he kneels at one end of a long plywood subfloor panel, holding a framing nail gun in his own clawed hands, its tip against a blue chalk line that runs the full length of the panel. Nobody else is in the frame.",
+    action: "ONE continuous handheld phone take filmed by a coworker, photorealistic. He pulls the trigger and runs the nail gun along the whole chalk line at absurd speed — a rapid machine-gun burst of pops — leaving a perfectly straight, perfectly evenly spaced row of nail heads from one end to the other in about two seconds. He stands up, blows across the tip of the nail gun, and walks out of frame. Off-screen, the man filming says in disbelief: \"Bro… BRO.\"" }),
+  oneshot({ id: "pov-one-trip", style: 8, title: "One trip", caption: "He said he'd get it all in one trip.", meme: "One trip.", seconds: 8, voice: "none", script: "No way. No way!",
+    scene: "Phone footage by a coworker on a house site: he walks toward the lens carrying an absurd load with total calm — a tall stack of plywood sheets balanced flat on his hard hat, a five-gallon bucket hanging from each forearm, a long bundle of timber under one arm, and a coil of extension lead looped over his tail.",
+    action: "ONE continuous handheld phone take filmed by a coworker, photorealistic. He walks steadily past the camera carrying the whole impossible load, perfectly balanced, not even looking at it, and gives the lens a tiny nod as he passes. Nothing falls. Off-screen, the man filming says: \"No way. No WAY.\"" }),
+
+  /* ── Style 9: satisfying ─────────────────────────────────────────────────── */
+  oneshot({ id: "satis-chalk", style: 9, title: "Chalk lines", caption: "Three snaps. Three straight lines.", seconds: 8,
+    scene: "He kneels on a clean plywood subfloor inside a framed house, holding a chalk line stretched tight across the floor with one hand and pinching the string up in the middle with the other; seen from a low angle a few steps away.",
+    action: "ONE continuous steady phone take, photorealistic. He lifts the tight string and lets it snap: a puff of blue chalk dust and a perfectly straight blue line appears on the plywood. He moves the string a hand's width over and snaps again, then a third time, in an even rhythm — three perfectly parallel blue lines. Sound: three crisp snaps, quiet room." }),
+  oneshot({ id: "satis-caulk", style: 9, title: "One bead", caption: "One bead. One pass.", seconds: 8,
+    scene: "Close view of a new white window frame set in a wall; he holds a caulk gun with its nozzle at the top corner of the joint between the frame and the wall, his snout near the work, concentrating.",
+    action: "ONE continuous steady close phone take, photorealistic. He draws the caulk gun slowly and smoothly down the whole length of the joint in a single unbroken motion, leaving a perfect, even, white bead of sealant. Then he runs one claw down the bead in a single pass, leaving it flawlessly smooth. Sound: a soft squeeze and a quiet room." }),
+
+  /* ── Style 10: the hot take ──────────────────────────────────────────────── */
+  hotTake({ id: "take-measure", title: "Measure once", stillFrom: "moment-ladders/s2", line: "Measure once. Cut twice. That's the trade.", prompt: "Measure once. Cut twice. That's the trade." }),
+  hotTake({ id: "take-caulk", title: "Do your best", stillFrom: "moment-video/s2", line: "Do your best. Caulk the rest.", prompt: "Do your best. Caulk the rest." }),
+
+  /* ── Style 12: the cast ──────────────────────────────────────────────────── */
+  oneshot({ id: "cast-stretcher", style: 12, title: "The board stretcher", caption: "He sent the new guy for a board stretcher.", seconds: 9, voice: "none", subtitled: true, script: "Got it, boss! The board stretcher! Who sold you that?",
+    scene: "On a house site he stands at a pair of sawhorses holding a paper coffee cup. In front of him a real rooster standing upright like a person, in a tiny yellow hard hat and orange vest, proudly presents a ridiculous home-made wooden contraption with ropes and a big hand crank, twice his own size.",
+    action: "ONE continuous handheld phone take, photorealistic. The rooster proudly drags the wooden contraption up to the alligator and says in a young man's eager voice: \"Got it, boss! The board stretcher!\" The alligator looks at the contraption, then at the rooster, takes a slow sip of coffee, and says in a gravelly, dry, deadpan New Jersey voice: \"Who sold you that?\" The rooster beams." }),
+  oneshot({ id: "cast-inspector", style: 12, title: "The inspector", caption: "The inspector looked in the panel.", seconds: 9, subtitled: true, script: "He does that. Means we passed.",
+    scene: "In a garage on a jobsite, a real opossum standing upright like a person, wearing a tiny white hard hat and an orange vest and holding a small clipboard, peers into an open grey electrical panel on the wall, its door swung open; nothing is written on anything. He stands beside the opossum holding a paper coffee cup, watching.",
+    action: "ONE continuous handheld phone take, photorealistic. The opossum inspector leans in and looks into the open electrical panel. It freezes, goes stiff, and topples straight over backward onto the floor, lying flat on its back with its legs in the air, playing dead. The alligator looks down at it, takes a slow sip of coffee, turns to the lens and says, completely deadpan: \"He does that. Means we passed.\" Behind him the opossum opens one eye." }),
 ];

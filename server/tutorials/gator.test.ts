@@ -3,12 +3,18 @@ import {
   BudgetError, HF_BASE, PHASE2, PILOT, assertWithinBudget, charged, emptyLedger, estimate, generate, phase2Cap, pilotCap, redact, spent, uploadInput,
   type Creds, type Fetch, type GenerateInput, type Io, type Ledger,
 } from "../../scripts/gator/higgsfield";
-import { CONCEPTS, PHASE2_IDS, SAMPLES, conceptById, lintConcept, motionPrompt, postsOf, stillPrompt } from "../../scripts/gator/concepts";
+import { CONCEPTS, FINALS, PHASE2_IDS, SAMPLES, VOICE_DESCRIPTION, conceptById, lintConcept, motionPrompt, postsOf, stillPrompt } from "../../scripts/gator/concepts";
+import { LIVE_CONCEPTS } from "../../scripts/gator/concepts-live";
+import { plan as replayPlan } from "../../scripts/gator/replay";
+import { boardMd, byStyle, due, engagementRate, parseManual, percentiles, postedOf, rank, recommend, type Metrics, type Posted } from "../../scripts/gator/scoreboard";
+import { STYLES } from "../../scripts/gator/styles";
+import { schedule, stylesMd, DOC as STYLES_DOC } from "../../scripts/gator/styles-doc";
+import { BAND, REFERENCE, analyse, compare, pitchCorrection } from "../../scripts/gator/voiceprint";
 import { END_TAG_SEC, H, LOGO_RECT, MAX_SEC, MIN_PX, W, ZONES, assFile, layoutBeat, wrapCaption, type Beat } from "../../scripts/gator/layout";
 import { automaticChecks, mayPost, nextInQueue, type Queue } from "../../scripts/gator/daily";
 import { VOICE, voiceFilter, voiceKey } from "../../scripts/gator/voice";
 import { accountTimes, nextAllowed, rateRefusal } from "../../scripts/tutorials/social-rate";
-import { bandFault, clipSpent, hatRow, lineBeats, peaksOf, timeline } from "../../scripts/gator/make";
+import { bandFault, clipSpent, hatRow, lineBeats, peaksOf, plainWords, saysTheLine, subtitleBeats, timeline } from "../../scripts/gator/make";
 import fs from "fs";
 import { DOC, conceptsMd } from "../../scripts/gator/concepts-doc";
 import { mediaKey, planAsap, plannedMediaUrl, viralMain } from "../../scripts/gator/post";
@@ -550,21 +556,56 @@ describe("gator shorts — he talks", () => {
     expect(voiceKey("Two days.", { ...VOICE, pitch: 0.85 } as unknown as typeof VOICE)).not.toBe(voiceKey("Two days."));
     expect(fs.readFileSync("docs/gator/VOICE.md", "utf8")).toContain("`marcus` = Kokoro voice `am_adam`");
   });
-  it("a talking shot uses the house method: his own voice over a loose jaw, in profile", () => {
-    const talkers = PHASE2_IDS.map(conceptById).filter((c) => c.shots.some((s) => s.say));
-    expect(talkers.length).toBeGreaterThanOrEqual(6);
-    expect(PHASE2_IDS.length - talkers.length).toBeGreaterThanOrEqual(4);
-    for (const c of talkers) for (const s of c.shots.filter((x) => x.say)) {
-      expect(["kling", "kling-pro", undefined]).toContain(s.video);            // never the model that invents a voice
-      expect(s.say!.text.length, c.id).toBeLessThanOrEqual(70);
-      expect(s.scene).toMatch(/three-quarter view.*profile/);
-      expect(motionPrompt(s)).toContain("his long jaw opens and closes");
-      expect(motionPrompt(s)).not.toContain("New Jersey");                     // the accent is not asked of a video model
+  it("a talking shot uses the house method: the model's own voice, described in the same words every time", () => {
+    const talkers = [...LIVE_CONCEPTS, ...FINALS].flatMap((c) => c.shots.filter((x) => x.say && x.voice !== "none").map((x) => [c, x] as const));
+    expect(talkers.length).toBeGreaterThanOrEqual(8);
+    for (const [c, sh] of talkers) {
+      expect(sh.video, c.id).toBe("talk");
+      expect(motionPrompt(sh), c.id).toContain("a gravelly baritone, dry and unhurried, with a New York / North Jersey working-class accent");
+      expect(motionPrompt(sh)).toContain("No music and no other voices");
     }
-    for (const c of CONCEPTS) for (const s of c.shots.filter((x) => !x.say)) expect(motionPrompt(s)).toContain("mouth stays closed");
-    // The comparison sample is the only place a model's own voice is used, and it is not one of the thirty.
-    expect(SAMPLES.every((c) => c.sample && !CONCEPTS.includes(c))).toBe(true);
-    expect(CONCEPTS.flatMap((c) => c.shots).some((s) => s.video === "kling-voice" || s.video === "wan-talk")).toBe(false);
+    expect(VOICE_DESCRIPTION).toMatch(/about fifty.*deadpan — no laughing, no shouting/);
+    // The cast speak in their own voices: the gator's description is not put in their mouths.
+    const cast = LIVE_CONCEPTS.flatMap((c) => c.shots).filter((x) => x.voice === "none" && x.say);
+    expect(cast.length).toBeGreaterThanOrEqual(4);
+    for (const sh of cast) expect(motionPrompt(sh)).not.toContain("gravelly baritone, dry and unhurried");
+    for (const c of CONCEPTS) for (const sh of c.shots.filter((x) => !x.say)) expect(motionPrompt(sh)).toContain("mouth stays closed");
+    expect([...SAMPLES, ...FINALS, ...LIVE_CONCEPTS].every((c) => c.sample && !CONCEPTS.includes(c))).toBe(true);
+    expect(CONCEPTS.flatMap((c) => c.shots).some((x) => x.video === "kling-voice" || x.video === "wan-talk")).toBe(false);
+  });
+  it("the live concepts keep the line: he is fine, nothing is burned in, the brand cues are in the prompt", () => {
+    for (const c of LIVE_CONCEPTS) {
+      expect(lintConcept(c), c.id).toEqual([]);
+      for (const sh of c.shots.filter((x) => !x.videoFrom)) {
+        const still = sh.stillFrom ? "" : stillPrompt(sh), motion = motionPrompt(sh);
+        if (still && /alligator/i.test(still)) for (const must of ["hard hat", "No text"]) expect(still, `${c.id}: ${must}`).toContain(must);
+        if (still) expect(still).toMatch(/[Nn]o (text|logos)/);
+        expect(motion, c.id).toMatch(/[Nn]o text/);
+      }
+      if (c.cut === "oneshot") expect(c.shots[0].beats).toEqual([]);
+      expect(postsOf(c).instagram!.text).toContain("AI-generated");
+      expect(c.hashtags, c.id).toContain("aicontent");
+    }
+    expect(new Set(LIVE_CONCEPTS.map((c) => c.style)).size).toBeGreaterThanOrEqual(12);
+  });
+  it("what he is heard to say is held against the script — exactly when short, four fifths when long", () => {
+    expect(saysTheLine("Two days, he says, two days.", "Two days, he says. Two days.").ok).toBe(true);
+    expect(saysTheLine("Two days he said two days", "Two days, he says. Two days.").ok).toBe(false);
+    expect(saysTheLine("20 years, never heard the end of that sentence.", "Twenty years. Never heard the end of that sentence.").ok).toBe(true);
+    const long = saysTheLine("Guy says, tie off. I've been doing this 20 years. 20 years. Never said good years.", "Guy says tie off. I been doing this twenty years. Twenty years. Never said good years.");
+    expect(long.ok).toBe(true); expect(long.match).toBeGreaterThanOrEqual(0.8);
+    expect(saysTheLine("Guy says tie off and then something else entirely happens here today", "Guy says tie off. I been doing this twenty years. Twenty years. Never said good years.").ok).toBe(false);
+    expect(plainWords("“While you're here.” Three words!")).toEqual(["while", "you're", "here", "three", "words"]);
+  });
+  it("subtitles follow the heard words: a few at a time, on screen while they are said", () => {
+    const words = [["Day", 0.1, 0.3], ["one.", 0.3, 0.6], ["New", 0.9, 1.1], ["deck.", 1.1, 1.5], ["I'm", 2.0, 2.1], ["telling", 2.1, 2.4], ["you,", 2.4, 2.6], ["this", 2.6, 2.8], ["thing", 2.8, 3.0], ["ain't", 3.0, 3.2], ["going", 3.2, 3.4], ["nowhere.", 3.4, 3.9]].map(([w, start, end]) => ({ w: w as string, start: start as number, end: end as number }));
+    const subs = subtitleBeats(words, 0, 10);
+    expect(subs[0]).toMatchObject({ text: "Day one.", pos: "low", small: true });
+    expect(subs[1].text).toBe("New deck.");
+    expect(subs.map((b) => b.text).join(" ")).toBe(words.map((x) => x.w).join(" "));
+    for (let i = 1; i < subs.length; i++) expect(subs[i].at).toBeGreaterThanOrEqual(subs[i - 1].until - 1e-9);
+    for (const b of subs) { const box = layoutBeat(b); expect(box.px).toBeLessThanOrEqual(60); expect(box.lines.length).toBeLessThanOrEqual(2); expect(inside(box.rect, ZONES.low)).toBe(true); }
+    expect(subtitleBeats(words, 5, 10)[0].at).toBeCloseTo(5.04, 6);
   });
   it("the line is burned in, sentence by sentence, for as long as it is said", () => {
     const beats = lineBeats("Closes at four. It's three fifty-nine. Fuhgeddaboudit.", 10, 3, 14);
@@ -640,5 +681,120 @@ describe("gator shorts — what the machine checks by itself", () => {
     const req = uploadSessionRequest({ title: p.title!, description: p.text, categoryId: "24", privacyStatus: "public", containsSyntheticMedia: true }, 5_000_000);
     expect(req.body.status).toEqual({ privacyStatus: "public", selfDeclaredMadeForKids: false, containsSyntheticMedia: true });
     expect(req.body.snippet.title).toMatch(/#Shorts$/);
+  });
+});
+
+describe("gator shorts — measuring a voice nobody here can hear", () => {
+  const tone = (hz: number, sec: number, bright = 0) => Int16Array.from({ length: Math.round(16000 * sec) }, (_x, i) => { const t = i / 16000; return Math.round(9000 * (Math.sin(2 * Math.PI * hz * t) + 0.5 * Math.sin(2 * Math.PI * 2 * hz * t) + bright * Math.sin(2 * Math.PI * 3200 * t))); });
+  it("finds how low a voice sits, how bright it is and when there is sound", () => {
+    const quiet = new Int16Array(8000), low = analyse(Int16Array.from([...quiet, ...tone(125, 1.2), ...quiet]));
+    expect(low.f0).toBeGreaterThan(118); expect(low.f0).toBeLessThan(132);
+    expect(low.bursts).toHaveLength(1);
+    expect(low.bursts[0].start).toBeGreaterThan(0.4); expect(low.bursts[0].end).toBeLessThan(1.85);
+    const high = analyse(tone(240, 1));
+    expect(high.f0).toBeGreaterThan(225); expect(high.f0).toBeLessThan(255);
+    expect(analyse(tone(125, 1, 0.8)).centroid).toBeGreaterThan(analyse(tone(125, 1)).centroid * 1.5);
+    expect(analyse(new Int16Array(16000)).f0).toBe(0);
+  });
+  it("a take is held to a band around the voice the owner approved, and pulled onto its pitch when close", () => {
+    expect(REFERENCE).toEqual({ f0: 127, centroid: 1548 });
+    expect(compare({ f0: 134.5, centroid: 1429 }, REFERENCE).inBand).toBe(true);
+    expect(compare({ f0: 179.8, centroid: 1704 }, REFERENCE).inBand).toBe(false);
+    expect(compare({ f0: 0, centroid: 0 }, REFERENCE).inBand).toBe(false);
+    expect(compare({ f0: 130, centroid: 1452 }, REFERENCE).distance).toBeLessThan(compare({ f0: 155, centroid: 1617 }, REFERENCE).distance);
+    expect(pitchCorrection({ f0: 134.5 }, REFERENCE)).toBeCloseTo(0.944, 3);
+    expect(pitchCorrection({ f0: 280 }, REFERENCE)).toBe(0.84);                // never more than about three semitones
+    expect(pitchCorrection({ f0: 0 }, REFERENCE)).toBe(1);
+    expect(BAND.f0).toBeLessThanOrEqual(0.2);
+    expect(fs.readFileSync("docs/gator/VOICE.md", "utf8")).toContain("127 Hz");
+  });
+});
+
+describe("gator shorts — the instant replay", () => {
+  it("the take, a rewind, four replays each a different way, the aftermath, a short tag", () => {
+    const ed = replayPlan(10, 5.55, 0.8, 2.2);
+    expect(ed.pieces.map((p) => p.name)).toEqual(["take", "rewind", "replay-1", "replay-2", "replay-3", "replay-4", "after"]);
+    expect(ed.pieces[0]).toMatchObject({ srcFrom: 2.2, speed: 1 });
+    expect(ed.pieces[1]).toMatchObject({ reverse: true, speed: 3 });
+    expect(ed.pieces.filter((p) => p.name.startsWith("replay")).map((p) => p.speed)).toEqual([0.6, 0.6, 0.8, 0.33]);
+    expect(ed.pieces[4]).toMatchObject({ mirror: true, shake: true, freeze: 0.5 });
+    for (let i = 1; i < ed.pieces.length; i++) expect(ed.pieces[i].outStart).toBeCloseTo(ed.pieces[i - 1].outStart + ed.pieces[i - 1].outSec, 6);
+    // Every replay shows the impact, and a hit can be laid on it.
+    for (const p of ed.pieces.filter((x) => x.name.startsWith("replay"))) { expect(p.impactAt).not.toBeNull(); expect(p.impactAt!).toBeGreaterThan(p.outStart); expect(p.impactAt!).toBeLessThanOrEqual(p.outStart + p.outSec); expect(p.outSec).toBeGreaterThanOrEqual(0.8); expect(p.outSec).toBeLessThanOrEqual(3.2); }
+    expect(ed.totalSec - ed.bodySec).toBeCloseTo(0.8, 6);
+    expect(ed.totalSec).toBeGreaterThan(12); expect(ed.totalSec).toBeLessThan(21);
+    // An impact too near either end is moved in, never out of the take.
+    expect(replayPlan(10, 0.1).pieces[1].srcFrom).toBeCloseTo(0, 6);
+    expect(replayPlan(10, 9.99).pieces[0].srcTo).toBeLessThanOrEqual(10);
+    expect(replayPlan(6, 5.4, 0).pieces.some((p) => p.name === "after")).toBe(false);
+  });
+});
+
+describe("gator shorts — the styles experiment and its scoreboard", () => {
+  const post = (conceptId: string, style: number, platform: string, hoursAgo: number, now: Date): Posted => ({ conceptId, style, platform, url: `https://x/${conceptId}`, publishedAt: new Date(now.getTime() - hoursAgo * 3600000).toISOString() });
+  const now = new Date("2026-10-12T16:00:00Z"), r = (views: number, likes = 0, comments = 0, shares = 0) => ({ views, likes, comments, shares, at: now.toISOString(), source: "manual" as const });
+  it("fifteen styles, each with a recipe, a cost and an example; the document is their print-out", () => {
+    expect(STYLES.map((s) => s.id)).toEqual(Array.from({ length: 15 }, (_x, i) => i + 1));
+    for (const s of STYLES) { expect(s.definition.length).toBeGreaterThan(20); expect(s.recipe.length).toBeGreaterThan(20); expect(s.creditsPerClip).toBeGreaterThan(0); expect(s.example.length).toBeGreaterThan(5); for (const c of s.clips) expect(conceptById(c).style ?? 6, c).toBe(s.id); }
+    expect(STYLES.reduce((n, s) => n + 2 * s.creditsPerClip, 0) * 0.0625).toBeLessThan(100);     // two of each fit under the cap
+    expect(fs.readFileSync(STYLES_DOC, "utf8")).toBe(stylesMd());
+  });
+  it("the posting plan puts a style's two clips on different days and different dayparts", () => {
+    const plan = schedule(STYLES);
+    for (const s of STYLES) {
+      const noon = plan.filter((d) => d.noon === s.id), evening = plan.filter((d) => d.evening === s.id);
+      expect(noon).toHaveLength(1); expect(evening).toHaveLength(1);
+      expect(noon[0].day).not.toBe(evening[0].day);
+    }
+    for (const d of plan) expect(d.noon).not.toBe(d.evening);
+  });
+  it("a reading is taken once, at the latest checkpoint that is due", () => {
+    expect(due(post("a", 1, "tiktok", 1, now), undefined, now)).toEqual([]);
+    expect(due(post("a", 1, "tiktok", 3, now), undefined, now)).toEqual(["2h"]);
+    expect(due(post("a", 1, "tiktok", 30, now), undefined, now)).toEqual(["24h"]);          // late: one reading, not two
+    expect(due(post("a", 1, "tiktok", 30, now), { "24h": r(10) }, now)).toEqual([]);
+    expect(due(post("a", 1, "tiktok", 80, now), { "2h": r(1), "24h": r(10) }, now)).toEqual(["72h"]);
+    expect(due(post("a", 1, "tiktok", 80, now), { "2h": r(1), "24h": r(10), "72h": r(20) }, now)).toEqual([]);
+  });
+  it("clips are ranked within their platform — by views and by engagement rate", () => {
+    expect(engagementRate(r(200, 10, 4, 6))).toBeCloseTo(0.1, 6);
+    expect(engagementRate(r(0, 5))).toBeNull();
+    expect(percentiles([10, 30, 20, null])).toEqual([0, 1, 0.5, null]);
+    expect(percentiles([5, 5])).toEqual([0.5, 0.5]);
+    const posted = [post("a", 1, "tiktok", 80, now), post("b", 6, "tiktok", 80, now), post("a", 1, "instagram", 80, now), post("b", 6, "instagram", 80, now)];
+    const metrics: Metrics = { "a@tiktok": { "72h": r(9000, 900) }, "b@tiktok": { "72h": r(1000, 20) }, "a@instagram": { "72h": r(300, 30) }, "b@instagram": { "72h": r(200, 40) } };
+    const rows = rank(posted, metrics, "72h");
+    // TikTok's 9,000 views do not swamp Instagram's 300: each is first in its own platform.
+    expect(rows.filter((x) => x.conceptId === "a").map((x) => x.viewsPct)).toEqual([1, 1]);
+    expect(rows.find((x) => x.conceptId === "b" && x.platform === "instagram")!.erPct).toBe(1);
+    const styles = byStyle(rows);
+    expect(styles.find((s) => s.style === 1)!.score!).toBeGreaterThan(styles.find((s) => s.style === 6)!.score!);
+    expect(styles.find((s) => s.style === 1)).toMatchObject({ clips: 1, readings: 2, views: 9300 });
+  });
+  it("no recommendation until every style has two clips at +72 h", () => {
+    const posted = [post("a1", 1, "tiktok", 80, now), post("a2", 1, "tiktok", 80, now), post("b1", 6, "tiktok", 80, now), post("b2", 6, "tiktok", 80, now), post("c1", 9, "tiktok", 80, now), post("c2", 9, "tiktok", 80, now)];
+    const metrics: Metrics = { "a1@tiktok": { "72h": r(9000, 900) }, "a2@tiktok": { "72h": r(7000, 500) }, "b1@tiktok": { "72h": r(1000, 20) }, "b2@tiktok": { "72h": r(1500, 30) }, "c1@tiktok": { "72h": r(400, 4) } };
+    const early = recommend([1, 6, 9], rank(posted, metrics, "72h"));
+    expect(early.ready).toBe(false);
+    expect(early.text).toMatch(/style 9: 1 of 2 clips have a \+72 h reading/);
+    expect(recommend([1, 6, 9, 14], rank(posted, metrics, "72h")).text).toMatch(/style 14: 0 of 2 clips posted/);
+    metrics["c2@tiktok"] = { "72h": r(300, 2) };
+    const done = recommend([1, 6, 9], rank(posted, metrics, "72h"));
+    expect(done.ready).toBe(true);
+    expect(done.text).toMatch(/^Double down on styles 1 and 6.*drop style 9/);
+    const md = boardMd(posted, metrics, [1, 6, 9], ["c9,instagram,24h"], now);
+    expect(md).toContain("**Double down on styles 1 and 6");
+    expect(md).toContain("| a1 | 1 | tiktok | 9000 | 900 |");
+    expect(md).toContain("Blotato's API gives no analytics");
+  });
+  it("the manual sheet and the ledger are read strictly", () => {
+    const m = parseManual("conceptId,platform,checkpoint,views,likes,comments,shares\n# typed from the apps\nselfie-roof,tiktok,24h,1200,80,12,30\nselfie-roof,instagram,2h,90\n", now);
+    expect(m["selfie-roof@tiktok"]["24h"]).toMatchObject({ views: 1200, likes: 80, comments: 12, shares: 30, source: "manual" });
+    expect(m["selfie-roof@instagram"]["2h"]).toMatchObject({ views: 90, likes: 0 });
+    expect(() => parseManual("selfie-roof,tiktok,48h,1", now)).toThrow(/is not conceptId,platform,checkpoint/);
+    expect(() => parseManual("selfie-roof,tiktok,24h,abc", now)).toThrow();
+    const posted = postedOf({ posts: [{ conceptId: "a", platform: "tiktok", status: "published", publicUrl: "u", scheduledTime: "2026-10-08T04:17:00Z", createdAt: "x" }, { conceptId: "a", platform: "instagram", status: "failed", createdAt: "x" }], youtube: [{ conceptId: "a", status: "uploaded", videoId: "v1", url: "y", uploadedAt: "2026-10-09T00:00:00Z" }, { conceptId: "b", status: "failed", videoId: null }] }, () => 6);
+    expect(posted.map((p) => `${p.conceptId}@${p.platform}`)).toEqual(["a@tiktok", "a@youtube"]);
+    expect(posted[0].style).toBe(6);
   });
 });

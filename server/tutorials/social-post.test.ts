@@ -174,6 +174,9 @@ describe("when", () => {
       starts.push(mine[0].at.getTime());
       for (let i = 1; i < mine.length; i++) {
         const gap = (mine[i].at.getTime() - mine[i - 1].at.getTime()) / 60000;
+        // LinkedIn takes three posts in 24 hours from an unverified profile (social-rate.ts, learned 2026-10-08):
+        // its fourth waits until the first is a day old.
+        if (t.platform === "linkedin" && i === 3) { expect(mine[3].at.getTime() - mine[0].at.getTime()).toBeGreaterThanOrEqual(24 * 3600000); continue; }
         expect(gap).toBeGreaterThanOrEqual(30); expect(gap).toBeLessThanOrEqual(45);
         expect(mine[i].body.scheduledTime).toBe(mine[i].at.toISOString());
         expect(mine[i].immediate).toBe(false);

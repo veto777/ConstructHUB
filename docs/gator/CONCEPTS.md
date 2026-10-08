@@ -488,7 +488,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 8. Zero percent chance of rain
 
-`zero-percent-rain` · job-site pain · trend / season dependent — Seasonal: spring and storm season; any week the weather is the news. · 8.5 s with the end tag
+`zero-percent-rain` · job-site pain · trend / season dependent — Seasonal: spring and storm season; any week the weather is the news. · 7.3 s with the end tag
 
 **Hook on screen:** “FORECAST: 0% CHANCE OF RAIN.”
 
@@ -497,12 +497,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He admires the smooth wet concrete and nods, satisfied. Above him the one small grey cloud grows and darkens.`
 - Caption beats: 0.0 s “FORECAST: 0% CHANCE OF RAIN.” — orange: 0%
 
-**Shot s2** — 4.4 s of a 5 s generation
+**Shot s2** — 3.2 s of a 5 s generation
 - Still prompt (after the character block): `Heavy cartoon rain pours straight down on him as he stands beside a wet concrete slab, soaked, holding a comically tiny umbrella over his hard hat. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
-- Motion prompt: `Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, looks at the viewer and talks, deadpan.`
+- Motion prompt: `Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, and stares at the viewer, deadpan.`
 - Caption beats: 0.1 s “THE 0%:” — orange: 0%:
 
-**Sound:** A calm bed; a thunder-thud, steady rain noise and the three-note “wah-wah”. (cues: air, beat, thud)
+**Sound:** A calm bed; a thunder-thud, steady rain noise and the three-note “wah-wah”. (cues: air, beat, thud, sad)
 
 **Instagram**
 > The app said zero. The sky said “hold my float.”
@@ -700,7 +700,7 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 
 ### 13. Measure twice, cut once
 
-`measure-twice` · job-site pain · evergreen · 8.9 s with the end tag
+`measure-twice` · job-site pain · evergreen · 7.7 s with the end tag
 
 **Hook on screen:** “MEASURE TWICE. CUT ONCE.”
 
@@ -709,12 +709,12 @@ and the "X vs Y" split are formats that travel now and will date; the scenes und
 - Motion prompt: `He measures the board carefully with the tape, marks it with the pencil, then measures it a second time and nods.`
 - Caption beats: 0.0 s “MEASURE TWICE. CUT ONCE.” — orange: TWICE.
 
-**Shot s2** — 4.4 s of a 5 s generation
+**Shot s2** — 3.2 s of a 5 s generation
 - Still prompt (after the character block): `He holds a cut wooden board up across an open doorway frame; the board is clearly a hand's width too short and does not reach the other side. He stands in three-quarter view, his long snout in profile, facing the viewer with a flat, unimpressed, closed mouth.`
-- Motion prompt: `He holds the too-short board against the opening, looks at the gap, then turns his head to the viewer and talks, deadpan.`
-- Caption beats: 
+- Motion prompt: `He holds the too-short board against the opening, looks at the gap, then slowly turns his head to the viewer, deadpan.`
+- Caption beats: 0.2 s “STILL SHORT.” — orange: SHORT.
 
-**Sound:** A patient bed with two pencil ticks; a thud and the “wah-wah”. (cues: beat, tick, thud, air)
+**Sound:** A patient bed with two pencil ticks; a thud and the “wah-wah”. (cues: beat, tick, thud, sad)
 
 **Instagram**
 > Measured twice. Cut once. Read the tape wrong both times.

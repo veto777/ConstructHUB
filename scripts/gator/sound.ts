@@ -25,7 +25,13 @@ export type Cue =
   /** Birds-at-dawn air: quiet filtered noise, so a still moment is not dead silent. */
   | { type: "air"; at: number; dur: number; gain?: number }
   /** A descending three-note "wah-wah" for a deflating moment. */
-  | { type: "sad"; at: number; gain?: number };
+  | { type: "sad"; at: number; gain?: number }
+  /** A tape being scrubbed backwards: the instant-replay rewind. */
+  | { type: "rewind"; at: number; dur: number; gain?: number }
+  /** An impact with weight: a crack on top of a deep thump (the replayed moment). */
+  | { type: "hit"; at: number; gain?: number }
+  /** A sub-bass drop: a low tone falling away under a slow-motion replay. */
+  | { type: "bass"; at: number; dur?: number; gain?: number };
 
 /** mulberry32: a small seeded generator — the noise is the same on every run. */
 const rng = (seed: number) => () => { let t = (seed += 0x6d2b79f5); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
@@ -65,6 +71,9 @@ export function synth(cues: readonly Cue[], seconds: number): Float32Array {
         break;
       }
       case "air": { let lp = 0; add(c.at, c.dur, (t) => { lp += 0.01 * ((rand() * 2 - 1) - lp); return g * 0.9 * Math.min(1, t / 0.3, (c.dur - t) / 0.3) * lp; }); break; }
+      case "rewind": { let ph = 0; add(c.at, c.dur, (t) => { const x = t / c.dur, f = 500 + 2600 * x + 300 * Math.sin(TAU * 13 * t); ph += (TAU * f) / RATE; return g * 0.22 * Math.min(1, t / 0.03, (c.dur - t) / 0.04) * (Math.sin(ph) * (0.6 + 0.4 * Math.sin(TAU * 31 * t)) + 0.5 * (rand() * 2 - 1) * (0.5 + 0.5 * Math.sin(TAU * 17 * t))); }); break; }
+      case "hit": { let lp = 0; add(c.at, 0.5, (t) => { lp += 0.25 * ((rand() * 2 - 1) - lp); return g * (0.9 * Math.sin(TAU * (55 + 120 * Math.exp(-t * 26)) * t) * Math.exp(-t * 9) + 0.7 * lp * Math.exp(-t * 45) + 0.25 * (rand() * 2 - 1) * Math.exp(-t * 160)); }); break; }
+      case "bass": { const d = c.dur ?? 1.0; let ph = 0; add(c.at, d, (t) => { const f = 34 + 62 * Math.exp(-t * 3.2); ph += (TAU * f) / RATE; return g * 0.8 * Math.min(1, t / 0.01, (d - t) / 0.15) * (Math.sin(ph) + 0.25 * Math.sin(2 * ph)); }); break; }
       case "sad": [392, 370, 330].forEach((f, k) => add(c.at + k * 0.34, k === 2 ? 0.8 : 0.32, (t) => { const d = k === 2 ? 0.8 : 0.32, w = f * (1 - (k === 2 ? 0.06 * t / d : 0)); return g * 0.22 * Math.min(1, t / 0.02, (d - t) / 0.06) * (Math.sin(TAU * w * t) + 0.4 * Math.sin(TAU * 2 * w * t) + 0.2 * Math.sin(TAU * 3 * w * t)) * (1 + 0.08 * Math.sin(TAU * 6 * t)); })); break;
     }
   });

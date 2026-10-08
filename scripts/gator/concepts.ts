@@ -66,6 +66,8 @@ export type Shot = {
   rawMotion?: boolean;
   /** The whole prompt for the STILL, used as written and drawn without the gator's reference (a shot of the supporting cast, the goat, a trap). */
   rawStill?: boolean;
+  /** "none": the speaker in this shot is not the gator (a member of the cast) — his voice note is not added and the take is not held to his voice. */
+  voice?: "none";
   /** How loud this shot's own generated sound sits in the mix, 0–1 (default 0.7; a scream is 0.9, room tone 0.3). */
   ownGain?: number;
   /**
@@ -75,6 +77,8 @@ export type Shot = {
   sync?: "peaks" | "max";
   /** Animate a still that was already drawn and approved for another shot: "<conceptId>/<shotId>". */
   stillFrom?: string;
+  /** Use the CLIP that was already made and approved for another shot ("<conceptId>/<shotId>") — the goat is generated once. */
+  videoFrom?: string;
   /** A speech bubble over the picture (x, y: the bubble's centre, in 1080×1920 pixels). */
   bubble?: { at: number; dur: number; text: string; x: number; y: number; tail: "left" | "right" };
   /** Sound cues, in seconds from the start of this shot as it plays. */
@@ -114,6 +118,10 @@ export type Concept = {
   endTagSec?: number;
   /** false: no logo bug over the picture. */
   logo?: boolean;
+  /** "cctv": a camera name and a running clock in the corner, drawn in the edit (never by the model) — part of the picture, also in the pure cut. */
+  overlay?: "cctv";
+  /** A one-shot's meme caption for its CAPTIONED variant only (seven words at most); the pure cut never carries it. */
+  meme?: string;
   /** The style of the styles experiment (docs/gator/STYLES.md), carried into the viral ledger. */
   style?: number;
   /** Not one of the thirty: a test piece (a voice sample). Left out of the document and the queue. */
@@ -223,9 +231,9 @@ const PRODUCTION: Record<string, Record<string, Partial<Shot>>> = {
       motion: "He holds the tape measure up, looks at it, then looks at the viewer and talks, deadpan, shaking his head slightly." },
   },
   "measure-twice": {
-    s2: { use: 4.4, beats: [], say: { text: "Measured twice. Cut once. Still short.", lead: 0.6 }, cues: [{ type: "thud", at: 0.05 }, { type: "air", at: 0, dur: 4.4 }],
+    s2: {
       scene: `He holds a cut wooden board up across an open doorway frame; the board is clearly a hand's width too short and does not reach the other side. ${DEADPAN34}`,
-      motion: "He holds the too-short board against the opening, looks at the gap, then turns his head to the viewer and talks, deadpan." },
+      motion: "He holds the too-short board against the opening, looks at the gap, then slowly turns his head to the viewer, deadpan." },
   },
   "permit-office-in-seconds": {
     s2: { use: 5.0, beats: [], say: { text: "Found the permit office in ten seconds. Parking? Different story.", lead: 0.3 }, cues: [{ type: "ding", at: 0.05, gain: 0.6 }, { type: "air", at: 0, dur: 5.0 }],
@@ -238,16 +246,18 @@ const PRODUCTION: Record<string, Record<string, Partial<Shot>>> = {
       motion: "He looks into the empty cup, then at the viewer, and talks, deadpan and tired. A light wind moves a scrap of paper across the ground behind him." },
   },
   "zero-percent-rain": {
-    s2: { use: 4.4, say: { text: "Zero percent, they said. Zero.", lead: 0.8 }, cues: [{ type: "thud", at: 0 }, { type: "air", at: 0, dur: 4.4, gain: 3 }],
+    s2: {
       scene: `Heavy cartoon rain pours straight down on him as he stands beside a wet concrete slab, soaked, holding a comically tiny umbrella over his hard hat. ${DEADPAN34}`,
-      motion: "Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, looks at the viewer and talks, deadpan." },
+      motion: "Rain pours straight down. He stands still under the tiny umbrella, water streaming off his hard hat, and stares at the viewer, deadpan." },
   },
   "chalk-line-snap": { s1: { sync: "max" } },
   "deck-boards-rhythm": { s1: { sync: "peaks" } },
 };
 /** The ten made in phase 2, in the order they were made. */
 export const PHASE2_IDS = ["permit-office-359", "where-is-my-tape", "measure-twice", "permit-office-in-seconds", "coffee-ran-out", "zero-percent-rain", "chalk-line-snap", "deck-boards-rhythm", "pov-first-on-site", "paid-same-day"];
-export const CONCEPTS: Concept[] = [...PILOTS, ...MORE_CONCEPTS].map((c) => (PRODUCTION[c.id] ? { ...c, shots: c.shots.map((s) => ({ ...s, ...(PRODUCTION[c.id][s.id] ?? {}) })) } : c));
+/** Which style of the experiment a cartoon concept belongs to (docs/gator/STYLES.md); the live ones carry theirs. */
+const STYLE_OF: Record<string, number> = { "two-day-job": 6, "shingle-rhythm": 6, "while-youre-here": 6, "measure-twice": 11, "zero-percent-rain": 11 };
+export const CONCEPTS: Concept[] = [...PILOTS, ...MORE_CONCEPTS].map((c) => ({ ...c, ...(STYLE_OF[c.id] ? { style: STYLE_OF[c.id] } : {}), ...(PRODUCTION[c.id] ? { shots: c.shots.map((s) => ({ ...s, ...(PRODUCTION[c.id][s.id] ?? {}) })) } : {}) }));
 
 /** Voice samples (2026-10-08): the same line, the same still, two ways of making him talk. */
 const PROFILE = "He keeps the same three-quarter profile as in the image the whole time — he does not turn to face the viewer; only his eyes-line, jaw and shoulders move. Deadpan, unimpressed, never smiling or laughing. He lowers the coffee cup and talks; when he has finished he shakes his head once, slowly.";
@@ -296,7 +306,7 @@ export const VOICE_DESCRIPTION = "in the voice of a man of about fifty: a gravel
 export const ON_MODEL_TALKING = "His sunglasses are opaque and dark with an orange tint at all times: his eyes are never visible, not even for a frame. His hard hat stays on. The same vest and hoodie, the same bold cartoon drawing style throughout. He keeps the pose and the three-quarter angle of the image. His long jaw moves only while he is speaking and is shut before and after. No other character appears. No text appears.";
 export const LIVE_VOICE_NOTE = `His voice is ${VOICE_DESCRIPTION.replace(/^in /, "")}.`;
 export function motionPrompt(s: Shot): string {
-  if (s.rawMotion) return s.say ? `${s.motion} ${LIVE_VOICE_NOTE}` : s.motion;
+  if (s.rawMotion) return s.say && s.voice !== "none" ? `${s.motion} ${LIVE_VOICE_NOTE}` : s.motion;
   const who = "The cartoon alligator in the hard hat and sunglasses.";
   if (s.video === "talk") return `${who} ${s.motion} He starts speaking almost at once and says, ${VOICE_DESCRIPTION}: "${s.say!.text}" ${ON_MODEL_TALKING}`;
   return `${who} ${s.motion} ${s.say ? (s.video === "kling-voice" ? `He says, in a gravelly, warm, dry New Jersey accent: "${s.say.text}" ` : "") + TALKING : SILENT} ${MOTION_STYLE}`;
@@ -320,15 +330,17 @@ export function postsOf(c: Concept): Record<ViralPlatform, ViralPost | null> {
 }
 
 /** Words a caption, a hook or a prompt may not carry (brands, people, politics, crude). Checked by the tests. */
-export const BANNED = /\b(ford|chevy|chevrolet|ram|toyota|dewalt|milwaukee|makita|home depot|lowe'?s|carhartt|tiktok sound|trump|biden|democrat|republican|election|sexy|damn|hell|stupid|idiot|dumb|karen|guarantee[ds]?|best)\b/i;
+export const BANNED = /\b(ford|chevy|chevrolet|ram|toyota|dewalt|milwaukee|makita|home depot|lowe'?s|carhartt|tiktok sound|trump|biden|democrat|republican|election|sexy|damn|hell|stupid|idiot|dumb|karen|guarantee[ds]?|the best|best in)\b/i;
 /** What is wrong with a concept — an empty list when it keeps the house rules that can be checked by machine. */
 export function lintConcept(c: Concept): string[] {
   const bad: string[] = [], words = (s: string) => s.trim().split(/\s+/).length;
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.id)) bad.push("the id is not kebab-case");
   // A one-shot's hook is its caption line (nothing is burned in), so it may be a sentence.
-  if (words(c.hook) > (c.cut === "oneshot" ? 14 : 8)) bad.push(`the hook is ${words(c.hook)} words (${c.cut === "oneshot" ? 14 : 8} at most)`);
+  if (words(c.hook) > (c.cut === "oneshot" || c.subtitles ? 14 : 8)) bad.push(`the hook is ${words(c.hook)} words (${c.cut === "oneshot" || c.subtitles ? 14 : 8} at most)`);
   if (!c.shots.length || c.shots.length > 3) bad.push("one to three shots");
+  if (c.meme && words(c.meme) > 7) bad.push("the meme caption is over seven words");
   if (c.cut === "oneshot") { if (c.shots.length !== 1 || c.shots[0].beats.length) bad.push("a one-shot clip is one shot with nothing burned in"); }
+  else if (c.subtitles && !c.shots[0]?.beats.length) { /* the line is the joke: subtitles only, no hook burned in */ }
   else if (c.shots[0]?.beats[0]?.at !== 0 || c.shots[0].beats[0].text !== c.hook) bad.push("the first beat of the first shot must be the hook, at 0 s");
   const sec = c.shots.reduce((n, s) => n + s.use, 0);
   if (sec < 4 || sec > 20) bad.push(`${sec.toFixed(1)} s of shots (5–20 s)`);
@@ -336,11 +348,12 @@ export function lintConcept(c: Concept): string[] {
   for (const s of c.shots) {
     if ((s.shiftDown ?? 0) < 0 || (s.shiftDown ?? 0) > 300) bad.push(`${s.id}: shiftDown is 0–300`);
     if (s.seconds !== undefined && (s.video !== "talk" || s.seconds < 3 || s.seconds > 15 || !Number.isInteger(s.seconds))) bad.push(`${s.id}: \`seconds\` is 3–15, for a shot with the model's own sound`);
+    if (s.rawStill && /alligator/i.test(s.scene) && !/hard hat/i.test(s.scene)) bad.push(`${s.id}: a still with the gator in it names his hard hat`);
     if (s.use <= 0 || (s.from ?? 0) + s.use * (s.speed ?? 1) > (s.seconds ?? 5) + 1e-9) bad.push(`${s.id}: uses more than the ${s.seconds ?? 5} s that are generated`);
     if (s.say && (s.say.text.length > 260 || (s.video !== "talk" && (s.say.lead ?? 0.5) + 1 > s.use))) bad.push(`${s.id}: the spoken line is too long for the shot`);
-    if ((s.video === "wan-talk" || s.video === "kling-voice" || (s.video === "talk" && !s.rawMotion)) && !s.say) bad.push(`${s.id}: a talking model needs a line`);
+    if ((s.video === "wan-talk" || s.video === "kling-voice" || (s.video === "talk" && !s.rawMotion && !s.videoFrom)) && !s.say && !s.videoFrom) bad.push(`${s.id}: a talking model needs a line`);
     for (const b of s.beats) { if (b.at < 0 || b.at >= s.use) bad.push(`${s.id}: a beat starts outside the shot`); if (b.accent && !b.text.toLowerCase().includes(b.accent.toLowerCase())) bad.push(`${s.id}: the accent “${b.accent}” is not in “${b.text}”`); }
-    if (!s.stillFrom && !s.scene.trim()) bad.push(`${s.id}: no scene`);
+    if (!s.stillFrom && !s.videoFrom && !s.scene.trim()) bad.push(`${s.id}: no scene`);
     if (/\b(roof|ladder|scaffold)/i.test(s.scene) && /\b(stands?|kneels?|sits?|climbs?|walks?) on (a |the )?(pitched |finished |residential )*(roof|ladder|scaffold)/i.test(s.scene) && !/harness|three points of contact|guard ?rail/i.test(s.scene)) bad.push(`${s.id}: he is at height without a harness, a guard rail or three points of contact in the prompt`);
     if (/sunglasses (off|removed)|without (his )?(hard hat|sunglasses)|takes off/i.test(`${s.scene} ${s.motion}`)) bad.push(`${s.id}: the hard hat and sunglasses stay on`);
   }

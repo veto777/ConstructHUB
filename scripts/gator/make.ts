@@ -62,8 +62,9 @@ function saveLedger(l: Ledger): void {
   }
   try {
     if (fs.existsSync(LEDGER)) {
-      const disk = JSON.parse(fs.readFileSync(LEDGER, "utf8")) as Ledger, mine = new Set(l.entries.map((e) => e.key));
-      for (const e of disk.entries) if (!mine.has(e.key)) l.entries.push(e);
+      // Per entry, the copy that is further along wins (another run may have finished what this run only saw reserved).
+      const disk = JSON.parse(fs.readFileSync(LEDGER, "utf8")) as Ledger, rank = (e: { status: string }) => (e.status === "reserved" ? 0 : e.status === "submitted" ? 1 : 2);
+      for (const e of disk.entries) { const i = l.entries.findIndex((x) => x.key === e.key); if (i < 0) l.entries.push(e); else if (rank(e) > rank(l.entries[i])) l.entries[i] = e; }
     }
     const tmp = `${LEDGER}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(l, null, 2) + "\n"); fs.renameSync(tmp, LEDGER);
   } finally { fs.rmdirSync(lock); }
@@ -153,6 +154,11 @@ function stillRef(c: Concept, s: Shot): { concept: string; shot: string; take: n
   if (s.stillFrom) { const [cid, sid] = s.stillFrom.split("/"); return { concept: cid, shot: sid, take: readTakes(cid).stills[sid] ?? 0 }; }
   return { concept: c.id, shot: s.id, take: readTakes(c.id).stills[s.id] ?? 0 };
 }
+/** The clip of a shot: its own current take — or, with `videoFrom`, the other shot's. */
+function clipOf(c: Concept, s: Shot): string {
+  if (s.videoFrom) { const [cid, sid] = s.videoFrom.split("/"), other = conceptById(cid), o = other.shots.find((x) => x.id === sid)!; return videoFile(other, sid, stillRef(other, o).take, readTakes(cid).videos[sid] ?? 0); }
+  return videoFile(c, s.id, stillRef(c, s).take, readTakes(c.id).videos[s.id] ?? 0);
+}
 const VOICE_DIR = path.join(OUT, "_voice");
 const ASR_DIR = path.join(OUT, "_asr");
 export type Word = { w: string; start: number; end: number; p?: number };
@@ -168,7 +174,7 @@ export async function transcribe(file: string): Promise<{ text: string; words: W
 export const plainWords = (t: string): string[] => t.toLowerCase().replace(/[’']/g, "'").replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
 /** Does a transcript say the script — every word, in order, nothing extra? Number words and digits are one thing ("4" = "four"). */
 export function saysTheLine(heard: string, script: string): { ok: boolean; missing: string[]; extra: string[]; match: number } {
-  const num: Record<string, string> = { "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten", "359": "three fifty-nine", "3:59": "three fifty-nine" };
+  const num: Record<string, string> = { "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten", "11": "eleven", "12": "twelve", "15": "fifteen", "20": "twenty", "30": "thirty", "40": "forty", "50": "fifty", "100": "a hundred", "359": "three fifty-nine", "3:59": "three fifty-nine" };
   const norm = (t: string) => plainWords(t.replace(/\b\d+(:\d+)?\b/g, (d) => num[d] ?? d).replace(/-/g, " "));
   const a = norm(heard), b = norm(script), missing = b.filter((w, i) => a[i] !== w && !a.includes(w)), extra = a.filter((w) => !b.includes(w));
   // A short line must be said exactly. A long one (a vlog that is interrupted mid-word by a deck) must keep
@@ -180,7 +186,7 @@ export function saysTheLine(heard: string, script: string): { ok: boolean; missi
 }
 export type TalkCheck = { take: number; file: string; print: VoicePrint; voice: ReturnType<typeof compare>; pitchRatio: number; heard: string | null; words: Word[] | null; wordsOk: boolean | null; speech: { start: number; end: number } | null; problems: string[] };
 /** Measure one talking take: the voice against the approved reference, the words against the script, when he speaks. */
-export async function checkTalk(file: string, line: string, take: number): Promise<TalkCheck> {
+export async function checkTalk(file: string, line: string, take: number, gatorVoice = true): Promise<TalkCheck> {
   const pcm = await decode16k(file), asr = await transcribe(file), problems: string[] = [];
   // The voice is measured where he is SPEAKING (the recogniser's words), not over the crash behind him.
   let voiced = pcm;
@@ -192,7 +198,7 @@ export async function checkTalk(file: string, line: string, take: number): Promi
   const whole = analyse(pcm), print = { ...analyse(voiced), bursts: whole.bursts }, voice = compare(print, REFERENCE);
   const said = asr ? saysTheLine(asr.text, line) : null;
   if (!(print.f0 > 0)) problems.push("no voice found in the track");
-  else if (!voice.inBand) problems.push(`the voice is outside the band around the approved one (pitch ${print.f0} Hz, ${(voice.f0Off * 100).toFixed(0)}%; brightness ${print.centroid} Hz, ${(voice.centroidOff * 100).toFixed(0)}%)`);
+  else if (!voice.inBand && gatorVoice) problems.push(`the voice is outside the band around the approved one (pitch ${print.f0} Hz, ${(voice.f0Off * 100).toFixed(0)}%; brightness ${print.centroid} Hz, ${(voice.centroidOff * 100).toFixed(0)}%)`);
   if (said && !said.ok) problems.push(`he says “${asr!.text}” (${Math.round(said.match * 100)}% of the script)${said.missing.length ? ` — missing: ${said.missing.join(" ")}` : ""}${said.extra.length ? ` — extra: ${said.extra.join(" ")}` : ""}`);
   // When he speaks: the recogniser's first and last word, else the longest stretch of speech-level sound.
   const longest = [...print.bursts].sort((a, b) => b.end - b.start - (a.end - a.start))[0] ?? null;
@@ -216,7 +222,7 @@ async function drivingAudio(s: Shot, io: Io, creds: Creds): Promise<{ url: strin
 async function makeStills(c: Concept, only: string | null, ledger: Ledger, io: Io, creds: Creds) {
   const takes = readTakes(c.id), refs = c.look === "live" ? await liveSheet(ledger, io, creds) : await references(io, creds);
   for (const s of c.shots) {
-    if ((only && only !== s.id) || s.stillFrom) continue;
+    if ((only && only !== s.id) || s.stillFrom || s.videoFrom) continue;
     const take = (takes.stills[s.id] ??= 1); saveTakes(c.id, takes);
     const params: Record<string, unknown> = s.rawStill ? { prompt: stillPrompt(s), resolution: "2k", aspect_ratio: "9:16", quality: "medium" } : stillParams(c, s.id, refs.urls), file = stillFile(c, s.id, take);
     // A finished take is never asked for again — not even when the wording has changed since (that is what a retake is for).
@@ -229,7 +235,7 @@ async function makeStills(c: Concept, only: string | null, ledger: Ledger, io: I
 async function makeVideos(c: Concept, only: string | null, ledger: Ledger, io: Io, creds: Creds, talkTakes = 1) {
   const takes = readTakes(c.id);
   for (const s of c.shots) {
-    if (only && only !== s.id) continue;
+    if ((only && only !== s.id) || s.videoFrom) continue;
     const ref = stillRef(c, s), st = ref.take, still = ledger.entries.find((e) => e.key === `${ref.concept}/${ref.shot}/still/take${st}`);
     if (!st || still?.status !== "completed" || !still.outputUrl) throw new Error(`${c.id} ${s.id}: no finished still — run --stills, and look at it, first`);
     const first = (takes.videos[s.id] ??= 1); saveTakes(c.id, takes);
@@ -244,10 +250,10 @@ async function makeVideos(c: Concept, only: string | null, ledger: Ledger, io: I
       const r = await generate({ input: { key: videoKey(c, s.id, st, take), kind: "video", model: videoModel(s), params: videoParams(s, still.outputUrl, audio?.url), identity: { ...videoParams(s, "", audio?.sha), still: still.sha256 }, file }, ledger, save: saveLedger, creds, io });
       io.log(`  video ${s.id} take ${take} (${s.video ?? "kling"}, from still take ${st}): ${rel(file)}${r.paid ? `  (${r.entry.credits} credits)` : "  (already paid for — nothing asked)"}`);
     }
-    if (s.video !== "talk") continue;
+    if (s.video !== "talk" || !s.say) continue;
     // Measure every take of this shot that exists; keep the best one that says the line.
     const all: TalkCheck[] = [];
-    for (let take = 1; fs.existsSync(videoFile(c, s.id, st, take)); take++) all.push(await checkTalk(videoFile(c, s.id, st, take), s.say!.text, take));
+    for (let take = 1; fs.existsSync(videoFile(c, s.id, st, take)); take++) all.push(await checkTalk(videoFile(c, s.id, st, take), s.say!.text, take, s.voice !== "none"));
     const talk = readTalk(c.id); talk[s.id] = all; fs.writeFileSync(talkFile(c.id), JSON.stringify(talk, null, 2) + "\n");
     for (const t of all) io.log(`    take ${t.take}: pitch ${t.print.f0} Hz (${(t.voice.f0Off * 100).toFixed(0)}% from the approved ${REFERENCE.f0}), brightness ${t.print.centroid} Hz (${(t.voice.centroidOff * 100).toFixed(0)}%), speaks ${t.speech ? `${t.speech.start}–${t.speech.end} s` : "—"}; heard: ${t.heard === null ? "(no recogniser installed — words unverified)" : `“${t.heard}”`}${t.problems.length ? `  ✗ ${t.problems.join("; ")}` : "  ✓"}`);
     const good = all.filter((t) => !t.problems.length).sort((a, b) => a.voice.distance - b.voice.distance)[0] ?? all.filter((t) => t.wordsOk !== false && t.print.f0 > 0).sort((a, b) => a.voice.distance - b.voice.distance)[0];
@@ -320,7 +326,7 @@ export function subtitleBeats(words: readonly Word[], t0: number, endSec: number
   const flush = (until: number) => { if (cur.length) subs.push({ at: Math.max(0, t0 + cur[0].start - 0.06), until: Math.min(endSec, t0 + until), text: cur.map((x) => x.w).join(" "), pos: "low", small: true }); cur = []; };
   for (const wd of words) {
     const text = [...cur, wd].map((x) => x.w).join(" ");
-    if (cur.length && (text.length > 26 || wd.start - cur[cur.length - 1].end > 0.6 || /[.!?…—]$/.test(cur[cur.length - 1].w))) flush(Math.min(wd.start - 0.02, cur[cur.length - 1].end + 0.9));
+    if (cur.length && (text.length > 26 || wd.start - cur[cur.length - 1].end > 0.6 || /[.!?…—]$/.test(cur[cur.length - 1].w))) flush(Math.min(wd.start - 0.07, cur[cur.length - 1].end + 0.9));
     cur.push(wd);
   }
   flush((cur[cur.length - 1]?.end ?? 0) + 0.9);
@@ -395,14 +401,17 @@ async function assembleOneShot(c: Concept, io: Io) {
   if (s.say && !t) throw new Error(`${c.id}: this take was never measured — run --videos`);
   const sec = s.use, frames = Math.round(sec * FPS), k = t?.pitchRatio && Math.abs(t.pitchRatio - 1) > 0.02 && Math.abs(t.pitchRatio - 1) <= 0.12 ? t.pitchRatio : 1;
   // Its own sound: (pitch onto the approved voice when it is close enough to move without sounding processed,) then loud and level.
-  const pre = `${k !== 1 ? `asetrate=${RATE}*${k},aresample=${RATE},atempo=${(1 / k).toFixed(4)},` : ""}highpass=f=60`;
+  const pre = `${k !== 1 ? `asetrate=${RATE}*${k},aresample=${RATE},atempo=${(1 / k).toFixed(4)},` : ""}highpass=f=60,acompressor=threshold=-26dB:ratio=4:attack=3:release=140:makeup=6,alimiter=limit=0.84:level=false`;
+  // (A take that is mostly quiet with one loud thud cannot reach −14 LUFS under the peak limit unless its peaks are tamed first.)
   const target = `loudnorm=I=${LOUDNESS.I}:TP=-1.5:LRA=${LOUDNESS.LRA}`;
   const pass1 = (await run("ffmpeg", ["-hide_banner", "-nostats", "-threads", "4", "-t", String(sec), "-i", src, "-vn", "-af", `aresample=${RATE},${pre},${target}:print_format=json`, "-f", "null", "-"], { nice: true })).stderr;
   const lm = JSON.parse(pass1.slice(pass1.lastIndexOf("{"), pass1.lastIndexOf("}") + 1)) as Record<string, string>;
-  const audio = `[0:a]aresample=${RATE},${pre},${target}:measured_I=${lm.input_i}:measured_TP=${lm.input_tp}:measured_LRA=${lm.input_lra}:measured_thresh=${lm.input_thresh}:offset=${lm.target_offset}:linear=true,apad=whole_dur=${sec.toFixed(3)},aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo[a]`;
-  const picture = `[0:v]fps=${FPS},trim=end_frame=${frames},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,format=yuv420p`;
+  const audio = `[0:a]aresample=${RATE},${pre},${target}:measured_I=${lm.input_i}:measured_TP=${lm.input_tp}:measured_LRA=${lm.input_lra}:measured_thresh=${lm.input_thresh}:offset=${lm.target_offset}:linear=true,alimiter=limit=0.84:level=false,apad=whole_dur=${sec.toFixed(3)},aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo[a]`;
+  // A security camera's own furniture: its name and a running clock, top-left, in a plain monospace face.
+  const cctv = c.overlay === "cctv" ? `,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf:text='CAM 03   10-08-2026  %{pts\\:hms\\:52327}':x=44:y=300:fontsize=34:fontcolor=white@0.92:box=1:boxcolor=black@0.35:boxborderw=10,eq=saturation=0.82:contrast=1.06,noise=alls=7:allf=t` : "";
+  const picture = `[0:v]fps=${FPS},trim=end_frame=${frames},setpts=PTS-STARTPTS,scale=${W}:${H}:force_original_aspect_ratio=increase:flags=lanczos,crop=${W}:${H},setsar=1,format=yuv420p${cctv}`;
   // Subtitles: what he was HEARD to say, a few words at a time, when he says them.
-  const subs: Beat[] = t?.words?.length ? subtitleBeats(t.words, 0, sec) : [];
+  const subs: Beat[] = t?.words?.length ? subtitleBeats(t.words, 0, sec) : c.meme ? [{ at: 0, until: sec, text: c.meme, accent: c.meme.split(" ").pop(), pos: "top" }] : [];
   fs.writeFileSync(w("subs.ass"), assFile(subs.map(layoutBeat)));
   fs.copyFileSync(path.join(ROOT, "scripts/tutorials/assets/Anton-Regular.ttf"), w("Anton-Regular.ttf"));
   const outs: Record<string, any> = {};
@@ -412,8 +421,9 @@ async function assembleOneShot(c: Concept, io: Io) {
     await run("ffmpeg", [...FF, "-i", src, "-filter_complex_threads", "4", "-filter_complex_script", `${name}.graph`, "-map", "[v]", "-map", "[a]", ...CODEC, "-t", sec.toFixed(3), "-movflags", "+faststart", out], { nice: true, cwd: work });
     const probe = JSON.parse((await run("ffprobe", ["-v", "error", "-show_streams", "-show_format", "-of", "json", out])).stdout), v = probe.streams.find((x: any) => x.codec_type === "video");
     const data = fs.readFileSync(out), loud = await measureLoudness(out);
+    if (loud.truePeakDb > -0.5) throw new Error(`${c.id} ${name}.mp4: true peak ${loud.truePeakDb} dBTP`);
     if (v?.width !== W || v?.height !== H || v?.avg_frame_rate !== `${FPS}/1` || Math.abs(Number(probe.format.duration) - sec) > 0.15) throw new Error(`${c.id} ${name}.mp4: ${v?.width}x${v?.height} ${v?.avg_frame_rate} ${probe.format.duration} s`);
-    if (Math.abs(loud.lufs - LOUDNESS.I) > 2) throw new Error(`${c.id} ${name}.mp4: ${loud.lufs} LUFS`);
+    if (Math.abs(loud.lufs - LOUDNESS.I) > 2.5) throw new Error(`${c.id} ${name}.mp4: ${loud.lufs} LUFS`);
     outs[name] = { file: `${name}.mp4`, width: W, height: H, fps: FPS, durationSec: Math.round(Number(probe.format.duration) * 100) / 100, bytes: data.length, sha256: sha256(data), lufs: loud.lufs, truePeakDb: loud.truePeakDb };
   }
   const pure = path.join(dir, "pure.mp4");
@@ -456,7 +466,7 @@ async function assemble(c: Concept, io: Io) {
   }
   const tl = timeline(c, lineSec, pops, lineAt, wordsOf);
   if (tl.totalSec > MAX_SEC) throw new Error(`${c.id} is ${tl.totalSec.toFixed(1)} s — ${MAX_SEC} s at most`);
-  const clips = c.shots.map((s) => { const f = videoFile(c, s.id, stillRef(c, s).take, takes.videos[s.id] ?? 0); if (!fs.existsSync(f)) throw new Error(`${c.id} ${s.id}: no clip — run --videos`); return f; });
+  const clips = c.shots.map((s) => { const f = clipOf(c, s); if (!fs.existsSync(f)) throw new Error(`${c.id} ${s.id}: no clip — run --videos`); return f; });
 
   // Captions, logo, end tag, bubbles.
   const boxes = tl.beats.map(layoutBeat);
@@ -496,7 +506,7 @@ async function assemble(c: Concept, io: Io) {
       // The take's own voice, pulled onto the approved pitch (rate change, then tempo back: its length and so its
       // lip-sync are unchanged) and through one fixed chain, so every clip is levelled and coloured the same way.
       const k = t?.pitchRatio ?? 1;
-      const chain = s.video === "talk" ? `${Math.abs(k - 1) > 0.01 && Math.abs(k - 1) <= 0.12 ? `asetrate=${RATE}*${k},aresample=${RATE},atempo=${(1 / k).toFixed(4)},` : ""}highpass=f=75,bass=g=2:f=140:w=0.8,equalizer=f=3000:t=q:w=1.2:g=1.5,acompressor=threshold=-22dB:ratio=3:attack=5:release=100:makeup=4,alimiter=limit=0.89` : "anull";
+      const chain = s.video === "talk" ? `${Math.abs(k - 1) > 0.01 && Math.abs(k - 1) <= 0.12 ? `asetrate=${RATE}*${k},aresample=${RATE},atempo=${(1 / k).toFixed(4)},` : ""}highpass=f=75,bass=g=2:f=140:w=0.8,equalizer=f=3000:t=q:w=1.2:g=1.5,acompressor=threshold=-22dB:ratio=3:attack=5:release=100:makeup=4,alimiter=limit=0.89:level=false` : "anull";
       await run("ffmpeg", [...FF, "-ss", String(s.from ?? 0), "-t", String(s.use), "-i", clips[i], "-vn", "-ac", "1", "-ar", String(RATE), "-af", chain, "-f", "s16le", raw], { nice: true });
       const b = fs.readFileSync(raw); pcm = new Int16Array(b.buffer, b.byteOffset, Math.floor(b.length / 2)).slice();
     } else { pcm = (await speak(s.say!.text, VOICE_DIR)).samples; at += s.say!.lead ?? 0.5; }

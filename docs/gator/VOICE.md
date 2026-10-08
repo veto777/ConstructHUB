@@ -1,72 +1,103 @@
 # The gator's voice
 
-One recipe, so every clip is the same guy. The code is `scripts/gator/voice.ts` (`VOICE`); change the
-recipe there, bump `version`, and say so here.
-
 ## Who he is
 
-An adult man: gravelly, warm, dry, quick. A foreman who has seen it all and still likes the work. New York /
-New Jersey in his rhythm and his wording — "he says", "my friend", "fuhgeddaboudit" — never a cartoon of an
-ethnicity, never an impression of a real person, an actor or an existing cartoon character. He is never
-mean, never crude, and the joke is never on the customer.
+An adult man of about fifty: a gravelly baritone, dry, unhurried, deadpan. A foreman who has seen it all and
+still likes the work. New York / North Jersey working-class in his sound and his wording — "he says", "lemme
+tell you somethin'", "fuhgeddaboudit" — never a cartoon of an ethnicity, never an impression of a real person,
+an actor or an existing character. Never mean, never crude; the joke is never on the customer.
 
-**He has no name yet.** The brand names the headset gator "Gabe" (the Hub assistant,
-`client/src/components/mascot.tsx`); the standing hard-hat gator is only "the brand mascot" there. Three to
-choose from — none is used anywhere until the owner picks: **Mack**, **Richie**, **Hank**.
+**He has no name yet.** The brand names the headset gator "Gabe" (`client/src/components/mascot.tsx`); the
+standing hard-hat gator is only "the brand mascot" there. Three to choose from — none is used until the owner
+picks: **Mack**, **Richie**, **Hank**.
 
-## The recipe (locked 2026-10-08, version 1)
+## The house method (owner's decision, 2026-10-08)
+
+The owner listened to four samples of one line and said of the second: *"This is the only decent one."* That one
+was **the video model's own generated voice** — so that is how he talks. Our own text-to-speech (below) is
+retired for speech.
 
 | | |
 | --- | --- |
-| Engine | our own voice engine — the Call Assistant's Kokoro-82M service (`POST /tts/preview {personaId, text}`, 24 kHz mono), the one `scripts/tutorials/narrate.ts` uses. Self-hosted: no cost per line, no new service. |
-| Voice | persona `marcus` = Kokoro voice `am_adam` (American male). Not `gabe` / `am_michael`: that is Gabe's voice. |
-| Pitch | played at 0.90 of its rate (about 1.8 semitones lower) |
-| Pace | then `atempo=1.14` — a touch quicker than the engine reads, pitch unchanged |
-| Tone | `highpass=f=70, bass=g=5:f=150:w=0.8, equalizer=f=2800:t=q:w=1.2:g=2.5, treble=g=-3:f=7000, acompressor=threshold=-20dB:ratio=3.5:attack=4:release=90:makeup=5, asoftclip=type=tanh:threshold=0.6` — chest, a little grit, an even level |
-| Output | 48 kHz mono, the engine's silence trimmed; cached by the hash of the recipe and the text in `analysis/gator-shorts/_voice/` |
-| In the mix | the line peaks at 0.7 of full scale, the sound bed is held to 0.16 while a clip has speech; the clip is then brought to −14 LUFS. `make.ts` refuses a clip whose line is less than 10 dB over the bed, or whose mix clips. |
+| Model | Kling 3.0 Standard image-to-video, `sound: "on"` (`kling-video/v3.0/std/image-to-video`), 2.016 credits ($0.126) per second; 3–15 s |
+| The voice, in every prompt, verbatim | `VOICE_DESCRIPTION` in `scripts/gator/concepts.ts`: *"in the voice of a man of about fifty: a gravelly baritone, dry and unhurried, with a New York / North Jersey working-class accent, completely deadpan — no laughing, no shouting. No music and no other voices: only his voice and quiet room tone"* |
+| The words | written in the prompt in quotes, exactly; numbers as words |
+| On-model | the model has no negative prompt: the prompt says opaque dark sunglasses, eyes never visible, hard hat on, same vest, pose held, jaw moves only while speaking, no other character, no text |
+| Voice reference / voice id | **none available**: no entry in the catalogue takes a voice reference. Kling 3.0's `elements` are account-registered Kling element ids (not creatable through this API); Wan 2.6/2.7 and Grok Imagine take an `audio_url`, but as a *driving* track, not a voice to imitate (tried: the jaw hangs open). No `seed` on Kling 3.0. |
+| Every take is measured | `scripts/gator/voiceprint.ts` (pitch and brightness over the words he speaks) and `scripts/gator/asr.py` (local speech-to-text: faster-whisper base.en on the CPU) — `make.ts <id> --videos --takes 2` makes two takes, prints both, keeps the nearer one that says the line |
+| Pulled together afterwards | pitch moved onto the reference by rate (never more than 12%; beyond that it sounds processed and is left alone), then one fixed chain: `highpass=f=75, bass=g=2:f=140, equalizer=f=3000:g=1.5, acompressor=threshold=-22dB:ratio=3, alimiter` and −14 LUFS |
+| Captions | timed from the words the recogniser heard, never from the script's guess |
 
-The engine answers live customer calls: one request at a time across every producer (the tutorials'
-`tts.lock`), a pause after each, and a line that was said before is never asked for again.
+### The reference: the voice the owner approved
 
-**What this voice is not.** The engine has six American voices and no regional ones, so there is **no real
-New York / New Jersey accent** in it — only a lower, rougher, quicker American man. The accent lives in the
-writing. Nobody on the production box can listen: the level, the length and the line-over-bed margin are
-measured; whether "Fuhgeddaboudit" comes out right is not. **A person must listen to every talking clip
-before it is approved** (the review sheet asks).
+`talking-sample-2` (Kling 3.0 Standard, 5 s): median pitch **127 Hz** (middle half 110–178 Hz), spectral
+centroid **1548 Hz**, speaking from 1.44 s. Recorded in `voiceprint.ts` as `REFERENCE`. A take is "in band" when
+its pitch is within 15% and its brightness within 30%.
+
+### How consistent it really is (measured, 2026-10-08 — nobody on this box can listen)
+
+| Clip | Kind of delivery | Median pitch | vs 127 Hz | Brightness | Words heard |
+| --- | --- | --- | --- | --- | --- |
+| talking-sample-2 (the reference) | calm, to camera | 127 Hz | — | 1548 Hz | exact |
+| talking-final-1, take 1 | calm, to camera | 134.5 Hz | +6% | 1429 Hz | exact |
+| talking-final-1, take 2 | calm, to camera | 179.8 Hz | +42% | 1704 Hz | exact |
+| moment-video — the gator's button | calm, after a sip | 130.1 Hz | +2% | 1452 Hz | exact |
+| moment-ladders — the gator's button | calm, after a sip | 155.3 Hz | +22% | 1617 Hz | exact |
+| selfie-leak, takes 1 / 2 | fast vlog | 190.5 / 175.8 Hz | +50% / +38% | 1698 / 1617 Hz | exact |
+| selfie-roof, takes 1 / 2 | fast vlog, then a fall | 238.8 / 202.5 Hz | +88% / +59% | 1815 / 1753 Hz | exact |
+| selfie-deck, takes 1 / 2 / 3 | fast vlog, then a fall | 275.9 / 242.4 / 242.4 Hz | +117% / +91% / +91% | 1720–1760 Hz | exact |
+
+Plainly:
+
+- **The words are reliable.** Every take said its line, in order (one "home owner" for "homeowner", "20" for
+  "twenty"). Dialogue in quotes in the prompt works.
+- **The voice is not one voice.** Calm, short lines to camera land within about a fifth of the reference —
+  three of five takes inside the band. Fast, excited selfie vlogs measure 40–120% higher: either a different,
+  lighter voice or shouting (the meter cannot tell which; some of that may be the meter itself being fooled by
+  a rough voice). Two takes of the same prompt differ by up to 36%.
+- **What helps:** the verbatim description; a short calm line; "deadpan, unhurried" in the action; two takes
+  and keeping the nearer. **What does not exist:** a seed, a voice id, a voice reference.
+- **The owner's ear is the final check.** These numbers say "probably the same sort of voice" or "probably
+  not"; they do not say "sounds like the same guy".
+
+### On-model while talking
+
+- **Live-action gator:** stays on-model (hat, shades, vest) through speech, camera spin and falls in every take
+  looked at; one take lost the vest for half a second mid-slide; in one the blast knocked the hard hat off.
+- **Cartoon mascot:** Kling 3.0 makes his sunglasses see-through and gives him eyes within a second of speaking
+  — in sample 2 and again in `talking-final-1` with the on-model wording in the prompt. That is off-model for
+  the mascot. Until a model holds the glasses, **the cartoon mascot does not talk on camera**; he reacts, and
+  the line belongs to the live gator or sits in a caption.
 
 ## Writing for him
 
-- One or two short lines a clip, 60 characters at most each, said in under four seconds. Dry. Fragments.
-  "Twenty minutes. On my belt. The whole time."
-- Rhythm over spelling. "He says." "My friend." "Different story." Use at most one dialect word a clip, spelled
-  the way it should sound (`Fuhgeddaboudit.`) — and listen to it.
-- Numbers as words ("three fifty-nine", "seven fifteen"): the engine reads digits its own way.
+- One or two short lines, dry, fragments. "Twenty years. Never said good years."
+- For a vlog: a confident sentence the disaster can interrupt, and a short deadpan line after it.
+- Numbers as words. One dialect word a clip at most.
 - A product line stays true and light: "Found the permit office in ten seconds. Parking? Different story."
-- The captions burn the line in, sentence by sentence, low on the frame — every clip works with the sound off.
+- Subtitles are burned into the captioned cut from what was heard; the pure cut carries nothing.
 
-## How he "talks" on screen — what was tried (2026-10-08)
+## What was tried first (kept for the record)
 
-Four samples of the same line on the same still ("Two days, he says. Two days."):
-
-| | Voice | Mouth | Cost / 5 s shot | What it looked like |
+| | Voice | Mouth | Cost / 5 s | Verdict |
 | --- | --- | --- | --- | --- |
-| 1 | the recipe | Wan 2.7 image-to-video driven by the line (`audio_url`) | $0.50 | The jaw follows the words — but the model turned him to face the camera, where the long snout becomes a wide laughing face that is not our gator. |
-| 2 | Kling 3.0 Standard's own generated voice (`sound: on`, the line and "New Jersey accent" in the prompt) | the same model | $0.63 | It speaks, and can attempt the accent — a different man every time, so it cannot be the house voice; and it made his sunglasses see-through. Comparison only. |
-| 3 | the recipe | **Kling 2.5 Turbo Standard**, told he is speaking, in three-quarter profile, deadpan | **$0.21** | **The house method.** He stays on-model; the jaw opens and closes like a cartoon character talking. Not locked to the words — a puppet's sync — which reads fine at feed speed with captions. |
-| 4 | the recipe | Wan 2.7 driven by the line, held in profile | $0.50 | On-model, but the jaw drops open on the first word and stays open past the end: a laugh, not speech. |
+| 1 | our own TTS | Wan 2.7 driven by the line (`audio_url`) | $0.50 | the jaw follows, but he turns front-on into a wide laughing face |
+| 2 | **Kling 3.0's own voice** | the same model | $0.63 | **the owner's pick** — and it gave the cartoon mascot eyes |
+| 3 | our own TTS | Kling 2.5, loose jaw | $0.21 | best-looking mascot; the voice has no accent |
+| 4 | our own TTS | Wan 2.7 driven, held in profile | $0.50 | the jaw drops open and stays open |
 
-Verified: the catalogue has no text-to-speech model and no lip-sync-to-video model; speech comes only from
-video models' own audio (Kling 2.6 / 3.0 `sound`, Seedance / Wan 3.0 / LTX / PixVerse `generate_audio`) or
-from audio-driven image-to-video (Wan 2.6 / 2.7 `audio_url`, Grok Imagine Video `audio_url`). Assumed, not
-tested: that Wan 2.6 and Grok behave like Wan 2.7 on a snout.
+Our own TTS (`scripts/gator/voice.ts`, recipe version 1): the Call Assistant's Kokoro engine, persona
+`marcus` = Kokoro voice `am_adam`, pitched down 10%, tempo up 14%, bass and a little grit. Consistent and free — and
+without any regional accent, which is why the owner passed on it. It stays in the code for a line that must be
+identical every time (an end-tag sting, say); it is not the gator's speaking voice.
 
-**The rule:** a talking shot is `video: "kling"` (or `"kling-pro"`) with `say: { text, lead }`; the shot's
-still shows him in three-quarter profile, mouth shut; the line is voice-over from the recipe. If a jaw looks
-wrong, the fallback is the line delivered while he only reacts (a look, a shrug) — often funnier.
+Other models with native speech, priced but not tried: PixVerse V6 ($0.26 / 5 s at 720p, has a seed and a
+negative prompt — the next one to test for the mascot's glasses and for consistency), MiniMax H3 ($0.65), Kling
+2.6 Pro ($0.70), Grok Imagine Video ($0.71), LTX 2.5 ($0.78 / 6 s); Seedance, Wan 3.0 and Cinema Studio are
+token- or per-second-metered with no fixed estimate, so the budgeted client refuses them.
 
 ## What would make it better
 
-- A real accent needs a voice the engine does not have: a Kokoro-compatible voice pack trained or blended
-  for it, or an owner-approved voice from a service we do not use today. Both are decisions for the owner.
-- A person's ear on the first ten lines, to tune pitch and pace once and lock version 2.
+- A model that accepts a voice reference (none in this catalogue today), or approval to try one outside it.
+- The owner's ear on ten lines, to say which measured pitch range is "him" — then the band can be set from
+  that instead of from one clip.
