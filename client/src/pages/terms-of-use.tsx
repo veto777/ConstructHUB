@@ -2,14 +2,15 @@ import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
 import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { CRM_TRIAL_DAYS } from "@shared/crm-plans";
 import { inNativeApp } from "@/lib/app-shell";
 import {
-  AGENCY_ONLY_MODULES, CRM_SEATS_LINE, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
-  agencyBandsLine, formatUsd, joinNames, planPriceLine,
+  AGENCY_ONLY_MODULES, CRM_SEATS_LINE, CRM_STARTING_PLAN, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
+  agencyBandsLine, annualExceptionsLine, formatUsd, joinNames, planPriceLine,
 } from "@shared/plan-copy";
 
 /** Shown under the title; update whenever these Terms change. */
-const LAST_UPDATED = "September 30, 2026";
+const LAST_UPDATED = "October 7, 2026";
 
 export default function TermsOfUsePage() {
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function TermsOfUsePage() {
               ))}
             </ul>
             <p className="mb-2">The {PLANS.agency.name} plan includes {PLANS.agency.limits.locations} locations. Additional locations are billed at {agencyBandsLine()}. Only the {PLANS.agency.name} plan includes the {joinNames(AGENCY_ONLY_MODULES)}.</p>
-            <p className="mb-2">The ConstructHUB CRM is included in every plan; the plan sets the number of CRM seats ({CRM_SEATS_LINE}). What each plan includes, and its usage limits, are listed on the Pricing page.</p>
+            <p className="mb-2">The ConstructHUB CRM is a separate product with its own subscription plans and is not included in any of the plans above. CRM plans start at {formatUsd(CRM_STARTING_PLAN.monthlyCents)}/month ({CRM_STARTING_PLAN.name}); the CRM plan sets the number of CRM seats ({CRM_SEATS_LINE}). CRM plans have their own annual prices, and a first CRM subscription starts with a {CRM_TRIAL_DAYS}-day trial. What each plan includes, and its usage limits, are listed on the Pricing page.</p>
             <p className="mb-2">There is no free plan. A new subscription starts with a {TRIAL_LABEL}. When the trial ends, the subscription continues at the plan price unless you cancel before then.</p>
             <p>All subscription plans automatically renew at the end of each billing cycle unless canceled before the renewal date. You may cancel your subscription at any time through your account settings, and cancellation will take effect at the end of the current billing period. No partial refunds are issued for unused portions of the current billing cycle unless otherwise stated.</p>
             </>}
@@ -63,7 +64,7 @@ export default function TermsOfUsePage() {
           <section data-testid="section-add-ons">
             <h2 className="text-xl font-semibold mb-3">4. Add-ons</h2>
             {inNativeApp() ? <p>Add-ons aren't sold in the ConstructHUB apps. Add-ons on your account follow the same terms as your plan.</p> : <>
-            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price):</p>
+            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price{annualExceptionsLine()}):</p>
             <ul className="list-disc pl-6 space-y-1">
               {Object.values(ADDONS).map((addon) => (
                 <li key={addon.key}>
@@ -171,6 +172,11 @@ export default function TermsOfUsePage() {
               <li>ConstructHUB is not affiliated with or endorsed by Google.</li>
               <li>Changes to Google's APIs or policies may affect the availability or accuracy of these features.</li>
             </ul>
+            <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-youtube-terms">YouTube API Services</h3>
+            <p>
+              ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel, and to let you connect your own YouTube channel and upload videos you choose to it. By connecting a YouTube channel, or using any other feature of ConstructHUB that relies on YouTube, you agree to be bound by the{" "}
+              <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-youtube-terms">YouTube Terms of Service</a>. You are responsible for the videos you upload: each must comply with YouTube's Community Guidelines, and you must own it or have permission to publish everything in it. How we handle YouTube data is described in our Privacy Policy.
+            </p>
           </section>
 
           <section data-testid="section-intellectual-property">

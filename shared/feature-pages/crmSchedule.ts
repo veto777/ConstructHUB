@@ -99,13 +99,13 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "plan",
-    note: "Schedule is part of ConstructHub CRM; your plan's CRM seats decide how many people can be on it.",
+    kind: "crmPlan",
+    note: "Schedule is part of ConstructHub CRM; your CRM plan's seats decide how many people can be on it.",
   },
   faqs: [
     {
       q: "What do I need to use it?",
-      a: "A ConstructHUB plan and your CRM workspace. To put people on visits, invite them to your CRM team. Google Calendar sync needs a Google account; the company feed works with any calendar app that can subscribe to a link.",
+      a: "A CRM plan and your CRM workspace. To put people on visits, invite them to your CRM team. Google Calendar sync needs a Google account; the company feed works with any calendar app that can subscribe to a link.",
     },
     {
       q: "Which plans include it?",

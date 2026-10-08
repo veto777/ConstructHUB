@@ -292,6 +292,11 @@ export async function registerRoutes(
   const { ensureAccessGrantsSchema, registerAccessGrantRoutes } = await import("./access-grants");
   await ensureAccessGrantsSchema();
   registerAccessGrantRoutes(app, getDevUser);
+  // The company YouTube channel (/admin/youtube): one site-level connection the tutorial uploader uses.
+  const { ensureYoutubeSchema } = await import("./youtube/schema");
+  await ensureYoutubeSchema();
+  const { registerYoutubeRoutes } = await import("./youtube/routes");
+  registerYoutubeRoutes(app, getDevUser);
   // The issue desk (docs/ops/ISSUE-DESK.md): captured failures, /admin/issues,
   // the browser's error reports and the tower's hand-off to Claude.
   const { ensureOpsIssuesSchema } = await import("./ops/schema");
@@ -414,6 +419,12 @@ export async function registerRoutes(
   registerSocialRoutes(app, getDevUser);
   const { startSocialWorker } = await import("./social/service");
   startSocialWorker();
+  // Customers' own YouTube channels (Social Media → YouTube): connect, send a video, the upload worker.
+  const { ensureYoutubeCustomerSchema } = await import("./youtube/customer-schema");
+  await ensureYoutubeCustomerSchema();
+  const { registerCustomerYoutubeRoutes } = await import("./youtube/customer-routes");
+  registerCustomerYoutubeRoutes(app, getDevUser);
+  (await import("./youtube/customer-service")).startCustomerYoutubeWorker();
 
   // Public API (/api/v1, chub_ keys). Mounted before the CRM so requests
   // without a chub_ token reach the CRM's chk_-key routes unchanged.

@@ -7,7 +7,7 @@ import {
 import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import {
   pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
-  AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
+  AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, CRM_TEXTING_PLANS, CLIENT_NUMBER_INCLUDED_PLANS, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
   CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
   callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule, callAssistantTierNumbersLine, CALL_ASSISTANT_SPAM_BLOCK_TITLE,
   callAssistantOverageLine, callAssistantOverageRule, callAssistantTiersShortLine, formatCentsShort,
@@ -291,7 +291,10 @@ describe("emails and in-app help", () => {
   it("the SMS info tip names the texting plans from the price book", () => {
     const body = INFO_CONTENT["settings-sms"].body.join(" ");
     expect(body).toContain("Pro, Growth and Agency");
-    expect(body).toContain("Growth includes one number");
+    // Texting comes with a CRM plan too (server/crm/sms.ts accepts either), and CRM Max also includes a number.
+    expect(body).toContain(CRM_TEXTING_PLANS);
+    expect(body).toContain(`${CLIENT_NUMBER_INCLUDED_PLANS} each include one number`);
+    expect(CLIENT_NUMBER_INCLUDED_PLANS).toBe("CRM Max and Growth");
   });
 });
 
@@ -345,9 +348,12 @@ describe("page copy outside /pricing", () => {
     expect(read("client/src/pages/home.tsx")).not.toContain("/individual-pricing");
   });
 
-  it("the Terms are dated September 30, 2026 and list plans from the price book", () => {
+  it("the Terms are dated October 7, 2026 and list plans from the price book", () => {
     const src = read("client/src/pages/terms-of-use.tsx");
-    expect(src).toContain('const LAST_UPDATED = "September 30, 2026"');
+    expect(src).toContain('const LAST_UPDATED = "October 7, 2026"');
+    // The CRM is a separate product (owner, 2026-10-07): the Terms never say a plan includes it.
+    expect(src).not.toMatch(/CRM is included/i);
+    expect(src).toContain("is a separate product with its own subscription plans");
     expect(src).toContain("PLAN_KEYS.map");
     expect(src).toContain("Object.values(ADDONS)");
     expect(src).not.toMatch(/Individual Tool Pricing/);

@@ -12,6 +12,6 @@ const entry: HelpDraft = {
     "Choose Send estimate. Preview on the estimate’s page shows what the client sees.",
   ],
   howItWorks: "The client opens the link, confirms their email with a one-time code, and approves by typing their full name. Preview opens the same page for you with approving and paying switched off, and it does not count as the client opening it.",
-  needs: ["A CRM workspace.", "Price book items to pick from.", "An email address on the client, to send to."],
+  needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "Price book items to pick from.", "An email address on the client, to send to."],
 };
 export default entry;

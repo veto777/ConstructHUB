@@ -11,6 +11,7 @@ export const APP_CONNECTIONS = {
   gbp: { callback: "/api/gbp/callback", fields: ["gbpOAuth"] },
   ads: { callback: "/api/ads/callback", fields: ["adsOAuth"] },
   gsc: { callback: "/api/gsc/callback", fields: ["gscOAuth"] },
+  youtube: { callback: "/api/social/youtube/callback", fields: ["youtubeCustomerOAuth"] },
   gmail: { callback: "/api/mail-alerts/oauth/callback", fields: ["mailOAuth"] },
   lsa: { callback: "/api/lsa/oauth/callback", fields: ["lsaOauthState", "lsaAppRedirect"] },
   calendar: { callback: "/api/crm/calendar/google/callback", fields: ["googleCalendarState", "googleCalendarOrgId", "googleCalendarScope", "googleCalendarMemberId"] },

@@ -3198,3 +3198,106 @@ export const jobcamChecklistFields = pgTable("jobcam_checklist_fields", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ── Company YouTube channel (server/youtube/*, /admin/youtube) ──────────────
+// Created idempotently by server/youtube/schema.ts YOUTUBE_DDL (boot and the
+// migration script). At most ONE row (id = 1, CHECK id = 1 in the DDL): the
+// site-level connection the tutorial uploader uses. Tokens are AES-256-GCM
+// encrypted (server/gbp/token-crypto.ts) and never returned by a route.
+export const youtubeConnection = pgTable("youtube_connection", {
+  id: integer("id").primaryKey().default(1),
+  channelId: text("channel_id"),
+  channelTitle: text("channel_title"),
+  /** Encrypted. NULL = not connected (the row may still hold the last error). */
+  refreshToken: text("refresh_token"),
+  /** Encrypted. */
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  /** The scopes Google actually granted. */
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  connectedBy: integer("connected_by"),
+  connectedByEmail: text("connected_by_email"),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
+  /** Google refused the refresh token (invalid_grant): an admin must connect again. */
+  needsReconnect: boolean("needs_reconnect").notNull().default(false),
+  lastErrorCode: text("last_error_code"),
+  /** Scrubbed (server/ops/scrub.ts). */
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Customers' own YouTube channels (server/youtube/customer-*.ts, Social Media → YouTube) ──
+// Created idempotently by server/youtube/customer-schema.ts YOUTUBE_CUSTOMER_DDL
+// (boot and the migration script). One connection per account (user_id is the
+// primary key). Tokens are AES-256-GCM encrypted and never returned by a route.
+export const youtubeCustomerConnections = pgTable("youtube_customer_connections", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  channelId: text("channel_id"),
+  channelTitle: text("channel_title"),
+  channelThumbnail: text("channel_thumbnail"),
+  /** Encrypted. NULL = not connected (the row may still hold the last error). */
+  refreshToken: text("refresh_token"),
+  /** Encrypted. */
+  accessToken: text("access_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
+  needsReconnect: boolean("needs_reconnect").notNull().default(false),
+  lastErrorCode: text("last_error_code"),
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// One row per video a customer sends to their channel: the file arriving in
+// our storage (receiving → ready), then the background upload (queued →
+// uploading → processing → published | failed). The stored file is deleted once
+// YouTube has the video, and after 24 hours whatever happened.
+export const youtubeCustomerVideos = pgTable("youtube_customer_videos", {
+  id: uuid("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  mime: text("mime").notNull(),
+  bytes: bigint("bytes", { mode: "number" }).notNull(),
+  storageMode: text("storage_mode").notNull(),
+  storageKey: text("storage_key").notNull(),
+  storageUploadId: text("storage_upload_id"),
+  partSize: integer("part_size").notNull(),
+  partsTotal: integer("parts_total").notNull(),
+  partsDone: jsonb("parts_done").$type<Record<string, string>>().notNull().default({}),
+  fileDeletedAt: timestamp("file_deleted_at", { withTimezone: true }),
+  state: text("state").notNull().default("receiving"),
+  title: text("title"),
+  description: text("description"),
+  tags: jsonb("tags").$type<string[]>().notNull().default([]),
+  privacy: text("privacy"),
+  madeForKids: boolean("made_for_kids"),
+  /** When the customer certified Community Guidelines compliance and ownership of the rights. */
+  certifiedAt: timestamp("certified_at", { withTimezone: true }),
+  channelId: text("channel_id"),
+  channelTitle: text("channel_title"),
+  youtubeVideoId: text("youtube_video_id"),
+  /** The privacy status YouTube actually gave the video. */
+  actualPrivacy: text("actual_privacy"),
+  sentBytes: bigint("sent_bytes", { mode: "number" }).notNull().default(0),
+  quotaDay: date("quota_day"),
+  quotaSpent: boolean("quota_spent").notNull().default(false),
+  errorCode: text("error_code"),
+  error: text("error"),
+  leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  nextCheckAt: timestamp("next_check_at", { withTimezone: true }),
+  checks: integer("checks").notNull().default(0),
+  queuedAt: timestamp("queued_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Uploads started per Pacific day (YouTube's quota day): one row per account,
+// and user_id 0 for the whole Google project (customers + the company channel).
+export const youtubeUploadDaily = pgTable("youtube_upload_daily", {
+  day: date("day").notNull(),
+  userId: integer("user_id").notNull(),
+  used: integer("used").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.day, t.userId] })]);

@@ -60,7 +60,7 @@ const COMPARE = [
     key: "features",
     kicker: "Features",
     title: "Software you run",
-    body: "Tools in your ConstructHUB plan that you use yourself, whenever you like: Site Scan, the CRM, Click Guard, permit search and the rest. Each one is priced by plan, and a new account's first plan starts with a trial.",
+    body: "Tools you use yourself, whenever you like: Site Scan, Click Guard, permit search and the rest in your ConstructHUB plan, and the CRM as a separate product with its own plans. Each one is priced by plan, and a new account's first plan starts with a trial.",
     points: ["You do the work, with the tools", "Priced by plan or as an add-on", "Open any time from your dashboard"],
     link: { label: "See every feature", href: FEATURES_PATH, testId: "link-dfy-compare-features" },
   },

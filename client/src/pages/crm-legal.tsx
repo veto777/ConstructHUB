@@ -59,7 +59,7 @@ const LI = ({ children }: { children: React.ReactNode }) => <li className="mb-1"
 
 export function CrmTermsPage() {
   return (
-    <LegalShell title="Terms of Service — ConstructHUB CRM" testid="page-crm-terms">
+    <LegalShell title="Terms of Service — ConstructHUB CRM" testid="page-crm-terms" updated="October 7, 2026">
       <P>
         These Terms of Service ("Terms") govern the ConstructHUB CRM — the contractor workspace at
         portal.constructhub.us and the client-facing pages it powers, including the client portal
@@ -84,8 +84,9 @@ export function CrmTermsPage() {
         representation about any Contractor's or Client's identity, qualifications or conduct.
       </P>
       <P>
-        The CRM is included with every ConstructHUB plan — there is no separate CRM membership. A
-        Contractor's plan sets how many team seats the workspace has, and extra seats are an add-on.
+        The CRM is a separate product with its own subscription plans; it is not included in the
+        ConstructHUB platform plans. A Contractor's CRM plan sets how many team seats the workspace
+        has, and extra seats are an add-on.
         Plans, trials, billing and cancellation are governed by the{" "}
         <a href="/terms" className="text-primary hover:underline" data-testid="link-crm-terms-plans">ConstructHUB Terms of Use</a>.
       </P>

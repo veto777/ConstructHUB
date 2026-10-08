@@ -208,7 +208,7 @@ export function comparisonSections(): CompareSection[] {
       ],
     },
     {
-      title: "Permits & CRM",
+      title: "Permits & texting",
       rows: [
         row("permitSearches", "Permit searches", (p) => countOrNone(p.limits.permitSearches, perMonth)),
         row("teamText", "Team text alerts", (p) => countOrNone(p.limits.teamTextSegments, perMonth)),

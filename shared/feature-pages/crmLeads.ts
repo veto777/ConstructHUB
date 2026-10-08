@@ -105,13 +105,13 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "plan",
+    kind: "crmPlan",
     note: "Leads & follow-ups is part of ConstructHub CRM. Alert texts count against your plan's text allowance.",
   },
   faqs: [
     {
       q: "What do I need to use it?",
-      a: "A ConstructHUB plan and your CRM workspace. To capture website enquiries, paste the embed code on your site or link to the form. Email alerts work on every plan; text alerts need a plan with texting.",
+      a: "A CRM plan and your CRM workspace. To capture website enquiries, paste the embed code on your site or link to the form. Email alerts work on every plan; text alerts need a plan with texting.",
     },
     {
       q: "Which plans include it?",

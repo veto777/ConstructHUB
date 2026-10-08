@@ -1,10 +1,13 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
+import { inNativeApp } from "@/lib/app-shell";
 
 /**
  * /support — how to reach ConstructHUB support and help for the iPhone apps. It is the App Store listing's Support
  * URL for both apps (docs/app/APP-STORE-PLAN.md), so every answer here must match the apps exactly.
+ * The apps are NOT in the App Store yet (HANDOFF.md, 2026-10-04/05: "Left for submission"), so the page says
+ * "coming to the App Store". When they are released, drop the "coming" / "once they are released" wording.
  */
 export default function SupportPage() {
   useEffect(() => {
@@ -18,7 +21,7 @@ export default function SupportPage() {
       pageTestId="page-support"
       title="Support"
       titleTestId="heading-support"
-      date="ConstructHUB on the web and on iPhone"
+      date={inNativeApp() ? "ConstructHUB on the web and on iPhone" : "ConstructHUB on the web · iPhone apps coming to the App Store"}
       dateTestId="text-support-scope"
       footer={copyrightNotice()}
     >
@@ -33,7 +36,7 @@ export default function SupportPage() {
       <section className="mb-8" data-testid="section-sign-in">
         <h2 className="text-xl font-semibold mb-3">Signing in</h2>
         <ul className="list-disc pl-6 space-y-1 mb-4">
-          <li>Use the same account on the website and in both iPhone apps (ConstructHUB and ConstructHUB CRM).</li>
+          <li>One account works on the website and, once they are released, in both iPhone apps (ConstructHUB and ConstructHUB CRM).</li>
           <li>Sign in with your email and password, with Google, or in the iPhone apps with Apple.</li>
           <li>Forgot your password? Choose <strong>Forgot password?</strong> on the sign-in screen to get a reset link by email.</li>
           <li>If your account uses two-factor sign-in, have your authenticator app ready.</li>
@@ -42,6 +45,11 @@ export default function SupportPage() {
 
       <section className="mb-8" data-testid="section-iphone-apps">
         <h2 className="text-xl font-semibold mb-3">The iPhone apps</h2>
+        {/* Not shown inside the apps themselves: someone reading this in the app already has it. */}
+        {!inNativeApp() && <p className="mb-3" data-testid="text-iphone-apps-status">
+          The ConstructHUB iPhone apps are coming to the App Store; they are not available to download yet. Until
+          then, use ConstructHUB in your phone's browser. Once the apps are released, this is how they work:
+        </p>}
         <ul className="list-disc pl-6 space-y-1 mb-4">
           <li><strong>ConstructHUB</strong> opens your growth tools; <strong>ConstructHUB CRM</strong> opens your clients, jobs, estimates, invoices and schedule.</li>
           <li><strong>Notifications:</strong> in ConstructHUB, open Settings → Notifications; in ConstructHUB CRM, open More. Tap <strong>Turn on</strong> under "Notifications on this iPhone". The switches on that page decide which alerts you get. To stop them, turn notifications off for the app in iPhone Settings.</li>
@@ -53,7 +61,7 @@ export default function SupportPage() {
       <section className="mb-8" data-testid="section-delete-account">
         <h2 className="text-xl font-semibold mb-3">Deleting your account</h2>
         <p className="mb-3">
-          In the ConstructHUB app, open Settings → My account → <strong>Delete account</strong>. In ConstructHUB CRM, open
+          In the iPhone apps, once they are released: in the ConstructHUB app, open Settings → My account → <strong>Delete account</strong>. In ConstructHUB CRM, open
           More → <strong>Delete account</strong>. Deleting cancels billing, signs you out everywhere, revokes Sign in with
           Apple if you used it, and erases your data within 30 days (payment records are kept as the law requires). On the
           website, email {mail} from your account's address to ask for deletion.

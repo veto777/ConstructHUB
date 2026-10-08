@@ -68,6 +68,11 @@ export type FeaturePricing = (
    * whose limits carry it, an add-on on the others. Priced from the CRM price book, never a platform plan.
    */
   | { kind: "crmAddon"; addon: CrmAddonKey }
+  /**
+   * Part of the CRM itself (shared/crm-plans.ts CRM_PLANS): a separate product with its own plans, priced from the
+   * cheapest CRM plan. Never "plan" — no platform plan includes the CRM.
+   */
+  | { kind: "crmPlan" }
   /** No plan check in the code: any signed-in account can use it. */
   | { kind: "account" }
   /** A one-time service with its price in the price book. */

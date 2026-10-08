@@ -27,6 +27,9 @@ const EDGE = moduleNeed("cloudflareSearchConsole");
 const IDENTITY = "Sensitive buttons ask you to confirm it’s you first (password, authenticator code or an emailed code).";
 const PROTECTED = `Included with the ${PROTECTED_SITE_PLANS} plans; the number of protected websites depends on the plan.`;
 
+/** The CRM is a separate product (shared/crm-plans.ts): its pages need a CRM plan, not a platform plan. */
+export const CRM_NEED = "A ConstructHub CRM plan — the CRM is a separate product with its own plans.";
+
 type Draft = HelpDraft;
 const entries: Draft[] = [
   /* ══ Tools → Cloudflare ═══════════════════════════════════════════════════════════════════════ */
@@ -594,6 +597,20 @@ const entries: Draft[] = [
     needs: ["A Blotato subscription of your own — bought from Blotato, not billed by ConstructHUB.", "At least one Location to post for."],
   },
   {
+    key: "social-youtube", group: "Tools", route: "/social-media", title: "Social Media → YouTube",
+    whatItIs: "A direct connection between your ConstructHUB account and your own YouTube channel, so you can publish videos to it from the Social Media page.",
+    whatItDoes: "Connects one YouTube channel per account, shows you which channel was connected, and uploads the video files you choose to it with the title, description, tags and privacy setting you enter. It cannot edit or delete videos, read comments or statistics, or reach anything else in your Google account.",
+    howToUse: [
+      "Open Social Media, find the YouTube section and choose “Connect YouTube”. Pick the Google account and channel, and allow the two permissions Google lists.",
+      "Check the channel name shown is the one you meant. If it is not, choose “Connect a different channel”.",
+      "Choose “Publish a video”, pick the file and wait for it to finish arriving.",
+      "Enter the title, description and tags, choose who can see it, answer whether it is made for kids, and tick the box confirming YouTube’s Community Guidelines and your rights to the video.",
+      "Choose “Publish to YouTube” and follow the video in the list: Queued, Uploading, On YouTube — processing, then Published with a link, or Failed with the reason. To stop using it, choose Disconnect.",
+    ],
+    howItWorks: "ConstructHUB asks Google for two permissions only: upload videos, and see the channel. The sign-in Google returns is stored encrypted and is never shown. Your file is held by ConstructHUB until YouTube has it, and for at most 24 hours; a background worker then sends it to YouTube in pieces. YouTube decides the final privacy setting — the list shows what YouTube actually set. Each account can send a limited number of videos a day, and all ConstructHUB customers share one daily allowance from Google; when either is used up the page says so and you can try again the next day (the day resets at midnight Pacific time). Disconnect cancels the sign-in at Google and deletes the channel details, the sign-in and the list of videos you sent; videos already on YouTube stay on your channel.",
+    needs: ["A YouTube channel on the Google account you connect.", "Videos longer than 15 minutes need a channel verified with YouTube (youtube.com/verify)."],
+  },
+  {
     key: "site-scan", group: "Tools", route: "/site-scan", title: "Site Scan",
     whatItIs: "A check-up of your website that tells you what to fix, in priority order.",
     whatItDoes: "Checks technical and content issues (broken links, redirects, HTTPS, titles, headings, image text), Google PageSpeed measurements on sampled pages, how the site’s details compare with your Google Business Profile, and readiness for AI search. Each finding explains its impact and the fix steps.",
@@ -682,7 +699,7 @@ const entries: Draft[] = [
       "Work through the setup checklist: your profile, company details and inviting your crew.",
     ],
     howItWorks: "The numbers are read live from your workspace. The checklist goes away once it is done or you dismiss it.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-clients", group: "CRM", route: "/crm/clients", title: "Clients",
@@ -695,7 +712,7 @@ const entries: Draft[] = [
       "“See what the client sees” opens their portal the way they see it.",
     ],
     howItWorks: "Notes are private to your team and never appear in the portal. The timeline is kept for you from what happens: estimates sent, emails opened, payments made.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-messages", group: "CRM", route: "/crm/inbox", title: "Messages",
@@ -707,7 +724,7 @@ const entries: Draft[] = [
       "Check the Client activity tab to see what clients are doing.",
     ],
     howItWorks: "A reply is emailed when the client has an email address on file. Unread threads are counted on the Messages tab.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-pipeline", group: "CRM", route: "/crm/pipeline", title: "Pipeline",
@@ -720,7 +737,7 @@ const entries: Draft[] = [
       "Open a card to work on the project.",
     ],
     howItWorks: "When a client approves an estimate, its project moves to Approved by itself. A change order the client approves on its link adjusts the contract value.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-schedule", group: "CRM", route: "/crm/schedule", title: "Schedule",
@@ -733,7 +750,7 @@ const entries: Draft[] = [
       "From Settings, subscribe from Apple Calendar, Outlook or Google Calendar with the private feed link.",
     ],
     howItWorks: "Nothing lands on the schedule by itself — you add each visit. Anyone with the private feed link can read it, so regenerate the link to cut off old copies.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "jobcam", group: "CRM", route: "/crm/jobcam", title: "JobCam",
@@ -747,7 +764,7 @@ const entries: Draft[] = [
       "Copy the link or send it by email or text. Revoke it under “Existing links”.",
     ],
     howItWorks: "Each capture is saved on the phone first and uploaded from a queue, so a lost connection does not lose a shot. A share link can be a fixed gallery of the shots you picked or a live timeline that keeps updating, and can have a password. A revoked or expired link shows the client an honest “turned off” or “expired” page.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-estimates", group: "CRM", route: "/crm/estimates", title: "Estimates",
@@ -761,7 +778,7 @@ const entries: Draft[] = [
       "“Extend” adds seven days when a client needs more time.",
     ],
     howItWorks: "The first time a client opens the link they confirm their email with a one-time code. An estimate expires 7 days after it is sent. A signed estimate is locked, and permanent delete is for owners only.",
-    needs: ["A CRM workspace.", "Price book items to pick from."],
+    needs: [CRM_NEED, "Price book items to pick from."],
   },
   {
     key: "crm-invoices", group: "CRM", route: "/crm/invoices", title: "Invoices",
@@ -774,7 +791,7 @@ const entries: Draft[] = [
       "Filter the Invoices list by status to chase what is overdue.",
     ],
     howItWorks: "Online payments go to your own Stripe account. A receipt builds itself from the invoice once a payment is recorded. Voiding keeps the paper trail.",
-    needs: ["A CRM workspace.", "A connected Stripe account for online payment."],
+    needs: [CRM_NEED, "A connected Stripe account for online payment."],
   },
   {
     key: "crm-pricebook", group: "CRM", route: "/crm/pricebook", title: "Price book",
@@ -787,7 +804,7 @@ const entries: Draft[] = [
       "Change a price once and every new estimate uses it.",
     ],
     howItWorks: "Per-square-foot items multiply by the measured square footage, plus waste, in Quick Bid. The Price floor lock in Settings stops reps pricing below the price book.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   {
     key: "crm-payments", group: "CRM", route: "/crm/payments", title: "Payments",
@@ -799,7 +816,7 @@ const entries: Draft[] = [
       "From a client’s page choose “Take a payment”: send a secure link, or record a payment you already have.",
     ],
     howItWorks: "Money goes straight to your own Stripe account; ConstructHUB never holds it. The page shows Stripe’s standard processing rates.",
-    needs: ["A CRM workspace.", "A Stripe account."],
+    needs: [CRM_NEED, "A Stripe account."],
   },
   {
     key: "crm-team", group: "CRM", route: "/crm/team", title: "Team & Company",
@@ -812,7 +829,7 @@ const entries: Draft[] = [
       "Add a division if you run a second branch.",
     ],
     howItWorks: "The role decides what a person can see and change, and the server enforces it. Removing someone cuts their access immediately; what they created stays.",
-    needs: ["A CRM workspace.", "Owner or admin access to manage the team."],
+    needs: [CRM_NEED, "Owner or admin access to manage the team."],
   },
   {
     key: "crm-integrations", group: "CRM", route: "/crm/integrations", title: "Integrations",
@@ -825,7 +842,7 @@ const entries: Draft[] = [
       "Create an API key only if a tool or developer asks for one.",
     ],
     howItWorks: "A HOVER report lands on the client whose address matches. Lead-form submissions become clients tagged as website leads. An API key is shown in full only once, when it is created.",
-    needs: ["A CRM workspace."],
+    needs: [CRM_NEED],
   },
   /* ══ Tools → Report an issue ══════════════════════════════════════════════════════════════════ */
   {

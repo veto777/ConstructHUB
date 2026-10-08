@@ -4,16 +4,15 @@
  * you'd bother, and one concrete example. Every mounted <InfoTip k="…" />
  * must have an entry here — server/crm/info-content.test.ts enforces it.
  */
-import { TEXTING_PLANS, planNamesWhere } from "@shared/plan-copy";
+import { CLIENT_NUMBER_INCLUDED_PLANS, TEXTING_EITHER_LINE } from "@shared/plan-copy";
 import { inNativeApp } from "./app-shell";
 
 /** Which plans text, read from the price book (shared/plans.ts). In the iPhone
  * apps there are no plans or add-ons — the note just says what texting is. */
 const TEXTING_NOTE = inNativeApp()
   ? "Texting sends bid reminders to clients and texts you the moment a bid is signed, money lands, or a client re-opens their estimate."
-  : `Texting comes with the ${TEXTING_PLANS} plans: team text alerts on every one of them, and client texts from ` +
-    `your own SignalWire number or a texting-number add-on (${planNamesWhere((plan) => plan.limits.clientTexting === "included")} ` +
-    `includes one number).`;
+  : `Texting comes with ${TEXTING_EITHER_LINE}: team text alerts on every one of them, and client texts from ` +
+    `your own SignalWire number or a texting number of ours (${CLIENT_NUMBER_INCLUDED_PLANS} each include one number).`;
 
 export interface InfoEntry {
   title: string;
@@ -679,8 +678,8 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
   "account-limits": {
     title: "Limits & usage",
     body: [
-      "Every limit in your plan on one page — Google Business Profile locations, ranking-grid credits, Site Scans, permit searches, CRM seats, protected websites and the rest — with what's included next to what you've used.",
-      "The numbers are the same ones the server enforces, counted the same way, so a meter here at 100% is exactly when a tool says \"limit reached\". Monthly counts reset on the date shown; standing counts (seats, locations) just are what they are.",
+      "Every limit in your plan on one page — Google Business Profile locations, ranking-grid credits, Site Scans, permit searches, protected websites and the rest — with what's included next to what you've used.",
+      "The numbers are the same ones the server enforces, counted the same way, so a meter here at 100% is exactly when a tool says \"limit reached\". Monthly counts reset on the date shown; standing counts (locations, protected websites) just are what they are.",
       "Where an add-on raises a limit, its + and − sit right under that limit. Where only a bigger plan does, the Change plan button goes to Pricing.",
       "Example: Site Scans shows 5 of 5 used on the 20th. Instead of waiting until the 1st, you see the plan above it includes 15 and switch — no detour through a support ticket.",
     ],

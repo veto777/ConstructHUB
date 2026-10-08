@@ -14,7 +14,8 @@ import {
 import { allowanceLine, allowanceValue, featurePlanGap, featurePriceSummary, singularUnit } from "@shared/feature-pages/pricing";
 import { FEATURE_ICONS } from "@shared/feature-pages/types";
 import { DASHBOARD_TILES } from "@shared/dashboard";
-import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { ADDONS, CALL_ASSISTANT_TIERS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import { formatUsd } from "@shared/plan-copy";
 import { ROUTE_META } from "@shared/route-meta";
 import { buildSitemap, PUBLIC_ROUTES, withRouteMeta } from "./static";
@@ -200,13 +201,47 @@ describe("feature page prices", () => {
     const first = PLAN_KEYS.find((k) => PLANS[k].limits.protectedSites !== 0)!;
     expect(guard.headline).toBe(`Included from the ${PLANS[first].name} plan`);
     expect(guard.rows.find((r) => r.label === PLANS.starter.name)!.included).toBe(PLANS.starter.limits.protectedSites !== 0);
+    // The AI Call Assistant is sold in tiers: the page shows the cheapest tier's price as "from", never one middle tier's.
     const ca = featurePriceSummary({ kind: "addon", addon: "call_assistant" });
+    const cheapestTier = Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
     expect(ca.comingSoon).toBe(ADDONS.call_assistant.preview === true);
-    expect(ca.price).toBe(formatUsd(ADDONS.call_assistant.monthlyCents));
+    expect(ca.price).toBe(formatUsd(cheapestTier));
+    expect(ca.from).toBe(true);
+    for (const t of CALL_ASSISTANT_TIERS) expect(ca.priceNote).toContain(`${t.name}: ${formatUsd(t.monthlyCents)}/mo`);
+    // A single add-on keeps its own price.
+    expect(featurePriceSummary({ kind: "addon", addon: "competitor_pack" }).price).toBe(formatUsd(ADDONS.competitor_pack.monthlyCents));
     expect(allowanceValue(PLANS.starter, { limit: "permitSearches", unit: "permit searches", period: "month" })).toBe(`${PLANS.starter.limits.permitSearches} permit searches a month`);
     expect(singularUnit("permit searches")).toBe("permit search");
     expect(singularUnit("Site Scans")).toBe("Site Scan");
     expect(singularUnit("websites")).toBe("website");
+  });
+});
+
+describe("the CRM is a separate product on every feature page (owner, 2026-10-07)", () => {
+  it("CRM pages are priced from the cheapest CRM plan, never 'Included in every plan'", () => {
+    const cheapest = Math.min(...CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].monthlyCents));
+    for (const key of ["crm", "crmSchedule", "crmLeads"]) {
+      const page = featurePageByKey(key)!;
+      expect(page.pricing.kind, key).toBe("crmPlan");
+      const s = featurePriceSummary(page.pricing);
+      expect(s.headline, key).not.toMatch(/included/i);
+      expect(s.price).toBe(formatUsd(cheapest));
+      expect(s.from).toBe(true);
+      expect(s.rows.map((r) => r.label)).toEqual(CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].name));
+      expect(s.priceNote).toContain("separate product");
+    }
+  });
+
+  it("JobCam: the figure is the add-on's price on the plans that sell it, and the including plan shows its own price", () => {
+    const s = featurePriceSummary(featurePageByKey("jobcam")!.pricing);
+    const includedIn = CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.jobcam);
+    expect(s.headline).toBe("CRM add-on");
+    expect(s.price).toBe(formatUsd(CRM_ADDONS.jobcam.monthlyCents));
+    for (const k of CRM_ADDONS.jobcam.availableOn) expect(s.priceTail).toContain(CRM_PLANS[k].name);
+    for (const k of includedIn) {
+      expect(s.priceTail).toContain(`included in ${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`);
+      expect(s.priceNote).toContain(`${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`);
+    }
   });
 });
 
