@@ -11,11 +11,11 @@ import { Check, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
-import { KeywordWatch } from "./keyword-watch";
+import { KeywordWatch, type KwPick } from "./keyword-watch";
 import { marketLabel } from "@shared/seo-markets";
 
 type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up" | "kw_new" | "kw_lost";
-type KwItem = { since: string; takenOn?: string; locationCode?: number; languageCode?: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
+type KwItem = { since: string; takenOn?: string; snapshotId?: number; beforeId?: number; locationCode?: number; languageCode?: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
 type GridItem = { keyword: string; size: number; spacing: number; top3: number; checked: number; score: number | null; wasTop3: number; wasChecked: number; wasScore: number | null; since: string };
 type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null };
 type LinkItem = { from: number | null; to: number | null; since: string; backlinksFrom: number | null; backlinksTo: number | null; lost?: { domain: string; authority: number | null; from: string | null }[]; lostTotal?: number | null; lostShown?: number };
@@ -38,7 +38,7 @@ const WHAT: Record<RankItem["what"], (i: RankItem) => string> = {
 };
 
 /** One keyword-watch alert: what it compared, and every keyword the alert kept (the first twenty until asked for the rest). */
-function KwAlert({ kind, item: i, domain }: { kind: Kind; item: KwItem; domain: string }) {
+function KwAlert({ kind, item: i, domain, onOpen }: { kind: Kind; item: KwItem; domain: string; /** Open the exact comparison this alert was raised from in the keyword watch. */ onOpen?: () => void }) {
   const [all, setAll] = useState(false);
   const kept = i.keywords.length, more = i.more ?? 0, shown = all ? i.keywords : i.keywords.slice(0, 20);
   return (
@@ -49,7 +49,8 @@ function KwAlert({ kind, item: i, domain }: { kind: Kind; item: KwItem; domain: 
         <tbody>{shown.map((k) => <tr key={k.keyword}><td>{k.keyword}</td><td className="num">{(kind === "kw_new" ? k.position : k.was) ?? "—"}</td><td className="num">{fmtNum(k.volume)}</td></tr>)}</tbody>
       </table>
       {kept > 20 && <button type="button" className="g-link mt-1 text-[13px]" aria-expanded={all} onClick={() => setAll(!all)}>{all ? "Show the first 20" : `Show all ${fmtNum(kept)} kept with this alert`}</button>}
-      {more > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(more)} more changed than this alert keeps. While these two snapshots are still the newest for {domain}, the keyword watch above lists every one.</p>}
+      {more > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(more)} more changed than this alert keeps — the comparison lists every one.</p>}
+      {onOpen && <button type="button" className="g-link mt-1 text-[13px]" onClick={onOpen} data-testid="button-kw-alert-open">Open this comparison for {domain} (snapshots of {fmtDate(i.since)} and {i.takenOn ? fmtDate(i.takenOn) : "that day"})</button>}
     </div>
   );
 }
@@ -58,6 +59,7 @@ export default function SeoAlertsPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
   const [site, onSite] = useSelectedSite(sites.data);
+  const [kwPick, setKwPick] = useState<KwPick | null>(null);
   const qc = useQueryClient();
   const { toast } = useToast();
   const [scope, setScope] = useState<"site" | "all">("all");
@@ -89,7 +91,7 @@ export default function SeoAlertsPage() {
       </div>
       <p className="g-text-2 mb-4 text-[13px]">Alerts also reach the bell at the top of the page, and your inbox for falls and lost links. Choose what is emailed under <Link href="/settings?tab=notifications" className="g-link">Settings → Notifications</Link>; set how big a move counts under <Link href="/seo/rank-tracker" className="g-link">Rank tracker → Tracking settings</Link>.</p>
 
-      {site && <KeywordWatch site={site} />}
+      {site && <div id="keyword-watch" className="scroll-mt-4"><KeywordWatch site={site} pick={kwPick} onPick={setKwPick} /></div>}
       {q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading alerts…</p>}
       {q.isError && <div className="g-callout" role="alert" data-testid="alerts-error"><h3>Couldn't load your alerts</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {q.isSuccess && alerts.length === 0 && (
@@ -114,7 +116,7 @@ export default function SeoAlertsPage() {
                 <tbody>{(a.items as RankItem[]).map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}</td></tr>)}</tbody>
               </table>
             ) : a.kind === "kw_new" || a.kind === "kw_lost" ? (
-              (a.items as unknown as KwItem[]).map((i, n) => <KwAlert key={n} kind={a.kind} item={i} domain={a.domain} />)
+              (a.items as unknown as KwItem[]).map((i, n) => <KwAlert key={n} kind={a.kind} item={i} domain={a.domain} onOpen={i.snapshotId && i.beforeId ? () => { onSite(a.siteId); setKwPick({ siteId: a.siteId, now: i.snapshotId!, before: i.beforeId! }); requestAnimationFrame(() => document.getElementById("keyword-watch")?.scrollIntoView({ behavior: "smooth", block: "start" })); } : undefined} />)
             ) : a.kind === "grid_down" || a.kind === "grid_up" ? (
               (a.items as GridItem[]).map((i, n) => <p key={n} className="g-text text-[13px]">"{i.keyword}", {i.size} × {i.size} points {i.spacing} mile{i.spacing === 1 ? "" : "s"} apart: in the first three local results at <b className="font-medium tabular-nums">{i.top3} of {i.checked}</b> points, was <b className="font-medium tabular-nums">{i.wasTop3} of {i.wasChecked}</b> on {fmtDate(i.since)}. Position score {i.score ?? "—"}, was {i.wasScore ?? "—"} (lower is better).</p>)
             ) : (

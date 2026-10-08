@@ -323,6 +323,9 @@ it("reads what a site answers for an address that has no page", () => {
   // An ordinary page that happens to load reCAPTCHA for its contact form is still an ordinary page.
   const longText = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ");
   expect(read({ body: `<html><head><title>Roofing</title><script src="https://www.google.com/recaptcha/api.js"></script></head><body><p>${longText}</p></body></html>` })).toBe("ok_as_page");
+  // …and so is a short one with a reCAPTCHA contact form, or one that says the word.
+  expect(read({ body: '<html><head><title>Contact</title><script src="https://www.google.com/recaptcha/api.js"></script></head><body><form><div class="g-recaptcha"></div></form><p>Please complete the captcha.</p></body></html>' })).toBe("ok_as_page");
+  expect(read({ body: "<html><head><title>One moment</title></head><body><script>window._cf_chl_opt={}</script></body></html>" })).toBe("undetermined: answered with what looks like a bot check");
   // A sign-in form at the address itself, an empty answer, and an answer that is not marked as a page prove nothing.
   expect(read({ body: '<html><title>Members</title><body><form><input type="password" name="p"></form></body></html>' })).toBe("undetermined: answered with a sign-in form");
   expect(read({ status: 204, body: "" })).toBe("undetermined: answered with an empty response");
@@ -420,6 +423,11 @@ it("a missing-page fix is about a part of the site, judged again only where it w
   // A crawl whose sitemap no longer has that section never asks there: not checked, never fixed.
   const fourth = await run((url) => response(url, "Not found", 404), "<urlset></urlset>");
   expect(reconcileFixes(fixesOf(fourth), b, fourth).find((f) => f.page.endsWith("/services/"))!.verification).toBe("not checked");
+  // A fix saved under its crawl's made-up address (before fixes were named by part) carries on as the part's fix:
+  // still failing = "still present" with its "done" kept, not a new fix beside an orphan.
+  const legacy = a.map((f) => { const asked = first.missingPages!.find((m) => f.page === "https://fixture.test/" ? !m.url.includes("/services/") : m.url.includes("/services/"))!.url; return { ...f, page: asked, key: `legacy-${asked}`, done: true }; });
+  const carried = reconcileFixes(fixesOf(second), legacy, second);
+  expect(carried.map((f) => [f.page, f.verification, f.done])).toEqual([["https://fixture.test/", "still present", true], ["https://fixture.test/services/", "still present", true]]);
   // A redirect the crawl does not follow (to another site) is said, not dropped.
   const away = await run((url, allowed) => { allowed?.("https://elsewhere.test/landing"); throw new Error("Redirect excluded by crawl policy"); });
   expect(away.missingPages!.map((m) => m.note)).toEqual(["sent on to https://elsewhere.test/landing, which this crawl does not follow", "sent on to https://elsewhere.test/landing, which this crawl does not follow"]);

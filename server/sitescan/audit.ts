@@ -148,9 +148,11 @@ export function classifyMissingPage(
   const words = $("body").text().split(/\s+/).filter(Boolean).length;
   // A bot check is a short page that IS the check: its title says so, or a challenge script with little else on the
   // page. A reCAPTCHA on an ordinary page's contact form is not one.
+  // Only the markers of the interstitials themselves (Cloudflare, Imperva, PerimeterX, Akamai, DDoS-Guard) count — a
+  // reCAPTCHA or hCaptcha on a page's own form, or the word "captcha", does not.
   if (
     /just a moment|attention required|access denied|verify you are (a )?human|security check|are you a robot|ddos protection/i.test(title) ||
-    (/cf-chl|challenge-platform|captcha/i.test(r.body.slice(0, 50000)) && words < 120)
+    (/cf-chl|challenge-platform|cf_chl_opt|_incapsula_resource|px-captcha|\/_sec\/cp_challenge|ddos-guard/i.test(r.body.slice(0, 50000)) && words < 120)
   )
     return unsure("answered with what looks like a bot check");
   // A sign-in form served at the address itself: what it shows depends on who asks.
@@ -457,7 +459,12 @@ export async function crawl(
       } else {
         // Several discovered aliases can redirect to the same page. Count the
         // destination once so aliases cannot fabricate duplicate-content findings.
-        if (state.pages.some((p) => p.url === r.url)) {
+        const saved = state.pages.find((p) => p.url === r.url);
+        if (saved) {
+          // The address that led here is an alias of the saved page: kept, so "this page already links there" can see it.
+          for (const redirect of r.redirects)
+            if (!saved.redirects.includes(redirect) && saved.redirects.length < 20)
+              saved.redirects.push(redirect);
           state.queue.shift();
           await checkpoint(state);
           continue;

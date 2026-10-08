@@ -53,7 +53,7 @@ export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">Pages of your site that use the words of a keyword another of your pages ranks for, but don't link to it. A link there — on those words — points visitors and search engines at the page you want found for them. Whether it reads naturally is your call: the words around each mention are shown.</p>
       {!d.linksMeasured ? (
         <Empty testId="link-opps-unmeasured"><h3>The crawl can't see this site's links</h3><p>Most of its pages link nowhere in their HTML — usual when menus and links are added by JavaScript. Without knowing which links exist, nothing can be suggested here. The <b>Rendering</b> tab shows what a browser sees that the HTML does not.</p></Empty>
-      ) : d.targets + d.notCrawled === 0 ? (
+      ) : d.targets + d.notCrawled + d.notRanking + d.notUsable + d.tooShort + d.boilerplate === 0 ? (
         <Empty testId="link-opps-no-keywords"><h3>Nothing to look for yet</h3><p>This uses the keywords you track that your site ranks for. Add keywords in the <Link href="/seo/rank-tracker" className="g-link">rank tracker</Link> and run a check; once a page of yours ranks, mentions of that keyword on your other pages are looked for.</p></Empty>
       ) : (
         <>
@@ -80,10 +80,10 @@ export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
                 <tbody>
                   {d.items.slice(0, shown).map((i) => (
                     <tr key={`${i.from}|${i.to}`}>
-                      <td className="max-w-[16rem]"><a href={i.from} target="_blank" rel="noreferrer" className="g-link block truncate" title={i.from}>{nameOf(i.from, site.domain)}</a>{i.fromTitle && <span className="g-text-2 block truncate text-[12px]" title={i.fromTitle}>{i.fromTitle}</span>}</td>
-                      <td className="max-w-[22rem] !whitespace-normal"><b className="font-medium">{i.keyword}</b>{i.context && <span className="g-text-2 block text-[12px]">{i.context}</span>}</td>
-                      <td className="max-w-[14rem]"><a href={i.to} target="_blank" rel="noreferrer" className="g-link block truncate" title={i.to}>{nameOf(i.to, site.domain)}</a></td>
-                      <td className="num"><span title={rankBasis(i)}>{i.position ?? "—"}</span>{rankBasis(i) && <span className="g-text-2 block whitespace-nowrap text-[11px]">{rankBasis(i)}</span>}</td><td className="num">{fmtNum(i.volume)}</td>
+                      <td className="max-w-[16rem]" data-label="On this page"><a href={i.from} target="_blank" rel="noreferrer" className="g-link block truncate" title={i.from}>{nameOf(i.from, site.domain)}</a>{i.fromTitle && <span className="g-text-2 block truncate text-[12px]" title={i.fromTitle}>{i.fromTitle}</span>}</td>
+                      <td className="max-w-[22rem] !whitespace-normal" data-label="These words"><b className="font-medium">{i.keyword}</b>{i.context && <span className="g-text-2 block text-[12px]">{i.context}</span>}</td>
+                      <td className="max-w-[14rem]" data-label="Could link to"><a href={i.to} target="_blank" rel="noreferrer" className="g-link block truncate" title={i.to}>{nameOf(i.to, site.domain)}</a></td>
+                      <td className="num" data-label="Position"><span title={rankBasis(i)}>{i.position ?? "—"}</span>{rankBasis(i) && <span className="g-text-2 block whitespace-nowrap text-[11px]">{rankBasis(i)}</span>}</td><td className="num" data-label="Volume / mo">{fmtNum(i.volume)}</td>
                       <td className="num">{plannable(i) ? <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-link-${i.pair}`} tasks={[task(i)]} /> : <span className="g-text-2 text-[12px]">Address too long to plan</span>}</td>
                     </tr>
                   ))}
@@ -93,7 +93,7 @@ export function LinkOpportunitiesView({ site }: { site: SeoSite }) {
               {d.more > 0 && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(d.more)} more were found than are listed.</p>}
             </div>
           )}
-          <p className="g-text-2 mt-2 text-[12px]">The crawl reads each page's HTML (links added by JavaScript are not seen, so a page may already link in a way this cannot see). A link written with http or https, with or without "www" or a last slash, counts as a link to the page — and so does a link to an address the crawl saw redirect to it, or to a page whose canonical names it. Words must match whole (a plural or another spelling is not matched). Each keyword's position is from its newest rank check, on the device where it ranked better. One suggestion per pair of pages, at most 10 pages for each ranking page.{d.cutPages > 0 ? ` ${plural(d.cutPages, "page is", "pages are")} longer than is read (60,000 characters); a mention further down is not seen.` : ""}</p>
+          <p className="g-text-2 mt-2 text-[12px]">The crawl reads each page's HTML (links added by JavaScript are not seen, so a page may already link in a way this cannot see). A link written with http or https, with or without "www" or a last slash, counts as a link to the page — and so does a link to an address the crawl saw redirect to it, or to a page whose canonical names it. Words must match whole (a plural or another spelling is not matched). Each keyword's position is from its newest rank check, on the device where it ranked better. One suggestion per pair of pages, at most 10 pages for each ranking page.{d.cutPages > 0 ? ` ${plural(d.cutPages, "page is", "pages are")} cut where the crawl stops saving a page's text (its first 16,000 characters); a mention further down is not seen.` : ""}</p>
         </>
       )}
     </div>

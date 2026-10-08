@@ -65,11 +65,24 @@ describe("internal links to add", () => {
       ...filler,
     ];
     const out = findLinkOpportunities(pages, [target(1, "vinyl siding", "/siding")]);
-    expect(out.items.map((i) => i.from)).toEqual([`${H}/d`]);
+    expect(out.items.map((i) => [i.from, i.to])).toEqual([[`${H}/d`, `${H}/siding`]]);   // the page itself, never its printable copy
+    // A copy listed BEFORE the page it names canonical still does not become the destination.
+    const reordered = findLinkOpportunities([pages[2], ...pages.filter((_, i) => i !== 2)], [target(1, "vinyl siding", "/siding")]);
+    expect(reordered.items.map((i) => i.to)).toEqual([`${H}/siding`]);
+    // Followed to the end: a link to an old address that redirected to a copy that names the page canonical.
+    const chain = findLinkOpportunities([
+      page("/", "Home", [`${H}/siding`]), page("/siding", "Siding"), page("/siding-amp", "Siding", [`${H}/`], { canonical: `${H}/siding`, redirects: [`${H}/old-amp`] }),
+      page("/e", "We install vinyl siding.", [`${H}/old-amp`]), ...filler,
+    ], [target(1, "vinyl siding", "/siding")]);
+    expect(chain.items).toEqual([]);
   });
   it("menu text is judged against the other pages, the ranking page not counted either way", () => {
     // Six usable pages: the ranking page and five others, three of which use the words — more than half of the others.
     const pages = [page("/", "Home seamless gutters", [`${H}/gutters`]), page("/gutters", "seamless gutters"), page("/a", "seamless gutters"), page("/b", "seamless gutters"), page("/c", "other"), page("/d", "other")];
     expect(findLinkOpportunities(pages, [target(1, "seamless gutters", "/gutters")])).toMatchObject({ boilerplate: 1, targets: 0, items: [] });
+    // Copies of the ranking page (they name it canonical) are not "other pages": they count neither as mentions nor in the share.
+    const copies = Array.from({ length: 4 }, (_, i) => page(`/gutters-copy-${i}`, "seamless gutters", [`${H}/`], { canonical: `${H}/gutters` }));
+    const withCopies = findLinkOpportunities([page("/", "Home", [`${H}/gutters`]), page("/gutters", "seamless gutters"), page("/a", "seamless gutters"), ...copies, ...filler], [target(1, "seamless gutters", "/gutters")]);
+    expect([withCopies.boilerplate, withCopies.items.map((i) => i.from)]).toEqual([0, [`${H}/a`]]);
   });
 });

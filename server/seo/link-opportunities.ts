@@ -18,8 +18,11 @@ import { linksMeasurable, sameUrlKey, type RawPage } from "./audit-pages";
 export const LINK_OPP_MAX = 200, LINK_OPP_PER_TARGET = 10;
 /** Every link the crawler kept for a page (it keeps up to 2,000) is read here: "already links" must not miss one. */
 export const LINK_OPP_LINKS = 2000;
-/** A page's text is read to this many characters; a mention further down is not seen (the view says so). */
-export const LINK_OPP_TEXT = 60000;
+/**
+ * A page's text as the crawler saved it: it keeps the first 16,000 characters of each page (server/sitescan/audit.ts),
+ * so a mention further down is not seen — a page whose saved text reaches this length was cut (the view says so).
+ */
+export const LINK_OPP_TEXT = 16000;
 /** A keyword shorter than this, or of one short word, matches too much to mean anything. */
 export const MIN_PHRASE = 6;
 /**
@@ -69,13 +72,14 @@ function aliasesOf(pages: readonly OppPage[]): (u: string) => string {
   const to = new Map<string, string>();
   for (const p of pages) {
     const k = sameUrlKey(p.url);
-    for (const r of Array.isArray(p.redirects) ? p.redirects : []) if (typeof r === "string") to.set(sameUrlKey(r), k);
+    for (const r of Array.isArray(p.redirects) ? p.redirects : []) if (typeof r === "string" && sameUrlKey(r) !== k) to.set(sameUrlKey(r), k);
   }
   for (const p of pages) {
     const k = sameUrlKey(p.url);
-    if (typeof p.canonical === "string" && p.canonical && !to.has(k)) { const c = sameUrlKey(p.canonical); if (c !== k) to.set(k, to.get(c) ?? c); }
+    if (typeof p.canonical === "string" && p.canonical && !to.has(k)) { const c = sameUrlKey(p.canonical); if (c !== k) to.set(k, c); }
   }
-  return (u: string) => { const k = sameUrlKey(u); return to.get(k) ?? k; };
+  // Followed to the end (redirect -> copy -> the page it names canonical), with a guard against loops.
+  return (u: string) => { let k = sameUrlKey(u); for (let n = 0, seen = new Set([k]); n < 10 && to.has(k); n++) { const next = to.get(k)!; if (seen.has(next)) break; seen.add(next); k = next; } return k; };
 }
 
 /** Pure. `pages` are the crawl's pages; `targets` the tracked keywords with their newest check. */
@@ -84,7 +88,9 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   const measured = linksMeasurable(pages.map((p) => ({ url: p.url, status: p.status, links: p.links } as RawPage)));
   const resolve = aliasesOf(pages);
   const crawled = new Set(pages.map((p) => resolve(p.url)));
-  const byKey = new Map(usable.map((p) => [resolve(p.url), p] as const));
+  // The page that stands for an identity is the page itself — not a copy of it that names it canonical.
+  const byKey = new Map<string, OppPage>();
+  for (const p of usable) { const k = resolve(p.url); if (!byKey.has(k) || sameUrlKey(p.url) === k) byKey.set(k, p); }
   let notRanking = 0, notCrawled = 0, notUsable = 0, tooShort = 0;
   const known: (OppTarget & { url: string })[] = [];
   for (const t of targets) {
@@ -105,10 +111,11 @@ export function findLinkOpportunities(pages: readonly OppPage[], targets: readon
   for (const t of order) {
     const phrase = flat(t.keyword);
     const target = resolve(t.url), targetPage = byKey.get(target)!;
-    const mentions = texts.filter((x) => x.key !== target && x.flat.includes(phrase));
-    // On most of the OTHER pages (the target page itself is not counted either way): a menu, a footer, a slogan.
-    const others = usable.length - 1;
-    if (others >= BOILERPLATE_MIN_PAGES && mentions.length > others * BOILERPLATE_SHARE) { boilerplate++; continue; }
+    // The OTHER pages: neither the target nor a copy of it (a page that names it canonical), for the count and the share alike.
+    const others = texts.filter((x) => x.key !== target);
+    const mentions = others.filter((x) => x.flat.includes(phrase));
+    // On most of the other pages: a menu, a footer, a slogan.
+    if (others.length >= BOILERPLATE_MIN_PAGES && mentions.length > others.length * BOILERPLATE_SHARE) { boilerplate++; continue; }
     for (const x of mentions) {
       if (x.links.has(target)) continue;
       const pair = `${x.key}\u0000${target}`;
@@ -134,7 +141,7 @@ const TEXT_PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'noindex', COALESCE(p->'noindex' = 'true'::jsonb, false), 'title', p->>'title',
     'text', left(COALESCE(p->>'text', ''), ${LINK_OPP_TEXT}),
     'canonical', CASE WHEN jsonb_typeof(p->'canonical')='string' THEN p->>'canonical' END,
-    'redirects', ${strings("redirects", 10)},
+    'redirects', ${strings("redirects", 20)},
     'links', ${strings("links", LINK_OPP_LINKS)}) ORDER BY ord)
   FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
  WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;

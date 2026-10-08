@@ -73,7 +73,9 @@ export function summariseAi(rows: readonly AiCheckLite[], opts: { rivals?: reado
   // The customer's own business, however the answer wrote it: its name as whole words inside the bold text
   // ("Alpine Exteriors (Bellingham)", "Alpine Exteriors — siding"), or its web address.
   const own = normalizeBusinessName(opts.businessName), ownDomain = opts.domain ? bare(opts.domain) : "";
-  const isOwn = (name: string) => { const n = ` ${normalizeBusinessName(name)} `; return (own.length >= 4 && n.includes(` ${own} `)) || (!!ownDomain && name.toLowerCase().includes(ownDomain)); };
+  // The web address counts only as a whole address ("notalpine.example" is not "alpine.example"), as in the answer reading.
+  const ownAddress = ownDomain ? new RegExp(`(?<![a-z0-9.-])(?:www\\.)?${ownDomain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-]|\\.[a-z0-9])`) : null;
+  const isOwn = (name: string) => { const n = ` ${normalizeBusinessName(name)} `; return (own.length >= 4 && n.includes(` ${own} `)) || (!!ownAddress && ownAddress.test(name.toLowerCase())); };
   /** The other names an answer gives, one per business as far as the spelling allows: key -> as written. */
   const namesIn = (r: AiCheckLite) => {
     const out = new Map<string, string>();

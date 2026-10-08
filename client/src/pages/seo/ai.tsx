@@ -144,7 +144,7 @@ export default function SeoAiPage() {
   const ask = useMutation({
     mutationFn: (p: string) => api("POST", `${key}/ask`, { prompt: p, engines }),
     onSuccess: (r: { siteId: number; prompt: string; runId: string; saved: boolean; answers: Answer[]; failed: Engine[] }) => {
-      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai`] }); void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai/summary`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai`] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith(`/api/seo/sites/${r.siteId}/ai/summary`) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (r.siteId !== siteRef.current) return;
       setLastRun({ prompt: r.prompt, answers: r.answers.map((a) => ({ ...a, runId: r.runId })), at: new Date().toISOString(), runId: r.runId, saved: r.saved });
       setOpenPrompt(r.prompt); setPrompt("");

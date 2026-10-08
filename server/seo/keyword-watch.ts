@@ -294,6 +294,11 @@ export async function runDueKeywordSnapshots(): Promise<number> {
   return done;
 }
 
+/** Snapshots listed for choosing a comparison (newest first). */
+export const KW_HISTORY_LIMIT = 36;
+export type SnapshotSummary = { id: number; takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string };
+/** ?now=&before= on the view: two snapshot ids to compare instead of the newest two. */
+export const comparePick = z.object({ now: z.coerce.number().int().positive(), before: z.coerce.number().int().positive() }).strict();
 export type KeywordWatchView = {
   watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean;
   latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null;
@@ -302,15 +307,37 @@ export type KeywordWatchView = {
   /** false = the newest snapshot was taken for another country or language than the site is tracked in now. */
   sameMarket: boolean;
   comparison: KeywordComparison | null;
+  /** Which two snapshots `comparison` is (the newest two unless others were asked for). */
+  pair: { nowId: number; beforeId: number; chosen: boolean } | null;
+  /** The site's snapshots, newest first, up to KW_HISTORY_LIMIT, and how many there are in all. */
+  snapshots: SnapshotSummary[]; snapshotCount: number;
 };
-export async function keywordWatchView(userId: number, site: { id: number; kw_watch?: boolean; next_kw_snapshot_at?: unknown; location_code?: number; language_code?: string; alerts_enabled?: boolean }): Promise<KeywordWatchView> {
+export async function keywordWatchView(userId: number, site: { id: number; kw_watch?: boolean; next_kw_snapshot_at?: unknown; location_code?: number; language_code?: string; alerts_enabled?: boolean }, pick?: z.infer<typeof comparePick>): Promise<KeywordWatchView> {
   const [now, before] = await latestSnapshots(userId, site.id);
+  // Two chosen snapshots: both this site's and this account's, the "now" one the later of the two.
+  let chosen: [KeywordSnapshot, KeywordSnapshot] | null = null;
+  if (pick) {
+    if (pick.now === pick.before) throw new SeoCustomerError("Choose two different snapshots to compare.", 400);
+    const { rows } = await pool.query(`SELECT ${COLS} FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 AND id = ANY($3::int[])`, [site.id, userId, [pick.now, pick.before]]);
+    const a = rows.find((r: any) => r.id === pick.now), b = rows.find((r: any) => r.id === pick.before);
+    if (!a || !b) throw new SeoCustomerError("That snapshot is not on record for this site.", 404);
+    const x = toSnapshot(a), y = toSnapshot(b);
+    if (x.takenOn <= y.takenOn) throw new SeoCustomerError("Compare a snapshot with an earlier one.", 400);
+    chosen = [x, y];
+  }
+  const { rows: list } = await pool.query(
+    `SELECT id, taken_on::text AS taken_on, location_code, language_code, total, fetched, jsonb_array_length(keywords) AS n, count(*) OVER () AS all_count
+       FROM seo_keyword_snapshots WHERE site_id=$1 AND user_id=$2 ORDER BY taken_on DESC LIMIT ${KW_HISTORY_LIMIT}`, [site.id, userId]);
+  const snapshots: SnapshotSummary[] = list.map((r: any) => ({ id: r.id, takenOn: String(r.taken_on).slice(0, 10), keywords: r.n, total: r.total ?? null, whole: coverage({ total: r.total ?? null, fetched: r.fetched ?? null, keywords: { length: r.n } as unknown[] }), locationCode: r.location_code, languageCode: r.language_code }));
+  const [cNow, cBefore] = chosen ?? [now, before];
   const { rows: [d] } = await pool.query("SELECT current_date::text AS today, ((current_date + 1)::timestamp AT TIME ZONE current_setting('TimeZone'))::timestamptz AS next");
   return {
     watch: !!site.kw_watch, nextAt: site.kw_watch && site.next_kw_snapshot_at ? new Date(site.next_kw_snapshot_at as string).toISOString() : null, rows: KW_SNAPSHOT_ROWS, alertsOn: site.alerts_enabled !== false,
     latest: now ? { takenOn: now.takenOn, keywords: now.keywords.length, total: now.total, whole: coverage(now), locationCode: now.locationCode, languageCode: now.languageCode, today: now.takenOn === String(d.today).slice(0, 10) } : null,
     nextDayAt: new Date(d.next).toISOString(),
     sameMarket: !now || (now.locationCode === (site.location_code ?? 2840) && now.languageCode === (site.language_code ?? "en")),
-    comparison: now && before ? compareKeywordSnapshots(now, before) : null,
+    comparison: cNow && cBefore ? compareKeywordSnapshots(cNow, cBefore) : null,
+    pair: cNow && cBefore ? { nowId: cNow.id, beforeId: cBefore.id, chosen: !!chosen } : null,
+    snapshots, snapshotCount: list.length ? Number(list[0].all_count) : 0,
   };
 }

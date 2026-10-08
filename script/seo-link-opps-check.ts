@@ -16,8 +16,11 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
   await ensureSeoSchema(); await ensureSiteScanSchema();
   await pool.query("DELETE FROM seo_sites WHERE domain='linkopps.example'"); await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://linkopps.example%'");
   const { rows: [site] } = await pool.query("INSERT INTO seo_sites(user_id, domain) VALUES(1,'linkopps.example') RETURNING id, domain");
-  const pages = [page("/", "Home", [`${H}/siding`, `${H}/roofing`]), page("/siding", "Siding"), page("/roofing", "Roofing"),
-    page("/blog/a", "We install vinyl siding and metal roofing."), ...Array.from({ length: 6 }, (_, i) => page(`/about-${i}`, "Family company."))];
+  // A printable copy of /roofing listed first (it names /roofing canonical), and a post that links to /roofing only
+  // through an old address that redirected there: read from the saved crawl, neither may produce a wrong suggestion.
+  const pages = [page("/roofing-print", "Roofing", [`${H}/`], { canonical: `${H}/roofing` }), page("/", "Home", [`${H}/siding`, `${H}/roofing`]), page("/siding", "Siding"),
+    page("/roofing", "Roofing", [`${H}/`], { redirects: [`${H}/old-roofing`] }),
+    page("/blog/a", "We install vinyl siding and metal roofing."), page("/blog/b", "Metal roofing explained.", [`${H}/old-roofing`]), ...Array.from({ length: 6 }, (_, i) => page(`/about-${i}`, "Family company."))];
   const job = async (user: number, ps: object[], ago: number) => pool.query(
     `INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,$2,$3,150,$4,'completed','{}'::jsonb, now() - $5::int * interval '1 hour')`,
     [randomUUID(), user, `${H}/`, JSON.stringify({ pages: ps }), ago]);
@@ -35,6 +38,7 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
   const a = await linkOpportunities(1, site);
   ok(a && a.items.length === 1 && a.items[0].keyword === "metal roofing" && a.items[0].from === `${H}/blog/a`, `only the keyword that ranks in its newest check is looked for: ${JSON.stringify(a?.items.map((i) => i.keyword))}`);
   ok(a && a.notRanking === 1, "the keyword that stopped ranking is counted as not ranking, not looked for with its old page");
+  ok(a && a.items.length === 1 && a.items[0].to === `${H}/roofing`, `the destination is the ranking page, not its canonical copy, and the post linking through the old address is left alone: ${JSON.stringify(a?.items.map((i) => [i.from, i.to]))}`);
   ok(a && a.items[0].position === 9 && a.items[0].device === "mobile" && a.items[0].place === "Bellingham, WA", `the position says its device and place: ${JSON.stringify(a?.items[0])}`);
   // A same-day change to the rank check is seen at once (the answer is not served from a stale copy).
   await check(metal, 0, "desktop", null, null); await check(metal, 0, "mobile", null, null);

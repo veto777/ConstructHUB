@@ -137,6 +137,24 @@ let answer: { keywords: [string, number][]; total?: number | null } = { keywords
   await pool.query("ALTER TABLE seo_keyword_snapshots DROP CONSTRAINT kw_test_block");
   await setKeywordWatch(1, s.id, false);
   ok((await site()).next_kw_snapshot_at === null, "turned off: nothing is due");
+  // 7b. History: every snapshot listed newest first; any two compared by id; the alert's own pair is the same comparison
+  // it was raised from; another account's snapshot, the same one twice, or the later one as "before" are refused.
+  const hv = await keywordWatchView(1, await site());
+  const ids = hv.snapshots.map((x) => x.id);
+  ok(hv.snapshots.length >= 3 && hv.snapshotCount === hv.snapshots.length && hv.snapshots.every((x, i) => i === 0 || x.takenOn < hv.snapshots[i - 1].takenOn) && hv.pair?.chosen === false, `snapshots listed newest first (${hv.snapshots.length})`);
+  const oldest = ids[ids.length - 1], newest = ids[0];
+  const pv = await keywordWatchView(1, await site(), { now: newest, before: oldest });
+  ok(pv.pair?.nowId === newest && pv.pair.beforeId === oldest && pv.pair.chosen && pv.comparison?.since === hv.snapshots[hv.snapshots.length - 1].takenOn, "two chosen snapshots are compared");
+  const al = (await pool.query("SELECT items FROM seo_alerts WHERE site_id=$1 AND kind IN ('kw_new','kw_lost') ORDER BY id LIMIT 1", [s.id])).rows[0]?.items?.[0];
+  if (al?.snapshotId && al?.beforeId) {
+    const av = await keywordWatchView(1, await site(), { now: al.snapshotId, before: al.beforeId });
+    const listed = new Set((al.keywords as { keyword: string }[]).map((k) => k.keyword));
+    const found = [...(av.comparison?.added ?? []), ...(av.comparison?.gone ?? [])].map((k) => k.keyword);
+    // (This script moves snapshot dates back to fake the passing months, so the pair is matched by id, not by date.)
+    ok(av.pair?.nowId === al.snapshotId && av.pair.beforeId === al.beforeId && [...listed].every((k) => found.includes(k)), `an alert's own pair shows the comparison it was raised from, with every keyword it kept: ${JSON.stringify({ listed: [...listed], found, pair: av.pair })}`);
+  } else ok(false, "an alert with its snapshot ids exists to open");
+  const refused = async (p: { now: number; before: number }, user = 1) => keywordWatchView(user, await site(), p).then(() => 0, (e) => e?.status ?? e?.statusCode ?? -1);
+  ok((await refused({ now: oldest, before: newest })) === 400 && (await refused({ now: newest, before: newest })) === 400 && (await refused({ now: newest, before: 99999999 })) === 404 && (await refused({ now: newest, before: oldest }, 2)) === 404, "the later one as 'before', the same twice, an unknown id and another account's request are refused");
   // 8. A site tracked in another country now than its snapshots were taken for: said, not passed off as the current one.
   await pool.query("UPDATE seo_sites SET location_code=2124 WHERE id=$1", [s.id]);
   ok((await keywordWatchView(1, await site())).sameMarket === false, "snapshots from the country the site used to be tracked in are flagged");

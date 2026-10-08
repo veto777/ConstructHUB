@@ -238,8 +238,12 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         // before the check existed — "not_measured").
         // `probes` names the part of the site each address stood for, so "fixed" can be judged part by part;
         // `answered` counts the ones that got an answer (one not allowed or unanswered stays in the list).
+        // planned = addresses meant to be asked; asked = sent (robots.txt allowed them); answered = got an answer.
         missingPageProbe: {
-          asked: state.missingPages?.length ?? 0,
+          planned: state.missingPages?.length ?? 0,
+          asked: (state.missingPages ?? []).filter(
+            (m) => !/^not asked/.test(m.note ?? ""),
+          ).length,
           answered: (state.missingPages ?? []).filter((m) => m.status > 0)
             .length,
           outcomes: (state.missingPages ?? []).map((m) => m.outcome),
@@ -261,7 +265,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           "Scores are heuristic audit indicators, not search rankings.",
           "HTML-only crawl; JavaScript is not executed.",
           state.missingPages?.some((m) => m.status > 0)
-            ? `${state.missingPages.length} address${state.missingPages.length === 1 ? "" : "es"} with no page ${state.missingPages.length === 1 ? "was" : "were"} looked at, to see how the site answers for a missing page: ${state.missingPages.map((m) => `${missingPageScope(m.url)} ${m.status > 0 ? `answered ${m.status}` : (m.note ?? "no answer")}`).join("; ")}.`
+            ? `To see how the site answers for a missing page, ${state.missingPages.length} made-up address${state.missingPages.length === 1 ? " was" : "es were"} planned: ${state.missingPages.map((m) => `${missingPageScope(m.url)} ${m.status > 0 ? `answered ${m.status}` : (m.note ?? "no answer")}`).join("; ")}.`
             : state.missingPages === undefined
               ? "How the site answers for a missing page was not measured in this crawl."
               : state.missingPagesNote === "robots"

@@ -50,13 +50,17 @@ function TrendCard({ s }: { s: Summary }) {
           </tbody>
         </table>
       </div>
-      <p className="g-text-2 mt-2 text-[12px]">Months can hold different questions and assistants, so a column is not like for like with the next — the comparison below is. Names are read from what the answers set in bold: one business written two ways can appear twice.</p>
+      <p className="g-text-2 mt-2 text-[12px]">Months can hold different questions and assistants, so a column is not like for like with the next — {s.compare ? "the comparison below is" : "no two months share a question asked of the same assistant yet, so there is no like-for-like comparison; ask the same questions again next month"}. Names are read from what the answers set in bold: one business written two ways can appear twice. Months are calendar months in UTC.</p>
+      {s.truncated && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>There are more saved answers than are read at once, so the oldest months here may be missing answers.</p>}
     </div>
   );
 }
 
 /** Two months, like for like: only the questions both months asked the same assistant. */
-function CompareCard({ c, vs, setVs, loading }: { c: Compare; vs: string | null; setVs: (m: string) => void; loading: boolean }) {
+function CompareCard({ c, vs, setVs, loading, truncated }: { c: Compare; vs: string | null; setVs: (m: string) => void; loading: boolean; truncated?: boolean }) {
+  // While a newly chosen month loads, the select shows the choice and the figures are dimmed; once loaded it shows the
+  // month the figures are for (the server falls back to the default when the chosen one can no longer be compared).
+  const pending = loading && !!vs && vs !== c.from;
   const line = (label: string, x: { before: number; after: number }) => (
     <li className="flex flex-wrap items-baseline gap-x-2"><span className="g-text">{label}</span><span className="g-text-2 tabular-nums">{of(x.before, c.pairs)} → {of(x.after, c.pairs)}</span><span className="g-text-2 text-[12px]">({change(x.before, x.after)})</span></li>
   );
@@ -65,11 +69,14 @@ function CompareCard({ c, vs, setVs, loading }: { c: Compare; vs: string | null;
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <h3 className="g-text text-[14px] font-medium">Like for like: {monthName(c.to)} against</h3>
         <label className="sr-only" htmlFor="ai-compare-month">Month to compare with</label>
-        <select id="ai-compare-month" className="g-select" value={vs ?? c.from} onChange={(e) => setVs(e.target.value)} data-testid="select-ai-compare">
+        <select id="ai-compare-month" className="g-select" value={pending ? vs! : c.from} onChange={(e) => setVs(e.target.value)} data-testid="select-ai-compare">
           {c.options.map((m) => <option key={m} value={m}>{monthName(m)}</option>)}
+          {pending && !c.options.includes(vs!) && <option value={vs!}>{monthName(vs!)}</option>}
         </select>
-        {loading && <span className="g-text-2 text-[12px]" role="status">Updating…</span>}
+        {pending && <span className="g-text-2 text-[12px]" role="status">Updating…</span>}
       </div>
+      {!loading && vs && vs !== c.from && <p className="mb-1 text-[12px]" role="status" style={{ color: "#b06000" }} data-testid="text-ai-compare-fallback">{monthName(vs)} can no longer be compared with {monthName(c.to)}; showing {monthName(c.from)}.</p>}
+      <div className={pending ? "opacity-50" : undefined}>
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-ai-compare-basis">Only the {fmtNum(c.pairs)} answer{c.pairs === 1 ? "" : "s"} to {fmtNum(c.questions)} question{c.questions === 1 ? "" : "s"} asked of the same assistant in both months count — so a change here is not from asking something different. {c.pairs < 6 ? "That is a small sample: one answer more or less moves it." : ""}</p>
       <ul className="mb-3 space-y-1 text-[13px]">{line("Named you", c.you)}{line("Used your website as a source", c.cited)}</ul>
       <div className="grid gap-4 md:grid-cols-2">
@@ -92,7 +99,9 @@ function CompareCard({ c, vs, setVs, loading }: { c: Compare; vs: string | null;
           )}
         </div>
       </div>
-      <p className="g-text-2 mt-2 text-[12px]">Counts are answers out of {fmtNum(c.pairs)}, biggest change first. Assistants' answers vary from one asking to the next, so a small change can be chance.</p>
+      <p className="g-text-2 mt-2 text-[12px]">Counts are answers out of {fmtNum(c.pairs)}, biggest change first{c.names.length >= 15 || c.sources.length >= 15 ? " (the 15 with the biggest change in each list)" : ""}. Assistants' answers vary from one asking to the next, so a small change can be chance. Months are calendar months in UTC.</p>
+      {truncated && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>There are more saved answers than are read at once; if {monthName(c.from)} is among the oldest, some of its answers may be missing here.</p>}
+      </div>
     </div>
   );
 }
@@ -113,8 +122,16 @@ function Bar({ n, total, label }: { n: number; total: number; label: string }) {
 
 export function AiSummaryPanel({ site }: { site: SeoSite }) {
   // Asked again when the window is looked at and every few minutes: the monthly questions, or another tab, may have added answers.
-  const [vs, setVs] = useState<string | null>(null);
-  const q = useQuery<Summary>({ queryKey: [`/api/seo/sites/${site.id}/ai/summary${vs ? `?vs=${vs}` : ""}`], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 60_000, refetchInterval: 5 * 60_000, placeholderData: (prev) => prev });
+  // The chosen month belongs to the site it was chosen for: another site starts from its own default.
+  const [chosen, setChosen] = useState<{ siteId: number; vs: string } | null>(null);
+  const vs = chosen?.siteId === site.id ? chosen.vs : null;
+  const setVs = (m: string) => setChosen({ siteId: site.id, vs: m });
+  const base = `/api/seo/sites/${site.id}/ai/summary`;
+  const q = useQuery<Summary>({
+    queryKey: [vs ? `${base}?vs=${vs}` : base], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 60_000, refetchInterval: 5 * 60_000,
+    // Keep showing the previous figures while another month loads — for the same site only.
+    placeholderData: (prev, prevQuery) => (typeof prevQuery?.queryKey[0] === "string" && prevQuery.queryKey[0].startsWith(base) ? prev : undefined),
+  });
   if (q.isLoading) return <p className="g-text-2 mb-4 text-[13px]" role="status" data-testid="ai-summary-loading">Adding up your saved answers…</p>;
   if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't add up your saved answers: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
   const s = q.data;
@@ -126,7 +143,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
       {s.byMonth.length < 2 && s.now.answers > 0 ? <p className="g-text-2 text-[13px]">One month of answers so far. Ask the same questions again next month — or tick "ask every month" — to see whether this moves.</p> : (
         <table className="g-table w-full">
           <thead><tr><th>Month</th><th className="num">Questions</th><th className="num">Named you</th><th className="num">Used your site</th></tr></thead>
-          <tbody>{s.byMonth.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td className="num">{fmtNum(m.questions)}</td><td className="num">{of(m.mentioned, m.answers)}</td><td className="num">{of(m.cited, m.answers)}</td></tr>)}</tbody>
+          <tbody>{s.byMonth.map((m) => <tr key={m.month}><td>{monthName(m.month)}</td><td className="num" data-label="Questions">{fmtNum(m.questions)}</td><td className="num" data-label="Named you">{of(m.mentioned, m.answers)}</td><td className="num" data-label="Used your site">{of(m.cited, m.answers)}</td></tr>)}</tbody>
         </table>
       )}
       {s.byMonth.length >= 2 && <p className="g-text-2 mt-2 text-[12px]">Each month counts the newest answer to each question from each assistant. Months can hold different questions and different assistants, so they are not like for like — the Questions column says how many each rests on.</p>}
@@ -138,7 +155,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
     <section className="mb-6" data-testid="ai-summary">
       <h2 className="g-text text-[16px] font-medium">The picture so far</h2>
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]" data-testid="text-ai-summary">No answers from the last {s.nowDays} days, so there is nothing to say about now. Ask your questions again to bring this up to date; the earlier months are below.</p>
-      <div className="grid gap-4 lg:grid-cols-2">{months}<TrendCard s={s} />{s.compare && <CompareCard c={s.compare} vs={vs} setVs={setVs} loading={q.isFetching} />}</div>
+      <div className="grid gap-4 lg:grid-cols-2">{months}<TrendCard s={s} />{s.compare && <CompareCard c={s.compare} vs={vs} setVs={setVs} loading={q.isFetching} truncated={s.truncated} />}</div>
     </section>
   );
   const others = s.sources.filter((x) => !x.ours);
@@ -158,7 +175,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
         </div>
         {months}
         <TrendCard s={s} />
-        {s.compare && <CompareCard c={s.compare} vs={vs} setVs={setVs} loading={q.isFetching} />}
+        {s.compare && <CompareCard c={s.compare} vs={vs} setVs={setVs} loading={q.isFetching} truncated={s.truncated} />}
         <div className="rounded-lg border p-4" style={card} data-testid="ai-summary-businesses">
           <h3 className="g-text mb-1 text-[14px] font-medium">Other names in the answers</h3>
           {s.businesses.length === 0 ? <p className="g-text-2 text-[13px]">No other name was picked out in these answers — which is not the same as no other business being mentioned.</p> : (
@@ -180,7 +197,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
                   {others.slice(0, 12).map((x) => (
                     <tr key={x.domain}>
                       <td className="max-w-[14rem] truncate"><Link href={`/seo/explorer?domain=${encodeURIComponent(x.domain)}`} className="g-link" title={`Open ${x.domain} in Site explorer`}>{x.domain}</Link>{x.rival && <span className="g-text-2 text-[12px]"> · a competitor you follow</span>}{x.directory && <span className="g-text-2 text-[12px]"> · a directory or profile site</span>}</td>
-                      <td className="num">{fmtNum(x.answers)}</td><td className="num">{fmtNum(x.questions)}</td>
+                      <td className="num" data-label="Answers">{fmtNum(x.answers)}</td><td className="num" data-label="Questions">{fmtNum(x.questions)}</td>
                       <td className="num">{x.directory && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-ai-${x.domain}`} tasks={[task(x)]} />}</td>
                     </tr>
                   ))}

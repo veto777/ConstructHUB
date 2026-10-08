@@ -148,7 +148,17 @@ export async function addTasks(userId: number, siteId: number, tasks: z.infer<ty
     const sources = [...new Set(tasks.map((t) => t.source).filter((s): s is string => !!s))];
     const { rows: have } = sources.length ? await client.query("SELECT source FROM seo_tasks WHERE site_id=$1 AND source = ANY($2::text[])", [siteId, sources]) : { rows: [] as any[] };
     const known = new Set<string>(have.map((r: any) => r.source));
-    const fresh = tasks.filter((t) => { if (!t.source) return true; if (known.has(t.source)) return false; known.add(t.source); return true; });
+    // A suggested internal link planned before tasks were identified by their pair of pages ("link-opp:<keyword>:<path>")
+    // is the same link: matched by the page it is on and the page it links to.
+    const pairs = tasks.some((t) => t.source?.startsWith("link-pair:"))
+      ? new Set<string>((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND source LIKE 'link-opp:%'", [siteId])).rows.map((r: any) => `${r.target}\u0000${r.link_to}`))
+      : new Set<string>();
+    const fresh = tasks.filter((t) => {
+      if (!t.source) return true;
+      if (known.has(t.source)) return false;
+      if (t.source.startsWith("link-pair:") && pairs.has(`${t.target}\u0000${t.facts.linkTo}`)) return false;
+      known.add(t.source); return true;
+    });
     const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);
     if (n + fresh.length > MAX_OPEN_TASKS) throw new TaskError(`The plan holds up to ${MAX_OPEN_TASKS} open tasks${fresh.length > 1 ? ` and these would make ${n + fresh.length}` : ""}. Finish or drop some first.`, 403);
     let added = 0;

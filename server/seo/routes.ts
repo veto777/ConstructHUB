@@ -55,7 +55,7 @@ import { rankHistory, keywordHistory } from "./rank-history";
 import { competingPages } from "./competing-pages";
 import { serpGroups } from "./serp-groups";
 import { aiSummary } from "./ai-summary";
-import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
+import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, comparePick, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
@@ -1255,9 +1255,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // ── Keyword watch: a monthly snapshot of what the site ranks for, compared with the one before ──
   // The setting, the newest snapshot and what changed since the one before. Saved rows only.
+  // ?now=<id>&before=<id>: compare those two of the site's snapshots instead of the newest two (an alert opens its own pair).
   route("get", "/api/seo/sites/:id/keyword-watch", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    res.json(await keywordWatchView(user, site));
+    const pick = req.query.now !== undefined || req.query.before !== undefined ? comparePick.safeParse({ now: req.query.now, before: req.query.before }) : null;
+    if (pick && !pick.success) return res.status(400).json({ message: "Choose two snapshots to compare." });
+    res.json(await keywordWatchView(user, site, pick?.data));
   });
   // Turn the monthly snapshot on or off. Spends nothing itself; the scheduler takes snapshots from the month's included data.
   route("post", "/api/seo/sites/:id/keyword-watch", async (req, res, user) => {

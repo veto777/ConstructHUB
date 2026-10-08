@@ -68,4 +68,8 @@ describe("AI visibility added up", () => {
     expect(summariseAi(rows, { now, vs: "2026-01" }).compare!.from).toBe("2026-09");
     expect(summariseAi([rows[0]], { now }).compare).toBeNull();
   });
+  it("the business's own web address is matched whole: a longer address that contains it is another business", () => {
+    const s = summariseAi([a("q", "chatgpt", "2026-10-01", { businesses: ["notalpine.example", "Alpine.example roofing", "www.alpine.example"] })], { now, domain: "alpine.example" });
+    expect(s.businesses.map((b) => b.name)).toEqual(["notalpine.example"]);
+  });
 });

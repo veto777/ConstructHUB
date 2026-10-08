@@ -14,15 +14,21 @@ import { api, fmtDate, fmtNum, money, useSeoStatus, type SeoSite } from "./shell
 
 type Kw = { keyword: string; position: number | null; volume: number | null; traffic: number | null; path: string | null; was?: number | null };
 type Comparison = { since: string; takenOn: string; locationCode: number; languageCode: string; basis: "whole" | "top" | "unknown" | "none"; added: Kw[]; gone: Kw[]; now: { keywords: number; total: number | null }; before: { keywords: number; total: number | null } };
-type View = { watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; nextDayAt?: string; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
+type Snap = { id: number; takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string };
+export type KwPick = { siteId: number; now: number; before: number };
+type View = { pair: { nowId: number; beforeId: number; chosen: boolean } | null; snapshots: Snap[]; snapshotCount: number; watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; nextDayAt?: string; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 
-export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a keyword in the rank tracker. */ onTrack?: (keywords: Kw[]) => void }) {
+export function KeywordWatch({ site, onTrack, pick, onPick }: {
+  site: SeoSite; /** Track a keyword in the rank tracker. */ onTrack?: (keywords: Kw[]) => void;
+  /** Two snapshots to compare instead of the newest two (an alert opens its own); null = the newest two. */ pick?: KwPick | null; onPick?: (p: KwPick | null) => void;
+}) {
   const status = useSeoStatus();
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${site.id}/keyword-watch`;
-  const q = useQuery<View>({ queryKey: [key], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 30_000 });
+  const mine = pick && pick.siteId === site.id ? pick : null;
+  const q = useQuery<View>({ queryKey: [mine ? `${key}?now=${mine.now}&before=${mine.before}` : key], refetchOnMount: "always", refetchOnWindowFocus: true, staleTime: 30_000, placeholderData: (prev) => prev });
   const [tab, setTab] = useState<"added" | "gone">("added");
   // The day for snapshots changes at midnight UTC: when it does, what can be taken changes, so the panel asks again then.
   const boundary = q.data?.nextDayAt;
@@ -35,7 +41,7 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
   }, [boundary, key]); // eslint-disable-line react-hooks/exhaustive-deps
   const newDay = boundary ? new Date(boundary).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : null;
   const [shown, setShown] = useState(50);
-  const done = () => { void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); };
+  const done = () => { void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith(key) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); };
   const set = useMutation({
     mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/keyword-watch`, { watch: v.watch }),
     onSuccess: (_d: unknown, v) => { done(); toast({ title: v.watch ? "Keyword watch is on" : "Keyword watch is off", description: v.watch ? "A snapshot is taken once a month from your included SEO data — the next date is shown here. From the second snapshot on, changes that qualify can raise an alert." : "Snapshots already taken are kept." }); },
@@ -51,12 +57,17 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
   const available = status.data?.credits ? status.data.credits.availableCents : -1;
   const canPay = price != null && (available === -1 || available >= price);
   if (q.isLoading) return <p className="g-text-2 mb-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading the keyword watch…</p>;
-  if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert">Couldn't load the keyword watch: {apiErrorMessage(q.error)} <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button></p>;
+  if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert" data-testid="keyword-watch-error">Couldn't load the keyword watch: {apiErrorMessage(q.error)} {mine && onPick ? <button type="button" className="g-link" onClick={() => onPick(null)}>Show the newest two snapshots</button> : <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button>}</p>;
   const d = q.data;
   if (!d) return null;
   const c = d.comparison, list = c ? (tab === "added" ? c.added : c.gone) : [];
   const whole = c?.basis === "whole";
   const place = (x: { locationCode: number; languageCode: string }) => marketLabel(x.locationCode, x.languageCode);
+  const snapLabel = (x: Snap) => `${fmtDate(x.takenOn)} — ${fmtNum(x.keywords)} keyword${x.keywords === 1 ? "" : "s"}${x.whole === false ? " (cut at the limit)" : x.whole === null ? " (total not known)" : ""}`;
+  const nowSnap = d.snapshots.find((x) => x.id === d.pair?.nowId), beforeSnap = d.snapshots.find((x) => x.id === d.pair?.beforeId);
+  const choose = (now: number, before: number) => onPick?.({ siteId: site.id, now, before });
+  // Earlier snapshots that can be compared with the chosen "now" one: the same country and language only.
+  const earlier = (n: Snap) => d.snapshots.filter((x) => x.takenOn < n.takenOn);
   return (
     <section className="mb-6 rounded-lg border p-4" style={card} data-testid="keyword-watch">
       <div className="flex flex-wrap items-start gap-3">
@@ -81,8 +92,24 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
       </div>
       {!d.alertsOn && d.watch && <p className="g-text-2 mt-2 text-[13px]" role="status" data-testid="keyword-watch-alerts-off">Alerts are switched off for this site (Rank tracker → Tracking settings), so changes are shown here but not sent.</p>}
       {d.latest && !d.sameMarket && <p className="mt-2 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="keyword-watch-other-market">These snapshots were taken for {place(d.latest)}; the site is now tracked in another country or language. The next snapshot starts a new comparison.</p>}
+      {d.snapshots.length >= 2 && onPick && nowSnap && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="keyword-watch-pick" aria-busy={q.isFetching}>
+          <label className="flex items-center gap-1"><span className="g-text-2">Compare</span>
+            <select className="g-select" value={nowSnap.id} data-testid="select-kw-now"
+              onChange={(e) => { const n = d.snapshots.find((x) => x.id === Number(e.target.value))!; const b = earlier(n).find((x) => x.locationCode === n.locationCode && x.languageCode === n.languageCode) ?? earlier(n)[0]; if (b) choose(n.id, b.id); }}>
+              {d.snapshots.filter((x) => earlier(x).length > 0).map((x) => <option key={x.id} value={x.id}>{snapLabel(x)}</option>)}
+            </select></label>
+          <label className="flex items-center gap-1"><span className="g-text-2">with</span>
+            <select className="g-select" value={beforeSnap?.id ?? ""} data-testid="select-kw-before" onChange={(e) => choose(nowSnap.id, Number(e.target.value))}>
+              {earlier(nowSnap).map((x) => <option key={x.id} value={x.id}>{snapLabel(x)}{x.locationCode !== nowSnap.locationCode || x.languageCode !== nowSnap.languageCode ? ` · ${place(x)} — not comparable` : ""}</option>)}
+            </select></label>
+          {d.pair?.chosen && <button type="button" className="g-link" onClick={() => onPick(null)} data-testid="button-kw-newest">Back to the newest two</button>}
+          {q.isFetching && <span className="g-text-2 text-[12px]" role="status">Loading…</span>}
+          <span className="g-text-2 w-full text-[12px]">{fmtNum(d.snapshotCount)} snapshot{d.snapshotCount === 1 ? "" : "s"} on record{d.snapshotCount > d.snapshots.length ? `; the newest ${fmtNum(d.snapshots.length)} can be chosen here` : ""}. Snapshots are never rewritten, so a comparison of two of them always shows the same thing.</span>
+        </div>
+      )}
       {d.latest && !c && <p className="g-text-2 mt-3 text-[13px]" data-testid="keyword-watch-first">One snapshot so far, so there is nothing to compare yet. The next one shows what changed.</p>}
-      {c && c.basis === "none" && <p className="g-text-2 mt-3 text-[13px]" role="status">The last two snapshots were taken for different countries or languages, so they are not compared.</p>}
+      {c && c.basis === "none" && <p className="g-text-2 mt-3 text-[13px]" role="status">{d.pair?.chosen ? "These two snapshots" : "The last two snapshots"} were taken for different countries or languages, so they are not compared.</p>}
       {c && c.basis !== "none" && (
         <div className="mt-3">
           <p className="g-text mb-2 text-[13px]" data-testid="text-keyword-watch-summary">
@@ -98,7 +125,7 @@ export function KeywordWatch({ site, onTrack }: { site: SeoSite; /** Track a key
           {list.length === 0 ? <p className="g-text-2 text-[13px]">None.</p> : (
             <div className="overflow-x-auto">
               <table className="g-table w-full" data-testid={`table-keyword-watch-${tab}`}>
-                <thead><tr><th>Keyword</th><th className="num">{tab === "added" ? "Position now" : "Position before"}</th><th className="num">Volume / mo</th><th className="num" title="Estimated visits a month from this search">Est. visits</th><th>Page</th>{tab === "added" && onTrack && <th><span className="sr-only">Track</span></th>}</tr></thead>
+                <thead><tr><th>Keyword</th><th className="num">{tab === "added" ? `Position ${fmtDate(c.takenOn)}` : `Position ${fmtDate(c.since)}`}</th><th className="num">Volume / mo</th><th className="num" title="Estimated visits a month from this search">Est. visits</th><th>Page</th>{tab === "added" && onTrack && <th><span className="sr-only">Track</span></th>}</tr></thead>
                 <tbody>
                   {list.slice(0, shown).map((k) => (
                     <tr key={k.keyword}>
