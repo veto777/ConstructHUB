@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-schedule-from-client",
+  "durationSec": 63,
+  "video": {
+    "key": "tutorials/crm-schedule-from-client.8294a677.mp4",
+    "bytes": 4897882,
+    "sha256": "8294a6772461838624a0cd3b6969a94111948bda1f62f10200777cab7a360b0d"
+  },
+  "captions": {
+    "key": "tutorials/crm-schedule-from-client.422d4499.vtt",
+    "bytes": 1249,
+    "sha256": "422d44997e2c0f9900d13ec6e7cb085652dd17a2e1df05cbe45a54dae9d66cb2"
+  },
+  "poster": {
+    "key": "tutorials/crm-schedule-from-client.a1de533d.jpg",
+    "bytes": 74716,
+    "sha256": "a1de533d6c81ef2c8c84f6fdea16721465a67f9686611788d2dcf61670b369eb"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:35:01.653Z",
+    "video": "9e4041d0828993475760586d6e33dfc8",
+    "captions": "137895ca8f66e3ace133a206fd7f45a1",
+    "poster": "59f04e52385783c5ae09b4f4d651828e"
+  }
+}
