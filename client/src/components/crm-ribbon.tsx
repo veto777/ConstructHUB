@@ -9,7 +9,8 @@ import { Link, useLocation } from "wouter";
 import { marketingUrl } from "@/lib/site";
 import { AppPushCard } from "@/components/app-push-card";
 import { inNativeApp } from "@/lib/app-shell";
-import { CRM_TAB_DEFAULT, CRM_TAB_OPTIONS, resolveTabs, type TabOption } from "@shared/tab-bar";
+import { CRM_TAB_DEFAULT, CRM_TAB_OPTIONS, resolveTabs, type TabOption, tabAllowed } from "@shared/tab-bar";
+import { CRM_ESTIMATES_MENU, crmHasAny } from "@shared/crm-access";
 import { CRM_TAB_ICONS, activeTabKey, useSaveTabPrefs, useTabPrefs } from "@/lib/tab-prefs";
 import { TabBarPicker } from "@/components/tab-bar-picker";
 import {
@@ -35,6 +36,8 @@ const MORE_LINKS: {
   infoKey: string;
   /** Permission required to see this item; undefined = everyone. */
   perm?: string;
+  /** …or any one of several. */
+  anyOf?: readonly string[];
   /** Platform admins only (ConstructHUB staff — see /api/crm/me). */
   platformAdmin?: boolean;
   active: (l: string) => boolean;
@@ -44,21 +47,21 @@ const MORE_LINKS: {
     infoKey: "pipeline",
     active: (l) => l.startsWith("/crm/pipeline") || l.startsWith("/crm/projects") },
   { title: "Estimates", url: "/crm/estimates", icon: FileText, testid: "ribbon-more-estimates",
-    infoKey: "estimates",
+    infoKey: "estimates", anyOf: CRM_ESTIMATES_MENU,
     active: (l) => l.startsWith("/crm/estimates") && l !== "/crm/estimates/new" },
-  // The one-tap fast path — the action a field user wants from the driveway.
+  // The one-tap fast path from the driveway — for the seats that may write estimates (the API refuses the rest).
   { title: "New estimate", url: "/crm/estimates/new", icon: FilePlus2, testid: "ribbon-more-new-estimate",
-    infoKey: "estimate-new",
+    infoKey: "estimate-new", perm: "manageEstimates",
     active: (l) => l === "/crm/estimates/new" },
   // Gated like the API: invoices are money, seePrices only.
   { title: "Invoices", url: "/crm/invoices", icon: ReceiptText, testid: "ribbon-more-invoices",
     infoKey: "invoices", perm: "seePrices",
     active: (l) => l.startsWith("/crm/invoices") },
   { title: "Price book", url: "/crm/pricebook", icon: BookOpen, testid: "ribbon-more-pricebook",
-    infoKey: "pricebook",
+    infoKey: "pricebook", perm: "seePrices",
     active: (l) => l.startsWith("/crm/pricebook") },
   { title: "Payments", url: "/crm/payments", icon: CreditCard, testid: "ribbon-more-payments",
-    infoKey: "payments",
+    infoKey: "payments", perm: "seePrices",
     active: (l) => l.startsWith("/crm/payments") },
   { title: "Team & Company", url: "/crm/team", icon: Building2, testid: "ribbon-more-team",
     infoKey: "team",
@@ -133,7 +136,7 @@ export function CrmRibbon() {
   const saveTabs = useSaveTabPrefs();
   const [customizing, setCustomizing] = useState(false);
   // A tab the person can't open (Inbox without manageCustomers, Invoices without seePrices) is never shown.
-  const can = (o: TabOption) => !o.perm || me?.permissions?.[o.perm] !== false;
+  const can = (o: TabOption) => tabAllowed(o, me?.permissions, false);
   const tabs = resolveTabs(prefs.data?.crmTabs, CRM_TAB_OPTIONS, CRM_TAB_DEFAULT, can);
   const activeKey = activeTabKey(tabs, location);
   const moreActive = !activeKey && MORE_LINKS.some((l) => l.active(location));
@@ -183,7 +186,7 @@ export function CrmRibbon() {
               }
             />
             {MORE_LINKS.filter((l) =>
-              (!l.perm || me?.permissions?.[l.perm] === true) &&
+              crmHasAny(me?.permissions, l.anyOf ?? (l.perm ? [l.perm] : [])) &&
               (!l.platformAdmin || me?.isPlatformAdmin === true),
             ).map((l) => (
               <div key={l.url} className="flex items-center gap-1">

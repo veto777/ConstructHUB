@@ -44,7 +44,8 @@ export function EstimateEngagement({ estimate: e, canManage, onChanged }: Props)
   const { toast } = useToast();
   const { data: eng } = useQuery<any>({
     queryKey: [`/api/crm/estimates/${e.id}/engagement`],
-    enabled: !!e.sentAt,
+    // Who opened the bid is for the seats that write estimates (the API refuses the rest).
+    enabled: !!e.sentAt && canManage,
   });
 
   const extend = useMutation({

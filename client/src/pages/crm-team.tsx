@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -138,23 +139,8 @@ const ROLE_BLURB: Record<string, string> = {
   subcontractor: "Outside crew. Sees only assigned work — never clients or pricing.",
 };
 
-const PERM_LABEL: Record<string, string> = {
-  viewAllJobs: "See all jobs (not just their own)",
-  manageJobs: "Create and edit jobs",
-  manageCustomers: "Manage clients",
-  manageEstimates: "Create and send estimates",
-  manageInvoices: "Create and send invoices",
-  takePayment: "Take payments",
-  seePrices: "See prices",
-  seeCosts: "See costs and margins",
-  approveChangeOrders: "Approve change orders",
-  managePriceBook: "Manage the price book",
-  manageTeam: "Manage team and invitations",
-  manageSettings: "Manage company settings",
-  seeReporting: "See reporting",
-  manageIntegrations: "Manage integrations",
-  exportData: "Export client data (CSV)",
-};
+/** The switch labels — one list for the page, the audit log and the "ask your admin" cards (shared/crm-access.ts). */
+const PERM_LABEL: Record<string, string> = CRM_PERMISSION_LABELS;
 
 /** Owner-only expandable audit feed for one member — everything they did, newest first. */
 function MemberActivity({ memberId }: { memberId: string }) {
