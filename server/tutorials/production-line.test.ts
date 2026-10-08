@@ -93,7 +93,8 @@ describe("thumbnails", () => {
     expect(read("scripts/tutorials/assets/Anton-OFL.txt")).toContain("SIL Open Font License");
   });
   it("a headline is two to five words and its accent is one of them", () => {
-    const base = { helpKey: "crm-x", title: "x", viewport: { width: 1024, height: 576 }, steps: [{ action: "wait", caption: "c", narration: "n" }] };
+    const base = { helpKey: "crm-x", title: "x", viewport: { width: 1024, height: 576 }, steps: [{ action: "highlight", selector: "h1", caption: "c", narration: "n" }] };
+    expect(() => parseTutorialScript({ ...base, steps: [{ action: "click", selector: "h1", caption: "c", narration: "n" }], thumbnail: { headline: "Send estimates fast", step: 0 } })).toThrow();
     expect(() => parseTutorialScript({ ...base, thumbnail: { headline: "Send estimates fast", accent: "fast", step: 0 } })).not.toThrow();
     expect(() => parseTutorialScript({ ...base, thumbnail: { headline: "Estimates", step: 0 } })).toThrow();
     expect(() => parseTutorialScript({ ...base, thumbnail: { headline: "Send estimates fast", accent: "slow", step: 0 } })).toThrow();
