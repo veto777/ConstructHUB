@@ -24,6 +24,7 @@ export { default as e_crm_pamphlets } from "./crm/crm-pamphlets";
 export { default as e_crm_payment_link } from "./crm/crm-payment-link";
 export { default as e_crm_payment_methods } from "./crm/crm-payment-methods";
 export { default as e_crm_price_floor } from "./crm/crm-price-floor";
+export { default as e_crm_pricebook_formulas } from "./crm/crm-pricebook-formulas";
 export { default as e_crm_pricebook_materials_labor } from "./crm/crm-pricebook-materials-labor";
 export { default as e_crm_project_budget } from "./crm/crm-project-budget";
 export { default as e_crm_scheduled_exports } from "./crm/crm-scheduled-exports";

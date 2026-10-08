@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-estimate-tax-deposit",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/crm-estimate-tax-deposit.29f6c02e.mp4",
+    "bytes": 6230423,
+    "sha256": "29f6c02e2516a72b3a9c0b080817dc25e0c7bdca31b24a91c0b4713421a582d8"
+  },
+  "captions": {
+    "key": "tutorials/crm-estimate-tax-deposit.2b4db28b.vtt",
+    "bytes": 1586,
+    "sha256": "2b4db28b1ce5e437b667112975bb538ad2264083ca32bc88ecd583fd42f991d3"
+  },
+  "poster": {
+    "key": "tutorials/crm-estimate-tax-deposit.148b50ba.jpg",
+    "bytes": 83673,
+    "sha256": "148b50ba5add32bd03cec7527cad87cebe9d8d5e620000c4824e8596096add40"
+  },
+  "uploaded": {
+    "at": "2026-10-08T06:51:22.933Z",
+    "video": "65e71ee5116832a2d0d97f6de60767f1",
+    "captions": "f2162e7f9187bf1ddc0a1aa79c89e130",
+    "poster": "191f38f587fb2b1ec259d23e54fb7d64"
+  }
+}
