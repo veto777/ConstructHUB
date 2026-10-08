@@ -17,7 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
-import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, claimDeadline, type Deadline, type DfsTask } from "./dataforseo";
 import { createHash } from "node:crypto";
 import { withBudget, SeoBudgetError } from "./budget";
 import { estimateLabsUsd } from "./pricing";
@@ -72,10 +72,10 @@ export function parseSnapshotKeyword(item: any): SnapshotKeyword | null {
   // The source's own figure, unrounded: it is rounded once, after adding up.
   return { keyword, position: num(serp.rank_group) ?? num(serp.rank_absolute), volume: num(kd?.keyword_info?.search_volume), traffic: etv, path, url, ...(serp.url != null && !url ? { urlRejected: true } : {}) };
 }
-export async function fetchKeywordSnapshot(input: { domain: string; locationCode: number; languageCode: string }): Promise<{ data: { total: number | null; fetched: number; keywords: SnapshotKeyword[] }; costUsd: number }> {
+export async function fetchKeywordSnapshot(input: { domain: string; locationCode: number; languageCode: string; /** The claim owner's deadline (see dataforseo.ts Deadline). */ deadline?: Deadline }): Promise<{ data: { total: number | null; fetched: number; keywords: SnapshotKeyword[] }; costUsd: number }> {
   const task: DfsTask = assertOk(await keywordWatchDeps.request("POST", "/dataforseo_labs/google/ranked_keywords/live", [{
     target: input.domain, location_code: input.locationCode, language_code: input.languageCode, item_types: ["organic"], limit: KW_SNAPSHOT_ROWS, order_by: ["ranked_serp_element.serp_item.etv,desc"],
-  }]), { treatNoResultsAsEmpty: true });
+  }], undefined, { deadline: input.deadline }), { treatNoResultsAsEmpty: true });
   const items = taskItems(task), seen = new Set<string>(), keywords: SnapshotKeyword[] = [];
   for (const i of items) { const k = parseSnapshotKeyword(i); if (k && !seen.has(k.keyword)) { seen.add(k.keyword); keywords.push(k); } }
   return { data: { total: num((task.result?.[0] as any)?.total_count), fetched: items.length, keywords }, costUsd: typeof task.cost === "number" ? task.cost : 0 };
@@ -267,6 +267,8 @@ export async function latestSnapshots(userId: number, siteId: number, upTo?: str
 type WatchSite = { id: number; user_id: number; domain: string; location_code: number; language_code: string };
 /** Longer than a snapshot can take (one request to the source, a minute at most, plus saving), so a live owner is not displaced. */
 const CLAIM_MINUTES = 10;
+/** How long the scheduler leases a due site for (never bought twice within it). */
+const LEASE_HOURS = 6;
 /**
  * Take the day's snapshot — or return it, if there already is one (`reused`, nothing bought: one snapshot a day, never
  * rewritten). Days are the database's, which runs in UTC; the day is read ONCE and used for the look-up and the save
@@ -280,13 +282,18 @@ const CLAIM_MINUTES = 10;
  * Saved inside the charged call (SAVED FIRST, CHARGED SECOND). The monthly one (`lease` given) spends only the
  * month's included data and is taken only if, when its turn comes, the watch is still on AND the site's next date is
  * still the one the scheduler leased — a snapshot taken by hand meanwhile moves that date, and the monthly one stands down.
+ * `outerDeadline`: the scheduler's own lease deadline, when the call is made under one (the earlier deadline counts).
  */
-export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, lease?: string): Promise<{ id: number; takenOn: string; keywords: number; reused: boolean }> {
+export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, lease?: string, outerDeadline?: Deadline): Promise<{ id: number; takenOn: string; keywords: number; reused: boolean }> {
   const token = randomUUID();
+  // The claim can be taken over CLAIM_MINUTES after it was taken, and the checks around a request cannot stop one already
+  // in flight: so the source is asked only while a request's full timeout, plus a margin, still ends inside the claim.
+  const claimedAt = Date.now();
   const { rows: [claim] } = await pool.query(
     `UPDATE seo_sites SET kw_snapshot_claim = now(), kw_snapshot_claim_token = $3 WHERE id=$1 AND user_id=$2 AND (kw_snapshot_claim IS NULL OR kw_snapshot_claim < now() - interval '${CLAIM_MINUTES} minutes')
      RETURNING current_date::text AS today`, [site.id, site.user_id, token]);
   if (!claim) throw new KeywordWatchBusy();
+  const deadline = Math.min(claimDeadline(claimedAt, CLAIM_MINUTES * 60_000), outerDeadline ?? Infinity);
   const day = String(claim.today).slice(0, 10);
   const mine = async (db: { query: typeof pool.query } = pool) => ((await db.query("SELECT 1 FROM seo_sites WHERE id=$1 AND kw_snapshot_claim_token=$2", [site.id, token])).rowCount ?? 0) > 0;
   const standDown = { id: 0, takenOn: "", keywords: 0, reused: true };
@@ -311,7 +318,7 @@ export async function takeKeywordSnapshot(site: WatchSite, automatic: boolean, l
     const out = await withBudget(site.user_id, KW_SNAPSHOT_ESTIMATE_USD, async () => {
       // Still the owner? (Reserving the budget can wait on the database.) If not, nothing is asked of the source.
       if (!(await mine())) throw Object.assign(new KeywordWatchBusy(), { costUsd: 0, costUnknown: false });
-      const o = await fetchKeywordSnapshot({ domain: site.domain, locationCode: site.location_code ?? 2840, languageCode: site.language_code ?? "en" });
+      const o = await fetchKeywordSnapshot({ domain: site.domain, locationCode: site.location_code ?? 2840, languageCode: site.language_code ?? "en", deadline });
       const fail = (why: string) => Object.assign(new Error(`keyword snapshot for ${site.domain} could not be saved: ${why}`), { costUsd: o.costUsd, costUnknown: false, notSaved: true });
       const client = await pool.connect();
       try {
@@ -389,15 +396,19 @@ export async function runDueKeywordSnapshots(): Promise<number> {
   const { rows: owed } = await pool.query(
     "SELECT site_id FROM seo_keyword_snapshots WHERE alerts_done = false GROUP BY site_id ORDER BY min(alerts_tried_at) NULLS FIRST, site_id LIMIT 20").catch(() => ({ rows: [] as any[] }));
   for (const o of owed) await settleKeywordAlerts(o.site_id).catch((e) => console.error(`[seo] keyword alerts for site ${o.site_id} failed: ${e?.message ?? e}`));
+  // Once the lease runs out a later pass leases the site again; this pass's buying ends a request's timeout and a
+  // margin before that (the snapshot's own ten-minute claim ends it sooner still).
+  const leasedAt = Date.now();
   const { rows: due } = await pool.query(
-    `UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '6 hours' WHERE kw_watch AND next_kw_snapshot_at <= now() RETURNING id, user_id, domain, location_code, language_code, next_kw_snapshot_at::text AS lease`);
+    `UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '${LEASE_HOURS} hours' WHERE kw_watch AND next_kw_snapshot_at <= now() RETURNING id, user_id, domain, location_code, language_code, next_kw_snapshot_at::text AS lease`);
+  const deadline = claimDeadline(leasedAt, LEASE_HOURS * 3600_000);
   let done = 0;
   for (const site of due) {
     try {
       // Every date this pass writes is written only while the site's date is still the one it leased: a snapshot taken
       // by hand meanwhile, or a newer pass, has moved it, and then it is theirs.
       if (!(await keywordWatchDeps.entitled(site.user_id))) { await pool.query("UPDATE seo_sites SET next_kw_snapshot_at = now() + interval '1 day' WHERE id=$1 AND kw_watch AND next_kw_snapshot_at::text = $2", [site.id, site.lease]); continue; }
-      const out = await takeKeywordSnapshot(site, true, site.lease);
+      const out = await takeKeywordSnapshot(site, true, site.lease, deadline);
       if (!out.reused) done++;
     } catch (e: any) {
       if (e instanceof KeywordWatchBusy) continue;   // the customer is taking one right now; the lease brings this site back later

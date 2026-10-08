@@ -19,7 +19,7 @@ type Report = {
   rankings: { byTag?: { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number; weighted?: boolean; changeWeighted?: boolean | null }[]; moreTags?: number; tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[] } | null;
   search: { fetchedAt: string } | null;
-  searchConsole?: { clicks: number } | null;
+  searchConsole?: { clicks: number; /** The server's verdict on the reads of these days: unfinished / failed, or not checkable (`completenessUnknown`) — the counts may be short and are not compared. */ incomplete?: boolean; completenessUnknown?: boolean } | null;
   audit: { scannedAt: string | null; health: number | null; topIssues: { title: string; severity: string; count: number }[] } | null;
   auditUnreadable?: string | null; auditUnavailable?: boolean;
   alerts: { title: string; kind: string; createdAt: string }[];
@@ -152,6 +152,7 @@ export default function SeoReportsPage() {
                 <ul className="g-text space-y-0.5 text-[13px]">{r.alerts.map((a, i) => <li key={i}><span className="g-text-2">{fmtDate(a.createdAt)}</span> — {a.title}</li>)}</ul>
               </section>
             )}
+            {r.searchConsole?.incomplete && <p className="g-text-2 text-[13px]" role="note" data-testid="report-gsc-incomplete">Search Console: {r.searchConsole.completenessUnknown ? "whether every one of these days was fully read from Google could not be checked" : "some of these days are still being read from Google, or a read of them failed"}, so the clicks and impressions above may be short and are not compared with the 28 days before.</p>}
             {!r.searchConsole && <p className="g-text-2 text-[13px]" data-testid="report-gsc-missing">Want real clicks in this report, not just estimates? <Link href="/search-console" className="g-link">Connect Google Search Console</Link> for {site.domain} and the report adds Google's own count of clicks and impressions.</p>}
             <p className="g-text-2 text-[12px]">The PDF has the same content{d.brandName ? `, under the name "${d.brandName}"` : ""}. Set your own name and logo for reports under <Link href="/site-scan" className="g-link">Site Scan → Branding</Link>. Missing a section? It appears once that tool has numbers for this site.</p>
           </div>

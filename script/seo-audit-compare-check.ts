@@ -63,5 +63,28 @@ const H = "https://compare.example";
   ok(rep?.audit === null && typeof rep?.auditUnreadable === "string", "the client report says the newest crawl could not be read, with no older score");
   await pool.query("DELETE FROM seo_sites WHERE id=$1", [s1.id]);
   await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://compare.example%' OR url LIKE 'https://elsewhere.example%'");
+  // A Google-profile gap ("no page for Gutters") is fixed only on positive evidence read from the stored crawl: the same
+  // profile still lists it AND a page of THIS crawl names it in its title or an H1 (the crawler's own rule). An empty
+  // crawl, or pages saved without titles, is "not re-checked" — never a fix (audit #55).
+  const G = "https://gapsite.example";
+  const gapJob = async (pages: unknown[], findings: unknown[], ago: number) => {
+    const id = randomUUID();
+    await pool.query(`INSERT INTO sitescan_jobs(id, user_id, url, page_cap, state, status, report, completed_at) VALUES($1,1,$2,150,$3,'completed',$4, now() - $5::int * interval '1 minute')`,
+      [id, `${G}/`, JSON.stringify({ pages }), JSON.stringify({ profile: { id: 5, services: ["Gutters"], service_areas: [] }, findings }), ago]);
+    return id;
+  };
+  const gapFinding = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: [`${G}/`], why: "w", fix: "f" };
+  const withGap = await gapJob([{ url: `${G}/`, status: 200, redirects: [], title: "Home", h1: ["Welcome"] }], [gapFinding], 60);
+  const named = await gapJob([{ url: `${G}/`, status: 200, redirects: [], title: "Home", h1: ["Welcome"] }, { url: `${G}/gutters`, status: 200, redirects: [], title: "Services", h1: ["Seamless GUTTERS"] }], [], 30);
+  const byH1 = await siteAudit(1, "gapsite.example");
+  ok(byH1.audit?.jobId === named && byH1.audit.fixed.map((f) => f.key).join() === "gap-services" && !byH1.audit.notRechecked.length, `a page naming the service in an H1, read from the stored crawl: fixed (${JSON.stringify(byH1.audit?.fixed)})`);
+  const empty = await gapJob([], [], 20);
+  const nothing = await siteAudit(1, "gapsite.example", { vs: withGap });
+  ok(nothing.audit?.jobId === empty && nothing.audit.comparedWith?.jobId === withGap && !nothing.audit.fixed.length && nothing.audit.notRechecked.map((f) => f.key).join() === "gap-services", `an empty crawl with the same profile (no gap raised): not re-checked, never fixed (${JSON.stringify(nothing.audit?.notRechecked)})`);
+  await pool.query("DELETE FROM sitescan_jobs WHERE id=$1", [empty]);
+  const untitled = await gapJob([{ url: `${G}/gutters`, status: 200, redirects: [], title: 7, h1: "Gutters" }], [], 10);
+  const malformed = await siteAudit(1, "gapsite.example", { vs: withGap });
+  ok(malformed.audit?.jobId === untitled && malformed.audit.comparedWith?.jobId === withGap && !malformed.audit.fixed.length && malformed.audit.notRechecked.map((f) => f.key).join() === "gap-services", "pages saved with a title and H1s in the wrong form have nothing to match: not re-checked");
+  await pool.query("DELETE FROM sitescan_jobs WHERE url LIKE 'https://gapsite.example%'");
   console.log(`audit compare checks passed: ${n}`); await pool.end();
 })().catch((e) => { console.error("FAILED", e); process.exit(1); });

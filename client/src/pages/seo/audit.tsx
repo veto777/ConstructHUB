@@ -388,7 +388,7 @@ export default function SeoAuditPage() {
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">
               <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
-              <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages, a page didn't answer normally this time (an error or a redirect), didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
+              <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages (or read no pages at all), a page didn't answer normally this time (an error or a redirect), didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>

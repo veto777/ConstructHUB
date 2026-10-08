@@ -14,6 +14,7 @@
  */
 import { z } from "zod";
 import { pool } from "../db";
+import { isCountryLabel } from "@shared/seo-markets";
 import { request, assertOk, normalizeBusinessName, safeHttpUrl, safeDomain } from "./dataforseo";
 
 export const AI_SCHEMA_DDL = [
@@ -288,7 +289,8 @@ export async function aiHistory(userId: number, siteId: number): Promise<AiPromp
 export function suggestPrompts(keywords: { keyword: string; location: string | null }[], max = 6): string[] {
   const out: string[] = [], seen = new Set<string>();
   for (const k of keywords) {
-    const city = k.location && k.location !== "United States" ? k.location.split(",")[0].trim() : null;
+    // A keyword's place is a city only when it is finer than a whole country (a site's own country is a place too).
+    const city = k.location && !isCountryLabel(k.location) ? k.location.split(",")[0].trim() : null;
     const kw = k.keyword.replace(/\b(near me|best|top|cost|price|prices)\b/gi, "").replace(/\s+/g, " ").trim();
     if (!kw || kw.split(" ").length > 5) continue;
     const q = city ? `Who are the best ${kw} companies in ${city}? Name specific businesses.` : `Who are the best ${kw} companies near me? Name specific businesses.`;

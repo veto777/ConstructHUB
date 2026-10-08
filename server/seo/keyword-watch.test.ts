@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareKeywordSnapshots, comparePick, pagesChanged, pageKey, visitsComparable, fetchKeywordSnapshot, coverage, keywordAlerts, keywordWatchDeps, parseSnapshotKeyword, KW_SNAPSHOT_ROWS, type KeywordSnapshot, type SnapshotKeyword } from "./keyword-watch";
+import { dataforseoDeps, DataForSeoError } from "./dataforseo";
 
 const k = (keyword: string, position: number | null, volume: number | null = 100, traffic: number | null = 10): SnapshotKeyword => ({ keyword, position, volume, traffic, path: "/" });
 const snap = (takenOn: string, keywords: SnapshotKeyword[], total: number | null = keywords.length, over: Partial<KeywordSnapshot> = {}): KeywordSnapshot => ({ id: Number(takenOn.replace(/-/g, "")), takenOn, locationCode: 2840, languageCode: "en", total, fetched: keywords.length, keywords, ...over });
@@ -116,5 +117,26 @@ describe("keyword watch", () => {
     const rows = Array.from({ length: 300 }, (_, i) => parseSnapshotKeyword({ keyword_data: { keyword: `k${i}` }, ranked_serp_element: { serp_item: { rank_group: 9, etv: 0.00016, relative_url: "/p" } } })!);
     expect(pagesChanged(rows, [], "h")[0].after.visits).toBe(0);   // 0.048, shown to one decimal
     expect(rows.reduce((a, r) => a + (r.traffic ?? 0), 0)).toBeCloseTo(0.048, 6);
+  });
+  it("a snapshot taken under a claim asks the source under the claim's deadline; past it, nothing is asked", async () => {
+    const real = keywordWatchDeps.request;
+    try {
+      let seen: any;
+      keywordWatchDeps.request = (async (_m: string, _p: string, _b: any, _r: any, opts: any) => { seen = opts; return { status_code: 20000, tasks: [{ status_code: 20000, cost: 0.01, result: [{ total_count: 0, items: [] }] }] }; }) as any;
+      await fetchKeywordSnapshot({ domain: "alpine.example", locationCode: 2840, languageCode: "en", deadline: 1234 });
+      expect(seen).toEqual({ deadline: 1234 });
+      await fetchKeywordSnapshot({ domain: "alpine.example", locationCode: 2840, languageCode: "en" });
+      expect(seen).toEqual({ deadline: undefined });
+    } finally { keywordWatchDeps.request = real; }
+    // Through the real client: a deadline already passed sends nothing, and the failure says it cost nothing.
+    const env = dataforseoDeps.env, fetch = dataforseoDeps.fetch;
+    try {
+      let calls = 0;
+      dataforseoDeps.env = () => ({ DATAFORSEO_LOGIN: "x", DATAFORSEO_PASSWORD: "y" }) as any;
+      dataforseoDeps.fetch = (async () => { calls++; return new Response("{}"); }) as any;
+      const e: any = await fetchKeywordSnapshot({ domain: "alpine.example", locationCode: 2840, languageCode: "en", deadline: Date.now() - 1 }).catch((x) => x);
+      expect(e).toBeInstanceOf(DataForSeoError);
+      expect([e.code, e.costUsd, e.costUnknown, calls]).toEqual(["timeout", 0, false, 0]);
+    } finally { dataforseoDeps.env = env; dataforseoDeps.fetch = fetch; }
   });
 });

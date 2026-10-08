@@ -249,10 +249,25 @@ export const SEO_SCHEMA_DDL = [
   )`,
   // A rank run remembers what paid for it and how many checks were accepted, to refund the ones that never come back.
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS reservation_id uuid`,
-  // A finished run owes its alerts until they are saved: set in the same statement that closes the run, cleared only
-  // once they are, so a crash or a failure in between is settled later (never silently dropped). Runs from before: none owed.
+  // Set by an earlier version, which closed a run first and saved its alerts after (a crash in between left them owed).
+  // Today both happen in one transaction, so no new run owes; a run still owing is settled by settleOwedRankAlerts
+  // (server/seo/jobs.ts) — raised from its own checks, or said to be lost on the run — and then cleared.
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS alerts_due boolean NOT NULL DEFAULT false`,
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS posted integer NOT NULL DEFAULT 0`,
+  // Not every lookup the run asked for came back with a result (null until the run is closed). Runs closed before the
+  // column existed: worked out from their counts, once.
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS partial boolean`,
+  `UPDATE seo_rank_runs SET partial = (checked < total) WHERE partial IS NULL AND status IN ('done','failed')`,
+  // A refund still owed (refund_due) is tried again until it is made — the one tried longest ago first; never given up.
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS refund_tries integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS refund_tried_at timestamptz`,
+  // Alert deliveries are tried again later and later (next_try_at); one given up after DELIVERY_TRIES is marked
+  // (delivery_failed_at) and stays on the Alerts page as not sent, counted — never forgotten. An email given up after
+  // EMAIL_TRIES is marked the same way (the bell entry went out).
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS delivery_tries integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS next_try_at timestamptz`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS delivery_failed_at timestamptz`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS email_failed_at timestamptz`,
   ...TASK_SCHEMA_DDL,
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS starred boolean NOT NULL DEFAULT false`,
   // Service-area planner: the services and towns a site used last ({ services: [...], towns: [...] }).

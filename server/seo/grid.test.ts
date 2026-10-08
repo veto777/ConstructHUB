@@ -137,4 +137,40 @@ describe("local grid", () => {
     expect(gridEstimateUsd(49)).toBeGreaterThan(49 * GRID_POINT_USD);
     expect(gridEstimateUsd(9)).toBeCloseTo(0.0225, 6);
   });
+  it("a scan under a deadline: lookups cut off at it are unknown tries; after it nothing is sent, second tries included", async () => {
+    const real = gridDeps.request;
+    const ok = (title: string) => ({ status_code: 20000, tasks: [{ status_code: 20000, status_message: "Ok.", cost: 0.002, result: [{ items: [{ type: "local_pack", title, cid: "9877668871764835558" }] }] }] });
+    try {
+      // Nine points start together, each under the scan's deadline. Four answer at once; five hang until the deadline
+      // passes and are then cut off, as the client cuts them off; from then on the client sends nothing (and says so
+      // at no cost) — so the two second tries the scan is allowed are not made.
+      let calls = 0, passed = false, hung = 0;
+      const seen = new Set<number | undefined>();
+      let release!: () => void; const gate = new Promise<void>((r) => { release = r; });
+      gridDeps.request = (async (_m: string, _p: string, _b: any, _r: any, opts: any) => {
+        seen.add(opts?.deadline);
+        if (passed) throw new DataForSeoError("timeout", "not sent: the deadline had passed", 0, undefined, false);
+        calls++;
+        if (calls <= 4) return ok("Alpine Exteriors");
+        hung++; await gate;
+        throw new DataForSeoError("timeout", "cut off at the deadline");
+      }) as any;
+      const deadline = Date.now() + 60_000;
+      const running = fetchGrid({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com", deadline });
+      while (hung < 5) await new Promise((r) => setTimeout(r, 5));
+      passed = true; release();
+      const out = await running;
+      expect([...seen]).toEqual([deadline]);
+      expect(calls).toBe(9);
+      expect(out.data.summary).toMatchObject({ points: 9, checked: 4, found: 4 });
+      expect(out.data.points.filter((p) => p.failed)).toHaveLength(5);
+      expect(out.customerUsd).toBeCloseTo(4 * GRID_POINT_USD, 6);
+      // Ours: the four that answered, and one lookup's price for each of the five cut off (billed or not, we cannot tell); nothing for what was never sent.
+      expect(out.costUsd).toBeCloseTo(9 * GRID_POINT_USD, 6);
+      expect(out.costUnknown).toBe(false);
+      // Past the deadline from the start: no point is looked up, the scan fails, and its cost is known to be nothing.
+      const failed: any = await fetchGrid({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com", deadline: Date.now() - 1 }).catch((e) => e);
+      expect([calls, failed instanceof Error, failed.costUsd, failed.costUnknown, failed.cause?.costUnknown]).toEqual([9, true, 0, false, false]);
+    } finally { gridDeps.request = real; }
+  });
 });

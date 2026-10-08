@@ -11,6 +11,10 @@ now and shown later. Platform admins may (the `admin` block, `GET /api/seo/admin
   `white-label.test.ts`, and to `ASKS_PROVIDER` if it calls the source while the request waits. Update the route count.
 - **An error the customer should read as written** (a limit, "not found"): throw a class that extends
   `SeoCustomerError`. A plain `Error`'s text is never shown.
+- **Something that could not be done just now and can simply be asked for again** (a one-at-a-time section held in
+  another process past its wait — `server/seo/locks.ts` — or the newest crawl replaced while it was read): throw
+  `new SeoRetryableError(code)`; its copy and status (503 / 409) live in `SEO_RETRY`, and the body carries
+  `code` and `retryable: true`. Add any new case to `SEO_RETRY`, which also makes it a known note.
 - **Background work that saves a note** (rank run, grid scan): save `publicFailure(e, "neutral fallback")` or a fixed
   sentence, and add every new fixed sentence to `KNOWN_NOTES`. Return saved notes through `publicNote(...)`.
 - **Never return to a customer:** `e.message`, an upstream `status_message`, any `...Usd` / `cost_usd` /

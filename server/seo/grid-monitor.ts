@@ -21,12 +21,14 @@ import { pool } from "../db";
 import { getEntitlements } from "../entitlements";
 import { seoIncluded } from "./plan";
 import { withBudget, SeoBudgetError } from "./budget";
-import { isConfigured } from "./dataforseo";
+import { isConfigured, claimDeadline, type Deadline } from "./dataforseo";
 import { SeoCustomerError } from "./public-errors";
 import { saveAlert, deliverAlert } from "./alerts";
-import { GRID_DEPTH, GRID_SIZES, GRID_SPACINGS, beginScan, failScan, fetchGrid, finishScan, gridEstimateUsd, readPin, type GridPin, type GridScan } from "./grid";
+import { GRID_DEPTH, GRID_SIZES, GRID_SPACINGS, GRID_STALE_MINUTES, beginScan, failScan, fetchGrid, finishScan, gridEstimateUsd, readPin, type GridPin, type GridScan } from "./grid";
 
 export const MAX_WATCHES = 5;
+/** How long a pass holds a due watch (one scan takes a minute or two). */
+const LEASE_HOURS = 2;
 const literal = <T extends readonly number[]>(values: T) => z.number().refine((n): n is T[number] => (values as readonly number[]).includes(n), "Not one of the choices");
 export const watchInput = z.object({
   keyword: z.string().trim().min(1).max(120),
@@ -146,9 +148,9 @@ export async function deleteWatch(userId: number, siteId: number, watchId: numbe
  * Run one scan into its row: the results are written inside the charged call (saved first, charged second), so a
  * scan is never paid for and then missing. Throws what went wrong; the caller records it on the row.
  */
-export async function runGridScan(userId: number, site: { id: number; domain: string }, pin: GridPin, input: { keyword: string; size: number; spacing: number }, scanId: number, opts: { allowanceOnly?: boolean; label: string }): Promise<GridScan> {
+export async function runGridScan(userId: number, site: { id: number; domain: string }, pin: GridPin, input: { keyword: string; size: number; spacing: number }, scanId: number, opts: { allowanceOnly?: boolean; label: string; /** When the scan must stop asking the source (see dataforseo.ts Deadline). */ deadline?: Deadline }): Promise<GridScan> {
   const out = await withBudget(userId, gridEstimateUsd(input.size * input.size), async () => {
-    const o = await fetchGrid({ ...input, pin, domain: site.domain });
+    const o = await fetchGrid({ ...input, pin, domain: site.domain, deadline: opts.deadline });
     let saved = false, lastError: unknown = null;
     for (let attempt = 1; attempt <= 3 && !saved; attempt++) {
       try { saved = await finishScan(scanId, o.data, o.costUsd); if (!saved) break; }
@@ -267,10 +269,13 @@ export async function runDueGridWatches(): Promise<number> {
     await raiseOwedGridAlerts().catch((e) => console.error("[seo] owed grid comparisons failed", e?.message ?? e));
     if (!isConfigured()) return 0;
     const token = randomUUID();
+    // Once the lease runs out another pass takes the watch over; this pass's lookups must all be over before then.
+    const leasedAt = Date.now();
     const { rows: due } = await pool.query(
-      `UPDATE seo_grid_watches SET lease_until = now() + interval '2 hours', lease_token = $1
+      `UPDATE seo_grid_watches SET lease_until = now() + interval '${LEASE_HOURS} hours', lease_token = $1
         WHERE id IN (SELECT id FROM seo_grid_watches WHERE next_at <= now() AND (lease_until IS NULL OR lease_until < now()) ORDER BY next_at LIMIT 2 FOR UPDATE SKIP LOCKED)
        RETURNING id, user_id, site_id, keyword, size, spacing::float8 AS spacing, every, anchor_at, next_at, run_scan_id`, [token]);
+    const leaseDeadline = claimDeadline(leasedAt, LEASE_HOURS * 3600_000);
     for (const w of due) {
       /** Only the holder of the lease records anything; a watch that was stopped, or taken over, answers false. */
       const mine = async (sql: string, args: unknown[] = []) => ((await pool.query(`UPDATE seo_grid_watches SET ${sql} WHERE id=$1 AND lease_token=$2`, [w.id, token, ...args])).rowCount ?? 0) > 0;
@@ -296,12 +301,16 @@ export async function runDueGridWatches(): Promise<number> {
         const { rows: [site] } = await pool.query("SELECT id, domain, grid_pin FROM seo_sites WHERE id=$1 AND user_id=$2", [w.site_id, w.user_id]);
         const pin = site ? readPin(site.grid_pin) : null;
         if (!site || !pin) { await backOff("1 day"); continue; }
+        // A scan "running" for GRID_STALE_MINUTES is closed as interrupted and may be replaced: its lookups end a
+        // request's timeout and a margin before that (sooner than the lease ends), so the two can never both pay.
+        const begun = Date.now();
         const started = await beginScan(w.user_id, site.id, { keyword: w.keyword, size: w.size, spacing: w.spacing });
         if (started.existing) { await backOff("15 minutes"); continue; } // the customer is scanning right now
         scanId = started.id;
         // The scan is tied to the period BEFORE anything is bought. If the watch was stopped meanwhile, nothing is bought.
         if (!(await mine("run_scan_id = $3", [scanId]))) { await failScan(scanId, "The scan was interrupted before it finished. Lookups it had not made were not charged.").catch(() => {}); continue; }
-        await runGridScan(w.user_id, site, pin, { keyword: w.keyword, size: w.size, spacing: w.spacing }, scanId, { allowanceOnly: true, label: `Local grid — "${String(w.keyword).slice(0, 80)}", ${w.size} × ${w.size} points (${w.every})` });
+        await runGridScan(w.user_id, site, pin, { keyword: w.keyword, size: w.size, spacing: w.spacing }, scanId,
+          { allowanceOnly: true, label: `Local grid — "${String(w.keyword).slice(0, 80)}", ${w.size} × ${w.size} points (${w.every})`, deadline: Math.min(leaseDeadline, claimDeadline(begun, GRID_STALE_MINUTES * 60_000)) });
         bought = true; // saved and charged: from here on nothing may untie it from the period
         if (await closePeriod(scanId)) done++;
       } catch (e: any) {

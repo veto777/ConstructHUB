@@ -6,9 +6,12 @@
  * alerts. Making or sending a report never spends SEO data.
  */
 import { gridReportLines, type GridReportLine } from "./grid-monitor";
+import fs from "node:fs";
+import path from "node:path";
 import PDFDocument from "pdfkit";
 import { z } from "zod";
 import { pool } from "../db";
+import { countryLabel } from "@shared/seo-markets";
 import { tagOverview } from "./rank-tags";
 import { siteAudit } from "./audit";
 
@@ -86,7 +89,8 @@ export type SiteReport = {
   audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
-  searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; /** The newest day synced; the 28 days end here. */ through?: string | null; syncedAt?: string | null } | null;
+  searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; /** The newest day synced; the 28 days end here. */ through?: string | null; syncedAt?: string | null;
+    /** A read of these days is still running or failed, or whether every read finished could not be established (`completenessUnknown`): the counts may be short, so no change is shown. */ incomplete?: boolean; completenessUnknown?: boolean } | null;
   alerts: { title: string; kind: string; createdAt: string }[];
   /** Repeating local grids: the newest scan of each with the comparable one before it. */
   grids?: GridReportLine[];
@@ -203,9 +207,10 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
   const primary = site.devices === "mobile" ? "mobile" : "desktop";
   const [{ rows: checks }, { rows: [saved] }, audit, gsc, { rows: alerts }] = await Promise.all([
     pool.query(
-      `SELECT c.keyword_id AS "keywordId", k.keyword, NULLIF(k.location_name, 'United States') AS location, k.search_volume AS volume, c.device, c.checked_on::text AS "checkedOn",
+      // A keyword's place is named only when it is not the site's own country (the default place of its keywords).
+      `SELECT c.keyword_id AS "keywordId", k.keyword, NULLIF(k.location_name, $2::text) AS location, k.search_volume AS volume, c.device, c.checked_on::text AS "checkedOn",
               c.position, c.local_position AS local, (jsonb_typeof(c.local_pack)='array' AND jsonb_array_length(c.local_pack)>0) AS "hasPack", k.tags
-         FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id WHERE c.site_id=$1 AND c.checked_on >= current_date - 120`, [site.id]),
+         FROM seo_rank_checks c JOIN seo_keywords k ON k.id=c.keyword_id WHERE c.site_id=$1 AND c.checked_on >= current_date - 120`, [site.id, countryLabel(site.location_code)]),
     pool.query(`SELECT report FROM seo_domain_reports WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$4 ORDER BY created_at DESC LIMIT 1`, [userId, site.domain, site.location_code, site.language_code]),
     siteAudit(userId, site.domain).catch((e) => { if (opts.strict) throw e; return "unavailable" as const; }),
     reportDeps.searchConsole(userId, site.domain).catch(() => null),
@@ -250,7 +255,9 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
       topIssues: a.issues.slice(0, 6).map((i) => ({ title: i.title, severity: i.severity, count: i.count })),
     } : null,
     // Nothing synced for the last 28 days is no section at all, rather than a row of zeros.
-    searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null } : null,
+    searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null,
+      // The summary's own completeness verdict travels with the numbers (the PDF, the email and the report page all say it).
+      ...(gsc.incomplete ? { incomplete: true } : {}), ...(gsc.completenessUnknown ? { completenessUnknown: true } : {}) } : null,
     alerts,
     grids,
     work,
@@ -261,17 +268,32 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
 
 const n = (v: number | null | undefined) => (v == null ? "—" : Math.round(v).toLocaleString("en-US"));
 const rnd = (v: number | null | undefined) => (v == null ? null : Math.round(v));
-/** Both 28-day periods are complete; only then is the difference a change and not missing days. (One rule for the PDF, the email and the rank tracker tile.) */
-export const gscComparable = (g: NonNullable<SiteReport["searchConsole"]>) => g.previousClicks !== null && (g.days ?? 28) >= GSC_MIN_DAYS && (g.previousDays ?? 28) >= GSC_MIN_DAYS;
+/**
+ * Both 28-day periods are complete — every day there, and every read of them finished (the summary's verdict, the same
+ * rule as the by-page report); only then is the difference a change and not missing days. (One rule for the PDF, the
+ * email and the rank tracker tile.)
+ */
+export const gscComparable = (g: NonNullable<SiteReport["searchConsole"]>) => g.previousClicks !== null && (g.days ?? 28) >= GSC_MIN_DAYS && (g.previousDays ?? 28) >= GSC_MIN_DAYS && !g.incomplete;
 export const GSC_MIN_DAYS = 28;
 const gscChange = (g: NonNullable<SiteReport["searchConsole"]>, now: number | null, before: number | null) => (gscComparable(g) && now !== null && before !== null ? signed(now - before) : "");
+/** Why the reads of these days do not count as complete, in a few words; null when they do. */
+const gscReadNote = (g: NonNullable<SiteReport["searchConsole"]>) => (!g.incomplete ? null : g.completenessUnknown ? "whether every day was fully read from Search Console is not known" : "some days are still being read from Search Console, or a read failed");
 /** The period in words, with its end date and anything missing from either window — the same text wherever these numbers are shown. */
 export const gscPeriod = (g: NonNullable<SiteReport["searchConsole"]>) => {
   const days = g.days ?? 28, before = g.previousDays ?? 28;
-  const notes = [days < GSC_MIN_DAYS ? `${days} of 28 days synced` : null, before < GSC_MIN_DAYS ? `not compared: ${before} of the 28 days before are synced` : null].filter(Boolean);
+  const read = gscReadNote(g);
+  const notes = [days < GSC_MIN_DAYS ? `${days} of 28 days synced` : null, before < GSC_MIN_DAYS ? `not compared: ${before} of the 28 days before are synced` : null, read ? `${before < GSC_MIN_DAYS ? "" : "not compared: "}${read}` : null].filter(Boolean);
   return `${g.through ? `28 days to ${g.through}` : "last 28 days"}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 };
-const gscPartial = (g: NonNullable<SiteReport["searchConsole"]>) => ((g.days ?? 28) < GSC_MIN_DAYS ? `Only ${g.days} of these 28 days have been synced from Search Console, so the counts are incomplete and are not compared with the period before.` : null);
+/** The sentence under the Search Console counts: what they rest on, and why no comparison is shown when none is. */
+export const gscNote = (g: NonNullable<SiteReport["searchConsole"]>) => {
+  if ((g.days ?? 28) < GSC_MIN_DAYS) return `Only ${g.days} of these 28 days have been synced from Search Console, so the counts are incomplete and are not compared with the period before.`;
+  if (g.incomplete) return g.completenessUnknown
+    ? "These are Google's own counts for the site, but whether every one of these days was fully read from Search Console could not be checked, so they are not compared with the 28 days before."
+    : "These are Google's own counts for the site, but some of these days (or of the 28 before) are still being read from Search Console, or a read of them failed: the counts may be short, so they are not compared with the 28 days before.";
+  if (gscComparable(g)) return "These are Google's own counts for the site. Changes in brackets compare with the 28 days before.";
+  return "These are Google's own counts for the site. The 28 days before are not fully synced, so no comparison is shown.";
+};
 const day = (iso: string | null | undefined) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—");
 const signed = (v: number | null | undefined) => (v == null || v === 0 ? "" : ` (${v > 0 ? "+" : "−"}${n(Math.abs(v))})`);
 const where = (m: { location: string | null }) => (m.location ? ` in ${m.location}` : "");
@@ -319,29 +341,106 @@ export const reportIsEmpty = (r: SiteReport) => !r.rankings && !r.search && !r.a
 
 // ── PDF ────────────────────────────────────────────────────────────────────
 
+/** Whether a PDF font has a glyph for a code point. */
+type HasGlyph = (codePoint: number) => boolean;
 /** Characters the built-in PDF font can draw beyond Latin-1 (its Windows-1252 extras). */
 const WIN_ANSI_EXTRA = new Set(Array.from("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ"));
-/** Text the built-in font can draw: control characters and line breaks become spaces; anything else it lacks becomes "?". */
-// The minus sign the app uses (U+2212) is not in the PDF font: it is written as a hyphen-minus, never as "?".
-export const pdfSafe = (t: string) => Array.from(String(t).normalize("NFC").replace(/\u2212/g, "-").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " "))
-  .map((c) => { const n = c.codePointAt(0)!; return (n >= 0x20 && n <= 0x7e) || (n >= 0xa0 && n <= 0xff) || WIN_ANSI_EXTRA.has(c) ? c : "?"; }).join("");
+/** What PDFKit's built-in Helvetica can draw: Windows-1252 and nothing else. */
+const winAnsi: HasGlyph = (n) => (n >= 0x20 && n <= 0x7e) || (n >= 0xa0 && n <= 0xff) || WIN_ANSI_EXTRA.has(String.fromCodePoint(n));
 
-/** The report as a PDF. `brand` is the account's white-label name and logo (Site Scan branding), when set. */
-export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; logo?: string | null } | null): Promise<Buffer> {
+/** Text as the PDF font draws it: control characters and line breaks become spaces; a character the font has no glyph for
+ *  becomes "?" and is counted as lost (an embedded font would draw it as nothing at all). Without a glyph lookup the
+ *  built-in font's Windows-1252 is assumed. */
+// The minus sign the app uses (U+2212) is written as a hyphen-minus when the font lacks it, never as "?".
+function pdfChars(t: string, hasGlyph: HasGlyph = winAnsi): { text: string; lost: boolean } {
+  let lost = false;
+  const text = Array.from(String(t).normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ")).map((c) => {
+    const n = c.codePointAt(0)!;
+    if (hasGlyph(n)) return c;
+    if (n === 0x2212) return "-";
+    lost = true;
+    return "?";
+  }).join("");
+  return { text, lost };
+}
+/** Text the PDF font can draw (see pdfChars); `hasGlyph` is the embedded font's lookup, or absent for the built-in font. */
+export const pdfSafe = (t: string, hasGlyph?: HasGlyph) => pdfChars(t, hasGlyph).text;
+/** Whether the PDF would lose a character of the text (draw it as "?"). */
+export const pdfLoses = (t: string, hasGlyph?: HasGlyph) => pdfChars(t, hasGlyph).lost;
+
+/** The report's own font: DejaVu Sans (server/data/fonts, with its licence), which covers Latin, Greek, Cyrillic, Arabic and
+ *  Hebrew where the built-in Helvetica stops at Windows-1252. CJK and the like still have no glyph and are drawn as "?". */
+const FONT_FILES = { regular: "DejaVuSans.ttf", bold: "DejaVuSans-Bold.ttf" } as const;
+/** dev: server/data/fonts, built: dist/data/fonts (script/build.ts copies server/data). */
+export function reportFontDir(): string {
+  const here = import.meta.dirname || __dirname;
+  const candidates = [path.join(here, "data", "fonts"), path.join(here, "..", "data", "fonts")];
+  return candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
+}
+type FontFiles = { regular: Buffer; bold: Buffer };
+const fontFiles = new Map<string, FontFiles | null>();
+/** The font files, read once per directory. A directory whose fonts cannot be used stays unusable for the process. */
+const readFontFiles = (dir: string): FontFiles | null => {
+  if (!fontFiles.has(dir)) {
+    try { fontFiles.set(dir, { regular: fs.readFileSync(path.join(dir, FONT_FILES.regular)), bold: fs.readFileSync(path.join(dir, FONT_FILES.bold)) }); }
+    catch (e) { fontsUnusable(dir, e); }
+  }
+  return fontFiles.get(dir)!;
+};
+// Said once per directory: the report still goes out, in the built-in font, with "?" for what that font cannot show.
+const fontsUnusable = (dir: string, e: unknown) => {
+  fontFiles.set(dir, null);
+  console.warn(`SEO report PDF: the DejaVu fonts in ${dir} cannot be used (${e instanceof Error ? e.message : String(e)}); using the built-in Helvetica, which cannot show characters beyond Windows-1252.`);
+};
+
+/** The fonts one report is set in, with the text rules they need. */
+type ReportFonts = { regular: string; bold: string; safe: (t: string) => string; loses: (t: string) => boolean };
+const BUILT_IN_FONTS: ReportFonts = { regular: "Helvetica", bold: "Helvetica-Bold", safe: (t) => pdfSafe(t), loses: (t) => pdfLoses(t) };
+/** DejaVu registered with the document and opened, or the built-in fonts exactly as before when it cannot be. */
+export function reportFonts(doc: PDFKit.PDFDocument, dir: string): ReportFonts {
+  const files = readFontFiles(dir);
+  if (!files) return BUILT_IN_FONTS;
+  try {
+    doc.registerFont("ReportSans", files.regular);
+    doc.registerFont("ReportSans-Bold", files.bold);
+    // PDFKit's view of an opened font (fontkit) knows which characters it has glyphs for. Both faces are asked: a character
+    // set in bold must exist in bold, and the two differ in a few rare code points.
+    type Opened = { _font?: { font?: { hasGlyphForCodePoint?: (n: number) => boolean } } };
+    const lookups = (["ReportSans-Bold", "ReportSans"] as const).map((name) => {
+      const font = (doc.font(name) as unknown as Opened)._font?.font;
+      const has = font?.hasGlyphForCodePoint;
+      if (typeof has !== "function") throw new Error(`PDFKit gave no glyph lookup for ${name}`);
+      return (n: number) => has.call(font, n);
+    });
+    const hasGlyph: HasGlyph = (n) => lookups.every((has) => has(n));
+    return { regular: "ReportSans", bold: "ReportSans-Bold", safe: (t) => pdfSafe(t, hasGlyph), loses: (t) => pdfLoses(t, hasGlyph) };
+  } catch (e) {
+    fontsUnusable(dir, e);
+    return BUILT_IN_FONTS;
+  }
+}
+
+/** The report as a PDF. `brand` is the account's white-label name and logo (Site Scan branding), when set; `fontDir` is where
+ *  the report's font files are (tests point it elsewhere). */
+export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; logo?: string | null } | null, deps: { fontDir?: string } = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 48, size: "LETTER", info: { Title: `SEO report — ${r.domain}`, Author: pdfSafe(brand?.name || "ConstructHUB") } });
+    const doc = new PDFDocument({ margin: 48, size: "LETTER", info: { Title: `SEO report — ${r.domain}` } });
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
+    const fonts = reportFonts(doc, deps.fontDir ?? reportFontDir());
+    // Everything drawn below goes through the rule of the font this report is actually set in.
+    const pdfSafe = fonts.safe;
+    doc.info.Author = pdfSafe(brand?.name || "ConstructHUB");
     const width = doc.page.width - 96, ink = "#1a1a2e", soft = "#666666", rule = "#dddddd";
     const room = (h: number) => { if (doc.y + h > doc.page.height - 60) doc.addPage(); };
-    const heading = (t: string) => { room(60); doc.moveDown(1).fontSize(14).fillColor(ink).font("Helvetica-Bold").text(pdfSafe(t)).moveDown(0.3); doc.moveTo(48, doc.y).lineTo(48 + width, doc.y).strokeColor(rule).stroke().moveDown(0.5); doc.font("Helvetica").fontSize(10).fillColor(ink); };
-    const pair = (label0: string, value0: string) => { const label = pdfSafe(label0), value = pdfSafe(value0); room(18); const y = doc.y; doc.fontSize(10).fillColor(soft).text(label, 48, y, { width: width * 0.55 }); doc.fillColor(ink).font("Helvetica-Bold").text(value, 48 + width * 0.55, y, { width: width * 0.45, align: "right" }).font("Helvetica"); doc.x = 48; doc.moveDown(0.35); };
+    const heading = (t: string) => { room(60); doc.moveDown(1).fontSize(14).fillColor(ink).font(fonts.bold).text(pdfSafe(t)).moveDown(0.3); doc.moveTo(48, doc.y).lineTo(48 + width, doc.y).strokeColor(rule).stroke().moveDown(0.5); doc.font(fonts.regular).fontSize(10).fillColor(ink); };
+    const pair = (label0: string, value0: string) => { const label = pdfSafe(label0), value = pdfSafe(value0); room(18); const y = doc.y; doc.fontSize(10).fillColor(soft).text(label, 48, y, { width: width * 0.55 }); doc.fillColor(ink).font(fonts.bold).text(value, 48 + width * 0.55, y, { width: width * 0.45, align: "right" }).font(fonts.regular); doc.x = 48; doc.moveDown(0.35); };
     const line = (t0: string, color = ink) => { const t = pdfSafe(t0); room(16); doc.fontSize(10).fillColor(color).text(t, 48, doc.y, { width }); doc.moveDown(0.2); };
 
     try { if (brand?.logo && /^data:image\/(png|jpe?g);base64,/.test(brand.logo)) { doc.image(Buffer.from(brand.logo.split(",")[1], "base64"), { fit: [150, 60] }); doc.moveDown(0.5); } } catch { /* an unreadable logo must not stop the report */ }
-    doc.fontSize(22).fillColor(ink).font("Helvetica-Bold").text(`SEO report`).font("Helvetica").fontSize(13).fillColor(soft).text(r.domain);
+    doc.fontSize(22).fillColor(ink).font(fonts.bold).text(`SEO report`).font(fonts.regular).fontSize(13).fillColor(soft).text(pdfSafe(r.domain));
     doc.fontSize(10).text(`${day(r.generatedAt)}${r.comparedWith ? ` · rankings compared with ${day(r.comparedWith)}` : ""}${brand?.name ? ` · prepared by ${pdfSafe(brand.name)}` : ""}`);
 
     if (reportIsEmpty(r)) { doc.moveDown(2).fontSize(11).fillColor(ink).text("There is nothing to report yet. Add keywords to the rank tracker, analyse the site in Site Explorer, and run a site audit — the next report will have their numbers.", { width }); doc.end(); return; }
@@ -355,20 +454,20 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       if (k.improved.length) { line(k.improvedCount > k.improved.length ? `Moved up — the ${k.improved.length} biggest of ${k.improvedCount}` : "Moved up", "#188038"); for (const m of k.improved) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
       if (k.declined.length) { line(k.declinedCount > k.declined.length ? `Moved down — the ${k.declined.length} biggest of ${k.declinedCount}` : "Moved down", "#c5221f"); for (const m of k.declined) line(`  • ${moverLine(m)}`); doc.moveDown(0.3); }
       if (!k.improved.length && !k.declined.length) line(!r.comparedWith ? "This is the first check, so there is nothing to compare with yet." : k.compared === 0 ? "No keyword was in both checks, so nothing is compared." : "No keyword changed position since the earlier check.", soft);
-      room(40); doc.moveDown(0.4).font("Helvetica-Bold").fontSize(9).fillColor(soft);
+      room(40); doc.moveDown(0.4).font(fonts.bold).fontSize(9).fillColor(soft);
       // The built-in PDF font has no arrow glyphs, and a header must fit its column: both were wrong on the first render.
       const cols = [0, width * 0.5, width * 0.63, width * 0.74, width * 0.87];
-      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+      const row = (cells: string[], bold = false) => { room(16); const y = doc.y; doc.font(bold ? fonts.bold : fonts.regular).fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + cols[i], y, { width: (cols[i + 1] ?? width) - cols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
       row(["Keyword", "Position", "Was", "Map pack", "Volume"], true);
       for (const kw of k.keywords) row([`${kw.keyword}${kw.location ? ` · ${kw.location}` : ""}`, kw.position === null ? "not ranked" : String(kw.position), kw.previous === null ? "—" : String(kw.previous), kw.local === null ? "—" : `#${kw.local}`, n(kw.volume)]);
       if (k.checked > k.keywords.length) line(`…and ${k.checked - k.keywords.length} more checked keywords.`, soft);
       if (k.byTag?.length) {
-        room(60); doc.moveDown(0.5).font("Helvetica-Bold").fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
+        room(60); doc.moveDown(0.5).font(fonts.bold).fontSize(11).fillColor(ink).text("By tag"); doc.moveDown(0.2);
         // Short cells that fit their column (no cell is cut short); the header comes again after a page break; the
         // weighting of each figure is said in lines under the table.
         const tcols = [0, width * 0.36, width * 0.5, width * 0.66, width * 0.82];
         const head = ["Tag", "Keywords", "In both / new", "In the top 10", "Visibility index"];
-        const tline = (cells: string[], bold = false) => { if (doc.y + 16 > doc.page.height - 60) doc.addPage(); const y = doc.y; doc.font(bold ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
+        const tline = (cells: string[], bold = false) => { if (doc.y + 16 > doc.page.height - 60) doc.addPage(); const y = doc.y; doc.font(bold ? fonts.bold : fonts.regular).fontSize(9).fillColor(bold ? soft : ink); cells.forEach((c, i) => doc.text(pdfSafe(c), 48 + tcols[i], y, { width: (tcols[i + 1] ?? width) - tcols[i] - 6, height: 11, lineBreak: false, ellipsis: true })); doc.x = 48; doc.y = y + 14; };
         const trow = (cells: string[]) => { if (doc.y + 16 > doc.page.height - 60) { doc.addPage(); tline(head, true); } tline(cells); };
         // A change that was measured is shown even when it is zero ("±0" is written "0"); none measured is "(—)" written "(-)".
         const chg = (v: number | null) => (v === null ? " (-)" : v === 0 ? " (0)" : ` (${v > 0 ? "+" : "-"}${Math.abs(v)})`);
@@ -377,10 +476,9 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
         const cut: string[] = [];
         k.byTag.forEach((t, idx) => {
           const label = `${idx + 1}. ${t.tag}`;
-          doc.font("Helvetica").fontSize(9);
-          // A name with characters the PDF font cannot show is flagged too (the report page shows it as written).
-          const unshown = pdfSafe(t.tag) !== t.tag.normalize("NFC").replace(/\u2212/g, "-");
-          if (unshown) cut.push(`${idx + 1}. ${t.tag} (has characters this PDF cannot show - see the report page)`);
+          doc.font(fonts.regular).fontSize(9);
+          // A name with characters the PDF font really cannot show is flagged too (the report page shows it as written).
+          if (fonts.loses(t.tag)) cut.push(`${idx + 1}. ${t.tag} (has characters this PDF cannot show - see the report page)`);
           else if (doc.widthOfString(pdfSafe(label)) > tcols[1] - 6) cut.push(`${idx + 1}. ${t.tag}`);
           const mark = t.visibility === null ? "" : ` ${t.weighted ? "v" : "o"}${r.comparedWith && t.changeWeighted != null && t.changeWeighted !== t.weighted ? (t.changeWeighted ? "/v" : "/o") : ""}`;
           trow([label, n(t.keywords), r.comparedWith ? `${n(t.compared)} / ${n(t.newSince)}` : "-", `${n(t.top10)}${r.comparedWith ? chg(t.top10Change) : ""}`,
@@ -398,8 +496,7 @@ export function renderReportPdf(r: SiteReport, brand?: { name?: string | null; l
       pair("Clicks", `${n(g.clicks)}${gscChange(g, g.clicks, g.previousClicks)}`);
       pair("Times shown in results", `${n(g.impressions)}${gscChange(g, g.impressions, g.previousImpressions)}`);
       if (g.position !== null) pair("Average position", String(g.position));
-      const partial = gscPartial(g);
-      line(partial ?? (gscComparable(g) ? "These are Google's own counts for the site. Changes in brackets compare with the 28 days before." : "These are Google's own counts for the site. The 28 days before are not fully synced, so no comparison is shown."), soft);
+      line(gscNote(g), soft);
     }
     if (r.search) {
       heading(`Search presence — analysed ${day(r.search.fetchedAt)}`);

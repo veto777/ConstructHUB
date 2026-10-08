@@ -135,7 +135,7 @@ import * as pricing from "./pricing";
 import { registerSeoRoutes } from "./routes";
 import { collectRunningRuns } from "./jobs";
 import { budgetDecision, SeoBudgetError, BUDGET_PAUSED_MESSAGE } from "./budget";
-import { VENDOR_NAME_RE, publicNote, publicFailure, seoErrorResponse, SEO_NOTE_FALLBACK, SEO_UNEXPECTED_MESSAGE } from "./public-errors";
+import { VENDOR_NAME_RE, publicNote, publicFailure, seoErrorResponse, SEO_NOTE_FALLBACK, SEO_UNEXPECTED_MESSAGE, SEO_RETRY, SeoRetryableError, SeoCustomerError } from "./public-errors";
 import { DOMAIN_TABLES, KEYWORD_TABLES } from "./reports";
 
 // ── The provider, failing in every way it can ───────────────────────────────
@@ -278,7 +278,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "GET /api/seo/locations": [{ url: "/api/seo/locations?q=tampa" }],
   "POST /api/seo/sites/:id/star": [{ url: "/api/seo/sites/1/star", body: { starred: true } }],
   "POST /api/seo/sites/:id/settings": [{ url: "/api/seo/sites/1/settings", body: { businessName: "Acme Roofing" } }],
-  "GET /api/seo/alerts": [{ url: "/api/seo/alerts" }],
+  "GET /api/seo/alerts": [{ url: "/api/seo/alerts" }, { url: "/api/seo/alerts?kind=rank_drop&limit=5" }, { url: "/api/seo/alerts?siteId=1&before=7" }],
   "POST /api/seo/alerts/read": [{ url: "/api/seo/alerts/read", body: {} }],
   "GET /api/seo/sites/:id/audit": [{ url: "/api/seo/sites/1/audit" }],
   "GET /api/seo/sites/:id/audit/pages": [{ url: "/api/seo/sites/1/audit/pages" }],
@@ -400,6 +400,47 @@ describe("every SEO route, as a customer", () => {
     // ...and the issue desk still got the real error.
     expect(issues.recorded.map((i) => i.err.message).join()).toMatch(/does not exist/);
   });
+
+  it("a one-at-a-time section held too long elsewhere (the lock's wait ran out): a retryable 503, not a generic 500", async () => {
+    const { pool } = await import("../db");
+    // Postgres gives up the wait for the advisory lock (lock_timeout) — the other process is still in the section.
+    (pool.query as any).mockImplementation(async (sql: unknown, params?: any[]) => {
+      if (/pg_advisory_xact_lock/.test(String(sql))) throw Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+      return fakeQuery(sql, params);
+    });
+    try {
+      const r = await hit("POST", "/api/seo/sites/1/keywords", { keywords: ["roof repair tampa"] });
+      expect(r.status).toBe(503);
+      expect(r.body).toEqual({ code: "seo_busy", message: SEO_RETRY.seo_busy.message, retryable: true });
+      expect(r.leaks).toEqual([]);
+      // A wait that long means a stuck holder somewhere: the issue desk hears of it like any 5xx.
+      expect(issues.recorded.map((i) => i.status)).toEqual([503]);
+      // The lock's transaction was ended whatever happened, so the connection goes back clean.
+      const sent = (pool.query as any).mock.calls.map((c: any[]) => String(c[0]));
+      expect(sent[sent.lastIndexOf("ROLLBACK")]).toBe("ROLLBACK");
+      expect(sent.lastIndexOf("ROLLBACK")).toBeGreaterThan(sent.findIndex((s: string) => /pg_advisory_xact_lock/.test(s)));
+    } finally { (pool.query as any).mockImplementation(async (sql: unknown, params?: any[]) => fakeQuery(sql, params)); }
+  });
+
+  it("the newest crawl replaced on every read: a retryable 409 with its own copy, nothing for the issue desk", async () => {
+    const { pool } = await import("../db");
+    // The crawl's check finds a finished crawl; the read at that version finds nothing, every time.
+    (pool.query as any).mockImplementation(async (sql: unknown, params?: any[]) => {
+      const s = String(sql);
+      if (/FROM sitescan_jobs/.test(s) && /xmin::text AS v/.test(s)) return { rows: [{ id: "crawl-1", v: "7", readable: true, completed_at: "2026-10-01T00:00:00Z" }], rowCount: 1 };
+      if (/FROM sitescan_jobs/.test(s) && /xmin::text=\$3/.test(s)) return { rows: [], rowCount: 0 };
+      return fakeQuery(sql, params);
+    });
+    try {
+      for (const url of ["/api/seo/sites/1/audit/pages", "/api/seo/sites/1/audit/link-opportunities", "/api/seo/sites/1/audit/outgoing"]) {
+        const r = await hit("GET", url);
+        expect(r.status, url).toBe(409);
+        expect(r.body, url).toEqual({ code: "seo_crawl_changed", message: SEO_RETRY.seo_crawl_changed.message, retryable: true });
+        expect(r.leaks).toEqual([]);
+      }
+      expect(issues.recorded).toEqual([]);
+    } finally { (pool.query as any).mockImplementation(async (sql: unknown, params?: any[]) => fakeQuery(sql, params)); }
+  });
 });
 
 describe("notes saved by earlier versions are made safe when read", () => {
@@ -452,6 +493,8 @@ describe("notes saved by earlier versions are made safe when read", () => {
     expect(publicNote("This needs about $0.0120 of DataForSEO data and $0.00 of the $100.00 monthly cap is left.")).toBe(SEO_NOTE_FALLBACK);
     expect(publicNote("1 check(s) failed: dataforseo pricing (desktop)")).toBe(SEO_NOTE_FALLBACK);
     expect(publicNote("x · y")).toBe(SEO_NOTE_FALLBACK);
+    // The retryable cases (a busy section, a crawl that changed under its read) are known notes, as written.
+    for (const r of Object.values(SEO_RETRY)) expect(publicNote(r.message)).toBe(r.message);
   });
 });
 
@@ -461,11 +504,15 @@ describe("the admin view is for platform admins only", () => {
     expect(customer.status).toBe(200);
     expect(customer.leaks).toEqual([]);
     expect(customer.body.admin).toBeUndefined();
-    expect(Object.keys(customer.body).sort()).toEqual(["alertsUnread", "configured", "credits", "holds", "packs", "prices", "quotes", "resetsAt", "usage"]);
+    expect(Object.keys(customer.body).sort()).toEqual(["alertsUndelivered", "alertsUnread", "configured", "credits", "holds", "packs", "prices", "quotes", "resetsAt", "usage"]);
     // Customer prices are whole cents at the customer's rate — never the wholesale figure they are worked out from.
     for (const cents of [...Object.values(customer.body.prices), ...Object.values(customer.body.holds)] as number[]) expect(Number.isInteger(cents) && cents >= 1).toBe(true);
     expect(admin.body.admin).toMatchObject({ vendor: "DataForSEO", configured: true, capUsd: 100, spentUsd: 12.345678 });
     expect(admin.body.admin.env).toContain("SEO_MONTHLY_BUDGET_USD");
+    // What is still outstanding (refunds owed, deliveries given up) is on the admin card alone; the customer's own count is a number.
+    expect(admin.body.admin.refundsOwed).toMatchObject({ runs: expect.any(Number), cents: expect.any(Number) });
+    expect(typeof customer.body.alertsUndelivered).toBe("number");
+    expect(customer.body.refundsOwed).toBeUndefined();
   });
   it("per-account wholesale spend: 403 for a customer", async () => {
     const customer = await hit("GET", "/api/seo/admin/usage"), admin = await hit("GET", "/api/seo/admin/usage", undefined, "admin");
@@ -535,6 +582,20 @@ describe("the boundary itself", () => {
     expect(publicFailure(wrapped, "fallback")).toBe(source.publicMessage);
     expect(seoErrorResponse(wrapped)).toMatchObject({ status: 429, body: { code: "seo_source_rate_limited", message: source.publicMessage } });
     expect(publicFailure(Object.assign(new Error("DataForSEO HTTP 429"), { cause: new Error("socket hang up") }), "fallback")).toBe("fallback");
+  });
+  it("a retryable case — a section held elsewhere, the newest crawl changed under its read — is answered as written, with its code and a status to retry on", () => {
+    expect(SEO_RETRY.seo_busy.status).toBe(503);
+    expect(SEO_RETRY.seo_crawl_changed.status).toBe(409);
+    for (const [code, r] of Object.entries(SEO_RETRY) as [keyof typeof SEO_RETRY, { status: number; message: string }][]) {
+      const e = new SeoRetryableError(code);
+      expect(e).toBeInstanceOf(SeoCustomerError);
+      expect(e.name).toBe("SeoRetryableError");
+      expect(leaksIn(r.message)).toEqual([]);
+      expect(seoErrorResponse(e)).toEqual({ status: r.status, unexpected: false, body: { code, message: r.message, retryable: true } });
+      // Nothing internal to add for an admin: the same body.
+      expect(seoErrorResponse(e, { admin: true }).body).toEqual({ code, message: r.message, retryable: true });
+      expect(publicFailure(e, "fallback")).toBe(r.message);
+    }
   });
 });
 

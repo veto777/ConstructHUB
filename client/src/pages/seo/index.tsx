@@ -15,25 +15,34 @@ import { CompetingPages } from "./competing";
 import { SerpGroupsPanel } from "./serp-groups";
 import { LocationPicker, type Place } from "./location-picker";
 import { CompetitorPanel } from "./rank-competitors";
+import { countryLabel } from "@shared/seo-markets";
+import { unresolvedPlaceMessage } from "@shared/seo-place";
 
 type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[]; top?: { position: number; domain: string; url?: string | null; title?: string | null }[] } | null;
 type Overview = {
   site: SeoSite; devices: ("desktop" | "mobile")[];
   summary: { tracked: number; checked: number; top3: number; top10: number; averagePosition: number | null; improved: number; declined: number; lastCheckedOn: string | null; inMapPack?: number; withMapPack?: number };
   rows: { id: number; keyword: string; location?: string | null; tags: string[]; searchVolume: number | null; cpc: number | null; difficulty: number | null; positions: Record<string, Position> }[];
-  runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; created_at: string; finished_at: string | null }[];
-  searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean } | null;
+  runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; /** Not every lookup came back with a result (null while the check runs, or for checks from before this was recorded). */ partial?: boolean | null; created_at: string; finished_at: string | null }[];
+  searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean;
+    /** A read of these days is still running or failed, or whether every read finished is not known (`completenessUnknown`): the count may be short, and nothing is compared. */ incomplete?: boolean; completenessUnknown?: boolean } | null;
   nextCheck: { serps: number; priceCents?: number; nextAt: string | null; perMonthCents?: Record<"weekly" | "twice_weekly" | "daily", number> };
 };
 
 const RUN_STATUS: Record<string, string> = { queued: "queued", running: "checking", done: "done", failed: "didn't finish" };
 const RUN_TRIGGER: Record<string, string> = { weekly: "automatic check", manual: "run now" };
 
-/** What the Search Console tile says under its number: the comparison when both 28-day windows are complete, otherwise how much of EACH is synced. */
-function gscHint(g: { clicks: number | null; previousClicks: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean }): string {
+/**
+ * What the Search Console tile says under its number: the comparison when both 28-day windows are complete (every day
+ * there and every read of them finished — the server's verdict), otherwise how much of EACH is synced and, when a read
+ * is unfinished or its completeness is not known, that the count itself may be short.
+ */
+function gscHint(g: { clicks: number | null; previousClicks: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean; incomplete?: boolean; completenessUnknown?: boolean }): string {
   if (g.comparable) return `${fmtNum(g.previousClicks)} the 28 days before`;
   const now = g.days ?? 0, before = g.previousDays ?? 0;
-  return `${now} of the last 28 days synced${g.through ? ` (to ${fmtDate(g.through)})` : ""}; ${before} of the 28 before — not compared`;
+  const synced = `${now} of the last 28 days synced${g.through ? ` (to ${fmtDate(g.through)})` : ""}; ${before} of the 28 before`;
+  if (g.incomplete) return `${synced} — ${g.completenessUnknown ? "whether every day was fully read is not known" : "some days are still being read from Google, or a read failed, so the count may be short"}; not compared`;
+  return `${synced} — not compared`;
 }
 
 export default function SeoOverviewPage() {
@@ -150,7 +159,7 @@ export default function SeoOverviewPage() {
                   return (
                     <Fragment key={r.id}>
                     <tr data-testid={`row-keyword-${r.id}`}>
-                      <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== "United States" && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
+                      <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== countryLabel(site.locationCode) && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
                       {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`In the map pack: ${first.pack!.map((p) => p.title).join(", ")}`}>not in it{first.previousLocal != null && <> <span className="g-move g-move--down">lost</span></>}</span> : <span className="g-text-2" title="Google showed no map for this search">no map</span>}</td>
                       <td data-label="On the page">{first ? <SerpFeatureChips features={(first.pack?.length ?? 0) > 0 || first.local != null ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} /> : <span className="g-text-2">—</span>}</td>
@@ -176,7 +185,7 @@ export default function SeoOverviewPage() {
             <section className="mt-6">
               <h2 className="g-text mb-2 text-[16px] font-medium">Recent checks</h2>
               <ul className="g-text-2 space-y-1 text-[13px]" data-testid="list-runs">
-                {o.runs.map((r) => <li key={r.id}>{fmtDate(r.created_at)} · {RUN_TRIGGER[r.trigger] ?? r.trigger} · {RUN_STATUS[r.status] ?? r.status}{r.total ? ` · ${r.checked}/${r.total} checks` : ""}{r.error ? <span className="g-closed"> · {r.error}</span> : null}</li>)}
+                {o.runs.map((r) => <li key={r.id}>{fmtDate(r.created_at)} · {RUN_TRIGGER[r.trigger] ?? r.trigger} · {r.status === "done" && r.partial ? "done, but not every check came back" : RUN_STATUS[r.status] ?? r.status}{r.total ? ` · ${r.checked}/${r.total} checks` : ""}{r.error ? <span className="g-closed"> · {r.error}</span> : null}</li>)}
               </ul>
             </section>
           )}
@@ -192,19 +201,31 @@ function AddKeywords({ site, onAdded }: { site: SeoSite; onAdded: () => void }) 
   const [text, setText] = useState("");
   const [tag, setTag] = useState("");
   const [place, setPlace] = useState<Place | null>(null);
+  // Text in the place box that was never chosen from the list, and the message about it once "Track these" was tried.
+  const [typed, setTyped] = useState("");
+  const [placeError, setPlaceError] = useState<string | null>(null);
+  // What a keyword is checked from when no place is picked: the site's own country (the same list the explorers use).
+  const country = countryLabel(site.locationCode);
+  const defaultLabel = country ? `the site's default (${country})` : "the site's own default location";
   const m = useMutation({
     mutationFn: () => api("POST", `/api/seo/sites/${site.id}/keywords`, { keywords: text.split(/\n|,/).map((s) => s.trim()).filter(Boolean).slice(0, 500), tags: tag.trim() ? [tag.trim()] : [], ...(place ? { locationCode: place.code } : {}) }),
-    onSuccess: (r: { added: number }) => { setText(""); setTag(""); setPlace(null); setOpen(false); onAdded(); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added` }); },
+    onSuccess: (r: { added: number }) => { setText(""); setTag(""); setPlace(null); setTyped(""); setOpen(false); onAdded(); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added` }); },
     onError: (e) => toast({ title: "Couldn't add keywords", description: apiErrorMessage(e), variant: "destructive" }),
   });
   if (!open) return <div className="mb-4"><button type="button" className="g-pill" onClick={() => setOpen(true)} data-testid="button-add-keywords"><Plus /> Add keywords</button></div>;
+  // Typed but never chosen is not "no place": the form stops here and says so (by mouse, keyboard or any other control).
+  const submit = () => {
+    const problem = place ? null : unresolvedPlaceMessage(typed, defaultLabel);
+    if (problem) { setPlaceError(problem); return; }
+    m.mutate();
+  };
   return (
-    <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); m.mutate(); }} data-testid="form-add-keywords">
+    <form className="g-callout mb-4" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-add-keywords">
       <h3>Keywords to track for {site.domain}</h3>
       <p>One per line (or comma-separated). Each is checked on {site.devices === "both" ? "desktop and mobile" : site.devices} every week.</p>
       <textarea aria-label={`Keywords to track for ${site.domain}, one per line`} className="g-input mt-2 min-h-[120px] py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"roofing contractor tampa\nroof repair near me"} data-testid="textarea-keywords" />
-      <div className="mt-2 text-[13px]"><div className="g-text-2 mb-1">Where to check from (optional) — pick a city or ZIP code to see what customers there see, including the map</div>
-        <div className="sm:max-w-sm"><LocationPicker value={place} onChange={setPlace} /></div>
+      <div className="mt-2 text-[13px]"><div className="g-text-2 mb-1">Where to check from (optional) — pick a city or ZIP code{country && country !== "United States" ? " (the list has United States places)" : ""} to see what customers there see, including the map</div>
+        <div className="sm:max-w-sm"><LocationPicker value={place} onChange={(p) => { setPlace(p); setPlaceError(null); }} onTyped={(t) => { setTyped(t); setPlaceError(null); }} error={placeError} defaultLabel={defaultLabel} /></div>
       </div>
       <label className="mt-2 block text-[13px]"><span className="g-text-2">Tag (optional) — group these keywords, e.g. a service or a city</span>
         <input className="g-input mt-1" value={tag} maxLength={40} onChange={(e) => setTag(e.target.value)} placeholder="roofing" data-testid="input-keyword-tag" />

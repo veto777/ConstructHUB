@@ -27,11 +27,30 @@ import { clampSerpDepth } from "./pricing";
 import { SEO_NOT_READY_MESSAGE } from "./plan";
 
 export const API_BASE = "https://api.dataforseo.com/v3";
-const REQUEST_TIMEOUT_MS = 60_000;
+/** The longest one request (retries included) can take. */
+export const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_RETRIES = 2;
 const RETRY_BACKOFF_MS = 250;
 /** task_post accepts up to 100 tasks per request. */
 export const MAX_TASKS_PER_POST = 100;
+
+/**
+ * An epoch time (ms) after which a claim's owner may ask the source nothing more. Paid work runs under claims in the
+ * database that another pass may take over once they are old; the checks an owner makes before and after a request
+ * cannot stop one that is already in flight, so a taken-over owner and its successor could both pay for the same data.
+ * The deadline makes that impossible: `request` sends nothing after it and cuts off a request still in flight then,
+ * so every request of an owner is over before its claim can be taken over.
+ */
+export type Deadline = number;
+/** Time left, after an owner's last request can have ended, for it to settle and give its claim back — and for clocks to disagree a little. */
+export const CLAIM_MARGIN_MS = 30_000;
+/**
+ * The deadline for work under a claim taken at `claimedAt` that another pass may take over `lifetimeMs` later: a
+ * request's full timeout plus the margin before that moment. `claimedAt` should be read BEFORE the claim is written,
+ * so the deadline can only err on the early side.
+ */
+export const claimDeadline = (claimedAt: number, lifetimeMs: number): Deadline => claimedAt + lifetimeMs - REQUEST_TIMEOUT_MS - CLAIM_MARGIN_MS;
+export type RequestOptions = { /** The owner's deadline, when the request is made under a claim (see Deadline). */ deadline?: Deadline };
 
 /** Swappable for tests (no live calls there). */
 export const dataforseoDeps: { fetch: typeof fetch; env: () => NodeJS.ProcessEnv } = {
@@ -73,6 +92,11 @@ export class DataForSeoError extends Error {
     /** What DataForSEO charged for the failed task (0 when nothing ran). */
     readonly costUsd = 0,
     readonly status?: number,
+    /**
+     * false: nothing about the cost is unknown — the request was never sent (its owner's deadline had passed). Left
+     * unset otherwise: what a timeout or an unanswered call cost is unknown, and the ledgers judge that by `code`.
+     */
+    readonly costUnknown?: boolean,
   ) {
     super(message);
     this.name = "DataForSeoError";
@@ -110,10 +134,17 @@ function basicAuth(env: NodeJS.ProcessEnv): string {
  * Authenticated request; retries idempotent reads on transient 5xx, never a
  * POST that may already have been charged (retries=0 for those).
  */
-export async function request(method: "GET" | "POST", path: string, body?: unknown, retries = method === "GET" ? MAX_RETRIES : 0): Promise<DfsResponse> {
+export async function request(method: "GET" | "POST", path: string, body?: unknown, retries = method === "GET" ? MAX_RETRIES : 0, opts: RequestOptions = {}): Promise<DfsResponse> {
   const env = dataforseoDeps.env();
   if (!isConfigured(env)) throw new DataForSeoError("not_configured", "DataForSEO is not connected (set DATAFORSEO_LOGIN and DATAFORSEO_PASSWORD).");
-  const signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const deadline = typeof opts.deadline === "number" && Number.isFinite(opts.deadline) ? opts.deadline : undefined;
+  // Past its owner's deadline nothing is sent — and that is known to have cost nothing (costUnknown false), unlike a
+  // request cut off in flight below, whose cost is as unknown as any timeout's.
+  if (deadline !== undefined && Date.now() >= deadline)
+    throw new DataForSeoError("timeout", `DataForSEO request on ${path} not sent: its owner's deadline had passed`, 0, undefined, false);
+  // The request's own timeout, shortened to the owner's deadline when that comes first: one signal cuts off both.
+  const signal = AbortSignal.timeout(deadline === undefined ? REQUEST_TIMEOUT_MS : Math.min(REQUEST_TIMEOUT_MS, Math.max(1, Math.ceil(deadline - Date.now()))));
+  const timedOut = () => new DataForSeoError("timeout", deadline !== undefined && Date.now() + 5 >= deadline ? `DataForSEO request on ${path} was cut off at its owner's deadline` : `DataForSEO request timed out on ${path}`);
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
@@ -124,8 +155,7 @@ export async function request(method: "GET" | "POST", path: string, body?: unkno
         signal,
       });
     } catch (e: any) {
-      if (e?.name === "TimeoutError" || e?.name === "AbortError")
-        throw new DataForSeoError("timeout", `DataForSEO request timed out on ${path}`);
+      if (e?.name === "TimeoutError" || e?.name === "AbortError") throw timedOut();
       throw new DataForSeoError("upstream", `DataForSEO unreachable on ${path}: ${e?.message ?? e}`);
     }
     if (res.ok) {
@@ -321,7 +351,7 @@ export interface RankTaskInput { keyword: string; keywordId: number; device: Dev
 export interface PostedRankTask extends RankTaskInput { taskId: string }
 
 /** Standard-queue task_post (charged now; results collected free by serpTaskGet). */
-export async function serpTaskPost(input: { tasks: RankTaskInput[]; locationCode: number; languageCode: string; depth: number; targetDomain: string }): Promise<Priced<PostedRankTask[]>> {
+export async function serpTaskPost(input: { tasks: RankTaskInput[]; locationCode: number; languageCode: string; depth: number; targetDomain: string; deadline?: Deadline }): Promise<Priced<PostedRankTask[]>> {
   if (!input.tasks.length || input.tasks.length > MAX_TASKS_PER_POST)
     throw new DataForSeoError("invalid", `task_post takes 1–${MAX_TASKS_PER_POST} tasks, got ${input.tasks.length}`);
   const depth = clampSerpDepth(input.depth);
@@ -335,7 +365,7 @@ export async function serpTaskPost(input: { tasks: RankTaskInput[]; locationCode
     priority: 1,
     ...stopOnTarget(input.targetDomain),
     tag: `${t.keywordId}:${t.device}`,
-  })));
+  })), undefined, { deadline: input.deadline });
   if (!response || response.status_code !== 20000)
     throw new DataForSeoError("invalid", response?.status_message || "DataForSEO task_post failed", 0, response?.status_code);
   return parseTaskPost(response, input.tasks);
@@ -614,8 +644,8 @@ const backlinksPayload = (target: string) => ({
   rank_scale: "one_thousand",
 });
 
-export async function backlinksSummary(input: { target: string }): Promise<Priced<BacklinkSummary>> {
-  const response = await request("POST", "/backlinks/summary/live", [backlinksPayload(input.target)]);
+export async function backlinksSummary(input: { target: string; deadline?: Deadline }): Promise<Priced<BacklinkSummary>> {
+  const response = await request("POST", "/backlinks/summary/live", [backlinksPayload(input.target)], undefined, { deadline: input.deadline });
   const task = assertOk(response, { treatNoResultsAsEmpty: true });
   return { data: parseBacklinkSummary(task.result?.[0] ?? {}), costUsd: taskCost(task) };
 }
@@ -637,19 +667,19 @@ export const lostLinksRequest = (target: string, since: string, limit: number) =
   filters: ["last_seen", ">", since], order_by: ["domain_from_rank,desc"],
 });
 /** The linking sites lost since a date — named, not just counted. */
-export async function lostLinks(input: { target: string; since: string; limit: number }): Promise<Priced<{ items: LostLink[]; total: number | null }>> {
+export async function lostLinks(input: { target: string; since: string; limit: number; deadline?: Deadline }): Promise<Priced<{ items: LostLink[]; total: number | null }>> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.since)) throw new DataForSeoError("invalid", "since must be a date");
-  const task = assertOk(await request("POST", "/backlinks/backlinks/live", [lostLinksRequest(input.target, input.since, input.limit)]), { treatNoResultsAsEmpty: true });
+  const task = assertOk(await request("POST", "/backlinks/backlinks/live", [lostLinksRequest(input.target, input.since, input.limit)], undefined, { deadline: input.deadline }), { treatNoResultsAsEmpty: true });
   return { data: { items: taskItems(task).map(parseLostLink).filter((x): x is LostLink => !!x), total: num(task.result?.[0]?.total_count) }, costUsd: taskCost(task) };
 }
 
-export async function backlinksList(input: { target: string; limit: number }): Promise<Priced<{ items: Backlink[]; totalCount: number | null }>> {
+export async function backlinksList(input: { target: string; limit: number; deadline?: Deadline }): Promise<Priced<{ items: Backlink[]; totalCount: number | null }>> {
   const response = await request("POST", "/backlinks/backlinks/live", [{
     ...backlinksPayload(input.target),
     limit: Math.min(1000, Math.max(1, input.limit)),
     mode: "one_per_domain",
     order_by: ["rank,desc"],
-  }]);
+  }], undefined, { deadline: input.deadline });
   const task = assertOk(response, { treatNoResultsAsEmpty: true });
   const first = task.result?.[0];
   return {

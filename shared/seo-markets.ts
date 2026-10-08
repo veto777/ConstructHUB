@@ -19,6 +19,13 @@ export const SEO_MARKETS: readonly SeoMarket[] = [
   { locationCode: 2484, languageCode: "es", label: "Mexico" },
 ];
 export const DEFAULT_MARKET: SeoMarket = SEO_MARKETS[0];
+/**
+ * The plain name of a country the product supports (its first market: "Canada", not "Canada (French)"), or null for
+ * any other code — never a guess. A site's own country is a rank-tracking place in its own right (server/seo/locations.ts).
+ */
+export const countryLabel = (locationCode: unknown): string | null => SEO_MARKETS.find((m) => m.locationCode === locationCode)?.label ?? null;
+/** Whether a saved place name is a whole country (one of the markets' labels) rather than a city, county, ZIP code or state. */
+export const isCountryLabel = (label: unknown): boolean => typeof label === "string" && SEO_MARKETS.some((m) => m.label === label);
 
 export const marketKey = (m: { locationCode: number; languageCode: string }) => `${m.locationCode}:${m.languageCode}`;
 export const findMarket = (locationCode: unknown, languageCode: unknown): SeoMarket | null =>

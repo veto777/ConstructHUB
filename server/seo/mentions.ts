@@ -15,7 +15,7 @@
  *    necessarily the page that mentions the business. "No link found" can also be a link it has not crawled.
  */
 import { z } from "zod";
-import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain, type Deadline, type DfsTask } from "./dataforseo";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { sameUrlKey } from "./audit-pages";
 
@@ -124,25 +124,25 @@ export function linkingWebsites(items: any[], websites: string[]): Set<string> {
 }
 
 /** Find the mentions; then, if any, which of those websites link. A failed link check leaves "links to you" unknown. */
-export async function fetchMentions(name: string, domain: string): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; /** What the customer pays: the parts that were delivered (a link check that failed is not charged). */ customerUsd: number }> {
+export async function fetchMentions(name: string, domain: string, opts: { /** The claim owner's deadline (see dataforseo.ts Deadline), when the check is made under a claim. */ deadline?: Deadline } = {}): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean; /** What the customer pays: the parts that were delivered (a link check that failed is not charged). */ customerUsd: number }> {
   const target = normalizeDomain(domain) ?? domain;
-  const task: DfsTask = assertOk(await mentionsDeps.request("POST", "/content_analysis/search/live", [mentionsRequest(name, target)]), { treatNoResultsAsEmpty: true });
+  const task: DfsTask = assertOk(await mentionsDeps.request("POST", "/content_analysis/search/live", [mentionsRequest(name, target)], undefined, { deadline: opts.deadline }), { treatNoResultsAsEmpty: true });
   let costUsd = typeof task.cost === "number" ? task.cost : 0;
   const seen = new Set<string>(), rows: Omit<MentionRow, "linksToYou">[] = [];
   for (const i of taskItems(task)) { const r = parseMention(i, target); if (r && !seen.has(r.domain)) { seen.add(r.domain); rows.push(r); } }
   const page: MentionsPage = { name, domain: target, rows: rows.map((r) => ({ ...r, linksToYou: null })), total: num((task.result?.[0] as any)?.total_count), linksChecked: false, fetchedAt: new Date().toISOString() };
   if (!rows.length) return { data: { ...page, linksChecked: true, linksCheckedAt: null }, costUsd, costUnknown: false, customerUsd: costUsd };
-  const links = await checkLinks(page);
+  const links = await checkLinks(page, opts);
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
   return { data: links.data, costUsd: r6(costUsd + links.costUsd), costUnknown: links.costUnknown, customerUsd: r6(costUsd + (links.data.linksChecked ? links.costUsd : 0)) };
 }
 
 /** The link check for a saved page of mentions. Never throws: a failure leaves the rows' "links to you" unknown. */
-export async function checkLinks(page: MentionsPage): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean }> {
+export async function checkLinks(page: MentionsPage, opts: { deadline?: Deadline } = {}): Promise<{ data: MentionsPage; costUsd: number; costUnknown: boolean }> {
   const websites = [...new Set(page.rows.map((r) => r.domain))];
   if (!websites.length) return { data: { ...page, linksChecked: true, linksCheckedAt: null }, costUsd: 0, costUnknown: false };
   try {
-    const task: DfsTask = assertOk(await mentionsDeps.request("POST", "/backlinks/referring_domains/live", [mentionLinksRequest(page.domain, websites)]), { treatNoResultsAsEmpty: true });
+    const task: DfsTask = assertOk(await mentionsDeps.request("POST", "/backlinks/referring_domains/live", [mentionLinksRequest(page.domain, websites)], undefined, { deadline: opts.deadline }), { treatNoResultsAsEmpty: true });
     const items = taskItems(task), total = num((task.result?.[0] as any)?.total_count);
     const linking = linkingWebsites(items, websites);
     const partial = total !== null ? total > items.length : items.length >= MENTIONS_ROWS;
@@ -151,7 +151,8 @@ export async function checkLinks(page: MentionsPage): Promise<{ data: MentionsPa
       costUsd: typeof task.cost === "number" ? task.cost : 0, costUnknown: false,
     };
   } catch (e: any) {
-    return { data: page, costUsd: typeof e?.costUsd === "number" ? e.costUsd : 0, costUnknown: e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0)) };
+    // A lookup never sent (the owner's deadline had passed) says so: its cost is known to be nothing.
+    return { data: page, costUsd: typeof e?.costUsd === "number" ? e.costUsd : 0, costUnknown: e?.costUnknown === false ? false : e?.code === "timeout" || (e?.code === "upstream" && !(e?.costUsd > 0)) };
   }
 }
 

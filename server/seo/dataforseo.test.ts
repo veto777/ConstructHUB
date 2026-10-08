@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import {
   dataforseoDeps, isConfigured, assertOk, isTaskInProgress, isNoResultsTask, buildRankResult, parseTaskPost, parseTaskGet,
   parseKeywordItem, parseIntersectionItem, parseBacklinkSummary, parseBacklinkRow, parseAdsVolumeItem, normalizeDomain,
-  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, safeHttpUrl, safeDomain, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume,
-  DataForSeoError, API_BASE,
+  serpTaskPost, serpTaskGet, normalizeBusinessName, isOurListing, safeHttpUrl, safeDomain, labsKeywordSuggestions, labsDomainIntersection, backlinksSummary, backlinksList, adsSearchVolume, lostLinks,
+  DataForSeoError, API_BASE, claimDeadline, REQUEST_TIMEOUT_MS, CLAIM_MARGIN_MS,
 } from "./dataforseo";
 
 const fixture = (name: string) => JSON.parse(readFileSync(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
@@ -256,5 +256,54 @@ describe("normalizeDomain", () => {
     expect(normalizeDomain("not a domain")).toBeNull();
     expect(normalizeDomain("localhost")).toBeNull();
     expect(normalizeDomain("")).toBeNull();
+  });
+});
+
+describe("a claim owner's deadline", () => {
+  /** A source that never answers on its own: the request ends only when its signal aborts. Returns the signal seen. */
+  const hanging = () => {
+    let signal: AbortSignal | undefined;
+    dataforseoDeps.fetch = ((_url: any, init: any) => new Promise<Response>((_, reject) => { signal = init.signal; init.signal.addEventListener("abort", () => reject(init.signal.reason)); })) as typeof fetch;
+    return () => signal;
+  };
+  it("ends a request's full timeout and a margin before the claim can be taken over", () => {
+    expect(claimDeadline(1_000_000, 10 * 60_000)).toBe(1_000_000 + 10 * 60_000 - REQUEST_TIMEOUT_MS - CLAIM_MARGIN_MS);
+    expect(claimDeadline(1_000_000, 10 * 60_000)).toBeLessThan(1_000_000 + 10 * 60_000 - REQUEST_TIMEOUT_MS);
+  });
+  it("a request that would start after the deadline is not sent — and is known to have cost nothing", async () => {
+    const calls = mockFetch(() => fixture("backlinks_summary"));
+    const e: any = await backlinksSummary({ target: "constructhub.us", deadline: Date.now() - 1 }).catch((x) => x);
+    expect(e).toBeInstanceOf(DataForSeoError);
+    expect([e.code, e.costUsd, e.costUnknown]).toEqual(["timeout", 0, false]);
+    expect(e.message).toContain("not sent");
+    expect(calls).toHaveLength(0);
+    // Every lookup a claim owner makes through this file passes its deadline on.
+    for (const call of [
+      () => serpTaskPost({ tasks: [{ keyword: "k", keywordId: 1, device: "desktop" }], locationCode: 2840, languageCode: "en", depth: 10, targetDomain: "x.com", deadline: 0 }),
+      () => backlinksList({ target: "x.com", limit: 10, deadline: 0 }),
+      () => lostLinks({ target: "x.com", since: "2026-09-01", limit: 10, deadline: 0 }),
+    ]) await expect(call()).rejects.toMatchObject({ code: "timeout", costUnknown: false });
+    expect(calls).toHaveLength(0);
+  });
+  it("a request still in flight at the deadline is cut off: a timeout, its cost unknown", async () => {
+    const signal = hanging();
+    const t0 = Date.now();
+    const e: any = await backlinksSummary({ target: "constructhub.us", deadline: t0 + 60 }).catch((x) => x);
+    expect(e).toBeInstanceOf(DataForSeoError);
+    expect([e.code, e.costUsd, e.costUnknown]).toEqual(["timeout", 0, undefined]);
+    expect(e.message).toContain("deadline");
+    expect(signal()?.aborted).toBe(true);
+    expect(Date.now() - t0).toBeLessThan(REQUEST_TIMEOUT_MS);
+  });
+  it("without a deadline nothing changes, and a deadline with time to spare shortens nothing", async () => {
+    let seen: AbortSignal | undefined;
+    dataforseoDeps.fetch = (async (_url: any, init: any) => { seen = init.signal; return new Response(JSON.stringify(fixture("backlinks_summary")), { status: 200 }); }) as typeof fetch;
+    expect((await backlinksSummary({ target: "constructhub.us" })).costUsd).toBe(0.024036);
+    expect(seen?.aborted).toBe(false);
+    expect((await backlinksSummary({ target: "constructhub.us", deadline: Date.now() + 3_600_000 })).costUsd).toBe(0.024036);
+    expect(seen?.aborted).toBe(false);
+    // Not a usable deadline: as none.
+    expect((await backlinksSummary({ target: "constructhub.us", deadline: Infinity })).costUsd).toBe(0.024036);
+    expect(seen?.aborted).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import {
   brandMatches,
   detectPlatform,
   missingPageScope,
+  profileEntryMatches,
   type Platform,
 } from "./guidance";
 export { missingPageScope };
@@ -825,13 +826,7 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
       ["service_areas", "service-area"],
     ] as const)
       for (const value of profile[key] || [])
-        if (
-          !pages.some((p) =>
-            (p.title + " " + p.h1.join(" "))
-              .toLowerCase()
-              .includes(value.toLowerCase()),
-          )
-        )
+        if (!pages.some((p) => profileEntryMatches(p, value)))
           add(
             "gap-" + key + "-" + value,
             "local",

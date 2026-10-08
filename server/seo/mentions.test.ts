@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { checkLinks, ownHost, defaultPlaces, fetchMentions, linkingWebsites, mentionsDeps, mentionsInput, mentionsRequest, mentionLinksRequest, parseMention, placeIn, MENTIONS_ROWS } from "./mentions";
+import { checkLinks, ownHost, defaultPlaces, fetchMentions, linkingWebsites, mentionsDeps, mentionsInput, mentionsRequest, mentionLinksRequest, parseMention, placeIn, MENTIONS_ROWS, type MentionsPage } from "./mentions";
+import { dataforseoDeps } from "./dataforseo";
 
 const item = (main_domain: string, title: string, snippet: string, o: Record<string, unknown> = {}) => ({ url: `https://${main_domain}/post`, main_domain, domain_rank: 420, content_info: { main_title: title, snippet, date_published: "2025-04-24 10:00:00 +00:00" }, ...o });
 const ok = (items: unknown[], cost = 0.02, total: number | null = items.length) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ total_count: total, items }] }] });
@@ -64,5 +65,31 @@ describe("unlinked mentions", () => {
     expect([ownHost("alpine.example", "branch.alpine.example"), ownHost("bob.github.io", "alice.github.io"), ownHost("notalpine.example", "alpine.example")]).toEqual([false, false, false]);
     // Judged on the page's own host as well as the website it is filed under.
     expect(parseMention({ url: "https://www.alpine.example/x", main_domain: "feed.example", content_info: {} }, "alpine.example")).toBeNull();
+  });
+  it("a check made under a claim asks both lookups under the claim's deadline; a link check not sent is known to have cost nothing", async () => {
+    const seen: (number | undefined)[] = [];
+    mentionsDeps.request = (async (_m: string, path: string, _b: any, _r: any, opts: any) => { seen.push(opts?.deadline); return path.includes("content_analysis") ? ok([item("a.com", "A", "x")], 0.025) : ok([{ domain: "a.com", backlinks: 4 }], 0.026); }) as any;
+    await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com", { deadline: 4321 });
+    expect(seen).toEqual([4321, 4321]);
+    seen.length = 0;
+    await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com");
+    expect(seen).toEqual([undefined, undefined]);
+    // Through the real client. Past the deadline the link check is not sent: "links to you" stays unknown, nothing is
+    // charged for it, and nothing about its cost is unknown. With time left it is sent as ever.
+    mentionsDeps.request = original;
+    const env = dataforseoDeps.env, fetch = dataforseoDeps.fetch;
+    try {
+      let calls = 0;
+      dataforseoDeps.env = () => ({ DATAFORSEO_LOGIN: "x", DATAFORSEO_PASSWORD: "y" }) as any;
+      dataforseoDeps.fetch = (async () => { calls++; return new Response(JSON.stringify(ok([{ domain: "a.com", backlinks: 1 }], 0.026))); }) as any;
+      const page: MentionsPage = { name: "Alpine Exteriors", domain: "alpineexteriorswa.com", rows: [{ url: "https://a.com/post", domain: "a.com", title: "A", snippet: null, published: null, authority: 42, linksToYou: null }], total: 1, linksChecked: false, fetchedAt: new Date().toISOString() };
+      const late = await checkLinks(page, { deadline: Date.now() - 1 });
+      expect([calls, late.data.linksChecked, late.data.rows[0].linksToYou, late.costUsd, late.costUnknown]).toEqual([0, false, null, 0, false]);
+      const fine = await checkLinks(page, { deadline: Date.now() + 60_000 });
+      expect([calls, fine.data.linksChecked, fine.data.rows[0].linksToYou, fine.costUsd]).toEqual([1, true, true, 0.026]);
+      // The whole check past its deadline: nothing is asked, and the failure says its cost is known to be nothing.
+      const e: any = await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com", { deadline: Date.now() - 1 }).catch((x) => x);
+      expect([calls, e?.code, e?.costUsd, e?.costUnknown]).toEqual([1, "timeout", 0, false]);
+    } finally { dataforseoDeps.env = env; dataforseoDeps.fetch = fetch; }
   });
 });

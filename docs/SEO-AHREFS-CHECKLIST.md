@@ -987,7 +987,40 @@ Verdict: four new defects, one HIGH - in the audit #53 fix itself.
  2 runs that stopped early never alerted ........................ FIXED (closed as failed together with the alerts for what they saved, titled "from a check that stopped early" - real Postgres)
  3 Google-profile gaps could pass as fixes ....................... FIXED (an entry counts as fixed only when the same profile is attached and still lists it; removed from the profile or another profile = changed scope, not re-checked - unit tests)
  4 immediate and retried alerts used different days ............. FIXED by 1 (one day, read inside the closing transaction)
- NOT DONE: as audit #43; a PDF font for every script.
+ carried since #48: a PDF font beyond Windows-1252 ............... FIXED (DejaVu Sans, bundled in server/data/fonts with its licence and embedded in the report PDF: Latin, Greek, Cyrillic, Arabic and Hebrew print as written; a tag name is flagged "cannot show" only when a character really has no glyph, as Chinese still has none; the built-in Helvetica stays as the fallback when the font files cannot be read, said once in the log)
+ NOT DONE: as audit #43.
+
+## Codex audit #55 - the FINAL audit of this build (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-55.md)
+
+Closed out with five parallel workers (Fable 5.1), each on its own worktree and throwaway database, merged and verified together on seo/ahrefs-68. The carried NOT DONE items are closed too:
+ - duplicate vendor request on a claim takeover ................ FIXED: every claim owner works to a deadline (claimed at + lifetime - 60s request timeout - 30s margin): nothing is sent after it and a request in flight is cut off, so an owner's requests always end before its claim can be taken over (keyword watch, "Check again" receipts, mentions watch, rank-run posting, backlink snapshots, grid scans and watches - unit tests + real Postgres "deadline" 16/16)
+ - request queues per server process .......................... FIXED (#55 item 12): once / buyOnce / serial hold a Postgres advisory lock per key across processes (transaction-scoped, waits capped at 75s, at most half the pool); a second process waits and then finds the saved copy; a wait that runs out, or a deadlock Postgres breaks, is "busy, try again" (503) - real Postgres "locks" 17/17
+ - alert debt from before the #18 migration .................... CLOSED on evidence: the live database has no backlink snapshots at all, so no alert was ever owed
+ - a PDF font for every script ................................. FIXED (#55 item 13): DejaVu Sans embedded (Latin, Greek, Cyrillic, Arabic, Hebrew); CJK and the like still cannot be shown and are flagged
+ - a crawl read racing crawl updates ........................... FIXED: a retryable 409 with its own message, never a generic 500
+ - shifting positions in the mentions watch .................... STAYS SAID (the source orders by time alone)
+
+#55 items 1, 2, 3, 4, 6, 8, 9 - rank runs, rank alerts, alert lists, retries:
+
+Verdict: thirteen new defects, four HIGH - rank alerts could still disappear and scheduled checks be skipped.
+
+ 1 HIGH a stuck run's planning failure became "no alerts" ...... FIXED: the moves are worked out INSIDE the transaction that closes the run (stuck or not); any failure rolls the closing back and the run is closed on a later tick - never closed without its alerts (real Postgres: 5c5, 5c5b)
+ 2 HIGH same-day dedupe hid genuinely new losses .............. FIXED: an alert belongs to its run (source = run id), and moves are compared one by one (keyword, device, what, positions, the two days compared - movementKey); a second check the same day alerts a new fall alone, the same run raised again adds nothing, the same moves are not said twice (5c3, 5c4, 5c; unit tests)
+ 3 HIGH runs still owing alerts (alerts_due) were abandoned ... FIXED: settleOwedRankAlerts raises them from the run's own checks while they are there; when a later check replaced them all, that is written on the run and logged, then the debt is cleared (5c7, 5c7b)
+ 4 HIGH scheduled checks advanced before being queued ......... FIXED: the site's next date moves on in the same transaction that queues its run; a refused insert leaves it due; a plan without the tools skips on purpose; with the source not set up the checks wait (frequency 9/9)
+ 6 a 90-minute timeout closed as a complete check ............. FIXED: completeness = results saved against lookups asked for (less keywords removed meanwhile); kept on the run (`partial`, backfilled for old rows) and shown ("done, but not every check came back"); the alert title says "from a check that did not finish: N of M lookups came back" (5c2b, 5c6)
+ 8 alerts cut evidence (200) and history (100, filtered after) FIXED: every movement is kept (the page shows 25 and "Show all N"); GET /api/seo/alerts pages server-side (50, `before` cursor) with the kind filtered by the database first and the counts the wording rests on (total, totalAll, "Showing N of M") - "No alerts of this kind" is now true (alerts 1-4; white-label SPECS)
+ 9 deliveries aged out at 3 days, refunds at 14 ............... FIXED: deliveries are tried later and later for ever until sent or given up after 48 tries, when the alert is marked "Not sent" (kept on the page, counted in /api/seo/status alertsUndelivered and on the admin card, logged); a given-up email is marked too; refunds owed are never aged out (longest-waiting first, counted on the admin card as refundsOwed) and the run's note says the refund is owed (alerts 5-8; ledger 13d, 13e)
+ Also: alert ids are numbers in the listing (the driver hands bigints over as text; the page's single "Mark read" sent a string, which the route refused).
+
+#55 items 5, 7, 10, 11 - gaps, Search Console, places:
+ 5 HIGH profile gaps "fixed" when nothing was read ............. FIXED: one matching rule shared with the crawler (profileEntryMatches); fixed only when the same profile lists the entry AND a page this crawl read names it in its title or H1
+ 7 headline Search Console numbers skipped the completeness rules FIXED: the summary uses the breakdown's property choice and read-completeness evidence; incomplete / not known is said on the tile, the report page, the PDF and the email, and nothing is compared then
+ 10 a typed town became a national check ........................ FIXED: an unchosen town blocks "Track these" with a linked message (checked in the browser: nothing sent)
+ 11 site countries could not be default locations .............. FIXED: every country the product accepts works as a site's default location
+ 12, 13: see the carried items above.
+
+THE LOOP STOPS HERE (owner, 10/8: "finish these tasks"). Left for the owner, not code: Google tag IDs, Google Ads OAuth, Stripe live tests, SEO_MONTHLY_BUDGET_USD, the DataForSEO top-up, the lead-attribution source. Left to another session: server/crm/crm-plans.test.ts (the 7-day trial vs a test expecting 14). Product gaps still thinner than Ahrefs, for a later build: B4, B8, B10, B12, C7, C8, G1 (paid data) and G3 Web Analytics.
 
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
@@ -1076,3 +1109,5 @@ Verdict: four new defects, one HIGH - in the audit #53 fix itself.
 - 10/8 audit #52 fixes: 409 tests (unit tests with the audit's own examples); nineteen real-Postgres scripts passing. Browser (vb11, commit checked): Site audit fixed / not re-checked and pickers; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #53 fixes: 411 tests; nineteen real-Postgres scripts passing (local 33/33 with owed rank alerts). Browser (vb11, commit checked): Site audit choices, fixed / not re-checked; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #54 fixes: 412 tests; nineteen real-Postgres scripts passing (local 31/31: run closed with its alerts; a run that stopped early alerts what it saved). Browser (vb11, commit checked): Site audit, health tile; no page errors.
+- 10/8 audit #55 fixes, items 1-4, 6, 8, 9 (branch seo/fable-4): 417 tests; twenty real-Postgres scripts passing (new: alerts 15/15 - paging, kind filter, whole evidence, deliveries given up visibly; local 38/38 - planning failure leaves the run open, a new fall the same day, the window-closed run marked partial, owed runs settled; ledger 46/46 - a month-old refund still made; frequency 9/9 - a refused queue insert leaves the check due). NOT seen in a browser from this seat (none here): the Alerts page's paging, "Not sent" and the rank tracker's "not every check came back" wording are unconfirmed on screen.
+- 10/8 final close-out (seo/ahrefs-68): 452 tests across server/seo and the crawler's suites; full repository suite - nothing newly failing but the other session's CRM test; real Postgres - 22 scripts passing (new: locks 17/17, deadline 16/16, alerts 15/15; ledger 46/46, local 40/40, gsc breakdown 21/21, audit compare 22/22). Browser (vb11, commit checked): an unchosen town blocks "Track these" with a linked message and sends nothing; alerts "Showing 4 of 4"; the report PDF downloaded with DejaVu embedded; Site audit pickers; 1440 and 390 px, no overflow, no page errors.

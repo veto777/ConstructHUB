@@ -6,7 +6,7 @@
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { budgetDeps } from "../server/seo/budget";
-import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps } from "../server/seo/jobs";
+import { enqueueRankRun, postQueuedRun, collectRunningRuns, settleOwedRankAlerts, seoJobDeps } from "../server/seo/jobs";
 import { dataforseoDeps } from "../server/seo/dataforseo";
 import { searchLocations, locationByCode } from "../server/seo/locations";
 import { raiseRankAlerts, raiseLinkAlerts, listAlerts, unreadAlerts, markAlertsRead } from "../server/seo/alerts";
@@ -31,6 +31,9 @@ async function main() {
   eq("2b a ZIP code is found by its digits", (await searchLocations("336")).map((l) => l.label), ["33602, Florida"]);
   eq("2c wildcards typed by a user are not wildcards", (await searchLocations("%%")).length, 0);
   eq("2d a code that is not a place we offer is refused", await locationByCode(424242), null);
+  // A site may be made for any country the explorers support; its keywords default to that country, so it is a place.
+  eq("2e the United States is a place", await locationByCode(2840), { code: 2840, label: "United States", kind: "Country" });
+  eq("2f so is every other country a site can be made for (Canada, the United Kingdom)", [await locationByCode(2124), await locationByCode(2826)], [{ code: 2124, label: "Canada", kind: "Country" }, { code: 2826, label: "United Kingdom", kind: "Country" }]);
 
   budgetDeps.allowanceCents = async () => 100000;
   dataforseoDeps.env = () => ({ DATAFORSEO_LOGIN: "x", DATAFORSEO_PASSWORD: "y" });
@@ -70,11 +73,12 @@ async function main() {
   // A run that stopped early (no answer for hours) but saved a ranking: closed as failed WITH its alert, said to be partial.
   const savedAlert = await one("SELECT * FROM seo_alerts WHERE site_id=$1", [site.id]);
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [site.id]);
-  const stuck = await one("INSERT INTO seo_rank_runs(id, site_id, user_id, status, started_at, tasks) VALUES(gen_random_uuid(), $1, 1, 'running', now() - interval '4 hours', '[]'::jsonb) RETURNING id", [site.id]);
+  const stuck = await one("INSERT INTO seo_rank_runs(id, site_id, user_id, status, started_at, tasks, total, checked) VALUES(gen_random_uuid(), $1, 1, 'running', now() - interval '4 hours', '[]'::jsonb, 2, 1) RETURNING id", [site.id]);
   await pool.query("INSERT INTO seo_rank_checks(keyword_id, site_id, run_id, checked_on, device, position) VALUES($1,$2,$3,current_date+1,'desktop',30)", [us.id, site.id, stuck.id]);
   await collectRunningRuns();
   const partial = await listAlerts(1, site.id);
-  eq("5c2b a run that stopped early still alerts what it saved, and says so", [(await one("SELECT status FROM seo_rank_runs WHERE id=$1", [stuck.id])).status, partial.map((a: any) => a.title)], ["failed", ["1 ranking fell for alpine.example (from a check that stopped early)"]]);
+  eq("5c2b a run that stopped early still alerts what it saved, and says so with its numbers; the run is marked partial",
+    [(await one("SELECT status, partial FROM seo_rank_runs WHERE id=$1", [stuck.id])), partial.map((a: any) => a.title)], [{ status: "failed", partial: true }, ["1 ranking fell for alpine.example (from a check that stopped early: 1 of 2 lookups came back)"]]);
   await pool.query("DELETE FROM seo_rank_checks WHERE run_id=$1", [stuck.id]);
   // Put the original alert back as it was (the steps below mark it read by its id).
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [site.id]);
@@ -84,7 +88,51 @@ async function main() {
   run = await enqueueRankRun(site, "manual");
   await postQueuedRun(run.id);
   await collectRunningRuns();
-  eq("5c3 running the check again the same day raises no second alert", (await listAlerts(1, site.id)).length, 1);
+  eq("5c3 running the check again the same day, finding the same moves, raises no second alert", (await listAlerts(1, site.id)).length, 1);
+  const extra = async () => (await listAlerts(1, site.id)).filter((a: any) => a.id !== alerts[0].id).map((a: any) => [a.kind, a.title, a.items.map((i: any) => [i.what, i.location, i.from, i.to])]);
+  const tidy = async () => { await pool.query("DELETE FROM seo_alerts WHERE site_id=$1 AND id<>$2", [site.id, alerts[0].id]); };
+  // ...but a second check the same day that finds a NEW move (a further fall) alerts it — only it: the map-pack loss is the morning's.
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? result(3, null) : result(15, null))) as any;
+  await collectRunningRuns();
+  eq("5c4 a second check the same day with a new fall alerts that fall alone (the alert belongs to its run)", await extra(), [["rank_drop", "1 ranking fell for alpine.example", [["dropped", null, 4, 15]]]]);
+  eq("5c4b every move says which two days it compares", (await listAlerts(1, site.id)).every((a: any) => a.items.every((i: any) => /^\d{4}-\d{2}-\d{2}$/.test(i.since) && /^\d{4}-\d{2}-\d{2}$/.test(i.on) && i.since < i.on)), true);
+  await tidy();
+  // When the alerts cannot be worked out (here: their table is away), the run is NOT closed: it stays, lease given back, and is closed with its alert on a later tick.
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? result(3, null) : result(18, null))) as any;
+  await pool.query("ALTER TABLE seo_alerts RENAME TO seo_alerts_away");
+  await collectRunningRuns();
+  const open = await one("SELECT status, lease_until, checked FROM seo_rank_runs WHERE id=$1", [run.id]);
+  await pool.query("ALTER TABLE seo_alerts_away RENAME TO seo_alerts");
+  eq("5c5 a run whose alerts could not be worked out is not closed (no alert, nothing lost)", [open.status, open.lease_until, open.checked, (await listAlerts(1, site.id)).length], ["running", null, 0, 1]);
+  await collectRunningRuns();
+  eq("5c5b ...and is closed with its alert on a later tick, counted once", [(await one("SELECT status, checked, partial FROM seo_rank_runs WHERE id=$1", [run.id])), await extra()], [{ status: "done", checked: 2, partial: false }, [["rank_drop", "1 ranking fell for alpine.example", [["dropped", null, 4, 18]]]]]);
+  await tidy();
+  // A lookup that never comes back inside the window: the run closes as done but PARTIAL, and its alert says so with the numbers.
+  run = await enqueueRankRun(site, "manual");
+  await postQueuedRun(run.id);
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === tampa.id ? { status: "pending" } : result(25, null))) as any;
+  await pool.query("UPDATE seo_rank_runs SET started_at = now() - interval '2 hours' WHERE id=$1", [run.id]);
+  await collectRunningRuns();
+  const windowed = await one("SELECT status, partial, checked, total, error FROM seo_rank_runs WHERE id=$1", [run.id]);
+  eq("5c6 a check that did not come back by the window's end: done, marked partial, said in the note and in the alert's title",
+    [windowed.status, windowed.partial, windowed.checked, windowed.total, /1 check\(s\) never came back from the queue/.test(windowed.error), await extra()],
+    ["done", true, 1, 2, true, [["rank_drop", "1 ranking fell for alpine.example (from a check that did not finish: 1 of 2 lookups came back)", [["dropped", null, 4, 25]]]]]);
+  await tidy();
+  // Runs closed by an earlier version that still owe their alerts (alerts_due): raised from the run's own checks when
+  // they are still there; when a later check replaced them all, it is written on the run and logged — never dropped quietly.
+  const owedOk = await one("INSERT INTO seo_rank_runs(id, site_id, user_id, status, alerts_due, total, checked, finished_at) VALUES(gen_random_uuid(), $1, 1, 'done', true, 1, 1, now()) RETURNING id", [site.id]);
+  await pool.query("INSERT INTO seo_rank_checks(keyword_id, site_id, run_id, checked_on, device, position) VALUES($1,$2,$3,current_date+2,'desktop',12)", [tampa.id, site.id, owedOk.id]);
+  const owedLost = await one("INSERT INTO seo_rank_runs(id, site_id, user_id, status, alerts_due, total, checked, finished_at) VALUES(gen_random_uuid(), $1, 1, 'done', true, 2, 2, now()) RETURNING id", [site.id]);
+  eq("5c7 an owed run whose checks are still there is raised, and the debt cleared; one whose results were replaced is said so on the run", [await settleOwedRankAlerts(), await extra(),
+    (await one("SELECT alerts_due, error FROM seo_rank_runs WHERE id=$1", [owedOk.id])), (await one("SELECT alerts_due, error FROM seo_rank_runs WHERE id=$1", [owedLost.id]))],
+    [2, [["rank_drop", "1 ranking fell for alpine.example", [["dropped", "Tampa, Florida", 3, 12]]]], { alerts_due: false, error: null }, { alerts_due: false, error: "its alerts could not be worked out afterwards: a later check the same day replaced all of its results" }]);
+  eq("5c7b ...once", [await settleOwedRankAlerts(), (await extra()).length], [0, 1]);
+  await pool.query("DELETE FROM seo_rank_checks WHERE run_id=$1", [owedOk.id]);
+  await tidy();
   eq("5d it is unread until marked", [await unreadAlerts(1), (await markAlertsRead(1, [alerts[0].id]), await unreadAlerts(1))], [1, 0]);
 
   // alerts switched off

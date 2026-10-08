@@ -1,13 +1,21 @@
 /** Pick the place a rank check is run from: type a city, ZIP code, county or state (GET /api/seo/locations). Free to use. */
-import { useEffect, useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, MapPin, X } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 
 export type Place = { code: number; label: string; kind: string };
 
-export function LocationPicker({ value, onChange, placeholder = "City, ZIP code or state", defaultLabel = "the site's default (United States)" }: {
-  value: Place | null; onChange: (p: Place | null) => void; placeholder?: string;
+export function LocationPicker({ value, onChange, onTyped, error = null, placeholder = "City, ZIP code or state", defaultLabel = "the site's default (United States)" }: {
+  value: Place | null; onChange: (p: Place | null) => void;
+  /**
+   * Text in the box that is not a chosen place, each time it changes ("" once a place is picked or the box is cleared).
+   * The form must not go out while this is non-empty: that text would quietly become "no place" (shared/seo-place.ts).
+   */
+  onTyped?: (text: string) => void;
+  /** The form's message about that text: shown under the box, linked to it and announced. */
+  error?: string | null;
+  placeholder?: string;
   /** What is used when nothing is picked. */
   defaultLabel?: string;
 }) {
@@ -15,20 +23,25 @@ export function LocationPicker({ value, onChange, placeholder = "City, ZIP code 
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
   const [active, setActive] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
   // Wait for a pause in typing before searching.
   useEffect(() => { const t = setTimeout(() => setQ(text.trim()), 250); return () => clearTimeout(t); }, [text]);
+  // A message about the text puts the cursor back in the box, so the fix is one keystroke away.
+  useEffect(() => { if (error) input.current?.focus(); }, [error]);
   const search = useQuery<{ items: Place[] }>({ queryKey: [`/api/seo/locations?q=${encodeURIComponent(q)}`], enabled: q.length >= 2 && !value, staleTime: 10 * 60_000 });
   const items = search.data?.items ?? [];
   useEffect(() => { setActive(0); }, [q, items.length]);
+  const type = (v: string) => { setText(v); onTyped?.(v.trim()); };
+  const clear = () => { setText(""); setQ(""); onTyped?.(""); };
   if (value) {
     return (
       <span className="g-chip" data-testid="chip-location"><MapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden />{value.label} <span className="g-text-2 text-[12px]">· {value.kind}</span>
-        <button type="button" className="ml-1 align-middle" aria-label={`Remove ${value.label}`} onClick={() => { onChange(null); setText(""); }}><X className="h-3 w-3" /></button>
+        <button type="button" className="ml-1 align-middle" aria-label={`Remove ${value.label}`} onClick={() => { onChange(null); clear(); }}><X className="h-3 w-3" /></button>
       </span>
     );
   }
   const open = text.trim().length >= 2;
-  const pick = (p: Place) => { onChange(p); setText(""); setQ(""); };
+  const pick = (p: Place) => { onChange(p); clear(); };
   /** The list on screen answers the text in the box (not an earlier keystroke still on its way). */
   const current = q === text.trim() && search.isSuccess;
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -37,13 +50,14 @@ export function LocationPicker({ value, onChange, placeholder = "City, ZIP code 
     if (!open) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(items.length - 1, a + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
-    else if (e.key === "Escape") { e.preventDefault(); setText(""); setQ(""); }
+    else if (e.key === "Escape") { e.preventDefault(); clear(); }
   };
   return (
     <div className="relative" data-testid="location-picker">
       <label htmlFor={id} className="sr-only">Where to check from</label>
-      <input id={id} className="g-input w-full" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} autoComplete="off"
-        role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-list`} aria-activedescendant={open && items[active] ? `${id}-opt-${items[active].code}` : undefined} data-testid="input-location" />
+      <input id={id} ref={input} className="g-input w-full" value={text} onChange={(e) => type(e.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} autoComplete="off"
+        role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-list`} aria-activedescendant={open && items[active] ? `${id}-opt-${items[active].code}` : undefined}
+        aria-invalid={error ? true : undefined} aria-describedby={error ? `${id}-error` : undefined} data-testid="input-location" />
       {open && (
         <ul id={`${id}-list`} role="listbox" aria-label="Places" className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-lg border py-1 text-[13px] shadow" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
           {(search.isLoading || q !== text.trim()) && <li className="g-text-2 flex items-center gap-2 px-3 py-2" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Searching…</li>}
@@ -57,6 +71,7 @@ export function LocationPicker({ value, onChange, placeholder = "City, ZIP code 
           ))}
         </ul>
       )}
+      {error && <p id={`${id}-error`} role="alert" className="mt-1 text-[12px]" style={{ color: "var(--g-red, #c5221f)" }} data-testid="text-location-error">{error}</p>}
       {!open && <p className="g-text-2 mt-1 text-[12px]">Leave empty to use {defaultLabel}. Arrow keys and Enter choose a place.</p>}
     </div>
   );

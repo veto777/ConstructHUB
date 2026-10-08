@@ -155,8 +155,10 @@ describe("what counts as broken, and what counts as fixed", () => {
     const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };
     const before = { report: { profile: { id: 7 }, findings: [local] }, pages: [page("https://x/")] };
     expect(auditSummary({ findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
-    // Fixed only when the same profile still lists the service (then the crawl found its page).
-    expect(auditSummary({ profile: { id: 7, services: ["Gutters"] }, findings: [] }, [page("https://x/")], before).fixed.map((f) => f.key)).toEqual(["gap-services"]);
+    // Fixed only when the same profile still lists the service AND this crawl read a page that names it (audit #55:
+    // the profile alone used to be enough, so an empty crawl "fixed" every gap).
+    expect(auditSummary({ profile: { id: 7, services: ["Gutters"] }, findings: [] }, [{ ...page("https://x/gutters"), title: "Gutters | X" }], before).fixed.map((f) => f.key)).toEqual(["gap-services"]);
+    expect(auditSummary({ profile: { id: 7, services: ["Gutters"] }, findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
     expect(auditSummary({ profile: { id: 7 }, findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
   });
   it("a malformed stored report is read as empty instead of throwing", () => {
@@ -233,14 +235,34 @@ describe("Google-profile gaps", () => {
   const gap = (name: string) => ({ id: `gap-services-${name}`, category: "local", severity: "warning", title: `No matching page: ${name}`, urls: [], why: "w", fix: "f" });
   const prof = (id: number, services: string[]) => ({ id, services, service_areas: [] });
   const before = { report: { findings: [gap("Gutters"), gap("Siding")], profile: prof(7, ["Gutters", "Siding"]) }, pages: [page("https://a.com/")] };
-  it("an entry gone from the profile is changed scope, not a fix; one the same profile still lists is fixed", () => {
+  it("an entry gone from the profile is changed scope, not a fix; one the same profile still lists is fixed when a page read names it", () => {
     const removed = auditSummary({ findings: [gap("Siding")], profile: prof(7, ["Siding"]) }, [page("https://a.com/")], before);
     const g1 = removed.issues.find((i) => i.key === "gap-services")!;
     expect([g1.count, g1.change, g1.notRechecked]).toEqual([1, 0, 1]);
-    const pageAdded = auditSummary({ findings: [gap("Siding")], profile: prof(7, ["Gutters", "Siding"]) }, [page("https://a.com/")], before);
+    // (The page for "Gutters" is in this crawl, named in its title — the evidence the crawl stopped listing the gap on.)
+    const pageAdded = auditSummary({ findings: [gap("Siding")], profile: prof(7, ["Gutters", "Siding"]) }, [page("https://a.com/"), { ...page("https://a.com/gutters"), title: "Gutters — A" }], before);
     const g2 = pageAdded.issues.find((i) => i.key === "gap-services")!;
     expect([g2.change, g2.notRechecked]).toEqual([-1, 0]);
     const otherProfile = auditSummary({ findings: [], profile: prof(8, ["Gutters", "Siding"]) }, [page("https://a.com/")], before);
     expect([otherProfile.fixed.length, otherProfile.notRechecked.map((f) => f.key)]).toEqual([0, ["gap-services"]]);
+  });
+  it("a gap is fixed only on positive evidence: the same profile still lists it AND a page this crawl read names it", () => {
+    const same = prof(7, ["Gutters", "Siding"]);
+    // An empty crawl (no page read) raises no gap at all — that is nothing, not a fix.
+    const empty = auditSummary({ findings: [], profile: same }, [], before);
+    expect([empty.fixed, empty.notRechecked.map((f) => f.key)]).toEqual([[], ["gap-services"]]);
+    // Pages read, but none names either entry (an older saved form without titles, or pages that do not match): not re-checked.
+    const unnamed = auditSummary({ findings: [], profile: same }, [page("https://a.com/"), { ...page("https://a.com/about"), title: "About us", h1: ["Our story"] }], before);
+    expect([unnamed.fixed, unnamed.notRechecked.map((f) => f.key)]).toEqual([[], ["gap-services"]]);
+    // Named by the crawler's own rule — the title or an H1, any letter case — on every entry: fixed.
+    const named = auditSummary({ findings: [], profile: same }, [{ ...page("https://a.com/gutters"), title: "Seamless gutters", h1: [] }, { ...page("https://a.com/siding"), title: "A", h1: ["Vinyl SIDING installers"] }], before);
+    expect([named.fixed.map((f) => f.key), named.notRechecked]).toEqual([["gap-services"], []]);
+    // One entry named, the other not: the issue is not fixed as a whole, and only the named entry counts as an improvement.
+    const half = auditSummary({ findings: [gap("Siding")], profile: same }, [{ ...page("https://a.com/gutters"), title: "Gutters" }], before);
+    const g = half.issues.find((i) => i.key === "gap-services")!;
+    expect([g.count, g.previous, g.change, g.notRechecked]).toEqual([1, 2, -1, 0]);
+    const neither = auditSummary({ findings: [gap("Siding")], profile: same }, [page("https://a.com/")], before);
+    const n = neither.issues.find((i) => i.key === "gap-services")!;
+    expect([n.count, n.previous, n.change, n.notRechecked]).toEqual([1, 2, 0, 1]);
   });
 });

@@ -36,6 +36,8 @@ export type SeoStatus = {
   prices: SeoPrices;
   /** Alerts not yet read (the badge on the Alerts tab). */
   alertsUnread?: number;
+  /** Alerts whose delivery (bell / email) was given up after repeated tries; they stay on the Alerts page, marked. */
+  alertsUndelivered?: number;
   /** The most a lookup can cost: what must be available for it to start. */
   holds?: Partial<Record<keyof SeoPrices, number>>;
   /** Exact quotes in cents for lookups sized by the customer: entry n-1 is for n sites or pages. */

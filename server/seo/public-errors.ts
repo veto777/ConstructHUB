@@ -40,6 +40,24 @@ export class SeoCustomerError extends Error {
   constructor(message: string, readonly status = 400) { super(message); this.name = new.target.name; }
 }
 
+/**
+ * The things that did not fail, but could not be done at this moment and can be asked for again as they are. Each has
+ * its customer message and status here, so a route answers them the same way everywhere and a page can offer "try again".
+ *   seo_busy          the one-at-a-time section this request needed (server/seo/locks.ts) was held by another request —
+ *                     possibly in another server process — for longer than a request may wait. 503: ours, temporary.
+ *   seo_crawl_changed the newest crawl was replaced while it was being read (server/seo/audit.ts readNewestCrawl),
+ *                     three times over. 409: the thing asked about changed under the request.
+ */
+export const SEO_RETRY = {
+  seo_busy: { status: 503, message: "That is still being worked on for your account — try again in a minute." },
+  seo_crawl_changed: { status: 409, message: "The newest crawl changed while it was being read — try again in a moment." },
+} as const;
+export type SeoRetryCode = keyof typeof SEO_RETRY;
+/** An SeoCustomerError the customer can simply retry; `code` tells the page which case it is. */
+export class SeoRetryableError extends SeoCustomerError {
+  constructor(readonly code: SeoRetryCode) { super(SEO_RETRY[code].message, SEO_RETRY[code].status); }
+}
+
 export type SeoErrorResponse = { status: number; body: Record<string, unknown>; /** Something the server did not expect: worth a line in the log and the issue desk. */ unexpected: boolean };
 
 const SOURCE_STATUS: Record<DataForSeoError["code"], number> = {
@@ -64,6 +82,8 @@ function knownError(e: unknown): unknown {
 export function seoErrorResponse(thrown: unknown, opts: { admin?: boolean } = {}): SeoErrorResponse {
   const admin = opts.admin === true, e = knownError(thrown);
   if (e instanceof z.ZodError) return { status: 400, unexpected: false, body: { message: "Invalid input", issues: e.issues.slice(0, 3) } };
+  // Could not be done just now and can be asked for again as it is: the code and `retryable` let a page say so.
+  if (e instanceof SeoRetryableError) return { status: e.status, unexpected: false, body: { code: e.code, message: e.message, retryable: true } };
   // Written for the customer by the feature that throws it (ListError, WatchError).
   if (e instanceof SeoCustomerError) return { status: e.status, unexpected: false, body: { message: e.message } };
   if (e instanceof SeoBudgetError) {
@@ -94,6 +114,8 @@ export function publicFailure(thrown: unknown, fallback: string): string {
   const e = knownError(thrown);
   if (e instanceof SeoBudgetError) return e.message;
   if (e instanceof DataForSeoError) return e.publicMessage;
+  // Its message was written for the customer here (SEO_RETRY), so it is kept — and is a known note when read back.
+  if (e instanceof SeoRetryableError) return e.message;
   return fallback;
 }
 
@@ -105,6 +127,8 @@ const REFUNDED_TAIL = " — their cost was refunded";
 /** The notes this code writes for the customer, whole. Anything else is not shown as written. */
 const KNOWN_NOTES: (string | RegExp)[] = [
   ...Object.values(SEO_SOURCE_PUBLIC_MESSAGES), SEO_NOT_READY_MESSAGE, BUDGET_PAUSED_MESSAGE, SEO_NOTE_FALLBACK, SEO_UNEXPECTED_MESSAGE,
+  // The retryable cases above (SEO_RETRY), should background work ever save one through publicFailure.
+  ...Object.values(SEO_RETRY).map((r) => r.message),
   // server/seo/jobs.ts
   "Site is gone", "No keywords to check", "Some checks were not accepted by the search data service.",
   "None of the checks were accepted by the search data service. Your credits were not charged.",

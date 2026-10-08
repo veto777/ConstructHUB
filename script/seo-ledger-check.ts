@@ -8,7 +8,7 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { budgetDeps, reserveBudget, settleBudget, applySettlement, reconcileReservations, refundReservation, withBudget, SeoBudgetError } from "../server/seo/budget";
 import { reserveCredits } from "../server/seo/credits";
-import { enqueueRankRun, postQueuedRun, collectRunningRuns, retryOwedRefunds, seoJobDeps } from "../server/seo/jobs";
+import { enqueueRankRun, postQueuedRun, collectRunningRuns, retryOwedRefunds, owedRefunds, seoJobDeps } from "../server/seo/jobs";
 import { dataforseoDeps } from "../server/seo/dataforseo";
 
 let failed = 0;
@@ -169,6 +169,12 @@ async function main() {
   await settleBudget(r, 0.05);
   eq("13b refunded once it has settled", [await retryOwedRefunds(), (await one("SELECT refund_due FROM seo_rank_runs WHERE id=$1", [owing.id])).refund_due, (await moved()).included], [1, 0, 10]);
   eq("13c and not again", [await retryOwedRefunds(), (await moved()).included], [0, 10]);
+  // Money owed never ages out: a refund owed by a run from a month ago is still tried (counted, with the try), and made.
+  r = await reserveBudget(2, 0.05);
+  const oldOwing = await one("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger,status,reservation_id,posted,cost_usd,refund_due,finished_at,created_at) VALUES(gen_random_uuid(),$1,2,'manual','done',$2,2,0.05,10,now()-interval '30 days',now()-interval '30 days') RETURNING id", [site3.id, r.id]);
+  eq("13d a refund owed by a month-old run is still tried while unsettled, and counted as owed", [await retryOwedRefunds(), (await one("SELECT refund_due, refund_tries, refund_tried_at IS NOT NULL AS tried FROM seo_rank_runs WHERE id=$1", [oldOwing.id])), (await owedRefunds()).runs >= 1], [0, { refund_due: 10, refund_tries: 1, tried: true }, true]);
+  await settleBudget(r, 0.05);
+  eq("13e ...and made once the reservation settles, however old the run", [await retryOwedRefunds(), (await one("SELECT refund_due, refund_tries FROM seo_rank_runs WHERE id=$1", [oldOwing.id])), (await moved()).included], [1, { refund_due: 0, refund_tries: 2 }, 20]);
 
   // 14. a check the source said it could not do is refunded too
   base = await state(2);

@@ -6,10 +6,12 @@
  * crawl is one of the plan's monthly Site Scans.
  */
 import { pool } from "../db";
-import { missingPageScope } from "../sitescan/guidance";
+import { missingPageScope, profileEntryMatches } from "../sitescan/guidance";
+import { SeoRetryableError } from "./public-errors";
 
 export type AuditSeverity = "error" | "warning" | "notice";
-export type AuditPage = { url: string; status: number; redirects: number };
+/** A page the crawl read; its title and H1s are what the Google-profile gap check matches against (absent in an older saved form: nothing to match). */
+export type AuditPage = { url: string; status: number; redirects: number; title?: string | null; h1?: string[] };
 type Finding = { id: string; category: string; severity: string; title: string; urls?: string[]; why?: string; fix?: string };
 export type AuditReport = { /** Every PageSpeed attempt of this crawl: a number in `score` means it was measured. */ psi?: { url?: string; strategy?: string; score?: number }[]; scannedAt?: string; url?: string; remaining?: number; blocked?: number; errors?: { url: string; message?: string }[]; profile?: unknown; findings?: Finding[]; scores?: { overall: number | null; categories: Record<string, number | null> }; coverage?: { pageCap?: number } };
 
@@ -145,9 +147,10 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   //  - everything else: reread() above.
   const probes = (report as { coverage?: { missingPageProbe?: { probes?: unknown } | null } }).coverage?.missingPageProbe?.probes;
   const measuredFor = (device: string) => new Set((Array.isArray(report.psi) ? report.psi : []).filter((p) => p?.strategy === device && typeof p.score === "number" && typeof p.url === "string").map((p) => p.url as string));
-  // A Google-profile gap entry ("no page for the service X") went away for a reason only if the SAME profile is
-  // attached this time and still lists X — then the crawl found a page for it. A profile changed, missing, or no
-  // longer listing X changes what is asked: not re-checked, never fixed.
+  // A Google-profile gap entry ("no page for the service X") is re-checked only on positive evidence: the SAME profile
+  // is attached this time and still lists X (a profile changed, missing, or no longer listing X changes what is
+  // asked), AND a page THIS crawl read names X by the crawler's own rule (profileEntryMatches) — the one reason the
+  // crawl stops listing the gap. A crawl that read no page raises no gap at all; that is not a fix, it is nothing.
   const profileList = (r: AuditReport | undefined, list: string) => { const p = r?.profile as any; return p && typeof p === "object" && Array.isArray(p[list]) ? new Set((p[list] as unknown[]).filter((x): x is string => typeof x === "string").map((x) => x.trim().toLowerCase())) : null; };
   const profileId = (r: AuditReport | undefined) => { const p = r?.profile as any; return p && typeof p === "object" && (typeof p.id === "number" || typeof p.id === "string") ? String(p.id) : null; };
   const gapRechecked = (key: string, name: string) => {
@@ -155,7 +158,8 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     if (!list) return false;
     const idNow = profileId(report), idBefore = profileId(previous?.report);
     if (!idNow || idNow !== idBefore) return false;
-    return profileList(report, list)?.has(name.trim().toLowerCase()) ?? false;
+    if (!profileList(report, list)?.has(name.trim().toLowerCase())) return false;
+    return pages.length > 0 && pages.some((p) => profileEntryMatches(p, name));
   };
   const isGap = (key: string) => key === "gap-services" || key === "gap-service_areas";
   const itemRechecked = (key: string, u: string) => {
@@ -232,10 +236,13 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
 const HOST_SQL = `regexp_replace(regexp_replace(lower(url), '^https?://(www\\.)?', ''), '[/:?#].*$', '')`;
 const bare = (domain: string) => domain.toLowerCase().replace(/^www\./, "");
 // Tolerant of a malformed stored crawl: anything that is not the expected JSON type reads as empty, never as an error.
+// (The title and H1s are what the Google-profile gap check reads; a page saved without them has nothing to match.)
 const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
                                 'url', p->>'url',
                                 'status', CASE WHEN jsonb_typeof(p->'status')='number' AND (p->>'status')::numeric BETWEEN 0 AND 999 THEN (p->>'status')::numeric::int ELSE 0 END,
-                                'redirects', CASE WHEN jsonb_typeof(p->'redirects')='array' THEN jsonb_array_length(p->'redirects') ELSE 0 END))
+                                'redirects', CASE WHEN jsonb_typeof(p->'redirects')='array' THEN jsonb_array_length(p->'redirects') ELSE 0 END,
+                                'title', CASE WHEN jsonb_typeof(p->'title')='string' THEN p->>'title' END,
+                                'h1', CASE WHEN jsonb_typeof(p->'h1')='array' THEN (SELECT COALESCE(jsonb_agg(h), '[]'::jsonb) FROM jsonb_array_elements(p->'h1') h WHERE jsonb_typeof(h)='string') ELSE '[]'::jsonb END))
                               FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) p
                              WHERE jsonb_typeof(p)='object'), '[]'::jsonb)`;
 const CRAWLED_SQL = `CASE WHEN jsonb_typeof(state->'pages')='array' THEN jsonb_array_length(state->'pages') ELSE 0 END`;
@@ -275,20 +282,23 @@ export async function newestCrawl(user: number, domain: string, db: { query: typ
       WHERE user_id=$1 AND status='completed' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC, id LIMIT 1`, [user, bare(domain)]);
   return j ? { id: j.id, v: j.v, readable: !!j.readable, at: j.completed_at ? new Date(j.completed_at).toISOString() : null } : null;
 }
+/** How many times a crawl read is tried when the newest crawl changes between its check and its read. */
+export const CRAWL_READ_TRIES = 3;
 /**
  * The newest finished crawl's row, read in the same step as its check: `columns` are taken only if the row is still the
  * version that was checked AND passes the evidence test; if it changed in between, the newest crawl is looked up again
- * (up to three times). Returns the crawl (as newestCrawl) and its row, or the crawl alone when it cannot be read.
+ * (CRAWL_READ_TRIES times in all). Returns the crawl (as newestCrawl) and its row, or the crawl alone when it cannot be
+ * read. Changing on every try is not a failure of ours: the customer is told to try again (a 409, retryable).
  */
 export async function readNewestCrawl(user: number, domain: string, columns: string, db: { query: typeof pool.query } = pool): Promise<{ crawl: NonNullable<Awaited<ReturnType<typeof newestCrawl>>>; row: any | null } | null> {
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < CRAWL_READ_TRIES; i++) {
     const crawl = await newestCrawl(user, domain, db);
     if (!crawl) return null;
     if (!crawl.readable) return { crawl, row: null };
     const { rows: [row] } = await db.query(`SELECT ${columns} FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2 AND xmin::text=$3 AND ${WELL_FORMED_SQL}`, [crawl.id, user, crawl.v]);
     if (row) return { crawl, row };
   }
-  throw new Error("The newest crawl kept changing while it was read; try again.");
+  throw new SeoRetryableError("seo_crawl_changed");
 }
 /** What a view reading the newest crawl answers when that crawl cannot be read. */
 export type UnreadableCrawl = { unreadable: true; jobId: string; scannedAt: string | null };

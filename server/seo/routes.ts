@@ -19,13 +19,13 @@ import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryP
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
 import { setMentionWatch, mentionWatchView, retryWatchedLinks } from "./mention-watch";
 import { siteOutgoingLinks } from "./outgoing-links";
-import { gscBreakdown } from "./gsc-breakdown";
+import { gscBreakdown, searchConsoleSummary } from "./gsc-breakdown";
 import { mentionsInput as webMentionsInput, markInput, nameKey as mentionNameKey, nameOk as mentionNameOk, pageKeyOf, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
 import { oppInput, fetchOpportunities, OPP_ESTIMATE_USD, type Opportunities } from "./opportunities";
-import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, type GridScan, type MapListing } from "./grid";
+import { scanInput, locateInput, pinInput, readPin, savePin, beginScan, finishScan, failScan, runningScan, listScans, getScan, locateBusiness, fetchGrid, gridEstimateUsd, GRID_SIZES, GRID_SPACINGS, GRID_DEPTH, GRID_POINT_USD, GRID_STALE_MINUTES, type GridScan, type MapListing } from "./grid";
 import { renderInput, renderUrl, renderUrls, renderSuggestions, beginRender, failRender, latestRender, getRender, runRender, renderEstimateUsd, RENDER_MAX_PAGES } from "./render-check";
 import { findMarket } from "@shared/seo-markets";
 import type { Express } from "express";
@@ -37,7 +37,7 @@ import { requirePlan, sendLimitReached, raiseHint, plural, type Entitlements } f
 import { monthlyUsage, reserveQuotaFor, refundReservation, resetsAt } from "../growth-quotas";
 import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey, BUDGET_PAUSED_MESSAGE } from "./budget";
 import {
-  isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
+  isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError, claimDeadline,
 } from "./dataforseo";
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier, estimateLostLinksUsd } from "./pricing";
 import { creditStatus, outOfCreditMessage } from "./credits";
@@ -48,7 +48,7 @@ import {
   CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
   type ReportPage, type KeywordOverview,
 } from "./reports";
-import { enqueueRankRun, postQueuedRun, snapshotBacklinks, RANK_FREQUENCIES, RANK_FREQUENCY_KEYS, type SiteRow } from "./jobs";
+import { enqueueRankRun, postQueuedRun, snapshotBacklinks, owedRefunds, RANK_FREQUENCIES, RANK_FREQUENCY_KEYS, type SiteRow } from "./jobs";
 import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
@@ -77,8 +77,9 @@ import { batchInput, cleanDomains, batchEstimateUsd, fetchBatch, type BatchPage 
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
 import { askInput, mentionsInput, askAi, askEstimateUsd, saveAiAnswers, aiHistory, suggestPrompts, fetchAiMentions, trackedPrompts, setTracked, trackInput, MAX_TRACKED_PROMPTS, AI_ENGINES, AI_MENTIONS_ESTIMATE_USD, AI_MENTIONS_TYPICAL_USD, type AiMentionsPage } from "./ai-visibility";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
-import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
+import { alertPage, unreadAlerts, undeliveredAlerts, markAlertsRead, ALERT_KINDS } from "./alerts";
 import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
+import { seoLocks, requestQueues } from "./locks";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -232,6 +233,13 @@ const settingsInput = z.object({
   group: z.string().trim().max(40).transform((g) => g.replace(/\s+/g, " ")).nullable().optional(),
 }).strict();
 const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
+/** The Alerts page: one site or all, one kind or all (filtered before the page is cut), a page at a time (`before` = the last alert seen). */
+const alertsQuery = z.object({
+  siteId: z.coerce.number().int().positive().optional(),
+  kind: z.enum(ALERT_KINDS).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  before: z.coerce.number().int().positive().optional(),
+});
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
 /** A search with an operator costs several times more at the source than the price we show, so it is refused where the price is fixed. */
@@ -261,27 +269,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     });
 
   /**
-   * One purchase at a time per account per exact request: a second identical
-   * request made while the first is still running waits for it and shares its
-   * result instead of buying the same data again. (One app process serves
-   * production; the saved copy covers every later request.)
+   * One purchase at a time per account per exact request: a second identical request made while the first is still
+   * running waits for it and shares its result instead of buying the same data again — in this process by joining
+   * the request in flight, in another process (two of them overlap during a deploy restart) by waiting for its lock
+   * and then finding the saved copy (server/seo/locks.ts). A wait past LOCK_WAIT_MS is answered "busy, try again".
    */
-  const inflight = new Map<string, Promise<any>>();
-  const once = <T>(key: string, run: () => Promise<T>): Promise<T> => {
-    const running = inflight.get(key);
-    if (running) return running;
-    const p = run().finally(() => inflight.delete(key));
-    inflight.set(key, p);
-    return p;
-  };
+  const { inflight, once, serial } = requestQueues(seoLocks.withLock);
   /** Save a paid result. A failed save must not cost the customer the data they just paid for: they still get the response. */
   const keep = async (what: string, save: () => Promise<void>): Promise<boolean> => {
     try { await save(); return true; } catch (e: any) { console.error(`[seo] ${what} was paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); return false; }
   };
   /**
    * Buy a cacheable result once. The first request runs it; anyone asking for the same thing meanwhile waits and
-   * gets the same result marked `reused` (they bought nothing). The saved copy is checked again inside, so a
-   * request arriving just after another finished does not buy it a second time.
+   * gets the same result marked `reused` (they bought nothing). The saved copy is checked again inside — after the
+   * lock is held — so a request arriving just after another finished, or waiting in another process, finds what it
+   * bought instead of buying it a second time.
    */
   const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean; /** false: bought and returned, but it could not be kept — reopening it will not be free. */ saved: boolean }> => {
     const flight = `${kind}:${user}:${key}`;
@@ -294,14 +296,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     });
     return { data: out.data, reused: waiting || !out.bought, saved: out.saved };
   };
-  /** Requests for one key run one after another (keyword imports: the plan limit is counted, then inserted). */
-  const queues = new Map<string, Promise<unknown>>();
-  const serial = <T>(key: string, run: () => Promise<T>): Promise<T> => {
-    const next = (queues.get(key) ?? Promise.resolve()).catch(() => {}).then(run);
-    const tail = next.catch(() => {}).finally(() => { if (queues.get(key) === tail) queues.delete(key); });
-    queues.set(key, tail);
-    return next;
-  };
+  // `serial` (from requestQueues above): requests for one key run one after another, in every process — keyword
+  // imports count the plan limit, then insert, and the count holds because nobody else is between the two.
 
   const notReady = (res: any) => res.status(503).json({ configured: false, code: "seo_not_ready", message: SEO_NOT_READY_MESSAGE });
 
@@ -328,10 +324,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.setHeader("Cache-Control", "no-store");
     // The customer's SEO data credit and what each lookup costs them (shared/seo-credits.ts).
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
-    const body: Record<string, unknown> = { configured: isConfigured(), alertsUnread: await unreadAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, quotes: SEO_QUOTES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
+    // alertsUndelivered: this account's alerts whose delivery was given up after repeated tries (they stay on the page, marked).
+    const body: Record<string, unknown> = { configured: isConfigured(), alertsUnread: await unreadAlerts(user), alertsUndelivered: await undeliveredAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, quotes: SEO_QUOTES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
-      body.admin = { vendor: SEO_VENDOR_NAME, configured: isConfigured(), env: SEO_ENV_VARS, ...budget };
+      // What is still outstanding platform-wide: refunds owed to customers (never given up) and alert deliveries given up.
+      body.admin = { vendor: SEO_VENDOR_NAME, configured: isConfigured(), env: SEO_ENV_VARS, ...budget, refundsOwed: await owedRefunds(), alertsGivenUp: await undeliveredAlerts(null) };
     }
     res.json(body);
   });
@@ -389,7 +387,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack, serp_top FROM (
            SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
            FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
-      pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
+      pool.query("SELECT id, trigger, status, total, checked, error, partial, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
       searchConsoleSummary(user, site.domain),
     ]);
     const latest = new Map<string, any>(), previous = new Map<string, any>();
@@ -526,7 +524,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   route("get", "/api/seo/sites/:id/runs", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
-    const { rows } = await pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 20", [site.id]);
+    const { rows } = await pool.query("SELECT id, trigger, status, total, checked, error, partial, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 20", [site.id]);
     res.json(rows.map((r: any) => runView(r, isPlatformAdmin(req.user))));
   });
 
@@ -674,11 +672,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const pin = readPin((site as { grid_pin?: unknown }).grid_pin);
     if (!pin) return res.status(400).json({ message: "Choose your business on Google Maps first." });
     if (!isConfigured()) return notReady(res);
-    // One at a time per site — the database's rule, so a second server process cannot start another.
+    // One at a time per site — the database's rule, so a second server process cannot start another. A scan still
+    // "running" after GRID_STALE_MINUTES is closed as interrupted and may be replaced, so its lookups end a request's
+    // timeout and a margin before that: the scan and its replacement can never both pay for a point.
+    const begun = Date.now();
     const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const scanId = started.id;
-    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points` })
+    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points`, deadline: claimDeadline(begun, GRID_STALE_MINUTES * 60_000) })
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
         // The note is the customer's (server/seo/public-errors.ts): never the error's own text. publicFailure looks through
@@ -807,6 +808,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // ── Unlinked mentions (Site Explorer): pages that use the business's exact name, and whether those websites link ──
   // The name and places a site uses, and the saved check for that name if there is one. Spends nothing.
   const mentionsKey = (domain: string, name: string) => cacheKey("mentions", [domain, name.toLowerCase()]);
+  /** A "Check again" claim with no answer after this long (a crash before the save) can be taken over. */
+  const RECEIPT_CLAIM_MINUTES = 10;
   const placesOf = async (site: SiteRow) => {
     const saved = (site as { mention_places?: unknown }).mention_places;
     if (Array.isArray(saved)) return saved.filter((x): x is string => typeof x === "string").slice(0, 8);
@@ -942,20 +945,25 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // while it is young; an old claim with no answer (a crash before the save) can be taken over.
       await pool.query("DELETE FROM seo_refresh_receipts WHERE created_at < now() - interval '7 days'").catch(() => {});
       // The claim carries its holder's token: taking over an abandoned claim gives it a new token, so the old holder
-      // can neither save under it nor give it back.
+      // can neither save under it nor give it back. The checks around a request cannot stop one already in flight,
+      // though: so the holder asks the source nothing after a request's full timeout, plus a margin, would still end
+      // inside the claim — a displaced holder never has a purchase on its way back.
       const token = randomUUID();
+      let claimedAt = Date.now();
       const { rowCount: claimed } = await pool.query("INSERT INTO seo_refresh_receipts(user_id, key, replaces, answer, token) VALUES($1,$2,$3,NULL,$4) ON CONFLICT DO NOTHING", [user, key, input.replaces, token]);
       if (!claimed) {
-        const { rows: [rc] } = await pool.query("SELECT answer, claimed_at > now() - interval '10 minutes' AS young FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3", [user, key, input.replaces]);
+        const { rows: [rc] } = await pool.query(`SELECT answer, claimed_at > now() - interval '${RECEIPT_CLAIM_MINUTES} minutes' AS young FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3`, [user, key, input.replaces]);
         if (rc?.answer) return res.json({ page: await view(rc.answer as MentionsPage), reused: true });
         if (rc?.young) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
-        const { rowCount: taken } = await pool.query("UPDATE seo_refresh_receipts SET claimed_at=now(), token=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND claimed_at <= now() - interval '10 minutes'", [user, key, input.replaces, token]);
+        claimedAt = Date.now();
+        const { rowCount: taken } = await pool.query(`UPDATE seo_refresh_receipts SET claimed_at=now(), token=$4 WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND claimed_at <= now() - interval '${RECEIPT_CLAIM_MINUTES} minutes'`, [user, key, input.replaces, token]);
         if (!taken) return res.status(409).json({ code: "in_progress", message: "This check is being made right now. It will be here in a moment." });
       }
+      const deadline = claimDeadline(claimedAt, RECEIPT_CLAIM_MINUTES * 60_000);
       const release = () => pool.query("DELETE FROM seo_refresh_receipts WHERE user_id=$1 AND key=$2 AND replaces=$3 AND answer IS NULL AND token=$4", [user, key, input.replaces, token]).catch(() => {});
       if (!isConfigured()) { await release(); return notReady(res); }
       try {
-        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}" (again)`, () => fetchMentions(input.name, site.domain), { replaces: input.replaces!, token });
+        const out = await buyMentionsSaved(user, key, MENTIONS_ESTIMATE_USD, `Mentions — "${input.name}" (again)`, () => fetchMentions(input.name, site.domain, { deadline }), { replaces: input.replaces!, token });
         return res.status(201).json({ page: await view(out.data), reused: false, saved: true });
       } catch (e) {
         // Nothing was saved: this holder's claim is given back, so trying again can buy (a successor's claim is left alone).
@@ -1363,10 +1371,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ id: site.id, starred });
   });
 
-  // Alerts: what changed between checks. Saved rows only.
+  // Alerts: what changed between checks. Saved rows only — a page at a time, the kind filtered by the database first,
+  // with the counts the page's wording rests on and how many deliveries were given up (those alerts say so).
   route("get", "/api/seo/alerts", async (req, res, user) => {
-    const siteId = req.query.siteId === undefined ? null : (await ownedSite(user, req.query.siteId)).id;
-    res.json({ alerts: await listAlerts(user, siteId), unread: await unreadAlerts(user) });
+    const q = alertsQuery.parse(req.query ?? {});
+    const siteId = q.siteId === undefined ? null : (await ownedSite(user, q.siteId)).id;
+    const page = await alertPage(user, siteId, { kind: q.kind ?? null, limit: q.limit, before: q.before ?? null });
+    res.json({ ...page, unread: await unreadAlerts(user), undelivered: await undeliveredAlerts(user) });
   });
   route("post", "/api/seo/alerts/read", async (req, res, user) => {
     await markAlertsRead(user, readInput.parse(req.body ?? {}).ids ?? null);
@@ -1552,39 +1563,5 @@ function siteView(s: any) {
     id: s.id, domain: s.domain, businessName: s.business_name ?? null, alertsEnabled: s.alerts_enabled !== false, alertDrop: s.alert_drop ?? 3, rankFrequency: s.rank_frequency ?? "weekly", group: s.group_name ?? null, locationCode: s.location_code, languageCode: s.language_code, devices: s.devices, serpDepth: s.serp_depth,
     keywordCount: s.keyword_count ?? 0, nextRankCheckAt: s.next_rank_check_at, lastRankCheckAt: s.last_rank_check_at,
     nextBacklinksAt: s.next_backlinks_at, lastBacklinksAt: s.last_backlinks_at, createdAt: s.created_at, starred: s.starred === true,
-  };
-}
-
-/**
- * Search Console clicks / impressions for the site's domain over the last 28
- * days (and the 28 before), from the gsc_analytics rows the Search Console
- * page already syncs (server/gsc). null when no property matches the domain.
- */
-export async function searchConsoleSummary(user: number, domain: string) {
-  const { rows: assets } = await pool.query(
-    `SELECT id, external_id, synced_at FROM edge_assets WHERE user_id=$1 AND provider='gsc'
-       AND (external_id=$2 OR external_id=$3 OR external_id=$4 OR external_id=$5 OR external_id=$6 OR external_id=$7)
-     ORDER BY (external_id=$2) DESC, id LIMIT 1`,
-    [user, `sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`, `http://${domain}/`, `http://www.${domain}/`, `sc-domain:www.${domain}`]);
-  const asset = assets[0];
-  if (!asset) return null;
-  // Two equal 28-day windows counted back from the newest day that has been synced (Google runs two or three days
-  // behind), so the newer window is not short just because today's numbers do not exist yet.
-  const { rows } = await pool.query(
-    `WITH last AS (SELECT max(date) AS d FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date >= current_date - 70)
-     SELECT (g.date > last.d - 28) AS recent, sum(g.clicks)::float8 clicks, sum(g.impressions)::float8 impressions, count(DISTINCT g.date)::int AS days, max(last.d)::text AS through,
-            CASE WHEN sum(g.impressions)>0 THEN sum(g.position*g.impressions)/sum(g.impressions) END::float8 AS position
-       FROM gsc_analytics g, last WHERE g.asset_id=$1 AND g.dimension='date' AND g.date > last.d - 56 GROUP BY 1`, [asset.id]);
-  const pick = (recent: boolean) => rows.find((r) => r.recent === recent);
-  const cur = pick(true), prev = pick(false);
-  const days = cur?.days ?? 0, previousDays = prev?.days ?? 0;
-  return {
-    property: asset.external_id, syncedAt: asset.synced_at,
-    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each 28 is there.
-    clicks: cur ? cur.clicks ?? 0 : null, impressions: cur ? cur.impressions ?? 0 : null, position: cur?.position != null ? Math.round(cur.position * 10) / 10 : null,
-    previousClicks: prev ? prev.clicks ?? 0 : null, previousImpressions: prev ? prev.impressions ?? 0 : null,
-    days, previousDays, through: (cur?.through ?? prev?.through ?? null) as string | null,
-    /** Both windows are complete, so the difference between them is a real change and not missing days. */
-    comparable: days === 28 && previousDays === 28,
   };
 }

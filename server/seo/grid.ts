@@ -9,7 +9,7 @@
  */
 import { z } from "zod";
 import { pool } from "../db";
-import { request, assertOk, taskItems, safeDomain, normalizeBusinessName, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, safeDomain, normalizeBusinessName, type Deadline, type DfsTask } from "./dataforseo";
 import { publicNote } from "./public-errors";
 
 export const GRID_SIZES = [3, 5, 7] as const;
@@ -21,7 +21,11 @@ export const GRID_POINT_USD = 0.002;
 export const GRID_DEPTH = 20;
 /** Lookups in flight at once. One takes 5–30 seconds, so a 7 x 7 scan takes a minute or two. */
 const GRID_PARALLEL = 12;
-/** A scan still "running" after this long was interrupted (a restart); it is closed as failed. */
+/**
+ * A scan still "running" after this long was interrupted (a restart); it is closed as failed — and a new one may then
+ * start, so whoever runs a scan asks the source nothing after a deadline counted from this (claimDeadline), and the
+ * lookups still in flight then are cut off. Otherwise a slow scan and its replacement could both pay for the same points.
+ */
 export const GRID_STALE_MINUTES = 12;
 const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
 /**
@@ -180,8 +184,8 @@ export function buildScan(input: { keyword: string; size: number; spacing: numbe
   };
 }
 
-async function mapLookup(path: string, body: Record<string, unknown>): Promise<{ listings: MapListing[]; costUsd: number }> {
-  const task: DfsTask = assertOk(await gridDeps.request("POST", path, [body]), { treatNoResultsAsEmpty: true });
+async function mapLookup(path: string, body: Record<string, unknown>, opts: { deadline?: Deadline } = {}): Promise<{ listings: MapListing[]; costUsd: number }> {
+  const task: DfsTask = assertOk(await gridDeps.request("POST", path, [body], undefined, { deadline: opts.deadline }), { treatNoResultsAsEmpty: true });
   return { listings: parseMapListings(taskItems(task)), costUsd: typeof task.cost === "number" ? task.cost : 0 };
 }
 
@@ -201,7 +205,7 @@ export async function locateBusiness(query: string): Promise<{ data: MapListing[
  *   costUsd     — everything it cost us, including failed tries the source billed and an allowance for tries whose
  *                 cost we never learned (a timeout may still have been billed).
  */
-export async function fetchGrid(input: { keyword: string; size: number; spacing: number; pin: GridPin; domain: string }): Promise<{ data: GridScan; costUsd: number; customerUsd: number; costUnknown: false }> {
+export async function fetchGrid(input: { keyword: string; size: number; spacing: number; pin: GridPin; domain: string; /** The scan owner's deadline (see dataforseo.ts Deadline): no lookup starts after it, and the points not looked up stay unknown. */ deadline?: Deadline }): Promise<{ data: GridScan; costUsd: number; customerUsd: number; costUnknown: false }> {
   const cells = gridPoints(input.pin, input.size, input.spacing);
   const results: (MapListing[] | null)[] = new Array(cells.length).fill(null);
   let known = 0, customerUsd = 0, unknownTries = 0, next = 0;
@@ -216,12 +220,14 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
       for (let attempt = 1; attempt <= 2 && results[i] === null; attempt++) {
         if (attempt === 2 && retriesLeft-- <= 0) break;
         try {
-          const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]));
+          const r = await mapLookup("/serp/google/local_finder/live/advanced", pointRequest(input.keyword, cells[i]), { deadline: input.deadline });
           known += r.costUsd; customerUsd += r.costUsd; results[i] = r.listings;
         } catch (e: any) {
           firstError ??= e;
           const reported = typeof e?.costUsd === "number" ? e.costUsd : 0;
           known += reported;
+          // A lookup never sent (the deadline had passed) cost nothing for certain, and a second try would not be sent either.
+          if (e?.costUnknown === false) break;
           if (e?.code === "timeout" || (e?.code === "upstream" && !(reported > 0))) unknownTries++;
           // Only a lookup that may simply have been slow is worth a second go.
           if (e?.code !== "timeout" && e?.code !== "upstream" && e?.code !== "rate_limited") break;

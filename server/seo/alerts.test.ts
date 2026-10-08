@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertMessage, describeChange, linkChange, rankChanges, type CheckPair } from "./alerts";
+import { alertMessage, describeChange, linkChange, movementKey, rankAlertTitle, rankChanges, type CheckPair, type RankChange } from "./alerts";
 import { locationLabel, locationTypeLabel, parsePlaceQuery, usableLocations } from "./locations";
 
 const pair = (keyword: string, previous: number | null, position: number | null, extra: Partial<CheckPair> = {}): CheckPair =>
@@ -32,6 +32,40 @@ describe("rankChanges", () => {
   it("a threshold below one still means a real move", () => {
     expect(rankChanges([pair("a", 3, 3)], 0).drops).toEqual([]);
     expect(rankChanges([pair("a", 3, 4)], 0).drops).toHaveLength(1);
+  });
+  it("every move carries the keyword it is about and the two days it compares", () => {
+    const { drops } = rankChanges([pair("a", 4, 9, { keywordId: 7, on: "2026-10-08", since: "2026-10-01" })]);
+    expect(drops[0]).toMatchObject({ keywordId: 7, keyword: "a", what: "dropped", from: 4, to: 9, on: "2026-10-08", since: "2026-10-01" });
+    // A pair without days (older callers) still produces a move, with the days left unknown rather than invented.
+    expect(rankChanges([pair("b", 4, 9)]).drops[0]).toMatchObject({ on: null, since: null });
+  });
+});
+
+describe("movementKey", () => {
+  const move = (extra: Partial<RankChange> = {}): RankChange => ({ keywordId: 7, keyword: "roof repair", device: "desktop", location: null, what: "dropped", from: 4, to: 9, since: "2026-10-01", on: "2026-10-08", ...extra });
+  it("the same move found again (a second check the same day compares the same two days) is the same key", () => {
+    expect(movementKey(move())).toBe(movementKey(move({ keyword: "Roof Repair", location: "Tampa, Florida" })));
+    expect(movementKey(move())).toBe("7|desktop|dropped|4|9|2026-10-01|2026-10-08");
+  });
+  it("another keyword, a further fall, the other device or another pair of days is a new move", () => {
+    const k = movementKey(move());
+    expect(movementKey(move({ keywordId: 8 }))).not.toBe(k);
+    expect(movementKey(move({ to: 15 }))).not.toBe(k);
+    expect(movementKey(move({ device: "mobile" }))).not.toBe(k);
+    expect(movementKey(move({ since: "2026-09-24" }))).not.toBe(k);
+    expect(movementKey(move({ what: "lost", to: null }))).toBe("7|desktop|lost|4|-|2026-10-01|2026-10-08");
+  });
+});
+
+describe("rankAlertTitle", () => {
+  it("a complete check says nothing about itself; one that did not finish says so with its numbers", () => {
+    expect(rankAlertTitle(2, "fell", "x.com", { delivered: 5, expected: 5 })).toBe("2 rankings fell for x.com");
+    expect(rankAlertTitle(1, "fell", "x.com", null)).toBe("1 ranking fell for x.com");
+    expect(rankAlertTitle(3, "improved", "x.com", { delivered: 3, expected: 5 })).toBe("3 rankings improved for x.com (from a check that did not finish: 3 of 5 lookups came back)");
+  });
+  it("a check that stopped early is said so even when its numbers are not known", () => {
+    expect(rankAlertTitle(1, "fell", "x.com", { delivered: 1, expected: 2, stopped: true })).toBe("1 ranking fell for x.com (from a check that stopped early: 1 of 2 lookups came back)");
+    expect(rankAlertTitle(1, "fell", "x.com", { delivered: 0, expected: 0, stopped: true })).toBe("1 ranking fell for x.com (from a check that stopped early)");
   });
 });
 

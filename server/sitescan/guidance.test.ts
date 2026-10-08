@@ -9,6 +9,7 @@ import {
   guides,
   platformSteps,
   checklist,
+  profileEntryMatches,
 } from "./guidance";
 import { emptyState, parsePage, findingsFor, scoresFor } from "./audit";
 import { pageSpeed } from "./providers";
@@ -227,4 +228,21 @@ it("reports a returning fixed issue as new and resets its reported done state", 
       (f) => f.verification === "new" && !f.done,
     ),
   ).toBe(true);
+});
+it("the Google-profile gap rule is one function: the crawl raises a gap exactly when no page passes it", () => {
+  const gutters = page("<title>Seamless Gutters | Fixture</title><h1>Gutters</h1>", "https://fixture.test/gutters");
+  const about = page("<title>About us</title><h1>Our story</h1>", "https://fixture.test/about");
+  expect(profileEntryMatches(gutters, "gutters")).toBe(true);
+  expect(profileEntryMatches(about, "Gutters")).toBe(false);
+  // An H1 counts, any letter case; a page saved without a title or H1s (or with them in the wrong form) matches nothing.
+  expect(profileEntryMatches({ title: "A", h1: ["Vinyl SIDING installers"] }, "siding")).toBe(true);
+  expect(profileEntryMatches({}, "siding")).toBe(false);
+  expect(profileEntryMatches({ title: 5, h1: "Siding" }, "siding")).toBe(false);
+  const s = emptyState("https://fixture.test/");
+  s.pages = [about, gutters];
+  const ids = findingsFor(s, { id: 1, services: ["Gutters", "Siding"], service_areas: [] }).map((f) => f.id);
+  expect(ids).toContain("gap-services-Siding");
+  expect(ids).not.toContain("gap-services-Gutters");
+  // No page read: no gap is raised at all (Site Audit must not read that as a fix — server/seo/audit.test.ts).
+  expect(findingsFor(emptyState("https://fixture.test/"), { id: 1, services: ["Gutters"] }).map((f) => f.id)).not.toContain("gap-services-Gutters");
 });

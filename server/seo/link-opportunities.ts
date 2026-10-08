@@ -12,7 +12,8 @@
  */
 import { createHash } from "node:crypto";
 import { pool } from "../db";
-import { auditDomainKey, newestCrawl, readNewestCrawl, WELL_FORMED_SQL, type UnreadableCrawl } from "./audit";
+import { auditDomainKey, newestCrawl, readNewestCrawl, CRAWL_READ_TRIES, WELL_FORMED_SQL, type UnreadableCrawl } from "./audit";
+import { SeoRetryableError } from "./public-errors";
 import { linksMeasurable, sameUrlKey, type RawPage } from "./audit-pages";
 
 export const LINK_OPP_MAX = 200, LINK_OPP_PER_TARGET = 10;
@@ -197,9 +198,10 @@ export async function linkOpportunities(userId: number, site: { id: number; doma
   const cacheKey = `${userId}:${newest.id}:${newest.v}:${site.id}:${createHash("sha256").update(JSON.stringify(targets)).digest("hex")}`;
   const kept = worked.get(cacheKey);
   if (kept) return kept;
-  // Read at the version checked; a crawl changed meanwhile is looked up again (a few times at most).
+  // Read at the version checked; a crawl changed meanwhile is looked up again (CRAWL_READ_TRIES times in all, as
+  // readNewestCrawl does), after which the customer is told to try again — a retryable 409, not a failure of ours.
   const { rows: [job] } = await pool.query(`SELECT id, completed_at, ${TEXT_PAGES_SQL} AS pages FROM sitescan_jobs WHERE id::text=$1 AND user_id=$2 AND xmin::text=$3 AND ${WELL_FORMED_SQL}`, [newest.id, userId, newest.v]);
-  if (!job) { if (tries >= 2) throw new Error("The newest crawl kept changing while it was read; try again."); return linkOpportunities(userId, site, tries + 1); }
+  if (!job) { if (tries >= CRAWL_READ_TRIES - 1) throw new SeoRetryableError("seo_crawl_changed"); return linkOpportunities(userId, site, tries + 1); }
   const result: Result = { ...findLinkOpportunities(job.pages as OppPage[], targets as OppTarget[]), jobId: job.id, scannedAt: job.completed_at ? new Date(job.completed_at).toISOString() : null, checkedOn };
   worked.set(cacheKey, result);
   if (worked.size > 20) worked.delete(worked.keys().next().value as string);

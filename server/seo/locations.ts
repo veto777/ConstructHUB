@@ -5,6 +5,7 @@
  * a city never costs anything.
  */
 import { pool } from "../db";
+import { countryLabel } from "@shared/seo-markets";
 import { request, DataForSeoError } from "./dataforseo";
 
 export const LOCATION_SCHEMA_DDL = [
@@ -128,9 +129,20 @@ export async function searchLocations(q: string, limit = 12): Promise<LocationOp
   return rows.map((r: any) => ({ code: r.code, label: locationLabel(r.name), kind: locationTypeLabel(r.type) }));
 }
 
+/**
+ * A whole country as a place: any country the product supports (the Site Explorer's and Keywords Explorer's markets,
+ * shared/seo-markets.ts) — a site made with one of them has it as the default place of its keywords, so its own
+ * country must be a place here too, not only the United States. Pure. null for anything else.
+ */
+export function countryLocation(code: number): LocationOption | null {
+  const label = countryLabel(code);
+  return label ? { code, label, kind: "Country" } : null;
+}
+
 /** The label for a code the customer picked, or null when it is not a place we offer. */
 export async function locationByCode(code: number): Promise<LocationOption | null> {
-  if (code === UNITED_STATES.code) return { code, label: UNITED_STATES.name, kind: "Country" };
+  const country = countryLocation(code);
+  if (country) return country;
   const { rows: [r] } = await pool.query("SELECT code, name, type FROM seo_locations WHERE code=$1", [code]);
   return r ? { code: r.code, label: locationLabel(r.name), kind: locationTypeLabel(r.type) } : null;
 }

@@ -1,7 +1,12 @@
 import { gscComparable as _gscComparable } from "./site-report";
-import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import PDFDocument from "pdfkit";
+import { describe, expect, it, vi } from "vitest";
 import { reportEmail, unsubscribeToken, validUnsubscribe } from "./site-report-send";
-import { moverLine, nextSendAt, rankingsSection, renderReportPdf, reportHighlights, reportIsEmpty, scheduleInput, sendPeriod, type SiteReport } from "./site-report";
+import { gscNote, gscPeriod, moverLine, nextSendAt, pdfLoses, pdfSafe, rankingsSection, renderReportPdf, reportFontDir, reportFonts, reportHighlights, reportIsEmpty, scheduleInput, sendPeriod, type SiteReport } from "./site-report";
 
 const check = (keywordId: number, keyword: string, checkedOn: string, position: number | null, extra: Partial<{ device: string; local: number | null; hasPack: boolean; location: string | null; volume: number | null }> = {}) =>
   ({ keywordId, keyword, checkedOn, position, device: "desktop", local: null, hasPack: false, location: null, volume: null, ...extra });
@@ -101,6 +106,60 @@ describe("PDF", () => {
     const pdf = await renderReportPdf(report({ rankings: { ...report().rankings!, tracked: 120, keywords: many } }));
     expect(pdf.length).toBeGreaterThan(3000);
   });
+
+  // Keywords and tags in Polish, Russian, Greek and French, and one in Chinese, which no bundled font covers.
+  const names = ["Łódź", "Ремонт", "Ωmega", "café", "屋顶"];
+  const worldReport = () => report({ rankings: { ...report().rankings!, keywords: names.map((n, i) => ({ keyword: `${n} roofing`, location: null, position: i + 1, previous: i + 2, local: null, volume: 10 })),
+    byTag: names.map((tag) => ({ tag, keywords: 1, top3: 0, top10: 1, top10Change: 0, visibility: 40, visibilityChange: 2, compared: 1, newSince: 0, weighted: true, changeWeighted: true })) } });
+  const brand = { name: "Ремонт Про", logo: null };
+  const baseFonts = (pdf: Buffer) => Array.from(pdf.toString("latin1").matchAll(/\/BaseFont \/([^\s/>]+)/g), (m) => m[1]);
+
+  it("is set in DejaVu Sans, embedded in the file", async () => {
+    const pdf = await renderReportPdf(worldReport(), brand);
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+    const fonts = baseFonts(pdf);
+    expect(fonts.some((f) => /^[A-Z]{6}\+DejaVuSans$/.test(f))).toBe(true);
+    expect(fonts.some((f) => /^[A-Z]{6}\+DejaVuSans-Bold$/.test(f))).toBe(true);
+    expect(fonts.some((f) => f.startsWith("Helvetica"))).toBe(false);
+  });
+  it("keeps every character the font has a glyph for, replaces only the rest, and flags only a name that really loses one", () => {
+    const fonts = reportFonts(new PDFDocument(), reportFontDir());
+    expect([fonts.regular, fonts.bold]).toEqual(["ReportSans", "ReportSans-Bold"]);
+    expect(fonts.safe("Łódź · Ремонт · Ωmega · café · 屋顶 · 3 (−2)" + String.fromCharCode(7))).toBe("Łódź · Ремонт · Ωmega · café · ?? · 3 (−2) ");
+    expect(names.filter((n) => fonts.loses(n))).toEqual(["屋顶"]);
+    // Without a font lookup the rule is the built-in font's: Windows-1252 only, the minus sign as a hyphen (not lost).
+    expect(pdfSafe("Łódź 3 (−2)")).toBe("?ód? 3 (-2)");
+    expect([pdfLoses("Łódź"), pdfLoses("café"), pdfLoses("3 (−2)")]).toEqual([true, false, false]);
+  });
+  const pdftotext = "/usr/bin/pdftotext";
+  it.skipIf(!fs.existsSync(pdftotext))("pdftotext reads the Cyrillic back as written; only the Chinese tag is flagged as not shown", async () => {
+    const pdf = await renderReportPdf(worldReport(), brand);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "seo-report-pdf-"));
+    try {
+      const file = path.join(dir, "report.pdf");
+      fs.writeFileSync(file, pdf);
+      const text = execFileSync(pdftotext, [file, "-"], { encoding: "utf8" });
+      for (const s of ["Ремонт roofing", "Łódź roofing", "Ωmega roofing", "café roofing", "prepared by Ремонт Про"]) expect(text).toContain(s);
+      expect(text.match(/has characters this PDF cannot show/g)).toHaveLength(1);
+      expect(text).toMatch(/5\. \?\? \(has characters this PDF cannot show/);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+  it("keeps the built-in Helvetica, and says so once, when the font files cannot be read", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const nowhere = path.join(os.tmpdir(), "seo-report-no-fonts-here");
+      for (let i = 0; i < 2; i++) {
+        const pdf = await renderReportPdf(worldReport(), brand, { fontDir: nowhere });
+        expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+        const fonts = baseFonts(pdf);
+        expect(fonts).toContain("Helvetica");
+        expect(fonts).toContain("Helvetica-Bold");
+        expect(fonts.some((f) => f.includes("DejaVu"))).toBe(false);
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toMatch(/fonts in .* cannot be used .*built-in Helvetica/);
+    } finally { warn.mockRestore(); }
+  });
 });
 
 describe("schedule", () => {
@@ -153,6 +212,31 @@ describe("Search Console numbers in a report", () => {
     expect(_gscComparable({ ...base, days: 26, previousDays: 28 })).toBe(false);
     expect(_gscComparable({ ...base, days: 28, previousDays: 6 })).toBe(false);
     expect(_gscComparable({ ...base, previousClicks: null, previousImpressions: null, days: 28, previousDays: 0 })).toBe(false);
+  });
+  it("a read of these days still running or failed, or of unknown completeness, is no comparison — and the words say why (audit #55)", async () => {
+    const full = { ...base, days: 28, previousDays: 28, through: "2026-10-05" };
+    expect(_gscComparable(full)).toBe(true);
+    expect(_gscComparable({ ...full, incomplete: true })).toBe(false);
+    expect(_gscComparable({ ...full, incomplete: true, completenessUnknown: true })).toBe(false);
+    // The period (the highlight labels, the PDF heading) carries the reason; the sentence under the counts says what they rest on.
+    expect(gscPeriod(full)).toBe("28 days to 2026-10-05");
+    expect(gscPeriod({ ...full, incomplete: true })).toBe("28 days to 2026-10-05 (not compared: some days are still being read from Search Console, or a read failed)");
+    expect(gscPeriod({ ...full, incomplete: true, completenessUnknown: true })).toBe("28 days to 2026-10-05 (not compared: whether every day was fully read from Search Console is not known)");
+    expect(gscPeriod({ ...full, previousDays: 6, incomplete: true })).toBe("28 days to 2026-10-05 (not compared: 6 of the 28 days before are synced; some days are still being read from Search Console, or a read failed)");
+    expect(gscNote(full)).toBe("These are Google's own counts for the site. Changes in brackets compare with the 28 days before.");
+    expect(gscNote({ ...full, incomplete: true })).toMatch(/still being read from Search Console, or a read of them failed: the counts may be short, so they are not compared/);
+    expect(gscNote({ ...full, incomplete: true, completenessUnknown: true })).toMatch(/could not be checked, so they are not compared/);
+    expect(gscNote({ ...full, days: 20 })).toMatch(/^Only 20 of these 28 days/);
+    // The highlights — the email body and the top of the PDF — show the count with no change, under that label.
+    const rows = Object.fromEntries(reportHighlights(report({ searchConsole: { ...full, incomplete: true } })));
+    expect(rows["Clicks from Google, 28 days to 2026-10-05 (not compared: some days are still being read from Search Console, or a read failed)"]).toBe("120");
+    expect(rows["Times shown in Google, 28 days to 2026-10-05 (not compared: some days are still being read from Search Console, or a read failed)"]).toBe("4,000");
+    expect(Object.fromEntries(reportHighlights(report({ searchConsole: full })))["Clicks from Google, 28 days to 2026-10-05"]).toBe("120 (+20)");
+    expect(reportEmail(report({ searchConsole: { ...full, incomplete: true, completenessUnknown: true } })).text).toContain("not compared: whether every day was fully read from Search Console is not known");
+    expect(reportEmail(report({ searchConsole: { ...full, incomplete: true, completenessUnknown: true } })).text).not.toContain("(+20)");
+    // The PDF renders with the same text (its Search Console section only; the font code is not touched here).
+    const pdf = await renderReportPdf(report({ searchConsole: { ...full, incomplete: true } }));
+    expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
   });
   it("work done: tasks marked done in the last 30 days, newest first, and what is still open; no plan = no section", async () => {
     const { workSection } = await import("./site-report");

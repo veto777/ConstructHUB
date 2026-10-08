@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { alertPages, newMentionsRequest } from "./mention-watch";
+import { alertPages, fetchNewMentions, mentionWatchDeps, newMentionsRequest } from "./mention-watch";
+import { mentionsDeps } from "./mentions";
 import { alertMessage } from "./alerts";
 
 const row = (domain: string, title: string, linksToYou: boolean | null = false) => ({ url: `https://${domain}/p`, domain, title, snippet: null, published: "2026-10-01", authority: 30, linksToYou });
@@ -23,5 +24,19 @@ describe("mentions watch", () => {
     expect(m).toMatchObject({ kind: "seo.mention_new", severity: "info" });
     expect(m.body).toContain("likely you — check each one");
     expect(m.body).toContain("a.com — News");
+  });
+  it("a watched check made under a lease asks the search and the link check under the lease's deadline", async () => {
+    const real = mentionWatchDeps.request, realLinks = mentionsDeps.request;
+    const seen: (number | undefined)[] = [];
+    const answer = (items: unknown[], cost: number) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ total_count: items.length, items }] }] });
+    try {
+      mentionWatchDeps.request = (async (_m: string, _p: string, _b: any, _r: any, opts: any) => { seen.push(opts?.deadline); return answer([{ url: "https://a.com/p", main_domain: "a.com", domain_rank: 400, content_info: { main_title: "A", date_published: "2026-10-01 10:00:00 +00:00" } }], 0.03); }) as any;
+      mentionsDeps.request = (async (_m: string, _p: string, _b: any, _r: any, opts: any) => { seen.push(opts?.deadline); return answer([{ domain: "a.com", backlinks: 1 }], 0.02); }) as any;
+      const out = await fetchNewMentions("Alpine Exteriors", "alpine.example", new Date("2026-09-08T10:00:00Z"), new Date("2026-10-08T10:00:00Z"), new Set(), 0, 777);
+      expect([seen, out.data.rows.length, out.data.linksChecked, out.data.rows[0].linksToYou]).toEqual([[777, 777], 1, true, true]);
+      seen.length = 0;
+      await fetchNewMentions("Alpine Exteriors", "alpine.example", new Date("2026-09-08T10:00:00Z"), new Date("2026-10-08T10:00:00Z"));
+      expect(seen).toEqual([undefined, undefined]);
+    } finally { mentionWatchDeps.request = real; mentionsDeps.request = realLinks; }
   });
 });

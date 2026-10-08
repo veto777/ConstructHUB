@@ -18,9 +18,13 @@ type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_do
 type MentionItem = { checkId: number; name: string; since: string; takenOn: string; linksChecked?: boolean; pages: { domain: string; url: string; title: string; place: string | null; confirmed: boolean; linksToYou: boolean | null }[]; more?: number };
 type KwItem = { since: string; takenOn?: string; snapshotId?: number; beforeId?: number; locationCode?: number; languageCode?: string; keywords: { keyword: string; position: number | null; volume: number | null; was?: number | null }[]; more?: number };
 type GridItem = { keyword: string; size: number; spacing: number; top3: number; checked: number; score: number | null; wasTop3: number; wasChecked: number; wasScore: number | null; since: string };
-type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null };
+type RankItem = { keyword: string; device: string; location: string | null; what: "dropped" | "lost" | "left_map_pack" | "improved" | "new" | "entered_map_pack"; from: number | null; to: number | null; /** The two days compared (older alerts have none). */ since?: string | null; on?: string | null };
 type LinkItem = { from: number | null; to: number | null; since: string; backlinksFrom: number | null; backlinksTo: number | null; lost?: { domain: string; authority: number | null; from: string | null }[]; lostTotal?: number | null; lostShown?: number };
-type Alert = { id: number; siteId: number; domain: string; kind: Kind; title: string; items: (RankItem | LinkItem | GridItem)[]; readAt: string | null; createdAt: string };
+type Alert = { id: number; siteId: number; domain: string; kind: Kind; title: string; items: (RankItem | LinkItem | GridItem)[]; readAt: string | null; createdAt: string; /** Its delivery (bell / email) was given up after repeated tries. */ notSent?: boolean; /** The bell entry went out; the email did not, after its tries. */ emailFailed?: boolean };
+/** One page of alerts (GET /api/seo/alerts): filtered by kind on the server, with the counts the wording rests on. */
+type AlertPage = { alerts: Alert[]; hasMore: boolean; pageSize: number; /** Of the kind chosen, within the scope. */ total: number; /** Of every kind, within the scope. */ totalAll: number; unread: number; /** Deliveries given up (those alerts are marked). */ undelivered: number };
+/** Rank rows shown before "Show all" (every movement is kept with the alert; none is cut). */
+const RANK_ROWS = 25;
 
 const KIND: Record<Kind, { label: string; good: boolean }> = {
   rank_drop: { label: "Rankings fell", good: false }, rank_gain: { label: "Rankings improved", good: true },
@@ -57,6 +61,21 @@ function KwAlert({ kind, item: i, domain, onOpen }: { kind: Kind; item: KwItem; 
   );
 }
 
+/** The movements of one rank alert: every one the alert holds, the first RANK_ROWS until asked for the rest. */
+function RankRows({ items }: { items: RankItem[] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? items : items.slice(0, RANK_ROWS);
+  return (
+    <>
+      <table className="g-table mt-2">
+        <thead><tr><th>Keyword</th><th>Where</th><th>Device</th><th>What happened</th></tr></thead>
+        <tbody>{shown.map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}{i.since && i.on ? <span className="g-text-2"> · {fmtDate(i.since)} → {fmtDate(i.on)}</span> : null}</td></tr>)}</tbody>
+      </table>
+      {items.length > RANK_ROWS && <button type="button" className="g-link mt-1 text-[13px]" aria-expanded={all} onClick={() => setAll(!all)} data-testid="button-rank-alert-all">{all ? `Show the first ${RANK_ROWS}` : `Show all ${fmtNum(items.length)} movements`}</button>}
+    </>
+  );
+}
+
 export default function SeoAlertsPage() {
   const status = useSeoStatus();
   const sites = useSeoSites();
@@ -66,15 +85,35 @@ export default function SeoAlertsPage() {
   const { toast } = useToast();
   const [scope, setScope] = useState<"site" | "all">("all");
   const [kind, setKind] = useState<Kind | "all">("all");
-  const url = `/api/seo/alerts${scope === "site" && site ? `?siteId=${site.id}` : ""}`;
-  const q = useQuery<{ alerts: Alert[]; unread: number }>({ queryKey: [url], refetchOnMount: "always", refetchInterval: 60_000 });
+  // The site and the kind go to the server: it filters before it cuts the page, so an empty page means there are none.
+  const params = new URLSearchParams();
+  if (scope === "site" && site) params.set("siteId", String(site.id));
+  if (kind !== "all") params.set("kind", kind);
+  const qs = params.toString();
+  const url = `/api/seo/alerts${qs ? `?${qs}` : ""}`;
+  const q = useQuery<AlertPage>({ queryKey: [url], refetchOnMount: "always", refetchInterval: 60_000 });
+  // Older pages ("Show more") sit after the live first page; they belong to one filter and go when it changes.
+  const [older, setOlder] = useState<{ url: string; alerts: Alert[]; hasMore: boolean }>({ url, alerts: [], hasMore: false });
+  const more = useMutation({
+    mutationFn: (before: number) => api("GET", `${url}${qs ? "&" : "?"}before=${before}`) as Promise<AlertPage>,
+    onSuccess: (p) => setOlder((o) => ({ url, alerts: [...(o.url === url ? o.alerts : []), ...p.alerts], hasMore: p.hasMore })),
+    onError: (e) => toast({ title: "Couldn't load more alerts", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const read = useMutation({
     mutationFn: (ids: number[] | null) => api("POST", "/api/seo/alerts/read", ids ? { ids } : {}),
-    onSuccess: () => { void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
+    onSuccess: (_d, ids) => {
+      void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      // The older pages are not fetched again: they are marked here.
+      setOlder((o) => ({ ...o, alerts: o.alerts.map((a) => (!ids || ids.includes(a.id)) && !a.readAt ? { ...a, readAt: new Date().toISOString() } : a) }));
+    },
     onError: (e) => toast({ title: "Couldn't mark that as read", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const alerts = (q.data?.alerts ?? []).filter((a) => kind === "all" || a.kind === kind);
+  const extra = older.url === url ? older.alerts : [];
+  const seen = new Set<number>();
+  const alerts = [...(q.data?.alerts ?? []), ...extra].filter((a) => !seen.has(a.id) && (seen.add(a.id), true));
+  const hasMore = extra.length ? older.hasMore : (q.data?.hasMore ?? false);
   const unread = q.data?.unread ?? 0;
+  const total = q.data?.total ?? 0, undelivered = q.data?.undelivered ?? 0;
 
   return (
     <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status}>
@@ -96,12 +135,19 @@ export default function SeoAlertsPage() {
       {site && <div id="keyword-watch" className="scroll-mt-4"><KeywordWatch site={site} pick={kwPick} onPick={setKwPick} /></div>}
       {q.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading alerts…</p>}
       {q.isError && <div className="g-callout" role="alert" data-testid="alerts-error"><h3>Couldn't load your alerts</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
+      {q.isSuccess && undelivered > 0 && (
+        <div className="g-callout mb-4" role="status" data-testid="alerts-undelivered">
+          <h3>{fmtNum(undelivered)} alert{undelivered === 1 ? "" : "s"} could not be sent</h3>
+          <p>The bell or email delivery failed again and again, so it was given up. {undelivered === 1 ? "The alert is" : "They are"} kept here, marked "Not sent".</p>
+        </div>
+      )}
       {q.isSuccess && alerts.length === 0 && (
         <Empty testId="alerts-empty">
-          <h3>{(q.data?.alerts.length ?? 0) > 0 ? "No alerts of this kind" : "No alerts yet"}</h3>
-          <p>{(q.data?.alerts.length ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check, a monthly backlink snapshot, a repeating local grid or the keyword watch finds a change in the saved data, compared with the one before it, that is big enough to qualify. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
+          <h3>{(q.data?.totalAll ?? 0) > 0 ? "No alerts of this kind" : scope === "site" && site ? `No alerts for ${site.domain} yet` : "No alerts yet"}</h3>
+          <p>{(q.data?.totalAll ?? 0) > 0 ? "Choose a different kind above." : "An alert appears here when a weekly rank check, a monthly backlink snapshot, a repeating local grid or the keyword watch finds a change in the saved data, compared with the one before it, that is big enough to qualify. The first check of a keyword has nothing to compare with, so alerts start with the second."}</p>
         </Empty>
       )}
+      {q.isSuccess && alerts.length > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid="alerts-count">Showing {fmtNum(alerts.length)} of {fmtNum(total)} alert{total === 1 ? "" : "s"}{kind !== "all" ? ` of this kind` : ""}{scope === "site" && site ? ` for ${site.domain}` : ""}, newest first.</p>}
       <ul className="space-y-3" data-testid="list-alerts">
         {alerts.map((a) => (
           <li key={a.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`alert-${a.id}`}>
@@ -109,14 +155,13 @@ export default function SeoAlertsPage() {
               <span className={`g-move ${KIND[a.kind].good ? "g-move--up" : "g-move--down"} text-[13px]`}>{KIND[a.kind].good ? "▲" : "▼"} {KIND[a.kind].label}</span>
               <h2 className="g-text text-[15px] font-medium">{a.title}</h2>
               {!a.readAt && <span className="g-chip g-chip--sm">New</span>}
+              {a.notSent && <span className="g-chip g-chip--sm" title="Sending it to the bell or by email failed again and again, so it was given up. It is kept here.">Not sent</span>}
+              {!a.notSent && a.emailFailed && <span className="g-chip g-chip--sm" title="The bell entry went out; the email failed every time it was tried.">Email not sent</span>}
               <span className="g-text-2 ml-auto text-[12px]">{fmtDate(a.createdAt)}</span>
               {!a.readAt && <button type="button" className="g-pill g-pill--sm" disabled={read.isPending} onClick={() => read.mutate([a.id])} aria-label={`Mark "${a.title}" as read`}>Mark read</button>}
             </div>
             {a.kind === "rank_drop" || a.kind === "rank_gain" ? (
-              <table className="g-table mt-2">
-                <thead><tr><th>Keyword</th><th>Where</th><th>Device</th><th>What happened</th></tr></thead>
-                <tbody>{(a.items as RankItem[]).map((i, n) => <tr key={n}><td>{i.keyword}</td><td data-label="Where" className="g-text-2">{i.location ?? "United States"}</td><td data-label="Device" className="g-text-2 capitalize">{i.device}</td><td data-label="What happened">{WHAT[i.what]?.(i) ?? i.what}</td></tr>)}</tbody>
-              </table>
+              <RankRows items={a.items as RankItem[]} />
             ) : a.kind === "mention_new" ? (
               (a.items as unknown as MentionItem[]).map((i, n) => (
                 <div key={n}>
@@ -140,6 +185,9 @@ export default function SeoAlertsPage() {
           </li>
         ))}
       </ul>
+      {q.isSuccess && hasMore && alerts.length > 0 && (
+        <p className="mt-4"><button type="button" className="g-pill" disabled={more.isPending} onClick={() => more.mutate(alerts[alerts.length - 1].id)} data-testid="button-alerts-more">{more.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading…</> : `Show more (${fmtNum(Math.max(0, total - alerts.length))} older)`}</button></p>
+      )}
     </SeoShell>
   );
 }

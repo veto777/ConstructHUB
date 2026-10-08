@@ -71,6 +71,24 @@ export function brandMatches(name: string, text: string) {
     words.some((_, i) => tokens.every((t, j) => near(t, words[i + j] || "")))
   );
 }
+/**
+ * The one rule for "this crawled page is a page for that Google Business Profile entry" (a service or a service
+ * area): the entry's text appears in the page's title or an H1. The crawl raises a gap when no page passes it;
+ * Site Audit calls an earlier gap fixed only when a page read by THIS crawl passes it (server/seo/audit.ts) — so the
+ * two can never disagree. Tolerant of a page saved without a title or H1s (nothing to match: false).
+ */
+export function profileEntryMatches(
+  page: { title?: unknown; h1?: unknown },
+  value: string,
+): boolean {
+  const title = typeof page.title === "string" ? page.title : "";
+  const h1 = Array.isArray(page.h1)
+    ? page.h1.filter((h): h is string => typeof h === "string")
+    : [];
+  return (title + " " + h1.join(" "))
+    .toLowerCase()
+    .includes(String(value).toLowerCase());
+}
 const google = "https://developers.google.com/search/docs/";
 type Guide = {
   impact: "High" | "Medium" | "Low";

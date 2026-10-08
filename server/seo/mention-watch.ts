@@ -20,7 +20,7 @@
  */
 import type { PoolClient } from "pg";
 import { pool } from "../db";
-import { request, assertOk, taskItems, normalizeDomain, type DfsTask } from "./dataforseo";
+import { request, assertOk, taskItems, normalizeDomain, claimDeadline, type Deadline, type DfsTask } from "./dataforseo";
 import { withBudget, SeoBudgetError } from "./budget";
 import { saveAlert, deliverAlert } from "./alerts";
 import { getEntitlements } from "../entitlements";
@@ -35,6 +35,8 @@ export const FIRST_LOOKBACK_DAYS = 31;
 export const OVERLAP_DAYS = 7;
 /** Pages read in one watched check (one search; the price is verified for this many). */
 export const WATCH_ROWS = MENTIONS_ROWS;
+/** How long the scheduler leases a due site for (never bought twice within it). */
+const LEASE_HOURS = 6;
 
 export const MENTION_WATCH_DDL = [
   `ALTER TABLE seo_sites ADD COLUMN IF NOT EXISTS mention_watch boolean NOT NULL DEFAULT false`,
@@ -98,9 +100,9 @@ export type WatchPage = MentionsPage & {
  * failed link check leaves "links to you" unknown and is not charged. The source's dates and the window decide what is
  * new; `complete` = every page of the window was read (else the next window resumes from the last one read).
  */
-export async function fetchNewMentions(name: string, domain: string, from: Date, to: Date, seenBefore: ReadonlySet<string> = new Set(), offset = 0): Promise<{ data: WatchPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
+export async function fetchNewMentions(name: string, domain: string, from: Date, to: Date, seenBefore: ReadonlySet<string> = new Set(), offset = 0, /** The claim owner's deadline (see dataforseo.ts Deadline). */ deadline?: Deadline): Promise<{ data: WatchPage; costUsd: number; costUnknown: boolean; customerUsd: number }> {
   const target = normalizeDomain(domain) ?? domain;
-  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, from, to, offset)]), { treatNoResultsAsEmpty: true });
+  const task: DfsTask = assertOk(await mentionWatchDeps.request("POST", "/content_analysis/search/live", [newMentionsRequest(name, target, from, to, offset)], undefined, { deadline }), { treatNoResultsAsEmpty: true });
   const searchUsd = typeof task.cost === "number" ? task.cost : 0;
   const items = taskItems(task), seen = new Set<string>(), rows: MentionRow[] = [], allKeys = new Set<string>();
   let skippedSeen = 0;
@@ -124,7 +126,7 @@ export async function fetchNewMentions(name: string, domain: string, from: Date,
     resumeFrom: complete ? null : from.toISOString(), ...(complete ? {} : { resumeTo: to.toISOString(), resumeOffset: read }),
   };
   if (!rows.length) return { data: page, costUsd: searchUsd, costUnknown: false, customerUsd: searchUsd };
-  const links = await checkLinks(page);
+  const links = await checkLinks(page, { deadline });
   const r6 = (n: number) => Math.round(n * 1e6) / 1e6;
   return { data: { ...page, ...links.data }, costUsd: r6(searchUsd + links.costUsd), costUnknown: links.costUnknown, customerUsd: r6(searchUsd + (links.data.linksChecked ? links.costUsd : 0)) };
 }
@@ -146,8 +148,9 @@ const WATCH_KEY_SQL = `lower(regexp_replace(${WATCH_NAME_SQL}, '\\s+', ' ', 'g')
  * together with the next date — only while the site's date is still the leased one, the watch is on, and it still
  * follows the same name. A day that already has its check buys nothing (its next date is put right instead). Anything
  * that stops the save charges the customer nothing; what the source cost is kept, with its uncertainty.
+ * `deadline`: the lease's deadline (see dataforseo.ts Deadline) — the source is asked nothing after it.
  */
-export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; pages: number } | null> {
+export async function takeWatchedCheck(site: WatchSite, deadline?: Deadline): Promise<{ id: number; pages: number } | null> {
   const key = nameKey(site.name);
   if (!nameOk(site.name)) throw Object.assign(new Error(`mentions watch for ${site.domain}: the name cannot be searched as it is written`), { notSaved: true, badName: true });
   // One check a day, decided BEFORE anything is bought.
@@ -175,7 +178,7 @@ export async function takeWatchedCheck(site: WatchSite): Promise<{ id: number; p
     "SELECT seen_keys, page->'rows' AS rows FROM seo_mention_checks WHERE site_id=$1 AND name_key=$2 AND coalesce(window_to, created_at) >= $3", [site.id, key, new Date(from.getTime() - 864e5).toISOString()]);
   const seenBefore = new Set<string>(prev.flatMap((p: any) => [...(Array.isArray(p.seen_keys) ? p.seen_keys : []), ...(Array.isArray(p.rows) ? p.rows : []).map((r: any) => (typeof r?.url === "string" ? pageKeyOf(r.url) : ""))]).filter(Boolean));
   const out = await withBudget(site.user_id, MENTIONS_ESTIMATE_USD, async () => {
-    const o = await fetchNewMentions(site.name, site.domain, from, to, seenBefore, resuming ? Number(last.resume_offset ?? 0) : 0);
+    const o = await fetchNewMentions(site.name, site.domain, from, to, seenBefore, resuming ? Number(last.resume_offset ?? 0) : 0, deadline);
     const fail = (why: string) => Object.assign(new Error(`mentions watch for ${site.domain} not saved: ${why}`), { costUsd: o.costUsd, costUnknown: o.costUnknown, notSaved: true });
     let client: PoolClient | null = null;
     try {
@@ -241,17 +244,21 @@ export async function runDueMentionChecks(): Promise<number> {
   for (const o of owed) await settleMentionAlerts(o.site_id).catch(() => {});
   // A watch with no name to follow (the business name was cleared): nothing to search; it says so and waits.
   await pool.query(`UPDATE seo_sites SET mention_watch_note = 'no_name', next_mention_at = now() + interval '1 day' WHERE mention_watch AND next_mention_at <= now() AND ${WATCH_NAME_SQL} = ''`).catch(() => {});
+  // Once the lease runs out a later pass leases the site again, and the checks around a request cannot stop one already
+  // in flight: so this pass asks the source nothing after a request's full timeout, plus a margin, before that.
+  const leasedAt = Date.now();
   const { rows: due } = await pool.query(
-    `UPDATE seo_sites SET next_mention_at = now() + interval '6 hours'
+    `UPDATE seo_sites SET next_mention_at = now() + interval '${LEASE_HOURS} hours'
       WHERE mention_watch AND next_mention_at <= now() AND ${WATCH_NAME_SQL} <> ''
       RETURNING id, user_id, domain, ${WATCH_NAME_SQL} AS name, next_mention_at::text AS lease`);
+  const deadline = claimDeadline(leasedAt, LEASE_HOURS * 3600_000);
   let done = 0;
   for (const site of due) {
     // Waiting is said on the page: the reason is kept with the site until a check succeeds.
     const later = (interval: string, note: string) => pool.query(`UPDATE seo_sites SET next_mention_at = now() + interval '${interval}', mention_watch_note = $3 WHERE id=$1 AND mention_watch AND next_mention_at::text = $2`, [site.id, site.lease, note]).catch(() => {});
     try {
       if (!(await mentionWatchDeps.entitled(site.user_id))) { await later("1 day", "not_included"); continue; }
-      if (await takeWatchedCheck(site)) done++;
+      if (await takeWatchedCheck(site, deadline)) done++;
     } catch (e: any) {
       if (e instanceof SeoBudgetError) { console.warn(`[seo] mentions watch for ${site.domain} skipped: ${e.message}`); await later("1 day", "no_allowance"); }
       else if (e?.badName) { console.warn(`[seo] ${e.message}`); await later("7 days", "bad_name"); }
