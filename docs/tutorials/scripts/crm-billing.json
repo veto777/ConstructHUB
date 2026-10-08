@@ -43,7 +43,7 @@
     },
     {
       "action": "scroll",
-      "selector": "[data-testid=\"member-demo-member-owen\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Owen Brooks\")",
       "caption": "Team members",
       "narration": "Everyone listed under Team members uses a seat."
     },
@@ -55,7 +55,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"button-remove-demo-member-priya\"]",
+      "selector": "[data-testid^=\"member-\"]:has-text(\"Priya Shah\") [data-testid^=\"button-remove-\"]",
       "caption": "Remove from team",
       "chapter": "Free up a seat",
       "narration": "The trash can removes someone from the team. They lose access right away."
