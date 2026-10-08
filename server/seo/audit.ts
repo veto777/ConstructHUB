@@ -145,7 +145,21 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   //  - everything else: reread() above.
   const probes = (report as { coverage?: { missingPageProbe?: { probes?: unknown } | null } }).coverage?.missingPageProbe?.probes;
   const measuredFor = (device: string) => new Set((Array.isArray(report.psi) ? report.psi : []).filter((p) => p?.strategy === device && typeof p.score === "number" && typeof p.url === "string").map((p) => p.url as string));
+  // A Google-profile gap entry ("no page for the service X") went away for a reason only if the SAME profile is
+  // attached this time and still lists X — then the crawl found a page for it. A profile changed, missing, or no
+  // longer listing X changes what is asked: not re-checked, never fixed.
+  const profileList = (r: AuditReport | undefined, list: string) => { const p = r?.profile as any; return p && typeof p === "object" && Array.isArray(p[list]) ? new Set((p[list] as unknown[]).filter((x): x is string => typeof x === "string").map((x) => x.trim().toLowerCase())) : null; };
+  const profileId = (r: AuditReport | undefined) => { const p = r?.profile as any; return p && typeof p === "object" && (typeof p.id === "number" || typeof p.id === "string") ? String(p.id) : null; };
+  const gapRechecked = (key: string, name: string) => {
+    const list = key === "gap-services" ? "services" : key === "gap-service_areas" ? "service_areas" : null;
+    if (!list) return false;
+    const idNow = profileId(report), idBefore = profileId(previous?.report);
+    if (!idNow || idNow !== idBefore) return false;
+    return profileList(report, list)?.has(name.trim().toLowerCase()) ?? false;
+  };
+  const isGap = (key: string) => key === "gap-services" || key === "gap-service_areas";
   const itemRechecked = (key: string, u: string) => {
+    if (isGap(key)) return gapRechecked(key, u);
     if (SAMPLED_CHECKS.has(key)) return false;
     if (key === "soft-404") {
       if (!Array.isArray(probes)) return false;
@@ -162,13 +176,13 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
     // Pages it was on before that are not on the list now but were not looked at again (down, redirected, not
     // crawled): not counted as improvements — the change is on the pages that could be compared.
     // (A soft 404 is compared by part of the site: each crawl asks fresh made-up addresses.)
-    const unit = (i: string) => { const u = urlOf(i); return u === null ? null : g.key === "soft-404" ? missingPageScope(u) : u; };
+    const unit = (i: string) => { if (isGap(g.key)) return i; const u = urlOf(i); return u === null ? null : g.key === "soft-404" ? missingPageScope(u) : u; };
     const stillAt = new Set(g.items.map(unit));
     const local = g.category === "local" && !report.profile && previous?.report.profile;
     const unknown = b ? [...new Set(b.items.map(unit))].filter((x) => x !== null && !stillAt.has(x)).filter((x) => {
       if (local) return true;
       const sample = b.items.find((i) => unit(i) === x)!;
-      return !itemRechecked(g.key, urlOf(sample)!);
+      return !itemRechecked(g.key, isGap(g.key) ? sample : urlOf(sample)!);
     }).length : 0;
     const prevUnits = b ? (g.key === "soft-404" ? new Set(b.items.map(unit)).size : b.items.length) : 0;
     const nowUnits = g.key === "soft-404" ? stillAt.size : g.items.length;
@@ -185,6 +199,7 @@ export function auditSummary(report: AuditReport, pages: AuditPage[], previous?:
   const recheckable = (g: Group) => {
     if (g.category === "local" && !report.profile && previous?.report.profile) return false;
     if (SAMPLED_CHECKS.has(g.key)) return false;
+    if (isGap(g.key)) return g.items.length > 0 && g.items.every((name) => gapRechecked(g.key, name));
     const urls = g.items.map(urlOf).filter((u): u is string => !!u);
     // Soft 404s and PageSpeed need evidence about the very parts / pages they were raised for; others with no page
     // (a rolled-up entry) are judged by the crawl having run.

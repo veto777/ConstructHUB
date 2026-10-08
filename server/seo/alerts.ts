@@ -67,8 +67,8 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export const ITEM_CAP = 200;
 
 /** Insert the alert once (per site, kind and source); its id when it is new, null when it already exists. */
-export async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[]): Promise<number | null> {
-  const { rows: [row] } = await pool.query(
+export async function saveAlert(userId: number, siteId: number, kind: string, source: string, title: string, items: unknown[], db: { query: typeof pool.query } = pool): Promise<number | null> {
+  const { rows: [row] } = await db.query(
     `INSERT INTO seo_alerts(user_id, site_id, kind, source, title, items) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT (site_id, kind, source) DO NOTHING RETURNING id`,
     [userId, siteId, kind, source, title, JSON.stringify(items.slice(0, ITEM_CAP))]);
   return row ? Number(row.id) : null;
@@ -198,10 +198,14 @@ export async function deliverPendingAlerts(): Promise<number> {
  * running the check again the same day compares with the same earlier day, so
  * it must not tell the owner the same thing twice.
  */
-/** `onDay`: the day the alert is filed under (the run's own day when settled later, so it is never made twice). */
-export async function raiseRankAlerts(siteId: number, runId: string, onDay?: string): Promise<{ drops: number; gains: number }> {
-  const { rows: [site] } = await pool.query("SELECT id, user_id, domain, alerts_enabled, alert_drop, current_date::text AS today FROM seo_sites WHERE id=$1", [siteId]);
-  if (!site || site.alerts_enabled === false) return { drops: 0, gains: 0 };
+export type RankAlertPlan = { userId: number; siteId: number; domain: string; drops: RankChange[]; gains: RankChange[] } | null;
+/**
+ * What a run moved, worked out from its own checks against each keyword's check before (read only). Done BEFORE the run
+ * is closed: closing and saving these alerts then happen in one transaction, so a run is never done without its alerts.
+ */
+export async function rankAlertPlan(siteId: number, runId: string, db: { query: typeof pool.query } = pool): Promise<RankAlertPlan> {
+  const { rows: [site] } = await db.query("SELECT id, user_id, domain, alerts_enabled, alert_drop FROM seo_sites WHERE id=$1", [siteId]);
+  if (!site || site.alerts_enabled === false) return null;
   const { rows } = await pool.query(
     `SELECT k.id AS "keywordId", k.keyword, NULLIF(k.location_name, 'United States') AS location, x.device,
             max(x.position) FILTER (WHERE rn=1) AS position, max(x.position) FILTER (WHERE rn=2) AS previous,
@@ -212,12 +216,28 @@ export async function raiseRankAlerts(siteId: number, runId: string, onDay?: str
       WHERE rn<=2 GROUP BY k.id, k.keyword, k.location_name, x.device HAVING count(*)=2`, [siteId, runId]);
   // Only keywords this run actually checked, and only those that had a check before it.
   const { drops, gains } = rankChanges(rows.filter((r: any) => r.in_run), site.alert_drop ?? DEFAULT_DROP);
-  for (const [kind, items, verb] of [["rank_drop", drops, "fell"], ["rank_gain", gains, "improved"]] as const) {
+  return { userId: site.user_id, siteId, domain: site.domain, drops, gains };
+}
+/**
+ * Saves a plan's alerts with `db` (inside the transaction that closes the run), filed under the transaction's own day.
+ * `partial`: the run stopped before every keyword came back — said in the title. Returns the new alerts' ids (to send).
+ */
+export async function saveRankAlerts(db: { query: typeof pool.query }, plan: RankAlertPlan, partial = false): Promise<number[]> {
+  if (!plan) return [];
+  const { rows: [{ today }] } = await db.query("SELECT current_date::text AS today");
+  const ids: number[] = [];
+  for (const [kind, items, verb] of [["rank_drop", plan.drops, "fell"], ["rank_gain", plan.gains, "improved"]] as const) {
     if (!items.length) continue;
-    const id = await saveAlert(site.user_id, siteId, kind, onDay ?? site.today, `${plural(items.length, "ranking")} ${verb} for ${site.domain}`, items);
-    if (id) await deliverAlert(id);
+    const id = await saveAlert(plan.userId, plan.siteId, kind, today, `${plural(items.length, "ranking")} ${verb} for ${plan.domain}${partial ? " (from a check that stopped early)" : ""}`, items, db);
+    if (id) ids.push(id);
   }
-  return { drops: drops.length, gains: gains.length };
+  return ids;
+}
+/** Work out, save and send a run's alerts (outside a run's closing; the closing does the same in its transaction). */
+export async function raiseRankAlerts(siteId: number, runId: string): Promise<{ drops: number; gains: number }> {
+  const plan = await rankAlertPlan(siteId, runId);
+  for (const id of await saveRankAlerts(pool, plan)) await deliverAlert(id);
+  return { drops: plan?.drops.length ?? 0, gains: plan?.gains.length ?? 0 };
 }
 
 /** Linking sites lost or gained between two snapshots, when it is at least 3 sites and 5% of what there was. */

@@ -6,7 +6,7 @@
 import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { budgetDeps } from "../server/seo/budget";
-import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps, settleRankAlertsDue } from "../server/seo/jobs";
+import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps } from "../server/seo/jobs";
 import { dataforseoDeps } from "../server/seo/dataforseo";
 import { searchLocations, locationByCode } from "../server/seo/locations";
 import { raiseRankAlerts, raiseLinkAlerts, listAlerts, unreadAlerts, markAlertsRead } from "../server/seo/alerts";
@@ -66,16 +66,16 @@ async function main() {
   eq("5b it says what fell, and where", alerts[0].items.map((i: any) => [i.what, i.location, i.from, i.to]).sort(), [["dropped", null, 4, 9], ["left_map_pack", "Tampa, Florida", 2, null]].sort());
   await raiseRankAlerts(site.id, run.id);
   eq("5c raising the same run again adds nothing", (await listAlerts(1, site.id)).length, 1);
-  eq("5c1 a run whose alerts were saved owes none", (await one("SELECT alerts_due FROM seo_rank_runs WHERE id=$1", [run.id])).alerts_due, false);
-  // The process stopped after closing the run and before saving its alerts: owed, and settled later — exactly once.
+  eq("5c1 the run was closed with its alerts in one step (nothing owed)", (await one("SELECT status, alerts_due FROM seo_rank_runs WHERE id=$1", [run.id])), { status: "done", alerts_due: false });
+  // A run that stopped early (no answer for hours) but saved a ranking: closed as failed WITH its alert, said to be partial.
   const savedAlert = await one("SELECT * FROM seo_alerts WHERE site_id=$1", [site.id]);
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [site.id]);
-  await pool.query("UPDATE seo_rank_runs SET alerts_due=true, finished_at=now() - interval '10 minutes' WHERE id=$1", [run.id]);
-  eq("5c3 an owed run's alerts are raised on a later pass", [await settleRankAlertsDue(), (await listAlerts(1, site.id)).map((a: any) => a.kind)], [1, ["rank_drop"]]);
-  eq("5c4 and then it owes nothing; another pass adds nothing", [(await one("SELECT alerts_due FROM seo_rank_runs WHERE id=$1", [run.id])).alerts_due, await settleRankAlertsDue(), (await listAlerts(1, site.id)).length], [false, 0, 1]);
-  await pool.query("UPDATE seo_rank_runs SET alerts_due=true, finished_at=now() - interval '10 minutes' WHERE id=$1", [run.id]);
-  await settleRankAlertsDue();
-  eq("5c5 an alert already saved for that run's day is not made twice", (await listAlerts(1, site.id)).length, 1);
+  const stuck = await one("INSERT INTO seo_rank_runs(id, site_id, user_id, status, started_at, tasks) VALUES(gen_random_uuid(), $1, 1, 'running', now() - interval '4 hours', '[]'::jsonb) RETURNING id", [site.id]);
+  await pool.query("INSERT INTO seo_rank_checks(keyword_id, site_id, run_id, checked_on, device, position) VALUES($1,$2,$3,current_date+1,'desktop',30)", [us.id, site.id, stuck.id]);
+  await collectRunningRuns();
+  const partial = await listAlerts(1, site.id);
+  eq("5c2b a run that stopped early still alerts what it saved, and says so", [(await one("SELECT status FROM seo_rank_runs WHERE id=$1", [stuck.id])).status, partial.map((a: any) => a.title)], ["failed", ["1 ranking fell for alpine.example (from a check that stopped early)"]]);
+  await pool.query("DELETE FROM seo_rank_checks WHERE run_id=$1", [stuck.id]);
   // Put the original alert back as it was (the steps below mark it read by its id).
   await pool.query("DELETE FROM seo_alerts WHERE site_id=$1", [site.id]);
   await pool.query("INSERT INTO seo_alerts SELECT (jsonb_populate_record(NULL::seo_alerts, $1::jsonb)).*", [JSON.stringify(savedAlert)]);

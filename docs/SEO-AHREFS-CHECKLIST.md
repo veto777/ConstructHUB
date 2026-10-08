@@ -979,6 +979,16 @@ Verdict: four new defects, one HIGH (ranked by customer impact; the HIGH is in o
  4 choosing a crawl dropped the pickers and focus ................ FIXED (this site's answer stays, marked loading; a failed choice keeps it with "Try again" and "Show the newest crawl")
  NOT DONE: as audit #43; a PDF font for every script.
 
+## Codex audit #54 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-54.md)
+
+Verdict: four new defects, one HIGH - in the audit #53 fix itself.
+
+ 1 HIGH owed rank alerts vanished after a newer check ............ FIXED by removing the debt: a run's moves are worked out BEFORE it is closed, and closing it and saving its alerts happen in ONE transaction (a failure leaves the run open, closed again on a later tick) - nothing is ever owed, so nothing can be overwritten (real Postgres)
+ 2 runs that stopped early never alerted ........................ FIXED (closed as failed together with the alerts for what they saved, titled "from a check that stopped early" - real Postgres)
+ 3 Google-profile gaps could pass as fixes ....................... FIXED (an entry counts as fixed only when the same profile is attached and still lists it; removed from the profile or another profile = changed scope, not re-checked - unit tests)
+ 4 immediate and retried alerts used different days ............. FIXED by 1 (one day, read inside the closing transaction)
+ NOT DONE: as audit #43; a PDF font for every script.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -1065,3 +1075,4 @@ Verdict: four new defects, one HIGH (ranked by customer impact; the HIGH is in o
 - 10/8 audit #51 fixes: 407 tests; nineteen real-Postgres scripts passing. Kimi reviewed the diff before deploy. Browser (vb11, commit checked): competitors, Site audit fixed / not re-checked; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #52 fixes: 409 tests (unit tests with the audit's own examples); nineteen real-Postgres scripts passing. Browser (vb11, commit checked): Site audit fixed / not re-checked and pickers; 1440 and 390 px, no overflow, no page errors.
 - 10/8 audit #53 fixes: 411 tests; nineteen real-Postgres scripts passing (local 33/33 with owed rank alerts). Browser (vb11, commit checked): Site audit choices, fixed / not re-checked; 1440 and 390 px, no overflow, no page errors.
+- 10/8 audit #54 fixes: 412 tests; nineteen real-Postgres scripts passing (local 31/31: run closed with its alerts; a run that stopped early alerts what it saved). Browser (vb11, commit checked): Site audit, health tile; no page errors.

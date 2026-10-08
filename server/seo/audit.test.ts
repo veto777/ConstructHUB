@@ -155,7 +155,9 @@ describe("what counts as broken, and what counts as fixed", () => {
     const local = { id: "gap-services-Gutters", category: "local", severity: "warning", title: "No matching service page: Gutters", urls: ["https://x/"], why: "", fix: "" };
     const before = { report: { profile: { id: 7 }, findings: [local] }, pages: [page("https://x/")] };
     expect(auditSummary({ findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
-    expect(auditSummary({ profile: { id: 7 }, findings: [] }, [page("https://x/")], before).fixed.map((f) => f.key)).toEqual(["gap-services"]);
+    // Fixed only when the same profile still lists the service (then the crawl found its page).
+    expect(auditSummary({ profile: { id: 7, services: ["Gutters"] }, findings: [] }, [page("https://x/")], before).fixed.map((f) => f.key)).toEqual(["gap-services"]);
+    expect(auditSummary({ profile: { id: 7 }, findings: [] }, [page("https://x/")], before).notRechecked.map((f) => f.key)).toEqual(["gap-services"]);
   });
   it("a malformed stored report is read as empty instead of throwing", () => {
     const s = auditSummary({ findings: "nope", errors: { a: 1 } } as any, []);
@@ -224,5 +226,21 @@ describe("one evidence rule for a still-listed issue's change", () => {
     const now = auditSummary({ findings: [probe("https://a.com/zz-new-9")] }, [page("https://a.com/")], before);
     const i = now.issues.find((x) => x.key === "soft-404")!;
     expect([i.count, i.previous, i.change, i.notRechecked]).toEqual([1, 1, 0, 0]);
+  });
+});
+
+describe("Google-profile gaps", () => {
+  const gap = (name: string) => ({ id: `gap-services-${name}`, category: "local", severity: "warning", title: `No matching page: ${name}`, urls: [], why: "w", fix: "f" });
+  const prof = (id: number, services: string[]) => ({ id, services, service_areas: [] });
+  const before = { report: { findings: [gap("Gutters"), gap("Siding")], profile: prof(7, ["Gutters", "Siding"]) }, pages: [page("https://a.com/")] };
+  it("an entry gone from the profile is changed scope, not a fix; one the same profile still lists is fixed", () => {
+    const removed = auditSummary({ findings: [gap("Siding")], profile: prof(7, ["Siding"]) }, [page("https://a.com/")], before);
+    const g1 = removed.issues.find((i) => i.key === "gap-services")!;
+    expect([g1.count, g1.change, g1.notRechecked]).toEqual([1, 0, 1]);
+    const pageAdded = auditSummary({ findings: [gap("Siding")], profile: prof(7, ["Gutters", "Siding"]) }, [page("https://a.com/")], before);
+    const g2 = pageAdded.issues.find((i) => i.key === "gap-services")!;
+    expect([g2.change, g2.notRechecked]).toEqual([-1, 0]);
+    const otherProfile = auditSummary({ findings: [], profile: prof(8, ["Gutters", "Siding"]) }, [page("https://a.com/")], before);
+    expect([otherProfile.fixed.length, otherProfile.notRechecked.map((f) => f.key)]).toEqual([0, ["gap-services"]]);
   });
 });
