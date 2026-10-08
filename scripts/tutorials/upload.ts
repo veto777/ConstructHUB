@@ -6,6 +6,10 @@
  *   tsx scripts/tutorials/upload.ts <helpKey> [--out analysis/video-out/<helpKey>] [--dry-run]
  *   tsx scripts/tutorials/upload.ts <helpKey> --check     HEAD the manifest's keys; compare size and ETag
  *   tsx scripts/tutorials/upload.ts <helpKey> --adopt     a manifest without upload proof: HEAD, record the ETags
+ *   tsx scripts/tutorials/upload.ts <helpKey> --out DIR --manifest-dir STAGING
+ *        a remastered video (remaster.ts): the same create-only upload, but the manifest is written to
+ *        STAGING/<helpKey>.json for an integrator to apply — this checkout's shared/help/videos, its
+ *        index and its dev store are left alone
  *
  * CREATE-ONLY. It never deletes and never overwrites:
  *   · a key that already exists is left alone — "already there" when its size matches, and a hard
@@ -38,6 +42,8 @@ async function main() {
   if (!helpKey || !/^[a-z0-9-]+(\.[a-z0-9-]+)?$/.test(helpKey)) throw new Error("Usage: tsx scripts/tutorials/upload.ts <helpKey> [--check | --adopt | --dry-run]");
   const checkOnly = !!args.flags.check, adopt = !!args.flags.adopt, dry = !!args.flags["dry-run"];
   const dir = path.resolve(flagStr(args, "out") ?? path.join(ROOT, "analysis", "video-out", helpKey));
+  const staging = flagStr(args, "manifest-dir");
+  if (staging && (checkOnly || adopt)) throw new Error("--manifest-dir goes with an upload, not with --check or --adopt");
 
   // What is to be in R2: from the committed manifest (--check, --adopt) or from what mux.ts just measured.
   let durationSec: number, files: Record<(typeof PARTS)[number], VideoFile & { file?: string }>;
@@ -111,6 +117,12 @@ async function main() {
     helpKey, durationSec, video: strip(files.video), captions: strip(files.captions), poster: strip(files.poster),
     uploaded: { at: previous?.at ?? new Date().toISOString(), video: etags.video!, captions: etags.captions!, poster: etags.poster! },
   };
+  if (staging) {
+    fs.mkdirSync(path.resolve(staging), { recursive: true });
+    fs.writeFileSync(path.join(path.resolve(staging), `${helpKey}.json`), JSON.stringify(entry, null, 2) + "\n");
+    console.log(`${helpKey}: in R2 · manifest staged → ${path.join(path.resolve(staging), `${helpKey}.json`)}`);
+    return;
+  }
   fs.mkdirSync(path.dirname(manifestPath(helpKey)), { recursive: true });
   fs.writeFileSync(manifestPath(helpKey), JSON.stringify(entry, null, 2) + "\n");
   writeIndexes();

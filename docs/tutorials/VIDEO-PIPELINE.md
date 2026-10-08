@@ -297,6 +297,62 @@ R2 is the app's object store in production (env `R2_ENDPOINT`, `R2_ACCESS_KEY_ID
 - Upload, then build, `rsync` and restart as in `HANDOFF.md`. Check `/tutorials` and the feature's
   "i" panel on a desktop and on an iPhone (not yet done for the first video — see below).
 
+## Pronunciation, the fallback flash, and repairing finished masters (2026-10-08)
+
+The owner watched the videos and reported two defects. Both are now refused by the line, and
+finished masters are repaired without recording again.
+
+**"con-STRUCT hub", not "CON-struct hub" — the pronunciation lexicon** (`scripts/tutorials/lexicon.ts`).
+The engine's text front end reads "construct" as a noun or a verb from the sentence around it:
+"Welcome to ConstructHUB" came out right, "in the ConstructHUB CRM" came out as the noun — in all 15
+lines that said the name. Respellings ("Construct Hub", "construct hub", "Konstruct Hub",
+"kun-struckt hub", "Con struct Hub") were each measured wrong in at least one of four test sentences.
+What is right in every one is inline phoneme markup, which the engine passes through:
+`[Construct](/kənstɹˈʌkt/) Hub`. Measured (syllable length, first-vowel quality, pitch — the numbers
+are in the file's header) and still heard as "Construct Hub" by a speech recogniser.
+
+- The lexicon is applied **at narration time only** (`narrate.ts` → `spokenText`). The script, the
+  captions, `narration.json`, titles and descriptions keep the spelling "ConstructHUB".
+- The clip cache is keyed on the lexicon's version for a line it changes (and on the old key for a
+  line it leaves alone), so a new version speaks every affected line again and nothing else.
+- A brand name in a spelling the lexicon does not know ("Con struct HUB", "ConstruktHub"), or phoneme
+  markup typed into a script, stops `narrate.ts` and fails `check.ts`. Write "ConstructHUB".
+- Heard and right as written, no entry needed: CRM, JobCam, HOVER, CHUB, SKU, API, CSV, SMS, ZIP, PDF,
+  PNG, JPG, D.C., "dot U S", e-signature. A new term: say it through `narrate.ts`, listen or
+  transcribe, add an entry only if it is wrong, bump `LEXICON_VERSION`.
+
+**The static fallback page** ("ConstructHUB … Privacy Policy · Terms of Use"). A browser showed
+`client/index.html`'s crawler fallback on every full page load until the app mounted — in the product,
+and so in recordings with a whole-page load (Preview, Back, a link out of the app).
+
+- The product no longer shows it to a browser that runs the app (`client/index.html`: a mark set
+  before first paint hides it and shows the app's own loading state; `server/boot-fallback.test.ts`,
+  `e2e/boot-fallback.spec.ts`). Without JavaScript and in the HTML source it is unchanged.
+- The recorder holds the previous frame through a page load (since `video-fixtures`).
+- `check.ts` reads **every frame** of the finished video (`flash.ts`) and fails on a single frame of
+  the fallback — compared with the fallback as this machine draws it at the recording's size — or on a
+  page that is one flat colour for more than 200 ms, between the two cards.
+
+**Repairing a finished master** — nothing is recorded again, the old files are not touched:
+
+```bash
+npx tsx scripts/tutorials/deflash.ts <folder>/walkthrough.mp4          # picture only → <folder>/deflash/
+npx tsx scripts/tutorials/remaster.ts <helpKey> --out-dir <folder>     # + lexicon lines → <folder>/remaster/
+npx tsx scripts/tutorials/remaster.ts --all [--first k,k] [--upload]   # every producer checkout on this box
+```
+
+`deflash.ts` holds the last good frame over each span: same frame count, same length, sound copied,
+one encode at the master's settings. `remaster.ts` does that and, when a line's spoken text changes
+under the lexicon, rebuilds the narration track from the clips the master was made of (each checked
+against the sha256 in `narration.json`) with the new clip in its place: a longer clip extends its step
+by holding the step's last frame, a shorter one leaves silence; captions and YouTube chapters are
+timed again. A video with neither defect is left alone. The result is a whole out-folder with a
+`remaster.json` and a `span-NN@….jpg` strip per repaired span (old above new) — **look at them**.
+`--upload` puts the new files in R2 (`upload.ts --manifest-dir`: create-only, new hashed names) and
+writes the manifest into a staging folder, never into a checkout, with a `remaster-report.json`; an
+integrator applies the manifests. `--all` skips a folder a producer may still be writing (no
+`video.json`, or changed in the last 15 minutes).
+
 ## Step scripts
 
 Type: `TutorialScript` / `TutorialStep` in `shared/help/step-script.ts` (parse with
@@ -379,6 +435,6 @@ permissions line, the "Connections" list heading and `tab-connection-work-queue`
    Business Profile, Google Ads, Cloudflare, SEO data, Site Scan. And a signed-out second session, for
    the invited team member's side.
 5. Deploy this branch and play a video on a real iPhone — Range/206 is implemented and tested, but
-   only desktop Chromium has played them. Listen to the narration once by ear: the tools measure
-   level and timing, not pronunciation.
+   only desktop Chromium has played them. Listen to a new brand or product term once by ear before
+   it goes in a script (the lexicon section says how).
 6. Re-record Database Directory in the house framing (it is still the 1280×720 original).

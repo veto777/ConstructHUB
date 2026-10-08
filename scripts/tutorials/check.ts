@@ -9,17 +9,26 @@
  * clip, in order, none overlapping; youtube.json, when the script asks for it, is upload-ready. Then
  * writes frames/NN-….jpg — the intro card, the end of every step, the end card — and contact sheets. The measurements cannot see a ring on the wrong element or a half-loaded page:
  * open the frames.
+ *
+ * It also fails a video with a single frame of index.html's static fallback page ("ConstructHUB …
+ * Privacy Policy · Terms of Use") or a page that is one flat colour for longer than 200 ms between
+ * the two cards (flash.ts reads every frame) — and a narration line with the brand name in a spelling
+ * the pronunciation lexicon does not know (lexicon.ts).
  */
 import fs from "fs";
 import path from "path";
 import { lastFrameSeekSec, loadScript, outDir, parseArgs, run, type NarrationIndex, type Timings } from "./lib";
 import { LOUDNESS, measureLoudness } from "./mux";
+import { describeSpan, findFlashes } from "./flash";
+import { unlexiconedBrandTerms } from "./lexicon";
 
-async function main() {
-  const args = parseArgs();
-  if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/check.ts <script.json> [--out DIR]");
-  const { script } = loadScript(args._[0]);
-  const dir = outDir(args, script.helpKey);
+export type CheckResult = { problems: string[]; lines: string[]; seconds: number; loudness: { lufs: number; truePeakDb: number }; worstCaptionEdgeMs: number; flashes: number };
+
+/**
+ * Every check on a finished out-folder. `wantsYoutube`: the step script has a `youtube` block, so
+ * youtube.json must be there and upload-ready. Writes frames/ and the contact sheets.
+ */
+export async function checkVideo(dir: string, script: { helpKey: string; wantsYoutube: boolean }, o: { fallbackRefs?: Buffer[] } = {}): Promise<CheckResult> {
   const at = (f: string) => path.join(dir, f);
   const timings = JSON.parse(fs.readFileSync(at("timings.json"), "utf8")) as Timings;
   const narration = JSON.parse(fs.readFileSync(at("narration.json"), "utf8")) as NarrationIndex;
@@ -89,7 +98,7 @@ async function main() {
   need(cues.every((c) => c.text.length <= 90), "a caption cue is longer than two lines");
 
   // YouTube metadata, when the script asks for it.
-  if (script.youtube) {
+  if (script.wantsYoutube) {
     const y = fs.existsSync(at("youtube.json")) ? JSON.parse(fs.readFileSync(at("youtube.json"), "utf8")) : null;
     need(!!y, "youtube.json is missing");
     if (y) {
@@ -102,6 +111,12 @@ async function main() {
       need(!/higgsfield|kokoro|playwright|ffmpeg/i.test(`${y.title} ${y.description} ${y.tags.join(" ")}`), "the YouTube text names a vendor");
     }
   }
+
+  // No frame of the static fallback page, no blank page: every frame between the two cards is looked at.
+  const flash = await findFlashes(at("walkthrough.mp4"), { cardMs: built.cardMs, endCardMs: built.endCardMs ?? 0, viewport: timings.viewport, zoom: timings.zoom ?? 1, refs: o.fallbackRefs });
+  for (const span of flash.spans) need(false, `the video shows ${describeSpan(span)} — record again on the current recorder, or repair it with deflash.ts`);
+  // The brand name as the lexicon knows it — any other spelling is read by the engine's own rules ("CON-struct").
+  for (const clip of narration.clips) { const left = unlexiconedBrandTerms(clip.text); need(!left.length, `step ${clip.index} says “${left.join("”, “")}” — a brand name in a spelling the pronunciation lexicon does not know`); }
 
   // Frames to look at.
   const frames = at("frames");
@@ -131,10 +146,21 @@ async function main() {
     await run("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4", ...inputs, "-filter_complex", graph, "-map", "[o]", "-frames:v", "1", "-q:v", "4", "-update", "1", at(`contact-sheet-${n}.jpg`)], { nice: true });
   }
 
-  console.log(`${v.codec_name}/${v.pix_fmt} ${v.width}x${v.height} ${v.avg_frame_rate} fps + ${a.codec_name} ${a.sample_rate} Hz · ${seconds.toFixed(2)} s · boxes ${boxes.join(" ")}`);
-  console.log(`loudness ${loud.lufs} LUFS, true peak ${loud.truePeakDb} dBTP · audio max ${max} dB, mean ${mean} dB · ${cues.length} caption cues, worst edge ${Math.round(worst)} ms from its narration · ${shots.length} frames → ${frames}`);
-  if (problems.length) { for (const p of problems) console.error(`✗ ${p}`); process.exit(1); }
+  const lines = [
+    `${v.codec_name}/${v.pix_fmt} ${v.width}x${v.height} ${v.avg_frame_rate} fps + ${a.codec_name} ${a.sample_rate} Hz · ${seconds.toFixed(2)} s · boxes ${boxes.join(" ")}`,
+    `loudness ${loud.lufs} LUFS, true peak ${loud.truePeakDb} dBTP · audio max ${max} dB, mean ${mean} dB · ${cues.length} caption cues, worst edge ${Math.round(worst)} ms from its narration · ${flash.frames} frames read, ${flash.spans.length} fallback / blank span(s) · ${shots.length} frames → ${frames}`,
+  ];
+  return { problems, lines, seconds, loudness: loud, worstCaptionEdgeMs: Math.round(worst), flashes: flash.spans.length };
+}
+
+async function main() {
+  const args = parseArgs();
+  if (!args._[0]) throw new Error("Usage: tsx scripts/tutorials/check.ts <script.json> [--out DIR]");
+  const { script } = loadScript(args._[0]);
+  const result = await checkVideo(outDir(args, script.helpKey), { helpKey: script.helpKey, wantsYoutube: !!script.youtube });
+  for (const l of result.lines) console.log(l);
+  if (result.problems.length) { for (const p of result.problems) console.error(`✗ ${p}`); process.exit(1); }
   console.log("measurements pass — now open the frames and look at them");
 }
 
-main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) main().catch((e) => { console.error(e instanceof Error ? e.message : e); process.exit(1); });
