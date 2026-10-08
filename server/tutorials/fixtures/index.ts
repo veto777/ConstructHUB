@@ -12,7 +12,7 @@ import "./providers/auth";
 import "./providers/search-console";
 
 export { tutorialFixturesOn, assertTutorialFixturesBootable, evaluateTutorialGate, fixtureMarked, FIXTURE_MARK } from "./gate";
-import { registerTutorialFixtureRoutes } from "./registry";
+import { registerTutorialFixtureRoutes, FIXTURE_ROUTE_PREFIX } from "./registry";
 export { providerFixture, registerTutorialFixtureRoutes, runTutorialFixtureBoot, registeredFixtureIds, FIXTURE_ROUTE_PREFIX } from "./registry";
 export type { StripeFixture } from "./providers/stripe";
 export type { HoverFixture } from "./providers/hover";
@@ -43,12 +43,17 @@ export function installTutorialEgressGuard(): boolean {
 }
 
 /**
- * The one call server/routes.ts makes. With the gate off it does nothing and returns false: no
- * route, no guard, no boot hook. With it on: the stand-in routes under /__tutorial (local-only),
+ * The one call server/routes.ts makes. With the gate off it mounts a 404 on the prefix and returns
+ * false: no stand-in route, no guard, no boot hook. With it on: the stand-in routes under /__tutorial (local-only),
  * the egress guard, and the boot hooks behind GET /__tutorial/ready.
  */
 export function registerTutorialFixtures(app: import("express").Express): boolean {
-  if (!tutorialFixturesOn()) return false;
+  if (!tutorialFixturesOn()) {
+    // Everywhere that is not a recording slot — production included — the prefix is a plain 404,
+    // before the page fallback can answer it with the app shell.
+    app.use(FIXTURE_ROUTE_PREFIX, (_req, res) => { res.status(404).type("text/plain").send("Not found"); });
+    return false;
+  }
   const demoOrgId = async (): Promise<string | null> => {
     const { pool } = await import("../../db");
     return (await pool.query(`select id from crm_orgs where name = 'Aspire Interiors' order by created_at limit 1`)).rows[0]?.id ?? null;

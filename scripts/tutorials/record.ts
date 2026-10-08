@@ -256,16 +256,20 @@ class Player {
     await target.waitFor({ state: "visible", timeout: 20_000 });
     // The bottom of the frame belongs to the captions (the player draws them there, and so does YouTube):
     // a target that sits in it is brought up to the middle of the page first.
-    await target.evaluate((el, safe) => {
+    const scrolled = await target.evaluate((el, safe) => {
       const r = el.getBoundingClientRect();
-      if (r.top < 70 || r.bottom > innerHeight - safe) el.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (r.top < 70 || r.bottom > innerHeight - safe) { el.scrollIntoView({ block: "center", behavior: "smooth" }); return true; }
+      return false;
     }, CAPTION_SAFE(this.viewport.height));
-    // Wait for a smooth scroll (or a list that is still settling) to stop moving the target.
+    // Wait for a smooth scroll (or a list that is still settling) to stop moving the target. A smooth
+    // scroll can take a moment to START on a busy machine, so "has not moved yet" is not "has stopped":
+    // give it time to begin, and ask for two still readings in a row.
+    if (scrolled) await sleep(350);
     let last = await target.boundingBox();
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0, still = 0; i < 24 && still < 2; i++) {
       await sleep(120);
       const box = await target.boundingBox();
-      if (box && last && Math.abs(box.y - last.y) < 0.5 && Math.abs(box.x - last.x) < 0.5) { last = box; break; }
+      still = box && last && Math.abs(box.y - last.y) < 0.5 && Math.abs(box.x - last.x) < 0.5 ? still + 1 : 0;
       last = box;
     }
     if (!last) throw new Error("target has no box");
@@ -356,11 +360,19 @@ class Player {
       await sleep(300);
       return;
     }
-    const point = await this.aim(target);
+    let point = await this.aim(target);
     if (step.redact) await target.evaluate((el) => (window as any).__tut?.blur(el));
     if (step.action === "scroll") { await this.ring(target); return; }
     await this.ring(target);
     await this.glide(point);
+    // The page may have moved while the pointer travelled (a bar that slid in, a late scroll): a click
+    // must land on the target, not on where the target was. Look again; follow it if it moved.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const now = await this.aim(target);
+      if (Math.abs(now.x - point.x) < 3 && Math.abs(now.y - point.y) < 3) break;
+      point = now;
+      await this.glide(point);
+    }
     switch (step.action) {
       case "highlight": break;
       case "hover": await page.mouse.move(point.x, point.y); break;
@@ -691,7 +703,8 @@ async function main() {
     const page = current!.page, player = current!.player;
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
-    const until = dry ? now() + 350 : Math.max(now(), narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
+    // Never shorter than the line — and never so short after a slow action that its result is not seen.
+    const until = dry ? now() + 350 : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
     while (until - now() > 300) { await sleep(250); await player.keepRing(); }
     await sleep(Math.max(0, until - now()));
     if (script.thumbnail?.step === i) {

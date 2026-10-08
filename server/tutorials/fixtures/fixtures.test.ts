@@ -130,6 +130,7 @@ describe("the registry — with the gate OFF nothing is reachable", () => {
         ["GET", "/__tutorial/hover/api/v2/jobs"], ["POST", "/__tutorial/hover/oauth/token"]] as const) {
         const r = await fetch(base + url, { method });
         expect(r.status, `${method} ${url}`).toBe(404);
+        expect(await r.text(), `${method} ${url}`).toBe("Not found"); // the registry's own 404, not a page fallback
       }
     } finally { server.close(); }
   });

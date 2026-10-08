@@ -2,7 +2,7 @@ import type { HelpDraft } from "../../types";
 
 /** Written from client/src/pages/jobcam/ and client/src/pages/client-portal.tsx as they run. */
 const entry: HelpDraft = {
-  key: "crm-jobcam-upload", group: "CRM", route: "/crm/jobcam", title: "Add photos to JobCam and show them to your client",
+  key: "crm-jobcam-upload", group: "CRM", route: "/crm/jobcam", title: "Add photos to JobCam",
   whatItIs: "How photos you already have get onto a job, and how the ones you choose reach your client.",
   whatItDoes: "Photos you add from your computer or camera roll are filed to the project you pick. A photo stays private to your team until you mark it visible to the client; then it appears in that client’s portal.",
   howToUse: [

@@ -18,7 +18,7 @@
     },
     {
       "action": "highlight",
-      "selector": "text=Your payment account",
+      "selector": "xpath=//*[normalize-space(text())=\"Your payment account\"]/ancestor::div[contains(@class,\"rounded\")][1]",
       "caption": "The connected account",
       "narration": "Your own Stripe account is connected here, with bank payments and cards switched on."
     },
@@ -100,7 +100,7 @@
     },
     {
       "action": "highlight",
-      "selector": "text=Paid — thank you!",
+      "selector": "xpath=//*[normalize-space(text())=\"Paid — thank you!\"]/ancestor::div[contains(@class,\"rounded\")][1]",
       "caption": "Paid",
       "narration": "They are back on the invoice. It says paid, and that you have been notified."
     },
@@ -110,7 +110,8 @@
       "url": "/crm/payments",
       "caption": "Back to Payments",
       "chapter": "The money shows up",
-      "narration": "Back to your own Payments page."
+      "narration": "Back to your own Payments page.",
+      "holdMs": 1200
     },
     {
       "action": "highlight",

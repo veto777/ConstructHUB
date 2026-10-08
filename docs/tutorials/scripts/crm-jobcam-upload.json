@@ -1,7 +1,7 @@
 {
   "$schema": "../../../shared/help/step-script.schema.json",
   "helpKey": "crm-jobcam-upload",
-  "title": "Add photos to JobCam and show them to your client",
+  "title": "Add photos to JobCam",
   "viewport": {
     "width": 1024,
     "height": 576

@@ -1,6 +1,6 @@
 # Producing a walkthrough video — the recipe
 
-One person (or agent), one video at a time, one **slot**. Four slots (1–4) can work at once. Read
+One person (or agent), one video at a time, one **slot**. Eight slots (1–8) can work at once. Read
 `CLAUDE.md` first; the pipeline's internals are in `VIDEO-PIPELINE.md`; the list of CRM videos and who
 takes which is `CRM-VIDEO-PLAN.md`.
 
@@ -18,7 +18,7 @@ takes which is `CRM-VIDEO-PLAN.md`.
 
 ```bash
 K=crm-pipeline          # the helpKey: its row in CRM-VIDEO-PLAN.md
-N=2                     # your slot, 1–4 (ports 8181–8184); one producer per slot
+N=2                     # your slot, 1–8 (ports 8181–8188); one producer per slot
 ```
 
 1. **Help entry.** If `K` is not already a key in `shared/help/registry.ts`, write
@@ -155,15 +155,21 @@ screen shows it ("Choose Send estimate", "Tick who is going"). Phrase clicks as 
 tick / type / open* — never "simply", "just", "easily". Open by saying what the viewer will do; end
 on where the feature is in the menu. No "welcome", no sign-off, no music.
 
+**The demo is a demo.** Narration must never claim the demo company or its numbers are real customers
+or real results — no "our customer", no "contractors see", no "this company made". Say what the screen
+does.
+
 **Forbidden.** Real customer or company names; emails that are not `@example.com`; phones outside
 `555-01xx`; any price or plan price; claims about features that are not built or not configured in
-the slot (a page that says "not configured" is not recorded — see BLOCKED in the plan); how the video
+the slot (a page that says "not configured" is not recorded — see BLOCKED in the plan); a provider's
+own screen imitated (the checkout stand-in is said to be a stand-in); how the video
 was made (tools, voices, vendors); anything typed that looks like a secret (use `{{PLACEHOLDER}}` +
 `"redact": true`).
 
 **Pointing.** `highlight` for "look here", `hover` for links, `click`, `type` (replaces the field;
 date and time fields take `2026-10-09` / `13:30`), `select` (native and custom lists, by visible
-name), `back`, `goto`, `wait`. The ring is the brand orange everywhere. Use `{{DATE}}`, `{{DATE+1}}`
+name), `back`, `goto`, `wait` — and `upload`, `drag`, `session`, `fixture`, `wait-for` (next section).
+The ring is the brand orange everywhere. Use `{{DATE}}`, `{{DATE+1}}`
 for dates — the demo data moves with the calendar, so never name a weekday or a date in narration.
 
 **Selectors.** Prefer `[data-testid="…"]` (the dry run lists them). A row by its text:
@@ -180,6 +186,35 @@ selectors (`text=Outstanding balance`) only where there is no test id.
 - `thumbnail.headline`: 2–5 punchy words, true to the video; `accent`: the one word on the orange
   pill; `step`: a `highlight`/`type`/`hover` step whose ring marks the key element (a `click` loses
   its ring).
+
+## Uploads, drags, a second person, connected accounts
+
+A slot runs with the **tutorial fixtures** (`FIXTURES.md`): the demo company's Stripe account, HOVER,
+Google Calendar and texting number read as connected, with stand-ins answering on this machine. Nothing
+to set up — `produce.ts` and `app.ts up` do it (`--no-fixtures` for the workspace without them).
+
+| Step | Fields | What happens on camera |
+| --- | --- | --- |
+| `upload` | `selector`, `files` | The pointer clicks the button or drop area and the files are chosen (the system file dialog is never shown). `files` are demo files under `scripts/tutorials/assets/` only: `photos/site-01.jpg` … `site-08.jpg` (drawn job-site scenes), `clip-floor-walkthrough.mp4`, `logo-aspire-interiors.png`, `care-guide.pdf`, `clients-import.csv`. A hidden `input[type=file]` can be the target too (no pointer). The dry run lists every file input (`⬆`). |
+| `drag` | `selector`, `to` | Press, carry (the card is drawn following the pointer), drop. Works on the pipeline board. The dry run marks what can be dragged (`⇄`). |
+| `session` | `session`, and `url` or `fixture` + `input` | The camera switches to another person's browser: `"owner"`, `"client"` (the homeowner, own cookies), `"member:Marco Delgado"` (really signed in as that team member — not relabelled). The previous picture is held until the new page has drawn. |
+| `fixture` | `fixture`, `input`, `open` | Calls a fixture helper (`FIXTURES.md` lists them). `"open": true` opens the address it answers with — the link in an email, the checkout link — in the current session. |
+| `wait-for` | `selector` and/or `text`, `state`, `timeoutMs` | Waits until it is on screen (or `"state": "hidden"`: gone). Use it for uploads and anything that finishes on its own time. It still needs a narration line. |
+
+Patterns that work (see `crm-payment-link.json`, `crm-jobcam-upload.json`):
+
+- **The homeowner, already signed in** — `{ "action": "session", "session": "client", "fixture": "email.signIn", "input": { "to": "greta.ellison@example.com" } }`
+  opens their portal; add `"invoice": "INV-1999"` (or `"estimate"`) to land on that document instead.
+- **The link in an email you just sent** — `{ "action": "session", "session": "client", "fixture": "email.link", "input": { "to": "…@example.com" } }`.
+- **A payment** — create the link in the CRM, then in the client's session
+  `{ "action": "fixture", "fixture": "stripe.checkout", "open": true }`, choose a method, click
+  `button-checkout-pay`. Say that the checkout page is a stand-in.
+- **Later** — `{ "action": "fixture", "fixture": "stripe.settle" }` (a bank payment clears),
+  `email.opened` (the client opened the estimate ninety minutes ago).
+
+Rules: a session switch is a cut, so say whose screen it is ("Now your client."). Connecting an account
+is the provider's own screen and is never filmed or imitated — start from the connected state. Give a
+`session` step back to `"owner"` a `holdMs` of a second so the page is seen before the next line.
 
 ## Publishing to YouTube
 
@@ -236,6 +271,15 @@ The in-app poster stays a plain frame of the video (`poster.jpg`) — the thumbn
   with `search_path` (see `db.ts`). The app works in it; code that hard-codes `public.` (account
   erase/delete, the public API's key tables) would read the dev tables — none of that is in a CRM
   flow, but do not record those pages until the role has CREATEDB.
-- **Stripe and HOVER are not configured in a slot** — on purpose (no outside keys). Their pages say
-  so on screen; those videos are BLOCKED in the plan.
+- **Stripe, HOVER, Google Calendar and texting read as connected in a slot** — through the tutorial
+  fixtures, with no outside key (`FIXTURES.md`). `--no-fixtures` gives the old "not configured" pages.
+- **Do not run anything heavy while a recording is being filmed** (tests, a build, another slot's
+  boot): the page slows down, dialogs open late and a short step can end before its ring is seen. The
+  recorder now holds every step at least 0.7 s after its action, but a quiet machine is the real fix.
+- **A click that landed where the target used to be** (a bar slid in, a late scroll): the recorder looks
+  again after the pointer has travelled and follows the target.
+- **Demo projects with ids like `demo-project-p-1997`** (the New York and Texas jobs) have no project
+  page: `GET /api/crm/projects/:id` only accepts a uuid, so the page says "Project not found". Until
+  the seed gives them uuids, film project pages on the original Florida jobs and use the NY / TX
+  clients for client, estimate, invoice and payment videos.
 - **Two producers copying the template at once** take about twice as long for that step; nothing breaks.
