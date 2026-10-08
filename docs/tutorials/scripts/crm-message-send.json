@@ -41,7 +41,7 @@
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"pick-client-demo-client-ferrante\"]",
+      "selector": "[data-testid^=\"pick-client-\"]:has-text(\"Rosa & Stefan Ferrante\")",
       "caption": "Pick the client",
       "narration": "Pick Rosa and Stefan Ferrante.",
       "holdMs": 1200

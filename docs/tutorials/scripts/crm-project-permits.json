@@ -1,0 +1,110 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-permits",
+  "title": "Find the permit office for a job",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the Permits tab",
+      "narration": "A project can show you the official permit office for the place the job is in."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Oyelaran\")",
+      "caption": "The card",
+      "narration": "Find the job on the Pipeline board. We'll use the Oyelaran kitchen."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Oyelaran\") a",
+      "caption": "Open the project",
+      "narration": "Click its name to open the project.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Permits\"]",
+      "caption": "Permits tab",
+      "narration": "Choose the Permits tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Matched on",
+      "caption": "Matched on",
+      "chapter": "The permit portal",
+      "narration": "Matched on shows the place the job was matched to. This job is in Albany."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Official site",
+      "caption": "The portal",
+      "narration": "Under it is the official permit portal on file for that place."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Official site",
+      "caption": "Last checked",
+      "narration": "A note shows when a link was last checked.",
+      "holdMs": 600
+    },
+    {
+      "action": "highlight",
+      "selector": "div.px-4.py-3:has-text(\"Official site\")",
+      "caption": "Open portal",
+      "narration": "Open portal, on the right, takes you to that office's own website."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Permits & inspections",
+      "caption": "No guessed links",
+      "chapter": "No guessed links",
+      "narration": "When no official portal is on file for a place, the tab says so."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Official permit portals on file",
+      "caption": "No guessed links",
+      "narration": "It never shows a guessed link.",
+      "holdMs": 800
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to find the permit office for a job | ConstructHUB CRM",
+    "description": "A short walkthrough of the Permits tab in the ConstructHUB CRM. You will open a project and see the official permit portal on file for the place the job is in, with the date its link was last checked.",
+    "tags": [
+      "building permits",
+      "permit portal",
+      "permit office",
+      "construction permits",
+      "project management",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Find the permit office",
+    "accent": "permit",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}

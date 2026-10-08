@@ -33,7 +33,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"project-demo-project-p-1998\"]",
+      "selector": "[data-testid^=\"project-\"]:has-text(\"subway tile backsplash\")",
       "caption": "Projects",
       "chapter": "Create the project",
       "narration": "The Projects section lists the jobs she already has."
