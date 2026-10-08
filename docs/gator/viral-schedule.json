@@ -16,12 +16,14 @@
       "textLength": 265,
       "scheduledTime": null,
       "scheduledEastern": "2026-10-08 00:15 EDT (Thursday) — at once",
-      "status": "in-progress",
+      "status": "published",
       "postSubmissionId": "c031f14c-cd34-475c-8448-b14e10c275a9",
       "createdAt": "2026-10-08T04:15:20.010Z",
       "stream": "viral",
       "conceptId": "while-youre-here",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:28.722Z",
+      "publicUrl": "https://www.instagram.com/reel/DeODYfcgAKS/"
     },
     {
       "helpKey": "gator:while-youre-here",
@@ -36,12 +38,14 @@
       "textLength": 322,
       "scheduledTime": null,
       "scheduledEastern": "2026-10-08 00:15 EDT (Thursday) — at once",
-      "status": "in-progress",
+      "status": "published",
       "postSubmissionId": "6a96f136-7da9-4ef0-a17a-b065476bd662",
       "createdAt": "2026-10-08T04:15:26.507Z",
       "stream": "viral",
       "conceptId": "while-youre-here",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:30.158Z",
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513814313808154624"
     },
     {
       "helpKey": "gator:while-youre-here",
@@ -56,12 +60,14 @@
       "textLength": 160,
       "scheduledTime": "2026-10-08T04:17:12.000Z",
       "scheduledEastern": "2026-10-08 00:17 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "1f7b62d5-c12d-4349-b91e-ad9d59fce7c6",
       "createdAt": "2026-10-08T04:15:32.906Z",
       "stream": "viral",
       "conceptId": "while-youre-here",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:31.579Z",
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694146198894136607"
     },
     {
       "helpKey": "gator:two-day-job",
@@ -76,12 +82,14 @@
       "textLength": 223,
       "scheduledTime": "2026-10-08T04:19:12.000Z",
       "scheduledEastern": "2026-10-08 00:19 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "failed",
       "postSubmissionId": "52c0f42e-98e2-4a6e-bc1c-98926d9a5d41",
       "createdAt": "2026-10-08T04:15:39.557Z",
       "stream": "viral",
       "conceptId": "two-day-job",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:32.933Z",
+      "errorMessage": "Could not publish on Instagram: The Instagram account is restricted."
     },
     {
       "helpKey": "gator:two-day-job",
@@ -96,12 +104,14 @@
       "textLength": 328,
       "scheduledTime": "2026-10-08T04:20:12.000Z",
       "scheduledEastern": "2026-10-08 00:20 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "fb9bedcb-5951-4788-b8fa-a4cf44ee3237",
       "createdAt": "2026-10-08T04:15:46.237Z",
       "stream": "viral",
       "conceptId": "two-day-job",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:34.361Z",
+      "publicUrl": "https://linkedin.com/feed/update/urn:li:ugcPost:7513815500192321537"
     },
     {
       "helpKey": "gator:two-day-job",
@@ -116,12 +126,14 @@
       "textLength": 118,
       "scheduledTime": "2026-10-08T04:21:12.000Z",
       "scheduledEastern": "2026-10-08 00:21 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "27461769-3b44-48a5-a939-4e83c49a664c",
       "createdAt": "2026-10-08T04:15:52.923Z",
       "stream": "viral",
       "conceptId": "two-day-job",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:35.785Z",
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694147256429055262"
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -136,12 +148,14 @@
       "textLength": 233,
       "scheduledTime": "2026-10-08T04:23:12.000Z",
       "scheduledEastern": "2026-10-08 00:23 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "bc78014e-ae79-422c-a1a6-5c132d2a0490",
       "createdAt": "2026-10-08T04:15:59.564Z",
       "stream": "viral",
       "conceptId": "shingle-rhythm",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:37.209Z",
+      "publicUrl": "https://www.instagram.com/reel/DeOER4YjJe-/"
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -156,12 +170,14 @@
       "textLength": 269,
       "scheduledTime": "2026-10-08T04:24:12.000Z",
       "scheduledEastern": "2026-10-08 00:24 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "failed",
       "postSubmissionId": "8a7fecd9-25a4-416d-9f42-e57fcb47afce",
       "createdAt": "2026-10-08T04:16:06.285Z",
       "stream": "viral",
       "conceptId": "shingle-rhythm",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:38.575Z",
+      "errorMessage": "Could not publish to LinkedIn: com.linkedin.content.common.ResponseException: UGC action was blocked because a share limit has been reached for unverified members"
     },
     {
       "helpKey": "gator:shingle-rhythm",
@@ -176,12 +192,72 @@
       "textLength": 128,
       "scheduledTime": "2026-10-08T04:25:12.000Z",
       "scheduledEastern": "2026-10-08 00:25 EDT (Thursday)",
-      "status": "scheduled",
+      "status": "published",
       "postSubmissionId": "0597bf28-045d-4695-87ba-da60a062f81f",
       "createdAt": "2026-10-08T04:16:12.902Z",
       "stream": "viral",
       "conceptId": "shingle-rhythm",
-      "aiGenerated": true
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:26:40.001Z",
+      "publicUrl": "https://www.tiktok.com/@construct.hub/video/7694148278446755103"
+    },
+    {
+      "helpKey": "gator:two-day-job",
+      "accountId": "76607",
+      "platform": "instagram",
+      "account": "constructhubapp",
+      "cut": "clip.mp4",
+      "mediaUrl": "https://constructhub.us/api/tutorials/media/gator-two-day-job.social-vertical.16fe0baa.mp4",
+      "mediaSha256": "16fe0baae1edd4e0240674f7f805b1af7edba2a4ce27b98dbf86f0abd66112d2",
+      "coverUrl": "https://constructhub.us/api/tutorials/media/gator-two-day-job.social-cover-vertical.16fe0baa.jpg",
+      "textSha256": "9667ea828b154c92c7cb3d5d855162edc76c18500866f8086b0215cf1c9e27fb",
+      "textLength": 223,
+      "scheduledTime": null,
+      "scheduledEastern": "2026-10-08 00:30 EDT (Thursday) — at once",
+      "status": "published",
+      "postSubmissionId": "637e0cde-00ed-48ad-93eb-351b858fc1e6",
+      "createdAt": "2026-10-08T04:30:03.047Z",
+      "stream": "viral",
+      "conceptId": "two-day-job",
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:30:59.385Z",
+      "publicUrl": "https://www.instagram.com/reel/DeOFEOnDafC/"
+    },
+    {
+      "helpKey": "gator:shingle-rhythm",
+      "accountId": "38445",
+      "platform": "linkedin",
+      "account": "Construct HUB",
+      "cut": "clip.mp4",
+      "mediaUrl": "https://constructhub.us/api/tutorials/media/gator-shingle-rhythm.social-vertical.0bb7606d.mp4",
+      "mediaSha256": "0bb7606de6cf62c4eb4999cee3d45f0814b56c8a3cdb5d38993e7f6133135c80",
+      "coverUrl": null,
+      "textSha256": "9cf9b2fc4802f9205ea90b4c577cafacf5e750792f9178e062099815a0f048d2",
+      "textLength": 269,
+      "scheduledTime": "2026-10-08T14:15:00.000Z",
+      "scheduledEastern": "2026-10-08 10:15 EDT (Thursday)",
+      "status": "scheduled",
+      "postSubmissionId": "118f98f3-c7d6-4b00-86de-677ea2b0ec36",
+      "createdAt": "2026-10-08T04:30:06.534Z",
+      "stream": "viral",
+      "conceptId": "shingle-rhythm",
+      "aiGenerated": true,
+      "checkedAt": "2026-10-08T04:31:00.998Z"
+    }
+  ],
+  "youtube": [
+    {
+      "conceptId": "while-youre-here",
+      "title": "“While you're here…” (every contractor knows) #Shorts",
+      "sha256": "b78f4420e00397f44ee21bfc0ee1993a492b79f8ecadae8ea4349be46bdee080",
+      "status": "failed",
+      "videoId": null,
+      "url": null,
+      "privacyStatus": null,
+      "containsSyntheticMedia": true,
+      "playlist": null,
+      "startedAt": "2026-10-08T04:30:14.744Z",
+      "error": "YouTube rejected the request (400 uploadLimitExceeded)"
     }
   ]
 }
