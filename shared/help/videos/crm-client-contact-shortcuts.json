@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-client-contact-shortcuts",
+  "durationSec": 57,
+  "video": {
+    "key": "tutorials/crm-client-contact-shortcuts.871c1636.mp4",
+    "bytes": 4434083,
+    "sha256": "871c1636d5dabf52955fd6abc43b5bcc06d2db540140682a5f8d648e45b95ad6"
+  },
+  "captions": {
+    "key": "tutorials/crm-client-contact-shortcuts.1e58a074.vtt",
+    "bytes": 1233,
+    "sha256": "1e58a0749d0b41f4b5aa4b500cda43ec7776c5598c53f3bfaf646d8185c224af"
+  },
+  "poster": {
+    "key": "tutorials/crm-client-contact-shortcuts.5e03ffce.jpg",
+    "bytes": 76597,
+    "sha256": "5e03ffceba27cf4032e8c279ab0a6eb676eb838de18306fd962677541c4030cd"
+  },
+  "uploaded": {
+    "at": "2026-10-08T05:21:25.150Z",
+    "video": "4f4bb85272c14ace5d4737be5864b8a9",
+    "captions": "93610d29c77703d4fc6b5222e2bbe6b9",
+    "poster": "f6af6e56a7b04c035c32a33138f9f5ea"
+  }
+}

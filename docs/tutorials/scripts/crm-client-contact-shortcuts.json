@@ -1,0 +1,112 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-client-contact-shortcuts",
+  "title": "Call, text, email or map a client",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/clients",
+      "caption": "Clients",
+      "narration": "Call, text, email or find a client without typing anything in. Start on Clients.",
+      "chapter": "Open the client"
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"client-\"] a:has-text(\"Imani Brewster\")",
+      "caption": "Open the client",
+      "narration": "Open a client. We'll use Imani Brewster.",
+      "holdMs": 700
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"link-client-email\"]/../..",
+      "caption": "The contact row",
+      "narration": "Under her name are the email, the phone number and the address. Each one is a link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-email\"]",
+      "caption": "Email",
+      "narration": "Click the email address, and a new email to her starts in your mail app.",
+      "chapter": "Email, call and text"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-phone\"]",
+      "caption": "Call",
+      "narration": "Click the phone number to call her."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-phone\"]",
+      "caption": "On a phone",
+      "narration": "On your phone, that opens the dialer with the number filled in.",
+      "holdMs": 300
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-client-call\"]",
+      "caption": "The call button",
+      "narration": "The small phone button beside it does the same."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-client-text\"]",
+      "caption": "The text button",
+      "narration": "And the speech bubble starts a text message to that number."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-address\"]",
+      "caption": "Maps",
+      "narration": "Click the address, and it opens in Maps in a new tab.",
+      "chapter": "Find the job"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-client-address\"]",
+      "caption": "Directions",
+      "narration": "From there you can get directions to the job."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"link-client-email\"]/../..",
+      "caption": "Your own apps",
+      "narration": "These shortcuts use the phone, texting and mail apps of the device you are on."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-clients\"]",
+      "caption": "Where to find it",
+      "narration": "They are at the top of every client's page, under Clients."
+    }
+  ],
+  "youtube": {
+    "title": "Call, text, email or map a client in one click | ConstructHUB CRM",
+    "description": "The contact row at the top of a client's page in ConstructHUB CRM: click the email address to write, the phone number to call, the small buttons to call or text, and the address to open it in Maps. The walkthrough uses a demo company and a demo client.",
+    "tags": [
+      "ConstructHUB",
+      "contractor CRM",
+      "call a client",
+      "text a client",
+      "client contact",
+      "directions to job",
+      "contractor software",
+      "CRM tutorial"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "One-click contact",
+    "accent": "contact",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
