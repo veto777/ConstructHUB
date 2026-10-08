@@ -215,7 +215,18 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
 
 type TargetBox = { x: number; y: number; width: number; height: number };
 
-class Player {
+/** A click's ring is taken away this long after the click (it would otherwise sit on whatever the click opened). */
+export const RING_OFF_AFTER_CLICK_MS = 450;
+/**
+ * A page that a step OPENED WHOLE (a click on a link out of the app, a Preview, a checkout) stays on
+ * screen at least this long after it has drawn, before anything leaves it again — a `back` right
+ * after such a click used to show the page for under half a second.
+ */
+export const MIN_PAGE_DWELL_MS = 1600;
+/** How much longer the page on camera must stay: `shownAtMs` is when it finished drawing (null: it was there all along). */
+export const dwellLeft = (shownAtMs: number | null, nowMs: number, min: number = MIN_PAGE_DWELL_MS): number => (shownAtMs == null ? 0 : Math.max(0, shownAtMs + min - nowMs));
+
+export class Player {
   pos: { x: number; y: number };
   /** `now` is the recording's clock (ms since the capture started): every session's player shares it. */
   constructor(private page: Page, private viewport: { width: number; height: number }, private now: () => number = () => Date.now()) {
@@ -255,7 +266,15 @@ class Player {
   }
 
   private ringed: Locator | null = null;
+  private ringOffTimer: ReturnType<typeof setTimeout> | null = null;
+  /** After a click: the ring goes a moment later. Cancelled by the next `ring()` — it must never wipe the NEXT step's ring. */
+  ringOffSoon(ms: number = RING_OFF_AFTER_CLICK_MS) {
+    if (this.ringOffTimer) clearTimeout(this.ringOffTimer);
+    this.ringOffTimer = setTimeout(() => { this.ringOffTimer = null; void this.ring(null).catch(() => {}); }, ms);
+  }
   async ring(target: Locator | null) {
+    // Whoever rings (or clears) now decides: a pending "take the click's ring away" is void.
+    if (this.ringOffTimer) { clearTimeout(this.ringOffTimer); this.ringOffTimer = null; }
     if (!target && this.ringed) this.ringOffAt = this.now();
     this.ringed = target;
     if (target) await target.evaluate((el) => (window as any).__tut?.ring(el));
@@ -357,7 +376,7 @@ class Player {
       const opened = await chooser.catch(() => null);
       if (!opened) throw new Error(`upload: clicking ${step.selector} opened no file chooser — point the step at the input[type=file] itself (the dry run lists them)`);
       await opened.setFiles(files);
-      setTimeout(() => { void this.ring(null); }, 450);
+      this.ringOffSoon();
       return;
     }
     if (step.action === "drag") {
@@ -403,7 +422,7 @@ class Player {
         await sleep(350);
         await page.mouse.down(); await sleep(70); await page.mouse.up();
         // The click has done its job; a ring left behind would sit on whatever the click put there (a dialog, a new page).
-        setTimeout(() => { void this.ring(null); }, 450);
+        this.ringOffSoon();
         break;
       case "type":
         await sleep(250);
@@ -492,7 +511,11 @@ async function settle(page: Page) {
 }
 
 /** One person's browser: its own cookies, its own cursor. Only the session on camera is filmed. */
-type Session = { name: string; base: string; context: BrowserContext; page: Page; player: Player; cdp: CDPSession | null };
+type Session = {
+  name: string; base: string; context: BrowserContext; page: Page; player: Player; cdp: CDPSession | null;
+  /** When the page on camera finished drawing after its last whole-page load (recording clock, ms) — see MIN_PAGE_DWELL_MS. */
+  shownAtMs: number | null;
+};
 
 async function main() {
   const args = parseArgs(process.argv.slice(2), ["shots", "no-narration", "dry"]);
@@ -609,14 +632,14 @@ async function main() {
     if (got.w !== script.viewport.width || got.h !== script.viewport.height || Math.abs(got.dpr - zoom) > 0.001)
       throw new Error(`the browser window of "${name}" is ${got.w}x${got.h} at ${got.dpr}, the script asks for ${script.viewport.width}x${script.viewport.height} at ${zoom}`);
     page.on("pageerror", (e) => console.warn(`  page error (${name}): ${e.message}`));
-    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport, now), cdp: null };
+    const session: Session = { name, base: sessionBase(name), context, page, player: new Player(page, script.viewport, now), cdp: null, shownAtMs: null };
     // A page that loads whole is blank, then plain text, then the app: none of that is filmed. The
     // moment the main frame asks for a new document, the capture holds what is on screen until the
     // new page has drawn.
     page.on("request", (request) => {
       if (current !== session || !request.isNavigationRequest() || request.frame() !== page.mainFrame()) return;
       // …that is: until the new document has replaced this one (a redirect asks again and holds again), and then drawn.
-      void hold(async () => { await page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 8000 }).catch(() => {}); await drawn(page); });
+      void hold(async () => { await page.waitForEvent("framenavigated", { predicate: (f) => f === page.mainFrame(), timeout: 8000 }).catch(() => {}); await drawn(page); session.shownAtMs = now(); });
     });
     if (writer) {
       const cdp = await context.newCDPSession(page);
@@ -700,6 +723,8 @@ async function main() {
       if (step.text) await session.page.getByText(fill(step.text)).first().waitFor({ state, timeout });
       return;
     }
+    // Leaving a page that has only just appeared (Back straight after the click that opened it): let it be seen first.
+    if ((step.action === "back" || step.action === "goto") && !dry) await sleep(dwellLeft(session.shownAtMs, now()));
     return session.player.play(step, session.base);
   }
 
@@ -748,8 +773,10 @@ async function main() {
     const page = current!.page, player = current!.player;
     const narrationStartMs = startMs + lead;
     if (dry) await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
-    // Never shorter than the line — and never so short after a slow action that its result is not seen.
-    const until = dry ? now() + 350 : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad) + (step.holdMs ?? 0);
+    // Never shorter than the line — and never so short after a slow action that its result is not seen:
+    // a page this step opened whole (its load is not filmed) gets its minimum time on screen from when it drew.
+    const opened = current!.shownAtMs != null && current!.shownAtMs >= startMs ? current!.shownAtMs : null;
+    const until = dry ? now() + 350 : Math.max(now() + 700, narrationStartMs + clipMs[i] + pad, opened == null ? 0 : opened + MIN_PAGE_DWELL_MS) + (step.holdMs ?? 0);
     while (until - now() > 300) { await sleep(250); await player.keepRing(); }
     await sleep(Math.max(0, until - now()));
     if (script.thumbnail?.step === i) {

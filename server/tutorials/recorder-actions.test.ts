@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import fs from "fs";
 import path from "path";
 import { parseTutorialScript, tutorialStepSchema, STEP_ACTIONS } from "@shared/help/step-script";
-import { ASSETS_DIR, CAPTION_SAFE, assetFiles, fill } from "../../scripts/tutorials/record";
+import { ASSETS_DIR, CAPTION_SAFE, MIN_PAGE_DWELL_MS, Player, RING_OFF_AFTER_CLICK_MS, assetFiles, dwellLeft, fill, hostFor } from "../../scripts/tutorials/record";
 import { SLOT_MAX, SLOT_PORT, isSlot } from "../../scripts/tutorials/app";
 
 /**
@@ -136,6 +136,81 @@ describe("the recorder", () => {
   it("lists file inputs and draggable things in a dry run", () => {
     expect(src).toContain(`document.querySelectorAll('input[type="file"]')`);
     expect(src).toContain('el.getAttribute("draggable") === "true" ? "⇄" : " "');
+  });
+});
+
+describe("the recorder's ring, dwell and hosts", () => {
+  /** A page and an element that only record what the overlay is told: "on:<name>" / "off". */
+  const stage = () => {
+    const calls: string[] = [];
+    const page = { evaluate: async () => { calls.push("off"); } } as any;
+    const el = (name: string) => ({ evaluate: async () => { calls.push(`on:${name}`); }, boundingBox: async () => ({ x: 1, y: 2, width: 3, height: 4 }) }) as any;
+    return { calls, player: new Player(page, { width: 1024, height: 576 }, () => 0), el };
+  };
+
+  it("a click's delayed ring-off never wipes the next step's ring", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, player, el } = stage();
+      await player.ring(el("save"));
+      player.ringOffSoon();                    // the click on "save"
+      await vi.advanceTimersByTimeAsync(200);  // the next step starts 200 ms later…
+      await player.ring(el("next"));           // …and rings its own target
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS * 3);
+      expect(calls).toEqual(["on:save", "on:next"]); // no "off" after "on:next"
+      expect((await player.endStep()).target).toEqual({ x: 1, y: 2, width: 3, height: 4 });
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("still takes the click's ring away when nothing else is ringed, once, and a second click restarts the wait", async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, player, el } = stage();
+      await player.ring(el("open"));
+      player.ringOffSoon();
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS - 50);
+      player.ringOffSoon();
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS - 50);
+      expect(calls).toEqual(["on:open"]);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(calls).toEqual(["on:open", "off"]);
+      await vi.advanceTimersByTimeAsync(RING_OFF_AFTER_CLICK_MS * 3);
+      expect(calls).toEqual(["on:open", "off"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("a page a step opened whole stays on screen a minimum time before a back or a goto leaves it", () => {
+    expect(MIN_PAGE_DWELL_MS).toBeGreaterThanOrEqual(1500);
+    expect(dwellLeft(null, 5000)).toBe(0);                       // the page was there all along
+    expect(dwellLeft(10_000, 10_300)).toBe(MIN_PAGE_DWELL_MS - 300); // drawn 0.3 s ago: wait the rest
+    expect(dwellLeft(10_000, 10_000 + MIN_PAGE_DWELL_MS + 1)).toBe(0);
+    const src = read("scripts/tutorials/record.ts");
+    expect(src).toMatch(/session\.shownAtMs = now\(\)/);                                   // stamped when the new page has drawn
+    expect(src).toMatch(/step\.action === "back" \|\| step\.action === "goto"\) && !dry\) await sleep\(dwellLeft\(/);
+    expect(src).toMatch(/opened \+ MIN_PAGE_DWELL_MS/);                                     // …and the step that opened it is held that long
+    expect(src).not.toMatch(/setTimeout\(\(\) => \{ void this\.ring\(null\); \}/);       // the uncancellable timer is gone
+  });
+
+  it("a goto crosses hosts: /crm… on the CRM host, anything else on the main host — and the homeowner's browser stays where it is", () => {
+    for (const base of ["http://portal.constructhub.us:8186", "http://127.0.0.1:8186"]) {
+      expect(hostFor("/crm/pipeline", base)).toBe("http://portal.constructhub.us:8186/crm/pipeline");
+      expect(hostFor("/crm", base)).toBe("http://portal.constructhub.us:8186/crm");
+      expect(hostFor("/databases?state=TX", base)).toBe("http://127.0.0.1:8186/databases?state=TX");
+      expect(hostFor("/", base)).toBe("http://127.0.0.1:8186/");
+    }
+    expect(hostFor("/crmish", "http://portal.constructhub.us:8186")).toBe("http://127.0.0.1:8186/crmish");
+    expect(hostFor("/invoices", "http://client.constructhub.us:8186")).toBe("http://client.constructhub.us:8186/invoices");
+    expect(hostFor("/crm", "http://client.constructhub.us:8186")).toBe("http://client.constructhub.us:8186/crm");
+  });
+
+  it("keeps every capability of the lines that were merged into it", () => {
+    const src = read("scripts/tutorials/record.ts");
+    for (const action of ["upload", "drag", "session", "fixture", "wait-for"]) expect(src, action).toContain(`step.action === "${action}"`);
+    expect(src).toMatch(/held\+\+/);                    // frame-hold on whole-page loads
+    expect(src).toMatch(/host\.style\.translate/);      // dialog lifting
+    expect(src).toMatch(/this\.aimed = last/);          // target box for the social cuts…
+    expect(src).toMatch(/target: pointed\.target, ringOffMs: pointed\.ringOffMs, cursor: pointed\.cursor/); // …saved with the cursor path
+    expect(src).toMatch(/page\.goto\(hostFor\(step\.url!, base\)/); // host-switching goto
   });
 });
 
