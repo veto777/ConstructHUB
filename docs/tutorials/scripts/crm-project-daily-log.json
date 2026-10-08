@@ -1,0 +1,137 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-project-daily-log",
+  "title": "Daily logs",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "Open the logs",
+      "narration": "A daily log records what got done on a job each day. Here is how to file one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\")",
+      "caption": "The card",
+      "narration": "Find the job on the Pipeline board. We'll use the Hadley job."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Hadley\") a",
+      "caption": "Open the project",
+      "narration": "Click its name to open the project.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Daily logs\"]",
+      "caption": "Daily logs tab",
+      "narration": "Choose the Daily logs tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-log-work\"]",
+      "value": "Pulled the old carpet in the living room and hall. Subfloor is dry and flat.",
+      "caption": "Work done",
+      "chapter": "File a log",
+      "narration": "Type what got done today.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Weather\")) > input",
+      "value": "Clear, 78°F",
+      "caption": "Weather",
+      "narration": "Add the weather.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "div:has(> label:text-is(\"Crew\")) > input",
+      "value": "3",
+      "caption": "Crew",
+      "narration": "And how many crew were on the job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-add-log\"]",
+      "caption": "File log",
+      "narration": "Choose File log.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"log-row-\"]:has-text(\"old carpet\")",
+      "caption": "The log",
+      "narration": "The log is saved with today's date, the weather and the crew count."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"log-row-\"]:has-text(\"old carpet\") [data-testid^=\"button-edit-log-\"]",
+      "caption": "Edit",
+      "chapter": "Edit a log",
+      "narration": "To correct a log, choose Edit.",
+      "holdMs": 1200
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-edit-log-work\"]",
+      "value": "Pulled the old carpet in the living room and hall. Subfloor is dry and flat. Planks delivered.",
+      "caption": "New text",
+      "narration": "Change the text.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-log\"]",
+      "caption": "Save",
+      "narration": "Then choose Save.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"log-row-\"]:has-text(\"Planks delivered\")",
+      "caption": "Updated",
+      "narration": "The log shows the new text."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to file a daily log on a job | ConstructHUB CRM",
+    "description": "A short walkthrough of the Daily logs tab in the ConstructHUB CRM. You will open a project, file a log with the work done, the weather and the crew count, and edit it afterwards.",
+    "tags": [
+      "daily log",
+      "construction daily report",
+      "job site log",
+      "project management",
+      "contractor daily report",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Log the day's work",
+    "accent": "work",
+    "kicker": "CRM Tutorial",
+    "step": 8
+  }
+}
