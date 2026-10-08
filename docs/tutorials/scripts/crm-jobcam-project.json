@@ -1,0 +1,111 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-jobcam-project",
+  "title": "Photos on a project",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pipeline",
+      "caption": "Pipeline",
+      "chapter": "The JobCam tab",
+      "narration": "Every job keeps its own photos. Here is where to find them on a project."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"card-project-\"]:has-text(\"Kane\") a",
+      "caption": "Open the project",
+      "narration": "Open the job from the Pipeline. We'll use the Kane job.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-jobcam\"]",
+      "caption": "JobCam tab",
+      "narration": "Choose the JobCam tab.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-grid\"]",
+      "caption": "This job's shots",
+      "narration": "These are this job's shots, newest first."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-panel-open\"]",
+      "caption": "Open feed",
+      "chapter": "The job's photo page",
+      "narration": "Open feed gives the job's photos a page of their own.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-filters\"]",
+      "caption": "Search and filters",
+      "narration": "Search and filter here, the same way as in the main JobCam feed."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-view-toggle\"]",
+      "caption": "Timeline",
+      "narration": "Timeline groups this job's shots by day.",
+      "holdMs": 1200
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-view-toggle\"]",
+      "caption": "Grid",
+      "narration": "Grid brings the tiles back.",
+      "holdMs": 1200
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-share-open\"]",
+      "caption": "Share",
+      "chapter": "Share and camera",
+      "narration": "Share is for sending this job's photos to someone as a link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-open-camera\"]",
+      "caption": "Open camera",
+      "narration": "Open camera is where new shots for this job are taken."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pipeline\"]",
+      "caption": "Menu: Pipeline",
+      "narration": "Open any job from Pipeline, in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "How to find a job's photos on its project | ConstructHUB CRM",
+    "description": "A short walkthrough of the JobCam tab on a project in the ConstructHUB CRM. You will open a job, see its photos, open the job's own photo page, and switch between the grid and the timeline.",
+    "tags": [
+      "job site photos",
+      "construction photo app",
+      "jobsite photo documentation",
+      "project photos",
+      "JobCam",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Photos on every job",
+    "accent": "photos",
+    "kicker": "CRM Tutorial",
+    "step": 3
+  }
+}
