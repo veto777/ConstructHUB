@@ -252,7 +252,6 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
 
   return (
     <div data-testid={`report-${table}`}>
-      {saved.isError && <p className="g-text-2 mb-2 text-[13px]" role="alert" data-testid="report-saved-error">Couldn't check for a saved copy of this report: {apiErrorMessage(saved.error)} <button type="button" className="g-link" onClick={() => void saved.refetch()}>Try again</button></p>}
       <form className="mb-3 flex flex-wrap items-end gap-x-3 gap-y-2" onSubmit={(e) => { e.preventDefault(); apply(); }} data-testid="report-filters">
         {has("position") && <>{numField("positionMin", "Position from", "w-[60px]")}{numField("positionMax", "to", "w-[60px]")}</>}
         {has("volume") && numField("volumeMin", "Volume ≥")}

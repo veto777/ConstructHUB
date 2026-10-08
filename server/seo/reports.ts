@@ -104,6 +104,10 @@ export const SORTS: Record<ReportTable, Record<string, string>> = {
   questions: { volume: "keyword_info.search_volume,desc", difficulty: "keyword_properties.keyword_difficulty,asc" },
 };
 export const defaultSort = (table: ReportTable) => Object.keys(SORTS[table])[0];
+/** Only a sort the report itself lists — never something every object has, like "constructor". */
+export const hasSort = (table: ReportTable, sort: string) => Object.prototype.hasOwnProperty.call(SORTS[table], sort);
+/** Reports whose answer depends on the country; link reports are the same everywhere. */
+export const COUNTRY_TABLES: ReadonlySet<ReportTable> = new Set<ReportTable>(["keywords", "paidKeywords", "pages", "competitors", "subdomains", "ads", "matchingTerms", "relatedTerms", "questions"]);
 
 const KW_FILTERS = ["positionMin", "positionMax", "volumeMin", "volumeMax", "difficultyMin", "difficultyMax", "intent", "contains"] as const;
 const IDEA_FILTERS = ["volumeMin", "volumeMax", "difficultyMin", "difficultyMax", "intent", "contains"] as const;
@@ -124,15 +128,21 @@ export const FILTERS_FOR: Record<ReportTable, readonly (keyof ReportFilters)[]> 
 export function effectiveReport<T extends ReportInput>(input: T): T {
   const allowed = FILTERS_FOR[input.table] as readonly string[];
   const filters = Object.fromEntries(Object.entries(input.filters).filter(([k, v]) => allowed.includes(k) && v !== undefined && v !== false)) as ReportFilters;
-  return { ...input, filters, sort: input.sort !== undefined && SORTS[input.table][input.sort] !== undefined ? input.sort : defaultSort(input.table) };
+  return { ...input, filters, sort: input.sort !== undefined && hasSort(input.table, input.sort) ? input.sort : defaultSort(input.table) };
 }
 
-const QUESTION_RE = "^(how|what|why|when|where|who|which|can|does|do|is|are|should|will) ";
+/** How a question starts, by language (the Questions report keeps only searches that start this way). */
+export const QUESTION_RE: Record<string, string> = {
+  en: "^(how|what|why|when|where|who|which|can|does|do|is|are|should|will) ",
+  es: "^(cómo|como|qué|por qué|cuándo|cuando|dónde|donde|quién|quien|cuál|cual|cuánto|cuanto|cuánta|cuanta|cuántos|cuantos|se puede|puedo) ",
+  fr: "^(comment|pourquoi|quand|où|qui|quel|quelle|quels|quelles|combien|est-ce|peut-on|faut-il|que faire) ",
+};
+export const questionRe = (languageCode: string) => QUESTION_RE[languageCode] ?? QUESTION_RE.en;
 
 /** The vendor request for one page of one report. Pure. */
 export function reportRequest(input: ReportInput & { target: string }): { path: string; body: Record<string, unknown> } {
   const f = input.filters, t = input.table;
-  const sort = SORTS[t][input.sort ?? ""] ?? SORTS[t][defaultSort(t)];
+  const sort = SORTS[t][input.sort !== undefined && hasSort(t, input.sort) ? input.sort : defaultSort(t)];
   const labs = { location_code: input.locationCode, language_code: input.languageCode, limit: input.limit, offset: input.offset };
   const links = { target: input.target, include_subdomains: true, rank_scale: "one_thousand", limit: input.limit, offset: input.offset };
   const range = (field: string, min?: number, max?: number): Clause[] => [
@@ -187,7 +197,7 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
         ...range("keyword_info.search_volume", f.volumeMin, f.volumeMax),
         ...range("keyword_properties.keyword_difficulty", f.difficultyMin, f.difficultyMax),
         ...(f.intent ? [["search_intent_info.main_intent", "=", f.intent] as Clause] : []),
-        ...(t === "questions" ? [["keyword", "regex", QUESTION_RE] as Clause] : []),
+        ...(t === "questions" ? [["keyword", "regex", questionRe(input.languageCode)] as Clause] : []),
         ...(f.contains ? [["keyword", "like", `%${f.contains}%`] as Clause] : []),
       ];
       return { path: "/dataforseo_labs/google/keyword_suggestions/live", body: { ...labs, keyword: input.target, filters: andClauses(clauses), order_by: [sort] } };
@@ -336,7 +346,7 @@ export function adsPage(s: AdsSnapshot, limit: number, offset: number): ReportPa
 
 export type SerpRow = { position: number; domain: string; url: string; title: string | null; authority: number | null };
 export type KeywordOverview = {
-  keyword: string; locationCode: number; fetchedAt: string;
+  keyword: string; locationCode: number; /** Absent on overviews saved before 2026-10-08 (they are English). */ languageCode?: string; fetchedAt: string;
   volume: number | null; cpc: number | null; difficulty: number | null; intent: Intent | null; competition: string | null;
   bidLow: number | null; bidHigh: number | null; results: number | null;
   /** Monthly searches, oldest first. */
@@ -355,10 +365,10 @@ export type KeywordOverview = {
 export type KeywordPotential = {
   /** The page ranking first today. */
   url: string;
-  /** Estimated monthly visits that page gets from search, across every keyword it ranks for. */
-  traffic: number;
+  /** Estimated monthly visits that page gets from search in this country, across every keyword it ranks for (null = the source has no figure). */
+  traffic: number | null;
   /** How many keywords it ranks for. */
-  keywords: number;
+  keywords: number | null;
   /** The keyword that sends that page the most visits — the broader topic to aim at. */
   parentTopic: string | null; parentVolume: number | null;
 };
@@ -367,19 +377,23 @@ export function parsePotential(result: any, url: string): KeywordPotential | nul
   const o = result?.metrics?.organic, top = Array.isArray(result?.items) ? result.items[0] : null;
   if (num(o?.etv) === null && !top) return null;
   return {
-    url, traffic: Math.round(num(o?.etv) ?? 0), keywords: num(o?.count) ?? num(result?.total_count) ?? 0,
+    url, traffic: num(o?.etv) === null ? null : Math.round(o.etv), keywords: num(o?.count) ?? num(result?.total_count),
     parentTopic: str(top?.keyword_data?.keyword), parentVolume: num(top?.keyword_data?.keyword_info?.search_volume),
   };
 }
-/** The request for it: the first page's own keywords, the biggest earner first. */
+/**
+ * The request for it: that exact page (its own host name and scheme — www.example.com/x is not example.com/x), its
+ * organic rankings only (never an ad), the biggest earner first.
+ */
 export function potentialRequest(url: string, loc: { location_code: number; language_code: string }): Record<string, unknown> | null {
   const safe = safeHttpUrl(url);
   if (!safe) return null;
   const u = new URL(safe);
-  return { ...loc, target: u.hostname.replace(/^www\./, ""), limit: 1, order_by: ["ranked_serp_element.serp_item.etv,desc"], filters: ["ranked_serp_element.serp_item.relative_url", "=", u.pathname + u.search] };
+  u.hash = "";
+  return { ...loc, target: u.toString(), item_types: ["organic"], limit: 1, order_by: ["ranked_serp_element.serp_item.etv,desc"] };
 }
 
-export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], input: { keyword: string; locationCode: number; fetchedAt?: string }): KeywordOverview {
+export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], input: { keyword: string; locationCode: number; languageCode?: string; fetchedAt?: string }): KeywordOverview {
   const idea = parseKeywordIdea(item) ?? { keyword: input.keyword, volume: null, cpc: null, difficulty: null, intent: null, competition: null };
   const rankOf = new Map(ranks.map((r) => [String(r?.target ?? "").replace(/^www\./, ""), auth(r?.rank)]));
   const trend = (Array.isArray(item?.keyword_info?.monthly_searches) ? item.keyword_info.monthly_searches : [])
@@ -391,7 +405,7 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
     return { position: num(s.rank_group) ?? 0, domain, url: String(s.url), title: str(s.title), authority: rankOf.get(domain) ?? null };
   });
   return {
-    keyword: idea.keyword, locationCode: input.locationCode, fetchedAt: input.fetchedAt ?? new Date().toISOString(),
+    keyword: idea.keyword, locationCode: input.locationCode, ...(input.languageCode ? { languageCode: input.languageCode } : {}), fetchedAt: input.fetchedAt ?? new Date().toISOString(),
     volume: idea.volume, cpc: idea.cpc, difficulty: idea.difficulty, intent: idea.intent, competition: idea.competition,
     bidLow: r2(num(item?.keyword_info?.low_top_of_page_bid)), bidHigh: r2(num(item?.keyword_info?.high_top_of_page_bid)),
     results: num(item?.serp_info?.se_results_count), trend,
@@ -402,12 +416,13 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
 }
 
 /** Overview + today's top results, then their authority and what the first page earns: four calls. */
-export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; costUnknown?: boolean }> {
-  let costUsd = 0;
+export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; /** The parts that arrived: what the customer pays for. A part that failed is ours to carry. */ customerUsd: number; costUnknown?: boolean }> {
+  let costUsd = 0, customerUsd = 0;
   const call = async (path: string, body: Record<string, unknown>) => {
     try {
       const task = assertOk(await request("POST", path, [body]), { treatNoResultsAsEmpty: true });
       costUsd += typeof task.cost === "number" ? task.cost : 0;
+      customerUsd += typeof task.cost === "number" ? task.cost : 0;
       return task;
     } catch (e: any) {
       costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
@@ -438,7 +453,7 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
       ? call("/dataforseo_labs/google/ranked_keywords/live", potentialBody).then((t) => parsePotential(t.result?.[0], String(first.url))).catch(() => { missing.push("potential"); return null; })
       : null,
   ]);
-  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), potential, missing }, costUsd, costUnknown };
+  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), potential, missing }, costUsd, customerUsd, costUnknown };
 }
 
 // ── Saved pages ────────────────────────────────────────────────────────────
@@ -461,7 +476,8 @@ export function cacheKey(kind: string, parts: unknown): string {
   return createHash("sha1").update(kind).update("\n").update(JSON.stringify(parts)).digest("hex");
 }
 export const reportCacheKey = (i: ReportInput & { target: string }) =>
-  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, i.locationCode, i.languageCode, Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b))]);
+  // A report that does not depend on the country is keyed as the United States whatever was sent, so it is one saved page, not one per country.
+  cacheKey(`report:${i.table}`, [i.target, i.limit, i.offset, effectiveReport(i).sort, COUNTRY_TABLES.has(i.table) ? i.locationCode : 2840, COUNTRY_TABLES.has(i.table) ? i.languageCode : "en", Object.entries(effectiveReport(i).filters).sort(([a], [b]) => a.localeCompare(b))]);
 
 export async function cached<T>(userId: number, key: string, maxAgeHours: number): Promise<T | null> {
   const { rows: [row] } = await pool.query(

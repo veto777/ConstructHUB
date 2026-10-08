@@ -239,6 +239,22 @@ Verdict: "The audit #9 fixes are incomplete"; coverage about 58% (52-64). No cro
  Re-check items: keyword Refresh no longer replaces another keyword's overview; Content explorer's failed check keeps Back; batch "can afford" uses the server's hold; report tables and Site Explorer say when a result could not be kept.
  NOT DONE: legacy AI answers without a run id still grouped by time (old rows only); persisting report purchases that fail to save (they are shown and flagged, not recoverable).
 
+## Codex audit #11 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-11.md)
+Verdict: "Audit #10 is only partly resolved"; coverage about 59% (53-65). No cross-account disclosure found. What was done:
+ 1 HIGH paid AI recovery began too late                FIXED: a run row ('asking') is written BEFORE the ask is bought; a known failure closes it; answers are parked on that row together with moving the month on; an 'asking' row left by a crash means the question is NOT bought again that month (logged for a person). Filing can move the month on in its own transaction. One answer per assistant per run is a unique index. Real Postgres: script/seo-ai-waiting-check.ts 6a-6c.
+ 2 MED  refresh showed one country's overview as another  FIXED: every lookup carries the country it was started in and is dropped if that is no longer the one on screen; the picker is disabled during a refresh; the overview records its language.
+ 3 MED  country lost in lists and the tracker           FIXED: a list has one country (set when made; other countries are refused with the reason; refresh uses the list's own); tracking from another country than the site's sends the keywords without the numbers and says so. Real Postgres 7a-7c.
+ 4 MED  location / language not validated everywhere    FIXED: keyword research and site creation accept only a listed pair; list adds too.
+ 5 MED  traffic potential not the exact organic page    FIXED: the exact URL as the target (host and scheme kept), organic only, null when the source has no figure; tile says "estimated ... in <country>". Limitation found live: the source has no record of some pages (e.g. a Home Depot product page), shown as "Not available".
+ 6 MED  failed part charged / wrong message             FIXED: the customer pays only for the calls that returned; each missing part is named. NOT DONE: retrying one part without buying the overview again.
+ 7 MED  hold not an upper bound with search operators   FIXED: operators (site:, intitle: ...) are refused on the keyword overview and the local grid.
+ 8 MED  Search Console change from missing days         FIXED: two equal 28-day windows counted back from the newest synced day; a change is shown only when both are complete (28/28); coverage is stated whenever a window is short; one rule (server `comparable`) for the PDF, the email and the tile.
+ 9 MED  English-only "Questions"                        FIXED: question words by language (en, es, fr). Run live in French.
+10 MED  unused geography in cache keys                  FIXED: link reports and link intersect are keyed as one page whatever country is sent.
+11 MED  failed-save flag ignored on some screens        FIXED: keyword overview, content gap / link intersect and bulk analysis now say so. NOT DONE: durable recovery of a purchase that could not be saved.
+12 LOW  inherited property accepted as a sort           FIXED: own properties only.
+ Also: the duplicate "couldn't check" alert in report tables removed.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -273,3 +289,4 @@ Verdict: "The audit #9 fixes are incomplete"; coverage about 58% (52-64). No cro
 - 10/8 slice 14: keyword overview refreshed live in the browser ("siding contractor": traffic potential and parent topic shown; price line $0.20, hold $0.26); switched to Canada - screen cleared, nothing bought until Look up, then Canadian numbers and results (1,300 searches, klzroofing.com first); Site Explorer followed the same choice and showed no report for Canada until asked. 0 page errors.
 - 10/8 audit #10 fixes: ads report run in the browser - one purchase, pages 2 and 3 opened without another (purchases counted: 1), "Rows 101-120 of 120 most recent", Next disabled; referring-IP note and subdomain rows read back. Real Postgres: ledger 44/44, places+alerts 20/20, waiting AI answers 7/7.
 - 10/8 slice 15 (local grid): in the browser against live data - business found by name and pinned; 5x5 at 5 miles (23 of 25 checked before retries were added; 2 timeouts) and 7x7 at 3 miles in the background (start answered in 61 ms, finished in 83 s, a reload mid-scan picked it up, 49 of 49 checked, charged 40c against a 48c hold). 0 page errors.
+- 10/8 audit #11 fixes in the browser, live: keyword overview bought (201); "site:..." refused with a plain message; Canada (French) lookup and the Questions list returned French questions ("comment poser une toiture..."); "Save to a list" offered only a new list, the United States list shown disabled with its country. Real Postgres: ledger 44/44, places+alerts 20/20, AI waiting + lists 13/13.

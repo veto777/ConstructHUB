@@ -146,10 +146,12 @@ export default function SeoExplorerPage() {
     },
     onError: (e) => toast({ title: "Couldn't analyse that domain", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  const tracksHere = (siteId: number) => { const s = (sites.data ?? []).find((x) => x.id === siteId); return !!s && s.locationCode === market.locationCode && s.languageCode === market.languageCode; };
   const trackKeywords = useMutation({
     mutationFn: (v: { siteId: number; rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null }[] }) =>
-      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) }),
-    onSuccess: (r: { added: number }) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker` }); },
+      // Numbers from another country are not the tracked site's numbers: the keywords go in without them.
+      api("POST", `/api/seo/sites/${v.siteId}/keywords`, { keywords: v.rows.map((r) => r.keyword), ...(tracksHere(v.siteId) ? { volumes: v.rows.map((r) => ({ keyword: r.keyword, searchVolume: r.volume, cpc: r.cpc, difficulty: r.difficulty })) } : {}) }),
+    onSuccess: (r: { added: number }, v) => { refreshSeoData(qc); toast({ title: `${r.added} keyword${r.added === 1 ? "" : "s"} added to the rank tracker`, description: tracksHere(v.siteId) ? undefined : `These numbers are for ${market.label}, not the country that site is tracked in, so they were not copied.` }); },
     onError: (e) => toast({ title: "Couldn't track", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
@@ -259,7 +261,7 @@ export default function SeoExplorerPage() {
                   onExplore={(d) => { setInput(d); open(d); }} onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} />
               ) : (<>
                 {REPORT_NOTE[view] && <p className="g-text-2 mb-3 text-[13px]" data-testid="text-report-note">{REPORT_NOTE[view]}</p>}
-                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList rows={rows} onDone={clear} />}
+                <ReportView key={`${view}:${report.domain}:${marketKey(market)}`} market={market} table={view} domain={report.domain} status={status.data} onExplore={(d) => { setInput(d); open(d); }} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />}
                   onTrack={trackedSite ? (rows) => trackKeywords.mutate({ siteId: trackedSite.id, rows }) : undefined} trackLabel="Add to rank tracker" />
               </>)}
               {(view === "keywords" || view === "paidKeywords") && !trackedSite && <p className="g-text-2 mt-2 text-[13px]">Press <b>Track rankings</b> above to follow this site's keywords every week.</p>}

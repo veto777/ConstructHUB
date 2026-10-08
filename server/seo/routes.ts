@@ -28,7 +28,7 @@ import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthl
 import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError,
 } from "./dataforseo";
-import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd } from "./pricing";
+import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier } from "./pricing";
 import { creditStatus, outOfCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
@@ -180,6 +180,9 @@ const settingsInput = z.object({
 const readInput = z.object({ ids: z.array(z.number().int().positive()).max(500).optional() }).strict();
 const tagsInput = z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(10) }).strict();
 const cleanKeyword = (k: string) => k.toLowerCase().replace(/\s+/g, " ").trim();
+/** A search with an operator costs several times more at the source than the price we show, so it is refused where the price is fixed. */
+const hasOperator = (k: string) => serpKeywordMultiplier(k) > 1;
+const NO_OPERATORS = "Search operators such as site: or intitle: aren't supported here — enter the search the way a customer would type it.";
 
 /** Customer-facing wording for a vendor error: what happened, never who the vendor is. */
 function vendorErrorMessage(e: DataForSeoError): string {
@@ -315,6 +318,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   route("post", "/api/seo/sites", async (req, res, user) => {
     const input = siteInput.parse(req.body);
+    // A site's own country and language are used by paid lookups later, so only a pair on the list is stored.
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a domain like example.com" });
     const { rows: [{ n }] } = await pool.query("SELECT count(*)::int n FROM seo_sites WHERE user_id=$1", [user]);
@@ -484,6 +489,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // Keyword research: seed → suggestions with volume / CPC / difficulty (up to 50 rows). One keyword search of the plan.
   route("post", "/api/seo/keywords/research", async (req, res, user, ent) => {
     const input = researchInput.parse(req.body);
+    if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     if (!isConfigured()) return notReady(res);
     const out = await once(`research:${user}:${cleanKeyword(input.seed)}:${input.locationCode}:${input.languageCode}`, () =>
       withBudget(user, estimateLabsUsd(SUGGESTION_LIMIT), () => labsKeywordSuggestions({ keyword: input.seed, locationCode: input.locationCode, languageCode: input.languageCode, limit: SUGGESTION_LIMIT }), { label: `Keyword ideas — ${cleanKeyword(input.seed)}` }));
@@ -613,6 +619,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = scanInput.parse(req.body);
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a search to check." });
+    if (hasOperator(keyword)) return res.status(400).json({ message: NO_OPERATORS });
     const pin = readPin((site as { grid_pin?: unknown }).grid_pin);
     if (!pin) return res.status(400).json({ message: "Choose your business on Google Maps first." });
     if (!isConfigured()) return notReady(res);
@@ -648,6 +655,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a keyword." });
+    if (hasOperator(keyword)) return res.status(400).json({ message: NO_OPERATORS });
     const key = cacheKey("keyword-overview", [keyword, input.locationCode, input.languageCode]);
     if (!input.refresh) {
       const saved = await cached<KeywordOverview>(user, key, KEYWORD_OVERVIEW_TTL_DAYS * 24);
@@ -671,7 +679,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!competitors.length) return res.status(400).json({ message: "Enter at least one competitor's domain, different from the site itself." });
     const content = input.kind === "content";
     const limit = content ? CONTENT_GAP_ROWS : input.limit, offset = content ? 0 : input.offset;
-    const key = cacheKey(`gap:${input.kind}`, [target, competitors, limit, offset, input.locationCode, input.languageCode]);
+    // Links are the same in every country: one saved page, whatever country was sent.
+    const key = cacheKey(`gap:${input.kind}`, [target, competitors, limit, offset, content ? input.locationCode : 2840, content ? input.languageCode : "en"]);
     const saved = input.refresh ? null : await cached<GapPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
@@ -735,7 +744,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
   route("get", "/api/seo/lists", async (_req, res, user) => { res.json({ lists: await listsOf(user) }); });
   // One at a time per account, so two requests cannot both pass the list limits.
-  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); }));
+  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { const input = listItemsInput.parse(req.body); if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." }); res.status(201).json(await addToList(user, input)); }));
   // "Refresh numbers": today's volume, difficulty, CPC and intent for every keyword in the list, written back to it.
   // One lookup per 200 keywords; always bought fresh (that is the point), and each batch is on the usage page.
   route("post", "/api/seo/lists/:id/refresh", (req, res, user) => serial(`lists:${user}`, async () => {
@@ -747,7 +756,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     for (let i = 0; i < keywords.length; i += BULK_MAX) {
       const chunk = keywords.slice(i, i + BULK_MAX);
       try {
-        const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
+        const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: list.locationCode, languageCode: list.languageCode }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
         updated += await refreshListMetrics(list.id, out.data.rows, out.data.notFound);
         attempted += chunk.length;
       } catch (e: any) {
@@ -1038,17 +1047,23 @@ export async function searchConsoleSummary(user: number, domain: string) {
     [user, `sc-domain:${domain}`, `https://${domain}/`, `https://www.${domain}/`, `http://${domain}/`, `http://www.${domain}/`, `sc-domain:www.${domain}`]);
   const asset = assets[0];
   if (!asset) return null;
+  // Two equal 28-day windows counted back from the newest day that has been synced (Google runs two or three days
+  // behind), so the newer window is not short just because today's numbers do not exist yet.
   const { rows } = await pool.query(
-    `SELECT (date>=current_date-28) AS recent, sum(clicks)::float8 clicks, sum(impressions)::float8 impressions, count(DISTINCT date)::int AS days,
-            CASE WHEN sum(impressions)>0 THEN sum(position*impressions)/sum(impressions) END::float8 AS position
-       FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date>=current_date-56 GROUP BY 1`, [asset.id]);
+    `WITH last AS (SELECT max(date) AS d FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date >= current_date - 70)
+     SELECT (g.date > last.d - 28) AS recent, sum(g.clicks)::float8 clicks, sum(g.impressions)::float8 impressions, count(DISTINCT g.date)::int AS days, max(last.d)::text AS through,
+            CASE WHEN sum(g.impressions)>0 THEN sum(g.position*g.impressions)/sum(g.impressions) END::float8 AS position
+       FROM gsc_analytics g, last WHERE g.asset_id=$1 AND g.dimension='date' AND g.date > last.d - 56 GROUP BY 1`, [asset.id]);
   const pick = (recent: boolean) => rows.find((r) => r.recent === recent);
   const cur = pick(true), prev = pick(false);
+  const days = cur?.days ?? 0, previousDays = prev?.days ?? 0;
   return {
     property: asset.external_id, syncedAt: asset.synced_at,
-    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each period is there.
+    // A period with nothing synced is unknown (null), never a measured zero. `days` says how much of each 28 is there.
     clicks: cur ? cur.clicks ?? 0 : null, impressions: cur ? cur.impressions ?? 0 : null, position: cur?.position != null ? Math.round(cur.position * 10) / 10 : null,
     previousClicks: prev ? prev.clicks ?? 0 : null, previousImpressions: prev ? prev.impressions ?? 0 : null,
-    days: cur?.days ?? 0, previousDays: prev?.days ?? 0,
+    days, previousDays, through: (cur?.through ?? prev?.through ?? null) as string | null,
+    /** Both windows are complete, so the difference between them is a real change and not missing days. */
+    comparable: days === 28 && previousDays === 28,
   };
 }

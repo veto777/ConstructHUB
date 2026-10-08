@@ -133,10 +133,11 @@ describe("report email", () => {
 
 describe("Search Console numbers in a report", () => {
   const base = { clicks: 120, impressions: 4000, position: 9.1, previousClicks: 100, previousImpressions: 3500 };
-  it("compares the two periods only when enough of both is synced", () => {
-    expect(_gscComparable({ ...base, days: 26, previousDays: 28 })).toBe(true);
-    expect(_gscComparable({ ...base, days: 26, previousDays: 6 })).toBe(false);
-    expect(_gscComparable({ ...base, days: 9, previousDays: 28 })).toBe(false);
-    expect(_gscComparable({ ...base, previousClicks: null, previousImpressions: null, days: 26, previousDays: 0 })).toBe(false);
+  it("compares the two periods only when both are complete", () => {
+    expect(_gscComparable({ ...base, days: 28, previousDays: 28 })).toBe(true);
+    // 26 of 28 against a full 28 would show a fall that is only missing days.
+    expect(_gscComparable({ ...base, days: 26, previousDays: 28 })).toBe(false);
+    expect(_gscComparable({ ...base, days: 28, previousDays: 6 })).toBe(false);
+    expect(_gscComparable({ ...base, previousClicks: null, previousImpressions: null, days: 28, previousDays: 0 })).toBe(false);
   });
 });
