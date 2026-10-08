@@ -8,12 +8,13 @@ describe("the later Site Explorer reports", () => {
     const r = req("referringIps");
     expect(r.path).toBe("/backlinks/referring_networks/live");
     expect(r.body).toMatchObject({ target: "a.com", network_address_type: "ip", order_by: ["referring_domains,desc"], limit: 50, offset: 0 });
-    expect(parseReferringIp({ network_address: "188.114.96.3", rank: 274, backlinks: 1873, referring_domains: 730, first_seen: "2025-08-13 14:29:11 +00:00" })).toEqual({ ip: "188.114.96.3", referringDomains: 730, backlinks: 1873, authority: 27, firstSeen: "2025-08-13" });
+    expect(parseReferringIp({ network_address: "188.114.96.3", rank: 274, backlinks: 1873, referring_domains: 730, first_seen: "2025-08-13 14:29:11 +00:00" })).toEqual({ ip: "188.114.96.3", referringDomains: 730, backlinks: 1873, firstSeen: "2025-08-13" });
     expect(parseReferringIp({ network_address: "<script>" })).toBeNull();
   });
   it("sites with similar links: never the site itself", () => {
-    expect(req("linkCompetitors", { sort: "authority" }).body).toMatchObject({ target: "a.com", exclude_large_domains: true, order_by: ["rank,desc"] });
-    expect(parseLinkCompetitor({ target: "www.B.com", rank: 210, intersections: 1111 }, "a.com")).toEqual({ domain: "b.com", shared: 1111, authority: 21 });
+    expect(req("linkCompetitors").body).toMatchObject({ target: "a.com", exclude_large_domains: true, order_by: ["intersections,desc"] });
+    expect(parseLinkCompetitor({ target: "www.B.com", rank: 210, intersections: 1111 }, "a.com")).toEqual({ domain: "b.com", shared: 1111 });
+    expect(parseLinkCompetitor({ target: "shop.a.com", rank: 300, intersections: 5 }, "a.com")).toBeNull();
     expect(parseLinkCompetitor({ target: "a.com", rank: 300, intersections: 5 }, "a.com")).toBeNull();
   });
   it("subdomains: traffic and keywords for each", () => {

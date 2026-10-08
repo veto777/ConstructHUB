@@ -95,7 +95,7 @@ export const SORTS: Record<ReportTable, Record<string, string>> = {
   anchors: { links: "backlinks,desc", domains: "referring_domains,desc" },
   bestByLinks: { links: "backlinks,desc", domains: "referring_domains,desc" },
   referringIps: { domains: "referring_domains,desc", links: "backlinks,desc" },
-  linkCompetitors: { shared: "intersections,desc", authority: "rank,desc" },
+  linkCompetitors: { shared: "intersections,desc" },
   subdomains: { traffic: "metrics.organic.etv,desc", keywords: "metrics.organic.count,desc" },
   // Google's ad library returns its own order (most recently shown first); there is nothing to choose.
   ads: { newest: "" },
@@ -208,16 +208,16 @@ export function parseLinkedPage(i: any): LinkedPageRow | null {
   return url ? { url, backlinks: num(i.backlinks), referringDomains: num(i.referring_domains), authority: auth(i.rank), brokenBacklinks: num(i.broken_backlinks), firstSeen: day(i.first_seen) } : null;
 }
 
-export type ReferringIpRow = { ip: string; referringDomains: number | null; backlinks: number | null; authority: number | null; firstSeen: string | null };
+export type ReferringIpRow = { ip: string; referringDomains: number | null; backlinks: number | null; firstSeen: string | null };
 export function parseReferringIp(i: any): ReferringIpRow | null {
   const ip = str(i?.network_address);
-  return ip && /^[0-9a-f.:/]+$/i.test(ip) ? { ip, referringDomains: num(i.referring_domains), backlinks: num(i.backlinks), authority: auth(i.rank), firstSeen: day(i.first_seen) } : null;
+  return ip && /^[0-9a-f.:/]+$/i.test(ip) ? { ip, referringDomains: num(i.referring_domains), backlinks: num(i.backlinks), firstSeen: day(i.first_seen) } : null;
 }
-export type LinkCompetitorRow = { domain: string; shared: number | null; authority: number | null };
-/** Sites that many of the same websites link to — the target itself is left out. */
+export type LinkCompetitorRow = { domain: string; shared: number | null };
+/** Sites that many of the same websites link to — the target and its own sub-domains are left out. The source's "rank" here is not the site's own strength, so it is not shown. */
 export function parseLinkCompetitor(i: any, target: string): LinkCompetitorRow | null {
   const domain = safeDomain(i?.target);
-  return domain && domain !== target ? { domain, shared: num(i.intersections), authority: auth(i.rank) } : null;
+  return domain && domain !== target && !domain.endsWith(`.${target}`) ? { domain, shared: num(i.intersections) } : null;
 }
 export type SubdomainRow = { subdomain: string; traffic: number; keywords: number; top3: number; top10: number; trafficValue: number | null };
 export function parseSubdomain(i: any): SubdomainRow | null {

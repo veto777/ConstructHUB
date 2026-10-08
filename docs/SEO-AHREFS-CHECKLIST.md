@@ -23,11 +23,11 @@ Legend: DONE = built, tested and verified against live data · PART = works but 
 - [x] DONE  B5  Left menu of reports, each with filters, sort, paging (25/50/100), CSV export, saved for a day: Backlinks, New / Lost / Broken backlinks, Referring domains, Anchors, Best pages by links, Organic keywords, Top pages, Organic competitors, Paid keywords. Organic competitors and Best pages by links got their filters 10-08 (tested live).
 - [x] DONE  B6  Organic keywords filters: position range, volume, difficulty, intent, keyword contains; sort by traffic / volume / position / difficulty / CPC.
 - [x] DONE  B7  Tick keywords in a report and add them to the rank tracker.
-- [ ] TODO  B8  Referring IPs, linking authors, outgoing links (linked domains, outgoing anchors), internal links.
+- [x] PART  B8  Referring IPs (linking sites grouped by server address) and Sites with similar links - DONE, run live for jameshardie.com 10/8. Still TODO: linking authors, outgoing links (linked domains, outgoing anchors), internal links.
 - [x] DONE  B9  Content gap and Link intersect in the Site Explorer menu: up to 3 competitors, suggestions from the report's organic competitors, export, add keywords to the rank tracker; saved for a day. Run against live data 10-08 (193 gap keywords, 2,875 linking sites for alpineexteriorswa.com vs two competitors). Seen in a browser 10-08.
 - [ ] TODO  B10 Traffic by country; multi-year history; compare two dates.
 - [x] DONE  B11 Organic keywords by position over time (top 3 / 4-10 / the rest) from the saved two-year history.
-- [ ] TODO  B12 Paid ads copy and paid pages.
+- [x] PART  B12 Ads: the Google ads a site has run (advertiser, kind, first/last shown, link to Google's own ad page) from the public ad library; Subdomains report (traffic, keywords, top 3 / top 10, value). The ad wording itself and paid landing pages are not available from the source - TODO.
 - [x] DONE  B13 AI visibility (`/seo/ai`): ask ChatGPT, Google Gemini and Perplexity a customer's question (web search on) and see for each whether the business is named, where in the list, whether its site is a source, who else is named, which sites were used and what was searched; saved history per question. Plus AI mentions: the questions for which Google AI Overviews / ChatGPT already use a site. Run live and seen in a browser 10-08 (ChatGPT named Alpine Exteriors first; Gemini and Perplexity did not).
 - [ ] TODO  B14 Filter chips for URL / subdomain / exact-path scope ("Subdomains" selector).
 
@@ -251,3 +251,4 @@ Also: the report now carries real clicks and impressions from Google Search Cons
   Content explorer run live; the AI page re-run in the browser after the run-id change.
 - 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
   a report page) were run in the browser.
+- 10/8 slice 13: referring IPs, similar-link sites, subdomains and ads run in the browser against live data for jameshardie.com (50/50/7/50 rows, 0 page errors). Found by looking: the "Authority" number on two of them was not the site's own - column removed.

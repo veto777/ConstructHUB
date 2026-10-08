@@ -103,13 +103,11 @@ const COLS: Record<TableKey, Col[]> = {
     { key: "ip", label: "IP address", cell: (r) => r.ip, csv: (r) => r.ip },
     { key: "referringDomains", label: "Linking sites on it", num: true, cell: (r) => fmtNum(r.referringDomains), csv: (r) => r.referringDomains },
     { key: "backlinks", label: "Links", num: true, cell: (r) => fmtNum(r.backlinks), csv: (r) => r.backlinks },
-    { key: "authority", label: "Authority", num: true, cell: (r) => r.authority ?? "—", csv: (r) => r.authority },
     { key: "firstSeen", label: "First seen", num: true, cell: (r) => fmtDate(r.firstSeen), csv: (r) => r.firstSeen },
   ],
   linkCompetitors: [
     { key: "domain", label: "Site", cell: (r) => <Ext href={`https://${r.domain}`}>{r.domain}</Ext>, csv: (r) => r.domain },
     { key: "shared", label: "Linking sites in common", num: true, cell: (r) => fmtNum(r.shared), csv: (r) => r.shared },
-    { key: "authority", label: "Authority", num: true, cell: (r) => r.authority ?? "—", csv: (r) => r.authority },
     { key: "explore", label: "", num: true, cell: (r, c) => (c.onExplore ? <button type="button" className="g-link" onClick={() => c.onExplore!(r.domain)}>Explore</button> : null), csv: () => null },
   ],
   subdomains: [
@@ -150,7 +148,7 @@ const SORT_LABELS: Record<TableKey, [string, string][]> = {
   anchors: [["links", "Most backlinks"], ["domains", "Most domains"]],
   bestByLinks: [["links", "Most backlinks"], ["domains", "Most domains"]],
   referringIps: [["domains", "Most linking sites"], ["links", "Most links"]],
-  linkCompetitors: [["shared", "Most shared linking sites"], ["authority", "Strongest sites"]],
+  linkCompetitors: [["shared", "Most shared linking sites"]],
   subdomains: [["traffic", "Most traffic"], ["keywords", "Most keywords"]],
   ads: [["newest", "Most recently shown"]],
   matchingTerms: [["volume", "Highest volume"], ["difficulty", "Easiest"], ["cpc", "Highest CPC"]],
