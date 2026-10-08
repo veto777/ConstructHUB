@@ -8,7 +8,7 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { budgetDeps, reserveBudget, settleBudget, applySettlement, reconcileReservations, refundReservation, withBudget, SeoBudgetError } from "../server/seo/budget";
 import { reserveCredits } from "../server/seo/credits";
-import { enqueueRankRun, postQueuedRun, collectRunningRuns, seoJobDeps } from "../server/seo/jobs";
+import { enqueueRankRun, postQueuedRun, collectRunningRuns, retryOwedRefunds, seoJobDeps } from "../server/seo/jobs";
 import { dataforseoDeps } from "../server/seo/dataforseo";
 
 let failed = 0;
@@ -148,6 +148,38 @@ async function main() {
   eq("11d half of the 20c came back, to where it was taken from", [(await moved()).included, (await moved()).wallet], [10, 0]);
   await collectRunningRuns();
   eq("11e and only once", (await moved()).included, 10);
+
+
+  // 12. a late outcome that could not be applied when it arrived is kept and applied by the reconciler
+  base = await state(2);
+  r = await reserveBudget(2, 0.05);
+  await pool.query("UPDATE seo_reservations SET created_at=now()-interval '31 minutes' WHERE id=$1", [r.id]);
+  await reconcileReservations();
+  await pool.query("UPDATE seo_reservations SET late_actual_usd=0.03, late_customer_usd=0.03 WHERE id=$1", [r.id]);   // what a failed late settlement leaves behind
+  await reconcileReservations();
+  eq("12a the kept late outcome is applied: 12c charged, our ledger at $0.03", await moved(), { included: 12, wallet: 0, cost: 0.03, open: 0 });
+  await reconcileReservations();
+  eq("12b ...once", [await moved(), (await one("SELECT reconciled, late_actual_usd FROM seo_reservations WHERE id=$1", [r.id]))], [{ included: 12, wallet: 0, cost: 0.03, open: 0 }, { reconciled: false, late_actual_usd: null }]);
+
+  // 13. a refund that cannot be made yet is owed, and made once the reservation settles
+  base = await state(2);
+  r = await reserveBudget(2, 0.05);
+  const owing = await one("INSERT INTO seo_rank_runs(id,site_id,user_id,trigger,status,reservation_id,posted,cost_usd,refund_due,finished_at) VALUES(gen_random_uuid(),$1,2,'manual','done',$2,2,0.05,10,now()) RETURNING id", [site3.id, r.id]);
+  eq("13a still owed while the reservation is open", [await retryOwedRefunds(), (await one("SELECT refund_due FROM seo_rank_runs WHERE id=$1", [owing.id])).refund_due], [0, 10]);
+  await settleBudget(r, 0.05);
+  eq("13b refunded once it has settled", [await retryOwedRefunds(), (await one("SELECT refund_due FROM seo_rank_runs WHERE id=$1", [owing.id])).refund_due, (await moved()).included], [1, 0, 10]);
+  eq("13c and not again", [await retryOwedRefunds(), (await moved()).included], [0, 10]);
+
+  // 14. a check the source said it could not do is refunded too
+  base = await state(2);
+  const site4 = await one("INSERT INTO seo_sites(user_id,domain,devices) VALUES(2,'failed.example','desktop') RETURNING *");
+  const f1 = await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,2,'a') RETURNING id", [site4.id]);
+  await one("INSERT INTO seo_keywords(site_id,user_id,keyword) VALUES($1,2,'b') RETURNING id", [site4.id]);
+  const failRun = await enqueueRankRun(site4, "manual");
+  await postQueuedRun(failRun.id);
+  seoJobDeps.serpTaskGet = (async (i: any) => (i.keywordId === f1.id ? { status: "completed", result: { position: 3, url: "u", serpFeatures: [], localPosition: null, localPack: [], serpTop: [], rivals: {} } } : { status: "failed", message: "boom" })) as any;
+  await collectRunningRuns();
+  eq("14 one delivered, one failed: half of the 20c is refunded", [(await one("SELECT status FROM seo_rank_runs WHERE id=$1", [failRun.id])).status, (await moved()).included], ["done", 10]);
 
   console.log(failed ? `\n${failed} FAILED` : "\nALL PASSED");
   await pool.end();

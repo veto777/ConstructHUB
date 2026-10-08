@@ -40,8 +40,14 @@ import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey } from "./audit";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
+import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
+import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
+import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
+import { takeBudget } from "../growth-limits";
+import { shareOfVoice, latestChecks, trackedCompetitors, competitorInput as followInput, MAX_TRACKED_COMPETITORS } from "./voice";
+import { listingNamed } from "./dataforseo";
 import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { listAlerts, unreadAlerts, markAlertsRead } from "./alerts";
 import { gapInput, gapEstimateUsd, fetchGap, CONTENT_GAP_ROWS, GAP_MAX_COMPETITORS, type GapPage } from "./gap";
@@ -295,7 +301,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const [{ rows: keywords }, { rows: checks }, { rows: runs }, gsc] = await Promise.all([
       pool.query("SELECT id, keyword, tags, search_volume, cpc::float8 AS cpc, difficulty, location_name FROM seo_keywords WHERE site_id=$1 ORDER BY keyword, location_name NULLS FIRST", [site.id]),
       pool.query(
-        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack FROM (
+        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack, serp_top FROM (
            SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
            FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
       pool.query("SELECT id, trigger, status, total, checked, error, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
@@ -312,7 +318,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       positions: Object.fromEntries(devices.map((d) => {
         const l = latest.get(`${k.id}:${d}`), p = previous.get(`${k.id}:${d}`);
         return [d, l ? { position: l.position, url: l.url, checkedOn: l.checked_on, previous: p?.position ?? null, previousOn: p?.checked_on ?? null, features: l.serp_features ?? [],
-          local: l.local_position ?? null, previousLocal: p?.local_position ?? null, pack: Array.isArray(l.local_pack) ? l.local_pack : [] } : null];
+          local: l.local_position ?? null, previousLocal: p?.local_position ?? null, pack: Array.isArray(l.local_pack) ? l.local_pack : [], top: Array.isArray(l.serp_top) ? l.serp_top : [] } : null];
       })),
     }));
     const primary = devices[0];
@@ -615,12 +621,100 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
 
   // ── Keyword lists: saved research. Nothing here calls the data source. ──────
   route("get", "/api/seo/lists", async (_req, res, user) => { res.json({ lists: await listsOf(user) }); });
-  route("post", "/api/seo/lists/items", async (req, res, user) => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); });
+  // One at a time per account, so two requests cannot both pass the list limits.
+  route("post", "/api/seo/lists/items", (req, res, user) => serial(`lists:${user}`, async () => { res.status(201).json(await addToList(user, listItemsInput.parse(req.body))); }));
+  // "Refresh numbers": today's volume, difficulty, CPC and intent for every keyword in the list, written back to it.
+  // One lookup per 200 keywords; always bought fresh (that is the point), and each batch is on the usage page.
+  route("post", "/api/seo/lists/:id/refresh", (req, res, user) => serial(`lists:${user}`, async () => {
+    if (!isConfigured()) return notReady(res);
+    const { list, items } = await listItems(user, id.parse(req.params.id));
+    const keywords = items.map((i: any) => i.keyword as string);
+    if (!keywords.length) return res.status(400).json({ message: "This list is empty." });
+    let updated = 0;
+    for (let i = 0; i < keywords.length; i += BULK_MAX) {
+      const chunk = keywords.slice(i, i + BULK_MAX);
+      const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
+      if (out.data.rows.length) updated += (await addToList(user, { listId: list.id, items: out.data.rows.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent })) })).total ? out.data.rows.length : 0;
+    }
+    res.json({ updated, total: keywords.length });
+  }));
   route("get", "/api/seo/lists/:id", async (req, res, user) => { res.json(await listItems(user, id.parse(req.params.id))); });
   route("post", "/api/seo/lists/:id/remove", async (req, res, user) => {
     res.json({ removed: await removeFromList(user, id.parse(req.params.id), removeInput.parse(req.body).keywords) });
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
+
+  // ── Rank tracker competitors: share of voice, who else is seen on these keywords, map-pack leaders. Saved checks only. ──
+  route("get", "/api/seo/sites/:id/voice", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const devices = site.devices === "both" ? ["desktop", "mobile"] : [site.devices];
+    const device = (devices.includes(String(req.query.device)) ? String(req.query.device) : devices[0]) as "desktop" | "mobile";
+    const [competitors, { checks, checkedOn }] = await Promise.all([trackedCompetitors(site.id), latestChecks(site.id, device)]);
+    const voice = shareOfVoice(checks, site.domain, competitors, (e) => listingNamed(e, site.business_name));
+    res.json({ device, checkedOn, competitors, max: MAX_TRACKED_COMPETITORS, hasPages: checks.some((c) => (c.serpTop?.length ?? 0) > 0), ...voice });
+  });
+  route("post", "/api/seo/sites/:id/tracked-competitors", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const domain = normalizeDomain(followInput.parse(req.body).domain);
+    if (!domain) return res.status(400).json({ message: "Enter the competitor's website like example.com" });
+    if (domain === site.domain) return res.status(400).json({ message: "That is your own site." });
+    const have = await trackedCompetitors(site.id);
+    if (!have.includes(domain) && have.length >= MAX_TRACKED_COMPETITORS) return res.status(403).json({ message: `You can follow up to ${MAX_TRACKED_COMPETITORS} competitors per site. Remove one first.` });
+    await pool.query("INSERT INTO seo_site_competitors(site_id, domain) VALUES($1,$2) ON CONFLICT DO NOTHING", [site.id, domain]);
+    res.status(201).json({ competitors: await trackedCompetitors(site.id) });
+  });
+  route("delete", "/api/seo/sites/:id/tracked-competitors/:domain", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    await pool.query("DELETE FROM seo_site_competitors WHERE site_id=$1 AND domain=$2", [site.id, String(req.params.domain).toLowerCase().slice(0, 253)]);
+    res.json({ competitors: await trackedCompetitors(site.id) });
+  });
+
+  // The link in every report email: no sign-in (the person clicking is the recipient, not the customer). The token
+  // proves the link came from an email we sent to that address for that account; using it stops all further reports.
+  app.get("/api/seo/report-unsubscribe", async (req, res) => {
+    const userId = Number(req.query.u), email = String(req.query.e ?? "").slice(0, 254), token = String(req.query.t ?? "");
+    const page = (title: string, body: string, status = 200) => res.status(status).type("html").send(
+      `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${title}</title>` +
+      `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:15vh auto;padding:0 24px;color:#1a1a2e"><h1 style="font-size:22px">${title}</h1><p style="line-height:1.6;color:#444">${body}</p></div>`);
+    try {
+      if (!Number.isInteger(userId) || userId <= 0 || !validUnsubscribe(userId, email, token)) return page("This link is not valid", "It may have been cut off by your email program. Open the link from the newest report email, or reply to the person who sends you the reports.", 400);
+      await optOut(userId, email);
+      page("You won't get these reports any more", "Your address has been removed from this sender's SEO reports. Nothing else is needed.");
+    } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); page("Something went wrong", "Please try the link again in a minute.", 500); }
+  });
+
+  // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
+  const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
+  route("get", "/api/seo/sites/:id/report", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const report = await buildSiteReport(user, site.id);
+    if (!report) return res.status(404).json({ message: "Site not found" });
+    const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null, optedOut: await optedOut(user) });
+  });
+  route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const report = await buildSiteReport(user, site.id);
+    if (!report) return res.status(404).json({ message: "Site not found" });
+    const pdf = await renderReportPdf(report, await brandOf(user));
+    res.setHeader("Cache-Control", "no-store");
+    res.type("application/pdf").setHeader("Content-Disposition", `attachment; filename="seo-report-${site.domain.replace(/[^a-z0-9.-]/gi, "-")}.pdf"`).send(pdf);
+  });
+  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = scheduleInput.parse(req.body);
+    if (input.frequency !== "off" && !input.recipients.length) return res.status(400).json({ message: "Add at least one email address to send the report to." });
+    res.json(await saveSchedule(user, site.id, input));
+  });
+  // "Send now". Ten sends a day per account: this emails addresses the customer typed.
+  route("post", "/api/seo/sites/:id/report/send", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const { recipients } = scheduleInput.pick({ recipients: true }).parse(req.body);
+    if (!recipients.length) return res.status(400).json({ message: "Add at least one email address." });
+    if (!(await takeBudget(`seo:report:${user}`, 10, 1, 86_400_000))) return res.status(429).json({ message: `You can send a report ${10} times a day. Scheduled reports are not affected.` });
+    res.json(await sendSiteReport(user, site.id, [...new Set(recipients)].slice(0, MAX_RECIPIENTS), `now-${Date.now()}`));
+  });
 
   // Usage history: every lookup with what it cost the customer. Saved rows only.
   route("get", "/api/seo/usage", async (_req, res, user) => {

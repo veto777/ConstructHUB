@@ -92,30 +92,34 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
 }
 
 /**
- * Send one alert to the bell (and email when that is on). The row is claimed
- * first, so it goes out once; if sending fails the claim is released and
- * deliverPendingAlerts tries again.
+ * Send one alert to the bell (and email when that is on). A delivery in
+ * progress holds a five-minute lease (`claimed_at`); `notified_at` is set only
+ * after it went out. A crash mid-delivery therefore leaves the alert due again
+ * when the lease runs out, instead of marking it sent.
  */
 export async function deliverAlert(alertId: number): Promise<boolean> {
   const { rows: [a] } = await pool.query(
-    `UPDATE seo_alerts x SET notified_at=now() FROM seo_sites s WHERE x.id=$1 AND x.notified_at IS NULL AND s.id=x.site_id
+    `UPDATE seo_alerts x SET claimed_at=now() FROM seo_sites s
+      WHERE x.id=$1 AND x.notified_at IS NULL AND (x.claimed_at IS NULL OR x.claimed_at < now() - interval '5 minutes') AND s.id=x.site_id
      RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId]);
   if (!a) return false;
   try {
     const m = alertMessage(a);
     await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
+    await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL WHERE id=$1", [alertId]);
     return true;
   } catch (e: any) {
-    await pool.query("UPDATE seo_alerts SET notified_at=NULL WHERE id=$1", [alertId]).catch(() => {});
+    await pool.query("UPDATE seo_alerts SET claimed_at=NULL WHERE id=$1 AND notified_at IS NULL", [alertId]).catch(() => {});
     console.error(`[seo] alert ${alertId} was not delivered (it will be retried): ${e?.message ?? e}`);
     return false;
   }
 }
 
-/** Alerts saved but never sent (a crash between the two, or a failed send): try again for a day. */
+/** Alerts saved but not sent (a crash, a failed send, a lease that ran out): try again for three days. */
 export async function deliverPendingAlerts(): Promise<number> {
   const { rows } = await pool.query(
-    "SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '24 hours' ORDER BY id LIMIT 20");
+    `SELECT id FROM seo_alerts WHERE notified_at IS NULL AND created_at < now() - interval '2 minutes' AND created_at > now() - interval '3 days'
+        AND (claimed_at IS NULL OR claimed_at < now() - interval '5 minutes') ORDER BY id LIMIT 20`);
   let sent = 0;
   for (const r of rows) if (await deliverAlert(Number(r.id))) sent++;
   return sent;

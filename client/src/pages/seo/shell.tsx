@@ -101,6 +101,7 @@ const TABS = [
   { href: "/seo/rank-tracker", label: "Rank tracker" },
   { href: "/seo/audit", label: "Site audit" },
   { href: "/seo/alerts", label: "Alerts" },
+  { href: "/seo/reports", label: "Reports" },
   { href: "/seo/backlinks", label: "Backlinks" },
   { href: "/seo/competitors", label: "Competitors" },
   { href: "/seo/usage", label: "Usage" },

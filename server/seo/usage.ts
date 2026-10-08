@@ -22,19 +22,17 @@ export function usageRow(r: { id: string; label: string | null; created_at: stri
   const what = r.label?.trim() || "SEO data lookup";
   const held = (r.credit?.fromIncluded ?? 0) + (r.credit?.fromWallet ?? 0);
   if (!r.settled_at) return { id: r.id, at, what, status: "running", cents: held, fromIncluded: r.credit?.fromIncluded ?? 0, fromPurchased: r.credit?.fromWallet ?? 0 };
-  // An account with unlimited data holds no credit: nothing was charged to it.
-  const cents = r.credit ? Math.max(0, retailCents(Number(r.customer_usd ?? 0)) - Number(r.refunded_cents ?? 0)) : 0;
-  // Purchased credit is given back first when a lookup costs less than was held, so what is left came from the allowance first.
-  // Once settled, the row's credit is what the lookup took (less any refund), split by where it came from.
-  const fromIncluded = Math.min(cents, r.credit?.fromIncluded ?? 0);
-  return { id: r.id, at, what, status: cents > 0 ? "charged" : "free", cents, fromIncluded, fromPurchased: cents - fromIncluded };
+  // Once settled, the row's credit is exactly what the lookup took (less any refund), split by where it came from —
+  // never a figure worked out from the price, which can differ when the account could not cover an overrun.
+  const fromIncluded = Math.max(0, r.credit?.fromIncluded ?? 0), fromPurchased = Math.max(0, r.credit?.fromWallet ?? 0), cents = fromIncluded + fromPurchased;
+  return { id: r.id, at, what, status: cents > 0 ? "charged" : "free", cents, fromIncluded, fromPurchased };
 }
 
-export async function usageHistory(userId: number, limit = 200): Promise<{ rows: UsageRow[]; purchases: { at: string; cents: number }[]; months: { month: string; cents: number; lookups: number }[] }> {
+export async function usageHistory(userId: number, limit = 200): Promise<{ rows: UsageRow[]; purchases: { at: string; cents: number }[]; months: { month: string; cents: number; lookups: number }[]; thisMonth: string }> {
   const [{ rows }, { rows: purchases }, { rows: months }] = await Promise.all([
     pool.query("SELECT id, label, created_at, settled_at, estimate_usd, customer_usd, credit, refunded_cents FROM seo_reservations WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2", [userId, limit]),
     pool.query(`SELECT created_at AS at, cents FROM seo_credit_purchases WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50`, [userId]),
     pool.query(`SELECT month, (included_cents + wallet_cents)::int AS cents, requests::int AS lookups FROM seo_credit_usage WHERE user_id=$1 ORDER BY month DESC LIMIT 12`, [userId]),
   ]);
-  return { rows: rows.map(usageRow), purchases, months };
+  return { rows: rows.map(usageRow), purchases, months, thisMonth: new Date().toISOString().slice(0, 7) };
 }

@@ -29,16 +29,15 @@ export function LocationPicker({ value, onChange, placeholder = "City, ZIP code 
   }
   const open = text.trim().length >= 2;
   const pick = (p: Place) => { onChange(p); setText(""); setQ(""); };
+  /** The list on screen answers the text in the box (not an earlier keystroke still on its way). */
+  const current = q === text.trim() && search.isSuccess;
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    // Text in the box that is not a chosen place must never go out with the form as "no place".
+    if (e.key === "Enter" && text.trim()) { e.preventDefault(); if (open && current && items[active]) pick(items[active]); return; }
     if (!open) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(items.length - 1, a + 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(0, a - 1)); }
     else if (e.key === "Escape") { e.preventDefault(); setText(""); setQ(""); }
-    else if (e.key === "Enter") {
-      // Typed text that is not a chosen place must never be submitted as "no place": pick the highlighted one or stay put.
-      e.preventDefault();
-      if (items[active]) pick(items[active]);
-    }
   };
   return (
     <div className="relative" data-testid="location-picker">

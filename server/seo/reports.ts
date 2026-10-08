@@ -129,7 +129,7 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
     case "pages":
       return { path: "/dataforseo_labs/google/relevant_pages/live", body: { ...labs, target: input.target, filters: andClauses(f.contains ? [["page_address", "like", `%${f.contains}%`]] : []), order_by: [sort] } };
     case "competitors":
-      return { path: "/dataforseo_labs/google/competitors_domain/live", body: { ...labs, target: input.target, exclude_top_domains: true, order_by: [sort] } };
+      return { path: "/dataforseo_labs/google/competitors_domain/live", body: { ...labs, target: input.target, exclude_top_domains: true, filters: andClauses(like("domain")), order_by: [sort] } };
     case "backlinks":
       return { path: "/backlinks/backlinks/live", body: { ...links, mode: f.everyLink ? "as_is" : "one_per_domain", backlinks_status_type: "live", filters: andClauses([...follow, ...like("anchor")]), order_by: [sort] } };
     case "newBacklinks":
@@ -143,7 +143,7 @@ export function reportRequest(input: ReportInput & { target: string }): { path: 
     case "anchors":
       return { path: "/backlinks/anchors/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("anchor")), order_by: [sort] } };
     case "bestByLinks":
-      return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", order_by: [sort] } };
+      return { path: "/backlinks/domain_pages_summary/live", body: { ...links, backlinks_status_type: "live", filters: andClauses(like("url")), order_by: [sort] } };
     case "matchingTerms":
     case "questions": {
       const clauses = [

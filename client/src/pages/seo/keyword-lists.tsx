@@ -53,6 +53,8 @@ export function AddToList({ rows, onDone, label = "Add to a list" }: { rows: KwR
           {(lists.data?.lists ?? []).map((l) => <option key={l.id} value={l.id}>{l.name} ({l.keywords})</option>)}
         </select>
       </label>
+      {lists.isLoading && <span className="g-text-2 flex items-center gap-1" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" /> loading your lists…</span>}
+      {lists.isError && <span className="g-text-2" role="alert">Couldn't load your lists — you can still make a new one. <button type="button" className="g-link" onClick={() => void lists.refetch()}>Try again</button></span>}
       {listId === "new" && <label><span className="sr-only">Name of the new list</span><input className="g-input !py-1" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="e.g. Tampa roofing" autoFocus data-testid="input-list-name" /></label>}
       <Button size="sm" type="submit" disabled={m.isPending || (listId === "new" && !name.trim())} data-testid="button-save-to-list">{m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add ${rows.length}`}</Button>
       <button type="button" className="g-pill g-pill--sm" onClick={() => setOpen(false)}>Cancel</button>
@@ -153,7 +155,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "" }: { 
 }
 
 /** The account's keyword lists: open one, tidy it, track it, export it, or get fresh numbers for it. */
-export function KeywordLists({ status, site, onTrack, onOpen, onAnalyse }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void; onAnalyse: (keywords: string[]) => void }) {
+export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [openId, setOpenId] = useState<number | null>(null);
@@ -180,7 +182,14 @@ export function KeywordLists({ status, site, onTrack, onOpen, onAnalyse }: { sta
   });
   const all = lists.data?.lists ?? [], rows = items.data?.items ?? [];
   const chosen = rows.filter((r) => picked.has(r.keyword));
-  const price = bulkPrice(status, Math.min(rows.length, MAX_BULK));
+  // One lookup per 200 keywords.
+  const batches = Array.from({ length: Math.ceil(rows.length / MAX_BULK) }, (_, i) => Math.min(MAX_BULK, rows.length - i * MAX_BULK));
+  const price = batches.length && bulkPrice(status, 1) != null ? batches.reduce((a, n) => a + (bulkPrice(status, n) ?? 0), 0) : null;
+  const renew = useMutation({
+    mutationFn: () => api("POST", `/api/seo/lists/${current}/refresh`),
+    onSuccess: (r: { updated: number; total: number }) => { refresh(); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); toast({ title: `Numbers refreshed for ${r.updated} of ${r.total} keywords`, description: r.updated < r.total ? "The rest have too few searches to measure." : undefined }); },
+    onError: (e) => toast({ title: "Couldn't refresh the numbers", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   return (
     <div data-testid="keyword-lists">
       {lists.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your lists…</p>}
@@ -214,7 +223,7 @@ export function KeywordLists({ status, site, onTrack, onOpen, onAnalyse }: { sta
                   <span className="ml-auto flex flex-wrap items-center gap-2">
                     {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => { onTrack(chosen); clear(); }} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
-                    <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => onAnalyse(rows.slice(0, MAX_BULK).map((r) => r.keyword))} title={price != null ? `Fresh numbers for ${Math.min(rows.length, MAX_BULK)} keywords — about ${money(price)}` : undefined} data-testid="button-list-refresh"><RefreshCw /> Refresh numbers{price != null && rows.length ? ` · ${money(price)}` : ""}</button>
+                    <button type="button" className="g-pill g-pill--sm" disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
                     <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
                     <button type="button" className="g-pill g-pill--sm g-pill--danger" disabled={drop.isPending} onClick={() => { if (window.confirm(`Delete the list "${items.data!.list.name}" and its ${rows.length} keywords? This can't be undone.`)) drop.mutate(items.data!.list.id); }} data-testid="button-list-delete"><Trash2 /> Delete list</button>
                   </span>
