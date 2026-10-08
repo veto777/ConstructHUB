@@ -5,3 +5,4 @@ export { default as e_crm_create_estimate } from "./crm/crm-create-estimate";
 export { default as e_crm_estimate_client_view } from "./crm/crm-estimate-client-view";
 export { default as e_crm_jobcam_upload } from "./crm/crm-jobcam-upload";
 export { default as e_crm_payment_link } from "./crm/crm-payment-link";
+export { default as e_crm_team_crew_view } from "./crm/crm-team-crew-view";
