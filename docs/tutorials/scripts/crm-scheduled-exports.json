@@ -1,0 +1,116 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-scheduled-exports",
+  "title": "Email yourself a regular export",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/settings",
+      "caption": "Settings",
+      "chapter": "What an export holds",
+      "narration": "Keep your own copy of your clients, estimates and invoices, emailed to you on a schedule."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-backup\"] >> text=Scheduled exports",
+      "caption": "Scheduled exports",
+      "narration": "In Settings, scroll down to Scheduled exports. Only the owner sees this card."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-backup\"] >> text=/An export of clients/",
+      "caption": "What is included",
+      "narration": "An export holds clients, estimates and invoices. Attachments, signed documents and payments are left out."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"switch-backup-enabled\"]",
+      "caption": "Switch it on",
+      "chapter": "Set the schedule",
+      "narration": "Switch on Automatic email exports.",
+      "holdMs": 700
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-backup-frequency\"]",
+      "value": "Every 2 weeks",
+      "caption": "How often",
+      "narration": "Choose how often: every week, every two weeks, or your own number of days."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-backup-format\"]",
+      "value": "Excel (.xls, three sheets)",
+      "caption": "The format",
+      "narration": "Then the format: three CSV files, or one Excel file with three sheets."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-backup-email-hint\"]",
+      "caption": "Where it goes",
+      "narration": "Leave Send to blank and it goes to your company email. Or type another address."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-save-backup\"]",
+      "caption": "Save export settings",
+      "narration": "Choose Save export settings.",
+      "holdMs": 900
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-send-backup-now\"]",
+      "caption": "Send export now",
+      "chapter": "Send one now",
+      "narration": "You do not have to wait for the schedule. Choose Send export now.",
+      "holdMs": 1500
+    },
+    {
+      "action": "highlight",
+      "selector": "li[role=\"status\"]:has-text(\"Export sent\")",
+      "caption": "Export sent",
+      "narration": "A message says how many clients, estimates and invoices went out, and to which address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-backup-last-sent\"]",
+      "caption": "Last sent",
+      "narration": "And the card shows when the last export was sent."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-settings\"]",
+      "caption": "Where to find it",
+      "narration": "Scheduled exports are in Settings, near the bottom of the left menu."
+    }
+  ],
+  "youtube": {
+    "title": "How to email yourself a scheduled data export | ConstructHUB CRM",
+    "description": "Keep your own copy of your CRM data. In ConstructHUB CRM Settings, switch on Scheduled exports, choose how often and in which format, and send one right away. An export holds clients, estimates and invoices. Recorded in a demo workspace.",
+    "tags": [
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "contractor CRM",
+      "data export",
+      "export clients",
+      "CSV export",
+      "Excel export",
+      "CRM tutorial",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your data, emailed",
+    "accent": "emailed",
+    "kicker": "CRM Tutorial",
+    "step": 4
+  }
+}
