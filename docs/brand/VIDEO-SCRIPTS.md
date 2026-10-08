@@ -7,8 +7,8 @@ never named, Google is never a "partner", and only the demo workspace is ever on
 
 | # | Key | Status |
 | --- | --- | --- |
-| 1 | `brand-what-is-constructhub` | **Recorded** (channel trailer). Step script: `docs/tutorials/scripts/brand-what-is-constructhub.json` |
-| 2 | `brand-tour-crm` | **Recorded.** Step script: `docs/tutorials/scripts/brand-tour-crm.json` |
+| 1 | `brand-what-is-constructhub` | **Step script ready; one full take made 2026-10-08 (78 s) and inspected, NOT uploaded** — it showed one flaw (the ring missed "Verified portal" because the list was still loading) and ran 3 s long; both are fixed in the script, which now needs one more take. `docs/tutorials/scripts/brand-what-is-constructhub.json` |
+| 2 | `brand-tour-crm` | **Step script ready, every step played in dry runs, NOT yet recorded** — recording stopped when the merge of `video-fixtures` conflicted (see the hand-off note in the session report). `docs/tutorials/scripts/brand-tour-crm.json` |
 | 3 | `brand-tour-business-tools` | Script only — waits until the Business tools upgrades are finished (owner) |
 | 4 | `brand-why-constructhub` | Script only — safe to record without a lawyer (no names, no prices spoken); not recorded in this pass |
 | 5a | `brand-vs-jobber` | Script + fact table — **NEEDS OWNER SIGN-OFF BEFORE RECORDING OR PUBLISHING** |
@@ -77,7 +77,7 @@ not make a JobCam-vs-CompanyCam video** — on the facts it is their win.
 
 ---
 
-## 1. `brand-what-is-constructhub` — "What is ConstructHUB?" (RECORDED · channel trailer)
+## 1. `brand-what-is-constructhub` — "What is ConstructHUB?" (channel trailer · one more take needed)
 
 Problem → two products → Business tools (permit directory, property records) → the CRM montage → how
 to start. No competitor names, no prices. Platform scenes are real pages with the real directory
@@ -87,7 +87,7 @@ workspace.
 | # | On screen | Narration |
 | --- | --- | --- |
 | 1 | **[The problem]** The dashboard (`goto`) | Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online. |
-| 2 | Two products (`highlight`) | ConstructHUB is two products for contractors: Business tools, and a CRM. |
+| 2 | Two products (`highlight`) | ConstructHUB is two products: Business tools, and a CRM. |
 | 3 | **[Business tools]** Database Directory (`goto`) | Business tools start with a directory of county and city permit offices. |
 | 4 | Search a city (`type`) | Type a city or a county. |
 | 5 | Verified portal (`highlight`) | A checked link opens the office's own permit portal. No guessed addresses. |
@@ -103,10 +103,9 @@ workspace.
 | 15 | JobCam feed (`highlight`) | with JobCam. |
 | 16 | Invoices (`goto`) | Then send the invoice, |
 | 17 | Paid (`highlight`) | and record the payment. |
-| 18 | **[How to start]** How to start (`goto`) | Buy one product or both. Each has its own plans. |
-| 19 | Compare plans (`highlight`) | Compare them, and start, at ConstructHUB dot U S. |
+| 18 | **[How to start]** How to start (`goto`) | Buy one or both. Each has its own plans, at ConstructHUB dot U S. |
 
-**Full narration.** Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online. ConstructHUB is two products for contractors: Business tools, and a CRM. Business tools start with a directory of county and city permit offices. Type a city or a county. A checked link opens the office's own permit portal. No guessed addresses. County property records offices are listed the same way. The same product looks after your Google listing, your reviews and your website. The second product is the CRM. Every job is a card, from lead to paid. Open a job, and its estimate, schedule and invoices are together. Send an estimate from your price book. Your client approves it online. Put the visit on the schedule. File job-site photos to the job with JobCam. Then send the invoice, and record the payment. Buy one product or both. Each has its own plans. Compare them, and start, at ConstructHUB dot U S.
+**Full narration.** Leads in one app. Estimates in another. Job photos on a phone. Permits, somewhere online. ConstructHUB is two products: Business tools, and a CRM. Business tools start with a directory of county and city permit offices. Type a city or a county. A checked link opens the office's own permit portal. No guessed addresses. County property records offices are listed the same way. The same product looks after your Google listing, your reviews and your website. The second product is the CRM. Every job is a card, from lead to paid. Open a job, and its estimate, schedule and invoices are together. Send an estimate from your price book. Your client approves it online. Put the visit on the schedule. File job-site photos to the job with JobCam. Then send the invoice, and record the payment. Buy one or both. Each has its own plans, at ConstructHUB dot U S.
 
 Fact base: "two products" [D5]; permit directory and checked links [D1][D2]; property records [1b];
 Google listing, reviews, website [1b] — said, not shown, because those pages need a connected Google
@@ -126,7 +125,7 @@ account; CRM beats [1c]; "its own plans" [D5].
   schedule, invoices, job photos). Plans and what each includes: https://constructhub.us/pricing —
   the permit directory is free to browse: https://constructhub.us/databases"
 
-## 2. `brand-tour-crm` — "ConstructHUB CRM in 2 minutes" (RECORDED)
+## 2. `brand-tour-crm` — "ConstructHUB CRM in 2 minutes" (script ready · not yet recorded)
 
 One fictional job, the Hadleys' floor in Austin, Texas (demo client "Caleb & Nora Hadley", project
 P-1997, estimate E-1998): lead → estimate → signature → schedule → job photos → invoice → paid. The
@@ -137,25 +136,27 @@ invoice is created and the check recorded on camera; the rest is the seeded job.
 | 1 | **[A lead comes in]** Pipeline (`goto`) | Here is one job in the ConstructHUB CRM, from the first call to the final payment. |
 | 2 | Leads (`highlight`) | Every job starts as a lead on the pipeline. |
 | 3 | The Hadley job (`highlight`) | This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled. |
-| 4 | The client's page (`goto`) | Open the client, and the whole job is on one page. |
-| 5 | Quick actions (`highlight`) | Quick actions start the next step: a visit, an estimate, a payment. |
-| 6 | **[Estimate and signature]** The estimate (`highlight`) | The estimate went out by email. You can see when they opened it, and when they approved. |
-| 7 | Estimate lines (`goto`) | Each line came from the price book, with its quantity and its price. |
-| 8 | Signed (`highlight`) | Nora approved it online by typing her name. Now it is a signed contract. |
-| 9 | **[Schedule and job photos]** Schedule (`goto`) | Next, the visit goes on the schedule. |
-| 10 | The visit (`click`) | Open it for the time, the client, and who is going. |
-| 11 | Close (`press`) | The crew sees it on their own calendar. |
-| 12 | Back to the client (`goto`) | On site, the crew shoots photos with JobCam. |
-| 13 | JobCam (`highlight`) | Each shot is filed to this client's job. |
-| 14 | **[Invoice and payment]** Create invoice (`click`) | When the work is done, choose Create invoice on the approved estimate. |
-| 15 | The invoice (`highlight`) | The invoice is made from the estimate, ready to send. |
-| 16 | Record payment (`click`) | When the check arrives, choose Record payment. |
-| 17 | Record it (`click`) | Check the amount, and record it. |
-| 18 | Paid (`highlight`) | The invoice is marked paid, and the client gets a receipt by email. |
-| 19 | Home (`goto`) | Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. |
-| 20 | Where to start (`highlight`) | The CRM is its own product, with its own plans. See them at ConstructHUB dot U S. |
+| 4 | Clients (`goto`) | Every client has a page. |
+| 5 | Caleb & Nora Hadley (`click`) | Open the Hadleys, and the whole job is in one place. |
+| 6 | Quick actions (`highlight`) | Quick actions start the next step: a visit, an estimate, a payment. |
+| 7 | **[Estimate and signature]** The estimate (`highlight`) | The estimate went out by email. You can see when they opened it, and when they approved. |
+| 8 | Estimate lines (`goto`) | Each line came from the price book, with its quantity and its price. |
+| 9 | Signed (`highlight`) | Nora approved it online by typing her name. Now it is a signed contract. |
+| 10 | **[Schedule and job photos]** Schedule (`goto`) | Next, the visit goes on the schedule. |
+| 11 | The visit (`click`) | Open it for the time, the client, and who is going. |
+| 12 | Close (`press`) | The crew sees it on their own calendar. |
+| 13 | Back to the client (`goto`) | On site, the crew shoots photos with JobCam. |
+| 14 | Caleb & Nora Hadley (`click`) | Back on the Hadleys' page, |
+| 15 | JobCam (`highlight`) | each shot is filed to this client's job. |
+| 16 | **[Invoice and payment]** Create invoice (`click`) | When the work is done, choose Create invoice on the approved estimate. |
+| 17 | The invoice (`highlight`) | The invoice is made from the estimate, ready to send. |
+| 18 | Record payment (`click`) | When the check arrives, choose Record payment. |
+| 19 | Record it (`click`) | Check the amount, and record it. |
+| 20 | Paid (`highlight`) | The invoice is marked paid, and the client gets a receipt by email. |
+| 21 | Home (`goto`) | Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. |
+| 22 | Where to start (`highlight`) | The CRM is its own product, with its own plans. See them at ConstructHUB dot U S. |
 
-**Full narration.** Here is one job in the ConstructHUB CRM, from the first call to the final payment. Every job starts as a lead on the pipeline. This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled. Open the client, and the whole job is on one page. Quick actions start the next step: a visit, an estimate, a payment. The estimate went out by email. You can see when they opened it, and when they approved. Each line came from the price book, with its quantity and its price. Nora approved it online by typing her name. Now it is a signed contract. Next, the visit goes on the schedule. Open it for the time, the client, and who is going. The crew sees it on their own calendar. On site, the crew shoots photos with JobCam. Each shot is filed to this client's job. When the work is done, choose Create invoice on the approved estimate. The invoice is made from the estimate, ready to send. When the check arrives, choose Record payment. Check the amount, and record it. The invoice is marked paid, and the client gets a receipt by email. Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. The CRM is its own product, with its own plans. See them at ConstructHUB dot U S.
+**Full narration.** Here is one job in the ConstructHUB CRM, from the first call to the final payment. Every job starts as a lead on the pipeline. This one is the Hadleys' new floor, in Austin. It has moved along to Scheduled. Every client has a page. Open the Hadleys, and the whole job is in one place. Quick actions start the next step: a visit, an estimate, a payment. The estimate went out by email. You can see when they opened it, and when they approved. Each line came from the price book, with its quantity and its price. Nora approved it online by typing her name. Now it is a signed contract. Next, the visit goes on the schedule. Open it for the time, the client, and who is going. The crew sees it on their own calendar. On site, the crew shoots photos with JobCam. Back on the Hadleys' page, each shot is filed to this client's job. When the work is done, choose Create invoice on the approved estimate. The invoice is made from the estimate, ready to send. When the check arrives, choose Record payment. Check the amount, and record it. The invoice is marked paid, and the client gets a receipt by email. Lead, estimate, signature, schedule, photos, invoice, paid. One job, in one place. The CRM is its own product, with its own plans. See them at ConstructHUB dot U S.
 
 Fact base: pipeline, estimates and typed-name approval, schedule, JobCam, invoices and recorded
 payments [1c]; "its own product, with its own plans" [D5]. Not said, on purpose: card payments (Stripe

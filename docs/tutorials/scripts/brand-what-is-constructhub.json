@@ -20,7 +20,7 @@
       "action": "highlight",
       "selector": "a:has-text(\"Open CRM\")",
       "caption": "Two products",
-      "narration": "ConstructHUB is two products for contractors: Business tools, and a CRM."
+      "narration": "ConstructHUB is two products: Business tools, and a CRM."
     },
     {
       "action": "goto",
@@ -34,7 +34,8 @@
       "selector": "[data-testid=\"input-database-search\"]",
       "value": "Houston",
       "caption": "Search a city",
-      "narration": "Type a city or a county."
+      "narration": "Type a city or a county.",
+      "holdMs": 1500
     },
     {
       "action": "highlight",
@@ -120,13 +121,7 @@
       "url": "/features",
       "caption": "How to start",
       "chapter": "How to start",
-      "narration": "Buy one product or both. Each has its own plans."
-    },
-    {
-      "action": "highlight",
-      "selector": "[data-testid=\"cta-features-primary\"]",
-      "caption": "Compare plans",
-      "narration": "Compare them, and start, at ConstructHUB dot U S."
+      "narration": "Buy one or both. Each has its own plans, at ConstructHUB dot U S."
     }
   ],
   "youtube": {
