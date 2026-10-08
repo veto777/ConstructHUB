@@ -1,0 +1,25 @@
+{
+  "helpKey": "crm-client-edit",
+  "durationSec": 65,
+  "video": {
+    "key": "tutorials/crm-client-edit.2733be0c.mp4",
+    "bytes": 4977852,
+    "sha256": "2733be0c04e697056000024d3d27ff65333f96a7e74cb1fcbe0e36261c26c12a"
+  },
+  "captions": {
+    "key": "tutorials/crm-client-edit.2999fa2e.vtt",
+    "bytes": 1432,
+    "sha256": "2999fa2ee2cc9b8e95a10a9cbf4de9822fb536fa04c4533eeb7ce1098785f0f0"
+  },
+  "poster": {
+    "key": "tutorials/crm-client-edit.6b93de9a.jpg",
+    "bytes": 107463,
+    "sha256": "6b93de9a5ddea95dfb9d8f14b8c2ec7a6be31df00c6debef0c0e1085ee595c0d"
+  },
+  "uploaded": {
+    "at": "2026-10-08T01:06:50.508Z",
+    "video": "78faf25725ae908999f817b4b847363a",
+    "captions": "a884e957ea97f9750372ac088dcebf17",
+    "poster": "79bc1be934f2573ad388805b330eb693"
+  }
+}
