@@ -11,6 +11,7 @@
  * scripts/tutorials/upload.ts — docs/tutorials/VIDEO-PIPELINE.md), and is null for every entry that
  * has no recording.
  */
+import { YOUTUBE_HOLDS } from "./holds";
 import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from "../plans";
 import { CALL_ASSISTANT_PLANS, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
 import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
@@ -889,7 +890,9 @@ export const helpSummary = (e: HelpEntry): string => /^.*?[.!?](?=\s|$)/.exec(e.
 /** A section's short name ("Cloudflare → Sites" → "Sites"). */
 export const helpShortTitle = (e: HelpEntry): string => e.title.split(" → ").pop()!;
 /** Keys whose video waits for the owner's approval before it is posted anywhere (`youtube.hold` on the entry). */
-export const heldHelpKeys = (): string[] => HELP_ENTRIES.filter((e) => e.youtube?.hold === true).map((e) => e.key);
+export const heldHelpKeys = (): string[] => Array.from(new Set([...HELP_ENTRIES.filter((e) => e.youtube?.hold === true).map((e) => e.key), ...Object.keys(YOUTUBE_HOLDS)])).filter((k) => BY_KEY.has(k));
+/** Why a key is held, when the reason is on record (./holds.ts); the overview films' reason is the owner's approval. */
+export const holdReason = (key: string): string | null => YOUTUBE_HOLDS[key] ?? (BY_KEY.get(key)?.youtube?.hold ? "an overview film: the owner releases it" : null);
 /** CRM routes live on the CRM (portal) host. */
 export const isCrmRoute = (route: string): boolean => route === "/crm" || route.startsWith("/crm/");
 /** Does a help entry match a search? Every word must appear somewhere in its text (or its sections'). */

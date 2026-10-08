@@ -685,6 +685,9 @@ describe("held for owner approval", () => {
     // Every overview film is held. (Tutorials can be held too — a cut withdrawn until it is re-recorded: each
     // such entry says why beside its flag, and docs/tutorials/held-manifests/README.md lists them.)
     expect(heldHelpKeys().filter((k) => k.startsWith("brand-")).sort()).toEqual(["brand-tour-crm", "brand-vs-housecall-pro", "brand-vs-jobber", "brand-vs-leap", "brand-what-is-constructhub", "brand-why-constructhub"]);
+    // The held tutorials (shared/help/holds.ts): each is a real key and says why.
+    const { YOUTUBE_HOLDS } = await import("../../shared/help/holds");
+    for (const [k, why] of Object.entries(YOUTUBE_HOLDS)) { expect(helpEntry(k), `${k} is not a help key`).toBeTruthy(); expect(why.length, k).toBeGreaterThan(30); expect(heldHelpKeys()).toContain(k); }
     const { HELP_ENTRIES } = await import("../../shared/help/registry");
     expect(HELP_ENTRIES.filter((e) => e.key.startsWith("brand-") && !e.youtube?.hold).map((e) => e.key)).toEqual([]);
     // …and the named comparisons are not in the app at all until they are released.

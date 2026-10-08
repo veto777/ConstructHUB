@@ -63,7 +63,7 @@ import {
 } from "../../server/youtube/schedule";
 import { DESCRIPTION_TARGET_MIN, TITLE_MAX, YT_DESCRIPTION_LIMIT, YT_TAGS_LIMIT, lintDescription, similarity, tagsCost } from "../../server/youtube/description";
 import { describeVideo, scriptKeys, siblingWorktrees, type DescribeContext, type Described } from "../../server/youtube/description-sources";
-import { heldHelpKeys, helpEntry } from "../../shared/help/registry";
+import { heldHelpKeys, helpEntry, holdReason } from "../../shared/help/registry";
 import type { Deps } from "../../server/youtube/client";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
@@ -122,7 +122,7 @@ function printPlan(plan: Plan, max: number, ledgerCount: number, tracks: Track[]
     if (plan.planned.length > max) console.log(`\nOne run uploads at most ${max} (--max): rows 1–${max} first, the rest on the next run.`);
   } else console.log("Nothing new to schedule.");
   console.log(`\nIn the ledger already: ${ledgerCount} video(s)${plan.alreadyPosted.length ? ` — of the videos found, left alone: ${plan.alreadyPosted.join(", ")}` : ""}`);
-  for (const k of plan.held) console.log(`⏸ ${k}: held for owner approval — not scheduled. When the owner has approved it: --release ${k}`);
+  for (const k of plan.held) console.log(`⏸ ${k}: held for owner approval — not scheduled${holdReason(k) ? ` (${holdReason(k)})` : ""}. To post it: --release ${k}`);
   for (const line of masterChangedLines(plan)) console.log(line);
   for (const h of plan.hashChanged)
     console.log(`! ${h.helpKey}: the mp4 in ${h.dir} is NOT the file that was uploaded as ${h.videoId} (${h.uploadedSha256.slice(0, 8)} → ${h.fileSha256.slice(0, 8)}). Not re-uploaded. To post the new cut: --replace ${h.helpKey}`);
