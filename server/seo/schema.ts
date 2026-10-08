@@ -168,6 +168,7 @@ export const SEO_SCHEMA_DDL = [
   `ALTER TABLE seo_rank_runs ADD COLUMN IF NOT EXISTS refund_due integer NOT NULL DEFAULT 0`,
   // Alerts: a delivery in progress holds a short lease; notified_at is set only once it went out.
   `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claimed_at timestamptz`,
+  `ALTER TABLE seo_alerts ADD COLUMN IF NOT EXISTS claim_token text`,
   // One list name per account, whatever the capitals.
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_keyword_lists_name ON seo_keyword_lists(user_id, lower(name))`,
   // People who asked not to get an account's reports any more (server/seo/site-report-send.ts).

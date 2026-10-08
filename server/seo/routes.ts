@@ -42,7 +42,7 @@ import { auditPages } from "./audit-pages";
 import { rankHistory, keywordHistory } from "./rank-history";
 import { searchLocations, locationByCode } from "./locations";
 import { BULK_MAX } from "./lists";
-import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, listItemsInput, ListError, type BulkPage } from "./lists";
+import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, getSchedule, saveSchedule, scheduleInput, MAX_RECIPIENTS } from "./site-report";
 import { sendSiteReport, validUnsubscribe, optOut, optedOut } from "./site-report-send";
@@ -95,6 +95,10 @@ export const SEO_HOLDS = {
   explorerReport: retailCents(EXPLORER_ESTIMATE_USD),
   reportPage: retailCents(REPORT_ESTIMATE_USD),
   keywordOverview: retailCents(KEYWORD_OVERVIEW_ESTIMATE_USD),
+  aiChatgpt: retailCents(AI_ENGINES.chatgpt.estimateUsd),
+  aiGemini: retailCents(AI_ENGINES.gemini.estimateUsd),
+  aiPerplexity: retailCents(AI_ENGINES.perplexity.estimateUsd),
+  aiMentions: retailCents(AI_MENTIONS_ESTIMATE_USD),
 };
 
 /** Report names as the customer sees them (usage history). */
@@ -212,7 +216,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
    * gets the same result marked `reused` (they bought nothing). The saved copy is checked again inside, so a
    * request arriving just after another finished does not buy it a second time.
    */
-  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean }> => {
+  const buyOnce = async <T>(user: number, key: string, kind: string, maxAgeHours: number, estimateUsd: number, fetch: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number }>, skipSaved = false, label?: string): Promise<{ data: T; reused: boolean }> => {
     const flight = `${kind}:${user}:${key}`;
     const waiting = inflight.has(flight);
     const out = await once(flight, async () => {
@@ -642,17 +646,13 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { list, items } = await listItems(user, id.parse(req.params.id));
     const keywords = items.map((i: any) => i.keyword as string);
     if (!keywords.length) return res.status(400).json({ message: "This list is empty." });
-    let updated = 0, failed = 0, problem: string | null = null;
+    let updated = 0, failed = 0, attempted = 0, problem: string | null = null;
     for (let i = 0; i < keywords.length; i += BULK_MAX) {
       const chunk = keywords.slice(i, i + BULK_MAX);
       try {
         const out = await withBudget(user, bulkEstimateUsd(chunk.length), () => fetchBulkKeywords({ keywords: chunk, locationCode: 2840, languageCode: "en" }), { label: `Refresh list — ${list.name} (${chunk.length} keyword${chunk.length === 1 ? "" : "s"})` });
-        // Only keywords still in the list (one removed while this ran stays removed).
-        const { rows: still } = await pool.query("SELECT keyword FROM seo_keyword_list_items WHERE list_id=$1 AND keyword = ANY($2::text[])", [list.id, out.data.rows.map((r) => r.keyword)]);
-        const keep = new Set(still.map((r: any) => r.keyword));
-        const fresh = out.data.rows.filter((r) => keep.has(r.keyword));
-        if (fresh.length) await addToList(user, { listId: list.id, items: fresh.map((r) => ({ keyword: r.keyword, volume: r.volume, cpc: r.cpc, difficulty: r.difficulty, intent: r.intent })) }, true);
-        updated += fresh.length;
+        updated += await refreshListMetrics(list.id, out.data.rows, out.data.notFound);
+        attempted += chunk.length;
       } catch (e: any) {
         // What was done stays done and is reported; out of credit stops here, anything else moves on to the next batch.
         failed += chunk.length;
@@ -660,7 +660,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         if (e instanceof SeoBudgetError || e instanceof ListError) break;
       }
     }
-    res.json({ updated, total: keywords.length, failed, problem });
+    res.json({ updated, total: keywords.length, failed, notAttempted: Math.max(0, keywords.length - attempted - failed), problem });
   }));
   route("get", "/api/seo/lists/:id", async (req, res, user) => { res.json(await listItems(user, id.parse(req.params.id))); });
   route("post", "/api/seo/lists/:id/remove", async (req, res, user) => {
@@ -698,6 +698,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const input = askInput.parse(req.body);
     if (!isConfigured()) return notReady(res);
+    // This is a visibility check, not a chatbot: a generous ceiling on how many questions an account asks in an hour.
+    if (!(await takeBudget(`seo:ai:${user}`, 40, 1, 3_600_000))) return res.status(429).json({ message: "That is a lot of questions in one hour — try again in a little while." });
     const engines = [...new Set(input.engines)];
     const out = await once(`ai:${user}:${site.id}:${engines.join(",")}:${cleanKeyword(input.prompt)}`, async () => {
       const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")})` });

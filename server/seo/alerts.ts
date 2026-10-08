@@ -5,6 +5,7 @@
  * alert never costs SEO data. Each alert is one row in seo_alerts (the Alerts
  * page) and one platform notification (the bell, and email when it is on).
  */
+import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { notifyUser } from "../account-events";
 
@@ -98,18 +99,20 @@ export function alertMessage(a: { kind: string; title: string; domain: string; i
  * when the lease runs out, instead of marking it sent.
  */
 export async function deliverAlert(alertId: number): Promise<boolean> {
+  // Only the sender holding this token may finish or give up the delivery: a slow sender whose lease ran out cannot undo a newer one's.
+  const token = randomUUID();
   const { rows: [a] } = await pool.query(
-    `UPDATE seo_alerts x SET claimed_at=now() FROM seo_sites s
+    `UPDATE seo_alerts x SET claimed_at=now(), claim_token=$2 FROM seo_sites s
       WHERE x.id=$1 AND x.notified_at IS NULL AND (x.claimed_at IS NULL OR x.claimed_at < now() - interval '5 minutes') AND s.id=x.site_id
-     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId]);
+     RETURNING x.id, x.user_id, x.kind, x.title, x.items, s.domain`, [alertId, token]);
   if (!a) return false;
   try {
     const m = alertMessage(a);
     await notifyUser(a.user_id, m.kind, { title: m.title, body: m.body, link: "/seo/alerts", severity: m.severity, actionLabel: m.actionLabel, actionUrl: m.actionUrl });
-    await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL WHERE id=$1", [alertId]);
+    await pool.query("UPDATE seo_alerts SET notified_at=now(), claimed_at=NULL, claim_token=NULL WHERE id=$1 AND claim_token=$2", [alertId, token]);
     return true;
   } catch (e: any) {
-    await pool.query("UPDATE seo_alerts SET claimed_at=NULL WHERE id=$1 AND notified_at IS NULL", [alertId]).catch(() => {});
+    await pool.query("UPDATE seo_alerts SET claimed_at=NULL, claim_token=NULL WHERE id=$1 AND notified_at IS NULL AND claim_token=$2", [alertId, token]).catch(() => {});
     console.error(`[seo] alert ${alertId} was not delivered (it will be retried): ${e?.message ?? e}`);
     return false;
   }

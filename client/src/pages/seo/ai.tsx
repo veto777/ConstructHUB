@@ -33,7 +33,7 @@ function Verdict({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   return <span className="inline-flex items-center gap-1 text-[13px]" style={{ color: ok ? "var(--g-green)" : "var(--g-red)" }}>{ok ? <Check className="h-4 w-4" aria-hidden /> : <X className="h-4 w-4" aria-hidden />}{ok ? yes : no}</span>;
 }
 
-function AnswerCard({ a, name }: { a: Answer; name: string | null }) {
+function AnswerCard({ a, name, stale }: { a: Answer; name: string | null; /** From an earlier ask than the others shown. */ stale?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <section className="rounded-lg border p-4" style={card} data-testid={`ai-answer-${a.engine}`}>
@@ -41,13 +41,14 @@ function AnswerCard({ a, name }: { a: Answer; name: string | null }) {
         <h3 className="g-text text-[15px] font-medium">{LABEL[a.engine]}</h3>
         {a.at && <span className="g-text-2 text-[12px]">asked {fmtDate(a.at)}</span>}
       </div>
+      {stale && <p className="g-text-2 mb-2 text-[12px]" data-testid={`ai-stale-${a.engine}`}>Not asked the last time — this is its answer from {fmtDate(a.at)}.</p>}
       <div className="flex flex-col gap-1">
         <Verdict ok={a.mentioned} yes={a.listedAt ? `Named you — ${a.listedAt === 1 ? "first" : `#${a.listedAt}`} of ${a.businesses.length} businesses` : "Named you"} no={name ? `Did not name ${name}` : "Did not name you"} />
         <Verdict ok={a.cited} yes="Used your website as a source" no="Did not use your website as a source" />
       </div>
       {a.businesses.length > 0 && (
         <div className="mt-3">
-          <h4 className="g-text-2 mb-1 text-[12px]">Businesses it named, in order</h4>
+          <h4 className="g-text-2 mb-1 text-[12px]" title="Read from the names the answer sets in bold">Businesses it named, in the order it listed them</h4>
           <ol className="list-decimal space-y-0.5 pl-5 text-[13px]">{a.businesses.map((b, i) => <li key={b} className={a.listedAt === i + 1 ? "g-text font-medium" : "g-text"}>{b}{a.listedAt === i + 1 ? " · you" : ""}</li>)}</ol>
         </div>
       )}
@@ -129,12 +130,17 @@ export default function SeoAiPage() {
   const [engines, setEngines] = useState<Engine[]>(["chatgpt", "gemini", "perplexity"]);
   const [openPrompt, setOpenPrompt] = useState<string | null>(null);
   const [name, setName] = useState("");
-  useEffect(() => { setPrompt(""); setOpenPrompt(null); }, [site?.id]);
+  /** The answers just paid for, shown straight away — also when saving them to the history failed. */
+  const [lastRun, setLastRun] = useState<{ prompt: string; answers: Answer[]; at: string } | null>(null);
+  useEffect(() => { setPrompt(""); setOpenPrompt(null); setLastRun(null); }, [site?.id]);
   const d = q.data;
   const price = status.data?.prices ? engines.reduce((a, e) => a + (status.data!.prices[ENGINES.find((x) => x.key === e)!.price] ?? 0), 0) : null;
+  // What must be available to start (the most it can cost), which is more than the usual price.
+  const hold = status.data?.prices ? engines.reduce((a, e) => { const k = ENGINES.find((x) => x.key === e)!.price; return a + (status.data!.holds?.[k] ?? status.data!.prices[k] ?? 0); }, 0) : null;
   const ask = useMutation({
     mutationFn: (p: string) => api("POST", `${key}/ask`, { prompt: p, engines }),
-    onSuccess: (r: { prompt: string; failed: Engine[] }) => {
+    onSuccess: (r: { prompt: string; answers: Answer[]; failed: Engine[] }) => {
+      setLastRun({ prompt: r.prompt, answers: r.answers, at: new Date().toISOString() });
       setOpenPrompt(r.prompt); setPrompt("");
       void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (r.failed.length) toast({ title: `${r.failed.map((e) => LABEL[e]).join(" and ")} didn't answer`, description: "You were not charged for it. The others are below.", variant: "destructive" });
@@ -151,7 +157,14 @@ export default function SeoAiPage() {
     onSuccess: (_r, v) => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: v.on ? "This question will be asked again every month" : "Monthly asking stopped" }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  const shown = d?.prompts.find((p) => p.prompt === openPrompt) ?? d?.prompts[0] ?? null;
+  const savedShown = d?.prompts.find((p) => p.prompt === openPrompt) ?? d?.prompts[0] ?? null;
+  // The run just made is on screen at once. Normally the history has it too a moment later; if saving failed, this is all there is.
+  const unsaved = !!lastRun && (openPrompt === null || openPrompt === lastRun.prompt) && !(savedShown && savedShown.prompt === lastRun.prompt && Date.parse(savedShown.lastAt) >= Date.parse(lastRun.at) - 180_000);
+  const shown: PromptHistory | null = unsaved && lastRun ? { prompt: lastRun.prompt, lastAt: lastRun.at, latest: lastRun.answers.map((a) => ({ ...a, at: lastRun.at })), history: savedShown?.prompt === lastRun.prompt ? savedShown.history : [] } : savedShown;
+  // Answers belong together only when they came from the same ask.
+  const isFresh = (a: { at: string }) => !!shown && Date.parse(shown.lastAt) - Date.parse(a.at) < 10 * 60_000;
+  const freshAnswers = shown ? shown.latest.filter(isFresh) : [];
+  const namesIt = !!shown && !!d?.businessName && shown.prompt.toLowerCase().includes(d.businessName.toLowerCase());
   const toggle = (e: Engine) => setEngines((x) => (x.includes(e) ? x.filter((y) => y !== e) : [...x, e]));
   const ready = prompt.trim().length >= 8 && engines.length > 0;
 
@@ -182,16 +195,18 @@ export default function SeoAiPage() {
               </div>
             </fieldset>
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Button type="submit" disabled={!ready || ask.isPending || !status.data?.configured || !can(status.data, price)} data-testid="button-ai-ask">{ask.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Asking — up to a minute…</> : `Ask${price != null && engines.length ? ` — about ${money(price)}` : ""}`}</Button>
-              <span className="g-text-2 text-[13px]">{!can(status.data, price) ? "You don't have enough SEO data left — add credit above." : "Each assistant is asked with its web search on, as a customer would use it. Answers vary from one day to the next; the history shows the trend."}</span>
+              <Button type="submit" disabled={!ready || ask.isPending || !status.data?.configured || !can(status.data, hold)} data-testid="button-ai-ask">{ask.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Asking — up to a minute…</> : `Ask${price != null && engines.length ? ` — about ${money(price)}` : ""}`}</Button>
+              <span className="g-text-2 text-[13px]">{!can(status.data, hold) ? `You need ${hold != null ? money(hold) : "more"} of SEO data available to start (the most it can cost) — add credit above.` : "Each assistant is asked with its web search on, as a customer would use it. Answers vary from one day to the next; the history shows the trend."}</span>
             </div>
           </form>
 
-          {d.prompts.length === 0 && !ask.isPending && <Empty testId="ai-empty"><h3>Nothing asked yet</h3><p>Ask the question your customers ask — "best roofing contractor in my city" — and see which businesses each assistant names, and which websites it relied on.</p></Empty>}
+          {d.prompts.length === 0 && !shown && !ask.isPending && <Empty testId="ai-empty"><h3>Nothing asked yet</h3><p>Ask the question your customers ask — "best roofing contractor in my city" — and see which businesses each assistant names, and which websites it relied on.</p></Empty>}
           {shown && (
             <section className="mt-5" data-testid="ai-result">
               <h2 className="g-text mb-1 text-[16px] font-medium">"{shown.prompt}"</h2>
-              <p className="g-text-2 mb-3 text-[13px]">Named by {shown.latest.filter((a) => a.mentioned).length} of {shown.latest.length} assistant{shown.latest.length === 1 ? "" : "s"} · last asked {fmtDate(shown.lastAt)} <button type="button" className="g-link ml-2" disabled={ask.isPending} onClick={() => ask.mutate(shown.prompt)} data-testid="button-ai-again">Ask again{price != null ? ` — about ${money(price)}` : ""}</button></p>
+              {unsaved && !ask.isPending && q.isFetched && !q.isFetching && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="ai-unsaved">These answers are shown but could not be added to your history. Copy anything you want to keep.</p>}
+              {namesIt && <p className="g-text-2 mb-2 text-[13px]" data-testid="ai-names-it">Your question names your business, so being named back proves little. Ask it the way a stranger would — the service and the city, no names.</p>}
+              <p className="g-text-2 mb-3 text-[13px]">Named by {freshAnswers.filter((a) => a.mentioned).length} of the {freshAnswers.length} assistant{freshAnswers.length === 1 ? "" : "s"} asked on {fmtDate(shown.lastAt)} <button type="button" className="g-link ml-2" disabled={ask.isPending} onClick={() => ask.mutate(shown.prompt)} data-testid="button-ai-again">Ask again{price != null ? ` — about ${money(price)}` : ""}</button></p>
               {(() => { const t = d.tracked?.find((x) => x.prompt.toLowerCase() === shown.prompt.toLowerCase()); const asked = shown.latest.map((a) => a.engine); const monthly = status.data?.prices ? asked.reduce((a, e) => a + (status.data!.prices[ENGINES.find((x) => x.key === e)!.price] ?? 0), 0) : null; return (
                 <label className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="ai-track">
                   <input type="checkbox" checked={!!t} disabled={track.isPending} onChange={(e) => track.mutate({ prompt: shown.prompt, on: e.target.checked, engines: asked })} data-testid="checkbox-ai-track" />
@@ -199,7 +214,7 @@ export default function SeoAiPage() {
                   <span className="g-text-2 text-[12px]">{t ? `next on ${fmtDate(t.nextAt)} · ` : ""}{monthly != null ? `about ${money(monthly)} a month, taken from your included SEO data only — it is skipped when that has run out` : ""}</span>
                 </label>
               ); })()}
-              <div className="grid gap-4 lg:grid-cols-3">{ENGINES.map((e) => shown.latest.find((a) => a.engine === e.key)).filter((a): a is Answer & { at: string } => !!a).map((a) => <AnswerCard key={a.engine} a={a} name={d.businessName} />)}</div>
+              <div className="grid gap-4 lg:grid-cols-3">{ENGINES.map((e) => shown.latest.find((a) => a.engine === e.key)).filter((a): a is Answer & { at: string } => !!a).map((a) => <AnswerCard key={a.engine} a={a} name={d.businessName} stale={!isFresh(a)} />)}</div>
               {shown.history.length > 0 && (
                 <details className="mt-3 text-[13px]" data-testid="ai-history"><summary className="g-link cursor-pointer">Earlier answers to this question ({shown.history.length})</summary>
                   <table className="g-table mt-2"><thead><tr><th>Asked</th><th>Assistant</th><th>Named you</th><th>Used your website</th></tr></thead>
@@ -223,7 +238,7 @@ export default function SeoAiPage() {
               </table></div>
             </section>
           )}
-          <p className="g-text-2 mt-4 text-[12px]">To be named more often: keep your Google Business Profile and reviews current, get listed on the directories the assistants quote (they are in "Websites it used"), and publish pages that answer the question plainly. See who they quote, then check those sites in <Link href="/seo/explorer" className="g-link">Site explorer</Link>.</p>
+          <p className="g-text-2 mt-4 text-[12px]">Your question is sent to each assistant through our data provider and the answers are kept in your history. The assistants are asked through their programming interfaces with web search on; the app on your phone can answer a little differently. To be named more often: keep your Google Business Profile and reviews current, get listed on the directories the assistants quote (they are in "Websites it used"), and publish pages that answer the question plainly. See who they quote, then check those sites in <Link href="/seo/explorer" className="g-link">Site explorer</Link>.</p>
           <Mentions status={status.data} domain={d.domain} />
         </>
       )}

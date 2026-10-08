@@ -292,9 +292,9 @@ export const releaseBudget = (r: BudgetReservation) => settleBudget(r, 0);
  * ledger keeps what the source says it charged, or the whole estimate when it
  * never answered (timeout, gateway error) and the cost is unknown.
  */
-export async function withBudget<T>(userId: number, estimateUsd: number, call: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean }>, opts: BudgetOptions = {}): Promise<{ data: T; costUsd: number }> {
+export async function withBudget<T>(userId: number, estimateUsd: number, call: () => Promise<{ data: T; costUsd: number; costUnknown?: boolean; /** What the delivered parts cost — the customer is charged this, not for a part that failed. Defaults to costUsd. */ customerUsd?: number }>, opts: BudgetOptions = {}): Promise<{ data: T; costUsd: number }> {
   const r = await reserveBudget(userId, estimateUsd, opts);
-  let out: { data: T; costUsd: number; costUnknown?: boolean };
+  let out: { data: T; costUsd: number; costUnknown?: boolean; customerUsd?: number };
   try {
     out = await call();
   } catch (e: any) {
@@ -306,7 +306,7 @@ export async function withBudget<T>(userId: number, estimateUsd: number, call: (
     throw e;
   }
   // The data is in hand: settleBudget never throws, so a ledger error cannot lose a result that was paid for.
-  await settleBudget(r, out.costUnknown ? Math.max(out.costUsd, estimateUsd) : out.costUsd, out.costUsd);
+  await settleBudget(r, out.costUnknown ? Math.max(out.costUsd, estimateUsd) : out.costUsd, Math.min(out.costUsd, out.customerUsd ?? out.costUsd));
   return out;
 }
 

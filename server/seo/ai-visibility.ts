@@ -92,6 +92,7 @@ export type AiReading = {
   sources: AiSource[];
 };
 
+const GEMINI_REDIRECT_HOST = "vertexaisearch.cloud.google.com";
 const bare = (d: string) => d.toLowerCase().replace(/^www\./, "");
 const sameSite = (host: string, target: string) => { const d = bare(host); return d === target || d.endsWith(`.${target}`); };
 /** Markdown reduced to the words a person reads: links to their text, emphasis marks dropped. */
@@ -133,17 +134,24 @@ export function readAnswer(markdown: string, annotations: { title?: unknown; url
     const url = safeHttpUrl(a?.url);
     let host: string | null = null;
     try { host = url ? new URL(url).hostname : null; } catch { host = null; }
-    // Gemini hands back a redirect address; the real site is in the title.
-    if (!host || /vertexaisearch\.cloud\.google\.com$/.test(host)) host = safeDomain(typeof a?.title === "string" ? a.title : "") ?? host;
+    // No usable address: not a source we can name.
+    if (!host) continue;
+    // Gemini hands back its own redirect address and puts the real site in the title; only then is the title read as the site.
+    const redirect = host === GEMINI_REDIRECT_HOST;
+    if (redirect) host = safeDomain(typeof a?.title === "string" ? a.title : "");
     const d = safeDomain(host ?? "");
     // A real site has a dot in its name; a title that is just a word is not one.
-    if (!d || !d.includes(".") || /vertexaisearch\.cloud\.google\.com$/.test(d) || seen.has(d)) continue;
+    if (!d || !d.includes(".") || d === GEMINI_REDIRECT_HOST || seen.has(d)) continue;
     seen.add(d);
-    sources.push({ domain: d, title: typeof a?.title === "string" && a.title !== d ? a.title.slice(0, 160) : null, url: url && !/vertexaisearch\.cloud\.google\.com/.test(url) ? url.replace(/[?&]utm_source=[^&]*/, "").replace(/\?$/, "") : null, ours: sameSite(d, domain) });
+    sources.push({ domain: d, title: typeof a?.title === "string" && a.title !== d ? a.title.slice(0, 160) : null, url: url && !redirect ? url.replace(/[?&]utm_source=[^&]*/, "").replace(/\?$/, "") : null, ours: sameSite(d, domain) });
     if (sources.length >= 20) break;
   }
   const cited = sources.some((s) => s.ours);
-  const mentioned = listed >= 0 || (ours.length >= 4 && flat.includes(` ${ours} `)) || text.toLowerCase().includes(domain);
+  // In running text a name counts only when it is distinctive: two words or more ("Quality LLC" must not match the word
+  // "quality"). The web address counts only as a whole address, not as part of a longer one.
+  const distinctive = ours.split(" ").length >= 2 && ours.length >= 6;
+  const addressed = new RegExp(`(?<![a-z0-9.-])(?:www\\.)?${domain.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![a-z0-9-]|\\.[a-z0-9])`).test(text.toLowerCase());
+  const mentioned = listed >= 0 || (distinctive && flat.includes(` ${ours} `)) || addressed;
   return { mentioned, cited, listedAt: listed >= 0 ? listed + 1 : null, businesses, sources };
 }
 
@@ -170,12 +178,13 @@ export async function fetchAiAnswer(engine: AiEngine, prompt: string, site: { do
 }
 
 /** Ask every chosen assistant at once. One failing does not lose the others; what each cost is added up. */
-export async function askAi(prompt: string, engines: AiEngine[], site: { domain: string; businessName?: string | null }): Promise<{ data: { answers: AiAnswer[]; failed: AiEngine[] }; costUsd: number; costUnknown: boolean }> {
+export async function askAi(prompt: string, engines: AiEngine[], site: { domain: string; businessName?: string | null }): Promise<{ data: { answers: AiAnswer[]; failed: AiEngine[] }; costUsd: number; customerUsd: number; costUnknown: boolean }> {
   const settled = await Promise.allSettled(engines.map((e) => fetchAiAnswer(e, prompt, site)));
-  let costUsd = 0, costUnknown = false, firstError: unknown = null;
+  // costUsd is everything it cost us; customerUsd only the assistants that answered — one that failed is not the customer's to pay.
+  let costUsd = 0, customerUsd = 0, costUnknown = false, firstError: unknown = null;
   const answers: AiAnswer[] = [], failed: AiEngine[] = [];
   settled.forEach((s, i) => {
-    if (s.status === "fulfilled") { costUsd += s.value.costUsd; answers.push(s.value.data); }
+    if (s.status === "fulfilled") { costUsd += s.value.costUsd; customerUsd += s.value.costUsd; answers.push(s.value.data); }
     else {
       costUsd += typeof s.reason?.costUsd === "number" ? s.reason.costUsd : 0;
       if (s.reason?.code === "timeout" || (s.reason?.code === "upstream" && !(s.reason?.costUsd > 0))) costUnknown = true;
@@ -183,7 +192,7 @@ export async function askAi(prompt: string, engines: AiEngine[], site: { domain:
     }
   });
   if (!answers.length) throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError)), { costUsd, costUnknown });
-  return { data: { answers, failed }, costUsd, costUnknown };
+  return { data: { answers, failed }, costUsd, customerUsd, costUnknown };
 }
 
 export const askEstimateUsd = (engines: AiEngine[]) => Math.round(engines.reduce((a, e) => a + AI_ENGINES[e].estimateUsd, 0) * 1e6) / 1e6;

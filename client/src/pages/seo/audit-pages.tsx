@@ -10,14 +10,14 @@ import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
 
-type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean; whyNot: string | null; depth: number | null; inlinks: number | null; outlinks: number;
+type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; depth: number | null; inlinks: number | null; outlinks: number;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
 type Summary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; linksMeasured?: boolean; orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
 type Data = { jobId: string; scannedAt: string | null; summary: Summary; pages: Row[] };
 
 const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolean; count: (s: Summary) => number; hint: string }[] = [
   { key: "all", label: "All pages", test: () => true, count: (s) => s.pages, hint: "" },
-  { key: "notIndexable", label: "Can't be indexed", test: (r) => !r.indexable, count: (s) => s.notIndexable, hint: "Google will not show these pages in results. Fine for a thank-you page; a problem for a service page." },
+  { key: "notIndexable", label: "Blocked from Google", test: (r) => r.indexable === false, count: (s) => s.notIndexable, hint: "The crawl found something on these pages that keeps Google from listing them: an error, a redirect, a noindex mark, or a canonical tag naming another page. Fine for a thank-you page; a problem for a service page." },
   { key: "errors", label: "Errors", test: (r) => r.status >= 400, count: (s) => s.errors, hint: "These addresses return an error. Restore the page or redirect it to the closest one that works." },
   { key: "redirected", label: "Redirected", test: (r) => r.redirected, count: (s) => s.redirected, hint: "Links on your site point to an address that forwards somewhere else. Link straight to the final address." },
   { key: "orphans", label: "No links to it", test: (r, i) => i > 0 && r.inlinks === 0, count: (s) => s.orphans ?? 0, hint: "No crawled page of your site links to these. Visitors and Google can only find them from a sitemap or another site — add a link from a related page." },
@@ -29,7 +29,7 @@ const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolea
 type SortKey = "path" | "status" | "depth" | "inlinks" | "words" | "titleLength" | "descriptionLength" | "kb";
 const COLS: { key: SortKey; label: string; num?: boolean; title?: string }[] = [
   { key: "path", label: "Page" }, { key: "status", label: "Status", num: true }, { key: "depth", label: "Clicks deep", num: true, title: "Clicks from the first page crawled" },
-  { key: "inlinks", label: "Links to it", num: true, title: "Other pages of your site that link to it" }, { key: "words", label: "Words", num: true },
+  { key: "inlinks", label: "Links to it", num: true, title: "Other crawled pages of your site whose page source links to it" }, { key: "words", label: "Words", num: true },
   { key: "titleLength", label: "Title", num: true, title: "Characters in the title (aim for 30–60)" }, { key: "descriptionLength", label: "Description", num: true, title: "Characters in the description (aim for 70–160)" }, { key: "kb", label: "Size", num: true },
 ];
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
@@ -52,8 +52,8 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
     return [...picked].sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : a.path.localeCompare(b.path)) * sort.dir; });
   }, [d, active, text, sort]);
   const exportCsv = () => {
-    const lines = [["URL", "Status", "Can be indexed", "Why not", "Clicks deep", "Links to it", "Links from it", "Words", "Title", "Title length", "Description length", "H1 headings", "Images", "Images without alt text", "Size (KB)", "Issues"],
-      ...rows.map((r) => [r.url, r.status, r.indexable ? "yes" : "no", r.whyNot, r.depth, r.inlinks, r.outlinks, r.words, r.title, r.titleLength, r.descriptionLength, r.h1, r.images, r.imagesNoAlt, r.kb, r.issues.map((k) => issueTitles[k] ?? k).join("; ")])];
+    const lines = [["URL", "Status", "Blocking signal found", "Which", "Clicks deep", "Links to it", "Links from it", "Words", "Title", "Title length", "Description length", "H1 headings", "Images", "Images without alt text", "Size (KB)", "Issues"],
+      ...rows.map((r) => [r.url, r.status, r.indexable === null ? "unknown" : r.indexable ? "no" : "yes", r.whyNot, r.depth, r.inlinks, r.outlinks, r.words, r.title, r.titleLength, r.descriptionLength, r.h1, r.images, r.imagesNoAlt, r.kb, r.issues.map((k) => issueTitles[k] ?? k).join("; ")])];
     const blob = new Blob([lines.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = `pages-${site.domain}.csv`; a.click(); URL.revokeObjectURL(a.href);
@@ -65,17 +65,17 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
   return (
     <div data-testid="audit-pages">
       <div className="g-tiles mb-4">
-        <Tile label="Can be indexed" value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} hint={s.notIndexable ? `${fmtNum(s.notIndexable)} can't — check they are meant not to` : "Every crawled page can appear in Google"} testId="tile-pages-indexable" />
+        <Tile label="Nothing blocking Google" value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} hint={s.notIndexable ? `${fmtNum(s.notIndexable)} carry a signal that keeps Google out — check they are meant to` : "No page tells Google to stay away. Google still decides what it lists."} testId="tile-pages-indexable" />
         {measured ? <>
           <Tile label="Average clicks from home" value={s.averageDepth ?? "—"} hint={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
           <Tile label="Pages nothing links to" value={fmtNum(s.orphans)} hint="Among the pages crawled" testId="tile-pages-orphans" />
-        </> : <Tile label="Links between pages" value="Not measurable" hint="This site's links are added by JavaScript" testId="tile-pages-links-unmeasured" />}
+        </> : <Tile label="Links between pages" value="Not measurable" hint="Too few links in the page source" testId="tile-pages-links-unmeasured" />}
         <Tile label="Pages with little text" value={fmtNum(s.thin)} hint="Under 200 words" testId="tile-pages-thin" />
       </div>
       {!measured && (
         <div className="g-callout mb-3" role="status" data-testid="pages-links-unmeasured">
           <h3>Links between your pages could not be measured</h3>
-          <p>Most pages of {site.domain} have no links in their page source — the menus and links are added by JavaScript after the page loads. This crawl reads the source without running scripts, so it cannot say which pages link to which, or how many clicks deep a page is. Google does run scripts, but more slowly and less reliably than it reads plain links; putting your main menu and in-page links in the page's HTML is the safer choice.</p>
+          <p>Most pages of {site.domain} have no links to other pages in their page source. That usually means the menus and links are added by JavaScript after the page loads — this crawl reads the source without running scripts, so it cannot say which pages link to which, or how many clicks deep a page is. Google does run scripts, but more slowly and less reliably than it reads plain links; putting your main menu and in-page links in the page's HTML is the safer choice.</p>
         </div>
       )}
       <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Show pages">
@@ -103,7 +103,7 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
                 <Fragment key={r.url}>
                   <tr>
                     <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${r.path}`} onClick={() => setOpen(isOpen ? null : r.url)}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
-                    <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{!r.indexable && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Can't be indexed: {r.whyNot}</span>}</td>
+                    <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{r.indexable === false && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Blocked from Google: {r.whyNot}</span>}{r.indexable === null && <span className="g-text-2 text-[12px]">Response not recorded — nothing can be said about this page</span>}</td>
                     <td className="num" data-label="Status" style={r.status >= 400 ? { color: "var(--g-red)" } : undefined}>{r.status || "—"}{r.redirected ? " ↪" : ""}</td>
                     <td className="num" data-label="Clicks deep">{r.depth ?? <span className="g-text-2" title="No crawled page links to it">—</span>}</td>
                     <td className="num" data-label="Links to it">{r.inlinks == null ? <span className="g-text-2" title="Not measurable on this site">—</span> : fmtNum(r.inlinks)}</td>

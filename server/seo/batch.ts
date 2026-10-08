@@ -40,12 +40,13 @@ const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : n
 const key = (t: unknown) => (typeof t === "string" ? t.toLowerCase().replace(/^www\./, "") : "");
 export const batchDeps = { request };
 
-export async function fetchBatch(domains: string[]): Promise<{ data: BatchPage; costUsd: number; costUnknown: boolean }> {
-  let costUsd = 0, costUnknown = false;
+export async function fetchBatch(domains: string[]): Promise<{ data: BatchPage; costUsd: number; customerUsd: number; costUnknown: boolean }> {
+  let costUsd = 0, customerUsd = 0, costUnknown = false;
   const call = async (path: string, body: Record<string, unknown>) => {
     try {
       const task = assertOk(await batchDeps.request("POST", path, [body]), { treatNoResultsAsEmpty: true });
       costUsd += typeof task.cost === "number" ? task.cost : 0;
+      customerUsd += typeof task.cost === "number" ? task.cost : 0;
       return new Map(taskItems(task).map((i: any) => [key(i?.target), i] as const));
     } catch (e: any) {
       costUsd += typeof e?.costUsd === "number" ? e.costUsd : 0;
@@ -75,5 +76,5 @@ export async function fetchBatch(domains: string[]): Promise<{ data: BatchPage; 
       traffic: organic ? Math.round(num(organic.etv) ?? 0) : traffic ? 0 : null, keywords: organic ? num(organic.count) : traffic ? 0 : null,
     };
   });
-  return { data: { rows, missing, fetchedAt: new Date().toISOString() }, costUsd, costUnknown };
+  return { data: { rows, missing, fetchedAt: new Date().toISOString() }, costUsd, customerUsd, costUnknown };
 }

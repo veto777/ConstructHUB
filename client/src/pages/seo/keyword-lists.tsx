@@ -187,7 +187,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   const price = batches.length && bulkPrice(status, 1) != null ? batches.reduce((a, n) => a + (bulkPrice(status, n) ?? 0), 0) : null;
   const renew = useMutation({
     mutationFn: () => api("POST", `/api/seo/lists/${current}/refresh`),
-    onSuccess: (r: { updated: number; total: number; failed?: number; problem?: string | null }) => toast({ title: `Numbers refreshed for ${r.updated} of ${r.total} keywords`, description: r.problem ?? (r.updated < r.total ? "The rest have too few searches to measure." : undefined), variant: r.problem ? "destructive" : undefined }),
+    onSuccess: (r: { updated: number; total: number; failed?: number; notAttempted?: number; problem?: string | null }) => toast({ title: `Numbers refreshed for ${r.updated} of ${r.total} keywords`, description: r.problem ? `${r.problem}${r.notAttempted ? ` ${r.notAttempted} were not attempted and were not charged.` : ""}` : (r.updated < r.total ? "The rest have too few searches to measure; their old numbers were cleared." : undefined), variant: r.problem ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't refresh the numbers", description: apiErrorMessage(e), variant: "destructive" }),
     // Whatever happened, show what is stored now and what it cost.
     onSettled: () => { refresh(); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },

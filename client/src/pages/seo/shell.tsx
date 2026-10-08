@@ -37,7 +37,7 @@ export type SeoStatus = {
   /** Alerts not yet read (the badge on the Alerts tab). */
   alertsUnread?: number;
   /** The most a lookup can cost: what must be available for it to start. */
-  holds?: Partial<SeoPrices>;
+  holds?: Partial<Record<keyof SeoPrices, number>>;
   packs: number[];
   resetsAt: string;
   /** Platform admins only: the real state of the data source. */

@@ -14,8 +14,11 @@ export type RawPage = {
 };
 export type PageRow = {
   url: string; path: string; status: number; redirected: boolean;
-  /** Can Google put this page in its index? And if not, the plain reason. */
-  indexable: boolean; whyNot: string | null;
+  /**
+   * true = the crawl found nothing on the page telling Google to stay away; false = it found a blocking signal (`whyNot`);
+   * null = the page's response was not recorded, so nothing can be said. Never a promise that Google will index it.
+   */
+  indexable: boolean | null; whyNot: string | null;
   /** Clicks from the first page crawled (0 = that page); null = no link to it was found, or links could not be measured. */
   depth: number | null;
   /** Other crawled pages of the site that link to it (null when links could not be measured) / pages of the site it links to. */
@@ -43,7 +46,7 @@ export function sameUrlKey(u: string): string {
 }
 const pathOf = (u: string) => { try { const x = new URL(u); return (x.pathname || "/") + x.search; } catch { return u; } };
 
-export const THIN_WORDS = 200, DEEP_CLICKS = 4;
+export const THIN_WORDS = 200, DEEP_CLICKS = 4, LINKS_PER_PAGE = 500;
 
 /** One row per crawled page, with link counts and click depth worked out across the crawl. Pure, for tests. */
 export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageRow[] {
@@ -55,7 +58,8 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
   // Internal links between crawled pages (a page's link to itself does not count).
   const out: Set<number>[] = pages.map(() => new Set<number>()), into: number[] = pages.map(() => 0);
   pages.forEach((p, i) => {
-    for (const l of Array.isArray(p.links) ? p.links : []) {
+    // A page with thousands of links is read to its first LINKS_PER_PAGE: enough for the picture, bounded for the server.
+    for (const l of Array.isArray(p.links) ? p.links.slice(0, LINKS_PER_PAGE) : []) {
       const j = typeof l === "string" ? byKey.get(sameUrlKey(l)) : undefined;
       if (j !== undefined && j !== i && !out[i].has(j)) { out[i].add(j); into[j]++; }
     }
@@ -78,9 +82,10 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
   return pages.map((p, i) => {
     const key = sameUrlKey(p.url);
     const canonicalElsewhere = !!p.canonical && sameUrlKey(p.canonical) !== key;
-    const whyNot = p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : canonicalElsewhere ? "its canonical tag points to another page" : null;
+    const known = Number.isInteger(p.status) && p.status >= 100;
+    const whyNot = !known ? null : p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : canonicalElsewhere ? "its canonical tag asks Google to index another page instead" : null;
     return {
-      url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: whyNot === null, whyNot,
+      url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: !known ? null : whyNot === null, whyNot,
       depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: out[i].size,
       title: p.title || null, titleLength: (p.title ?? "").trim().length, descriptionLength: (p.description ?? "").trim().length, h1: Array.isArray(p.h1) ? p.h1.length : 0,
       words: p.words, images: p.images, imagesNoAlt: p.imagesNoAlt, kb: typeof p.bytes === "number" ? Math.round(p.bytes / 1024) : null,
@@ -89,10 +94,14 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
   });
 }
 
-/** Links are measurable when at least half of the pages that loaded link to another crawled page. */
+/**
+ * Whether the links found in the pages' source are enough to talk about which page links to which. They are NOT when,
+ * in a crawl of five pages or more, most pages that loaded link to no other crawled page — usual for a site whose menus
+ * are added by JavaScript, though the crawl cannot prove that is the cause. A smaller crawl is taken as it is.
+ */
 export function linksMeasurable(pages: RawPage[], out: Set<number>[]): boolean {
   const loaded = pages.map((p, i) => (p.status < 400 ? i : -1)).filter((i) => i >= 0);
-  if (loaded.length < 3) return loaded.length > 0;
+  if (loaded.length < 5) return loaded.length > 0;
   return loaded.filter((i) => out[i].size > 0).length * 2 >= loaded.length;
 }
 
@@ -101,7 +110,7 @@ export function pagesSummary(rows: PageRow[]): PagesSummary {
   const depths = rows.map((r) => r.depth).filter((d): d is number => d !== null);
   const measured = rows.length === 0 || rows.some((r) => r.inlinks !== null);
   return {
-    pages: rows.length, indexable: rows.filter((r) => r.indexable).length, notIndexable: rows.filter((r) => !r.indexable).length,
+    pages: rows.length, indexable: rows.filter((r) => r.indexable === true).length, notIndexable: rows.filter((r) => r.indexable === false).length,
     errors: rows.filter((r) => r.status >= 400).length, redirected: rows.filter((r) => r.redirected).length,
     linksMeasured: measured,
     orphans: measured ? rows.filter((r, i) => i > 0 && r.inlinks === 0).length : null, deep: measured ? rows.filter((r) => (r.depth ?? 0) >= DEEP_CLICKS).length : null,
@@ -130,11 +139,22 @@ const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
 export const PAGE_CAP = 1000;
 
 /** The pages of this account's newest completed crawl of a domain; null when there is none. */
-export async function auditPages(user: number, domain: string): Promise<{ jobId: string; scannedAt: string | null; summary: PagesSummary; pages: PageRow[] } | null> {
-  const { rows: [job] } = await pool.query(
-    `SELECT id, completed_at, report->'findings' AS findings, ${PAGES_SQL} AS pages FROM sitescan_jobs
-      WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, auditDomainKey(domain)]);
+type PagesResult = { jobId: string; scannedAt: string | null; summary: PagesSummary; pages: PageRow[] };
+/** A finished crawl never changes, so its page table is worked out once and kept (the last few crawls looked at). */
+const worked = new Map<string, PagesResult>();
+
+export async function auditPages(user: number, domain: string): Promise<PagesResult | null> {
+  // Which crawl first (cheap), then its pages only when they are not already worked out.
+  const { rows: [newest] } = await pool.query(
+    `SELECT id FROM sitescan_jobs WHERE user_id=$1 AND status='completed' AND jsonb_typeof(report)='object' AND ${HOST_SQL}=$2 ORDER BY completed_at DESC LIMIT 1`, [user, auditDomainKey(domain)]);
+  if (!newest) return null;
+  const kept = worked.get(`${user}:${newest.id}`);
+  if (kept) return kept;
+  const { rows: [job] } = await pool.query(`SELECT id, completed_at, report->'findings' AS findings, ${PAGES_SQL} AS pages FROM sitescan_jobs WHERE id=$1 AND user_id=$2`, [newest.id, user]);
   if (!job) return null;
-  const rows = pageRows(job.pages as RawPage[], Array.isArray(job.findings) ? job.findings : []);
-  return { jobId: job.id, scannedAt: job.completed_at, summary: pagesSummary(rows), pages: rows.slice(0, PAGE_CAP) };
+  const rows = pageRows((job.pages as RawPage[]).slice(0, PAGE_CAP), Array.isArray(job.findings) ? job.findings : []);
+  const result = { jobId: job.id, scannedAt: job.completed_at, summary: pagesSummary(rows), pages: rows };
+  worked.set(`${user}:${job.id}`, result);
+  if (worked.size > 20) worked.delete(worked.keys().next().value as string);
+  return result;
 }

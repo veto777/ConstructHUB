@@ -149,6 +149,24 @@ export async function addToList(userId: number, input: z.infer<typeof listItemsI
   return { list, added: adding, total: have + adding };
 }
 
+/**
+ * Write today's numbers onto keywords that are IN the list (never adds one — a keyword removed meanwhile stays removed),
+ * and clear the numbers of keywords the source has nothing for, so an old figure cannot pass for a current one.
+ */
+export async function refreshListMetrics(listId: number, rows: { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null }[], notFound: string[]): Promise<number> {
+  let updated = 0;
+  if (rows.length) {
+    const { rowCount } = await pool.query(
+      `UPDATE seo_keyword_list_items i SET volume=v.volume, cpc=v.cpc, difficulty=v.difficulty, intent=v.intent
+         FROM unnest($2::text[], $3::int[], $4::numeric[], $5::int[], $6::text[]) AS v(keyword, volume, cpc, difficulty, intent)
+        WHERE i.list_id=$1 AND i.keyword=v.keyword`,
+      [listId, rows.map((r) => r.keyword), rows.map((r) => (r.volume == null ? null : Math.round(r.volume))), rows.map((r) => r.cpc), rows.map((r) => (r.difficulty == null ? null : Math.round(r.difficulty))), rows.map((r) => r.intent)]);
+    updated = rowCount ?? 0;
+  }
+  if (notFound.length) await pool.query("UPDATE seo_keyword_list_items SET volume=NULL, cpc=NULL, difficulty=NULL, intent=NULL WHERE list_id=$1 AND keyword = ANY($2::text[])", [listId, notFound]);
+  return updated;
+}
+
 export async function removeFromList(userId: number, listId: number, keywords: string[]): Promise<number> {
   const list = await ownedList(userId, listId);
   const { rowCount } = await pool.query("DELETE FROM seo_keyword_list_items WHERE list_id=$1 AND keyword = ANY($2::text[])", [list.id, keywords]);

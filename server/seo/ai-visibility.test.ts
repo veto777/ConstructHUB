@@ -27,10 +27,21 @@ describe("reading an answer", () => {
     // Gemini's redirect address is not kept; the site it names is
     expect(r.sources).toEqual([{ domain: "yelp.com", title: null, url: null, ours: false }]);
   });
+  it("a one-word name, or our address inside a longer one, is not a mention", () => {
+    expect(readAnswer("We value quality work above all.", [], { domain: "quality.example", businessName: "Quality LLC" }).mentioned).toBe(false);
+    expect(readAnswer("**Quality LLC**\nA contractor.", [], { domain: "quality.example", businessName: "Quality LLC" }).mentioned).toBe(true);
+    expect(readAnswer("Try notalpineexteriorswa.com or alpineexteriorswa.com.au", [], { domain: "alpineexteriorswa.com" }).mentioned).toBe(false);
+    expect(readAnswer("Visit https://www.alpineexteriorswa.com/quote today.", [], { domain: "alpineexteriorswa.com" }).mentioned).toBe(true);
+  });
   it("named in the running text counts, and so does the web address; unsafe links are dropped", () => {
     expect(readAnswer("People often recommend Alpine Exteriors for siding.", [], site).mentioned).toBe(true);
     expect(readAnswer("See alpineexteriorswa.com for a quote.", [], { domain: "alpineexteriorswa.com" }).mentioned).toBe(true);
     expect(readAnswer("x", [{ title: "t", url: "javascript:alert(1)" }], site).sources).toEqual([]);
+    // a title that looks like our site does not make an unsafe or missing address a citation of us
+    expect(readAnswer("x", [{ title: "alpineexteriorswa.com", url: "javascript:alert(1)" }, { title: "alpineexteriorswa.com" }], site).cited).toBe(false);
+    // ...but Gemini's redirect address with the site in the title is one
+    expect(readAnswer("x", [{ title: "alpineexteriorswa.com", url: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AAA" }], site).cited).toBe(true);
+    expect(readAnswer("x", [{ title: "alpineexteriorswa.com", url: "https://evil-vertexaisearch.cloud.google.com.example/x" }], site).cited).toBe(false);
   });
 });
 
@@ -50,7 +61,11 @@ describe("the real answers saved on 2026-10-08", () => {
     expect(by.chatgpt.answer).not.toContain("**");
   });
   it("one assistant failing leaves the others, and counts what it cost", async () => {
-    aiDeps.request = (async (_m: string, path: string) => { if (path.includes("gemini")) throw Object.assign(new Error("timed out"), { code: "timeout", costUsd: 0 }); return answerFrom(path); }) as typeof aiDeps.request;
+    aiDeps.request = (async (_m: string, path: string) => { if (path.includes("gemini")) throw Object.assign(new Error("timed out"), { code: "timeout", costUsd: 0 }); if (path.includes("perplexity")) throw Object.assign(new Error("failed after charging"), { code: "task_failed", costUsd: 0.004 }); return answerFrom(path); }) as typeof aiDeps.request;
+    const charged = await askAi("a question long enough", ["chatgpt", "perplexity"], site);
+    // what the failed assistant cost is ours, not the customer's
+    expect(charged.costUsd).toBeCloseTo(0.027039 + 0.004, 6);
+    expect(charged.customerUsd).toBeCloseTo(0.027039, 6);
     const out = await askAi("a question long enough", ["chatgpt", "gemini"], site);
     expect(out.data.answers.map((a) => a.engine)).toEqual(["chatgpt"]);
     expect(out.data.failed).toEqual(["gemini"]);
