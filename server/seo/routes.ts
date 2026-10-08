@@ -16,6 +16,7 @@
  * `configured: false`; sites and keywords save, checks wait for the source.
  */
 import type { Express } from "express";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { isPlatformAdmin } from "../admin";
@@ -691,11 +692,11 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const { domains, rejected } = cleanDomains(input.domains);
     if (!domains.length) return res.status(400).json({ message: "Enter at least one website like example.com" });
     const key = cacheKey("batch", [...domains].sort());
-    const saved = await cached<BatchPage>(user, key, CACHE_HOURS);
+    const saved = input.refresh ? null : await cached<BatchPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true, rejected });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
-    const out = await buyOnce<BatchPage>(user, key, "batch", CACHE_HOURS, batchEstimateUsd(domains.length), () => fetchBatch(domains), false, `Batch analysis — ${domains.length} website${domains.length === 1 ? "" : "s"}`);
+    const out = await buyOnce<BatchPage>(user, key, "batch", CACHE_HOURS, batchEstimateUsd(domains.length), () => fetchBatch(domains), input.refresh, `Batch analysis — ${domains.length} website${domains.length === 1 ? "" : "s"}`);
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, rejected });
   });
 
@@ -720,10 +721,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const engines = [...new Set(input.engines)];
     const out = await once(`ai:${user}:${site.id}:${engines.join(",")}:${cleanKeyword(input.prompt)}`, async () => {
       const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")})` });
-      await keep(`AI answers for site ${site.id}`, () => saveAiAnswers(user, site.id, input.prompt, o.data.answers, o.costUsd));
-      return o;
+      // Saved as one run. If saving fails the customer still gets the answers, and is told they are not in the history.
+      const runId = randomUUID();
+      let saved = true;
+      try { await saveAiAnswers(user, site.id, input.prompt, o.data.answers, o.costUsd, runId); }
+      catch (e: any) { saved = false; console.error(`[seo] AI answers for site ${site.id} were paid for but not saved (returned to the customer anyway): ${e?.message ?? e}`); }
+      return { ...o, runId, saved };
     });
-    res.status(201).json({ prompt: input.prompt, answers: out.data.answers, failed: out.data.failed });
+    res.status(201).json({ siteId: site.id, prompt: input.prompt, runId: out.runId, saved: out.saved, answers: out.data.answers, failed: out.data.failed });
   });
   // Ask a question again every month, or stop. One at a time per account, so the limit cannot be raced.
   route("post", "/api/seo/sites/:id/ai/track", (req, res, user) => serial(`aitrack:${user}`, async () => {

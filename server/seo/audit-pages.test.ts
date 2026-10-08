@@ -42,7 +42,8 @@ describe("pageRows", () => {
   it("says whether a page can be indexed and why not", () => {
     expect([row("/gone").indexable, row("/gone").whyNot]).toEqual([false, "it returns an error (404)"]);
     expect(row("/hidden").whyNot).toBe("it is marked noindex");
-    expect(row("/dupe").whyNot).toBe("its canonical tag asks Google to index another page instead");
+    // a canonical tag naming another page is a hint, counted on its own — not a block
+    expect(row("/dupe")).toMatchObject({ indexable: true, whyNot: null, canonicalElsewhere: true });
     // a page whose response was not recorded: nothing is claimed either way
     expect(pageRows([page(`${H}/`), page(`${H}/x`, [], { status: 0 })], [])[1]).toMatchObject({ indexable: null, whyNot: null });
     expect(row("/self").indexable).toBe(true);                                 // a canonical to itself is fine
@@ -54,7 +55,7 @@ describe("pageRows", () => {
     expect(row("/").issues).toEqual(["psi-mobile"]);
   });
   it("summarises the crawl", () => {
-    expect(pagesSummary(rows)).toEqual({ pages: 11, indexable: 8, notIndexable: 3, errors: 1, redirected: 1, linksMeasured: true, orphans: 5, deep: 1, averageDepth: 1.8, thin: 1, noTitle: 1, noDescription: 1 });
+    expect(pagesSummary(rows)).toEqual({ pages: 11, indexable: 9, notIndexable: 2, canonicalElsewhere: 1, errors: 1, redirected: 1, linksMeasured: true, orphans: 5, deep: 1, averageDepth: 1.8, thin: 1, noTitle: 1, noDescription: 1 });
   });
   it("says nothing about links on a site whose pages carry none in their source (menus built by JavaScript)", () => {
     // a small crawl is taken as it is

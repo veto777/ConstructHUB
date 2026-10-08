@@ -42,7 +42,7 @@ export default function SeoBatchPage() {
     queryFn: async () => { try { return await api("POST", "/api/seo/batch", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   const run = useMutation({
-    mutationFn: () => api("POST", "/api/seo/batch", body),
+    mutationFn: (again: boolean) => api("POST", "/api/seo/batch", again ? { ...body, refresh: true } : body),
     onSuccess: (data: unknown) => { qc.setQueryData(queryKey, data); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); },
     onError: (e) => toast({ title: "Couldn't analyse those sites", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -84,7 +84,7 @@ export default function SeoBatchPage() {
           <Empty testId="batch-not-run">
             <h3>{asked.length} site{asked.length === 1 ? "" : "s"} ready to analyse</h3>
             <p>{!canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
-            <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate()} data-testid="button-batch-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
+            <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate(false)} data-testid="button-batch-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : `Get the numbers${price != null ? ` — about ${money(price)}` : ""}`}</Button>
           </Empty>
         )}
         {page && (
@@ -93,7 +93,7 @@ export default function SeoBatchPage() {
               <span className="g-text-2" data-testid="text-batch-meta">{fmtNum(page.rows.length)} site{page.rows.length === 1 ? "" : "s"} · as of {fmtDate(page.fetchedAt)} · United States</span>
               <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportCsv} data-testid="button-batch-export"><Download /> Export</button>
             </div>
-            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete.</p>}
+            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className="g-link" disabled={run.isPending || !canPay} onClick={() => run.mutate(true)} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
             <div className="overflow-x-auto">
               <table className="g-table w-full" data-testid="table-batch">
                 <thead><tr>{th("domain", "Website", false)}{COLS.map((c) => th(c.key, c.label, true, c.title))}</tr></thead>

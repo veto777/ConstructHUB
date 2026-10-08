@@ -36,9 +36,9 @@ describe("fetchBatch", () => {
     const out = await fetchBatch(["b.com", "a.com", "c.com"]);
     expect(sent).toHaveLength(4);
     expect(out.data.rows).toEqual([
-      { domain: "b.com", authority: 5, referringDomains: null, backlinks: null, traffic: 0, keywords: 0 },
+      { domain: "b.com", authority: 5, referringDomains: null, backlinks: null, traffic: null, keywords: null },
       { domain: "a.com", authority: 37, referringDomains: 2693, backlinks: 31990, traffic: 54, keywords: 74 },
-      { domain: "c.com", authority: null, referringDomains: null, backlinks: null, traffic: 0, keywords: 0 },
+      { domain: "c.com", authority: null, referringDomains: null, backlinks: null, traffic: null, keywords: null },
     ]);
     expect(out.data.missing).toEqual([]);
     expect(out.costUsd).toBeCloseTo(0.0846, 6);

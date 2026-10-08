@@ -12,6 +12,8 @@ export const BATCH_MAX = 100;
 export const batchInput = z.object({
   domains: z.array(z.string().max(300)).min(1).max(1000),
   peek: z.boolean().default(false),
+  /** Run it again even though a copy is saved (a column did not load last time). */
+  refresh: z.boolean().default(false),
 }).strict();
 
 /** What was typed, as distinct bare domains (URLs and "www." accepted), capped. Pure. */
@@ -73,7 +75,8 @@ export async function fetchBatch(domains: string[]): Promise<{ data: BatchPage; 
     return {
       domain, authority: rank === null ? null : Math.max(0, Math.min(100, Math.round(rank / 10))),
       referringDomains: num(rds?.get(domain)?.referring_domains), backlinks: num(links?.get(domain)?.backlinks),
-      traffic: organic ? Math.round(num(organic.etv) ?? 0) : traffic ? 0 : null, keywords: organic ? num(organic.count) : traffic ? 0 : null,
+      // No row for a site means the source has no number for it — that is "unknown", not zero.
+      traffic: organic ? Math.round(num(organic.etv) ?? 0) : null, keywords: organic ? num(organic.count) : null,
     };
   });
   return { data: { rows, missing, fetchedAt: new Date().toISOString() }, costUsd, customerUsd, costUnknown };

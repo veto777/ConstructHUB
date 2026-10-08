@@ -5,7 +5,7 @@
  * tool lists the questions for which Google's AI answers already use a site.
  * Each run shows its price first; reopening a saved result is free.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Search, X } from "lucide-react";
@@ -16,9 +16,9 @@ import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedS
 
 type Engine = "chatgpt" | "gemini" | "perplexity";
 type Source = { domain: string; title: string | null; url: string | null; ours: boolean };
-type Answer = { engine: Engine; model: string; mentioned: boolean; cited: boolean; listedAt: number | null; businesses: string[]; sources: Source[]; searches: string[]; answer: string; at?: string };
-type PromptHistory = { prompt: string; lastAt: string; latest: (Answer & { at: string })[]; history: { at: string; engine: Engine; mentioned: boolean; cited: boolean; listedAt: number | null }[] };
-type Data = { businessName: string | null; domain: string; prompts: PromptHistory[]; suggestions: string[]; tracked?: { prompt: string; engines: Engine[]; nextAt: string }[]; maxTracked?: number };
+type Answer = { engine: Engine; model: string; mentioned: boolean; cited: boolean; listedAt: number | null; businesses: string[]; sources: Source[]; searches: string[]; answer: string; at?: string; runId?: string | null };
+type PromptHistory = { prompt: string; lastAt: string; runId?: string | null; latest: (Answer & { at: string })[]; history: { at: string; engine: Engine; mentioned: boolean; cited: boolean; listedAt: number | null }[] };
+type Data = { businessName: string | null; domain: string; prompts: PromptHistory[]; suggestions: string[]; tracked?: { id: number; prompt: string; engines: Engine[]; nextAt: string }[]; maxTracked?: number };
 type Mention = { question: string; searches: number | null; answer: string; sources: { domain: string; title: string | null; ours: boolean }[]; seenAt: string | null };
 type MentionsPage = { domain: string; platform: "google" | "chat_gpt"; total: number | null; rows: Mention[]; fetchedAt: string };
 
@@ -131,7 +131,10 @@ export default function SeoAiPage() {
   const [openPrompt, setOpenPrompt] = useState<string | null>(null);
   const [name, setName] = useState("");
   /** The answers just paid for, shown straight away — also when saving them to the history failed. */
-  const [lastRun, setLastRun] = useState<{ prompt: string; answers: Answer[]; at: string } | null>(null);
+  const [lastRun, setLastRun] = useState<{ prompt: string; answers: Answer[]; at: string; runId: string; saved: boolean } | null>(null);
+  // An answer that comes back after the site was switched belongs to the site it was asked for, not the one on screen.
+  const siteRef = useRef<number | undefined>(site?.id);
+  siteRef.current = site?.id;
   useEffect(() => { setPrompt(""); setOpenPrompt(null); setLastRun(null); }, [site?.id]);
   const d = q.data;
   const price = status.data?.prices ? engines.reduce((a, e) => a + (status.data!.prices[ENGINES.find((x) => x.key === e)!.price] ?? 0), 0) : null;
@@ -139,10 +142,11 @@ export default function SeoAiPage() {
   const hold = status.data?.prices ? engines.reduce((a, e) => { const k = ENGINES.find((x) => x.key === e)!.price; return a + (status.data!.holds?.[k] ?? status.data!.prices[k] ?? 0); }, 0) : null;
   const ask = useMutation({
     mutationFn: (p: string) => api("POST", `${key}/ask`, { prompt: p, engines }),
-    onSuccess: (r: { prompt: string; answers: Answer[]; failed: Engine[] }) => {
-      setLastRun({ prompt: r.prompt, answers: r.answers, at: new Date().toISOString() });
+    onSuccess: (r: { siteId: number; prompt: string; runId: string; saved: boolean; answers: Answer[]; failed: Engine[] }) => {
+      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${r.siteId}/ai`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (r.siteId !== siteRef.current) return;
+      setLastRun({ prompt: r.prompt, answers: r.answers.map((a) => ({ ...a, runId: r.runId })), at: new Date().toISOString(), runId: r.runId, saved: r.saved });
       setOpenPrompt(r.prompt); setPrompt("");
-      void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
       if (r.failed.length) toast({ title: `${r.failed.map((e) => LABEL[e]).join(" and ")} didn't answer`, description: "You were not charged for it. The others are below.", variant: "destructive" });
     },
     onError: (e) => toast({ title: "Couldn't ask the assistants", description: apiErrorMessage(e), variant: "destructive" }),
@@ -153,16 +157,19 @@ export default function SeoAiPage() {
     onError: (e) => toast({ title: "Couldn't save the name", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const track = useMutation({
-    mutationFn: (v: { prompt: string; on: boolean; engines: Engine[] }) => api("POST", `${key}/track`, v),
+    mutationFn: (v: { prompt: string; on: boolean; engines: Engine[] }) => api("POST", `${key}/track`, v.on ? v : { prompt: v.prompt, on: false }),
     onSuccess: (_r, v) => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: v.on ? "This question will be asked again every month" : "Monthly asking stopped" }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const savedShown = d?.prompts.find((p) => p.prompt === openPrompt) ?? d?.prompts[0] ?? null;
   // The run just made is on screen at once. Normally the history has it too a moment later; if saving failed, this is all there is.
-  const unsaved = !!lastRun && (openPrompt === null || openPrompt === lastRun.prompt) && !(savedShown && savedShown.prompt === lastRun.prompt && Date.parse(savedShown.lastAt) >= Date.parse(lastRun.at) - 180_000);
-  const shown: PromptHistory | null = unsaved && lastRun ? { prompt: lastRun.prompt, lastAt: lastRun.at, latest: lastRun.answers.map((a) => ({ ...a, at: lastRun.at })), history: savedShown?.prompt === lastRun.prompt ? savedShown.history : [] } : savedShown;
-  // Answers belong together only when they came from the same ask.
-  const isFresh = (a: { at: string }) => !!shown && Date.parse(shown.lastAt) - Date.parse(a.at) < 10 * 60_000;
+  // ...until the history itself holds that run (matched by its id, never by time).
+  const inHistory = !!lastRun && !!d?.prompts.some((p) => p.runId === lastRun.runId);
+  const showRun = !!lastRun && !inHistory && (openPrompt === null || openPrompt === lastRun.prompt);
+  const unsaved = showRun && !!lastRun && !lastRun.saved;
+  const shown: PromptHistory | null = showRun && lastRun ? { prompt: lastRun.prompt, lastAt: lastRun.at, runId: lastRun.runId, latest: lastRun.answers.map((a) => ({ ...a, at: lastRun.at })), history: savedShown?.prompt === lastRun.prompt ? savedShown.history : [] } : savedShown;
+  // Answers belong together only when they came from the same ask (older rows have no run id: those go by the minute).
+  const isFresh = (a: { at: string; runId?: string | null }) => !!shown && (shown.runId && a.runId ? a.runId === shown.runId : Date.parse(shown.lastAt) - Date.parse(a.at) < 60_000);
   const freshAnswers = shown ? shown.latest.filter(isFresh) : [];
   const namesIt = !!shown && !!d?.businessName && shown.prompt.toLowerCase().includes(d.businessName.toLowerCase());
   const toggle = (e: Engine) => setEngines((x) => (x.includes(e) ? x.filter((y) => y !== e) : [...x, e]));
@@ -204,7 +211,7 @@ export default function SeoAiPage() {
           {shown && (
             <section className="mt-5" data-testid="ai-result">
               <h2 className="g-text mb-1 text-[16px] font-medium">"{shown.prompt}"</h2>
-              {unsaved && !ask.isPending && q.isFetched && !q.isFetching && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="ai-unsaved">These answers are shown but could not be added to your history. Copy anything you want to keep.</p>}
+              {unsaved && !ask.isPending && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="ai-unsaved">These answers are shown but could not be added to your history. Copy anything you want to keep.</p>}
               {namesIt && <p className="g-text-2 mb-2 text-[13px]" data-testid="ai-names-it">Your question names your business, so being named back proves little. Ask it the way a stranger would — the service and the city, no names.</p>}
               <p className="g-text-2 mb-3 text-[13px]">Named by {freshAnswers.filter((a) => a.mentioned).length} of the {freshAnswers.length} assistant{freshAnswers.length === 1 ? "" : "s"} asked on {fmtDate(shown.lastAt)} <button type="button" className="g-link ml-2" disabled={ask.isPending} onClick={() => ask.mutate(shown.prompt)} data-testid="button-ai-again">Ask again{price != null ? ` — about ${money(price)}` : ""}</button></p>
               {(() => { const t = d.tracked?.find((x) => x.prompt.toLowerCase() === shown.prompt.toLowerCase()); const asked = shown.latest.map((a) => a.engine); const monthly = status.data?.prices ? (t ? t.engines : asked).reduce((a, e) => a + (status.data!.prices[ENGINES.find((x) => x.key === e)!.price] ?? 0), 0) : null; return (
@@ -236,6 +243,21 @@ export default function SeoAiPage() {
                   </tr>
                 ))}</tbody>
               </table></div>
+            </section>
+          )}
+          {(d.tracked?.length ?? 0) > 0 && (
+            <section className="mt-6" data-testid="ai-tracked">
+              <h2 className="g-text mb-1 text-[16px] font-medium">Asked again every month</h2>
+              <p className="g-text-2 mb-2 text-[13px]">{d.tracked!.length} of {d.maxTracked ?? 5} questions. Each uses your included SEO data only, and is skipped in a month when that has run out.</p>
+              <ul className="space-y-1 text-[13px]">
+                {d.tracked!.map((t) => (
+                  <li key={t.id} className="flex flex-wrap items-center gap-2">
+                    <span className="g-text min-w-0 flex-1">{t.prompt}</span>
+                    <span className="g-text-2 text-[12px]">{t.engines.map((e) => LABEL[e] ?? e).join(", ")} · next {fmtDate(t.nextAt)}</span>
+                    <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate({ prompt: t.prompt, on: false, engines: t.engines })} aria-label={`Stop asking "${t.prompt}" every month`} data-testid={`button-ai-stop-${t.id}`}>Stop</button>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
           <p className="g-text-2 mt-4 text-[12px]">Your question is sent to each assistant through our data provider and the answers are kept in your history. The assistants are asked through their programming interfaces with web search on; the app on your phone can answer a little differently. To be named more often: keep your Google Business Profile and reviews current, get listed on the directories the assistants quote (they are in "Websites it used"), and publish pages that answer the question plainly. See who they quote, then check those sites in <Link href="/seo/explorer" className="g-link">Site explorer</Link>.</p>

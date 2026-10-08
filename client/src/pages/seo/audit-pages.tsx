@@ -10,14 +10,15 @@ import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtNum, Tile, type SeoSite } from "./shell";
 
-type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; depth: number | null; inlinks: number | null; outlinks: number;
+type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
-type Summary = { pages: number; indexable: number; notIndexable: number; errors: number; redirected: number; linksMeasured?: boolean; orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
+type Summary = { pages: number; indexable: number; notIndexable: number; canonicalElsewhere?: number; errors: number; redirected: number; linksMeasured?: boolean; orphans: number | null; deep: number | null; averageDepth: number | null; thin: number; noTitle: number; noDescription: number };
 type Data = { jobId: string; scannedAt: string | null; summary: Summary; pages: Row[] };
 
 const FILTERS: { key: string; label: string; test: (r: Row, i: number) => boolean; count: (s: Summary) => number; hint: string }[] = [
   { key: "all", label: "All pages", test: () => true, count: (s) => s.pages, hint: "" },
-  { key: "notIndexable", label: "Blocked from Google", test: (r) => r.indexable === false, count: (s) => s.notIndexable, hint: "The crawl found something on these pages that keeps Google from listing them: an error, a redirect, a noindex mark, or a canonical tag naming another page. Fine for a thank-you page; a problem for a service page." },
+  { key: "notIndexable", label: "Blocked from Google", test: (r) => r.indexable === false, count: (s) => s.notIndexable, hint: "The crawl found something on these pages that keeps Google from listing them: an error, a redirect or a noindex mark. Fine for a thank-you page; a problem for a service page." },
+  { key: "canonical", label: "Points to another page", test: (r) => !!r.canonicalElsewhere, count: (s) => s.canonicalElsewhere ?? 0, hint: "The canonical tag on these pages names a different page — a request that Google list that one instead. Google usually follows it. Right for a duplicate; wrong on a page you want found." },
   { key: "errors", label: "Errors", test: (r) => r.status >= 400, count: (s) => s.errors, hint: "These addresses return an error. Restore the page or redirect it to the closest one that works." },
   { key: "redirected", label: "Redirected", test: (r) => r.redirected, count: (s) => s.redirected, hint: "Links on your site point to an address that forwards somewhere else. Link straight to the final address." },
   { key: "orphans", label: "No links to it", test: (r, i) => i > 0 && r.inlinks === 0, count: (s) => s.orphans ?? 0, hint: "No crawled page of your site links to these. Visitors and Google can only find them from a sitemap or another site — add a link from a related page." },
@@ -103,7 +104,7 @@ export function AuditPages({ site, issueTitles }: { site: SeoSite; issueTitles: 
                 <Fragment key={r.url}>
                   <tr>
                     <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${r.path}`} onClick={() => setOpen(isOpen ? null : r.url)}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
-                    <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{r.indexable === false && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Blocked from Google: {r.whyNot}</span>}{r.indexable === null && <span className="g-text-2 text-[12px]">Response not recorded — nothing can be said about this page</span>}</td>
+                    <td className="max-w-[340px]"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.path}</a>{r.indexable === false && <span className="text-[12px]" style={{ color: "var(--g-red)" }}>Blocked from Google: {r.whyNot}</span>}{r.canonicalElsewhere && <span className="g-text-2 text-[12px]">Its canonical tag asks Google to list another page instead</span>}{r.indexable === null && <span className="g-text-2 text-[12px]">Response not recorded — nothing can be said about this page</span>}</td>
                     <td className="num" data-label="Status" style={r.status >= 400 ? { color: "var(--g-red)" } : undefined}>{r.status || "—"}{r.redirected ? " ↪" : ""}</td>
                     <td className="num" data-label="Clicks deep">{r.depth ?? <span className="g-text-2" title="No crawled page links to it">—</span>}</td>
                     <td className="num" data-label="Links to it">{r.inlinks == null ? <span className="g-text-2" title="Not measurable on this site">—</span> : fmtNum(r.inlinks)}</td>

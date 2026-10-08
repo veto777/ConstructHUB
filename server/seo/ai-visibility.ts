@@ -35,6 +35,8 @@ export const AI_SCHEMA_DDL = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS seo_ai_checks_site ON seo_ai_checks(site_id, created_at DESC)`,
+  // Answers that came from one ask share a run id: they are counted together, and never with an older ask.
+  `ALTER TABLE seo_ai_checks ADD COLUMN IF NOT EXISTS run_id uuid`,
   // Questions asked again every month (from the month's included data only).
   `CREATE TABLE IF NOT EXISTS seo_ai_tracked (
     id serial PRIMARY KEY,
@@ -48,9 +50,12 @@ export const AI_SCHEMA_DDL = [
   `CREATE UNIQUE INDEX IF NOT EXISTS seo_ai_tracked_prompt ON seo_ai_tracked(site_id, lower(prompt))`,
 ];
 
+/** One spelling of a question everywhere it is stored or compared: single spaces, trimmed. */
+export function onePrompt(p: string): string { return String(p ?? "").replace(/\s+/g, " ").trim(); }
+
 export const MAX_TRACKED_PROMPTS = 5;
 export const trackInput = z.object({
-  prompt: z.string().trim().min(8).max(300),
+  prompt: z.string().trim().min(8).max(300).transform(onePrompt),
   engines: z.array(z.enum(["chatgpt", "gemini", "perplexity"])).min(1).max(3).default(["chatgpt", "gemini", "perplexity"]),
   on: z.boolean(),
 }).strict();
@@ -71,7 +76,7 @@ export const AI_MENTIONS_ESTIMATE_USD = 0.13, AI_MENTIONS_TYPICAL_USD = 0.12, AI
 export const MAX_ANSWER_CHARS = 6000;
 
 export const askInput = z.object({
-  prompt: z.string().trim().min(8, "Write the question a customer would ask.").max(300),
+  prompt: z.string().trim().min(8, "Write the question a customer would ask.").max(300).transform(onePrompt),
   engines: z.array(z.enum(["chatgpt", "gemini", "perplexity"])).min(1).max(3),
 }).strict();
 export const mentionsInput = z.object({
@@ -197,17 +202,28 @@ export async function askAi(prompt: string, engines: AiEngine[], site: { domain:
 
 export const askEstimateUsd = (engines: AiEngine[]) => Math.round(engines.reduce((a, e) => a + AI_ENGINES[e].estimateUsd, 0) * 1e6) / 1e6;
 
-export async function saveAiAnswers(userId: number, siteId: number, prompt: string, answers: AiAnswer[], costUsd: number): Promise<void> {
-  for (const a of answers)
-    await pool.query(
-      `INSERT INTO seo_ai_checks(user_id, site_id, prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, cost_usd) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [userId, siteId, prompt, a.engine, a.model, a.mentioned, a.cited, a.listedAt, JSON.stringify(a.businesses), JSON.stringify(a.sources), JSON.stringify(a.searches), a.answer, costUsd / Math.max(1, answers.length)]);
+/** Save the answers of one ask together (all or none), under one run id. */
+export async function saveAiAnswers(userId: number, siteId: number, prompt: string, answers: AiAnswer[], costUsd: number, runId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const a of answers)
+      await client.query(
+        `INSERT INTO seo_ai_checks(user_id, site_id, prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, cost_usd, run_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [userId, siteId, onePrompt(prompt), a.engine, a.model, a.mentioned, a.cited, a.listedAt, JSON.stringify(a.businesses), JSON.stringify(a.sources), JSON.stringify(a.searches), a.answer, costUsd / Math.max(1, answers.length), runId]);
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally { client.release(); }
 }
 
 export type AiPromptHistory = {
   prompt: string; lastAt: string;
+  /** The run the newest answers came from; an answer with another run id is from an earlier ask. */
+  runId: string | null;
   /** The newest answer from each assistant asked, with the full reading. */
-  latest: (AiAnswer & { at: string })[];
+  latest: (AiAnswer & { at: string; runId: string | null })[];
   /** Every earlier check, newest first: just whether the business was named and used as a source. */
   history: { at: string; engine: AiEngine; mentioned: boolean; cited: boolean; listedAt: number | null }[];
 };
@@ -218,15 +234,15 @@ export function groupAiChecks(rows: any[], maxPrompts = 15): AiPromptHistory[] {
   for (const r of rows) {   // rows are newest first
     const key = String(r.prompt).toLowerCase().replace(/\s+/g, " ").trim();
     let p = byPrompt.get(key);
-    if (!p) { if (byPrompt.size >= maxPrompts) continue; p = { prompt: r.prompt, lastAt: new Date(r.created_at).toISOString(), latest: [], history: [] }; byPrompt.set(key, p); }
+    if (!p) { if (byPrompt.size >= maxPrompts) continue; p = { prompt: r.prompt, lastAt: new Date(r.created_at).toISOString(), runId: r.run_id ?? null, latest: [], history: [] }; byPrompt.set(key, p); }
     const at = new Date(r.created_at).toISOString();
-    if (!p.latest.some((x) => x.engine === r.engine)) p.latest.push({ engine: r.engine, model: r.model ?? "", mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at, businesses: r.businesses ?? [], sources: r.sources ?? [], searches: r.searches ?? [], answer: r.answer ?? "", at });
+    if (!p.latest.some((x) => x.engine === r.engine)) p.latest.push({ engine: r.engine, model: r.model ?? "", mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at, businesses: r.businesses ?? [], sources: r.sources ?? [], searches: r.searches ?? [], answer: r.answer ?? "", at, runId: r.run_id ?? null });
     else if (p.history.length < 60) p.history.push({ at, engine: r.engine, mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at });
   }
   return [...byPrompt.values()];
 }
 export async function aiHistory(userId: number, siteId: number): Promise<AiPromptHistory[]> {
-  const { rows } = await pool.query("SELECT prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, created_at FROM seo_ai_checks WHERE site_id=$1 AND user_id=$2 ORDER BY created_at DESC, id DESC LIMIT 400", [siteId, userId]);
+  const { rows } = await pool.query("SELECT prompt, engine, model, mentioned, cited, listed_at, businesses, sources, searches, answer, created_at, run_id FROM seo_ai_checks WHERE site_id=$1 AND user_id=$2 ORDER BY created_at DESC, id DESC LIMIT 400", [siteId, userId]);
   return groupAiChecks(rows);
 }
 
@@ -280,8 +296,8 @@ export async function fetchAiMentions(input: { domain: string; platform: "google
 
 // ── Asked again every month ────────────────────────────────────────────────
 
-export async function trackedPrompts(siteId: number): Promise<{ prompt: string; engines: AiEngine[]; nextAt: string }[]> {
-  const { rows } = await pool.query(`SELECT prompt, engines, next_at AS "nextAt" FROM seo_ai_tracked WHERE site_id=$1 ORDER BY created_at`, [siteId]);
+export async function trackedPrompts(siteId: number): Promise<{ id: number; prompt: string; engines: AiEngine[]; nextAt: string }[]> {
+  const { rows } = await pool.query(`SELECT id, prompt, engines, next_at AS "nextAt" FROM seo_ai_tracked WHERE site_id=$1 ORDER BY created_at`, [siteId]);
   return rows;
 }
 /** Turn monthly re-asking on or off for a question. Returns null when the site already tracks the most allowed. */

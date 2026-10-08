@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
+import { onePrompt } from "./ai-visibility";
 import { aiDeps, askAi, askEstimateUsd, askInput, fetchAiAnswer, fetchAiMentions, groupAiChecks, namedBusinesses, plainText, readAnswer, suggestPrompts } from "./ai-visibility";
 
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/ai-fixture.json", import.meta.url), "utf8"));
@@ -95,10 +96,15 @@ describe("the real answers saved on 2026-10-08", () => {
 
 describe("history, prices and suggestions", () => {
   it("groups saved checks by question: the newest per assistant, the rest as history", () => {
-    const row = (prompt: string, engine: string, mentioned: boolean, at: string) => ({ prompt, engine, model: "m", mentioned, cited: false, listed_at: null, businesses: [], sources: [], searches: [], answer: "a", created_at: at });
+    const row = (prompt: string, engine: string, mentioned: boolean, at: string, run_id: string | null = null) => ({ prompt, engine, model: "m", mentioned, cited: false, listed_at: null, businesses: [], sources: [], searches: [], answer: "a", created_at: at, run_id });
     const g = groupAiChecks([row("Best roofer in Tampa?", "chatgpt", true, "2026-10-08T10:00:00Z"), row("best roofer in  tampa?", "gemini", false, "2026-10-08T10:00:00Z"), row("Best roofer in Tampa?", "chatgpt", false, "2026-09-08T10:00:00Z"), row("Other question", "chatgpt", false, "2026-09-01T10:00:00Z")]);
     expect(g.map((p) => [p.prompt, p.latest.map((l) => l.engine), p.history.length])).toEqual([["Best roofer in Tampa?", ["chatgpt", "gemini"], 1], ["Other question", ["chatgpt"], 0]]);
     expect(g[0].history[0]).toMatchObject({ engine: "chatgpt", mentioned: false });
+    // answers carry the run they came from, so a later ask of one assistant does not pass for an ask of all
+    const runs = groupAiChecks([row("Q one two three", "perplexity", false, "2026-10-08T10:05:00Z", "run-b"), row("Q one two three", "chatgpt", true, "2026-10-08T10:00:00Z", "run-a"), row("Q one two three", "perplexity", true, "2026-10-08T10:00:00Z", "run-a")]);
+    expect(runs[0].runId).toBe("run-b");
+    expect(runs[0].latest.map((l) => [l.engine, l.runId])).toEqual([["perplexity", "run-b"], ["chatgpt", "run-a"]]);
+    expect(onePrompt("  Best   roofer\n in Tampa? ")).toBe("Best roofer in Tampa?");
   });
   it("the reserve covers what each assistant was measured to cost", () => {
     expect(askEstimateUsd(["chatgpt"])).toBeGreaterThan(0.027039);

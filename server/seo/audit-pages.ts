@@ -19,6 +19,8 @@ export type PageRow = {
    * null = the page's response was not recorded, so nothing can be said. Never a promise that Google will index it.
    */
   indexable: boolean | null; whyNot: string | null;
+  /** Its canonical tag names another page: a request to Google to list that page instead — a hint Google usually follows, not a block. */
+  canonicalElsewhere: boolean;
   /** Clicks from the first page crawled (0 = that page); null = no link to it was found, or links could not be measured. */
   depth: number | null;
   /** Other crawled pages of the site that link to it (null when links could not be measured) / pages of the site it links to. */
@@ -29,7 +31,7 @@ export type PageRow = {
   issues: string[];
 };
 export type PagesSummary = {
-  pages: number; indexable: number; notIndexable: number; errors: number; redirected: number;
+  pages: number; indexable: number; notIndexable: number; canonicalElsewhere: number; errors: number; redirected: number;
   /**
    * False when most pages carry no links in their HTML — a site that builds its menus with JavaScript. The crawl reads
    * the page source without running scripts, so for such a site nothing can honestly be said about which pages link
@@ -74,7 +76,7 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
       queue = next;
     }
   }
-  const measured = linksMeasurable(pages, out);
+  const measured = linksMeasurable(pages);
   const issuesOf = new Map<string, string[]>();
   for (const g of groupFindings(findings as any).values())
     for (const item of g.items) { const u = item.match(/^https?:\/\/\S+/)?.[0]; if (u) { const k = sameUrlKey(u); issuesOf.set(k, [...(issuesOf.get(k) ?? []), g.key]); } }
@@ -83,9 +85,9 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
     const key = sameUrlKey(p.url);
     const canonicalElsewhere = !!p.canonical && sameUrlKey(p.canonical) !== key;
     const known = Number.isInteger(p.status) && p.status >= 100;
-    const whyNot = !known ? null : p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : canonicalElsewhere ? "its canonical tag asks Google to index another page instead" : null;
+    const whyNot = !known ? null : p.status >= 400 ? `it returns an error (${p.status})` : p.status >= 300 ? `it redirects (${p.status})` : p.noindex ? "it is marked noindex" : null;
     return {
-      url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: !known ? null : whyNot === null, whyNot,
+      url: p.url, path: pathOf(p.url), status: p.status, redirected: p.redirects > 0, indexable: !known ? null : whyNot === null, whyNot, canonicalElsewhere: known && p.status < 300 && canonicalElsewhere,
       depth: measured ? depth[i] : null, inlinks: measured ? into[i] : null, outlinks: out[i].size,
       title: p.title || null, titleLength: (p.title ?? "").trim().length, descriptionLength: (p.description ?? "").trim().length, h1: Array.isArray(p.h1) ? p.h1.length : 0,
       words: p.words, images: p.images, imagesNoAlt: p.imagesNoAlt, kb: typeof p.bytes === "number" ? Math.round(p.bytes / 1024) : null,
@@ -99,10 +101,12 @@ export function pageRows(all: RawPage[], findings: unknown[] | undefined): PageR
  * in a crawl of five pages or more, most pages that loaded link to no other crawled page — usual for a site whose menus
  * are added by JavaScript, though the crawl cannot prove that is the cause. A smaller crawl is taken as it is.
  */
-export function linksMeasurable(pages: RawPage[], out: Set<number>[]): boolean {
-  const loaded = pages.map((p, i) => (p.status < 400 ? i : -1)).filter((i) => i >= 0);
+export function linksMeasurable(pages: RawPage[]): boolean {
+  const loaded = pages.filter((p) => p.status >= 200 && p.status < 400);
   if (loaded.length < 5) return loaded.length > 0;
-  return loaded.filter((i) => out[i].size > 0).length * 2 >= loaded.length;
+  // A link to any other page of the same site counts — also to one the crawl did not reach.
+  const linksOut = (p: RawPage) => { const self = sameUrlKey(p.url), host = self.split("/")[0]; return (Array.isArray(p.links) ? p.links.slice(0, LINKS_PER_PAGE) : []).some((l) => { if (typeof l !== "string") return false; const k = sameUrlKey(l); return k !== self && k.split("/")[0] === host; }); };
+  return loaded.filter(linksOut).length * 2 >= loaded.length;
 }
 
 export function pagesSummary(rows: PageRow[]): PagesSummary {
@@ -111,6 +115,7 @@ export function pagesSummary(rows: PageRow[]): PagesSummary {
   const measured = rows.length === 0 || rows.some((r) => r.inlinks !== null);
   return {
     pages: rows.length, indexable: rows.filter((r) => r.indexable === true).length, notIndexable: rows.filter((r) => r.indexable === false).length,
+    canonicalElsewhere: rows.filter((r) => r.canonicalElsewhere).length,
     errors: rows.filter((r) => r.status >= 400).length, redirected: rows.filter((r) => r.redirected).length,
     linksMeasured: measured,
     orphans: measured ? rows.filter((r, i) => i > 0 && r.inlinks === 0).length : null, deep: measured ? rows.filter((r) => (r.depth ?? 0) >= DEEP_CLICKS).length : null,
@@ -127,14 +132,14 @@ const PAGES_SQL = `COALESCE((SELECT jsonb_agg(jsonb_build_object(
     'redirects', CASE WHEN jsonb_typeof(p->'redirects')='array' THEN jsonb_array_length(p->'redirects') ELSE 0 END,
     'title', p->>'title', 'description', p->>'description',
     'h1', CASE WHEN jsonb_typeof(p->'h1')='array' THEN p->'h1' ELSE '[]'::jsonb END,
-    'links', CASE WHEN jsonb_typeof(p->'links')='array' THEN p->'links' ELSE '[]'::jsonb END,
+    'links', CASE WHEN jsonb_typeof(p->'links')='array' THEN COALESCE((SELECT jsonb_agg(l) FROM jsonb_array_elements(p->'links') WITH ORDINALITY x(l, n) WHERE n <= 500), '[]'::jsonb) ELSE '[]'::jsonb END,
     'bytes', CASE WHEN jsonb_typeof(p->'bytes')='number' THEN p->'bytes' ELSE 'null'::jsonb END,
     'canonical', p->>'canonical', 'noindex', COALESCE(p->'noindex' = 'true'::jsonb, false),
     'words', COALESCE(array_length(regexp_split_to_array(btrim(COALESCE(p->>'text', '')), '\\s+'), 1), 0) - CASE WHEN btrim(COALESCE(p->>'text', '')) = '' THEN 1 ELSE 0 END,
     'images', CASE WHEN jsonb_typeof(p->'images')='array' THEN jsonb_array_length(p->'images') ELSE 0 END,
     'imagesNoAlt', CASE WHEN jsonb_typeof(p->'images')='array' THEN (SELECT count(*) FROM jsonb_array_elements(p->'images') i WHERE COALESCE(btrim(i->>'alt'), '') = '') ELSE 0 END) ORDER BY ord)
   FROM jsonb_array_elements(CASE WHEN jsonb_typeof(state->'pages')='array' THEN state->'pages' ELSE '[]'::jsonb END) WITH ORDINALITY AS t(p, ord)
- WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL), '[]'::jsonb)`;
+ WHERE jsonb_typeof(p)='object' AND p->>'url' IS NOT NULL AND ord <= 1000), '[]'::jsonb)`;
 
 export const PAGE_CAP = 1000;
 
