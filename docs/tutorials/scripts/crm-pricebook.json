@@ -1,0 +1,145 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "crm-pricebook",
+  "title": "Tour the price book",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/pricebook",
+      "caption": "The price book",
+      "chapter": "The Price Chart",
+      "narration": "This is your price book. It's the price list your estimates pick from."
+    },
+    {
+      "action": "highlight",
+      "selector": "role=tablist",
+      "caption": "Four tabs",
+      "narration": "It has four tabs: Price Chart, Materials, Labor and Formulas."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Baseboard\") >> nth=0",
+      "caption": "A SKU: name, code, unit, description",
+      "narration": "Price Chart lists what you sell. Each item has a name, a code, a unit and a description."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-add-item\"]",
+      "caption": "Add SKU and From template",
+      "narration": "Add SKU and From template bring in new items."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-items\"]",
+      "value": "base",
+      "caption": "Search by name or code",
+      "narration": "To find an item, search by name or code."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Baseboard\") [data-testid^=\"input-qty-\"]",
+      "value": "120",
+      "caption": "Type a quantity",
+      "chapter": "Check a price",
+      "narration": "To check a price, type a quantity. Here it's one hundred twenty feet of baseboard."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Baseboard\") [data-testid^=\"button-preview-\"]",
+      "caption": "Preview",
+      "narration": "Then choose Preview."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-item-\"]:has-text(\"Baseboard\") table",
+      "caption": "Material, labor, total",
+      "narration": "The item expands into its material and its labor, with waste added, and a total."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"preview-margin-\"]",
+      "caption": "Cost and margin",
+      "narration": "The last line shows your cost and your margin."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Materials\"]",
+      "caption": "Materials",
+      "chapter": "Materials and labor",
+      "narration": "Materials holds what you buy, with your cost, your price and a waste percent."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-mat-\"]:has-text(\"Acoustic underlayment\")",
+      "caption": "Margin per material",
+      "narration": "Each row works out the margin for you."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Labor\"]",
+      "caption": "Labor",
+      "narration": "Labor holds your hourly rates. Cost is what you pay, and price is what you charge."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pb-lab-\"]:has-text(\"Install crew\")",
+      "caption": "The default rate",
+      "narration": "One rate is marked as the default."
+    },
+    {
+      "action": "click",
+      "selector": "role=tab[name=\"Formulas\"]",
+      "caption": "Formulas",
+      "chapter": "Formulas",
+      "narration": "Formulas is a tester. It shows what a quantity formula works out to."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-test-formula\"]",
+      "caption": "Test",
+      "narration": "Fill in the values and choose Test to see the answer."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-formula-result\"]",
+      "caption": "The answer",
+      "narration": "Thirty-two squares with ten percent waste comes to thirty-six."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-pricebook\"]",
+      "caption": "Menu: Price book",
+      "narration": "You'll find Price book in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "Tour the price book: items, materials, labor | ConstructHUB CRM",
+    "description": "A short tour of the price book in the ConstructHUB CRM. You will see the four tabs - Price Chart, Materials, Labor and Formulas - search for an item, and preview a quantity to see its material, labor, total, cost and margin.",
+    "tags": [
+      "price book",
+      "contractor pricing",
+      "estimating software",
+      "construction estimate",
+      "contractor CRM",
+      "ConstructHUB",
+      "ConstructHUB CRM",
+      "CRM tutorial",
+      "labor rates",
+      "material costs"
+    ],
+    "playlist": "ConstructHUB CRM tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your price book",
+    "accent": "price",
+    "kicker": "CRM Tutorial",
+    "step": 7
+  }
+}
