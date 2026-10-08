@@ -9,6 +9,7 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { ensureSiteScanSchema } from "../server/sitescan/schema";
 import { linkOpportunities } from "../server/seo/link-opportunities";
+import { addTasks, taskInput } from "../server/seo/tasks";
 let n = 0; const ok = (c: unknown, m: string) => { if (!c) { console.error("FAIL", m); process.exitCode = 1; } else { n++; console.log("PASS ", m); } };
 const H = "https://linkopps.example";
 const page = (path: string, text: string, links: string[] = [`${H}/`], extra: object = {}) => ({ url: `${H}${path}`, status: 200, noindex: false, title: path, text, links, redirects: [], ...extra });
@@ -38,8 +39,15 @@ const page = (path: string, text: string, links: string[] = [`${H}/`], extra: ob
   // A link planned under the old identity, written another way and pointing at the printable copy of /roofing.
   const { rows: [old] } = await pool.query("INSERT INTO seo_tasks(user_id, site_id, kind, title, target, detail, source) VALUES(1,$1,'page','old','http://www.linkopps.example/blog/a/',$2,'link-opp:9:/blog/a') RETURNING id", [site.id, JSON.stringify({ linkTo: `${H}/roofing-print` })]);
   const a = await linkOpportunities(1, site);
-  const migrated = (await pool.query("SELECT source FROM seo_tasks WHERE id=$1", [old.id])).rows[0].source;
-  ok(a && migrated === `link-pair:${a.items[0]?.pair}`, `an old link task takes the identity of the same link today (through the copy's canonical): ${migrated} vs ${a?.items[0]?.pair}`);
+  // Planning today's suggestion: recognised as the link already planned (through the copy's canonical, under the
+  // insert's own lock); the old task itself is not rewritten.
+  const it = a!.items[0];
+  const again = await addTasks(1, site.id, [taskInput.parse({ kind: "page", title: "Link", target: it.from, facts: { linkTo: it.to }, source: `link-pair:${it.pair}` })]);
+  const stored = (await pool.query("SELECT source FROM seo_tasks WHERE id=$1", [old.id])).rows[0].source;
+  ok(again.added === 0 && again.already === 1 && stored === "link-opp:9:/blog/a", `today's link is the one already planned under the old identity: ${JSON.stringify(again)}, stored ${stored}`);
+  // Two requests at once for the same link (one written another way): one task.
+  const both = await Promise.all([1, 2].map((n) => addTasks(1, site.id, [taskInput.parse({ kind: "page", title: "Link", target: n === 1 ? `${H}/siding/` : "http://www.linkopps.example/siding", facts: { linkTo: `${H}/roofing` }, source: `link-pair:x${n}` })])));
+  ok(both.reduce((s2, r) => s2 + r.added, 0) === 1, `two requests for one link at once add one task: ${JSON.stringify(both)}`);
   ok(a && a.items.length === 1 && a.items[0].keyword === "metal roofing" && a.items[0].from === `${H}/blog/a`, `only the keyword that ranks in its newest check is looked for: ${JSON.stringify(a?.items.map((i) => i.keyword))}`);
   ok(a && a.notRanking === 1, "the keyword that stopped ranking is counted as not ranking, not looked for with its old page");
   ok(a && a.items.length === 1 && a.items[0].to === `${H}/roofing`, `the destination is the ranking page, not its canonical copy, and the post linking through the old address is left alone: ${JSON.stringify(a?.items.map((i) => [i.from, i.to]))}`);

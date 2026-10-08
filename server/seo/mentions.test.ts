@@ -1,0 +1,62 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { checkLinks, defaultPlaces, fetchMentions, linkingWebsites, mentionsDeps, mentionsInput, mentionsRequest, mentionLinksRequest, parseMention, placeIn, MENTIONS_ROWS } from "./mentions";
+
+const item = (main_domain: string, title: string, snippet: string, o: Record<string, unknown> = {}) => ({ url: `https://${main_domain}/post`, main_domain, domain_rank: 420, content_info: { main_title: title, snippet, date_published: "2025-04-24 10:00:00 +00:00" }, ...o });
+const ok = (items: unknown[], cost = 0.02, total: number | null = items.length) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ total_count: total, items }] }] });
+const original = mentionsDeps.request;
+afterEach(() => { mentionsDeps.request = original; });
+
+describe("unlinked mentions", () => {
+  it("searches the exact name, one page per website, the site itself left out; the link check is narrowed to those websites", () => {
+    expect(mentionsRequest("Alpine Exteriors", "alpineexteriorswa.com")).toEqual({ keyword: '"Alpine Exteriors"', search_mode: "one_per_domain", limit: MENTIONS_ROWS, filters: [["main_domain", "<>", "alpineexteriorswa.com"]], order_by: ["domain_rank,desc"] });
+    expect(mentionLinksRequest("alpineexteriorswa.com", ["a.com", "b.org"])).toMatchObject({ target: "alpineexteriorswa.com", filters: ["domain", "in", ["a.com", "b.org"]] });
+    // A name is a name: no quotes, operators or wildcards can be slipped into the search.
+    for (const bad of ['Alpine" OR "x', "Alpine*", "ab", "-Alpine", "Alpine (WA)"]) expect(mentionsInput.safeParse({ name: bad }).success, bad).toBe(false);
+    expect(mentionsInput.parse({ name: "  Smith  &  Sons Roofing, Inc. " }).name).toBe("Smith & Sons Roofing, Inc.");
+  });
+  it("reads a result; the site's own pages and sub-domains are never a mention", () => {
+    expect(parseMention(item("marketminute.com", "Alpine Exteriors opens showroom", "Alpine Exteriors opens Whatcom County's only showroom"), "alpineexteriorswa.com"))
+      .toEqual({ url: "https://marketminute.com/post", domain: "marketminute.com", title: "Alpine Exteriors opens showroom", snippet: "Alpine Exteriors opens Whatcom County's only showroom", published: "2025-04-24", authority: 42 });
+    expect(parseMention(item("alpineexteriorswa.com", "x", "y"), "alpineexteriorswa.com")).toBeNull();
+    expect(parseMention(item("blog.alpineexteriorswa.com", "x", "y"), "alpineexteriorswa.com")).toBeNull();
+    expect(parseMention({ url: "javascript:alert(1)", main_domain: "x.com" }, "a.com")).toBeNull();
+  });
+  it("a name is not a business: a mention is matched to the customer's places by whole words in its title or excerpt", () => {
+    const r = (title: string, snippet: string | null) => ({ title, snippet });
+    expect(placeIn(r("Alpine Exteriors opens showroom", "Whatcom County's only showroom"), ["Bellingham", "Whatcom"])).toBe("Whatcom");
+    expect(placeIn(r("Alpine Exteriors expands its Tampa operations", null), ["Bellingham", "Whatcom"])).toBeNull();
+    expect(placeIn(r("Ferndale news", "a Ferndaleish word"), ["Ferndale"])).toBe("Ferndale");
+    expect(placeIn(r("x", "the Ferndaleish word"), ["Ferndale"])).toBeNull();
+    expect(defaultPlaces(["Bellingham, WA", "bellingham, Washington", "United States", null, "Lynden, WA"])).toEqual(["Bellingham", "Lynden"]);
+  });
+  it("which websites link: a sub-domain row counts for its website; a row with no links is not one", () => {
+    const linking = linkingWebsites([{ domain: "news.marketminute.com", backlinks: 3 }, { domain: "bbb.org", backlinks: 0 }, { domain: "other.com", backlinks: 2 }], ["marketminute.com", "bbb.org", "yelp.com"]);
+    expect([...linking]).toEqual(["marketminute.com"]);
+  });
+  it("one check: the mentions, then the link check; a failed link check leaves 'links to you' unknown and is not charged", async () => {
+    const calls: string[] = [];
+    mentionsDeps.request = (async (_m: string, path: string) => { calls.push(path); return path.includes("content_analysis") ? ok([item("a.com", "A", "x"), item("a.com", "A2", "dup"), item("b.org", "B", "y")], 0.025) : ok([{ domain: "a.com", backlinks: 4 }], 0.026); }) as any;
+    const out = await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com");
+    expect(calls).toEqual(["/content_analysis/search/live", "/backlinks/referring_domains/live"]);
+    expect(out.data.rows.map((r) => [r.domain, r.linksToYou])).toEqual([["a.com", true], ["b.org", false]]);
+    expect([out.data.linksChecked, out.costUsd, out.customerUsd]).toEqual([true, 0.051, 0.051]);
+    mentionsDeps.request = (async (_m: string, path: string) => { if (path.includes("content_analysis")) return ok([item("a.com", "A", "x")], 0.025); throw Object.assign(new Error("down"), { code: "upstream", costUsd: 0 }); }) as any;
+    const half = await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com");
+    expect([half.data.linksChecked, half.data.rows[0].linksToYou, half.customerUsd, half.costUnknown]).toEqual([false, null, 0.025, true]);
+    // The second try: only the link check, and only what is missing.
+    mentionsDeps.request = (async () => ok([], 0.024)) as any;
+    const again = await checkLinks(half.data);
+    expect([again.data.linksChecked, again.data.rows[0].linksToYou, again.data.rows[0].title]).toEqual([true, false, "A"]);
+  });
+  it("a link check with more rows than one lookup returns says 'not known' for the rest, never 'no link'", async () => {
+    mentionsDeps.request = (async (_m: string, path: string) => (path.includes("content_analysis") ? ok([item("a.com", "A", "x"), item("b.org", "B", "y")]) : ok([{ domain: "a.com", backlinks: 1 }], 0.02, 900))) as any;
+    const out = await fetchMentions("Alpine Exteriors", "alpineexteriorswa.com");
+    expect([out.data.linksPartial, out.data.rows.map((r) => r.linksToYou)]).toEqual([true, [true, null]]);
+  });
+  it("no mentions: no link check is bought", async () => {
+    const calls: string[] = [];
+    mentionsDeps.request = (async (_m: string, path: string) => { calls.push(path); return ok([], 0.02, 0); }) as any;
+    const out = await fetchMentions("Nobody Named This", "x.com");
+    expect([calls.length, out.data.rows, out.data.linksChecked]).toEqual([1, [], true]);
+  });
+});

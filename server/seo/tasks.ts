@@ -5,7 +5,7 @@
  * A finding added twice is one task (`source` says where it came from).
  */
 import { z } from "zod";
-import { sameUrlKey } from "./audit-pages";
+import { linkResolverFor, pairOf } from "./link-opportunities";
 import { pool } from "../db";
 import { SeoCustomerError } from "./public-errors";
 import { safeHttpUrl } from "./dataforseo";
@@ -139,27 +139,31 @@ export async function listTasks(userId: number, siteId: number, closedLimit = 10
  * Add findings to the plan. One that is already there (same source) is left as it is and does not count against the
  * limit. The limit holds across requests: the site's row is locked for the count and the inserts.
  */
-/** Two addresses compared the way the suggestions compare them (scheme, "www", last slash and fragment do not matter). */
-const linkPair = (from: unknown, to: unknown) => `${sameUrlKey(String(from ?? ""))}\u0000${sameUrlKey(String(to ?? ""))}`;
 export async function addTasks(userId: number, siteId: number, tasks: z.infer<typeof taskInput>[]): Promise<{ added: number; already: number }> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const { rows: [site] } = await client.query("SELECT id FROM seo_sites WHERE id=$1 AND user_id=$2 FOR UPDATE", [siteId, userId]);
+    const { rows: [site] } = await client.query("SELECT id, domain FROM seo_sites WHERE id=$1 AND user_id=$2 FOR UPDATE", [siteId, userId]);
     if (!site) throw new TaskError("Site not found", 404);
     // What is really new: not already in the plan, and not twice in this request.
     const sources = [...new Set(tasks.map((t) => t.source).filter((s): s is string => !!s))];
     const { rows: have } = sources.length ? await client.query("SELECT source FROM seo_tasks WHERE site_id=$1 AND source = ANY($2::text[])", [siteId, sources]) : { rows: [] as any[] };
     const known = new Set<string>(have.map((r: any) => r.source));
-    // A suggested internal link planned before tasks were identified by their pair of pages ("link-opp:<keyword>:<path>")
-    // is the same link: matched by the page it is on and the page it links to.
-    const pairs = tasks.some((t) => t.source?.startsWith("link-pair:"))
-      ? new Set<string>((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND source LIKE 'link-opp:%'", [siteId])).rows.map((r: any) => linkPair(r.target, r.link_to)))
-      : new Set<string>();
+    // A suggested internal link is the same link however it was found or written: every link task already in the plan
+    // (old "link-opp:" ones included) is compared with the new one by its two pages — through the aliases of the
+    // site's newest crawl, read now, under the same lock as the insert. Stored tasks are never rewritten, so a later
+    // crawl that knows more aliases compares them afresh.
+    let pairs = new Set<string>(), linkPair = (_f: unknown, _t: unknown) => "";
+    if (tasks.some((t) => t.source?.startsWith("link-pair:"))) {
+      const resolve = await linkResolverFor(userId, site.domain, client);
+      linkPair = (from, to) => pairOf(resolve(String(from ?? "")), resolve(String(to ?? "")));
+      pairs = new Set((await client.query("SELECT target, detail->>'linkTo' AS link_to FROM seo_tasks WHERE site_id=$1 AND (source LIKE 'link-opp:%' OR source LIKE 'link-pair:%') AND target IS NOT NULL", [siteId])).rows
+        .filter((r: any) => typeof r.link_to === "string").map((r: any) => linkPair(r.target, r.link_to)));
+    }
     const fresh = tasks.filter((t) => {
       if (!t.source) return true;
       if (known.has(t.source)) return false;
-      if (t.source.startsWith("link-pair:") && pairs.has(linkPair(t.target, t.facts.linkTo))) return false;
+      if (t.source.startsWith("link-pair:")) { const pr = linkPair(t.target, t.facts.linkTo); if (pairs.has(pr)) return false; pairs.add(pr); }
       known.add(t.source); return true;
     });
     const { rows: [{ n }] } = await client.query(`SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND ${OPEN}`, [siteId]);

@@ -113,4 +113,10 @@ describe("internal links to add", () => {
     const cut = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding", [`${H}/`], { redirectsCut: true }), page("/post", "We install vinyl siding."), ...filler], [target(1, "vinyl siding", "/siding")]);
     expect([cut.items, cut.aliasesCut]).toEqual([[], 1]);
   });
+  it("aliases that may be incomplete anywhere along the chain keep the destination out; so does an old crawl's cap-sized list", () => {
+    const viaCopy = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding"), page("/siding-print", "Siding", [`${H}/`], { canonical: `${H}/siding`, redirectsCut: true }), page("/post", "We install vinyl siding."), ...filler], [target(1, "vinyl siding", "/siding")]);
+    expect([viaCopy.items, viaCopy.aliasesCut]).toEqual([[], 1]);
+    const legacy = findLinkOpportunities([page("/", "Home", [`${H}/siding`]), page("/siding", "Siding", [`${H}/`], { redirects: Array.from({ length: 20 }, (_, i) => `${H}/old-${i}`) }), page("/post", "We install vinyl siding."), ...filler], [target(1, "vinyl siding", "/siding")]);
+    expect(legacy.aliasesCut).toBe(1);
+  });
 });

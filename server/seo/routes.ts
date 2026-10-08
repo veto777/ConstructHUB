@@ -17,6 +17,7 @@
  */
 import { pageMetricsInput, cleanUrls, fetchPageMetrics, mergePageMetrics, retryPlan, planEstimateUsd, pageMetricsEstimateUsd, PAGE_METRICS_MAX, type PageMetrics } from "./page-metrics";
 import { directoriesInput, fetchDirectories, mergeDirectories, directoriesEstimateUsd, DIRECTORIES_MAX_SITES, type DirectoriesPage } from "./directories";
+import { mentionsInput as webMentionsInput, placesInput, fetchMentions, checkLinks, placeIn, defaultPlaces, MENTIONS_ESTIMATE_USD, MENTIONS_RETRY_USD, MENTIONS_CACHE_HOURS, MENTIONS_ROWS, type MentionsPage } from "./mentions";
 import { plannerInput, cleanTerms, fetchPlanner, plannerEstimateUsd, plannerTooLong, PLANNER_MAX_CELLS, PLANNER_MAX_CHARS, PLANNER_MAX_WORDS, type Planner } from "./planner";
 import { tasksInput, taskPatch, listTasks, addTasks, updateTask, deleteTask, openTaskCounts, markResolved, markUnavailable, MAX_OPEN_TASKS, MAX_CLOSED_SHOWN } from "./tasks";
 import { watchInput, listWatches, saveWatch, deleteWatch, runGridScan, WatchError, MAX_WATCHES } from "./grid-monitor";
@@ -161,6 +162,9 @@ export const SEO_HOLDS = {
   /** Batch analysis: what must be available to start (server/seo/batch.ts batchEstimateUsd), as a flat part plus so much per 100 websites. */
   batchBase: retailCents(3 * BACKLINKS_REQUEST_USD + LABS_TASK_USD),
   batchPer100: retailCents(100 * (3 * BACKLINKS_ROW_USD * 1.2 + LABS_ITEM_USD)),
+  /** Unlinked mentions: one check (the mentions and the link check), and a second try of the link check alone. */
+  mentions: retailCents(MENTIONS_ESTIMATE_USD),
+  mentionsRetry: retailCents(MENTIONS_RETRY_USD),
 };
 
 /** Report names as the customer sees them (usage history). */
@@ -787,6 +791,63 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       if (!isConfigured()) return notReady(res);
       const out = await buyOnce<DirectoriesPage>(user, key, "directories", CACHE_HOURS, directoriesEstimateUsd(sites.length), () => fetchDirectories(sites), input.refresh, `Directories — ${sites.join(", ")}`);
       return res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
+    });
+  });
+
+  // ── Unlinked mentions (Site Explorer): pages that use the business's exact name, and whether those websites link ──
+  // The name and places a site uses, and the saved check for that name if there is one. Spends nothing.
+  const mentionsKey = (domain: string, name: string) => cacheKey("mentions", [domain, name.toLowerCase()]);
+  const placesOf = async (site: SiteRow) => {
+    const saved = (site as { mention_places?: unknown }).mention_places;
+    if (Array.isArray(saved)) return saved.filter((x): x is string => typeof x === "string").slice(0, 8);
+    const { rows } = await pool.query("SELECT location_name FROM seo_keywords WHERE site_id=$1 AND location_name IS NOT NULL GROUP BY location_name ORDER BY count(*) DESC, location_name LIMIT 20", [site.id]);
+    return defaultPlaces(rows.map((r: any) => r.location_name));
+  };
+  /** A saved check as shown: each row read for the places (free to change, so worked out on every read). */
+  const mentionsView = (page: MentionsPage, places: string[]) => ({ ...page, rows: page.rows.map((r) => ({ ...r, place: placeIn(r, places) })) });
+  route("get", "/api/seo/sites/:id/mentions", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const name = ((site as { mention_name?: string | null }).mention_name ?? site.business_name ?? "").trim();
+    const places = await placesOf(site);
+    const page = name ? await cached<MentionsPage>(user, mentionsKey(site.domain, name), MENTIONS_CACHE_HOURS) : null;
+    res.json({ name, places, page: page ? mentionsView(page, places) : null, rows: MENTIONS_ROWS });
+  });
+  // The places a mention is read for. Spends nothing.
+  route("post", "/api/seo/sites/:id/mentions/places", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const places = [...new Set(placesInput.parse(req.body?.places).map((p) => p.replace(/\s+/g, " ")))];
+    await pool.query("UPDATE seo_sites SET mention_places=$3 WHERE id=$1 AND user_id=$2", [site.id, user, places]);
+    res.json({ places });
+  });
+  // Check for mentions of the name — or reopen the saved check (free for a week). The price on the button is the very
+  // figure set aside. A second try buys only the link check that did not load. One at a time per saved answer.
+  route("post", "/api/seo/sites/:id/mentions", async (req, res, user) => {
+    const site = await ownedSite(user, req.params.id);
+    const input = webMentionsInput.parse(req.body);
+    const key = mentionsKey(site.domain, input.name);
+    const places = await placesOf(site);
+    const view = (page: MentionsPage) => mentionsView(page, places);
+    if (input.peek) {
+      const kept = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
+      return kept ? res.json({ page: view(kept), reused: true }) : res.status(404).json({ code: "no_report", message: "Not checked yet." });
+    }
+    await serial(`mentions:${user}:${key}`, async () => {
+      // The name is remembered for the site whatever happens next (it is the customer's own choice, not data bought).
+      await pool.query("UPDATE seo_sites SET mention_name=$3 WHERE id=$1 AND user_id=$2", [site.id, user, input.name]);
+      if (input.retryMissing) {
+        const now = await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
+        if (!now) return res.status(409).json({ code: "retry_unavailable", message: "The saved check is no longer there, so there is nothing to complete. Run the check again — the price is on the button." });
+        if (now.linksChecked) return res.json({ page: view(now), reused: true });
+        if (!isConfigured()) return notReady(res);
+        const out = await buyOnce<MentionsPage>(user, key, "mentions-retry", MENTIONS_CACHE_HOURS, MENTIONS_RETRY_USD,
+          async () => { const o = await checkLinks(now); if (!o.data.linksChecked) throw Object.assign(new Error("The link check did not load."), { costUsd: o.costUsd, costUnknown: o.costUnknown }); return o; }, true, `Mentions — ${site.domain} (link check, second try)`);
+        return res.status(201).json({ page: view(out.data), reused: false, saved: out.saved });
+      }
+      const saved = input.refresh ? null : await cached<MentionsPage>(user, key, MENTIONS_CACHE_HOURS);
+      if (saved) return res.json({ page: view(saved), reused: true });
+      if (!isConfigured()) return notReady(res);
+      const out = await buyOnce<MentionsPage>(user, key, "mentions", MENTIONS_CACHE_HOURS, MENTIONS_ESTIMATE_USD, () => fetchMentions(input.name, site.domain), input.refresh, `Mentions — "${input.name}"`);
+      return res.status(out.reused ? 200 : 201).json({ page: view(out.data), reused: out.reused, saved: out.saved });
     });
   });
 

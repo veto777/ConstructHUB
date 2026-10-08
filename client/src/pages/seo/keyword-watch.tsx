@@ -57,8 +57,13 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   const [shown, setShown] = useState(50);
   // Refreshes the site the action was for (the screen may have moved to another site meanwhile).
   const done = (siteId = site.id) => { const k = `/api/seo/sites/${siteId}/keyword-watch`; void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && (x.queryKey[0] === k || x.queryKey[0].startsWith(`${k}?`)) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); };
+  // A change of the watch setting in flight, per site: shown and guarded for its own site only, however many sites
+  // have one going (the screen can move between sites while one is pending).
+  const [pendingWatch, setPendingWatch] = useState<Record<number, boolean>>({});
   const set = useMutation({
     mutationFn: (v: { siteId: number; watch: boolean }) => api("POST", `/api/seo/sites/${v.siteId}/keyword-watch`, { watch: v.watch }),
+    onMutate: (v) => setPendingWatch((m) => ({ ...m, [v.siteId]: v.watch })),
+    onSettled: (_d, _e, v) => setPendingWatch((m) => { const { [v.siteId]: _gone, ...rest } = m; return rest; }),
     onSuccess: (_d: unknown, v) => { done(v.siteId); toast({ title: v.watch ? "Keyword watch is on" : "Keyword watch is off", description: v.watch ? "A snapshot is taken once a month from your included SEO data — the next date is shown here. From the second snapshot on, changes that qualify can raise an alert." : "Snapshots already taken are kept." }); },
     onError: (e) => toast({ title: "Couldn't change that", description: apiErrorMessage(e), variant: "destructive" }),
   });
@@ -84,7 +89,8 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   // A page that lost keywords — or, where they can be compared, visits — can go on the plan with what it rests on.
   // Its address must be known and fit a task; otherwise the row says why it cannot be planned.
   const declined = (p: PageChange) => p.after.keywords < p.before.keywords || (comparable(p) && p.after.visits < p.before.visits);
-  const plannable = (p: PageChange) => !!p.url && p.url.length <= 500;
+  // An address an older snapshot cut short may not be the page's real one: never planned as if it were.
+  const plannable = (p: PageChange) => !!p.url && !p.cut && p.url.length <= 500;
   const words = c?.basis === "whole" ? { in: "newly seen", out: "no longer seen" } : c?.basis === "top" ? { in: `entered the top ${fmtNum(d.rows)}`, out: `left the top ${fmtNum(d.rows)}` } : { in: "in the newer snapshot only", out: "in the older snapshot only" };
   const pageTask = (p: PageChange): PlanTask => ({
     kind: "page", title: `Review ${p.path}: ${p.before.keywords} → ${p.after.keywords} keywords in the search data (${fmtDate(c!.since)} → ${fmtDate(c!.takenOn)})`.slice(0, 200),
@@ -114,7 +120,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
           <h2 id="keyword-watch-heading" tabIndex={-1} className="g-text text-[16px] font-medium outline-none">Searches newly seen, and no longer seen, for {site.domain}</h2>
           <p className="g-text-2 mt-1 max-w-3xl text-[13px]">Once a month, a snapshot of the searches our search data has the site ranking for — up to its {fmtNum(d.rows)} highest-traffic ones — is compared with the snapshot before it. It goes beyond the keywords you track, but it is the data's view, not Google's own: a search can be "newly seen" because the data started measuring it, and "no longer seen" while the site still ranks. The monthly snapshot uses your included SEO data only{price != null ? ` (up to ${money(price)} each)` : ""}; when that has run out it is skipped, never charged to credit you bought.</p>
         </div>
-        <label className="flex min-h-9 items-center gap-2 text-[13px]"><input type="checkbox" checked={set.isPending && set.variables?.siteId === site.id ? set.variables.watch : d.watch} aria-busy={set.isPending && set.variables?.siteId === site.id} disabled={placeholder} onChange={(e) => { if (!(set.isPending && set.variables?.siteId === site.id) && !placeholder) set.mutate({ siteId: site.id, watch: e.target.checked }); }} data-testid="checkbox-keyword-watch" /><span className="g-text">Watch every month</span></label>
+        <label className="flex min-h-9 items-center gap-2 text-[13px]"><input type="checkbox" checked={pendingWatch[site.id] ?? d.watch} aria-busy={pendingWatch[site.id] !== undefined} disabled={placeholder} onChange={(e) => { if (pendingWatch[site.id] === undefined && !placeholder) set.mutate({ siteId: site.id, watch: e.target.checked }); }} data-testid="checkbox-keyword-watch" /><span className="g-text">Watch every month</span></label>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px]">
         <span className="g-text-2" data-testid="text-keyword-watch-state">
@@ -175,7 +181,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
                       <td className="num" data-label={`Keywords ${fmtDate(c.since)}`}>{fmtNum(p.before.keywords)}</td><td className="num" data-label={`Keywords ${fmtDate(c.takenOn)}`}>{fmtNum(p.after.keywords)}</td>
                       <td className="num" data-label={`Est. visits ${fmtDate(c.since)}`}>{visits(p.before)}</td><td className="num" data-label={`Est. visits ${fmtDate(c.takenOn)}`}>{visits(p.after)}</td>
                       <td className="g-text-2 !whitespace-normal text-[12px]" data-label="What moved">{why(p)}</td>
-                      <td className="num">{declined(p) && (plannable(p) ? <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-kwpage-${p.id}`} tasks={[pageTask(p)]} /> : <span className="g-text-2 text-[12px]">{p.url ? "Address too long to plan" : "Page not known"}</span>)}</td>
+                      <td className="num">{declined(p) && (plannable(p) ? <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-kwpage-${p.id}`} tasks={[pageTask(p)]} /> : <span className="g-text-2 text-[12px]">{p.cut ? "Address incomplete — not planned" : p.url ? "Address too long to plan" : "Page not known"}</span>)}</td>
                     </tr>
                   ))}
                 </tbody>
