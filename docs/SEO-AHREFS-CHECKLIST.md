@@ -206,6 +206,21 @@ yet an Ahrefs equivalent." Coverage: 50-60%, midpoint 55%, with Content Explorer
 OPEN: 2 (refund intent not written atomically with the run closing), 3 (cost of rank tasks the source rejects), 4 (the shared notifier),
 9 (unknown cost as an amount, outside rank posting), 12 (the back-fill is not a versioned migration).
 
+## Codex audit #9 (2026-10-08; report: tower1 ~/codex-audits/out/seo-audit-9.md)
+Verdict: "Substantial SEO functionality, but billing recovery and scheduled delivery still need work. This is not an Ahrefs equivalent."
+Coverage: 55% (50-60%); Content Explorer now counted at 20-35%. 10 new defects; done the same day:
+ 1 monthly AI ask could be bought again if saving failed .. FIXED (the month moves on as soon as it is paid for; saving is retried, never the purchase)
+ 2 a result could be stored under another search ......... FIXED on every paid page (the result is written under the request it answers)
+ 3 content paging could strand you on an unbought page ... FIXED (a way back is always there)
+ 4 Stop could miss an older tracked question ............. FIXED (compared in one spelling)
+ 5 answers from different asks shown together ............ FIXED (exact run only; an older answer in the table carries its date)
+ 6 batch: a missing estimate shown as zero; affordability  FIXED
+ 7 content wording said more than the data ............... FIXED ("matches", authority as one sign)
+ 8 "reopens free" could fail silently .................... FIXED (the page says when a result could not be kept)
+ 9 outgoing links shown when links are unmeasurable ...... FIXED
+10 an invalid site to leave out was ignored .............. FIXED (refused)
+Also: the report now carries real clicks and impressions from Google Search Console when the site's property is connected.
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -234,3 +249,5 @@ OPEN: 2 (refund intent not written atomically with the run closing), 3 (cost of 
   Batch analysis and the monthly AI question were run for real; every SEO tab was opened in the browser with no page errors.
 - 2026-10-08 (slice 11): Content explorer, Codex audit #8 fixes, section tabs wrap to two lines on a wide screen. 188 SEO unit tests.
   Content explorer run live; the AI page re-run in the browser after the run-id change.
+- 2026-10-08 (slice 12): Search Console in the report, Codex audit #9 fixes. 188 SEO unit tests; the rewritten paid flows (content paging,
+  a report page) were run in the browser.
