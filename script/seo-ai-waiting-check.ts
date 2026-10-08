@@ -67,6 +67,17 @@ async function main() {
     [calls, (await pool.query("SELECT next_at > now() + interval '29 days' AS moved FROM seo_ai_tracked WHERE id=$1", [tracked.id])).rows[0].moved, await n("SELECT count(*)::int n FROM seo_ai_unsaved WHERE tracked_id=$1", [tracked.id])], [0, true, 0]);
   eq("6c one answer per assistant per run is the database's rule", (await pool.query("SELECT count(*)::int n FROM pg_indexes WHERE indexname='seo_ai_checks_run_engine'")).rows[0].n, 1);
 
+  // A run that was opened but never sent bought nothing: the question is asked now, not skipped for a month.
+  await pool.query("DELETE FROM seo_ai_unsaved WHERE tracked_id=$1", [tracked.id]);
+  await pool.query("UPDATE seo_ai_tracked SET next_at = now() - interval '1 minute' WHERE id=$1", [tracked.id]);
+  await pool.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, run_id, state, tracked_id) VALUES(1,$1,'who is the best roofer',NULL,'00000010-0000-4000-8000-000000000010','opened',$2)", [site.id, tracked.id]);
+  const { budgetDeps } = await import("../server/seo/budget"); budgetDeps.allowanceCents = async () => 100000;
+  calls = 0;
+  await runDueAiChecks();
+  const after = (await pool.query("SELECT run_id, state FROM seo_ai_unsaved WHERE tracked_id=$1", [tracked.id])).rows;
+  eq("6d an opened-but-never-sent run is cleared, not treated as a possible purchase", after.some((r) => r.run_id === "00000010-0000-4000-8000-000000000010"), false);
+  eq("6e ...and the month did not move on because of it", (await pool.query("SELECT next_at < now() + interval '2 days' AS soon FROM seo_ai_tracked WHERE id=$1", [tracked.id])).rows[0].soon, true);
+
   // Keyword lists: one country's numbers per list.
   await pool.query("DELETE FROM seo_keyword_lists WHERE user_id=1");
   const add = (extra: object) => addToList(1, listItemsInput.parse({ items: [{ keyword: "toiture", volume: 900 }], ...extra }));

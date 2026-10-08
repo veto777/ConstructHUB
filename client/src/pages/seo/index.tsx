@@ -17,7 +17,7 @@ type Overview = {
   summary: { tracked: number; checked: number; top3: number; top10: number; averagePosition: number | null; improved: number; declined: number; lastCheckedOn: string | null; inMapPack?: number; withMapPack?: number };
   rows: { id: number; keyword: string; location?: string | null; tags: string[]; searchVolume: number | null; cpc: number | null; difficulty: number | null; positions: Record<string, Position> }[];
   runs: { id: string; trigger: string; status: string; total: number; checked: number; error: string | null; created_at: string; finished_at: string | null }[];
-  searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; through?: string | null; comparable?: boolean } | null;
+  searchConsole: { property: string; clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; through?: string | null; comparable?: boolean } | null;
   nextCheck: { serps: number; priceCents?: number; nextAt: string | null };
 };
 
@@ -82,7 +82,7 @@ export default function SeoOverviewPage() {
             <Tile label="Since last check" value={<><span className="g-move g-move--up text-[20px]">▲{o.summary.improved}</span> <span className="g-move g-move--down text-[20px]">▼{o.summary.declined}</span></>} hint="Keywords up / down" testId="tile-movement" />
             {o.searchConsole ? (
               <>
-                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={o.searchConsole.clicks === null ? "Nothing synced for the last 28 days yet" : (o.searchConsole.days ?? 28) < 28 ? `Only ${o.searchConsole.days} of the 28 days to ${fmtDate(o.searchConsole.through)} are synced` : o.searchConsole.comparable ? `${fmtNum(o.searchConsole.previousClicks)} the 28 days before` : "The 28 days before are not fully synced, so there is nothing to compare with"} testId="tile-gsc-clicks" />
+                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={o.searchConsole.clicks === null ? "Nothing synced for the last 28 days yet" : (o.searchConsole.days ?? 28) < 28 ? `Only ${o.searchConsole.days} of the 28 days to ${fmtDate(o.searchConsole.through)} are synced` : o.searchConsole.comparable ? `${fmtNum(o.searchConsole.previousClicks)} the 28 days before` : `Not compared: ${o.searchConsole.previousDays ?? 0} of the 28 days before are synced`} testId="tile-gsc-clicks" />
                 <Tile label="Impressions (28 days)" value={fmtNum(o.searchConsole.impressions)} hint={o.searchConsole.position != null ? `Average position ${o.searchConsole.position}` : o.searchConsole.property} testId="tile-gsc-impressions" />
               </>
             ) : (

@@ -300,7 +300,8 @@ export async function withBudget<T>(userId: number, estimateUsd: number, call: (
   } catch (e: any) {
     const reported = typeof e?.costUsd === "number" ? e.costUsd : 0;
     // Part of the cost is unknown (a call timed out or the source never answered): our ledger keeps the whole estimate.
-    const unknown = e?.costUnknown === true || e?.code === "timeout" || (e?.code === "upstream" && reported === 0);
+    // `costUnknown: false` on the error means the caller has already counted what it could not learn (an allowance per try): believe its figure.
+    const unknown = e?.costUnknown === false ? false : e?.costUnknown === true || e?.code === "timeout" || (e?.code === "upstream" && reported === 0);
     await settleBudget(r, unknown ? Math.max(reported, estimateUsd) : reported, 0);
     // The reservation id travels with the error so nothing downstream has to guess what was (not) charged.
     throw e;

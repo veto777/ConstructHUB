@@ -162,7 +162,8 @@ export function buildScan(input: { keyword: string; size: number; spacing: numbe
   const points = cells.map((c, i): GridPointResult => {
     const listings = results[i];
     if (!listings) return { ...c, rank: null, failed: true, top: [] };
-    const hit = listings.find((l) => isTarget(l, target));
+    // The listing with the pinned id wherever it is in the list; only without one does the first website / name match count.
+    const hit = listings.find((l) => matchKind(l, target) === "id") ?? listings.find((l) => isTarget(l, target));
     return { ...c, rank: hit?.rank ?? null, ...(hit ? { by: matchKind(hit, target)! } : {}), top: listings.slice(0, 3).map((l) => ({ name: l.name, rank: l.rank })) };
   });
   return {
@@ -192,7 +193,7 @@ export async function locateBusiness(query: string): Promise<{ data: MapListing[
  *   costUsd     — everything it cost us, including failed tries the source billed and an allowance for tries whose
  *                 cost we never learned (a timeout may still have been billed).
  */
-export async function fetchGrid(input: { keyword: string; size: number; spacing: number; pin: GridPin; domain: string }): Promise<{ data: GridScan; costUsd: number; customerUsd: number; costUnknown: boolean }> {
+export async function fetchGrid(input: { keyword: string; size: number; spacing: number; pin: GridPin; domain: string }): Promise<{ data: GridScan; costUsd: number; customerUsd: number; costUnknown: false }> {
   const cells = gridPoints(input.pin, input.size, input.spacing);
   const results: (MapListing[] | null)[] = new Array(cells.length).fill(null);
   let known = 0, customerUsd = 0, unknownTries = 0, next = 0;
@@ -217,10 +218,12 @@ export async function fetchGrid(input: { keyword: string; size: number; spacing:
     }
   };
   await Promise.all(Array.from({ length: Math.min(GRID_PARALLEL, cells.length) }, worker));
+  // What we could not learn is already in the figure (one lookup's price per such try), so the ledger is told the cost
+  // is known: it must not swap this for the whole estimate.
   const costUsd = round6(known + unknownTries * GRID_POINT_USD);
   if (results.every((r) => r === null))
-    throw Object.assign(firstError instanceof Error ? firstError : new Error(String(firstError ?? "The map lookups failed.")), { costUsd, costUnknown: unknownTries > 0 });
-  return { data: buildScan(input, cells, results), costUsd, customerUsd: round6(customerUsd), costUnknown: unknownTries > 0 };
+    throw Object.assign(new Error((firstError as any)?.message ?? "The local searches failed."), { costUsd, costUnknown: false, cause: firstError });
+  return { data: buildScan(input, cells, results), costUsd, customerUsd: round6(customerUsd), costUnknown: false };
 }
 
 // ── Saved pins and scans ────────────────────────────────────────────────────
@@ -252,8 +255,15 @@ export const GRID_SCHEMA_DDL = [
   `ALTER TABLE seo_grid_scans ADD COLUMN IF NOT EXISTS error text`,
   // One scan at a time per site is the database's rule (two server processes cannot both start one). Any older
   // "running" row that would break the rule is closed first, so creating it can never fail on existing rows.
-  `UPDATE seo_grid_scans SET status='failed', error='${INTERRUPTED}' WHERE status='running' AND id NOT IN (SELECT max(id) FROM seo_grid_scans WHERE status='running' GROUP BY site_id)`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS seo_grid_scans_active ON seo_grid_scans(site_id) WHERE status='running'`,
+  // Done as ONE step under a lock (a DO block is a single transaction): no other writer can slip a second running row
+  // in between the clean-up and the rule being made.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'seo_grid_scans_active') THEN
+       LOCK TABLE seo_grid_scans IN SHARE ROW EXCLUSIVE MODE;
+       UPDATE seo_grid_scans SET status='failed', error='${INTERRUPTED}' WHERE status='running' AND id NOT IN (SELECT max(id) FROM seo_grid_scans WHERE status='running' GROUP BY site_id);
+       CREATE UNIQUE INDEX seo_grid_scans_active ON seo_grid_scans(site_id) WHERE status='running';
+     END IF;
+   END $$`,
 ];
 
 export function readPin(v: unknown): GridPin | null {

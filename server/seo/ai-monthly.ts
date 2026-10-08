@@ -39,12 +39,18 @@ type Tracked = { id: number; user_id: number; site_id: number; prompt: string };
  * again on its own (see the top of the loop in runDueAiChecks).
  */
 async function openRun(t: Tracked, runId: string): Promise<void> {
-  await pool.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, run_id, state, tracked_id, next_at) VALUES($1,$2,$3,NULL,$4,'asking',$5, now())", [t.user_id, t.site_id, t.prompt, runId, t.id]);
+  await pool.query("INSERT INTO seo_ai_unsaved(user_id, site_id, prompt, answers, run_id, state, tracked_id, next_at) VALUES($1,$2,$3,NULL,$4,'opened',$5, now())", [t.user_id, t.site_id, t.prompt, runId, t.id]);
+}
+/** The last thing before the ask leaves: from here on the outcome is unknown until answers are parked. If this cannot be written, nothing is sent. */
+async function markDispatching(runId: string): Promise<void> {
+  const { rowCount } = await pool.query("UPDATE seo_ai_unsaved SET state='asking' WHERE run_id=$1 AND state='opened'", [runId]);
+  if (!rowCount) throw new Error(`AI run ${runId} is no longer open`);
 }
 /** The ask certainly bought nothing (refused before it was sent, or the source said no): the run is closed, and the question may be asked again when its lease runs out. */
-const closeRun = (runId: string) => pool.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1 AND state='asking'", [runId]);
+const closeRun = (runId: string) => pool.query("DELETE FROM seo_ai_unsaved WHERE run_id=$1 AND state IN ('opened','asking')", [runId]);
 /** An error after which we cannot say whether the source did the work (and billed it). Such a run is NOT closed. */
 const outcomeUnknown = (e: any) => e?.costUnknown === true || e?.code === "timeout" || e?.code === "upstream" || e?.parked === false;
+// (A connection that failed before the request left looks the same as one that failed after: it is treated as unknown.)
 /** After a paid ask, in one step: the month moves on and the answers go on the waiting list. */
 async function parkPaidAnswers(t: Tracked, answers: unknown, costUsd: number, runId: string): Promise<void> {
   const client = await pool.connect();
@@ -73,6 +79,9 @@ export async function runDueAiChecks(): Promise<number> {
       // An earlier ask for this question was started and its outcome is unknown (the process stopped mid-ask, the source
       // timed out, or the answers could not be put away): it may have been paid for. It is not bought again on our own —
       // in ONE statement the unfinished run is cleared and the month moves on, and the loss is recorded for a person to see.
+      // A run that was opened but never sent (the process stopped before the ask left, or the budget refused it and the
+      // row could not be cleared) bought nothing: it is cleared and the question is simply asked now.
+      await pool.query("DELETE FROM seo_ai_unsaved WHERE tracked_id=$1 AND state='opened'", [t.id]);
       const { rows: unsure } = await pool.query(
         `WITH gone AS (DELETE FROM seo_ai_unsaved WHERE tracked_id=$1 AND state='asking' RETURNING run_id, created_at),
               moved AS (UPDATE seo_ai_tracked SET next_at = now() + interval '30 days' WHERE id=$1 AND EXISTS (SELECT 1 FROM gone) RETURNING id)
@@ -91,6 +100,8 @@ export async function runDueAiChecks(): Promise<number> {
       let out;
       try {
         out = await withBudget(t.user_id, askEstimateUsd(engines), async () => {
+          // The money is reserved (withBudget did that before calling us); only now is the run marked as on its way.
+          await markDispatching(runId);
           const r = await askAi(t.prompt, engines, { domain: site.domain, businessName: site.business_name });
           // Put away BEFORE it is charged: the month moves on and the answers go on the waiting list in one step. If that
           // cannot be done, this throws — the customer pays nothing for answers we could not keep, and the run stays

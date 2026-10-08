@@ -41,7 +41,9 @@ function whereIs(p: Point, size: number, spacing: number): string {
 }
 /** The same listing in the same place? Only then is one scan comparable with another. */
 const sameCenter = (a: Center | null | undefined, b: Center | null | undefined) =>
-  !!a && !!b && Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lng - b.lng) < 1e-4 && (a.cid ?? null) === (b.cid ?? null);
+  !!a && !!b && Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lng - b.lng) < 1e-4 && (a.cid ?? null) === (b.cid ?? null)
+  // Without Google's id on either side, the same name in the same place is the least that makes it the same listing.
+  && ((a.cid ?? null) !== null || a.name === b.name);
 
 export default function SeoLocalGridPage() {
   const status = useSeoStatus();
@@ -67,7 +69,8 @@ export default function SeoLocalGridPage() {
   useEffect(() => { setFound(null); setChanging(false); setOpenId(null); setActiveId(null); setCell(null); setKeyword(""); setQuery(""); }, [site?.id]);
   useEffect(() => { if (q.data && !query) setQuery(q.data.suggestion); }, [q.data]); // eslint-disable-line react-hooks/exhaustive-deps
   // A scan left running (this page was closed, or it was started elsewhere) is picked up again.
-  useEffect(() => { if (q.data?.running && activeId == null) setActiveId(q.data.running.id); }, [q.data?.running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Whatever the server says is running is what is watched — also one started in another tab after this page's own had finished.
+  useEffect(() => { if (q.data?.running && q.data.running.id !== activeId) setActiveId(q.data.running.id); }, [q.data?.running?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const prices = status.data?.prices as (Record<string, number | undefined> | undefined);
   const holds = status.data?.holds as (Record<string, number | undefined> | undefined);
@@ -101,10 +104,13 @@ export default function SeoLocalGridPage() {
   // The running scan is watched on its own, so opening an older scan from the history does not stop the watching.
   const active = useQuery<State>({
     queryKey: [`${key}/${activeId}`], enabled: !!site && activeId != null,
-    refetchInterval: (query) => (query.state.data?.status === "running" ? 3000 : false),
+    // Keep asking until there is a final answer — also when an attempt failed and there is no answer at all yet.
+    refetchInterval: (query) => (!query.state.data || query.state.data.status === "running" ? 3000 : false),
   });
-  const opened = useQuery<State>({ queryKey: [`${key}/${openId}`], enabled: !!site && openId != null && openId !== activeId });
+  const opened = useQuery<State>({ queryKey: [`${key}/${openId}`], enabled: !!site && openId != null && openId !== activeId, refetchInterval: (query) => (query.state.data?.status === "running" ? 3000 : false) });
   const view = openId != null && openId === activeId ? active : opened;
+  // The watching itself failing is said on its own line, whatever scan happens to be open.
+  const watchingFailed = activeId != null && active.isError && !active.data;
   const isRunning = active.data?.status === "running" || scan.isPending;
   const shown: Scan | null = openId != null && view.data?.status === "done" ? view.data.scan : null;
   // When the running scan ends, the history and what is left of the SEO data are both out of date.
@@ -113,6 +119,8 @@ export default function SeoLocalGridPage() {
     if (ended == null) return;
     void qc.invalidateQueries({ queryKey: [key] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
     if (openId !== ended) toast({ title: active.data?.status === "done" ? "The scan has finished" : "The scan didn't finish", description: "It is in the list of scans below." });
+    // Nothing is being watched any more; the next running scan (from here or another tab) is picked up from the server.
+    setActiveId(null);
   }, [ended]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const watch = useMutation({
@@ -200,7 +208,7 @@ export default function SeoLocalGridPage() {
                 </Button>
               </form>
               <p className="g-text-2 mt-2 text-[13px]" data-testid="text-grid-cost">
-                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one Google search made from that spot{scanPrice != null ? `, about ${money(scanPrice)} of your SEO data in all` : ""}; a point that returns nothing is not charged.
+                {size} × {size} points, {miles(spacing)} apart, covers a square {miles((size - 1) * spacing)} across. Each point is one Google search made from that spot{scanPrice != null ? `, about ${money(scanPrice)} of your SEO data in all` : ""}; a search that fails is not charged (one that works but finds no businesses is).
                 {scanHold != null && scanPrice != null && scanHold > scanPrice ? ` Up to ${money(scanHold)} is set aside while it runs; what isn't used comes straight back.` : ""} A scan is kept in the history below; running it again is a new scan.
                 {!can(scanHold) && <span style={{ color: "var(--g-red)" }}> Not enough SEO data left — add credit above.</span>}
               </p>
@@ -208,6 +216,7 @@ export default function SeoLocalGridPage() {
           )}
 
           {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Searching Google from each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
+          {watchingFailed && <p className="mb-3 text-[13px]" role="alert" style={{ color: "var(--g-red)" }} data-testid="grid-watch-error">Couldn't check on the running scan just now ({apiErrorMessage(active.error)}). Still trying; the scan itself is not affected.</p>}
           {openId != null && !shown && view.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
           {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}
           {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{view.data.error}</p></div>}
@@ -232,7 +241,7 @@ export default function SeoLocalGridPage() {
                   </p>
                 );
               })()}
-              {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At {unsure} point{unsure === 1 ? "" : "s"} Google's result carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
+              {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At {unsure} point{unsure === 1 ? "" : "s"} either Google's result or your pinned listing carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
               <div className="grid gap-5 lg:grid-cols-[auto,1fr]">
                 <div>
                   <div className="g-text-2 mb-1 text-center text-[11px]">North</div>

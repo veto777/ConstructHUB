@@ -83,6 +83,9 @@ describe("local grid", () => {
     expect(scan.center.cid).toBe(pin.cid);
     expect(summarise([])).toEqual({ points: 0, checked: 0, found: 0, top3: 0, avgRank: null, unsure: 0 });
     // Recognised without Google's id: counted, so the page can say so.
+    // The pinned id wins wherever it is in the list, even after an earlier website match (another branch of the same business).
+    const branch = buildScan({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com" }, cells.slice(0, 1), [[L("Alpine North", 1, { domain: "alpineexteriorswa.com" }), L("B", 2, { cid: "5" }), L("Alpine Exteriors", 3, { cid: pin.cid })]]);
+    expect([branch.points[0].rank, branch.points[0].by, branch.summary.unsure]).toEqual([3, "id", 0]);
     const loose = buildScan({ keyword: "siding", size: 3, spacing: 1, pin, domain: "alpineexteriorswa.com" }, cells.slice(0, 1), [[L("Someone", 1, { cid: "5" }), L("Alpine", 2, { domain: "alpineexteriorswa.com" })]]);
     expect([loose.points[0].rank, loose.points[0].by, loose.summary.unsure]).toEqual([2, "website", 1]);
   });
@@ -116,7 +119,8 @@ describe("local grid", () => {
       expect(out.customerUsd).toBeCloseTo(8 * GRID_POINT_USD, 6);
       // Ours: the 8 that returned plus an allowance for the 4 tries whose cost we never learned.
       expect(out.costUsd).toBeCloseTo(12 * GRID_POINT_USD, 6);
-      expect(out.costUnknown).toBe(true);
+      // The allowance for what we never learned is already in the figure, so the ledger is told the cost is known and keeps it as it is.
+      expect(out.costUnknown).toBe(false);
       expect(out.customerUsd).toBeLessThanOrEqual(gridEstimateUsd(9));
     } finally { gridDeps.request = real; }
   });
